@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.72 2005/03/15 19:52:24 gshi Exp $ */
+/* $Id: lrmd.c,v 1.73 2005/03/16 02:13:27 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -211,8 +211,6 @@ const char* lrm_system_name 	= "lrmd";
 GHashTable * RAExecFuncs 	= NULL;
 GList* ra_class_list		= NULL;
 gboolean shutdown_in_progress	= FALSE;
-extern int use_logging_daemon;
-extern int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 /*
  * Daemon functions
  *
@@ -235,8 +233,6 @@ main(int argc, char ** argv)
 	
 	int argerr = 0;
 	int flag;
-
-        const char *test = "Testing log daemon connection";
 
 	while ((flag = getopt(argc, argv, OPTARGS)) != EOF) {
 		switch(flag) {
@@ -274,13 +270,12 @@ main(int argc, char ** argv)
 	cl_log_enable_stderr(debug_level?TRUE:FALSE);
 	cl_log_set_facility(LOG_DAEMON);
 
-        cl_log_set_uselogd(FALSE);
-        if(HA_FAIL == LogToLoggingDaemon(LOG_INFO, test, strlen(test), TRUE)) {
-                lrmd_log(LOG_WARNING, "Not using log daemon");
-
-        } else {
+        if(cl_log_test_logd()) {
                 cl_log_set_uselogd(TRUE);
                 lrmd_log(LOG_INFO, "Enabled log daemon");
+        } else {
+                cl_log_set_uselogd(FALSE);
+                lrmd_log(LOG_WARNING, "Not using log daemon");
         }
 
 	if (req_status){
@@ -1819,7 +1814,7 @@ perform_ra_op(lrmd_op_t* op)
 				lrmd_log(LOG_ERR,"perform_ra_op: can not find timeout");
 			}
 			/*should we use logging daemon or not in script*/
-			setenv(HALOGD, use_logging_daemon?"yes":"no",1);
+			setenv(HALOGD, cl_log_get_uselogd()?"yes":"no",1);
 
 			/* Name of the resource and some others also
 			 * need to be passed in. Maybe pass through the
@@ -2164,6 +2159,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.73  2005/03/16 02:13:27  zhenh
+ * replace 'extern XXX' with new log functions, thx gshi
+ *
  * Revision 1.72  2005/03/15 19:52:24  gshi
  * changed cl_log_send_to_logging_daemon() to cl_log_set_uselogd()
  * added cl_log_get_uselogd()
