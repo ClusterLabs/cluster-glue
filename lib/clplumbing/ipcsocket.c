@@ -62,10 +62,15 @@ struct SOCKET_CH_PRIVATE{
   char path_name[UNIX_PATH_MAX];
   /* the domain socket. */
   int s;
+  /* the size of expecting data for below buffered message buf_msg */
+  int remaining_data;
   /* the buf used to save unfinished message */
-  char *msg_buf;
+  struct IPC_MESSAGE *buf_msg;
 };
 
+struct SOCKET_MSG_HEAD{
+  int msg_len;
+};
 /* unix domain socket implementations of IPC functions. */
 
 static void socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn);
@@ -289,6 +294,7 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
   result = ch->ops->resume_io(ch);
   
   if (result != IPC_OK) {
+    *message = NULL;
     return result;
   }else{
     if (ch->recv_queue->current_qlen != 0) {
@@ -317,7 +323,7 @@ socket_is_message_pending(struct IPC_CHANNEL * ch)
   int	len;
   struct SOCKET_CH_PRIVATE * conn_info = ch->ch_private;
 
-  if (ch->recv_queue->current_qlen > 0) {
+  if (ch->recv_queue->current_qlen > 0 || conn_info->buf_msg != NULL) {
     return TRUE;
   }
 
@@ -493,6 +499,9 @@ socket_resume_io(struct IPC_CHANNEL *ch)
   struct IPC_MESSAGE *msg;
   struct SOCKET_CH_PRIVATE* conn_info;
   GList *element;
+  struct SOCKET_MSG_HEAD head;
+  char *msg_begin;
+  gboolean new_msg = FALSE;
 
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
   
@@ -502,15 +511,26 @@ socket_resume_io(struct IPC_CHANNEL *ch)
       perror("ioctl");
       return IPC_FAIL;
     }
+
     if(len > 0){
-      msg = socket_message_new(ch, len + 1);
+      if(conn_info->remaining_data != 0){
+	new_msg = FALSE;
+	len = conn_info->remaining_data;
+	msg = conn_info->buf_msg;
+	msg_begin = (char *) msg->msg_body + (msg->msg_len - len); 
+      }else{
+	new_msg = TRUE;
+      }
     }else{
       break;
     }
 
-    msg_len = recv(conn_info->s, msg->msg_body, len , MSG_DONTWAIT);  
+    if(new_msg){
+      msg_len = recv(conn_info->s, (char *)&head , sizeof(struct SOCKET_MSG_HEAD) , MSG_DONTWAIT);
+    }else{
+      msg_len = recv(conn_info->s, msg_begin, len , MSG_DONTWAIT);
+    }
     if (msg_len < 0){
-      socket_free_message(msg);
       if(errno == EAGAIN) {
 	break;
       }else if( errno == ECONNREFUSED){
@@ -523,14 +543,29 @@ socket_resume_io(struct IPC_CHANNEL *ch)
     }
 
     if (msg_len > 0) {
-      msg->msg_done = socket_free_message;
-      msg->msg_ch = ch;
-      msg->msg_len = msg_len;
-      ch->recv_queue->queue = g_list_append(ch->recv_queue->queue, msg);
-      ch->recv_queue->current_qlen++;
-      msg = NULL;
+      if(new_msg){
+	msg = socket_message_new(ch, head.msg_len + 1);
+	msg->msg_done = socket_free_message;
+	msg->msg_ch = ch;
+	msg->msg_len = head.msg_len;
+	conn_info->buf_msg = msg;
+	conn_info->remaining_data = head.msg_len;
+	msg = NULL;
+      }else{
+	if(msg_len == conn_info->remaining_data){
+	  ch->recv_queue->queue = g_list_append(ch->recv_queue->queue, conn_info->buf_msg);
+	  ch->recv_queue->current_qlen++;
+	  conn_info->buf_msg = NULL;
+	  conn_info->remaining_data = 0;
+	}else if(msg_len < conn_info->remaining_data){
+	  conn_info->remaining_data = conn_info->remaining_data - msg_len;
+	}else{
+	  /* Wrong! */
+	  printf(" received more data than expected\n");
+	  return IPC_FAIL;
+	}
+      }
     }else{
-      socket_free_message(msg);
       break;
     }
   }
@@ -541,7 +576,20 @@ socket_resume_io(struct IPC_CHANNEL *ch)
     element = g_list_first(ch->send_queue->queue);
     if (element != NULL) {
       msg = (struct IPC_MESSAGE *) (element->data);
-      len=send(conn_info->s, msg->msg_body, msg->msg_len, MSG_DONTWAIT);
+      head.msg_len = msg->msg_len;
+      len=send(conn_info->s, (char *)&head, sizeof(struct SOCKET_MSG_HEAD), MSG_DONTWAIT);
+      if (len < 0){
+	if(errno == EAGAIN) {
+	  break;
+	}else if(errno == EPIPE){
+	  ch->ch_status = IPC_DISCONNECT;
+	  return IPC_BROKEN;
+	}else{
+	  ch->ch_status = IPC_DISCONNECT;
+	  return IPC_FAIL;	  
+	}
+      }
+      len=send(conn_info->s, msg->msg_body, msg->msg_len, MSG_DONTWAIT&MSG_OOB);
       if (len < 0){
 	if(errno == EAGAIN) {
 	  break;
@@ -809,7 +857,8 @@ socket_client_channel_new(GHashTable *ch_attrs) {
 
 
   conn_info->s = sockfd;
-
+  conn_info->remaining_data = 0;
+  conn_info->buf_msg = NULL;
   
   strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
   temp_ch->ch_status = IPC_DISCONNECT;
@@ -834,6 +883,8 @@ socket_server_channel_new(int sockfd){
 
 
   conn_info->s = sockfd;
+  conn_info->remaining_data = 0;
+  conn_info->buf_msg = NULL;
 
   temp_ch->ch_status = IPC_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
