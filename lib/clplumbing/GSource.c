@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include <portability.h>
 #include <clplumbing/GSource.h>
 
