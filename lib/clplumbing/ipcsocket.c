@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.89 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: ipcsocket.c,v 1.90 2004/03/08 21:11:09 alan Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -175,7 +175,7 @@ static int socket_waitin(struct IPC_CHANNEL * ch);
 
 static int socket_waitout(struct IPC_CHANNEL * ch);
 
-static int socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started);
+static int socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started, gboolean read1anyway);
 
 /* socket object of the function table */
 static struct IPC_OPS socket_ops = {
@@ -586,7 +586,7 @@ socket_check_disc_pending(struct IPC_CHANNEL* ch)
 	}
 	if (sockpoll.revents & POLLIN) {
 		int dummy;
-		socket_resume_io_read(ch, &dummy);
+		socket_resume_io_read(ch, &dummy, FALSE);
 	}
 	return IPC_OK;
 
@@ -653,7 +653,11 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 {
 	GList *element;
 
-	int	result = ch->ops->resume_io(ch);
+	gboolean	started;
+	int		result;
+
+	(void)socket_resume_io(ch);
+	result = socket_resume_io_read(ch, &started, TRUE);
 
 	*message = NULL;
 
@@ -834,21 +838,24 @@ socket_assert_auth(struct IPC_CHANNEL *ch, GHashTable *auth)
 
 
 static int
-socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
+socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started, gboolean read1anyway)
 {
 	struct SOCKET_CH_PRIVATE*	conn_info;
 	int				retcode = IPC_OK;
 	struct pollfd			sockpoll;
 	int				debug_loopcount = 0;
 	int				debug_bytecount = 0;
+	int				maxqlen = ch->recv_queue->max_qlen;
 
 	CHANAUDIT(ch);
 	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 	*started = FALSE;
 
  
-  	while (ch->recv_queue->current_qlen < ch->recv_queue->max_qlen
-	&&	retcode == IPC_OK) {
+	if (maxqlen <= 0 && read1anyway) {
+		maxqlen = 1;
+	}
+  	while (ch->recv_queue->current_qlen < maxqlen && retcode == IPC_OK) {
 
 		gboolean			new_msg;
 		void *				msg_begin;
@@ -1171,7 +1178,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	}
 
 	do {
-		rc1 = socket_resume_io_read(ch, &rstarted);
+		rc1 = socket_resume_io_read(ch, &rstarted, FALSE);
 		CHANAUDIT(ch);
 		if (ch->ch_status == IPC_DISC_PENDING) {
 			rc2 = IPC_OK;
