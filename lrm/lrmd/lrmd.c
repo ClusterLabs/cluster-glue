@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.73 2005/03/16 02:13:27 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.74 2005/03/18 12:18:25 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1905,13 +1905,19 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		lrmd_log(LOG_ERR,"on_ra_proc_finished: can not find RAExec");
 		return;
 	}
+
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
-	rc = RAExec->map_ra_retvalue(exitcode, op_type);
+	data = NULL;
+	read_pipe(op->output_fd, &data);
+	rc = RAExec->map_ra_retvalue(exitcode, op_type, data);
 	if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
 		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS,
 							LRM_OP_ERROR)) {
 			lrmd_log(LOG_ERR,
 			"on_ra_proc_finished: can not add opstatus to msg");
+			if (data!=NULL) {
+				g_free(data);
+			}
 			return ;
 		}
 	}
@@ -1920,17 +1926,21 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 								LRM_OP_DONE)) {
 			lrmd_log(LOG_ERR,
 			"on_ra_proc_finished: can not add opstatus to msg");
+			if (data!=NULL) {
+				g_free(data);
+			}
 			return ;
 		}
 		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_RC, rc)) {
 			lrmd_log(LOG_ERR,
 				"on_ra_proc_finished: can not add rc to msg");
+			if (data!=NULL) {
+				g_free(data);
+			}
 			return ;
 		}
 	}
 
-	data = NULL;
-	read_pipe(op->output_fd, &data);
 	if (NULL != data) {
 		if (NULL != cl_get_string(op->msg, F_LRM_DATA)) {
 			cl_msg_remove(op->msg, F_LRM_DATA);
@@ -2159,6 +2169,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.74  2005/03/18 12:18:25  sunjd
+ * changes for returning correct RC for heartbeat RA by check its string output to stdout
+ *
  * Revision 1.73  2005/03/16 02:13:27  zhenh
  * replace 'extern XXX' with new log functions, thx gshi
  *

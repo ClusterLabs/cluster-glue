@@ -93,12 +93,16 @@ struct RAExecOps {
 	 *
 	 * Parameters:
 	 *	ret_execra: the RA type specific ret value. 
+	 *	op_type:    the operation type
+	 *	std_output: the output which the RA write to stdout.
 	 *	
 	 * Return Value:
 	 *	A uniform value without regarding RA type.
 	 */
-	uniform_ret_execra_t (*map_ra_retvalue)(int ret_execra,
-				const char * op_type);
+	uniform_ret_execra_t (*map_ra_retvalue)(
+				  int ret_execra
+				, const char * op_type
+				, const char * std_output);
 
 	/*
 	 * Description:
