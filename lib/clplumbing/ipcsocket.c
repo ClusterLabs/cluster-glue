@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.101 2004/11/08 20:48:36 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.102 2004/11/12 18:33:17 lars Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1542,6 +1542,12 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   }
 #endif
 
+  if (fcntl(sockfd, F_SETFL, O_NONBLOCK) < 0) {
+    cl_perror("socket_client_channel_new: cannot set O_NONBLOCK");
+    close(sockfd);
+    return NULL;
+  }
+
   conn_info->s = sockfd;
   conn_info->remaining_data = 0;
   conn_info->buf_msg = NULL;
@@ -1568,6 +1574,11 @@ socket_server_channel_new(int sockfd){
   
   temp_ch = g_new(struct IPC_CHANNEL, 1);
   conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
+
+  if (fcntl(sockfd, F_SETFL, O_NONBLOCK) < 0) {
+    cl_perror("socket_server_channel_new: cannot set O_NONBLOCK");
+    return NULL;
+  }
 
   conn_info->s = sockfd;
   conn_info->remaining_data = 0;
