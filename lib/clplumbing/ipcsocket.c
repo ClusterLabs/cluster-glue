@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.106 2004/12/01 02:31:51 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.107 2004/12/01 22:04:42 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -206,6 +206,8 @@ static int socket_waitin(struct IPC_CHANNEL * ch);
 static int socket_waitout(struct IPC_CHANNEL * ch);
 
 static int socket_resume_io_read(struct IPC_CHANNEL *ch, int*, gboolean read1anyway);
+static IPC_Message* socket_new_ipcmsg(IPC_Channel* ch, const void* data, int len, void* private);
+
 
 /* socket object of the function table */
 static struct IPC_OPS socket_ops = {
@@ -224,6 +226,7 @@ static struct IPC_OPS socket_ops = {
   socket_get_recv_fd,
   socket_set_send_qlen,
   socket_set_recv_qlen,
+  socket_new_ipcmsg,
 };
 
 
@@ -1270,6 +1273,84 @@ socket_set_recv_qlen (struct IPC_CHANNEL* ch, int q_len)
   ch->recv_queue->max_qlen = q_len;
   return IPC_OK;
 }
+
+
+static void
+socket_del_ipcmsg(IPC_Message* m)
+{
+	if (m == NULL){
+		cl_log(LOG_ERR, "socket_del_ipcmsg:"
+		       "msg is NULL");
+		return;
+	}
+	
+	if (m->msg_body){
+		memset(m->msg_body, 0, m->msg_len);
+	}
+	if (m->msg_buf){
+		g_free(m->msg_buf);
+	}
+	
+	memset(m, 0, sizeof(*m));
+	g_free(m);
+	
+	return;
+}
+
+
+static IPC_Message*
+socket_new_ipcmsg(IPC_Channel* ch, const void* data, int len, void* private)
+{
+	IPC_Message*	hdr;
+	char*	copy = NULL;
+	char*	buf;
+	char*	body;
+
+	if (ch == NULL){
+		cl_log(LOG_ERR, "socket_new_ipcmsg:"
+		       " invalid parameter");
+		return NULL;
+	}
+	
+	if (ch->msgpad > MAX_MSGPAD){
+		cl_log(LOG_ERR, "socket_new_ipcmsg: too many pads "
+		       "something is wrong");
+		return NULL;
+	}
+
+	
+	if ((hdr = (IPC_Message*)g_malloc(sizeof(*hdr)))  == NULL) {
+		return NULL;
+	}
+	
+	memset(hdr, 0, sizeof(*hdr));
+	
+	if (len >= 0){
+		if ((copy = (char*)g_malloc(ch->msgpad + len)) == NULL) {
+			g_free(hdr);
+			return NULL;
+		}
+		
+		if (data){
+			memcpy(copy + ch->msgpad, data, len);
+		}
+		
+		buf = copy;
+		body = copy + ch->msgpad;;
+	}else {
+		len = 0;
+		buf = body = NULL;
+	}
+	hdr->msg_len = len;
+	hdr->msg_buf = buf;
+	hdr->msg_body = body;
+	hdr->msg_ch = ch;
+	hdr->msg_done = socket_del_ipcmsg;
+	hdr->msg_private = private;
+	
+	return hdr;
+}
+
 
 /* socket object of the function table */
 static struct IPC_WAIT_OPS socket_wait_ops = {

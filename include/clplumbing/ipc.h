@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.33 2004/12/01 02:31:51 gshi Exp $ */
+/* $Id: ipc.h,v 1.34 2004/12/01 22:04:42 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -489,6 +489,24 @@ struct IPC_OPS{
  *
  */
 	int  (* set_recv_qlen) (IPC_Channel * ch, int q_len);
+	
+/*
+ * IPC_OPS::new_ipcmsg
+ * ch	(IN) : the pointer to the channel
+ * data (IN) : data to be copied to the message body
+ * len	(IN) : data len
+ * private (IN): the pointer value to set as in the message
+ *
+ * Return values:
+ *	the pointer to a new created message will be
+ *	returned if success or NULL if failure
+ *
+ */
+	
+	IPC_Message*	(*new_ipcmsg)(IPC_Channel* ch, const void* data, 
+				      int len, void* private);
+	
+	
 };
 
 
