@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.38 2005/03/14 16:31:20 gshi Exp $ */
+/* $Id: cl_log.c,v 1.39 2005/03/14 22:56:19 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -210,6 +210,8 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 		} else {
 			fprintf(stderr, "Cannot open %s: %s\n",
 				debugfile_name, strerror(errno));
+			syslog(LOG_ERR, "Cannot open %s: %s\n",
+				debugfile_name, strerror(errno));
 		}
 	}
 	
@@ -233,6 +235,8 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 				fclose(fp);
 		} else {
 			fprintf(stderr, "Cannot open %s: %s\n",
+				logfile_name, strerror(errno));
+			syslog(LOG_ERR, "Cannot open %s: %s\n",
 				logfile_name, strerror(errno));
 		}
 	}
