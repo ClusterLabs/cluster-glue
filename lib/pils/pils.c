@@ -35,6 +35,9 @@ static PIL_rc InterfaceManager_plugin_init(PILPluginUniv* univ);
 static char** PILPluginTypeListPlugins(PILPluginType* pitype, int* picount);
 static PILInterface* FindIF(PILPluginUniv* universe, const char *iftype
 ,	const char * ifname);
+static PIL_rc PluginExists(const char * PluginPath);
+static char * PILPluginPath(PILPluginUniv* universe, const char * plugintype
+,	const char *	pluginname);
 
 
 void	DelPILPluginUniv(PILPluginUniv*);
@@ -1208,6 +1211,59 @@ PIL_strerror(PIL_rc rc)
 	return PIL_strerrmsgs[irc];
 }
 
+static char *
+PILPluginPath(PILPluginUniv* universe, const char * plugintype
+,	const char *	pluginname)
+{
+	char * PluginPath;
+
+	PluginPath = g_strdup_printf("%s%s%s%s%s%s"
+	,	universe->rootdirectory
+	,	G_DIR_SEPARATOR_S
+	,	plugintype
+	,	G_DIR_SEPARATOR_S
+	,	pluginname
+	,	LTDL_SHLIB_EXT);
+
+	if (DEBUGPLUGIN) {
+		PILLog(PIL_DEBUG, "Plugin path for %s/%s => [%s]"
+		,	plugintype, pluginname, PluginPath);
+	}
+	return PluginPath;
+}
+
+static PIL_rc
+PluginExists(const char * PluginPath)
+{
+	/* Make sure we can read and execute the plugin file */
+	/* This test is nice, because dlopen reasons aren't return codes */
+
+	if (access(PluginPath, R_OK|X_OK) != 0) {
+		if (DEBUGPLUGIN) {
+			PILLog(PIL_DEBUG, "Plugin file %s does not exist"
+			,	PluginPath);
+		}
+		return PIL_NOPLUGIN;
+	}
+	return PIL_OK;
+}
+
+/* Return  PIL_OK if the given  plugin exists */
+PIL_rc
+PILPluginExists(PILPluginUniv* piuniv
+,               const char *    plugintype
+,               const char *    pluginname)
+{
+	PIL_rc	rc;
+	char * path = PILPluginPath(piuniv, plugintype, pluginname);
+
+	if (path == NULL) {
+		return PIL_INVAL;
+	}
+	rc = PluginExists(path);
+	DELETE(path);
+	return rc;
+}
 
 /*
  * PILLoadPlugin()	- loads a plugin into memory and calls the
@@ -1237,6 +1293,7 @@ PILLoadPlugin(PILPluginUniv* universe, const char * plugintype
 ,	const char *	pluginname
 ,	void*		plugin_user_data)
 {
+	PIL_rc	rc;
 	char * PluginPath;
 	char * PluginSym;
 	PILPluginType*	pitype;
@@ -1244,29 +1301,11 @@ PILLoadPlugin(PILPluginUniv* universe, const char * plugintype
 	lt_dlhandle	dlhand;
 	PILPluginInitFun	initfun;
 
-	PluginPath = g_strdup_printf("%s%s%s%s%s%s"
-	,	universe->rootdirectory
-	,	G_DIR_SEPARATOR_S
-	,	plugintype
-	,	G_DIR_SEPARATOR_S
-	,	pluginname
-	,	LTDL_SHLIB_EXT);
+	PluginPath = PILPluginPath(universe, plugintype, pluginname);
 
-	if (DEBUGPLUGIN) {
-		PILLog(PIL_DEBUG, "Plugin path for %s/%s => [%s]"
-		,	plugintype, pluginname, PluginPath);
-	}
-
-	/* Make sure we can read and execute the plugin file */
-	/* This test is nice, because dlopen reasons aren't return codes */
-
-	if (access(PluginPath, R_OK|X_OK) != 0) {
-		if (DEBUGPLUGIN) {
-			PILLog(PIL_DEBUG, "Plugin file %s does not exist"
-			,	PluginPath);
-		}
+	if ((rc=PluginExists(PluginPath)) != PIL_OK) {
 		DELETE(PluginPath);
-		return PIL_NOPLUGIN;
+		return rc;
 	}
 
 	if((pitype=g_hash_table_lookup(universe->PluginTypes, plugintype))
