@@ -68,7 +68,7 @@ init_pluginsys(void) {
 	}
 
 
-	//PILpisysSetDebugLevel(10);
+	/* PILpisysSetDebugLevel(10); */
 	PIsys = NewPILPluginUniv(STONITH_MODULES);
 	
 	if (PIsys) {
@@ -78,7 +78,7 @@ init_pluginsys(void) {
 			DelPILPluginUniv(PIsys);
 			PIsys = NULL;
 		}
-		//PILSetDebugLevel(PIsys, PI_IFMANAGER, "generic", 10);
+		/* PILSetDebugLevel(PIsys, PI_IFMANAGER, "generic", 10); */
 	}else{
 		fprintf(stderr, "pi univ creation failed\n");
 	}
