@@ -1342,19 +1342,19 @@ PILLoadPlugin(PILPluginUniv* universe, const char * plugintype
 	 */
 
 	dlhand = lt_dlopen(PluginPath);
-	DELETE(PluginPath);
 
 	if (!dlhand) {
-		if (DEBUGPLUGIN) {
-			PILLog(PIL_DEBUG
-			,	"lt_dlopen() failure on plugin %s/%s."
-			" Reason: [%s]"
-			,	plugintype, pluginname
-			,	lt_dlerror());
-		}
+		PILLog(PIL_WARN
+		,	"lt_dlopen() failure on plugin %s/%s [%s]."
+		" Reason: [%s]"
+		,	plugintype, pluginname
+		,	PluginPath
+		,	lt_dlerror());
+		DELETE(PluginPath);
 		DelPILPluginType(pitype);
 		return PIL_NOPLUGIN;
 	}
+	DELETE(PluginPath);
 	/* Construct the magic init function symbol name */
 	PluginSym = g_strdup_printf(PIL_FUNC_FMT
 	,	plugintype, pluginname);
@@ -1365,18 +1365,17 @@ PILLoadPlugin(PILPluginUniv* universe, const char * plugintype
 	}
 
 	initfun = lt_dlsym(dlhand, PluginSym);
-	DELETE(PluginSym);
 
 	if (initfun == NULL) {
-		if (DEBUGPLUGIN) {
-			PILLog(PIL_DEBUG
-			,	"Plugin %s/%s init function not found"
-			,	plugintype, pluginname);
-		}
+		PILLog(PIL_WARN
+		,	"Plugin %s/%s init function (%s) not found"
+		,	plugintype, pluginname, PluginSym);
+		DELETE(PluginSym);
 		lt_dlclose(dlhand); dlhand=NULL;
 		DelPILPluginType(pitype);
 		return PIL_NOPLUGIN;
 	}
+	DELETE(PluginSym);
 	/*
 	 *	Construct the new PILPlugin object
 	 */
