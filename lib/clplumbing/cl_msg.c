@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.42 2005/02/07 13:56:15 andrew Exp $ */
+/* $Id: cl_msg.c,v 1.43 2005/02/07 18:04:37 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1670,18 +1670,11 @@ wirefmt2ipcmsg(void* p, size_t len, IPC_Channel* ch)
 	ret->msg_body = (char*)ret->msg_buf + ch->msgpad;
 	memcpy(ret->msg_body, p, len);
 
-	/* FIXME: WHOA! What's this freeing of 'p' doing here?? */
-	/* APIs which free arguments implicitly are generally evil */
-	/* BEAM brought this to my attention (ALR) */
 	cl_free(p);
 
 	ret->msg_done = ipcmsg_done;
 	ret->msg_private = NULL;
 	ret->msg_ch = ch;
-	/* FIXME: Why are we setting msg_body to 'p'? */
-	/* we just set it above.  And, to top it all, p was freed. */
-	/* BEAM brought this to my attention (ALR) */
-	ret->msg_body = p;
 	ret->msg_len = len;
 
 	return ret;
@@ -2098,6 +2091,12 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.43  2005/02/07 18:04:37  gshi
+ * Serious bug fix.
+ *
+ * p should not be assigned to msg_body since msg_body is already assigned
+ * and p is freed.
+ *
  * Revision 1.42  2005/02/07 13:56:15  andrew
  * Back out some test code
  *
