@@ -45,14 +45,14 @@ extern const char *	FT_strings[];
 static int (*authmethod)(int authmethod
 ,	const void * data
 ,	size_t datalen
-,	const char * authstr
+,	char * authstr
 ,	size_t authlen) = NULL;
 
 void
 cl_set_authentication_computation_method(int (*method)(int authmethod
 ,	const void * data
 ,	size_t datalen
-,	const char * authstr
+,	char * authstr
 ,	size_t authlen))
 {
 	authmethod = method;
@@ -396,10 +396,9 @@ is_auth_netstring(const char * datap, size_t datalen,
 		  const char * authstring, size_t authlen)
 {
 
-	char	authstr[MAXLINE];
+	char	authstr[MAXLINE];	/* A copy of authstring */
 	int	authwhich;
 	char	authtoken[MAXLINE];
-	char	authbuf[MAXLINE];
 
 
 	strncpy(authstr, authstring, MAXLINE);
@@ -410,18 +409,20 @@ is_auth_netstring(const char * datap, size_t datalen,
 	}
 
 
-	if (authmethod(authwhich, datap, datalen, authstr, authlen) != authwhich) {
+	if (authmethod(authwhich, datap, datalen, authstr, authlen)
+	!=	authwhich) {
+
 		cl_log(LOG_WARNING
 		,	"Invalid authentication [%d] in message!"
 		,	authwhich);
 		return(0);
 	}
 
-	if (strcmp(authtoken, authbuf) == 0) {
+	if (strcmp(authtoken, authstr) == 0) {
 		return(1);
 	}
 
-	cl_log(LOG_ERR,"authtoken does not match, authtoken=%s, authbuf=%s"
-	,	authtoken, authbuf);
+	cl_log(LOG_ERR,"authtoken does not match, authtoken=%s, authstr=%s"
+	,	authtoken, authstr);
 	return(0);
 }

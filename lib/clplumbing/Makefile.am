@@ -36,8 +36,11 @@ libplumb_la_SOURCES	= 		\
 			base64.c	\
 			ipcsocket.c	\
 			cl_log.c	\
-			cl_signal.c	\
+			cl_malloc.c	\
+			cl_msg.c	\
+			cl_netstring.c	\
 			cl_poll.c	\
+			cl_signal.c	\
 			cpulimits.c	\
 			longclock.c	\
 			mkstemp_mode.c	\
@@ -45,6 +48,7 @@ libplumb_la_SOURCES	= 		\
 			proctrack.c	\
 			realtime.c	\
 			timers.c	\
+			ttylock.c	\
 			uids.c
 
 testdir = $(libdir)/@HB_PKG@
@@ -63,3 +67,7 @@ ipctransientclient_LDADD = libplumb.la $(GLIBLIB)
 
 ipctransientserver_SOURCES = ipctransientserver.c
 ipctransientserver_LDADD = libplumb.la $(GLIBLIB)
+
+#netstring_test_SOURCES	= netstring_test.c
+#netstring_test_LDADD	= libplumb.la	\
+			libhbclient.la $(gliblib)

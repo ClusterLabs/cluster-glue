@@ -1,4 +1,4 @@
-/* $Id: longclock.c,v 1.11 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: longclock.c,v 1.12 2004/03/25 08:05:23 alan Exp $ */
 /*
  * Longclock operations
  *
@@ -144,6 +144,11 @@ longclockto_ms(longclock_t t)
 		return 0UL;
 	}
 	return (unsigned long) ((t*1000UL)/Lc_Hz);
+}
+long
+longclockto_long(longclock_t t)
+{
+	return	((long)(t));
 }
 
 longclock_t
