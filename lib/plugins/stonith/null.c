@@ -1,4 +1,4 @@
-/* $Id: null.c,v 1.9 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: null.c,v 1.10 2004/03/25 11:58:22 lars Exp $ */
 /*
  * Stonith module for NULL Stonith device
  *
@@ -29,6 +29,7 @@
 #include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
+#include <glib.h>
 
 #include <stonith/stonith.h>
 
@@ -284,6 +285,7 @@ NULL_parse_config_info(struct NullDevice* nd, const char * info)
 				return S_OOPS;
 			}
 			strncpy(ret[j], start, (s-start));
+			g_strdown(ret[j]);
 		}
 	}
 	nd->hostlist = ret;

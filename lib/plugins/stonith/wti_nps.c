@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.11 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: wti_nps.c,v 1.12 2004/03/25 11:58:22 lars Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -48,12 +48,6 @@
  *    private subnet.
  */
 
-
-/*
- * Version string that is filled in by CVS
- */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.11 $"; 
-
 #include <portability.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,6 +57,7 @@ static const char *version __attribute__ ((unused)) = "$Revision: 1.11 $";
 #include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
+#include <glib.h>
 
 #include <stonith/stonith.h>
 
@@ -544,6 +539,7 @@ NPSNametoOutlet(struct WTINPS* nps, const char * name, char **outlets)
   					break;
   				}
   			}
+			g_strdown(sockname);
   			if (strcmp(name, sockname) == 0) {
   				ret = sockno;
   				sprintf(buf, "%d ", sockno);
@@ -659,6 +655,7 @@ wti_nps_hostlist(Stonith  *s)
 				syslog(LOG_ERR, "out of memory");
 				return(NULL);
 			}
+			g_strdown(nm);
 			NameList[numnames] = nm;
 			++numnames;
 			NameList[numnames] = NULL;
@@ -774,10 +771,17 @@ wti_nps_reset_req(Stonith * s, int request, const char * host)
 		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
         }else{
 	        char *outlets;
+		char *shost;
 		int noutlet;
      
+		if ((shost = STRDUP(host)) == NULL) {
+			syslog(LOG_ERR, "strdup failed in NPS_reset_host");
+			return(S_OOPS);
+		}
+		g_strdown(shost);
 		noutlet = NPSNametoOutlet(nps, host, &outlets);
-		    
+		free(shost);
+
 		if (noutlet < 1) {
 			syslog(LOG_WARNING, _("%s %s "
 			"doesn't control host [%s]."), nps->idinfo

@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.9 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: rps10.c,v 1.10 2004/03/25 11:58:22 lars Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -39,6 +39,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <glib.h>
 
 #include <stonith/stonith.h>
 
@@ -746,6 +747,7 @@ RPS_parse_config_info(struct WTI_RPS10* ctx, const char * info)
 		}
 		
 		ctx->controllers[ctx->unit_count].node = STRDUP(node);
+		g_strdown(ctx->controllers[ctx->unit_count].node);
 		ctx->controllers[ctx->unit_count].outlet_id = outlet_id;
 		ctx->unit_count++;
 
@@ -899,18 +901,30 @@ static signed char
 RPSNametoOutlet ( struct WTI_RPS10 * ctx, const char * host )
 {
 	int i=0;
+	char *shost;
 
+	if ( (shost = STRDUP(host)) == NULL) {
+		syslog(LOG_ERR, "strdup failed in RPSNametoOutlet");
+		return -1;
+	}
+	g_strdown(shost);
+		
 	/* scan the controllers[] array to see if this host is there */
 	for (i=0;i<ctx->unit_count;i++) {
 		/* return the outlet id */
 		if ( ctx->controllers[i].node 
 		    && !strcmp(host, ctx->controllers[i].node)) {
 			/* found it! */
-			return ctx->controllers[i].outlet_id;
+			break;
 		}
 	}
-
-	return -1;
+	
+	free(shost);
+	if (i == ctx->unit_count) {
+		return -1;
+	} else {
+		return ctx->controllers[i].outlet_id;
+	}
 }
 
 

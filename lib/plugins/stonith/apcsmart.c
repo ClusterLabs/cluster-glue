@@ -1,4 +1,4 @@
-/* $Id: apcsmart.c,v 1.13 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: apcsmart.c,v 1.14 2004/03/25 11:58:21 lars Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>
@@ -38,8 +38,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
-
 #include <stonith/stonith.h>
+#include <glib.h>
 
 /*
  * APCSmart (tested with 2 old 900XLI)
@@ -671,6 +671,8 @@ APC_parse_config_info(struct APCDevice *ad, const char *info )
 
   if (sscanf(info, "%s %s", devicename, hostname) == 2) {
 
+    g_strdown(hostname);
+
     if(( hl[0] = STRDUP(hostname)) == NULL ) {
       apcsmart_free_hostlist(hl);
       hl = NULL;
@@ -816,6 +818,7 @@ apcsmart_reset_req(Stonith * s, int request, const char *host)
     int rc;
     int i;
     char **hl;
+    char *shost;
     int b_found=FALSE;
 
 #ifdef APC_DEBUG
@@ -832,13 +835,24 @@ apcsmart_reset_req(Stonith * s, int request, const char *host)
         return( S_OOPS );
     }
 
+    if (host == NULL) {
+	syslog(LOG_ERR, "%s: invalid hostname argument.", __FUNCTION__);
+	return (S_INVAL);
+    }
+    shost = strdup(host);
+    if (shost == NULL) {
+	syslog(LOG_ERR, "%s: strdup failed.", __FUNCTION__);
+	return (S_INVAL);
+    }
+    g_strdown(shost);
+    
     ad = (struct APCDevice *) s->pinfo;
 
     /* look through the hostlist */
     hl = ad->hostlist;
 
     while (*hl && !b_found ) {
-      if( strcmp( *hl, host ) == 0 ) {
+      if( strcmp( *hl, shost ) == 0 ) {
         b_found = TRUE;
         break;
       } else
@@ -848,8 +862,8 @@ apcsmart_reset_req(Stonith * s, int request, const char *host)
     /* host not found in hostlist */
     if( !b_found ) {
       syslog(LOG_ERR, "%s: host '%s' not in hostlist.", __FUNCTION__, host);
-
-      return( S_BADHOST );
+      rc = S_BADHOST;
+      goto out;
     }
 
     /* enter smartmode, send reset command */
@@ -869,8 +883,10 @@ apcsmart_reset_req(Stonith * s, int request, const char *host)
 
 	for (i = 0; i < 10; i++) {
 	    if (((rc = APC_send_cmd(ad->upsfd, CMD_GET_STATUS)) == S_OK) &&
-	        ((rc = APC_recv_rsp(ad->upsfd, resp)) == S_OK))
-		return (S_OK);
+	        ((rc = APC_recv_rsp(ad->upsfd, resp)) == S_OK)) {
+		    rc = S_OK;
+		    goto out;
+	    }
 	    sleep(1);
 	}
     }
@@ -878,7 +894,10 @@ apcsmart_reset_req(Stonith * s, int request, const char *host)
     /* reset failed */
     syslog(LOG_ERR, "%s: resetting host '%s' failed.", __FUNCTION__, host);
 
-    return (S_RESETFAIL);
+    rc = S_RESETFAIL;
+out:
+    free(shost);
+    return rc;
 }
 
 /*

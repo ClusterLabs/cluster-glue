@@ -1,4 +1,4 @@
-/* $Id: baytech.c,v 1.14 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: baytech.c,v 1.15 2004/03/25 11:58:22 lars Exp $ */
 /*
  *	Stonith module for BayTech Remote Power Controllers (RPC-x devices)
  *
@@ -29,6 +29,7 @@
 #include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
+#include <glib.h>
 
 #include <stonith/stonith.h>
 #define PIL_PLUGINTYPE          STONITH_TYPE
@@ -653,6 +654,7 @@ RPCNametoOutlet(struct BayTech* bt, const char * name)
 				break;
 			}
 		}
+		g_strdown(sockname);
 		if (strcmp(name, sockname) == 0) {
 			ret = sockno;
 		}
@@ -785,6 +787,7 @@ baytech_hostlist(Stonith  *s)
 			syslog(LOG_ERR, "out of memory");
 			return(NULL);
 		}
+		g_strdown(nm);
 		NameList[numnames] = nm;
 		++numnames;
 		NameList[numnames] = NULL;

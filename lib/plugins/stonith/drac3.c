@@ -1,4 +1,4 @@
-/* $Id: drac3.c,v 1.4 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: drac3.c,v 1.5 2004/03/25 11:58:22 lars Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -33,6 +33,7 @@
 #include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
+#include <glib.h>
 
 #include <curl/curl.h>
 #include "drac3_command.h"
@@ -407,6 +408,7 @@ drac3_hostlist(Stonith * s)
 			FREE(hl);
 			hl = NULL;
 		}
+		g_strdown(hl[0]);
 	}
 
 	return(hl);
@@ -450,6 +452,7 @@ DRAC3_parse_config_info(struct DRAC3Device * drac3d, const char * info)
 							__FUNCTION__);
 					return(S_OOPS);
 			}
+			g_strdown(drac3d->host);
 			if ((drac3d->user = STRDUP(user)) == NULL) {
 					syslog(LOG_ERR, "%s: out of memory", 
 							__FUNCTION__);

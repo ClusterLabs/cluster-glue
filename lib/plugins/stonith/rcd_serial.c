@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.12 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: rcd_serial.c,v 1.13 2004/03/25 11:58:22 lars Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -47,6 +47,7 @@
 #	include <termio.h>
 #endif
 #include <sys/termios.h>
+#include <glib.h>
 
 #include <stonith/stonith.h>
 #include "stonith_signal.h"
@@ -430,6 +431,7 @@ RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
 		ret = S_OOPS;
 		goto token_error;
 	}
+	g_strdown(rcd->hostlist[0]);
 	rcd->hostcount = 1;
 
 	/* Grab the device name */
@@ -520,7 +522,8 @@ rcd_serial_reset_req(Stonith * s, int request, const char * host)
 	int sigbit;
 	struct itimerval timer;
 	const char * err;
-
+	char* shost;
+	
 	if (!ISRCD_SERIALDEV(s)) {
 		syslog(LOG_ERR, "invalid argument to %s", __FUNCTION__);
 		return(S_OOPS);
@@ -529,11 +532,18 @@ rcd_serial_reset_req(Stonith * s, int request, const char * host)
 	rcd = (struct RCD_SerialDevice *) s->pinfo;
 
 	/* check that host matches */
+	if ((shost = STRDUP(host)) == NULL) {
+		syslog(LOG_ERR, "%s: strdup failed", __FUNCTION__);
+		return(S_OOPS);
+	}
+	g_strdown(shost);
 	if (strcmp(host, rcd->hostlist[0])) {
 		syslog(LOG_ERR, "%s: host '%s' not in hostlist.",
 			__FUNCTION__, host);
+		free(shost);
 		return(S_BADHOST);
 	}
+	free(shost);
 
 	/* Set the appropriate bit for the signal */
 	sigbit = *(rcd->signal)=='r' ? TIOCM_RTS : TIOCM_DTR;

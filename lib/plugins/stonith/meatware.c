@@ -1,4 +1,4 @@
-/* $Id: meatware.c,v 1.9 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: meatware.c,v 1.10 2004/03/25 11:58:22 lars Exp $ */
 /*
  * Stonith module for Human Operator Stonith device
  *
@@ -36,6 +36,7 @@
 #include <libintl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <glib.h>
 
 #include <stonith/stonith.h>
 
@@ -291,6 +292,7 @@ Meat_parse_config_info(struct MeatDevice* nd, const char * info)
 				return S_OOPS;
 			}
 			strncpy(ret[j], start, (s-start));
+			g_strdown(ret[j]);
 		}
 	}
 	nd->hostlist = ret;
@@ -312,13 +314,20 @@ meatware_reset_req(Stonith * s, int request, const char * host)
 
 	char		line[256], meatpipe[256];
 	char		resp_addr[50], resp_mw[50], resp_result[50];
-
+	char *		shost;
+	
 	if (!ISMeatDEV(s)) {
 		syslog(LOG_ERR, "invalid argument to %s", __FUNCTION__);
 		return(S_OOPS);
 	}
+	
+	if ((shost = STRDUP(host)) == NULL) {
+		syslog(LOG_ERR, "strdup failed in %s", __FUNCTION__);
+		return(S_OOPS);
+	}
+	g_strdown(shost);
 
-	snprintf(meatpipe, 256, "%s.%s", meatpipe_pr, host);
+	snprintf(meatpipe, 256, "%s.%s", meatpipe_pr, shost);
 
 	umask(0);
 	unlink(meatpipe);
@@ -327,18 +336,20 @@ meatware_reset_req(Stonith * s, int request, const char * host)
 
 	if (rc < 0) {
 		syslog(LOG_ERR, "cannot create FIFO for Meatware_reset_host");
-		return(S_OOPS);
+		rc = S_OOPS;
+		goto out;
 	}
 
 	syslog(LOG_CRIT, "OPERATOR INTERVENTION REQUIRED to reset %s.", host);
 	syslog(LOG_CRIT, "Run \"meatclient -c %s\" AFTER power-cycling the "
-	                 "machine.", host);
+	                 "machine.", shost);
 
 	fd = open(meatpipe, O_RDONLY);
 
 	if (fd < 0) {
 		syslog(LOG_ERR, "cannot open FIFO for Meatware_reset_host");
-		return(S_OOPS);
+		rc = S_OOPS;
+		goto out;
 	}
 
 	memset(line, 0, 256);
@@ -346,7 +357,8 @@ meatware_reset_req(Stonith * s, int request, const char * host)
 
 	if (rc < 0) {
 		syslog(LOG_ERR, "read error on FIFO for Meatware_reset_host");
-		return(S_OOPS);
+		rc = S_OOPS;
+		goto out;
 	}
 
 	memset(resp_mw, 0, 50);
@@ -354,18 +366,22 @@ meatware_reset_req(Stonith * s, int request, const char * host)
 	memset(resp_addr, 0, 50);
 
 	sscanf(line, "%s %s %s", resp_mw, resp_result, resp_addr);
+	g_strdown(resp_addr);
 
 	if (strncmp(resp_mw, "meatware", 8) ||
 	    strncmp(resp_result, "reply", 5) ||
-	    strncmp(resp_addr, host, strlen(resp_addr))) {
-		syslog(LOG_ERR, "failed to Meatware-reset node %s", host);	
-		return(S_RESETFAIL);
+	    strncmp(resp_addr, shost, strlen(resp_addr))) {
+		syslog(LOG_ERR, "failed to Meatware-reset node %s", shost);
+		rc = S_RESETFAIL;
+		goto out;
 	}
 	else {
-		syslog(LOG_INFO, _("node %s Meatware-reset."), host);
+		syslog(LOG_INFO, _("node %s Meatware-reset."), shost);
 		unlink(meatpipe);
-		return(S_OK);
+		rc = S_OK;
 	}
+out:	free(shost);
+	return rc;
 }
 
 /*

@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.11 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: apcmaster.c,v 1.12 2004/03/25 11:58:21 lars Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -50,7 +50,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.11 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.12 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -61,6 +61,7 @@ static const char *version __attribute__ ((unused)) = "$Revision: 1.11 $";
 #include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
+#include <glib.h>
 
 #include <stonith/stonith.h>
 #define PIL_PLUGINTYPE          STONITH_TYPE
@@ -615,6 +616,7 @@ MSNametoOutlet(struct APCMS* ms, const char * name)
 					break;
 				}
 			}
+			g_strdown(sockname);
 			if (strcmp(name, sockname) == 0) {
 				ret = sockno;
 			}
@@ -737,6 +739,7 @@ apcmaster_hostlist(Stonith  *s)
 				syslog(LOG_ERR, "out of memory");
 				return(NULL);
 			}
+			g_strdown(nm);
 			NameList[numnames] = nm;
 			++numnames;
 			NameList[numnames] = NULL;
