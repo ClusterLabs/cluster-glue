@@ -398,6 +398,7 @@ typedef enum {
 	PIL_INFO	= 4,	/* Informative message */
 	PIL_DEBUG= 5,	/* Debug message */
 }PILLogLevel;
+typedef void (*PILLogFun)(PILLogLevel priority, const char * fmt, ...);
 
 /*
  * struct PILPluginImports_s (typedef PILPluginImports) defines
@@ -444,6 +445,14 @@ struct PILPluginImports_s {
 	void*	(*alloc)(unsigned long size);
 	void	(*mfree)(void* space);
 };
+
+/*
+ * Function for logging with the given logging function
+ * The reason why it's here is so we can get printf arg checking
+ * You can't get that when you call a function pointer directly.
+ */
+void PILCallLog(PILLogFun logfun, PILLogLevel priority, const char * fmt, ...)
+	G_GNUC_PRINTF(3,4);
 
 /*
  * EXPORTED INTERFACES...
