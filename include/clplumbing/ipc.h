@@ -44,9 +44,9 @@
 #define MAX_MESSAGE_SIZE 4096
 
 /* channel and connection status */
-#define CH_CONNECT 0
-#define CH_WAIT 1
-#define CH_DISCONNECT 2
+#define IPC_CONNECT 0
+#define IPC_WAIT 1
+#define IPC_DISCONNECT 2
 
 /* general return values */
 #define IPC_OK 0
@@ -66,7 +66,9 @@ struct OCF_IPC_WAIT_CONNECTION{
 /* channel structure.*/
 struct OCF_IPC_CHANNEL{
   /* identify the status of channel.*/
-  int ch_status;  
+  int ch_status;
+  /* far side pid */
+  pid_t farside_pid;
   /* the information used for authentication */
   struct OCF_IPC_AUTH* auth_info;
   /* the channel private data. May contain the connection information*/
@@ -203,7 +205,7 @@ struct OCF_IPC_OPS{
    * return values:
    *   IPC_OK : the message was either sent out successfully or appended in the send_queue.
    *   IPC_FAIL    : the send operation fails.
-   *   CH_BROKEN  : the channel is broken.
+   *   IPC_BROKEN  : the channel is broken.
    *
   */    
   int (* send) (struct OCF_IPC_CHANNEL* ch, struct OCF_IPC_MESSAGE* msg);
@@ -217,7 +219,7 @@ struct OCF_IPC_OPS{
    * return values:
    *   IPC_OK : reveive operation is finished successfully.
    *   IPC_FAIL    : operation fails.
-   *   CH_BROKEN  : the channel is broken.
+   *   IPC_BROKEN  : the channel is broken.
    *
    * note: 
    *   return value IPC_OK doesn't mean the message is already 
@@ -257,9 +259,9 @@ struct OCF_IPC_OPS{
    * parameters:
    *   the pointer to the channel.
    * return values:
-   *   CH_SUCCSS : resume all the possible I/O operation succefully.
+   *   IPC_OK : resume all the possible I/O operation succefully.
    *   IPC_FAIL   : the operation fails.
-   *   CH_BROEKN : the channel is broken.
+   *   IPC_BROKEN : the channel is broken.
    *
   */
   int (* resume_io) (struct OCF_IPC_CHANNEL *ch);
@@ -345,7 +347,7 @@ extern struct OCF_IPC_WAIT_CONNECTION * ipc_wait_conn_constructor(const char * c
  *   ch_attrs (IN): the hash table which contains the attributes needed by this channel.
  *                  For example, the only attribute needed by doamin socket is path name.
  * return values:
- *   the pointer to the new channel whose status is CH_DISCONNECT or NULL if the channel can't be created.
+ *   the pointer to the new channel whose status is IPC_DISCONNECT or NULL if the channel can't be created.
  * note:
  *   current implementation only support unix domain socket 
  *   whose type is IPC_DOMAIN_SOCKET 
