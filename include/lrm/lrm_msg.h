@@ -100,13 +100,6 @@
 #define MAX_PARAM_LEN 		1024
 
 
-/* temporarily add for build and test
- * will be replaced when ha_msg provide such funcs
- */
-int ha_msg_add_int(struct ha_msg * msg, const char * name, int value);
-int ha_msg_value_int(struct ha_msg * msg, const char * name, int* value);
-int ha_msg_mod_int(struct ha_msg * msg, const char * name, int value);
-
 							
 GHashTable* copy_str_table(GHashTable* hash_table);
 GHashTable* merge_str_tables(GHashTable* old, GHashTable* new);
