@@ -1,8 +1,9 @@
+#include <portability.h>
 #include <string.h>
 
+#include <clplumbing/cl_log.h>
 #include <clplumbing/GSource.h>
 
-#include <portability.h>
 
 #define	MAG_GFDSOURCE	0xfeed0001U
 #define	MAG_GCHSOURCE	0xfeed0002U
@@ -330,7 +331,7 @@ G_CH_dispatch(gpointer source_data
 	}else if (chp->outfd.revents & OUTPUT_EVENTS) {
 		chp->outfd.events &= ~OUTPUT_EVENTS;
 	}
-	/* If we got a HUP then marke channel as disconnected */
+	/* If we got a HUP then mark channel as disconnected */
 	if ((chp->infd.revents|chp->outfd.revents) & G_IO_HUP) {
 		/* CHEAT!! */
 		chp->ch->ch_status = IPC_DISCONNECT;
@@ -482,11 +483,11 @@ G_WC_dispatch(gpointer source_data
 	g_assert(IS_WCSOURCE(wcp));
        
         do {
-	  ch = wcp->wch->ops->accept_connection(wcp->wch, wcp->auth_info);
-          if (!ch) {
-		break;
-	  }
-	  ++count;
+		ch = wcp->wch->ops->accept_connection(wcp->wch, wcp->auth_info);
+		if (ch == NULL) {
+			break;
+	  	}
+		++count;
 	}while ((rc = wcp->dispatch(ch, wcp->udata)));
 	return rc;
 }
