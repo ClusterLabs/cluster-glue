@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.35 2004/12/05 04:32:50 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.36 2004/12/05 19:20:56 andrew Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -569,7 +569,7 @@ ha_msg_mod_int(struct ha_msg * msg, const char * name, int value)
 }
 
 int
-ha_msg_value_int(struct ha_msg * msg, const char * name, int* value)
+ha_msg_value_int(const struct ha_msg * msg, const char * name, int* value)
 {
 	const char* svalue = ha_msg_value(msg, name);
 	if(NULL == svalue) {
@@ -1980,6 +1980,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.36  2004/12/05 19:20:56  andrew
+ * ha_msg_value_int() calls cl_get_value() which takes a const msg and ha_msg_value_int()
+ *   doesnt modify anything so I think this is correct.  Its also helpful since
+ *   llc_msg_callback_t must take a const msg.
+ *
  * Revision 1.35  2004/12/05 04:32:50  gshi
  * Moved some message-related functions from lrm_msg.c to cl_msg.c
  * These functions are general and shall be available to other subsystems
