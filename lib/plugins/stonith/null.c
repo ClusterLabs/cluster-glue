@@ -1,4 +1,4 @@
-/* $Id: null.c,v 1.15 2004/10/06 10:55:18 lars Exp $ */
+/* $Id: null.c,v 1.16 2004/10/24 13:00:14 lge Exp $ */
 /*
  * Stonith module for NULL Stonith device
  *
@@ -49,7 +49,7 @@ static struct stonith_ops nullOps ={
 	null_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;

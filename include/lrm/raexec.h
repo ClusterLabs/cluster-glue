@@ -24,7 +24,6 @@
 #include <glib.h>
 #include <lrm/racommon.h>
 
-typedef enum UNIFORM_RET_EXECRA uniform_ret_execra_t;
 /* Uniform return value of executing RA */
 enum UNIFORM_RET_EXECRA {
 	EXECRA_EXEC_UNKNOWN_ERROR = 152,
@@ -44,6 +43,7 @@ enum UNIFORM_RET_EXECRA {
 	EXECRA_RA_DEAMON_STOPPED = 13,
 	EXECRA_STATUS_UNKNOWN = 14
 };
+typedef enum UNIFORM_RET_EXECRA uniform_ret_execra_t;
 
 const int RA_MAX_NAME_LENGTH  = 240;
 const int RA_MAX_DIRNAME_LENGTH  = 200;

@@ -1,4 +1,4 @@
-/* $Id: proctrack.h,v 1.9 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: proctrack.h,v 1.10 2004/10/24 13:00:12 lge Exp $ */
 /*
  * Process tracking object.
  *
@@ -35,7 +35,6 @@
 typedef struct _ProcTrack	ProcTrack;
 typedef struct _ProcTrack_ops	ProcTrack_ops;
 typedef struct _ProcTrackKillInfo	ProcTrackKillInfo;
-typedef enum _ProcTrackLogType	ProcTrackLogType;
 
 /*
  * The levels of logging possible for our process
@@ -43,8 +42,9 @@ typedef enum _ProcTrackLogType	ProcTrackLogType;
 enum _ProcTrackLogType {
 	PT_LOGNONE = 2,		/* Exits never automatically logged */
 	PT_LOGNORMAL,		/* Automatically log abnormal exits */
-	PT_LOGVERBOSE,		/* Automatically log every exit */
+	PT_LOGVERBOSE		/* Automatically log every exit */
 };
+typedef enum _ProcTrackLogType	ProcTrackLogType;
 
 struct _ProcTrack {
 	pid_t			pid;
