@@ -76,7 +76,7 @@ typedef enum {
 	MONITOR_SET,
 	MONITOR_GET,
 	MONITOR_CLS,
-	RSC_STATUS,
+	RSC_STATE,
 	LIST_ALLRSC,
 	INF_RSC,
 	ADD_RSC,
@@ -87,11 +87,11 @@ typedef enum {
 } lrmadmin_cmd_t;
 
 static const char * status_msg[5] = {
-	"Succeed", 		  /* LRM_OP_DONE         */
-        "Cancelled", 		  /* LRM_OP_CANCELLED    */
-        "Timeout",		  /* LRM_OP_TIMEOUT 	 */
-        "Not Supported",	  /* LRM_OP_NOTSUPPORTED */
-        "Failed Due to a Error"   /* LRM_OP_ERROR	 */
+	"succeed", 		  /* LRM_OP_DONE         */
+        "cancelled", 		  /* LRM_OP_CANCELLED    */
+        "timeout",		  /* LRM_OP_TIMEOUT 	 */
+        "not Supported",	  /* LRM_OP_NOTSUPPORTED */
+        "failed due to an error"   /* LRM_OP_ERROR	 */
 };
 
 static gboolean QUIT_GETOPT = FALSE;
@@ -109,7 +109,7 @@ const char * simple_help_screen =
 "         {-M|--monitor} -s <rscid> <operator> <timeout> <interval> "
 "[<operator_parameters_list>]\n"
 "         {-M|--monitor} {-g|-c} <rscid>\n"
-"         {-S|--status} <rscid>\n"
+"         {-S|--state} <rscid>\n"
 "         {-L|--listall}\n"
 "         {-I|--information} <rsc_id>\n"
 "         {-C|--raclass_supported}\n"
@@ -267,7 +267,7 @@ int main(int argc, char **argv)
 
 			case 'S':
 				OPTION_OBSCURE_CHECK 
-				lrmadmin_cmd = RSC_STATUS;
+				lrmadmin_cmd = RSC_STATE;
 				if (optarg) {
 					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				}
@@ -457,32 +457,20 @@ int main(int argc, char **argv)
 			ASYN_OPS = FALSE;
 			break;	
 
-		case RSC_STATUS: 
+		case RSC_STATE: 
 			lrm_rsc = get_lrm_rsc(lrmd, rscid_arg_tmp);
 			if (!(lrm_rsc)) {
 				ret_value = -3;
 			} else { 
-				state_flag_t cur_state;
+				state_flag_t cur_state = LRM_RSC_IDLE;
 				GList * ops_queue;
 				ops_queue = lrm_rsc->ops->get_cur_state(lrm_rsc, 
 								&cur_state);
+				printf("resource state:%s\n",
+					 cur_state==LRM_RSC_IDLE?
+					 "LRM_RSC_IDLE":"LRM_RSC_BUSY");
+								
 				if (!ops_queue) {
-					cl_log(LOG_ERR, "Operation queue "\
-					  "pointer is null when try to get the"\
-					  " operation status on a RA.");
-					ret_value = -3;
-				} else {
-					if (cur_state == LRM_RSC_IDLE) {
-						printf("No operation is doing"\
-						 "on the resource, and the "\
-						 "operation is the last one "\
-						 "executed on the resource.\n");
-					} else {
-						printf("The following "\
-						 "operations are those in the "\
-						 "queue, and the first one is "\
-						 "running now.\n");
-					}
 					g_list_foreach(ops_queue, g_print_ops, 
 							NULL);
 					g_list_free(ops_queue);
@@ -513,7 +501,7 @@ int main(int argc, char **argv)
 					ret_value = -3;
 					ASYN_OPS = FALSE;
 				} else { 
-					ASYN_OPS = TRUE;
+					ASYN_OPS = FALSE;
 				}
 			}
 			break;
@@ -546,11 +534,14 @@ int main(int argc, char **argv)
 			} else { 
 				lrm_mon_t mon_ops;
 				mon_ops.mode = LRM_MONITOR_CLEAR;
+				mon_ops.op_type = "status";
+				mon_ops.params = NULL;
+				
 				if (lrm_rsc->ops->set_monitor(lrm_rsc, &mon_ops)
-					== 1 ) { /* HA_OK */
-					printf("Be trying to clearing all "\
+					!= 0 ) { /* HA_OK */
+					printf("clearing all "\
 						"monitors on this resource.\n");
-					ASYN_OPS = TRUE;
+					ASYN_OPS = FALSE;
 				} else {
 					fprintf(stderr, "Failed to clear all "\
 						"monitors on this resource.\n");
@@ -569,12 +560,11 @@ int main(int argc, char **argv)
 	}
 
 	if (ASYN_OPS) {
+		printf( "waiting for calling result from the lrmd.\n");
 		lrmd->lrm_ops->set_lrm_callback(lrmd, lrm_op_done_callback, 
 			lrm_monitor_callback);
 
 		mainloop = g_main_new(FALSE);
-		cl_log(LOG_DEBUG, "%s waiting for calling result from the lrmd.",
-			 lrmadmin_name);
 
 		g_idle_add(post_query_call_result, lrmd);
 		g_main_run(mainloop);
@@ -588,23 +578,16 @@ int main(int argc, char **argv)
 static void
 lrm_op_done_callback(lrm_op_t* op)
 {
-	char * tmp;
-
 	if (!op) {
 		cl_log(LOG_ERR, "In callback function, op is NULL pointer.");
 		return;
 	}
 
-	printf("Operation result: %s\n", status_msg[op->status-LRM_OP_DONE]);
-	printf("Operation type: %s\n", op->op_type);
-	tmp = params_hashtable_to_str(op->rsc->class, op->params);
-	printf("Opration parameters: %s\n", tmp);
-	g_free(tmp);
-	printf("Meta data is as following:\n%s\n", op->data);
+	printf("operation execution result:%s\n", status_msg[op->status-LRM_OP_DONE]);
+	printf("resource agent return code:%d\n", op->rc);
+	printf("output data from resource agent:\n%s\n", op->data);
 
-	printf("\nThe corresponding resource description as below\n");
-	print_rsc_inf(op->rsc);
-	/* Don't need ? 
+	/* Don't need ?
 	 * g_free(op->rsc);  
 	 * g_free(op);
 	 */
@@ -881,16 +864,16 @@ print_rsc_inf(lrm_rsc_t * lrm_rsc)
 
 	rscid_str_tmp[RID_LEN-1] = '\0';
 	strncpy(rscid_str_tmp, lrm_rsc->id, RID_LEN-1);
-	printf("\nResource ID:                %s\n", rscid_str_tmp);
-	printf("Resource agency class:       %s\n", lrm_rsc->class);
-	printf("Resource agency type:       %s\n", lrm_rsc->type);
+	printf("\nResource ID:%s\n", rscid_str_tmp);
+	printf("Resource agency class:%s\n", lrm_rsc->class);
+	printf("Resource agency type:%s\n", lrm_rsc->type);
 
 	if (lrm_rsc->params) {
 		tmp = params_hashtable_to_str(lrm_rsc->class, 
 				lrm_rsc->params);
 	}
 
-	printf("Resource agency parameters: %s\n", tmp);
+	printf("Resource agency parameters:%s\n", tmp);
 	g_free(tmp);
 }
 
@@ -983,7 +966,7 @@ set_monitor(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 		return -1;
 	}
 
-	mon.mode = LRM_MONITOR_SET;
+	mon.mode = LRM_MONITOR_CHANGE;
 	mon.op_type = argv[optind+1];
 	mon.timeout = atoi(argv[optind+2]);
 	mon.interval = atoi(argv[optind+3]);
