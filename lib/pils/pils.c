@@ -1,4 +1,4 @@
-/* $Id: pils.c,v 1.38 2004/09/27 20:46:43 alan Exp $ */
+/* $Id: pils.c,v 1.39 2004/09/28 06:34:43 alan Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -1861,7 +1861,7 @@ so_select (const struct dirent *dire)
 		,	dire->d_name, end
 		,	sizeof(obj_end), strlen(dire->d_name)
 		,	&dire->d_name[strlen(dire->d_name)
-		-	(sizeof(obj_end)-1)]);
+		-	(STRLEN_CONST(obj_end))]);
 	}
 	
 	return 0;
