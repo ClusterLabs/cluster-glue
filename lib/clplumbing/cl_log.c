@@ -324,6 +324,7 @@ FreeChildLogIPCMessage(IPC_Message* msg)
 		return;
 	}
 	if (msg->msg_body != NULL) {
+		memset(msg->msg_body, 0, msg->msg_len);
 		cl_free(msg->msg_body);
 	}
 	memset(msg, 0, sizeof (*msg));
