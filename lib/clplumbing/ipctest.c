@@ -113,14 +113,16 @@ main(int argc, char ** argv)
 	rc += channelpair(asyn_echoclient, asyn_echoserver, 20000);
 	rc += channelpair(mainloop_client, mainloop_server, 20000);
 
+#if 0
 	/* The code is know to be broken right now, don't use it */
 	cl_log(LOG_INFO, "Note: NOT enabling poll(2) replacement code.");
-#if 0
+#else
 	cl_log(LOG_INFO, "NOTE: Enabling poll(2) replacement code.");
 	PollFunc = cl_poll;
 	g_main_set_poll_func(cl_glibpoll);
-	rc += channelpair(asyn_echoclient, asyn_echoserver, 100000);
-	rc += channelpair(mainloop_client, mainloop_server, 100000);
+	rc += channelpair(echoclient, echoserver          , 1000000);
+	rc += channelpair(asyn_echoclient, asyn_echoserver, 1000000);
+	rc += channelpair(mainloop_client, mainloop_server, 1000000);
 #endif
 	
 	cl_log(LOG_INFO, "TOTAL errors: %d", rc);
@@ -306,7 +308,7 @@ newmessage(IPC_Channel* chan, int niter)
 	return msg;
 }
 static int
-checkinput(IPC_Channel* chan, int* rdcount, int maxcount)
+checkinput(IPC_Channel* chan, const char * where, int* rdcount, int maxcount)
 {
 	IPC_Message*	rmsg = NULL;
 	int		errs = 0;
@@ -324,14 +326,14 @@ checkinput(IPC_Channel* chan, int* rdcount, int maxcount)
 		if ((rc = chan->ops->recv(chan, &rmsg)) != IPC_OK) {
 			if (chan->ch_status == IPC_DISCONNECT) {
 				cl_log(LOG_ERR
-				,	"checkinput: EOF in iter %d"
-				,	*rdcount);
+				,	"checkinput[%s]: EOF in iter %d"
+				,	where, *rdcount);
 				return errs;
 			}
 			cl_log(LOG_ERR
-			,	"checkinput: recv"
+			,	"checkinput[%s]: recv"
 			" failed: rc %d  rdcount %d errno=%d"
-			,	rc, *rdcount, errno);
+			,	where, rc, *rdcount, errno);
 			cl_perror("recv");
 			rmsg=NULL;
 			++errs;
@@ -341,22 +343,43 @@ checkinput(IPC_Channel* chan, int* rdcount, int maxcount)
 		echomsgbody(str, *rdcount, &rdlen);
 		if (rmsg->msg_len != rdlen) {
 			cl_log(LOG_ERR
-			,	"checkinput: length mismatch"
-			" [%u,%lu] iter %d"
-			,	(unsigned)rdlen
+			,	"checkinput[%s]: length mismatch"
+			" [expected %u, got %lu] iteration %d"
+			,	where, (unsigned)rdlen
 			,	(unsigned long)rmsg->msg_len
 			,	*rdcount);
+			cl_log(LOG_ERR
+			,	"checkinput[%s]: expecting [%s]"
+			,	where, str);
+			cl_log(LOG_ERR
+			,	"checkinput[%s]: got [%s] instead"
+			,	where, (const char *)rmsg->msg_body);
 			++errs;
 			continue;
 		}
 		if (strncmp(rmsg->msg_body, str, rdlen) != 0) {
 			cl_log(LOG_ERR
-			,	"checkinput: data mismatch"
+			,	"checkinput[%s]: data mismatch"
 			". input iteration %d"
-			,	*rdcount);
+			,	where, *rdcount);
+			cl_log(LOG_ERR
+			,	"checkinput[%s]: expecting [%s]"
+			,	where, str);
+			cl_log(LOG_ERR
+			,	"checkinput[%s]: got [%s] instead"
+			,	where, (const char *)rmsg->msg_body);
 			++errs;
 			continue;
+#if 1
+		}else if (strcmp(where, "s_rcv_msg") == 0
+		||	strcmp(where, "s_echo_msg") == 0) {
+			cl_log(LOG_ERR
+			,	"checkinput[%s]: data Good"
+			"! input iteration %d"
+			,	where, *rdcount);
+#endif
 		}
+
 	}
 	return errs;
 }
@@ -370,6 +393,7 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 	int		blockedcount = 0;
 	IPC_Message*	wmsg;
 	int		lastcount = -1;
+	const char*	w = "asyn_echoserver";
 
 
 
@@ -388,7 +412,7 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 			//fprintf(stderr, "s");
 			if ((rc = wchan->ops->send(wchan, wmsg)) != IPC_OK) {
 				cl_log(LOG_ERR
-				,	"asyn_echotest: send failed"
+				,	"asyn_echoserver: send failed"
 				" %d rc iter %d"
 				,	rc, wrcount);
 				++errcount;
@@ -402,7 +426,7 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 			}else{
 				blockedcount = 0;
 			}
-			errcount += checkinput(wchan, &rdcount, repcount);
+			errcount += checkinput(wchan, w, &rdcount, repcount);
 			if (wrcount < repcount
 			&&	wchan->ch_status == IPC_DISCONNECT) {
 				++errcount;
@@ -415,11 +439,11 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 			// fprintf(stderr, "B");
 		}
 		wchan->ops->waitout(wchan);
-		errcount += checkinput(wchan, &rdcount, repcount);
+		errcount += checkinput(wchan, w, &rdcount, repcount);
 		if (wrcount >= repcount && rdcount < repcount) {
 			if ((rc = wchan->ops->waitin(wchan)) != IPC_OK) {
 				cl_log(LOG_ERR
-				,	"asyn_echotest server: waitin"
+				,	"asyn_echoserver: waitin()"
 				" failed %d rc rdcount %d errno=%d"
 				,	rc, rdcount, errno);
 				cl_perror("waitin");
@@ -650,7 +674,7 @@ s_rcv_msg(IPC_Channel* chan, gpointer data)
 {
 	struct iterinfo*i = data;
 
-	i->errcount += checkinput(chan, &i->rcount, i->max);
+	i->errcount += checkinput(chan, "s_rcv_msg", &i->rcount, i->max);
 
 	if (i->sendingsuspended
 	&&	!chan->ops->is_sending_blocked(chan)) {
@@ -690,6 +714,7 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 			return TRUE;
 		}
 		i->rcount++;
+		checkinput(chan, "s_echo_msg", &i->rcount, i->max);
 
 		//fprintf(stderr, "c");
 		if ((rc = chan->ops->send(chan, rmsg)) != IPC_OK) {
