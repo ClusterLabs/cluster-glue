@@ -34,7 +34,6 @@ static	longclock_t	lc_wrapcount;
 static	unsigned 	Hz = 0;
 static	longclock_t 	Lc_Hz;
 static	double		d_Hz;
-static	longclock_t	ms_per_tick;
 
 #define	WRAPSHIFT	32
 
@@ -63,7 +62,6 @@ hz_longclock(void)
 		Hz = sysconf(_SC_CLK_TCK);
 		Lc_Hz = Hz;
 		d_Hz = (double) Hz;
-		ms_per_tick = (longclock_t)(1000UL/Hz);
 	}
 	return Hz;
 }
@@ -109,7 +107,7 @@ msto_longclock(unsigned long ms)
 	if (ms == 0) {
 		return (longclock_t)0UL;
 	}
-	result = secs * Lc_Hz + (msec/ms_per_tick);
+	result = secs * Lc_Hz + (msec * Lc_Hz)/1000;
 
 	if (result == 0) {
 		result = 1;
