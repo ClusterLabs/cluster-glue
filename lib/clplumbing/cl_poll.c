@@ -64,7 +64,6 @@
 #	include <clplumbing/longclock.h>
 #	include <clplumbing/cl_log.h>
 #endif
-#	include <linux/sysctl.h>
 
 static int	debug = 0;
 static void dump_fd_info(struct pollfd *fds, unsigned int nfds, int timeoutms);
