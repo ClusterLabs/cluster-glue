@@ -1,4 +1,4 @@
- /* $Id: cyclades.c,v 1.3 2005/03/22 20:05:30 blaschke Exp $ */
+ /* $Id: cyclades.c,v 1.4 2005/03/29 17:06:31 blaschke Exp $ */
 /*
  * Stonith module for Cyclades AlterPath PM
  * Bases off the SSH plugin
@@ -28,6 +28,8 @@
  */
 
 #define	DEVICE	"Cyclades PM"
+
+#define DOESNT_USE_STONITHSCANLINE
 
 #include "stonith_plugin_common.h"
 
@@ -106,6 +108,8 @@ struct pluginDevice {
 	char *		device;
 	char *		user;
 
+	int		serial_port;
+
 	/* pid of ssh client process and its in/out file descriptors */
 	pid_t		pid; 
 	int 		rdfd, wrfd;		
@@ -115,6 +119,8 @@ static struct Etoken StatusOutput[] = {
 	{ "Outlet\t\tName\t\tStatus\t\tUsers\t\tInterval (s)", 0, 0},
 	{ NULL, 0, 0} 
 };
+
+static struct Etoken CRNL[] =		{ {"\n\r",0,0},{"\r\n",0,0},{NULL,0,0}};
 
 
 /* Commands of PM devices */
@@ -126,6 +132,8 @@ static int CYC_robust_cmd(struct pluginDevice *, char *);
 static const char * pluginid = "CycladesDevice-Stonith";
 static const char * NOTpluginID = "Cyclades device has been destroyed";
 
+#define ST_SERIALPORT "serialport"
+
 #define NEGEXPECT(fd,p,t)	{					\
                                 if (StonithLookFor(fd, p, t) < 0)	\
                                         return(-1);			\
@@ -136,6 +144,16 @@ static const char * NOTpluginID = "Cyclades device has been destroyed";
                                 	return(errno == ETIMEDOUT	\
 	                        ?       S_RESETFAIL : S_OOPS);		\
                         }
+
+static int
+CYCScanLine(struct pluginDevice *sd, int timeout, char * buf, int max)
+{
+	if (EXPECT_TOK(sd->rdfd, CRNL, timeout, buf, max, Debug) < 0) {
+		Stonithkillcomm(&sd->rdfd, &sd->wrfd, &sd->pid);
+		return(S_OOPS);
+	}
+	return(S_OK);
+}
 
 static int
 cyclades_status(StonithPlugin  *s)
@@ -162,8 +180,8 @@ static int CYC_run_command(struct pluginDevice *sd, char *cmd)
 	char	SshCommand[256];
 
 	snprintf(SshCommand, sizeof(SshCommand),
-			"exec ssh -q %s@%s /root/pmcmd %s 2>/dev/null", 
-			sd->user, sd->device, cmd);
+			"exec ssh -q %s@%s /bin/pmCommand %d %s 2>/dev/null", 
+			sd->user, sd->device, sd->serial_port, cmd);
 
 	sd->pid = STARTPROC(SshCommand, &sd->rdfd, &sd->wrfd);
 
@@ -224,14 +242,11 @@ static int CYCNametoOutlet(struct pluginDevice *sd, const char *host)
 		memset(locked, 0, sizeof(locked));
 		memset(on, 0, sizeof(on));
 
-		err = StonithScanLine(sd->rdfd, 50, savebuf, sizeof(savebuf));
-		if (err != S_OK) {
-			Stonithkillcomm(&sd->rdfd, &sd->wrfd, &sd->pid);
-			return ret;
-		}
+		err = CYCScanLine(sd, 5, savebuf, sizeof(savebuf));
 
-		if (sscanf(savebuf,"%2d %10s %10s %3s", &outlet, 
-			name, locked, on) > 0) {
+		if ((err == S_OK) &&
+		    (sscanf(savebuf,"%2d %10s %10s %3s", &outlet, 
+			name, locked, on) > 0)) {
 			g_strdown(name);
 			if (strstr(locked, "ocked") && !strcmp(name, host)) {
 				ret = outlet;
@@ -284,14 +299,11 @@ cyclades_hostlist(StonithPlugin  *s)
 		memset(locked, 0, sizeof(locked));
 		memset(on, 0, sizeof(on));
 
-		err = StonithScanLine(sd->rdfd, 50, savebuf, sizeof(savebuf));
-		if (err != S_OK) {
-			Stonithkillcomm(&sd->rdfd, &sd->wrfd, &sd->pid);
-			return ret;
-		}
+		err = CYCScanLine(sd, 5, savebuf, sizeof(savebuf));
 
-		if (sscanf(savebuf,"%2d %10s %10s %3s", &outlet, 
-			name, locked, on) > 0) {
+		if ((err == S_OK) &&
+		    (sscanf(savebuf,"%2d %10s %10s %3s", &outlet, 
+			name, locked, on) > 0)) {
 			if (strstr(locked, "ocked")) {
 				nm = (char *) STRDUP (name);
 				if (!nm) {
@@ -442,7 +454,7 @@ cyclades_reset_req(StonithPlugin * s, int request, const char * host)
 static const char **
 cyclades_get_confignames(StonithPlugin * s)
 {
-	static const char * ret[] = {ST_IPADDR, ST_LOGIN, NULL};
+	static const char * ret[] = {ST_IPADDR, ST_LOGIN, ST_SERIALPORT, NULL};
 	return ret;
 }
 
@@ -457,6 +469,7 @@ cyclades_set_config(StonithPlugin* s, StonithNVpair* list)
 	StonithNamesToGet	namestoget[] =
 	{	{ST_IPADDR,	NULL}
 	,	{ST_LOGIN,	NULL}
+	,	{ST_SERIALPORT, NULL}
 	,	{NULL,		NULL}
 	};
 
@@ -468,8 +481,9 @@ cyclades_set_config(StonithPlugin* s, StonithNVpair* list)
 	if ((rc = OurImports->GetAllValues(namestoget, list)) != S_OK) {
 		return rc;
 	}
-	sd->device = namestoget[0].s_value;
-	sd->user   = namestoget[1].s_value;
+	sd->device 	= namestoget[0].s_value;
+	sd->user   	= namestoget[1].s_value;
+	sd->serial_port	= atoi(namestoget[2].s_value);
 
 	return(S_OK);
 }
