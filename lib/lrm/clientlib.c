@@ -982,7 +982,7 @@ on_op_done (int call_id, lrm_op_t* op, struct ha_msg* msg)
 		op->app_name = g_strdup(app_name);
 	}
 	//if it has data (for example, metadata operation), get the data
-	int data_len = 0;
+	size_t data_len = 0;
 	const char* data = cl_get_binary(msg, F_LRM_DATA,&data_len);
 	if (NULL != data){
 		op->data = strndup(data, data_len);
@@ -1089,7 +1089,7 @@ msg_to_op(struct ha_msg* msg)
 		client_log(LOG_INFO, 0, "msg_to_op: can not get status.");
 	}
 	//op->data
-	int data_len = 0;
+	size_t data_len = 0;
 	const char* data = cl_get_binary(msg, F_LRM_DATA,&data_len);
 	if (NULL != data){
 		op->data = strndup(data, data_len);
