@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.34 2005/02/17 23:20:02 gshi Exp $ */
+/* $Id: cl_log.c,v 1.35 2005/02/28 12:32:41 andrew Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -109,12 +109,6 @@ cl_log_set_debugfile(const char * path)
 	debugfile_name = path;
 }
 
-const char *
-cl_log_get_debugfile(void)
-{
-	return debugfile_name;
-}
-
 /*
  * This function can cost us realtime unless use_logging_daemon
  * is enabled.  Then we log everything through a child process using
@@ -213,6 +207,9 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 			}
 			
 			fclose(fp);
+		} else {
+			fprintf(stderr, "Cannot open %s: %s\n",
+				debugfile_name, strerror(errno));
 		}
 	}
 	
@@ -234,6 +231,9 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 			}
 			
 				fclose(fp);
+		} else {
+			fprintf(stderr, "Cannot open %s: %s\n",
+				debugfile_name, strerror(errno));
 		}
 	}
 	
