@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.75 2005/04/04 10:21:09 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.76 2005/04/06 03:27:49 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -60,6 +60,12 @@
 #define OPTARGS		"skrhV"
 #define PID_FILE 	HA_VARRUNDIR"/lrmd.pid"
 #define LRMD_COREDUMP_ROOT_DIR HA_COREDIR
+
+/* Donnot directly use the definition in heartbeat.h/hb_api.h for fewer
+ * dependency, but need to keep identical with them.
+ */
+#define ENV_PREFIX "HA_"
+#define KEY_LOGDAEMON  "use_logd"
 
 typedef struct
 {
@@ -270,13 +276,8 @@ main(int argc, char ** argv)
 	cl_log_enable_stderr(debug_level?TRUE:FALSE);
 	cl_log_set_facility(LOG_DAEMON);
 
-        if(cl_log_test_logd()) {
-                cl_log_set_uselogd(TRUE);
-                lrmd_log(LOG_INFO, "Enabled log daemon");
-        } else {
-                cl_log_set_uselogd(FALSE);
-                lrmd_log(LOG_WARNING, "Not using log daemon");
-        }
+	/* Use logd if it's enabled by heartbeat */
+	cl_inherit_use_logd(ENV_PREFIX""KEY_LOGDAEMON, 0);
 
 	if (req_status){
 		return init_status(PID_FILE, lrm_system_name);
@@ -2169,6 +2170,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.76  2005/04/06 03:27:49  sunjd
+ * use the new function cl_inherit_use_logd
+ *
  * Revision 1.75  2005/04/04 10:21:09  zhenh
  * the first result of monitor should be return
  *
