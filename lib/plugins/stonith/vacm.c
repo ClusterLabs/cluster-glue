@@ -434,6 +434,7 @@ vacm_destroy(Stonith *s)
 
    if( vc->h )
       api_nexxus_disconnect(vc->h);
+   free(vc); vc = NULL;
 
 }
 

@@ -33,6 +33,7 @@ extern char *	optarg;
 extern int	optind, opterr, optopt;
 
 void usage(const char * cmd, int exit_status);
+void confhelp(const char * cmd, FILE* stream);
 
 void
 usage(const char * cmd, int exit_status)
@@ -47,7 +48,59 @@ usage(const char * cmd, int exit_status)
 	"[-p stonith-parameters] "
 	"nodename\n", cmd);
 
+	confhelp(cmd, stream);
+
 	exit(exit_status);
+}
+
+/* Thanks to Lorn Kay <lorn_kay@hotmail.com> for the confhelp code */
+void
+confhelp(const char * cmd, FILE* stream)
+{
+	char ** typelist;
+	char ** this;
+	Stonith *       s;
+
+	fprintf(stream
+	,	"\nSTONITH device types [-t devicetypes] and"
+		" associated configuration details:");
+
+	typelist = stonith_types();
+
+	for(this=typelist; *this; ++this) {
+	}
+	for(this=typelist; *this; ++this) {
+		const char *    SwitchType = *this;
+		const char *	cres;
+
+		if ((s = stonith_new(SwitchType)) == NULL) {
+			fprintf(stderr, "Invalid STONITH type %s(!)"
+			,	SwitchType);
+			continue;
+		}
+
+		fprintf(stream, "\n\nSTONITH Device: %s - ", SwitchType);
+
+		if ((cres = s->s_ops->getinfo(s, ST_DEVICEDESCR)) != NULL){
+			fprintf(stream, "%s\n"
+			,	cres);
+		}
+
+		if ((cres = s->s_ops->getinfo(s, ST_DEVICEURL)) != NULL){
+			fprintf(stream
+			,	"For more information see %s\n"
+			,	cres);
+		}
+
+		fprintf(stream, "\nConfig info [-p] syntax for %s:\n\t%s\n"
+		,    SwitchType, s->s_ops->getinfo(s, ST_CONF_INFO_SYNTAX));
+		fprintf(stream, "\nConfig file [-F] syntax for %s:\n\t%s\n"
+		,    SwitchType, s->s_ops->getinfo(s, ST_CONF_FILE_SYNTAX));
+
+		stonith_delete(s); s = NULL;
+	}
+	/* Note that the type list can't/shouldn't be freed */
+	
 }
 
 int
@@ -162,7 +215,7 @@ main(int argc, char** argv)
 			,	SwitchType);
 			syslog(LOG_INFO, "Config file syntax: %s"
 			,	s->s_ops->getinfo(s, ST_CONF_FILE_SYNTAX));
-			s->s_ops->destroy(s);
+			stonith_delete(s); s=NULL;
 			exit(rc);
 		}
 	}else{
@@ -173,7 +226,7 @@ main(int argc, char** argv)
 			,	SwitchType);
 			syslog(LOG_INFO, "Config info syntax: %s"
 			,	s->s_ops->getinfo(s, ST_CONF_INFO_SYNTAX));
-			s->s_ops->destroy(s);
+			stonith_delete(s); s=NULL;
 			exit(rc);
 		}
 	}
@@ -214,6 +267,6 @@ main(int argc, char** argv)
 	if (optind < argc) {
 		rc = (s->s_ops->reset_req(s, ST_GENERIC_RESET, argv[optind]));
 	}
-	s->s_ops->destroy(s);
+	stonith_delete(s); s = NULL;
 	return(rc);
 }

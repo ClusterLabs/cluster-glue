@@ -418,7 +418,7 @@ ssh_getinfo(Stonith * s, int reqtype)
     break;
 
   case ST_CONF_FILE_SYNTAX:
-    ret = _("IP-address login password\n"
+    ret = _("hostname...\n"
 	    "host names are white-space delimited.  "
 	    "All host names must be on one line.  "
 	    "Blank lines and lines beginning with # are ignored");
@@ -458,9 +458,6 @@ ssh_destroy(Stonith *s)
   }
   sd->hostcount = -1;
   FREE(sd);
-  s->pinfo = NULL;
-  FREE(s);
-  s = NULL;
 }
 
 /* Create a new ssh Stonith device */

@@ -1048,9 +1048,6 @@ apcsmart_destroy(Stonith * s)
 
     FREE(ad);
 
-    s->pinfo = NULL;
-    FREE(s);
-    s = NULL;
 }
 
 /*

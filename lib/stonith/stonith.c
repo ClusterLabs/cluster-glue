@@ -63,8 +63,8 @@ init_pluginsys(void) {
 		return TRUE;
 	}
 
-	//PILpisysSetDebugLevel(10);
 
+	//PILpisysSetDebugLevel(10);
 	PIsys = NewPILPluginUniv(STONITH_MODULES);
 	
 	if (PIsys) {
@@ -163,8 +163,18 @@ stonith_delete(Stonith *s)
 	if (!s) {
 		return;
 	}
+	if (s->s_ops) {
+		s->s_ops->destroy(s);
+	}
+	/*
+	 * FIXME:  This triggers a bug!
 	PILIncrIFRefCount(PIsys, STONITH_TYPE_S, s->stype, -1);
+	 * Naughty Bug!
+	 */
 	s->pinfo = NULL;
 	s->s_ops = NULL;
+	s->stype = NULL;	/* It is part of plugin system */
+				/* we cannot free it */
+
 	FREE(s);
 }

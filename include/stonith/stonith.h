@@ -70,9 +70,9 @@ typedef struct stonith {
 
 struct stonith_ops {
 	void * (*new)		(void);
-	void (*destroy)			(Stonith*);
-	int (*set_config_file)		(Stonith *, const char   * filename); 
-	int (*set_config_info)		(Stonith *, const char   * confstring); 
+	void (*destroy)		(Stonith*);
+	int (*set_config_file)	(Stonith *, const char   * filename); 
+	int (*set_config_info)	(Stonith *, const char   * confstring); 
 /*
  *	Type of information requested by the getinfo() call
  */

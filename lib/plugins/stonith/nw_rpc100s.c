@@ -923,6 +923,7 @@ nw_rpc100s_getinfo(Stonith * s, int reqtype)
 
 		case ST_DEVICEURL:
 			ret = "http://microenergeticscorp.com/";
+			break;
 
 		default:
 			ret = NULL;
