@@ -663,7 +663,7 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 static void
 dump_fd_info(struct pollfd *fds, unsigned int nfds, int timeoutms)
 {
-	int	j;
+	unsigned	j;
 
 	cl_log(LOG_DEBUG, "timeout: %d milliseconds", timeoutms);
 	for (j=0; j < nfds; ++j) {
@@ -675,7 +675,7 @@ dump_fd_info(struct pollfd *fds, unsigned int nfds, int timeoutms)
 		,	fd, fcntl(fd, F_GETFL), moni->nsig
 		,	fds[j].events, fds[j].revents, moni->pendevents);
 	}
-	for (j=SIGRTMIN; j < SIGRTMAX; ++j) {
+	for (j=SIGRTMIN; j < (unsigned)SIGRTMAX; ++j) {
 		if (!sigismember(&SignalSet, j)) {
 			continue;
 		}
@@ -689,7 +689,7 @@ dump_fd_info(struct pollfd *fds, unsigned int nfds, int timeoutms)
 static void
 check_fd_info(struct pollfd *fds, unsigned int nfds)
 {
-	int	j;
+	unsigned	j;
 
 	for (j=0; j < nfds; ++j) {
 		int	fd = fds[j].fd;
