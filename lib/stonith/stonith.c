@@ -1,4 +1,4 @@
-/* $Id: stonith.c,v 1.15 2005/01/11 04:57:59 alan Exp $ */
+/* $Id: stonith.c,v 1.16 2005/02/01 20:22:51 gshi Exp $ */
 /*
  * Stonith API infrastructure.
  *
@@ -233,9 +233,19 @@ stonith_set_config_file(Stonith* s, const char * configname)
 		return(S_BADCONFIG);
 	}
 	while (fgets(line, sizeof(line), cfgfile) != NULL){
+		int	len;
+		
 		if (*line == '#' || *line == '\n' || *line == EOS) {
 			continue;
 		}
+		
+		/*remove the new line in the end*/
+		len = strnlen(line, 1024);		
+		if (line[len-1] == '\n'){
+			line[len-1] = '\0';
+		}else {
+		}
+
 		return stonith_set_config_info(s, line);
 	}
 	return S_BADCONFIG;
