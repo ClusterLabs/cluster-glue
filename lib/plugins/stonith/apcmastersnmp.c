@@ -1,4 +1,4 @@
-/* $Id: apcmastersnmp.c,v 1.10 2004/03/25 11:58:21 lars Exp $ */
+/* $Id: apcmastersnmp.c,v 1.11 2004/07/07 07:01:35 lars Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
@@ -157,9 +157,6 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 #define OUTLET_REBOOT			3
 #define OUTLET_NO_CMD_PEND		2
 
-// for checking hardware (issue a warning if mismatch) 
-#define TESTED_IDENT			"AP9606"
-
 // oids
 #define OID_IDENT			".1.3.6.1.4.1.318.1.1.4.1.4.0"
 #define OID_NUM_OUTLETS			".1.3.6.1.4.1.318.1.1.4.4.1.0"
@@ -180,6 +177,9 @@ struct APCDevice {
     char *community;		// snmp community (r/w access)
     int num_outlets;		// number of outlets
 };
+
+// for checking hardware (issue a warning if mismatch)
+static const char* APC_tested_ident[] = {"AP9606","AP7920","AP_other_well_tested"};
 
 // constant strings
 static const char *APCid = DEVICE;
@@ -449,6 +449,7 @@ int apcmastersnmp_status(Stonith * s)
 {
     struct APCDevice *ad;
     char *ident;
+    int i;
 
 #ifdef APC_DEBUG
     syslog(LOG_DEBUG, "%s: called.", __FUNCTION__);
@@ -472,8 +473,11 @@ int apcmastersnmp_status(Stonith * s)
 #endif
 	return (S_ACCESS);
     }
+
     // issue a warning if ident mismatches
-    if (strcmp(ident, TESTED_IDENT) != 0) {
+    for(i=DIMOF(APC_tested_ident) -1; i >=0 ; i--)
+      if (strcmp(ident, APC_tested_ident[i]) == 0) break;
+    if (i<0) {
 	syslog(LOG_WARNING,
 	       "%s: module not tested with this hardware '%s'",
 	       __FUNCTION__, ident);
