@@ -367,17 +367,6 @@ struct lrm_ops
 ll_lrm_t* ll_lrm_new(const char * llctype);
 
 /*
- *set_debug_level:
- *		set the level of the message print out from the client library.
- *		if this function is not called, nothing will be printed out.
- *
- *level:	0: nothing will be printed out.
- *		LOG_ERR: print LOG_ERR messages.
- *		LOG_INFO: print out LOG_INFO and LOG_ERR messages
- */
-void set_debug_level(int level);
-
-/*
  *execra_code2string:
  *		Translate the return code of the operation to string
  *
