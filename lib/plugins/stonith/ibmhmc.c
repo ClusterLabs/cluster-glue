@@ -273,12 +273,12 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 		LOG(PIL_DEBUG , "%s called,info=%s\n" , __FUNCTION__,info);
 	}
 
-	if (NULL == info || 0 == strlen(info)) 	{
+	if ( info == NULL || strlen(info) == 0 ){
 		return S_BADCONFIG;
 	}
 	
 	/*check whether the HMC is enable ssh command */
-	if (S_OK!=check_hmc_status(info)) {
+	if (check_hmc_status(info) != S_OK) {
 		return S_BADCONFIG;
 	}		
 	/*get the managed system's names of the hmc */
@@ -294,8 +294,8 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 	syslist = g_strsplit(output, "\n", MAX_SYS_NUM);
 	FREE(output);
 	/* for each managed system */
-	for (i=0; i<MAX_SYS_NUM; i++) {
-		if (NULL==syslist[i]) {
+	for (i = 0; i < MAX_SYS_NUM; i++) {
+		if (syslist[i] == NULL) {
 			break;
 		}
 		name_mode = g_strsplit(syslist[i],":",2);
