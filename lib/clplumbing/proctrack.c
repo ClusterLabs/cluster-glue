@@ -174,7 +174,12 @@ ReportProcHasDied(int pid, int status)
 			g_source_remove(p->timerid);
 			p->timerid = 0;
 		}
-		p->ops->procdied(p, status, exitcode, signo, doreport);
+		/*
+		 * From clplumbing/proctrack.h:
+		 * (ProcTrack* p, int status, int signo, int exitcode
+		 * ,	int waslogged);
+		 */
+		p->ops->procdied(p, status, signo, exitcode,  doreport);
 		if (p->privatedata) {
 			/* They may have forgotten to free something... */
 			cl_log(LOG_ERR, "Exiting %s process %d did not"
