@@ -40,7 +40,6 @@
 #define ENABLE_PLUGIN_MANAGER_PRIVATE
 
 #include <pils/interface.h>
-#include "../../libltdl/config.h"
 
 #define NEW(type)	(g_new(type,1))
 #define	ZAP(obj)	memset(obj, 0, sizeof(*obj))
