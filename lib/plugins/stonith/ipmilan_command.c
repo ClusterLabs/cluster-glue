@@ -1,4 +1,4 @@
-/* $Id: ipmilan_command.c,v 1.2 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: ipmilan_command.c,v 1.3 2004/08/17 21:58:46 yixiong Exp $ */
 /*
  * This program is largely based on the ipmicmd.c program that's part of OpenIPMI package.
  * 
@@ -22,13 +22,16 @@
 #include <OpenIPMI/ipmi_smi.h>
 #include <OpenIPMI/ipmi_auth.h>
 #include <OpenIPMI/ipmi_msgbits.h>
+#include <OpenIPMI/ipmi_posix.h>
 
 #include "ipmilan.h"
 #include <stonith/stonith.h>
+#include <clplumbing/cl_log.h>
 
 // #define DUMP_MSG 0
 #define OPERATION_TIME_OUT 10
 
+os_handler_t *os_hnd;
 selector_t *os_sel;
 extern os_handler_t ipmi_os_cb_handlers;
 
@@ -266,7 +269,13 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 		return rv;
 	}
 
-	rv = sel_alloc_selector(&os_sel);
+	os_hnd = ipmi_posix_get_os_handler();
+	if (!os_hnd) {
+	    	syslog(LOG_ERR, "ipmi_smi_setup_con: Unable to allocate os handler");
+		return 1;
+	}
+
+	rv = sel_alloc_selector(os_hnd, &os_sel);
 	if (rv) {
 		syslog(LOG_ERR, "Could not alloctate selector\n");
 		return rv;
@@ -338,4 +347,46 @@ do_ipmi_cmd(struct ipmilanHostInfo * host, int request)
 	return setup_ipmi_conn(host, request);
 }
 
+void
+posix_vlog(char *format, enum ipmi_log_type_e log_type, va_list ap)
+{
+    int do_nl = 1; 
+
+    switch(log_type)
+    {
+        case IPMI_LOG_INFO:
+            syslog(LOG_INFO, "INFO: ");
+            break;
+                                                                                                                                                             
+        case IPMI_LOG_WARNING:
+            syslog(LOG_INFO, "WARN: ");
+            break;
+                                                                                                                                                             
+        case IPMI_LOG_SEVERE:
+            syslog(LOG_INFO, "SEVR: ");
+            break;
+                                                                                                                                                             
+        case IPMI_LOG_FATAL:
+            syslog(LOG_INFO, "FATL: ");
+            break;
+                                                                                                                                                             
+        case IPMI_LOG_ERR_INFO:
+            syslog(LOG_INFO, "EINF: ");
+            break;
+                                                                                                                                                             
+        case IPMI_LOG_DEBUG_START:
+            do_nl = 0;
+            /* FALLTHROUGH */
+        case IPMI_LOG_DEBUG:
+            syslog(LOG_INFO, "DEBG: ");
+            break;
+                                                                                                                                                             
+        case IPMI_LOG_DEBUG_CONT:
+            do_nl = 0;
+            /* FALLTHROUGH */
+        case IPMI_LOG_DEBUG_END:
+            break;
+    }
+                                                                                                                                                             
+}
 

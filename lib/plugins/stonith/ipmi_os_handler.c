@@ -1,4 +1,4 @@
-/* $Id: ipmi_os_handler.c,v 1.2 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: ipmi_os_handler.c,v 1.3 2004/08/17 21:58:46 yixiong Exp $ */
 /*
  * This program is largely based on the ipmicmd.c program that's part of OpenIPMI package.
  * 
@@ -67,7 +67,7 @@ add_fd(os_handler_t    *handler,
     fd_data->cb_data = cb_data;
     fd_data->data_ready = data_ready;
     fd_data->handler = handler;
-    sel_set_fd_handlers(os_sel, fd, fd_data, fd_handler, NULL, NULL);
+    sel_set_fd_handlers(os_sel, fd, fd_data, fd_handler, NULL, NULL, NULL);
     sel_set_fd_read_handler(os_sel, fd, SEL_FD_HANDLER_ENABLED);
     sel_set_fd_write_handler(os_sel, fd, SEL_FD_HANDLER_DISABLED);
     sel_set_fd_except_handler(os_sel, fd, SEL_FD_HANDLER_DISABLED);
