@@ -1,4 +1,4 @@
-/* $Id: main.c,v 1.10 2004/03/25 11:58:22 lars Exp $ */
+/* $Id: main.c,v 1.11 2004/09/27 21:02:34 alan Exp $ */
 /*
  * Stonith: simple test program for exercising the Stonith API code
  *
@@ -28,12 +28,15 @@
 #include <string.h>
 #include <syslog.h>
 #include <stonith/stonith.h>
+#include <pils/plugin.h>
 #include <glib.h>
 
-#define	OPTIONS	"F:p:t:sSlLvh"
+#define	OPTIONS	"F:p:t:sSlLvhd"
 
 extern char *	optarg;
 extern int	optind, opterr, optopt;
+
+static int	debug = 0;
 
 void usage(const char * cmd, int exit_status);
 void confhelp(const char * cmd, FILE* stream);
@@ -151,6 +154,10 @@ main(int argc, char** argv)
 
 	while ((c = getopt(argc, argv, OPTIONS)) != -1) {
 		switch(c) {
+
+		case 'd':	debug++;
+				break;
+
 		case 'F':	optfile = optarg;
 				break;
 
@@ -193,6 +200,10 @@ main(int argc, char** argv)
 
 	if (errors) {
 		usage(cmdname, 1);
+	}
+
+	if (debug) {
+		PILpisysSetDebugLevel(debug);
 	}
 
 	if (listtypes) {
