@@ -111,21 +111,20 @@ main(int argc, char ** argv)
 	cl_log_enable_stderr(TRUE);
 
 
-#if 0
 	rc += channelpair(echoclient, echoserver, 10000);
 	rc += channelpair(asyn_echoclient, asyn_echoserver, 20000);
 	rc += channelpair(mainloop_client, mainloop_server, 20000);
 
+#if 0
 	/* The code is know to be broken right now, don't use it */
 	cl_log(LOG_INFO, "Note: NOT enabling poll(2) replacement code.");
-#else
+#endif
 	cl_log(LOG_INFO, "NOTE: Enabling poll(2) replacement code.");
 	PollFunc = cl_poll;
 	g_main_set_poll_func(cl_glibpoll);
 	rc += channelpair(echoclient, echoserver          , 20000);
 	rc += channelpair(asyn_echoclient, asyn_echoserver, 20000);
 	rc += channelpair(mainloop_client, mainloop_server, 1000000);
-#endif
 	
 	cl_log(LOG_INFO, "TOTAL errors: %d", rc);
 
@@ -135,12 +134,71 @@ static int
 checksock(IPC_Channel* channel)
 {
 
-	if (channel->ch_status != IPC_CONNECT) {
+	if (!IPC_ISRCONN(channel)) {
 		cl_log(LOG_ERR, "Channel status is %d"
 		", not IPC_CONNECT", channel->ch_status);
 		return 1;
 	}
 	return 0;
+}
+
+static void
+EOFcheck(IPC_Channel* chan)
+{
+	int		fd = chan->ops->get_recv_select_fd(chan);
+	struct pollfd 	pf[1];
+	int		rc;
+
+	cl_log(LOG_INFO, "channel state: %d", chan->ch_status);
+
+	if (chan->recv_queue->current_qlen > 0) {
+		cl_log(LOG_INFO, "EOF Receive queue has %d messages in it"
+		,	chan->recv_queue->current_qlen);
+	}
+	if (fd <= 0) {
+		cl_log(LOG_INFO, "EOF receive fd: %d", fd);
+	}
+
+
+	pf[0].fd	= fd;
+	pf[0].events	= POLLIN|POLLHUP;
+	pf[0].revents	= 0;
+
+	rc = poll(pf, 1, 0);
+
+	if (rc < 0) {
+		cl_perror("failed poll(2) call in EOFcheck");
+		return;
+	}
+
+	/* Got input? */
+	if (pf[0].revents & POLLIN) {
+		cl_log(LOG_INFO, "EOF socket %d (still) has input ready (real poll)"
+		,	fd);
+	}
+	if ((pf[0].revents & ~(POLLIN|POLLHUP)) != 0) {
+		cl_log(LOG_INFO, "EOFcheck poll(2) bits: 0x%lx"
+		,	(unsigned long)pf[0].revents);
+	}
+	pf[0].fd	= fd;
+	pf[0].events	= POLLIN|POLLHUP;
+	pf[0].revents	= 0;
+	rc = PollFunc(pf, 1, 0);
+	if (rc < 0) {
+		cl_perror("failed PollFunc() call in EOFcheck");
+		return;
+	}
+
+	/* Got input? */
+	if (pf[0].revents & POLLIN) {
+		cl_log(LOG_INFO, "EOF socket %d (still) has input ready (PollFunc())"
+		,	fd);
+	}
+	if ((pf[0].revents & ~(POLLIN|POLLHUP)) != 0) {
+		cl_log(LOG_INFO, "EOFcheck PollFunc() bits: 0x%lx"
+		,	(unsigned long)pf[0].revents);
+	}
+	abort();
 }
 
 static int
@@ -221,6 +279,9 @@ echoserver(IPC_Channel* wchan, int repcount)
 		
 	}
 	cl_log(LOG_INFO, "echoserver: %d errors", errcount);
+#if 0
+	cl_log(LOG_INFO, "destroying channel 0x%lx", (unsigned long)wchan);
+#endif
 	wchan->ops->destroy(wchan); wchan = NULL;
 
 	return errcount;
@@ -276,6 +337,9 @@ echoclient(IPC_Channel* rchan, int repcount)
 		//fprintf(stderr, "C");
 	}
 	cl_log(LOG_INFO, "echoclient: %d errors", errcount);
+#if 0
+	cl_log(LOG_INFO, "destroying channel 0x%lx", (unsigned long)rchan);
+#endif
 	rchan->ops->destroy(rchan); rchan = NULL;
 	return errcount;
 }
@@ -291,8 +355,16 @@ echomsgbody(void * body, int niter, size_t * len)
 static void
 msg_free(IPC_Message* msg)
 {
+	
+#if 1
+	memset(msg->msg_body, 0xAA, msg->msg_len);
+#endif
 	free(msg->msg_body);
+#if 1
+	memset(msg, 0x55, sizeof(*msg));
+#endif
 	free(msg);
+
 }
 
 static IPC_Message*
@@ -315,6 +387,13 @@ checkinput(IPC_Channel* chan, const char * where, int* rdcount, int maxcount)
 	int		errs = 0;
 	int		rc;
 
+	if (chan->ch_status == IPC_DISCONNECT) {
+		cl_log(LOG_ERR
+		,	"checkinput0[0x%lx %s]: EOF in iter %d"
+		,	(unsigned long)chan, where, *rdcount);
+		EOFcheck(chan);
+		return errs;
+	}
 	while (chan->ops->is_message_pending(chan)
 	&&	errs < 10 && *rdcount < maxcount) {
 
@@ -322,11 +401,18 @@ checkinput(IPC_Channel* chan, const char * where, int* rdcount, int maxcount)
 			rmsg->msg_done(rmsg);
 			rmsg = NULL;
 		}
+		if (chan->ch_status == IPC_DISCONNECT) {
+			cl_log(LOG_ERR
+			,	"checkinput1[0x%lx %s]: EOF in iter %d"
+			,	(unsigned long)chan, where, *rdcount);
+			EOFcheck(chan);
+		}
 		if ((rc = chan->ops->recv(chan, &rmsg)) != IPC_OK) {
 			if (chan->ch_status == IPC_DISCONNECT) {
 				cl_log(LOG_ERR
-				,	"checkinput[%s]: EOF in iter %d"
-				,	where, *rdcount);
+				,	"checkinput2[0x%lx %s]: EOF in iter %d"
+				,	(unsigned long)chan, where, *rdcount);
+				EOFcheck(chan);
 				return errs;
 			}
 			cl_log(LOG_ERR
@@ -342,10 +428,19 @@ checkinput(IPC_Channel* chan, const char * where, int* rdcount, int maxcount)
 		if (!checkmsg(rmsg, where, *rdcount)) {
 			++errs;
 		}
+		if (chan->ch_status == IPC_DISCONNECT) {
+			cl_log(LOG_ERR
+			,	"checkinput3[0x%lx %s]: EOF in iter %d"
+			,	(unsigned long)chan, where, *rdcount);
+				EOFcheck(chan);
+		}
 
 	}
 	return errs;
 }
+
+
+
 
 static int
 asyn_echoserver(IPC_Channel* wchan, int repcount)
@@ -418,6 +513,7 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 			cl_log(LOG_ERR
 			,	"asyn_echoserver: EOF in iter %d"
 			,	rdcount);
+			EOFcheck(wchan);
 			++errcount;
 			break;
 		}
@@ -425,6 +521,9 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 	}
 
 	cl_log(LOG_INFO, "asyn_echoserver: %d errors", errcount);
+#if 0
+	cl_log(LOG_INFO, "destroying channel 0x%lx", (unsigned long)wchan);
+#endif
 	wchan->ops->destroy(wchan); wchan = NULL;
 	return errcount;
 }
@@ -472,7 +571,7 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 			//fprintf(stderr, "r");
 
 			if ((rc = chan->ops->recv(chan, &rmsg)) != IPC_OK) {
-				if (chan->ch_status != IPC_CONNECT) {
+				if (!IPC_ISRCONN(chan)) {
 					cl_log(LOG_ERR
 					,	"Async echoclient: disconnect"
 					" iter %d", rdcount+1);
@@ -501,10 +600,11 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 				" rc %d, iter %d", rc, rdcount);
 				cl_log(LOG_INFO, "Message being sent: %s"
 				,		(char*)rmsg->msg_body);
-				if (chan->ch_status != IPC_CONNECT) {
+				if (!IPC_ISRCONN(chan)) {
 					cl_log(LOG_ERR
 					,	"Async echoclient: EOF(2)"
 					" iter %d", rdcount+1);
+					EOFcheck(chan);
 					return errcount;
 				}
 				continue;
@@ -556,6 +656,7 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 			cl_log(LOG_ERR
 			,	"Async echoclient: premature pollhup."
 			" revents: 0x%x iter %d", pf[0].revents, rdcount);
+			EOFcheck(chan);
 			++errcount;
 			continue;
 		}
@@ -586,6 +687,9 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 	cl_poll_ignore(wfd);
 	cl_log(LOG_INFO, "Async echoclient: %d errors, %d reads, %d writes"
 	,	errcount, rdcount, wrcount);
+#if 0
+	cl_log(LOG_INFO, "destroying channel 0x%lx", (unsigned long)chan);
+#endif
 	chan->ops->destroy(chan); chan = NULL;
 	return errcount;
 }
@@ -652,6 +756,7 @@ s_rcv_msg(IPC_Channel* chan, gpointer data)
 	||	i->rcount >= i->max) {
 		if (i->rcount < i->max) {
 			++i->errcount;
+			cl_log(LOG_INFO, "Early exit from s_rcv_msg");
 		}
 		g_main_quit(loop);
 		return FALSE;
@@ -664,7 +769,7 @@ static gboolean
 checkmsg(IPC_Message* rmsg, const char * who, int rcount)
 {
 	char		str[256];
-	int		len;
+	size_t		len;
 
 	echomsgbody(str, rcount, &len);
 
@@ -779,7 +884,6 @@ mainloop_server(IPC_Channel* chan, int repcount)
 	,	FALSE, s_rcv_msg, &info, NULL);
 	cl_log(LOG_INFO, "Mainloop echo server: %d reps pid %d.", repcount, (int)getpid());
 	g_main_run(loop);
-	chan->ops->waitout(chan);
 	g_main_destroy(loop);
 	loop = NULL;
 	cl_log(LOG_INFO, "Mainloop echo server: %d errors", info.errcount);
@@ -795,7 +899,6 @@ mainloop_client(IPC_Channel* chan, int repcount)
 	,	FALSE, s_echo_msg, &info, NULL);
 	cl_log(LOG_INFO, "Mainloop echo client: %d reps pid %d.", repcount, (int)getpid());
 	g_main_run(loop);
-	chan->ops->waitout(chan);
 	g_main_destroy(loop);
 	loop = NULL;
 	cl_log(LOG_INFO, "Mainloop echo client: %d errors, %d read %d written"
