@@ -310,48 +310,51 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* message)
 static int 
 socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 {
-  int result;
-  struct pollfd sockpoll;
-  
-  result = ch->ops->resume_io(ch);
-  
-  if ((result == IPC_OK) && (ch->recv_queue->current_qlen != 0)) {
-      GList *element = g_list_first(ch->recv_queue->queue);
-      if (element != NULL) {
-	*message = (struct IPC_MESSAGE *) (element->data);
+	int result;
+	struct pollfd sockpoll;
+
+	result = ch->ops->resume_io(ch);
+
+	if ((result == IPC_OK) && (ch->recv_queue->current_qlen != 0)) {
+		GList *element = g_list_first(ch->recv_queue->queue);
+
+		if (element != NULL) {
+			*message = (struct IPC_MESSAGE *) (element->data);
 	      
-	ch->recv_queue->queue = g_list_remove(ch->recv_queue->queue
-	,	element->data);
-	ch->recv_queue->current_qlen--;
-      
-	return IPC_OK;
-      }
-  }
+			ch->recv_queue->queue
+			=	g_list_remove(ch->recv_queue->queue
+			,	element->data);
+			ch->recv_queue->current_qlen--;
+	
+			return IPC_OK;
+		}
+	}
 
-  if (ch->ch_status == IPC_DISCONNECT) {
-	return IPC_BROKEN;
-  }
-  result = IPC_FAIL;
-  *message = NULL;
-
-  if ((sockpoll.fd = socket_get_recv_fd(ch)) >= 0) {
-    	/* check if the server still exists */
-  	sockpoll.events = POLLHUP;
-	if ((ourpollfunc(&sockpoll, 1, 0)) && sockpoll.revents) {
-  		ch->ch_status = IPC_DISCONNECT;
+	if (ch->ch_status == IPC_DISCONNECT) {
 		return IPC_BROKEN;
-	 }
-  }
-  errno = EAGAIN;
-  return result;
+	}
+	result = IPC_FAIL;
+	*message = NULL;
+
+	if ((sockpoll.fd = socket_get_recv_fd(ch)) >= 0) {
+		/* Check if our peer still exists */
+		sockpoll.events = POLLHUP;
+		if ((ourpollfunc(&sockpoll, 1, 0)) && sockpoll.revents) {
+			ch->ch_status = IPC_DISCONNECT;
+			return IPC_BROKEN;
+		}
+	}
+	errno = EAGAIN;
+	return result;
 }
 
 static int
-socket_waitin(struct IPC_CHANNEL * ch)
+socket_waitfor(struct IPC_CHANNEL * ch
+,	gboolean (*finished)(struct IPC_CHANNEL * ch))
 {
 	struct pollfd sockpoll[2];
 
-	if(ch->recv_queue->current_qlen) {
+	if (finished(ch)) {
 		return IPC_OK;
 	}
 
@@ -362,19 +365,23 @@ socket_waitin(struct IPC_CHANNEL * ch)
 	sockpoll[1].fd = ch->ops->get_send_select_fd(ch);
 	sockpoll[1].events = POLLHUP|POLLNVAL|POLLERR|POLLOUT;
 
-	do {
+
+	while (!finished(ch)) {
 		int	rc;
 		int	nfd = 1;
 
 		sockpoll[0].events = POLLHUP|POLLNVAL|POLLERR|POLLIN;
 
-		if (ch->ops->is_sending_blocked(ch)) {
+		/* CANNOT call is_sending_blocked() here! */
+		/* (it calls resume_io) */
+		if (ch->send_queue->current_qlen > 0) {
 			if (sockpoll[0].fd == sockpoll[1].fd) {
 				sockpoll[0].events |= POLLOUT;
 			}else{
 				nfd=2;
 			}
 		}
+
 
 		rc = ourpollfunc(sockpoll, nfd, -1);
 
@@ -399,37 +406,57 @@ socket_waitin(struct IPC_CHANNEL * ch)
 			}
 			if (sockpoll[1].revents & (POLLNVAL|POLLERR)) {
 				cl_log(LOG_ERR
-				,	"revents[1] failure: fd %d, flags 0x%x"
+				,	"revents[1] failed: fd %d, flags 0x%x"
 				,	sockpoll[1].fd, sockpoll[1].revents);
 				errno = EINVAL;
 				return IPC_FAIL;
 			}
 		}
-		ch->ops->resume_io(ch);
-	} while (!ch->ops->is_message_pending(ch));
+	}
 
 	return IPC_OK;
 }
 
+static int
+socket_waitin(struct IPC_CHANNEL * ch)
+{
+	return socket_waitfor(ch, ch->ops->is_message_pending);
+}
+static gboolean
+socket_is_output_flushed(struct IPC_CHANNEL * ch)
+{
+	return ! ch->ops->is_sending_blocked(ch);
+}
+
+static int
+socket_waitout(struct IPC_CHANNEL * ch)
+{
+	int	rc;
+	rc = socket_waitfor(ch, socket_is_output_flushed);
+
+	if (rc != IPC_OK) {
+		cl_log(LOG_ERR
+		,	"socket_waitout failure: rc = %d", rc);
+		fprintf(stderr
+		,	"socket_waitout failure: rc = %d", rc);
+	}else if (ch->ops->is_sending_blocked(ch)) {
+		cl_log(LOG_ERR, "socket_waitout output still blocked");
+		fprintf(stderr, "socket_waitout output still blocked");
+	}
+	return rc;
+}
+
+
 static gboolean
 socket_is_message_pending(struct IPC_CHANNEL * ch)
 {
-  struct pollfd sockpoll;
 
-  if (ch->recv_queue->current_qlen > 0) {
-    return TRUE;
-  }
-
-  if((sockpoll.fd = socket_get_recv_fd(ch)) != -1) {
-  	sockpoll.events = POLLIN|POLLHUP;
-	if ((ourpollfunc(&sockpoll, 1, 0)) && sockpoll.revents) {
-		if (sockpoll.revents & POLLHUP) {
- 			ch->ch_status = IPC_DISCONNECT;
-		}
+	ch->ops->resume_io(ch);
+	if (ch->recv_queue->current_qlen > 0) {
 		return TRUE;
-	 }
-  }
-  return FALSE;
+	}
+
+	return ch->ch_status != IPC_CONNECT;
 }
 
 static gboolean
@@ -453,158 +480,231 @@ socket_assert_auth(struct IPC_CHANNEL *ch, GHashTable *auth)
 
 
 static int
-socket_resume_io(struct IPC_CHANNEL *ch)
+socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 {
-  int len,msg_len;
-  struct IPC_MESSAGE *msg;
-  struct SOCKET_CH_PRIVATE* conn_info;
-  GList *element;
-  struct SOCKET_MSG_HEAD head;
-  char *msg_begin = NULL;
-  gboolean new_msg = FALSE;
+	struct SOCKET_CH_PRIVATE*	conn_info;
+	int				retcode = IPC_OK;
+	
 
-  conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
-  
-  while (ch->ch_status == IPC_CONNECT
-  &&		ch->recv_queue->current_qlen < ch->recv_queue->max_qlen) {
-    /* check how much data queued. */
-    if(ioctl(conn_info->s, FIONREAD,&len) < 0){
-      cl_perror("socket_resume_io: ioctl FIONREAD failed");
-      return IPC_FAIL;
-    }
+	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
+	*started = FALSE;
+ 
+	while (ch->ch_status == IPC_CONNECT
+	&&	ch->recv_queue->current_qlen < ch->recv_queue->max_qlen
+	&&	retcode == IPC_OK) {
 
-    if(len <= 0) break;
-    if(conn_info->remaining_data != 0){
-	new_msg = FALSE;
-	len = conn_info->remaining_data;
-	msg = conn_info->buf_msg;
-	msg_begin = (char *) msg->msg_body + (msg->msg_len - len); 
-    }else{
-	msg_begin = (char *)&head;
-	new_msg = TRUE;
-    }
+		gboolean			new_msg;
+		void *				msg_begin;
+		int				msg_len;
+		struct SOCKET_MSG_HEAD		head;
+		int				len;
 
-    if(new_msg){
-      msg_len = recv(conn_info->s, (char *)&head , sizeof(struct SOCKET_MSG_HEAD) ,MSG_DONTWAIT );
-    }else{
-      msg_len = recv(conn_info->s, msg_begin, len , MSG_DONTWAIT);
-    }
-    if (msg_len < 0){
-      if(errno == EAGAIN) {
-	break;
-      }else if( errno == ECONNREFUSED){
-	ch->ch_status = IPC_DISCONNECT;
-	return IPC_BROKEN;
-      }else{
-	ch->ch_status = IPC_DISCONNECT;
-	return IPC_FAIL;
-      }
-    }
 
-    if (msg_len > 0) {
-      if(new_msg){
-	msg = socket_message_new(ch, head.msg_len + 1);
-	msg->msg_done = socket_free_message;
-	msg->msg_ch = ch;
-	msg->msg_len = head.msg_len;
-	conn_info->buf_msg = msg;
-	conn_info->remaining_data = head.msg_len;
-	msg = NULL;
-      }else{
-	if(msg_len == conn_info->remaining_data){
-	  ch->recv_queue->queue
-          =	g_list_append(ch->recv_queue->queue, conn_info->buf_msg);
+		new_msg = (conn_info->remaining_data == 0);
+
+		if (new_msg) {
+			len = sizeof(struct SOCKET_MSG_HEAD);
+			msg_begin = &head;
+		}else{
+			struct IPC_MESSAGE * msg = conn_info->buf_msg;
+			len = conn_info->remaining_data;
+			msg_begin = ((char*)msg->msg_body)
+			+	(msg->msg_len - len);
+		}
+
+		/* Now try to receive some data */
+
+		msg_len = recv(conn_info->s, msg_begin, len, MSG_DONTWAIT);
+
+		if (msg_len == 0) {
+			/* We don't think this should happen */
+			break;
+		}
+		if (msg_len < 0) {
+			switch (errno) {
+				case EAGAIN:
+					break;
+
+				case ECONNREFUSED:
+					ch->ch_status = IPC_DISCONNECT;
+					retcode = IPC_BROKEN;
+					break;
+
+				default:
+					cl_perror("socket_resume_read: recv");
+					ch->ch_status = IPC_DISCONNECT;
+					retcode = IPC_FAIL;
+					break;
+			}
+			break; /* out of loop */
+    		}
+		*started=TRUE;
+
 #if 0
-          cl_log(LOG_DEBUG, "channel: 0x%lx", (unsigned long)ch);
-          cl_log(LOG_DEBUG, "New recv_queue = 0x%lx"
-	  ,	(unsigned long)ch->recv_queue);
-          cl_log(LOG_DEBUG, "buf_msg: len = %ld, body =  0x%lx"
-	  ,	conn_info->buf_msg->msg_len
-	  ,	(unsigned long)conn_info->buf_msg->msg_body);
+		cl_log(LOG_DEBUG, "Got %d byte message", msg_len);
+		cl_log(LOG_DEBUG, "Contents: %s", (char*)msg_begin);
 #endif
-	  ch->recv_queue->current_qlen++;
-	  conn_info->buf_msg = NULL;
-	  conn_info->remaining_data = 0;
-	}else if(msg_len < conn_info->remaining_data){
-	  conn_info->remaining_data = conn_info->remaining_data - msg_len;
-	}else{
-	  /* Wrong! */
-	  cl_log(LOG_INFO, " received more data than expected");
-	  return IPC_FAIL;
+
+
+		if (new_msg){
+			conn_info->buf_msg
+			= socket_message_new(ch, head.msg_len);
+			conn_info->remaining_data = head.msg_len;
+			/* Next time we'll read the message body */
+			continue;
+		}
+
+
+		/* We received (more) data from an old message */
+
+		conn_info->remaining_data = conn_info->remaining_data
+		-	msg_len;
+
+		if (conn_info->remaining_data < 0){
+			cl_log(LOG_CRIT, "received more data than expected");
+			conn_info->remaining_data = 0;
+			retcode = IPC_FAIL;
+
+		}else if (conn_info->remaining_data == 0){
+#if 0
+			cl_log(LOG_DEBUG, "channel: 0x%lx"
+			,	(unsigned long)ch);
+			cl_log(LOG_DEBUG, "New recv_queue = 0x%lx"
+			,	(unsigned long)ch->recv_queue);
+			cl_log(LOG_DEBUG, "buf_msg: len = %ld, body =  0x%lx"
+			,	(unsigned long)conn_info->buf_msg->msg_len
+			,	(unsigned long)conn_info->buf_msg->msg_body);
+			cl_log(LOG_DEBUG, "buf_msg: contents: %s"
+			,	(char *)conn_info->buf_msg->msg_body);
+#endif
+
+			/* Got the last of the message! */
+
+			/* Append gotten message to receive queue */
+	  		ch->recv_queue->queue =	g_list_append
+			(	ch->recv_queue->queue, conn_info->buf_msg);
+			ch->recv_queue->current_qlen++;
+			conn_info->buf_msg = NULL;
+		}
 	}
-      }
-    }else{
-      break;
-    }
-  }
+
+	if (retcode != IPC_OK) {
+		return retcode;
+	}
+	return ch->ch_status == IPC_CONNECT ? IPC_OK : IPC_BROKEN;
+}
+
+static int
+socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
+{
+	int				retcode = IPC_OK;
+	struct SOCKET_CH_PRIVATE*	conn_info;
+
+
+	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
+	*started = FALSE;
   
  
-  len = 0;
-  while (ch->ch_status == IPC_CONNECT
-  &&		len >=0 && ch->send_queue->current_qlen >0) {
+	while (ch->ch_status == IPC_CONNECT
+	&&		retcode == IPC_OK
+	&&		ch->send_queue->current_qlen > 0) {
 
-    element = g_list_first(ch->send_queue->queue);
-    if (element != NULL) {
-      msg = (struct IPC_MESSAGE *) (element->data);
-      head.msg_len = msg->msg_len;
+		GList *				element;
+		struct IPC_MESSAGE *		msg;
+		struct SOCKET_MSG_HEAD		head;
+		int				sendrc = 0;
 
-      len=send(conn_info->s, (char *)&head
-      ,			sizeof(struct SOCKET_MSG_HEAD)
-      ,			(MSG_DONTWAIT|MSG_NOSIGNAL));
+		element = g_list_first(ch->send_queue->queue);
+		if (element == NULL) {
+			/* OOPS!  - correct consistency problem */
+			ch->send_queue->current_qlen = 0;
+			break;
+		}
+		msg = (struct IPC_MESSAGE *) (element->data);
+		head.msg_len = msg->msg_len;
 
-      if (len < 0){
-	if(errno == EAGAIN) {
-	  break;
-	}else if (errno == EPIPE){
-	  ch->ch_status = IPC_DISCONNECT;
-	  return IPC_BROKEN;
-	}else{
-	  ch->ch_status = IPC_DISCONNECT;
-	  return IPC_FAIL;	  
-	}
-      }
+		/* Send message header */
+		sendrc=send(conn_info->s, (char *)&head
+		,	sizeof(struct SOCKET_MSG_HEAD)
+		,	(MSG_DONTWAIT|MSG_NOSIGNAL));
+#if 0
+		cl_log(LOG_DEBUG, "Sent %d byte message header"
+		,	sizeof(struct SOCKET_MSG_HEAD));
+#endif
 
-      if (ch->ch_status != IPC_CONNECT) {
-		break;
-      }
 
-      len=send(conn_info->s, msg->msg_body, msg->msg_len
-      ,			(MSG_DONTWAIT|MSG_NOSIGNAL));
-      if (len < 0){
-	if (errno == EAGAIN) {
-	  break;
-	}else if (errno == EPIPE){
-	  ch->ch_status = IPC_DISCONNECT;
-	  return IPC_BROKEN;
-	}else{
-	  ch->ch_status = IPC_DISCONNECT;
-	  return IPC_FAIL;	  
-	}
-      }
+		if (sendrc < 0) {
+			switch (errno) {
+				case EAGAIN:
+					break;
+				case EPIPE:
+					ch->ch_status = IPC_DISCONNECT;
+					retcode = IPC_BROKEN;
+					break;
+				default:
+					ch->ch_status = IPC_DISCONNECT;
+					cl_perror("socket_resume_write: send1");
+					retcode = IPC_FAIL;
+					break;
+			}
+			break;
+    		}
+		*started=TRUE;
+
+		/* Send message body */
+		sendrc=send(conn_info->s, msg->msg_body, msg->msg_len
+		,	(MSG_DONTWAIT|MSG_NOSIGNAL));
+
+#if 0
+		cl_log(LOG_DEBUG, "Sent %d byte message body"
+		,	msg->msg_len);
+		cl_log(LOG_DEBUG, "Contents sent: %s", (char*)msg->msg_body);
+#endif
+
+		if (sendrc < 0) {
+			switch (errno) {
+				case EAGAIN:
+					break;
+				case EPIPE:
+					ch->ch_status = IPC_DISCONNECT;
+					retcode = IPC_BROKEN;
+					break;
+				default:
+					ch->ch_status = IPC_DISCONNECT;
+					cl_perror("socket_resume_write: send2");
+					retcode = IPC_FAIL;
+					break;
+			}
+			break;
+		}
+		*started=TRUE;
     
-      if (len > 0 ) {
-	if ((size_t)len < msg->msg_len){
-	  /* 
-	   * FIXME! for stream domain socket, if the message is too big, it 
-	   * may cause part of the message cut instead of being sent out.
-	   * We may need to implement the fragmentation for sending. 
-	   * 
-	   */
-	  cl_log(LOG_ERR, "can't send all data out %d",len);
+		ch->send_queue->queue = g_list_remove(ch->send_queue->queue
+		,	msg);
+		if (msg->msg_done != NULL) {
+			msg->msg_done(msg);
+		}
+		ch->send_queue->current_qlen--;
 	}
-	ch->send_queue->queue = g_list_remove(ch->send_queue->queue, msg);
-	if (msg->msg_done != NULL) {
-	  msg->msg_done(msg);
-        }
-	ch->send_queue->current_qlen--;
-      }else{
-	cl_perror("socket_resume_io: send");
-	break;
-      }
-    }
-  }
+	if (retcode != IPC_OK) {
+		return retcode;
+	}
+	return ch->ch_status == IPC_CONNECT ? IPC_OK : IPC_BROKEN;
+}
 
-  return ch->ch_status == IPC_CONNECT ? IPC_OK : IPC_BROKEN;
+static int
+socket_resume_io(struct IPC_CHANNEL *ch)
+{
+	int		rc1, rc2;
+	gboolean	rstarted;
+	gboolean	wstarted;
+
+	do {
+		rc1 = socket_resume_io_read(ch, &rstarted);
+		rc2 = socket_resume_io_write(ch, &wstarted);
+	}while (rc1 == IPC_OK && rc2 == IPC_OK && (rstarted||wstarted));
+
+	return (rc1 != IPC_OK ? rc1 : rc2);
 }
 
 
@@ -663,6 +763,7 @@ static struct IPC_OPS socket_ops = {
   socket_send,
   socket_recv,
   socket_waitin,
+  socket_waitout,
   socket_is_message_pending,
   socket_is_sending_blocked,
   socket_resume_io,
@@ -777,7 +878,8 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   strncpy(my_addr.sun_path, path_name, sizeof(my_addr.sun_path));
     
   if (bind(s, (struct sockaddr *)&my_addr, sizeof(my_addr)) == -1) {
-    cl_perror("socket_wait_conn_new: trying to create in %s bind:", path_name);
+    cl_perror("socket_wait_conn_new: trying to create in %s bind:"
+    ,	path_name);
     close(s);
     return NULL;
   }
@@ -925,10 +1027,14 @@ ipc_channel_pair(IPC_Channel* channels[2])
 		return IPC_FAIL;
 	}
 	if ((channels[0] = socket_server_channel_new(sockets[0])) == NULL) {
+		close(sockets[0]);
+		close(sockets[1]);
 		return IPC_FAIL;
 	}
 	if ((channels[1] = socket_server_channel_new(sockets[1])) == NULL) {
 		channels[0]->ops->destroy(channels[0]);
+		close(sockets[0]);
+		close(sockets[1]);
 		return IPC_FAIL;
 	}
 	channels[0]->ch_status = IPC_CONNECT;
@@ -1040,7 +1146,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 /* get farside pid through*/
 
 pid_t
-socket_get_farside_pid(int sockfd )
+socket_get_farside_pid(int sockfd)
 {
 
   socklen_t n;

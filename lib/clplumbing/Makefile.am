@@ -46,4 +46,10 @@ libplumb_la_SOURCES	= 		\
 			timers.c	\
 			uids.c
 
+testdir = $(libdir)/@HB_PKG@
+test_PROGRAMS = ipctest
+
 libplumb_la_LDFLAGS	= -version-info 0:0:0
+
+ipctest_SOURCES = ipctest.c
+ipctest_LDADD = libplumb.la $(GLIBLIB)
