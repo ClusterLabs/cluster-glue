@@ -640,6 +640,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 					break;
 
 				case ECONNREFUSED:
+				case ECONNRESET:
 					ch->ch_status = IPC_DISCONNECT;
 					retcode = IPC_BROKEN;
 					break;
