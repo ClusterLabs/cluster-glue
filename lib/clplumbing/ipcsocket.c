@@ -62,6 +62,10 @@
 #define HA_MSG_DONTWAIT_NOSIGNAL      (MSG_DONTWAIT)
 #endif
 
+#ifndef AF_LOCAL
+#define         AF_LOCAL AF_UNIX
+#endif
+
 /* wait connection private data. */
 struct SOCKET_WAIT_CONN_PRIVATE{
   /* the path name wich the connection will be built on. */
