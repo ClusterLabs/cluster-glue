@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.30 2004/11/04 22:56:11 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.31 2004/11/04 23:53:30 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -430,7 +430,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 	int (*addfield) (struct ha_msg* msg, char* name, size_t namelen,
 			 void* value, size_t vallen, int depth);
 		
-	if (!msg || msg->names == NULL || (msg->values == NULL && vallen != 0) ) {
+	if (!msg || msg->names == NULL || (msg->values == NULL) ) {
 		cl_log(LOG_ERR,	"ha_msg_addraw_ll: cannot add field to ha_msg");
 		return(HA_FAIL);
 	}
@@ -456,7 +456,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		}
 	}
 	
-	if (name == NULL || (value == NULL && vallen > 0)
+	if (name == NULL || (value == NULL)
 	    ||	namelen <= 0 || vallen < 0) {
 		cl_log(LOG_ERR, "ha_msg_addraw_ll: "
 		       "cannot add name/value to ha_msg");
@@ -502,7 +502,7 @@ ha_msg_addraw(struct ha_msg * msg, const char * name, size_t namelen,
 	if (fieldtypefuncs[type].dup){
 		cpvalue = fieldtypefuncs[type].dup(value, vallen);	
 	}
-	if (cpvalue == NULL && vallen != 0){
+	if (cpvalue == NULL){
 		cl_log(LOG_ERR, "ha_msg_addraw: copying message failed");
 		ha_free(cpname);
 		return(HA_FAIL);
@@ -843,9 +843,10 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 			int	netstring_sizediff = 0;
 			
 			newv = fieldtypefuncs[type].dup(value,vlen);
-			if (!newv && vlen != 0){
+			if (!newv){
 				cl_log(LOG_ERR, "dupliationg message fields failed"
-				       "value=%p, vlen=%d, msg->names[j]=%s", value, vlen, msg->names[j]);
+				       "value=%p, vlen=%d, msg->names[j]=%s", 
+				       value, vlen, msg->names[j]);
 				return HA_FAIL;
 			}
 			
@@ -1755,6 +1756,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.31  2004/11/04 23:53:30  gshi
+ * when adding a binary field, even it's length is zero,
+ * I still allocate 1-byte length memory for it and store '\0' in it
+ * there no field will have a NULL value
+ *
  * Revision 1.30  2004/11/04 22:56:11  gshi
  * fixed a bug in 0-length binary field
  *
