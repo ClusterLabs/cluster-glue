@@ -41,7 +41,7 @@ PIL_rc PIL_PLUGIN_INIT(PILPlugin*us, PILPluginImports* imports, void*);
 static PIL_rc
 IfClose(PILInterface*intf, void* ud_interface)
 {
-	OurPIImports->log(PIL_DEBUG, "In Ifclose (test plugin)");
+	OurPIImports->log(PIL_INFO, "In Ifclose (test plugin)");
 	return PIL_OK;
 }
 
@@ -58,15 +58,15 @@ PIL_PLUGIN_INIT(PILPlugin*us, PILPluginImports* imports, void *user_ptr)
 	OurPIImports = imports;
 	OurPlugin = us;
 
-	imports->log(PIL_DEBUG, "Plugin %s: user_ptr = %lx"
+	imports->log(PIL_INFO, "Plugin %s: user_ptr = %lx"
 	,	PIL_PLUGINNAME, (unsigned long)user_ptr);
 
-	imports->log(PIL_DEBUG, "Registering ourselves as a plugin");
+	imports->log(PIL_INFO, "Registering ourselves as a plugin");
 
 	/* Register as a plugin */
 	imports->register_plugin(us, &OurPIExports);
  
-	imports->log(PIL_DEBUG, "Registering our interfaces");
+	imports->log(PIL_INFO, "Registering our interfaces");
 
 	/*  Register our interfaces */
 	ret = imports->register_interface
@@ -78,7 +78,8 @@ PIL_PLUGIN_INIT(PILPlugin*us, PILPluginImports* imports, void *user_ptr)
 	,	&OurIf
 	,	(void**)&OurIfImports
 	,	NULL);
-	imports->log(PIL_DEBUG, "Returning %d", ret);
+	imports->log(PIL_INFO, "test init function: returning %d"
+		,	ret);
 
 	return ret;
 }

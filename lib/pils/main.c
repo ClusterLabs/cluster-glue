@@ -31,7 +31,7 @@ main(int argc, char ** argv)
 
 
 	u = NewPILPluginUniv(MOD);
-	PILSetDebugLevel(u, NULL, NULL, 100);
+	/* PILSetDebugLevel(u, NULL, NULL, 0); */
 	PILLogMemStats();
 
 	 
@@ -41,7 +41,7 @@ main(int argc, char ** argv)
 		,	lt_dlerror());
 		/*exit(1);*/
 	}
-	PILSetDebugLevel(u, NULL, NULL, 100);
+	/* PILSetDebugLevel(u, NULL, NULL, 0); */
 
 	for (j=0; j < 10; ++j) {
 		PILLogMemStats();
