@@ -885,7 +885,7 @@ nw_rpc100s_set_config_info(Stonith* s, const char * info)
 /*
  * nw_rpc100s_getinfo - API entry point to retrieve something from the handle
  */
-const char *
+static const char *
 nw_rpc100s_getinfo(Stonith * s, int reqtype)
 {
 	struct NW_RPC100S* ctx;

@@ -642,7 +642,7 @@ rcd_serial_set_config_info(Stonith* s, const char * info)
 	return(RCD_SERIAL_parse_config_info(rcd, info));
 }
 
-const char *
+static const char *
 rcd_serial_getinfo(Stonith * s, int reqtype)
 {
 	struct RCD_SerialDevice* rcd;

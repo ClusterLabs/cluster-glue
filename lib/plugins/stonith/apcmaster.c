@@ -49,7 +49,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.4 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.5 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -251,8 +251,8 @@ static int	apcmaster_parse_config_info(struct APCMS* ms, const char * info);
 static int	apcmaster_onoff(struct APCMS*, int outletnum, const char * unitid
 ,		int request);
 #endif
-void	apcmaster_destroy(Stonith *);
-void *	apcmaster_new(void);
+static void	apcmaster_destroy(Stonith *);
+static void *	apcmaster_new(void);
 
 /*
  *	We do these things a lot.  Here are a few shorthand macros.
@@ -634,7 +634,7 @@ MSNametoOutlet(struct APCMS* ms, const char * name)
 	return(ret);
 }
 
-int
+static int
 apcmaster_status(Stonith  *s)
 {
 	struct APCMS*	ms;
@@ -668,7 +668,7 @@ apcmaster_status(Stonith  *s)
  *	Return the list of hosts (outlet names) for the devices on this MS unit
  */
 
-char **
+static char **
 apcmaster_hostlist(Stonith  *s)
 {
 	char		NameMapping[128];
@@ -769,7 +769,7 @@ apcmaster_hostlist(Stonith  *s)
 	return(ret);
 }
 
-void
+static void
 apcmaster_free_hostlist (char ** hlist)
 {
 	char **	hl = hlist;
@@ -853,7 +853,7 @@ MS_connect_device(struct APCMS * ms)
 /*
  *	Reset the given host on this Stonith device.  
  */
-int
+static int
 apcmaster_reset_req(Stonith * s, int request, const char * host)
 {
 	int	rc = 0;
@@ -911,7 +911,7 @@ apcmaster_reset_req(Stonith * s, int request, const char * host)
  *	Parse the information in the given configuration file,
  *	and stash it away...
  */
-int
+static int
 apcmaster_set_config_file(Stonith* s, const char * configname)
 {
 	FILE *	cfgfile;
@@ -942,7 +942,7 @@ apcmaster_set_config_file(Stonith* s, const char * configname)
 /*
  *	Parse the config information in the given string, and stash it away...
  */
-int
+static int
 apcmaster_set_config_info(Stonith* s, const char * info)
 {
 	struct APCMS* ms;
@@ -955,7 +955,7 @@ apcmaster_set_config_info(Stonith* s, const char * info)
 
 	return(apcmaster_parse_config_info(ms, info));
 }
-const char *
+static const char *
 apcmaster_getinfo(Stonith * s, int reqtype)
 {
 	struct APCMS* ms;
@@ -1009,7 +1009,7 @@ apcmaster_getinfo(Stonith * s, int reqtype)
 /*
  *	APC MasterSwitch Stonith destructor...
  */
-void
+static void
 apcmaster_destroy(Stonith *s)
 {
 	struct APCMS* ms;
@@ -1046,7 +1046,7 @@ apcmaster_destroy(Stonith *s)
 
 /* Create a new APC Master Switch Stonith device. */
 
-void *
+static void *
 apcmaster_new(void)
 {
 	struct APCMS*	ms = MALLOCT(struct APCMS);

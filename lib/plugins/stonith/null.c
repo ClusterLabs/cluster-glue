@@ -369,7 +369,7 @@ null_set_config_info(Stonith* s, const char * info)
 	return(NULL_parse_config_info(nd, info));
 }
 
-const char *
+static const char *
 null_getinfo(Stonith * s, int reqtype)
 {
 	struct NullDevice* nd;

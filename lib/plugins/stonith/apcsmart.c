@@ -687,7 +687,7 @@ APC_parse_config_info(struct APCDevice *ad, const char *info )
  * return the status for this device 
  */
 
-int
+static int
 apcsmart_status(Stonith * s)
 {
     struct APCDevice *ad;
@@ -730,7 +730,7 @@ apcsmart_status(Stonith * s)
  * return the list of hosts configured for this device 
  */
 
-char **
+static char **
 apcsmart_hostlist(Stonith * s)
 {
     int numhosts;
@@ -780,7 +780,7 @@ apcsmart_hostlist(Stonith * s)
  * free the hostlist 
  */
 
-void
+static void
 apcsmart_free_hostlist(char **hlist)
 {
     char **hl = hlist;
@@ -806,7 +806,7 @@ apcsmart_free_hostlist(char **hlist)
  * reset the host 
  */
 
-int
+static int
 apcsmart_reset_req(Stonith * s, int request, const char *host)
 {
     struct APCDevice *ad;
@@ -883,7 +883,7 @@ apcsmart_reset_req(Stonith * s, int request, const char *host)
  * and stash it away... 
  */
 
-int
+static int
 apcsmart_set_config_file(Stonith * s, const char *configname)
 {
     FILE *cfgfile;
@@ -918,7 +918,7 @@ apcsmart_set_config_file(Stonith * s, const char *configname)
  * Parse the config information in the given string, and stash it away... 
  */
 
-int
+static int
 apcsmart_set_config_info(Stonith * s, const char *info)
 {
     struct APCDevice *ad;
@@ -945,7 +945,7 @@ apcsmart_set_config_info(Stonith * s, const char *info)
  * get info about the stonith device 
  */
 
-const char *
+static const char *
 apcsmart_getinfo(Stonith * s, int reqtype)
 {
     struct APCDevice *ad;
@@ -1000,7 +1000,7 @@ apcsmart_getinfo(Stonith * s, int reqtype)
  * APC Stonith destructor... 
  */
 
-void
+static void
 apcsmart_destroy(Stonith * s)
 {
     struct APCDevice *ad;
@@ -1037,7 +1037,7 @@ apcsmart_destroy(Stonith * s)
  * static 
  */
 
-void *
+static void *
 apcsmart_new(void)
 {
     struct APCDevice *ad = MALLOCT(struct APCDevice);

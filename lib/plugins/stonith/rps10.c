@@ -1038,7 +1038,7 @@ rps10_set_config_info(Stonith* s, const char * info)
 /*
  * rps10_getinfo - API entry point to retrieve something from the handle
  */
-const char *
+static const char *
 rps10_getinfo(Stonith * s, int reqtype)
 {
 	struct WTI_RPS10* ctx;
