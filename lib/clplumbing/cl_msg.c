@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.6 2004/04/17 13:45:13 alan Exp $ */
+/* $Id: cl_msg.c,v 1.7 2004/04/21 14:33:56 msoffen Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1571,7 +1571,7 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 	if (bp > buf + len){
 
 		cl_log(LOG_ERR, "msg2string_buf: out of memory bound,"
-		       "bp=%p, buf + len=%p, len=%zd \n",
+		       "bp=%p, buf + len=%p, len=%xd \n",
 		       bp, buf + len, len);
 
 		cl_log_message(m);
@@ -1783,6 +1783,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.7  2004/04/21 14:33:56  msoffen
+ * %z is not a standard formatting character.  Changed to a %x
+ *
  * Revision 1.6  2004/04/17 13:45:13  alan
  * More FreeBSD/64-bit problems fixed.  Problems found by ward.viaene@student.khleuven.be.
  *
