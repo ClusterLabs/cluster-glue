@@ -535,6 +535,7 @@ extern void ipc_destroy_auth(IPC_Auth * auth);
 
 #define	IPC_PATH_ATTR		"path"		/* pathname attribute */
 #define	IPC_DOMAIN_SOCKET	"uds"		/* Unix domain socket */
+#define IPC_MODE_ATTR           "sockmode"      /* socket mode attribute */
 
 #ifdef IPC_DOMAIN_SOCKET
 #	define	IPC_ANYTYPE		IPC_DOMAIN_SOCKET
