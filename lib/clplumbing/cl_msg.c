@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.63 2005/03/15 01:37:38 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.64 2005/03/18 23:22:16 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1635,32 +1635,39 @@ msgfromstream_netstring(FILE * f)
 
 /* Return the next message found in the IPC channel */
 static struct ha_msg*
-msgfromIPC_ll(IPC_Channel * ch, int need_auth)
+msgfromIPC_ll(IPC_Channel * ch, int flag)
 {
 	int		rc;
 	IPC_Message*	ipcmsg;
 	struct ha_msg*	hmsg;
-
+	int		need_auth = flag & MSG_NEEDAUTH;
+	int		allow_intr = flag & MSG_ALLOWINTR;
+	
+ startwait:
 	rc = ch->ops->waitin(ch);
-
+	
 	switch(rc) {
-		default:
-		case IPC_FAIL:
-			cl_perror("msgfromIPC: waitin failure");
+	default:
+	case IPC_FAIL:
+		cl_perror("msgfromIPC: waitin failure");
+		return NULL;
+		
+	case IPC_BROKEN:
+		sleep(1);
+		return NULL;
+		
+	case IPC_INTR:
+		if ( allow_intr){
+			goto startwait;
+		}else{
 			return NULL;
-
-		case IPC_BROKEN:
-			sleep(1);
-			return NULL;
-
-		case IPC_INTR:
-			return NULL;
-
-		case IPC_OK:
-			break;
+		}
+		
+	case IPC_OK:
+		break;
 	}
-
-
+	
+	
 	ipcmsg = NULL;
 	rc = ch->ops->recv(ch, &ipcmsg);
 #if 0
@@ -1687,16 +1694,19 @@ msgfromIPC_ll(IPC_Channel * ch, int need_auth)
 
 /* Return the next message found in the IPC channel */
 struct ha_msg*
-msgfromIPC(IPC_Channel * ch)
+msgfromIPC(IPC_Channel * ch, int flag)
 {
-	return msgfromIPC_ll(ch, 1);
+	return msgfromIPC_ll(ch, flag);
 }
 
 
 struct ha_msg*
 msgfromIPC_noauth(IPC_Channel * ch)
 {
-	return msgfromIPC_ll(ch, 0);
+	int flag = 0;
+	
+	flag |= MSG_ALLOWINTR;
+	return msgfromIPC_ll(ch, flag);
 }
 
 
@@ -2277,6 +2287,15 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.64  2005/03/18 23:22:16  gshi
+ * add a parameter (int flag) to msgfromIPC()
+ * flag can have the following bit set
+ * if (flag & MSG_NEEDAUTH): authentication is required for the message
+ * if (flag & MSG_ALLOWINTR): if there is interruption which causes recv() to return
+ * 			   return NULL.
+ *
+ * most of time, it is called with flag = 0
+ *
  * Revision 1.63  2005/03/15 01:37:38  gshi
  * fix IA64 compiling warnings
  *
