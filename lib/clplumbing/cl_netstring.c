@@ -80,11 +80,13 @@ compose_netstring(char * s, const char * smax, const char* data,
 	}
 
 	sp += sprintf(sp, "%ld:", (long)len);
-
-	memcpy(sp, data, len);
+	
+	if(data){
+		memcpy(sp, data, len);
+	}
 	sp += len;
 	*sp++ = ',';
-
+	
 	*comlen = sp - s;
 
 	return(HA_OK);
@@ -228,7 +230,7 @@ peel_netstring(const char * s, const char * smax, int* len,
 		return(HA_FAIL);
 	}
 
-	if (*len <= 0){
+	if (*len < 0){
 		return(HA_FAIL);
 	}
 
@@ -241,9 +243,9 @@ peel_netstring(const char * s, const char * smax, int* len,
 	}
 
 	sp ++;
-
-	*data = sp;
-
+	
+	*data = *len ==0? NULL: sp;
+	
 	sp += (*len);
 	if (*sp != ','){
 		return(HA_FAIL);
@@ -387,10 +389,7 @@ netstring2msg(const char *s, size_t length, int need_auth)
 		
 		if (memfree && ret_value){
 			memfree(ret_value);
-		} else{
-			cl_log(LOG_ERR, "netstring2msg:"
-			       "memfree or ret_value is NULL");
-		}
+		} 
 	}
 	
 	/* if program runs here,
