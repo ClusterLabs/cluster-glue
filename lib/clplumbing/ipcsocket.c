@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.107 2004/12/01 22:04:42 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.108 2004/12/01 22:22:48 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1306,7 +1306,7 @@ socket_new_ipcmsg(IPC_Channel* ch, const void* data, int len, void* private)
 	char*	buf;
 	char*	body;
 
-	if (ch == NULL){
+	if (ch == NULL || len < 0){
 		cl_log(LOG_ERR, "socket_new_ipcmsg:"
 		       " invalid parameter");
 		return NULL;
@@ -1325,7 +1325,7 @@ socket_new_ipcmsg(IPC_Channel* ch, const void* data, int len, void* private)
 	
 	memset(hdr, 0, sizeof(*hdr));
 	
-	if (len >= 0){
+	if (len > 0){
 		if ((copy = (char*)g_malloc(ch->msgpad + len)) == NULL) {
 			g_free(hdr);
 			return NULL;
