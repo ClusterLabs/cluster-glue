@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.14 2004/09/20 18:44:04 msoffen Exp $ */
+/* $Id: apcmaster.c,v 1.15 2004/10/05 14:26:16 lars Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -50,21 +50,12 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.14 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.15 $"; 
 
-#include <portability.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <libintl.h>
-#include <sys/wait.h>
-#include <glib.h>
+#define	DEVICE	"APC MasterSwitch"
 
-#include <stonith/stonith.h>
-#define PIL_PLUGINTYPE          STONITH_TYPE
-#define PIL_PLUGINTYPE_S        STONITH_TYPE_S
+#include "stonith_plugin_common.h"
+
 #define PIL_PLUGIN              apcmaster
 #define PIL_PLUGIN_S            "apcmaster"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
@@ -72,31 +63,6 @@ static const char *version __attribute__ ((unused)) = "$Revision: 1.14 $";
 #include <pils/plugin.h>
 
 #include "stonith_signal.h"
-
-/*
- * apcmasterclose is called as part of unloading the apcmaster STONITH plugin.
- * If there was any global data allocated, or file descriptors opened, etc.
- * which is associated with the plugin, and not a single interface
- * in particular, here's our chance to clean it up.
- */
-
-static void
-apcmasterclosepi(PILPlugin*pi)
-{
-}
-
-
-/*
- * apcmastercloseintf called as part of shutting down the apcmaster STONITH
- * interface.  If there was any global data allocated, or file descriptors
- * opened, etc.  which is associated with the apcmaster implementation,
- * here's our chance to clean it up.
- */
-static PIL_rc
-apcmastercloseintf(PILInterface* pi, void* pd)
-{
-	return PIL_OK;
-}
 
 static void *		apcmaster_new(void);
 static void		apcmaster_destroy(Stonith *);
@@ -106,7 +72,6 @@ static const char *	apcmaster_getinfo(Stonith * s, int InfoType);
 static int		apcmaster_status(Stonith * );
 static int		apcmaster_reset_req(Stonith * s, int request, const char * host);
 static char **		apcmaster_hostlist(Stonith  *);
-static void		apcmaster_free_hostlist(char **);
 
 static struct stonith_ops apcmasterOps ={
 	apcmaster_new,		/* Create new STONITH object	*/
@@ -117,22 +82,16 @@ static struct stonith_ops apcmasterOps ={
 	apcmaster_status,		/* Return STONITH device status	*/
 	apcmaster_reset_req,		/* Request a reset */
 	apcmaster_hostlist,		/* Return list of supported hosts */
-	apcmaster_free_hostlist	/* free above list */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, apcmasterclosepi);
+PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
 static StonithImports*		OurImports;
 static void*			interfprivate;
 
-#define LOG		PluginImports->log
-#define MALLOC		PluginImports->alloc
-#define STRDUP  	PluginImports->mstrdup
-#define FREE		PluginImports->mfree
-#define EXPECT_TOK	OurImports->ExpectToken
-#define STARTPROC	OurImports->StartProcess
+#include "stonith_expect_helpers.h"
 
 PIL_rc
 PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
@@ -153,23 +112,18 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  	return imports->register_interface(us, PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
 	,	&apcmasterOps
-	,	apcmastercloseintf		/*close */
+	,	NULL		/*close */
 	,	&OurInterface
 	,	(void*)&OurImports
 	,	&interfprivate); 
 }
 
-#define	DEVICE	"APC MasterSwitch"
-
-#define N_(text)	(text)
-#define _(text)		dgettext(ST_TEXTDOMAIN, text)
-
 /*
  *	I have an AP9211.  This code has been tested with this switch.
  */
 
-struct APCMS {
-	const char *	MSid;
+struct pluginDevice {
+	const char *	pluginid;
 	char *		idinfo;
 	char *		unitid;
 	pid_t		pid;
@@ -181,30 +135,8 @@ struct APCMS {
 	char *		passwd;
 };
 
-static const char * MSid = "APCMS-Stonith";
-static const char * NOTmsid = "Hey dummy, this has been destroyed (APCMS)";
-
-#define	ISAPCMS(i)	(((i)!= NULL && (i)->pinfo != NULL)	\
-	&& ((struct APCMS *)(i->pinfo))->MSid == MSid)
-
-#define	ISCONFIGED(i)	(ISAPCMS(i) && ((struct APCMS *)(i->pinfo))->config)
-
-#ifndef MALLOCT
-#	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
-#endif
-
-#define WHITESPACE	" \t\n\r\f"
-
-#define	REPLSTR(s,v)	{					\
-			if ((s) != NULL) {			\
-				FREE(s);			\
-				(s)=NULL;			\
-			}					\
-			(s) = STRDUP(v);			\
-			if ((s) == NULL) {			\
-				PILCallLog(PluginImports->log,PIL_CRIT, "%s",  _("out of memory"));\
-			} 					\
-			}
+static const char * pluginid = "APCMS-Stonith";
+static const char * NOTpluginID = "Hey dummy, this has been destroyed (APCMS)";
 
 /*
  *	Different expect strings that we get from the APC MasterSwitch
@@ -220,126 +152,60 @@ static struct Etoken Prompt[] =	{ {"> ", 0, 0} ,{NULL,0,0}};
 static struct Etoken LoginOK[] =	{ {APCMSSTR, 0, 0}
                     , {"User Name :", 1, 0} ,{NULL,0,0}};
 static struct Etoken Separator[] =	{ {"-----", 0, 0} ,{NULL,0,0}};
-/* Accept either a CR/NL or an NL/CR */
-static struct Etoken CRNL[] =		{ {"\n\r",0,0},{"\r\n",0,0},{NULL,0,0}};
 
 /* We may get a notice about rebooting, or a request for confirmation */
 static struct Etoken Processing[] =	{ {"Press <ENTER> to continue", 0, 0}
 				,	{"Enter 'YES' to continue", 1, 0}
 				,	{NULL,0,0}};
 
-static int	MSLookFor(struct APCMS* ms, struct Etoken * tlist, int timeout);
-static int	MS_connect_device(struct APCMS * ms);
-static int	MSLogin(struct APCMS * ms);
-static int	MSRobustLogin(struct APCMS * ms);
-static int	MSNametoOutlet(struct APCMS*, const char * name);
-static int	MSReset(struct APCMS*, int outletNum, const char * host);
-static int	MSScanLine(struct APCMS* ms, int timeout, char * buf, int max);
-static int	MSLogout(struct APCMS * ms);
-static void	MSkillcomm(struct APCMS * ms);
+static int	MS_connect_device(struct pluginDevice * ms);
+static int	MSLogin(struct pluginDevice * ms);
+static int	MSRobustLogin(struct pluginDevice * ms);
+static int	MSNametoOutlet(struct pluginDevice*, const char * name);
+static int	MSReset(struct pluginDevice*, int outletNum, const char * host);
+static int	MSLogout(struct pluginDevice * ms);
 
-static int	apcmaster_parse_config_info(struct APCMS* ms, const char * info);
+static int	apcmaster_parse_config_info(struct pluginDevice* ms, const char * info);
 
 #if defined(ST_POWERON) && defined(ST_POWEROFF)
-static int	apcmaster_onoff(struct APCMS*, int outletnum, const char * unitid
+static int	apcmaster_onoff(struct pluginDevice*, int outletnum, const char * unitid
 ,		int request);
 #endif
 static void	apcmaster_destroy(Stonith *);
 static void *	apcmaster_new(void);
 
-/*
- *	We do these things a lot.  Here are a few shorthand macros.
- */
-
-#define	SEND(s)         (write(ms->wrfd, (s), strlen(s)))
-
-#define	EXPECT(p,t)	{						\
-			if (MSLookFor(ms, p, t) < 0)			\
-				return(errno == ETIMEDOUT			\
-			?	S_TIMEOUT : S_OOPS);			\
-			}
-
-#define	NULLEXPECT(p,t)	{						\
-				if (MSLookFor(ms, p, t) < 0)		\
-					return(NULL);			\
-			}
-
-#define	SNARF(s, to)	{						\
-				if (MSScanLine(ms,to,(s),sizeof(s))	\
-				!=	S_OK)				\
-					return(S_OOPS);			\
-			}
-
-#define	NULLSNARF(s, to)	{					\
-				if (MSScanLine(ms,to,(s),sizeof(s))	\
-				!=	S_OK)				\
-					return(NULL);			\
-				}
-
-/* Look for any of the given patterns.  We don't care which */
-
-static int
-MSLookFor(struct APCMS* ms, struct Etoken * tlist, int timeout)
-{
-	int	rc;
-
-	if ((rc = EXPECT_TOK(ms->rdfd, tlist, timeout, NULL, 0)) < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s %s %s"
-		,	_("Did not find string"), tlist[0].string, _("from " DEVICE "."));
-		MSkillcomm(ms);
-	}
-	return(rc);
-}
-
-/* Read and return the rest of the line */
-
-static int
-MSScanLine(struct APCMS* ms, int timeout, char * buf, int max)
-{
-	if (EXPECT_TOK(ms->rdfd, CRNL, timeout, buf, max) < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Could not read line from" DEVICE "."));
-		MSkillcomm(ms);
-		return(S_OOPS);
-	}
-	return(S_OK);
-}
-
 /* Login to the APC Master Switch */
 
 static int
-MSLogin(struct APCMS * ms)
+MSLogin(struct pluginDevice * ms)
 {
-        /*EXPECT(EscapeChar, 10);*/
-        if (MSLookFor(ms, EscapeChar, 10) < 0) {
-		sleep(1);
-		return (errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
-	}
+        EXPECT(ms->rdfd, EscapeChar, 10);
 
   	/* 
 	 * We should be looking at something like this:
          *	User Name :
 	 */
-	EXPECT(login, 10);
-	SEND(ms->user);       
-	SEND("\r");
+	EXPECT(ms->rdfd, login, 10);
+	SEND(ms->wrfd, ms->user);       
+	SEND(ms->wrfd, "\r");
 
 	/* Expect "Password  :" */
-	EXPECT(password, 10);
-	SEND(ms->passwd);
-	SEND("\r");
+	EXPECT(ms->rdfd, password, 10);
+	SEND(ms->wrfd, ms->passwd);
+	SEND(ms->wrfd, "\r");
  
-	switch (MSLookFor(ms, LoginOK, 30)) {
+	switch (StonithLookFor(ms->rdfd, LoginOK, 30)) {
 
 		case 0:	/* Good! */
-			PILCallLog(PluginImports->log,PIL_INFO, "%s", _("Successful login to " DEVICE ".")); 
+			LOG(PIL_INFO, "%s", _("Successful login to " DEVICE ".")); 
 			break;
 
 		case 1:	/* Uh-oh - bad password */
-			PILCallLog(PluginImports->log,PIL_CRIT,"%s", _("Invalid password for " DEVICE "."));
+			LOG(PIL_CRIT,"%s", _("Invalid password for " DEVICE "."));
 			return(S_ACCESS);
 
 		default:
-			MSkillcomm(ms);
+			Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
 			return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	} 
 
@@ -349,16 +215,16 @@ MSLogin(struct APCMS * ms)
 /* Attempt to login up to 20 times... */
 
 static int
-MSRobustLogin(struct APCMS * ms)
+MSRobustLogin(struct pluginDevice * ms)
 {
 	int rc = S_OOPS;
 	int j = 0;
 
 	for ( ; ; ) {
 	  if (ms->pid > 0)
-	    MSkillcomm(ms);
+	    Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
 	  if (MS_connect_device(ms) != S_OK) {	
-	    MSkillcomm(ms);
+	    Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
 	  }
 	  else {
 	    rc = MSLogin(ms);
@@ -374,94 +240,76 @@ MSRobustLogin(struct APCMS * ms)
 /* Log out of the APC Master Switch */
 
 static 
-int MSLogout(struct APCMS* ms)
+int MSLogout(struct pluginDevice* ms)
 {
 	int	rc;
 
 	/* Make sure we're in the right menu... */
- 	/*SEND("\033\033\033\033\033\033\033"); */
-        SEND("\033");
-	EXPECT(Prompt, 5);
-        SEND("\033");
-	EXPECT(Prompt, 5);
-        SEND("\033");
-	EXPECT(Prompt, 5);
-        SEND("\033");
-	EXPECT(Prompt, 5);
-	SEND("\033");
+ 	/*SEND(ms->wrfd, "\033\033\033\033\033\033\033"); */
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");
 	
 	/* Expect "> " */
-	rc = MSLookFor(ms, Prompt, 5);
+	rc = StonithLookFor(ms->rdfd, Prompt, 5);
 
 	/* "4" is logout */
-	SEND("4\r");
+	SEND(ms->wrfd, "4\r");
 
-	MSkillcomm(ms);
+	Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
 	return(rc >= 0 ? S_OK : (errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS));
 }
-static void
-MSkillcomm(struct APCMS* ms)
-{
-        if (ms->rdfd >= 0) {
-		close(ms->rdfd);
-		ms->rdfd = -1;
-	}
-	if (ms->wrfd >= 0) {
-		close(ms->wrfd);
-		ms->wrfd = -1;
-	}
-	if (ms->pid > 0) {
-		STONITH_KILL(ms->pid, SIGKILL);
-		(void)waitpid(ms->pid, NULL, 0);
-		ms->pid = -1;
-	}
-}
-
 /* Reset (power-cycle) the given outlets */
 static int
-MSReset(struct APCMS* ms, int outletNum, const char *host)
+MSReset(struct pluginDevice* ms, int outletNum, const char *host)
 {
   	char		unum[32];
 
 	/* Make sure we're in the top level menu */
-        SEND("\033");
-	EXPECT(Prompt, 5);
-        SEND("\033");
-	EXPECT(Prompt, 5);
-        SEND("\033");
-	EXPECT(Prompt, 5);
-        SEND("\033");
-	EXPECT(Prompt, 5);
-	SEND("\033");
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");
 	
 	/* Expect ">" */
-	EXPECT(Prompt, 5);
+	EXPECT(ms->rdfd, Prompt, 5);
 
 	/* Request menu 1 (Device Control) */
-	SEND("1\r");
+	SEND(ms->wrfd, "1\r");
 
 	/* Select requested outlet */
-	EXPECT(Prompt, 5);
+	EXPECT(ms->rdfd, Prompt, 5);
 	snprintf(unum, sizeof(unum), "%i\r", outletNum);
-  	SEND(unum);
+  	SEND(ms->wrfd, unum);
 
 	/* Select menu 1 (Control Outlet) */
-	EXPECT(Prompt, 5);
-	SEND("1\r");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "1\r");
 
 	/* Select menu 3 (Immediate Reboot) */
-	EXPECT(Prompt, 5);
-	SEND("3\r");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "3\r");
 
 	/* Expect "Press <ENTER> " or "Enter 'YES'" (if confirmation turned on) */
 	retry:
-	switch (MSLookFor(ms, Processing, 5)) {
+	switch (StonithLookFor(ms->rdfd, Processing, 5)) {
 		case 0: /* Got "Press <ENTER>" Do so */
-			SEND("\r");
+			SEND(ms->wrfd, "\r");
 			break;
 
 		case 1: /* Got that annoying command confirmation :-( */
-			SEND("YES\r");
+			SEND(ms->wrfd, "YES\r");
 			goto retry;
 
 		default: 
@@ -469,36 +317,36 @@ MSReset(struct APCMS* ms, int outletNum, const char *host)
 	}
 
 	
-	PILCallLog(PluginImports->log,PIL_INFO, "%s: %s", _("Host being rebooted"), host); 
+	LOG(PIL_INFO, "%s: %s", _("Host being rebooted"), host); 
 
 	/* Expect ">" */
-	if (MSLookFor(ms, Prompt, 10) < 0) {
+	if (StonithLookFor(ms->rdfd, Prompt, 10) < 0) {
 		return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
 
 	/* All Right!  Power is back on.  Life is Good! */
 
-	PILCallLog(PluginImports->log,PIL_INFO, "%s: %s", _("Power restored to host"), host);
+	LOG(PIL_INFO, "%s: %s", _("Power restored to host"), host);
 
 	/* Return to top level menu */
-	SEND("\033");
-	EXPECT(Prompt, 5);
-        SEND("\033");
-	EXPECT(Prompt, 5);
-        SEND("\033");
-	EXPECT(Prompt, 5);
-        SEND("\033");
-	EXPECT(Prompt, 5);
-	SEND("\033");
-	EXPECT(Prompt, 5);
-	SEND("\033");
+	SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");
 
 	return(S_OK);
 }
 
 #if defined(ST_POWERON) && defined(ST_POWEROFF)
 static int
-apcmaster_onoff(struct APCMS* ms, int outletNum, const char * unitid, int req)
+apcmaster_onoff(struct pluginDevice* ms, int outletNum, const char * unitid, int req)
 {
 	char		unum[32];
 
@@ -506,58 +354,58 @@ apcmaster_onoff(struct APCMS* ms, int outletNum, const char * unitid, int req)
 	int	rc;
 
 	if ((rc = MSRobustLogin(ms) != S_OK)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
 	
 	/* Make sure we're in the top level menu */
-        SEND("\033");
-	EXPECT(Prompt, 5);
-        SEND("\033");
-	EXPECT(Prompt, 5);
-        SEND("\033");
-	EXPECT(Prompt, 5);
-        SEND("\033");
-	EXPECT(Prompt, 5);
-	SEND("\033");
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+        SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");
 
 	/* Expect ">" */
-	EXPECT(Prompt, 5);
+	EXPECT(ms->rdfd, Prompt, 5);
 
 	/* Request menu 1 (Device Control) */
-	SEND("1\r");
+	SEND(ms->wrfd, "1\r");
 
 	/* Select requested outlet */
   	snprintf(unum, sizeof(unum), "%d\r", outletNum); 
-  	SEND(unum); 
+  	SEND(ms->wrfd, unum); 
 
 	/* Select menu 1 (Control Outlet) */
-	SEND("1\r");
+	SEND(ms->wrfd, "1\r");
 
 	/* Send ON/OFF command for given outlet */
-	SEND(onoff);
+	SEND(ms->wrfd, onoff);
 
 	/* Expect "Press <ENTER> " or "Enter 'YES'" (if confirmation turned on) */
 	retry:
-	switch (MSLookFor(ms, Processing, 5)) {
+	switch (StonithLookFor(ms->rdfd, Processing, 5)) {
 		case 0: /* Got "Press <ENTER>" Do so */
-			SEND("\r");
+			SEND(ms->wrfd, "\r");
 			break;
 
 		case 1: /* Got that annoying command confirmation :-( */
-			SEND("YES\r");
+			SEND(ms->wrfd, "YES\r");
 			goto retry;
 
 		default: 
 			return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
 	
-	EXPECT(Prompt, 10);
+	EXPECT(ms->rdfd, Prompt, 10);
 
 	/* All Right!  Command done. Life is Good! */
-	PILCallLog(PluginImports->log,PIL_INFO, "%s %d %s %s", _("Power to MS outlet(s)"), outletNum, _("turned"), onoff);
+	LOG(PIL_INFO, "%s %d %s %s", _("Power to MS outlet(s)"), outletNum, _("turned"), onoff);
 	/* Pop back to main menu */
-	SEND("\033\033\033\033\033\033\033\r");
+	SEND(ms->wrfd, "\033\033\033\033\033\033\033\r");
 	return(S_OK);
 }
 #endif /* defined(ST_POWERON) && defined(ST_POWEROFF) */
@@ -567,7 +415,7 @@ apcmaster_onoff(struct APCMS* ms, int outletNum, const char * unitid, int req)
  */
 
 static int
-MSNametoOutlet(struct APCMS* ms, const char * name)
+MSNametoOutlet(struct pluginDevice* ms, const char * name)
 {
 	char	NameMapping[128];
 	int	sockno;
@@ -576,32 +424,32 @@ MSNametoOutlet(struct APCMS* ms, const char * name)
 	int ret = -1;
 
 	/* Verify that we're in the top-level menu */
-	EXPECT(Prompt, 5);
-	SEND("\033");
-	EXPECT(Prompt, 5);
-	SEND("\033");	
-	EXPECT(Prompt, 5);
-	SEND("\033");
-	EXPECT(Prompt, 5);
-	SEND("\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");	
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");
 
 	/* Expect ">" */
-	EXPECT(Prompt, 5);
+	EXPECT(ms->rdfd, Prompt, 5);
 	
 	/* Request menu 1 (Device Control) */
-	SEND("1\r");
+	SEND(ms->wrfd, "1\r");
 
 	/* Expect: "-----" so we can skip over it... */
-	EXPECT(Separator, 5);
-	EXPECT(CRNL, 5);
-	EXPECT(CRNL, 5);
+	EXPECT(ms->rdfd, Separator, 5);
+	EXPECT(ms->rdfd, CRNL, 5);
+	EXPECT(ms->rdfd, CRNL, 5);
 
 	/* Looks Good!  Parse the status output */
 
 	do {
 		times++;
 		NameMapping[0] = EOS;
-		SNARF(NameMapping, 5);
+		SNARF(ms->rdfd, NameMapping, 5);
 		if (sscanf(NameMapping
 		,	"%d- %23c",&sockno, sockname) == 2) {
 
@@ -625,43 +473,35 @@ MSNametoOutlet(struct APCMS* ms, const char * name)
 	} while (strlen(NameMapping) > 2 && times < 8);
 
 	/* Pop back out to the top level menu */
-	EXPECT(Prompt, 5);
-	SEND("\033");
-	EXPECT(Prompt, 5);
-	SEND("\033");	
-	EXPECT(Prompt, 5);
-	SEND("\033");
-	EXPECT(Prompt, 5);
-	SEND("\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");	
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");
+	EXPECT(ms->rdfd, Prompt, 5);
+	SEND(ms->wrfd, "\033");
 	return(ret);
 }
 
 static int
 apcmaster_status(Stonith  *s)
 {
-	struct APCMS*	ms;
+	struct pluginDevice*	ms;
 	int	rc;
 
-	if (!ISAPCMS(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to apcmaster_status");
-		return(S_OOPS);
-	}
-	if (!ISCONFIGED(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT
-		,	"unconfigured stonith object in apcmaster_status");
-		return(S_OOPS);
-	}
-	ms = (struct APCMS*) s->pinfo;
+	ERRIFNOTCONFIGED(s,S_OOPS);
+
+	ms = (struct pluginDevice*) s->pinfo;
 
 	if ((rc = MSRobustLogin(ms) != S_OK)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
 
-
 	/* Expect ">" */
-	SEND("\033\r");
-	EXPECT(Prompt, 5);
+	SEND(ms->wrfd, "\033\r");
+	EXPECT(ms->rdfd, Prompt, 5);
 
 	return(MSLogout(ms));
 }
@@ -677,46 +517,34 @@ apcmaster_hostlist(Stonith  *s)
 	char*		NameList[64];
 	unsigned int	numnames = 0;
 	char **		ret = NULL;
-	struct APCMS*	ms;
+	struct pluginDevice*	ms;
 
+	ERRIFNOTCONFIGED(s,NULL);
 
-	if (!ISAPCMS(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to apcmaster_list_hosts");
-		return(NULL);
-	}
-	
-	if (!ISCONFIGED(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT
-		,	"unconfigured stonith object in apcmaster_list_hosts");
-		return(NULL);
-	}
-
-	ms = (struct APCMS*) s->pinfo;
+	ms = (struct pluginDevice*) s->pinfo;
 		
 	if (MSRobustLogin(ms) != S_OK) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
 		return(NULL);
 	}
 
-
 	/* Expect ">" */
-	NULLEXPECT(Prompt, 10);
+	NULLEXPECT(ms->rdfd, Prompt, 10);
 
 	/* Request menu 1 (Device Control) */
-	SEND("1\r");
-	
+	SEND(ms->wrfd, "1\r");
 
 	/* Expect: "-----" so we can skip over it... */
-	NULLEXPECT(Separator, 5);
-	NULLEXPECT(CRNL, 5);
-	NULLEXPECT(CRNL, 5);
+	NULLEXPECT(ms->rdfd, Separator, 5);
+	NULLEXPECT(ms->rdfd, CRNL, 5);
+	NULLEXPECT(ms->rdfd, CRNL, 5);
 
 	/* Looks Good!  Parse the status output */
 	do {
 		int	sockno;
 		char	sockname[64];
 		NameMapping[0] = EOS;
-		NULLSNARF(NameMapping, 5);
+		NULLSNARF(ms->rdfd, NameMapping, 5);
 		if (sscanf(NameMapping
 		,	"%d- %23c",&sockno, sockname) == 2) {
 
@@ -737,7 +565,7 @@ apcmaster_hostlist(Stonith  *s)
 				break;
 			}
 			if ((nm = (char*)STRDUP(sockname)) == NULL) {
-				PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+				LOG(PIL_CRIT, "out of memory");
 				return(NULL);
 			}
 			g_strdown(nm);
@@ -748,20 +576,20 @@ apcmaster_hostlist(Stonith  *s)
 	} while (strlen(NameMapping) > 2);
 
 	/* Pop back out to the top level menu */
-    	SEND("\033");
-        NULLEXPECT(Prompt, 10);
-    	SEND("\033");
-        NULLEXPECT(Prompt, 10);
-    	SEND("\033");
-        NULLEXPECT(Prompt, 10);
-    	SEND("\033");
-	NULLEXPECT(Prompt, 10);
+    	SEND(ms->wrfd, "\033");
+        NULLEXPECT(ms->rdfd, Prompt, 10);
+    	SEND(ms->wrfd, "\033");
+        NULLEXPECT(ms->rdfd, Prompt, 10);
+    	SEND(ms->wrfd, "\033");
+        NULLEXPECT(ms->rdfd, Prompt, 10);
+    	SEND(ms->wrfd, "\033");
+	NULLEXPECT(ms->rdfd, Prompt, 10);
       
 
 	if (numnames >= 1) {
 		ret = (char **)MALLOC((numnames+1)*sizeof(char*));
 		if (ret == NULL) {
-			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+			LOG(PIL_CRIT, "out of memory");
 		}else{
 			memcpy(ret, NameList, (numnames+1)*sizeof(char*));
 		}
@@ -770,28 +598,12 @@ apcmaster_hostlist(Stonith  *s)
 	return(ret);
 }
 
-static void
-apcmaster_free_hostlist (char ** hlist)
-{
-	char **	hl = hlist;
-	if (hl == NULL) {
-		return;
-	}
-	while (*hl) {
-		FREE(*hl);
-		*hl = NULL;
-		++hl;
-	}
-	FREE(hlist);
-}
-
-
 /*
  *	Parse the given configuration information, and stash it away...
  */
 
 static int
-apcmaster_parse_config_info(struct APCMS* ms, const char * info)
+apcmaster_parse_config_info(struct pluginDevice* ms, const char * info)
 {
 	static char dev[1024];
 	static char user[1024];
@@ -801,18 +613,17 @@ apcmaster_parse_config_info(struct APCMS* ms, const char * info)
 		return(S_OOPS);
 	}
 
-
 	if (sscanf(info, "%s %s %[^\n\r\t]", dev, user, passwd) == 3
 	&&	strlen(passwd) > 1) {
 
 		if ((ms->device = STRDUP(dev)) == NULL) {
-			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+			LOG(PIL_CRIT, "out of memory");
 			return(S_OOPS);
 		}
 		if ((ms->user = STRDUP(user)) == NULL) {
 			FREE(ms->device);
 			ms->device=NULL;
-			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+			LOG(PIL_CRIT, "out of memory");
 			return(S_OOPS);
 		}
 		if ((ms->passwd = STRDUP(passwd)) == NULL) {
@@ -820,7 +631,7 @@ apcmaster_parse_config_info(struct APCMS* ms, const char * info)
 			ms->device=NULL;
 			FREE(ms->user);
 			ms->user=NULL;
-			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+			LOG(PIL_CRIT, "out of memory");
 			return(S_OOPS);
 		}
 		ms->config = 1;
@@ -834,7 +645,7 @@ apcmaster_parse_config_info(struct APCMS* ms, const char * info)
  *	eventually...
  */
 static int
-MS_connect_device(struct APCMS * ms)
+MS_connect_device(struct pluginDevice * ms)
 {
 	char	TelnetCommand[256];
 
@@ -856,29 +667,22 @@ apcmaster_reset_req(Stonith * s, int request, const char * host)
 {
 	int	rc = 0;
 	int	lorc = 0;
-	struct APCMS*	ms;
+	struct pluginDevice*	ms;
 
-	if (!ISAPCMS(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s", "invalid argument to apcmaster_reset_req");
-		return(S_OOPS);
-	}
-	if (!ISCONFIGED(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT
-		,	"unconfigured stonith object in apc_master_reset_req");
-		return(S_OOPS);
-	}
-	ms = (struct APCMS*) s->pinfo;
+	ERRIFNOTCONFIGED(s,S_OOPS);
+
+	ms = (struct pluginDevice*) s->pinfo;
 
 	if ((rc = MSRobustLogin(ms)) != S_OK) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
 		return(rc);
 	}else{
 		int noutlet; 
 		noutlet = MSNametoOutlet(ms, host);
 		if (noutlet < 1) {
-			PILCallLog(PluginImports->log,PIL_WARN, "%s %s %s [%s]"
+			LOG(PIL_WARN, "%s %s %s [%s]"
 			, ms->idinfo ,ms->unitid, _("doesn't control host"), host);
-			MSkillcomm(ms);
+			Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
 			return(S_BADHOST);
 		}
 		switch(request) {
@@ -914,16 +718,14 @@ apcmaster_set_config_file(Stonith* s, const char * configname)
 	FILE *	cfgfile;
 	char	APCMSid[256];
 
-	struct APCMS*	ms;
+	struct pluginDevice*	ms;
+	
+	ERRIFWRONGDEV(s,S_OOPS);
 
-	if (!ISAPCMS(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s", "invalid argument to apcmaster_set_config_file");
-		return(S_OOPS);
-	}
-	ms = (struct APCMS*) s->pinfo;
+	ms = (struct pluginDevice*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s %s", _("Cannot open"), configname);
+		LOG(PIL_CRIT, "%s %s", _("Cannot open"), configname);
 		return(S_BADCONFIG);
 	}
 	while (fgets(APCMSid, sizeof(APCMSid), cfgfile) != NULL){
@@ -941,30 +743,26 @@ apcmaster_set_config_file(Stonith* s, const char * configname)
 static int
 apcmaster_set_config_info(Stonith* s, const char * info)
 {
-	struct APCMS* ms;
+	struct pluginDevice* ms;
 
-	if (!ISAPCMS(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "apcmaster_set_config_info: invalid argument");
-		return(S_OOPS);
-	}
-	ms = (struct APCMS *)s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+
+	ms = (struct pluginDevice *)s->pinfo;
 
 	return(apcmaster_parse_config_info(ms, info));
 }
 static const char *
 apcmaster_getinfo(Stonith * s, int reqtype)
 {
-	struct APCMS* ms;
+	struct pluginDevice* ms;
 	const char *		ret;
 
-	if (!ISAPCMS(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "MS_idinfo: invalid argument");
-		return NULL;
-	}
+	ERRIFWRONGDEV(s,NULL);
+
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	ms = (struct APCMS *)s->pinfo;
+	ms = (struct pluginDevice *)s->pinfo;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
@@ -1008,16 +806,14 @@ apcmaster_getinfo(Stonith * s, int reqtype)
 static void
 apcmaster_destroy(Stonith *s)
 {
-	struct APCMS* ms;
+	struct pluginDevice* ms;
 
-	if (!ISAPCMS(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "apcms_del: invalid argument");
-		return;
-	}
-	ms = (struct APCMS *)s->pinfo;
+	VOIDERRIFWRONGDEV(s);
 
-	ms->MSid = NOTmsid;
-	MSkillcomm(ms);
+	ms = (struct pluginDevice *)s->pinfo;
+
+	ms->pluginid = NOTpluginID;
+	Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
 	if (ms->device != NULL) {
 		FREE(ms->device);
 		ms->device = NULL;
@@ -1045,14 +841,14 @@ apcmaster_destroy(Stonith *s)
 static void *
 apcmaster_new(void)
 {
-	struct APCMS*	ms = MALLOCT(struct APCMS);
+	struct pluginDevice*	ms = MALLOCT(struct pluginDevice);
 
 	if (ms == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(ms, 0, sizeof(*ms));
-	ms->MSid = MSid;
+	ms->pluginid = pluginid;
 	ms->pid = -1;
 	ms->rdfd = -1;
 	ms->wrfd = -1;

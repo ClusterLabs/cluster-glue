@@ -1,4 +1,4 @@
-/* $Id: nw_rpc100s.c,v 1.14 2004/09/20 18:44:04 msoffen Exp $ */
+/* $Id: nw_rpc100s.c,v 1.15 2004/10/05 14:26:17 lars Exp $ */
 /*
  *	Stonith module for Night/Ware RPC100S 
  *
@@ -25,54 +25,14 @@
  *
  */
 
-#include <portability.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <libintl.h>
-#include <sys/wait.h>
-#include <termios.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <glib.h>
+#define	DEVICE	"NW RPC100S Power Switch"
+#include "stonith_plugin_common.h"
 
-#include <stonith/stonith.h>
-#define PIL_PLUGINTYPE          STONITH_TYPE
-#define PIL_PLUGINTYPE_S        STONITH_TYPE_S
 #define PIL_PLUGIN              nw_rpc100s
 #define PIL_PLUGIN_S            "nw_rpc100s"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
-
-/*
- * nw_rpc100sclose is called as part of unloading the nw_rpc100s STONITH plugin.
- * If there was any global data allocated, or file descriptors opened, etc.
- * which is associated with the plugin, and not a single interface
- * in particular, here's our chance to clean it up.
- */
-
-static void
-nw_rpc100sclosepi(PILPlugin*pi)
-{
-}
-
-
-/*
- * nw_rpc100scloseintf called as part of shutting down the nw_rpc100s STONITH
- * interface.  If there was any global data allocated, or file descriptors
- * opened, etc.  which is associated with the nw_rpc100s implementation,
- * here's our chance to clean it up.
- */
-static PIL_rc
-nw_rpc100scloseintf(PILInterface* pi, void* pd)
-{
-	return PIL_OK;
-}
 
 static void *		nw_rpc100s_new(void);
 static void		nw_rpc100s_destroy(Stonith *);
@@ -82,7 +42,6 @@ static const char *	nw_rpc100s_getinfo(Stonith * s, int InfoType);
 static int		nw_rpc100s_status(Stonith * );
 static int		nw_rpc100s_reset_req(Stonith * s, int request, const char * host);
 static char **		nw_rpc100s_hostlist(Stonith  *);
-static void		nw_rpc100s_free_hostlist(char **);
 
 static struct stonith_ops nw_rpc100sOps ={
 	nw_rpc100s_new,		/* Create new STONITH object	*/
@@ -93,22 +52,20 @@ static struct stonith_ops nw_rpc100sOps ={
 	nw_rpc100s_status,		/* Return STONITH device status	*/
 	nw_rpc100s_reset_req,		/* Request a reset */
 	nw_rpc100s_hostlist,		/* Return list of supported hosts */
-	nw_rpc100s_free_hostlist	/* free above list */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, nw_rpc100sclosepi);
+PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
 static StonithImports*		OurImports;
 static void*			interfprivate;
 
-#define LOG		PluginImports->log
-#define MALLOC		PluginImports->alloc
-#define STRDUP  	PluginImports->mstrdup
-#define FREE		PluginImports->mfree
-#define EXPECT_TOK	OurImports->ExpectToken
-#define STARTPROC	OurImports->StartProcess
+#include "stonith_signal.h"
+
+#define DOESNT_USE_STONITHKILLCOMM
+#define DOESNT_USE_STONITHSCANLINE
+#include "stonith_expect_helpers.h"
 
 PIL_rc
 PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
@@ -129,16 +86,11 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  	return imports->register_interface(us, PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
 	,	&nw_rpc100sOps
-	,	nw_rpc100scloseintf		/*close */
+	,	NULL		/*close */
 	,	&OurInterface
 	,	(void*)&OurImports
 	,	&interfprivate); 
 }
-
-#define	DEVICE	"NW RPC100S Power Switch"
-
-#define N_(text)	(text)
-#define _(text)		dgettext(ST_TEXTDOMAIN, text)
 
 /*
    The Nightware RPS-100S is manufactured by:
@@ -191,8 +143,8 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 
 
 
-struct NW_RPC100S {
-	const char *	RPCid;
+struct pluginDevice {
+	const char *	pluginid;
 
 	char *	idinfo;  /* ??? What's this for Alan ??? */
 	char *	unitid;  /* ??? What's this for Alan ??? */
@@ -212,35 +164,13 @@ struct NW_RPC100S {
 };
 
 /* This string is used to identify this type of object in the config file */
-static const char * RPCid = "NW_RPC100S";
+static const char * pluginid = "NW_RPC100S";
 static const char * NOTrpcid = "OBJECT DESTROYED: (NW RPC100S)";
 
 #ifndef DEBUG
 #define DEBUG 0
 #endif
 static int gbl_debug = DEBUG;
-
-#define	ISNWRPC100S(i)	(((i)!= NULL && (i)->pinfo != NULL)	\
-	&& ((struct NW_RPC100S *)(i->pinfo))->RPCid == RPCid)
-
-#define	ISCONFIGED(i)	(ISNWRPC100S(i) && ((struct NW_RPC100S *)(i->pinfo))->config)
-
-#ifndef MALLOCT
-#	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
-#endif
-
-#define WHITESPACE	" \t\n\r\f"
-
-#define	REPLSTR(s,v)	{					\
-			if ((s) != NULL) {			\
-				FREE(s);			\
-				(s)=NULL;			\
-			}					\
-			(s) = STRDUP(v);			\
-			if ((s) == NULL) {			\
-				PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("out of memory"));\
-			}					\
-			}
 
 /*
  *	Different expect strings that we get from the NW_RPC100S
@@ -252,73 +182,31 @@ static struct Etoken NWtokInvalidEntry[] = { {"Invalid Entry", 0, 0}, {NULL,0,0}
 /* Accept either a CR/NL or an NL/CR */
 static struct Etoken NWtokCRNL[] =	{ {"\n\r",0,0},{"\r\n",0,0},{NULL,0,0}};
 
-static int	RPCConnect(struct NW_RPC100S * ctx);
-static int	RPCDisconnect(struct NW_RPC100S * ctx);
+static int	RPCConnect(struct pluginDevice * ctx);
+static int	RPCDisconnect(struct pluginDevice * ctx);
 
-static int	RPCReset(struct NW_RPC100S*, int unitnum, const char * rebootid);
+static int	RPCReset(struct pluginDevice*, int unitnum, const char * rebootid);
 #if defined(ST_POWERON) 
-static int	RPCOn(struct NW_RPC100S*, int unitnum, const char * rebootid);
+static int	RPCOn(struct pluginDevice*, int unitnum, const char * rebootid);
 #endif
 #if defined(ST_POWEROFF) 
-static int	RPCOff(struct NW_RPC100S*, int unitnum, const char * rebootid);
+static int	RPCOff(struct pluginDevice*, int unitnum, const char * rebootid);
 #endif
-static int	RPCNametoOutlet ( struct NW_RPC100S * ctx, const char * host );
+static int	RPCNametoOutlet ( struct pluginDevice * ctx, const char * host );
 
-static int RPC_parse_config_info(struct NW_RPC100S* ctx, const char * info);
+static int RPC_parse_config_info(struct pluginDevice* ctx, const char * info);
 
 
-/*
- *	We do these things a lot.  Here are a few shorthand macros.
- */
-
-#define	SEND(cmd, timeout)		{                       \
-	int return_val = RPCSendCommand(ctx, cmd, timeout);     \
-	if (return_val != S_OK)  return return_val;                     \
-}
-
-#define	EXPECT(p,t)	{						\
-			if (RPCLookFor(ctx, p, t) < 0)			\
-				return(errno == ETIMEDOUT		\
-			?	S_TIMEOUT : S_OOPS);			\
-			}
-
-#define	NULLEXPECT(p,t)	{						\
-				if (RPCLookFor(ctx, p, t) < 0)		\
-					return(NULL);			\
-			}
-
-#define	SNARF(s, to)	{						\
-				if (RPCScanLine(ctx,to,(s),sizeof(s))	\
-				!=	S_OK)				\
-					return(S_OOPS);			\
-			}
-
-#define	NULLSNARF(s, to)	{					\
-				if (RPCScanLine(ctx,to,(s),sizeof(s))	\
-				!=	S_OK)				\
-					return(NULL);			\
-				}
-
-/* Look for any of the given patterns.  We don't care which */
-
-static int
-RPCLookFor(struct NW_RPC100S* ctx, struct Etoken * tlist, int timeout)
-{
-	int	rc;
-	if ((rc = EXPECT_TOK(ctx->fd, tlist, timeout, NULL, 0)) < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: '%s' %s", _("Did not find string"), tlist[0].string, _(" from" DEVICE "."));
-		RPCDisconnect(ctx);
-		return(-1);
+#define        SENDCMD(cmd, timeout)              {			\
+		int return_val = RPCSendCommand(ctx, cmd, timeout);     \
+		if (return_val != S_OK)  return return_val;		\
 	}
-	return(rc);
-}
-
 
 /*
  * RPCSendCommand - send a command to the specified outlet
  */
 static int
-RPCSendCommand (struct NW_RPC100S *ctx, const char *command, int timeout)
+RPCSendCommand (struct pluginDevice *ctx, const char *command, int timeout)
 {
 	char            writebuf[64]; /* All commands are short.
 					 They should be WAY LESS
@@ -347,21 +235,21 @@ RPCSendCommand (struct NW_RPC100S *ctx, const char *command, int timeout)
 	return_val = select(ctx->fd+1, NULL, &wfds,&xfds, &tv);
 	if (return_val == 0) {
 		/* timeout waiting on serial port */
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Timeout writing to %s",
-			RPCid, ctx->device);
+		LOG(PIL_CRIT, "%s: Timeout writing to %s",
+			pluginid, ctx->device);
 		return S_TIMEOUT;
 	} else if ((return_val == -1) || FD_ISSET(ctx->fd, &xfds)) {
 		/* an error occured */
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Error before writing to %s: %s",
-			RPCid, ctx->device, strerror(errno));		
+		LOG(PIL_CRIT, "%s: Error before writing to %s: %s",
+			pluginid, ctx->device, strerror(errno));		
 		return S_OOPS;
 	}
 
 	/* send the command */
 	if (write(ctx->fd, writebuf, strlen(writebuf)) != 
 			(int)strlen(writebuf)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Error writing to  %s : %s",
-			RPCid, ctx->device, strerror(errno));
+		LOG(PIL_CRIT, "%s: Error writing to  %s : %s",
+			pluginid, ctx->device, strerror(errno));
 		return S_OOPS;
 	}
 
@@ -377,24 +265,24 @@ RPCSendCommand (struct NW_RPC100S *ctx, const char *command, int timeout)
  *
  */
 static int
-RPCReset(struct NW_RPC100S* ctx, int unitnum, const char * rebootid)
+RPCReset(struct pluginDevice* ctx, int unitnum, const char * rebootid)
 {
 
-	if (gbl_debug) printf ("Calling RPCReset (%s)\n", RPCid);
+	if (gbl_debug) printf ("Calling RPCReset (%s)\n", pluginid);
 	
 	if (ctx->fd < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device %s is not open!", RPCid, 
+		LOG(PIL_CRIT, "%s: device %s is not open!", pluginid, 
 		       ctx->device);
 		return S_OOPS;
 	}
 
 	/* send the "toggle power" command */
-	SEND("//0,0,10;\r\n", 12);
+	SENDCMD("//0,0,10;\r\n", 12);
 
 	/* Expect "OK" */
-	EXPECT(NWtokOK, 5);
+	EXPECT(ctx->fd, NWtokOK, 5);
 	if (gbl_debug) printf ("Got OK\n");
-	EXPECT(NWtokCRNL, 2);
+	EXPECT(ctx->fd, NWtokCRNL, 2);
 	if (gbl_debug) printf ("Got NL\n");
 	
 	return(S_OK);
@@ -407,21 +295,21 @@ RPCReset(struct NW_RPC100S* ctx, int unitnum, const char * rebootid)
  * RPCOn - Turn OFF the given outlet number 
  */
 static int
-RPCOn(struct NW_RPC100S* ctx, int unitnum, const char * host)
+RPCOn(struct pluginDevice* ctx, int unitnum, const char * host)
 {
 
 	if (ctx->fd < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device %s is not open!", RPCid, 
+		LOG(PIL_CRIT, "%s: device %s is not open!", pluginid, 
 		       ctx->device);
 		return S_OOPS;
 	}
 
 	/* send the "On" command */
-	SEND("//0,0,0;\r\n", 10);
+	SENDCMD("//0,0,0;\r\n", 10);
 
 	/* Expect "OK" */
-	EXPECT(NWtokOK, 5);
-	EXPECT(NWtokCRNL, 2);
+	EXPECT(ctx->fd, NWtokOK, 5);
+	EXPECT(ctx->fd, NWtokCRNL, 2);
 
 	return(S_OK);
 
@@ -434,21 +322,21 @@ RPCOn(struct NW_RPC100S* ctx, int unitnum, const char * host)
  * RPCOff - Turn Off the given outlet number 
  */
 static int
-RPCOff(struct NW_RPC100S* ctx, int unitnum, const char * host)
+RPCOff(struct pluginDevice* ctx, int unitnum, const char * host)
 {
 
 	if (ctx->fd < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device %s is not open!", RPCid, 
+		LOG(PIL_CRIT, "%s: device %s is not open!", pluginid, 
 		       ctx->device);
 		return S_OOPS;
 	}
 
 	/* send the "Off" command */
-	SEND("//0,0,*;\r\n", 10);
+	SENDCMD("//0,0,*;\r\n", 10);
 
 	/* Expect "OK" */
-	EXPECT(NWtokOK, 5);
-	EXPECT(NWtokCRNL, 2);
+	EXPECT(ctx->fd, NWtokOK, 5);
+	EXPECT(ctx->fd, NWtokCRNL, 2);
 
 	return(S_OK);
 
@@ -468,20 +356,13 @@ RPCOff(struct NW_RPC100S* ctx, int unitnum, const char * host)
 static int
 nw_rpc100s_status(Stonith  *s)
 {
-	struct NW_RPC100S*	ctx;
+	struct pluginDevice*	ctx;
 	
-	if (gbl_debug) printf ("Calling nw_rpc100s_status (%s)\n", RPCid);
+	if (gbl_debug) printf ("Calling nw_rpc100s_status (%s)\n", pluginid);
 	
-	if (!ISNWRPC100S(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RPC_status");
-		return(S_OOPS);
-	}
-	if (!ISCONFIGED(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT
-		,	"unconfigured stonith object in RPC_status");
-		return(S_OOPS);
-	}
-	ctx = (struct NW_RPC100S*) s->pinfo;
+	ERRIFNOTCONFIGED(s,S_OOPS);
+
+	ctx = (struct pluginDevice*) s->pinfo;
 	if (RPCConnect(ctx) != S_OK) {
 		return(S_OOPS);
 	}
@@ -510,30 +391,22 @@ static char **
 nw_rpc100s_hostlist(Stonith  *s)
 {
 	char **		ret = NULL;	/* list to return */
-	struct NW_RPC100S*	ctx;
+	struct pluginDevice*	ctx;
 
-	if (gbl_debug) printf ("Calling nw_rpc100s_hostlist (%s)\n", RPCid);
+	if (gbl_debug) printf ("Calling nw_rpc100s_hostlist (%s)\n", pluginid);
 	
-	if (!ISNWRPC100S(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RPC_list_hosts");
-		return(NULL);
-	}
-	if (!ISCONFIGED(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT
-		,	"unconfigured stonith object in RPC_list_hosts");
-		return(NULL);
-	}
+	ERRIFNOTCONFIGED(s,NULL);
 
-	ctx = (struct NW_RPC100S*) s->pinfo;
+	ctx = (struct pluginDevice*) s->pinfo;
 
 	ret = (char **)MALLOC(2*sizeof(char*));
 	if (ret == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 	} else {
 		ret[1]=NULL;
 		ret[0]=STRDUP(ctx->node);
 		if (ret[0] == NULL) {
-			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+			LOG(PIL_CRIT, "out of memory");
 			FREE(ret);
 			ret = NULL;
 		} else {
@@ -543,25 +416,6 @@ nw_rpc100s_hostlist(Stonith  *s)
 
 	return(ret);
 } /* end si_hostlist() */
-
-/*
- * nw_rpc100s_free_hostlist - free the result from nw_rpc100s_hostlist() 
- */
-static void
-nw_rpc100s_free_hostlist (char ** hlist)
-{
-	char **	hl = hlist;
-	if (hl == NULL) {
-		return;
-	}
-	while (*hl) {
-		FREE(*hl);
-		*hl = NULL;
-		++hl;
-	}
-	FREE(hlist);
-}
-
 
 /*
  *	Parse the given configuration information, and stash it away...
@@ -588,7 +442,7 @@ nw_rpc100s_free_hostlist (char ** hlist)
  */
 
 static int
-RPC_parse_config_info(struct NW_RPC100S* ctx, const char * info)
+RPC_parse_config_info(struct pluginDevice* ctx, const char * info)
 {
 	char *copy;
 	char *token;
@@ -606,21 +460,21 @@ RPC_parse_config_info(struct NW_RPC100S* ctx, const char * info)
 
 	copy = STRDUP(info);
 	if (!copy) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return S_OOPS;
 	}
 
 	/* Grab the serial device */
 	token = strtok (copy, " \t");
 	if (!token) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't find serial device on config line '%s'",
-		       RPCid, info);
+		LOG(PIL_CRIT, "%s: Can't find serial device on config line '%s'",
+		       pluginid, info);
 		goto token_error;		
 	}
 
 	ctx->device = STRDUP(token);
 	if (!ctx->device) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		goto token_error;
 	}
 
@@ -628,14 +482,14 @@ RPC_parse_config_info(struct NW_RPC100S* ctx, const char * info)
 	/* Grab <nodename>  */
 	token = strtok (NULL, " \t");
 	if (!token) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't find node name on config line '%s'",
-		       RPCid, info);
+		LOG(PIL_CRIT, "%s: Can't find node name on config line '%s'",
+		       pluginid, info);
 		goto token_error;		
 	}
 
 	ctx->node = STRDUP(token);
 	if (!ctx->node) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		goto token_error;
 	}
 	
@@ -668,7 +522,7 @@ token_error:
  *
  */
 static int
-RPCConnect(struct NW_RPC100S * ctx)
+RPCConnect(struct pluginDevice * ctx)
 {
   	  
 	/* Open the serial port if it isn't already open */
@@ -677,8 +531,8 @@ RPCConnect(struct NW_RPC100S * ctx)
 
 		ctx->fd = open (ctx->device, O_RDWR);
 		if (ctx->fd <0) {
-			PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't open %s : %s",
-				RPCid, ctx->device, strerror(errno));
+			LOG(PIL_CRIT, "%s: Can't open %s : %s",
+				pluginid, ctx->device, strerror(errno));
 			return S_OOPS;
 		}
 
@@ -697,16 +551,16 @@ RPCConnect(struct NW_RPC100S * ctx)
 		tio.c_lflag = ICANON;
 
 		if (tcsetattr (ctx->fd, TCSANOW, &tio) < 0) {
-			PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't set attributes %s : %s",
-				RPCid, ctx->device, strerror(errno));
+			LOG(PIL_CRIT, "%s: Can't set attributes %s : %s",
+				pluginid, ctx->device, strerror(errno));
 			close (ctx->fd);
 			ctx->fd=-1;
 			return S_OOPS;
 		}
 		/* flush all data to and fro the serial port before we start */
 		if (tcflush (ctx->fd, TCIOFLUSH) < 0) {
-			PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't flush %s : %s",
-				RPCid, ctx->device, strerror(errno));
+			LOG(PIL_CRIT, "%s: Can't flush %s : %s",
+				pluginid, ctx->device, strerror(errno));
 			close (ctx->fd);
 			ctx->fd=-1;
 			return S_OOPS;		
@@ -716,20 +570,20 @@ RPCConnect(struct NW_RPC100S * ctx)
 
 
 	/* Send a BOGUS string */
-	SEND("//0,0,BOGUS;\r\n", 10);
+	SENDCMD("//0,0,BOGUS;\r\n", 10);
 	
 	/* Should reply with "Invalid Command" */
 	if (gbl_debug) printf ("Waiting for \"Invalid Entry\"n");
-	EXPECT(NWtokInvalidEntry, 12);
+	EXPECT(ctx->fd, NWtokInvalidEntry, 12);
 	if (gbl_debug) printf ("Got Invalid Entry\n");
-	EXPECT(NWtokCRNL, 2);
+	EXPECT(ctx->fd, NWtokCRNL, 2);
 	if (gbl_debug) printf ("Got NL\n");
 	   
   return(S_OK);
 }
 
 static int
-RPCDisconnect(struct NW_RPC100S * ctx)
+RPCDisconnect(struct pluginDevice * ctx)
 {
 
   if (ctx->fd >= 0) {
@@ -753,13 +607,13 @@ RPCDisconnect(struct NW_RPC100S * ctx)
  * 
  */
 static int
-RPCNametoOutlet ( struct NW_RPC100S * ctx, const char * host )
+RPCNametoOutlet ( struct pluginDevice * ctx, const char * host )
 {
 	char *shost;
 	int rc = -1;
 	
 	if ( (shost = strdup(host)) == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "strdup failed in RPCNametoOutlet");
+		LOG(PIL_CRIT, "strdup failed in RPCNametoOutlet");
 		return -1;
 	}
 	if (!strcmp(ctx->node, host))
@@ -782,20 +636,13 @@ nw_rpc100s_reset_req(Stonith * s, int request, const char * host)
 	int	rc = S_OK;
 	int	lorc = S_OK;
 	int outletnum = -1;
-	struct NW_RPC100S*	ctx;
+	struct pluginDevice*	ctx;
 	
-	if (gbl_debug) printf ("Calling nw_rpc100s_reset (%s)\n", RPCid);
+	if (gbl_debug) printf ("Calling nw_rpc100s_reset (%s)\n", pluginid);
 	
-	if (!ISNWRPC100S(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RPC_reset_host");
-		return(S_OOPS);
-	}
-	if (!ISCONFIGED(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT
-		,	"unconfigured stonith object in RPC_reset_host");
-		return(S_OOPS);
-	}
-	ctx = (struct NW_RPC100S*) s->pinfo;
+	ERRIFNOTCONFIGED(s,S_OOPS);
+
+	ctx = (struct pluginDevice*) s->pinfo;
 
 	if ((rc = RPCConnect(ctx)) != S_OK) {
 		return(rc);
@@ -804,7 +651,7 @@ nw_rpc100s_reset_req(Stonith * s, int request, const char * host)
 	outletnum = RPCNametoOutlet(ctx, host);
 
 	if (outletnum < 0) {
-		PILCallLog(PluginImports->log,PIL_WARN, "%s %s %s[%s]",
+		LOG(PIL_WARN, "%s %s %s[%s]",
 		       ctx->idinfo, ctx->unitid, _("doesn't control host"), host);
 		RPCDisconnect(ctx);
 		return(S_BADHOST);
@@ -846,16 +693,14 @@ nw_rpc100s_set_config_file(Stonith* s, const char * configname)
 
 	char	cfgline[256];
 
-	struct NW_RPC100S*	ctx;
+	struct pluginDevice*	ctx;
 
-	if (!ISNWRPC100S(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RPC_set_configfile");
-		return(S_OOPS);
-	}
-	ctx = (struct NW_RPC100S*) s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+
+	ctx = (struct pluginDevice*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s %s", _("Cannot open"), configname);
+		LOG(PIL_CRIT, "%s %s", _("Cannot open"), configname);
 		return(S_BADCONFIG);
 	}
 
@@ -876,13 +721,11 @@ nw_rpc100s_set_config_file(Stonith* s, const char * configname)
 static int
 nw_rpc100s_set_config_info(Stonith* s, const char * info)
 {
-	struct NW_RPC100S* ctx;
+	struct pluginDevice* ctx;
 
-	if (!ISNWRPC100S(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "RPC_provide_config_info: invalid argument");
-		return(S_OOPS);
-	}
-	ctx = (struct NW_RPC100S *)s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+
+	ctx = (struct pluginDevice *)s->pinfo;
 
 	return(RPC_parse_config_info(ctx, info));
 }
@@ -893,17 +736,15 @@ nw_rpc100s_set_config_info(Stonith* s, const char * info)
 static const char *
 nw_rpc100s_getinfo(Stonith * s, int reqtype)
 {
-	struct NW_RPC100S* ctx;
+	struct pluginDevice* ctx;
 	const char *		ret;
 
-	if (!ISNWRPC100S(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "RPC_idinfo: invalid argument");
-		return NULL;
-	}
+	ERRIFWRONGDEV(s,NULL);
+
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	ctx = (struct NW_RPC100S *)s->pinfo;
+	ctx = (struct pluginDevice *)s->pinfo;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
@@ -942,15 +783,13 @@ nw_rpc100s_getinfo(Stonith * s, int reqtype)
 static void
 nw_rpc100s_destroy(Stonith *s)
 {
-	struct NW_RPC100S* ctx;
+	struct pluginDevice* ctx;
 
-	if (!ISNWRPC100S(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "nw_rpc100s_del: invalid argument");
-		return;
-	}
-	ctx = (struct NW_RPC100S *)s->pinfo;
+	VOIDERRIFWRONGDEV(s);
 
-	ctx->RPCid = NOTrpcid;
+	ctx = (struct pluginDevice *)s->pinfo;
+
+	ctx->pluginid = NOTrpcid;
 
 	/*  close the fd if open and set ctx->fd to invalid */
 	RPCDisconnect(ctx);
@@ -976,14 +815,14 @@ nw_rpc100s_destroy(Stonith *s)
 static void *
 nw_rpc100s_new(void)
 {
-	struct NW_RPC100S*	ctx = MALLOCT(struct NW_RPC100S);
+	struct pluginDevice*	ctx = MALLOCT(struct pluginDevice);
 
 	if (ctx == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(ctx, 0, sizeof(*ctx));
-	ctx->RPCid = RPCid;
+	ctx->pluginid = pluginid;
 	ctx->fd = -1;
 	ctx->config = 0;
 	ctx->device = NULL;

@@ -1,4 +1,6 @@
-/* $Id: vacm.c,v 1.7 2004/02/17 22:12:00 lars Exp $ */
+#error "This looks like it hasn't been compiled nor working for a while. Please review before using."
+
+/* $Id: vacm.c,v 1.8 2004/10/05 14:26:17 lars Exp $ */
 /******************************************************************************
 *
 *    Copyright 2000 Sistina Software, Inc.
@@ -27,48 +29,14 @@
 * 
 */
 
-#include <portability.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <libintl.h>
-#include <stonith/stonith.h>
+#include "stonith_plugin_common.h"
 #include "vacmclient_api.h"
 
-#define PIL_PLUGINTYPE          STONITH_TYPE
-#define PIL_PLUGINTYPE_S        STONITH_TYPE_S
 #define PIL_PLUGIN              vacm
 #define PIL_PLUGIN_S            "vacm"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
-
-/*
- * vacmclose is called as part of unloading the vacm STONITH plugin.
- * If there was any global data allocated, or file descriptors opened, etc.
- * which is associated with the plugin, and not a single interface
- * in particular, here's our chance to clean it up.
- */
-
-static void
-vacmclosepi(PILPlugin*pi)
-{
-}
-
-
-/*
- * vacmcloseintf called as part of shutting down the vacm STONITH
- * interface.  If there was any global data allocated, or file descriptors
- * opened, etc.  which is associated with the vacm implementation,
- * here's our chance to clean it up.
- */
-static PIL_rc
-vacmcloseintf(PILInterface* pi, void* pd)
-{
-	return PIL_OK;
-}
 
 static void *		vacm_new(void);
 static void		vacm_destroy(Stonith *);
@@ -78,7 +46,6 @@ static const char *	vacm_getinfo(Stonith * s, int InfoType);
 static int		vacm_status(Stonith * );
 static int		vacm_reset_req(Stonith * s, int request, const char * host);
 static char **		vacm_hostlist(Stonith  *);
-static void		vacm_free_hostlist(char **);
 
 static struct stonith_ops vacmOps ={
 	vacm_new,		/* Create new STONITH object	*/
@@ -89,22 +56,14 @@ static struct stonith_ops vacmOps ={
 	vacm_status,		/* Return STONITH device status	*/
 	vacm_reset_req,		/* Request a reset */
 	vacm_hostlist,		/* Return list of supported hosts */
-	vacm_free_hostlist	/* free above list */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, vacmclosepi);
+PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
 static StonithImports*		OurImports;
 static void*			interfprivate;
-
-#define LOG		PluginImports->log
-#define MALLOC		PluginImports->alloc
-#define STRDUP  	PluginImports->mstrdup
-#define FREE		PluginImports->mfree
-#define EXPECT_TOK	OurImports->ExpectToken
-#define STARTPROC	OurImports->StartProcess
 
 PIL_rc
 PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
@@ -125,7 +84,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  	return imports->register_interface(us, PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
 	,	&vacmOps
-	,	vacmcloseintf		/*close */
+	,	NULL		/*close */
 	,	&OurInterface
 	,	(void*)&OurImports
 	,	&interfprivate); 
@@ -191,21 +150,6 @@ vacm_status(Stonith *s)
    return S_OOPS;
 }
 
-void
-vacm_free_hostlist(char **hlist)
-{
-	char **	hl = hlist;
-	if (hl == NULL) {
-		return;
-	}
-	while (*hl) {
-		free(*hl);
-		*hl = NULL;
-		++hl;
-	}
-	free(hlist);
-}
-
 /* Better make sure the current group is correct. 
  * Can't think of a good way to do this.
  */
@@ -266,7 +210,7 @@ vacm_hostlist(Stonith *s)
    }
 
 HL_cleanup:
-   vacm_free_hostlist(hlst); /* give the mem back */
+   stonith_free_hostlist(hlst); /* give the mem back */
    return NULL;
 }
 

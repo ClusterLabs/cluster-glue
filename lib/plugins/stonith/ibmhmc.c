@@ -98,18 +98,9 @@
  * Note that the commands above are just reasonable guesses at the right commands.
  *
  */
- 
-#include <portability.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <libintl.h>
-#include <sys/wait.h>
-#include <glib.h>
-#include <stonith/stonith.h>
-#include <pils/plugin.h>
+
+#define DEVICE "IBM HMC Device"
+#include "stonith_plugin_common.h"
 
 #ifndef	SSH_CMD
 #	define SSH_CMD	"ssh"
@@ -118,20 +109,11 @@
 #	define HMCROOT	"hscroot"
 #endif
 
-#define PIL_PLUGINTYPE          STONITH_TYPE
-#define PIL_PLUGINTYPE_S        STONITH_TYPE_S
 #define PIL_PLUGIN              ibmhmc
 #define PIL_PLUGIN_S            "ibmhmc"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
-
-#define LOG			PluginImports->log
-#define MALLOC			PluginImports->alloc
-#define STRDUP  		PluginImports->mstrdup
-#define FREE			PluginImports->mfree
-#define EXPECT_TOK		OurImports->ExpectToken
-#define STARTPROC		OurImports->StartProcess
-
+#include <pils/plugin.h>
 
 #define MAX_HOST_NAME_LEN	(256*4)
 #define MAX_CMD_LEN		1024
@@ -151,15 +133,12 @@ static const char *	ibmhmc_getinfo(Stonith * s, int InfoType);
 static int		ibmhmc_status(Stonith * );
 static int		ibmhmc_reset_req(Stonith* s,int request,const char* host);
 static char **		ibmhmc_hostlist(Stonith  *);
-static void		ibmhmc_free_hostlist(char **);
-static void		ibmhmc_closepi(PILPlugin*pi);
-static PIL_rc		ibmhmc_closeintf(PILInterface* pi, void* pd);
 
 static char* do_shell_cmd(const char* cmd, int* status);
 static int check_hmc_status(const char* hmc);
 /* static char* do_shell_cmd_fake(const char* cmd, int* status); */
 
-static struct stonith_ops ibmhmcOps ={
+static struct stonith_ops ibmhmcOps = {
 	ibmhmc_new,		/* Create new STONITH object	*/
 	ibmhmc_destroy,		/* Destroy STONITH object	*/
 	ibmhmc_set_config_file,	/* set configuration from file	*/
@@ -168,10 +147,9 @@ static struct stonith_ops ibmhmcOps ={
 	ibmhmc_status,		/* Return STONITH device status	*/
 	ibmhmc_reset_req,	/* Request a reset */
 	ibmhmc_hostlist,	/* Return list of supported hosts */
-	ibmhmc_free_hostlist	/* free above list */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, ibmhmc_closepi);
+PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
 
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
@@ -199,55 +177,29 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  	return imports->register_interface(us, PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
 	,	&ibmhmcOps
-	,	ibmhmc_closeintf		/*close */
+	,	NULL		/*close */
 	,	&OurInterface
 	,	(void*)&OurImports
 	,	&interfprivate); 
 }
 
-struct HMCDevice {	
-	const char *		HMCid;
+struct pluginDevice {	
+	const char *		pluginid;
 	char *		hmc;
 	GList*		 	hostlist;
 };
 
-static const char * HMCid = 	"HMCDevice-Stonith";
-static const char * NOTibmhmcID = 	"This has been destroyed (HMC Dev)";
-
-#define	ISHMCDEV(i)	(((i) != NULL && (i)->pinfo != NULL)	\
-	&& ((struct HMCDevice *)(i->pinfo))->HMCid == HMCid)
-
-
-#ifndef MALLOCT
-	#define MALLOCT(t)	((t *)(MALLOC(sizeof(t)))) 
-#endif
-
-#define N_(text)		(text)
-#define _(text)			dgettext(ST_TEXTDOMAIN, text)
-
-
-static void
-ibmhmc_closepi(PILPlugin*pi)
-{
-}
-
-static PIL_rc
-ibmhmc_closeintf(PILInterface* pi, void* pd)
-{
-	return PIL_OK;
-}
+static const char * pluginid = 	"pluginDevice-Stonith";
+static const char * NOTpluginID = 	"This has been destroyed (HMC Dev)";
 
 static int
 ibmhmc_status(Stonith  *s)
 {
-	struct HMCDevice* dev = NULL;
+	struct pluginDevice* dev = NULL;
 
-	if (!ISHMCDEV(s)) {
-		PILCallLog(LOG, PIL_CRIT, "invalid argument to ibmhmc_status");
-		return(S_OOPS);
-	}
+	ERRIFWRONGDEV(s,S_OOPS);
 
-	dev = (struct HMCDevice*) s->pinfo;
+	dev = (struct pluginDevice*) s->pinfo;
 	
 	return check_hmc_status(dev->hmc);
 }
@@ -261,26 +213,23 @@ static char **
 ibmhmc_hostlist(Stonith  *s)
 {
 	int j;
-	struct HMCDevice* dev;
+	struct pluginDevice* dev;
 	int numnames = 0;
 	char** ret = NULL;
 	GList* node = NULL;
 
-	if (!ISHMCDEV(s)) {
-		PILCallLog(LOG, PIL_CRIT, "invalid argument to ibmhmc_list_hosts");
-		return(NULL);
-	}
-	dev = (struct HMCDevice*) s->pinfo;
+	ERRIFWRONGDEV(s,NULL);
+	dev = (struct pluginDevice*) s->pinfo;
 	numnames = g_list_length(dev->hostlist);
 	if (numnames<0) {
-		PILCallLog(LOG, PIL_CRIT
+		LOG( PIL_CRIT
 		,	"unconfigured stonith object in ibmhmc_list_hosts");
 		return(NULL);
 	}
 
 	ret = (char **)MALLOC((numnames+1)*sizeof(char*));
 	if (ret == NULL) {
-		PILCallLog(LOG, PIL_CRIT, "out of memory");
+		LOG( PIL_CRIT, "out of memory");
 		return ret;
 	}
 
@@ -294,27 +243,11 @@ ibmhmc_hostlist(Stonith  *s)
 	return ret;
 }
 
-static void
-ibmhmc_free_hostlist (char** hlist)
-{
-	char** hl = hlist;
-	if (hl == NULL) {
-		return;
-	}
-	while (*hl) {
-		FREE(*hl);
-		*hl = NULL;
-		++hl;
-	}
-	FREE(hlist);
-	hlist = NULL;
-}
-
 /*
  *	Parse the config information, and stash it away...
  */
 static int
-ibmhmc_parse_config_info(struct HMCDevice* dev, const char* info)
+ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 {
 	int i, j, status;
 	char* output = NULL;
@@ -398,7 +331,7 @@ static int
 ibmhmc_reset_req(Stonith * s, int request, const char * host)
 {
 	GList*			node = NULL;
-	struct HMCDevice*	dev = NULL;
+	struct pluginDevice*	dev = NULL;
 	char			off_cmd[MAX_CMD_LEN];
 	char			on_cmd[MAX_CMD_LEN];
 
@@ -409,13 +342,14 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 	int			is_lpar = FALSE;
 	int			status;
 	
-
-	if (!ISHMCDEV(s) || (NULL == host)) {
-		PILCallLog(LOG, PIL_CRIT, "invalid argument to %s", __FUNCTION__);
+	ERRIFWRONGDEV(s,S_OOPS);
+	
+	if (NULL == host) {
+		LOG( PIL_CRIT, "invalid argument to %s", __FUNCTION__);
 		return(S_OOPS);
 	}
 
-	dev = (struct HMCDevice*) s->pinfo;
+	dev = (struct pluginDevice*) s->pinfo;
 
 	for (node=g_list_first(dev->hostlist)
 	;	NULL != node
@@ -427,7 +361,7 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 	}
 
 	if (!node) {
-		PILCallLog(LOG, PIL_CRIT, "%s %s",
+		LOG( PIL_CRIT, "%s %s",
 			_("host s is not configured in this STONITH module."
 			 "Please check you configuration information."), 
 			host);
@@ -476,20 +410,20 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 	case ST_POWERON:
 		do_shell_cmd(on_cmd,&status);
 		if (0!=status) {
-			PILCallLog(LOG, PIL_CRIT, "command %s failed", on_cmd);
+			LOG( PIL_CRIT, "command %s failed", on_cmd);
 		}
 		break;
 	case ST_POWEROFF:
 		do_shell_cmd(off_cmd,&status);
 		if (0!=status) {
-			PILCallLog(LOG, PIL_CRIT, "command %s failed", off_cmd);
+			LOG( PIL_CRIT, "command %s failed", off_cmd);
 		}
 		break;
 	case ST_GENERIC_RESET:
 		if (is_lpar) {
 			do_shell_cmd(off_cmd,&status);
 			if (0!=status) {
-				PILCallLog(LOG, PIL_CRIT, "command %s failed", off_cmd);
+				LOG( PIL_CRIT, "command %s failed", off_cmd);
 				break;
 			}
 			for (i=0; i < MAX_POWERON_RETRY; i++) {
@@ -501,23 +435,23 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 				}
 			}
 			if (MAX_POWERON_RETRY == i) {
-				PILCallLog(LOG, PIL_CRIT, "command %s failed", on_cmd);
+				LOG( PIL_CRIT, "command %s failed", on_cmd);
 			}
 		}
 		else {
 			do_shell_cmd(reset_cmd,&status);
 			if (0!=status) {
-				PILCallLog(LOG, PIL_CRIT, "command %s failed", reset_cmd);
+				LOG( PIL_CRIT, "command %s failed", reset_cmd);
 			}
 			break;
 		}
 		break;
 	default:
-		PILCallLog(LOG, PIL_CRIT, "unknown reset request");
+		LOG( PIL_CRIT, "unknown reset request");
 	
 	}
 		
-	PILCallLog(LOG, PIL_INFO, "%s: %s", _("Host ibmhmc-reset."), host);
+	LOG( PIL_INFO, "%s: %s", _("Host ibmhmc-reset."), host);
 
 	return S_OK;
 }
@@ -530,19 +464,16 @@ static int
 ibmhmc_set_config_file(Stonith* s, const char * configname)
 {
 	FILE* cfgfile = NULL;
-	struct HMCDevice* dev = NULL;
+	struct pluginDevice* dev = NULL;
 	char hmc[MAX_HMC_NAME_LEN];
 	
-	if (!ISHMCDEV(s)) {
-		PILCallLog(LOG, PIL_CRIT, "%s", "invalid argument to HMC_set_configfile");
-		return(S_OOPS);
-	}
+	ERRIFWRONGDEV(s,S_OOPS);
 
-	dev = (struct HMCDevice*) s->pinfo;
+	dev = (struct pluginDevice*) s->pinfo;
 
 	cfgfile = fopen(configname, "r");
 	if (cfgfile == NULL)  {
-		PILCallLog(LOG, PIL_CRIT, "Cannot open %s", configname);
+		LOG( PIL_CRIT, "Cannot open %s", configname);
 		return(S_BADCONFIG);
 	}
 
@@ -564,13 +495,10 @@ ibmhmc_set_config_file(Stonith* s, const char * configname)
 static int
 ibmhmc_set_config_info(Stonith* s, const char * info)
 {
-	struct HMCDevice* dev;
+	struct pluginDevice* dev;
 
-	if (!ISHMCDEV(s)) {
-		PILCallLog(LOG, PIL_CRIT, "%s: invalid argument", __FUNCTION__);
-		return(S_OOPS);
-	}
-	dev = (struct HMCDevice *)s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+	dev = (struct pluginDevice *)s->pinfo;
 
 	return(ibmhmc_parse_config_info(dev, info));
 }
@@ -578,15 +506,12 @@ ibmhmc_set_config_info(Stonith* s, const char * info)
 static const char*
 ibmhmc_getinfo(Stonith* s, int reqtype)
 {
-	struct HMCDevice* dev;
+	struct pluginDevice* dev;
 	char* ret;
 
-	if (!ISHMCDEV(s)) {
-		PILCallLog(LOG, PIL_CRIT, "HMC_idinfo: invalid argument");
-		return NULL;
-	}
+	ERRIFWRONGDEV(s,NULL);
 
-	dev = (struct HMCDevice *)s->pinfo;
+	dev = (struct pluginDevice *)s->pinfo;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
@@ -623,15 +548,13 @@ ibmhmc_getinfo(Stonith* s, int reqtype)
 static void
 ibmhmc_destroy(Stonith *s)
 {
-	struct HMCDevice* dev;
+	struct pluginDevice* dev;
 
-	if (!ISHMCDEV(s)) {
-		PILCallLog(LOG, PIL_CRIT, "%s: invalid argument", __FUNCTION__);
-		return;
-	}
-	dev = (struct HMCDevice *)s->pinfo;
+	VOIDERRIFWRONGDEV(s);
 
-	dev->HMCid = NOTibmhmcID;
+	dev = (struct pluginDevice *)s->pinfo;
+
+	dev->pluginid = NOTpluginID;
 	if (dev->hmc) {
 		FREE(dev->hmc);
 		dev->hmc = NULL;
@@ -652,14 +575,14 @@ ibmhmc_destroy(Stonith *s)
 static void *
 ibmhmc_new(void)
 {
-	struct HMCDevice* dev = MALLOCT(struct HMCDevice);
+	struct pluginDevice* dev = MALLOCT(struct pluginDevice);
 
 	if (dev == NULL) {
-		PILCallLog(LOG, PIL_CRIT, "out of memory");
+		LOG( PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(dev, 0, sizeof(*dev));
-	dev->HMCid = HMCid;
+	dev->pluginid = pluginid;
 	dev->hmc = NULL;
 	dev->hostlist = NULL;
 	return((void *)dev);

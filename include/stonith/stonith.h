@@ -1,4 +1,4 @@
-/* $Id: stonith.h,v 1.8 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: stonith.h,v 1.9 2004/10/05 14:26:16 lars Exp $ */
 /*
  *	S hoot
  *	T he
@@ -105,7 +105,6 @@ struct stonith_ops {
 
 	char** (*hostlist)		(Stonith* s);
 					/* Returns list of hosts it supports */
-	void (*free_hostlist)		(char** hostlist);
 };
 
 extern Stonith *	stonith_new(const char * type);
@@ -175,4 +174,23 @@ struct StonithImports_s {
 	,	char * buf, int maxline);
 	int (*StartProcess)(const char * cmd, int * readfd, int * writefd);
 };
+
+/* XXX TODO: FREE() needs to be imported from somewhere instead of
+ * called directly... */
+static inline void
+stonith_free_hostlist (char ** hlist)
+{
+  char **	hl = hlist;
+  if (hl == NULL) {
+    return;
+  }
+  while (*hl) {
+    free(*hl);
+    *hl = NULL;
+    ++hl;
+  }
+  free(hlist);
+  hlist = NULL;
+}
+
 #endif /*__STONITH_H*/

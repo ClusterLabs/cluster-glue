@@ -5,7 +5,7 @@
  * Portions Copyright (c) 2004, tummy.com, ltd.
  *
  * Based on ssh.c, Authors: Joachim Gleissner <jg@suse.de>,
- *                          Lars Marowsky-Br�e <lmb@suse.de>
+ *                          Lars Marowsky-Bree <lmb@suse.de>
  * Modified for external.c: Scott Kleihege <scott@tummy.com>
  * Reviewed, tested, and config parsing: Sean Reifschneider <jafo@tummy.com>
  *
@@ -25,50 +25,13 @@
  *
  */
 
-#include <portability.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <libintl.h>
-#include <sys/wait.h>
-#include <ctype.h>
+#include "stonith_plugin_common.h"
 
-#include <stonith/stonith.h>
-
-#define PIL_PLUGINTYPE          STONITH_TYPE
-#define PIL_PLUGINTYPE_S        STONITH_TYPE_S
 #define PIL_PLUGIN              external
 #define PIL_PLUGIN_S            "external"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
-
-/*
- * externalclose is called as part of unloading the external STONITH plugin.
- * If there was any global data allocated, or file descriptors opened, etc.
- * which is associated with the plugin, and not a single interface
- * in particular, here's our chance to clean it up.
- */
-
-static void
-externalclosepi(PILPlugin*pi)
-{
-}
-
-
-/*
- * externalcloseintf called as part of shutting down the external STONITH
- * interface.  If there was any global data allocated, or file descriptors
- * opened, etc.  which is associated with the external implementation,
- * here's our chance to clean it up.
- */
-static PIL_rc
-externalcloseintf(PILInterface* pi, void* pd)
-{
-	return PIL_OK;
-}
 
 static void *		external_new(void);
 static void		external_destroy(Stonith *);
@@ -78,7 +41,6 @@ static const char *	external_getinfo(Stonith * s, int InfoType);
 static int		external_status(Stonith * );
 static int		external_reset_req(Stonith * s, int request, const char * host);
 static char **		external_hostlist(Stonith  *);
-static void		external_free_hostlist(char **);
 
 static struct stonith_ops externalOps ={
 	external_new,		/* Create new STONITH object	*/
@@ -89,22 +51,14 @@ static struct stonith_ops externalOps ={
 	external_status,		/* Return STONITH device status	*/
 	external_reset_req,		/* Request a reset */
 	external_hostlist,		/* Return list of supported hosts */
-	external_free_hostlist	/* free above list */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, externalclosepi);
+PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
 static StonithImports*		OurImports;
 static void*			interfprivate;
-
-#define LOG		PluginImports->log
-#define MALLOC		PluginImports->alloc
-#define STRDUP  	PluginImports->mstrdup
-#define FREE		PluginImports->mfree
-#define EXPECT_TOK	OurImports->ExpectToken
-#define STARTPROC	OurImports->StartProcess
 
 PIL_rc
 PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
@@ -125,14 +79,11 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  	return imports->register_interface(us, PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
 	,	&externalOps
-	,	externalcloseintf		/*close */
+	,	NULL			/*close */
 	,	&OurInterface
 	,	(void*)&OurImports
 	,	&interfprivate); 
 }
-
-#define	DEVICE	"EXTERNAL STONITH device"
-#define WHITESPACE	" \t\n\r\f"
 
 /*
  *    EXTERNAL STONITH device
@@ -142,39 +93,23 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  *
  */
 
-struct externalDevice {
-  const char *	externalid;
-  char **		hostlist;
-  char *command;
+struct pluginDevice {
+  const char *	pluginid;
+  char **	hostlist;
+  char *	command;
   int		hostcount;
 };
 
-static const char * externalid = "EXTERNALDevice-Stonith";
-static const char * NOTexternalID = "EXTERNAL device has been destroyed";
-
-#define	ISEXTERNALDEV(i)	(((i)!= NULL && (i)->pinfo != NULL)	\
-	&& ((struct externalDevice *)(i->pinfo))->externalid == externalid)
-
-
-#ifndef MALLOCT
-#	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
-#endif
-
-#define N_(text)	(text)
-#define _(text)		dgettext(ST_TEXTDOMAIN, text)
-
+static const char * pluginid = "EXTERNALDevice-Stonith";
+static const char * NOTpluginID = "EXTERNAL device has been destroyed";
 
 static int
 external_status(Stonith  *s)
 {
-  if (!ISEXTERNALDEV(s)) {
-    PILCallLog(LOG, PIL_CRIT, "invalid argument to EXTERNAL_status");
-    return(S_OOPS);
-  }
+  ERRIFWRONGDEV(s,S_OOPS);
 
   return S_OK;
 }
-
 
 /*
  *	Return the list of hosts configured for this EXTERNAL device
@@ -185,16 +120,14 @@ external_hostlist(Stonith  *s)
 {
   int		numnames = 0;
   char **		ret = NULL;
-  struct externalDevice*	sd;
+  struct pluginDevice*	sd;
   int		j;
 
-  if (!ISEXTERNALDEV(s)) {
-    PILCallLog(LOG, PIL_CRIT, "invalid argument to EXTERNAL_list_hosts");
-    return(NULL);
-  }
-  sd = (struct externalDevice*) s->pinfo;
+  ERRIFWRONGDEV(s,NULL);
+
+  sd = (struct pluginDevice*) s->pinfo;
   if (sd->hostcount < 0) {
-    PILCallLog(LOG, PIL_CRIT
+    LOG(PIL_CRIT
 	   ,	"unconfigured stonith object in EXTERNAL_list_hosts");
     return(NULL);
   }
@@ -202,7 +135,7 @@ external_hostlist(Stonith  *s)
 
   ret = (char **)MALLOC(numnames*sizeof(char*));
   if (ret == NULL) {
-    PILCallLog(LOG, PIL_CRIT, "out of memory");
+    LOG(PIL_CRIT, "out of memory");
     return ret;
   }
 
@@ -211,7 +144,7 @@ external_hostlist(Stonith  *s)
   for (j=0; j < numnames-1; ++j) {
     ret[j] = STRDUP(sd->hostlist[j]);
     if (ret[j] == NULL) {
-      external_free_hostlist(ret);
+      stonith_free_hostlist(ret);
       ret = NULL;
       return ret;
     }
@@ -219,29 +152,12 @@ external_hostlist(Stonith  *s)
   return(ret);
 }
 
-static void
-external_free_hostlist (char ** hlist)
-{
-  char **	hl = hlist;
-  if (hl == NULL) {
-    return;
-  }
-  while (*hl) {
-    FREE(*hl);
-    *hl = NULL;
-    ++hl;
-  }
-  FREE(hlist);
-  hlist = NULL;
-}
-
-
 /*
  *	Parse the config information, and stash it away...
  */
 
 static int
-external_parse_config_info(struct externalDevice* sd, const char * info)
+external_parse_config_info(struct pluginDevice* sd, const char * info)
 {
 	int i, end;
 	char *command = NULL;
@@ -250,32 +166,35 @@ external_parse_config_info(struct externalDevice* sd, const char * info)
 	/*  make sure that command has not already been set  */
 	if (sd->command) {
 		return(S_OOPS);
-		}
+	}
 
 	/*  skip the system name  */
 	i = 0;
 	while (info[i] != '\0' && !isspace(info[i])) i++;
-	if (info[i] == '\0')
+	if (info[i] == '\0') {
 		return(S_BADCONFIG);
-
+	}
+	
 	/*  skip past the white space after system name  */
 	while (info[i] != '\0' && isspace(info[i])) i++;
-	if (info[i] == '\0')
+	if (info[i] == '\0') {
 		return(S_BADCONFIG);
-
+	}
+	
 	/*  find the last non-whitespace character in the name  */
 	for (end = strlen(info + i) - 1; end > 0 && isspace(info[i + end]); end--)
 		;
 
 	if ((command = STRDUP(info + i)) == NULL) {
-		PILCallLog(LOG, PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return(S_OOPS);
 		}
-	if (command[end] != '\0' && !isspace(command[end]))
+	if (command[end] != '\0' && !isspace(command[end])) {
 		command[end + 1] = '\0';
-	else
+	} else {
 		command[end] = '\0';
-
+	}
+	
 	sd->command = command;
 	return(S_OK);
 }
@@ -287,15 +206,13 @@ external_parse_config_info(struct externalDevice* sd, const char * info)
 static int
 external_reset_req(Stonith * s, int request, const char * host)
 {
-	struct externalDevice *sd = NULL;
+	struct pluginDevice *sd = NULL;
 
-	if (!ISEXTERNALDEV(s)) {
-		PILCallLog(LOG, PIL_CRIT, "invalid argument to %s", __FUNCTION__);
-		return(S_OOPS);
-		}
-	PILCallLog(LOG, PIL_INFO, "%s %s", _("Host external-reset initiating on "), host);
+	ERRIFWRONGDEV(s,S_OOPS);
+	
+	LOG(PIL_INFO, "%s %s", _("Host external-reset initiating on "), host);
 
-	sd = (struct externalDevice*) s->pinfo;
+	sd = (struct pluginDevice*) s->pinfo;
 	if (sd->command == NULL) {
 		return(S_OOPS);
 		}
@@ -303,7 +220,7 @@ external_reset_req(Stonith * s, int request, const char * host)
 	if (system(sd->command) == 0) 
 		return S_OK;
 	else {
-		PILCallLog(LOG, PIL_CRIT, "command '%s' failed", sd->command);
+		LOG(PIL_CRIT, "command '%s' failed", sd->command);
 		return(S_RESETFAIL);
 		}
 }
@@ -317,16 +234,14 @@ external_set_config_file(Stonith* s, const char * configname)
 {
   FILE *	cfgfile;
   char	line[256];
-  struct externalDevice*	sd;
+  struct pluginDevice*	sd;
 
-  if (!ISEXTERNALDEV(s)) {
-    PILCallLog(LOG, PIL_CRIT, "invalid argument to EXTERNAL_set_configfile");
-    return(S_OOPS);
-  }
-  sd = (struct externalDevice*) s->pinfo;
+  ERRIFWRONGDEV(s,S_OOPS);
+
+  sd = (struct pluginDevice*) s->pinfo;
 
   if ((cfgfile = fopen(configname, "r")) == NULL)  {
-    PILCallLog(LOG, PIL_CRIT, "Cannot open %s", configname);
+    LOG(PIL_CRIT, "Cannot open %s", configname);
     return(S_BADCONFIG);
   }
   while (fgets(line, sizeof(line), cfgfile) != NULL){
@@ -344,13 +259,11 @@ external_set_config_file(Stonith* s, const char * configname)
 static int
 external_set_config_info(Stonith* s, const char * info)
 {
-  struct externalDevice* sd;
+  struct pluginDevice* sd;
 
-  if (!ISEXTERNALDEV(s)) {
-    PILCallLog(LOG, PIL_CRIT, "%s: invalid argument", __FUNCTION__);
-    return(S_OOPS);
-  }
-  sd = (struct externalDevice *)s->pinfo;
+  ERRIFWRONGDEV(s,S_OOPS);
+
+  sd = (struct pluginDevice *)s->pinfo;
 
   return(external_parse_config_info(sd, info));
 }
@@ -358,21 +271,18 @@ external_set_config_info(Stonith* s, const char * info)
 static const char *
 external_getinfo(Stonith * s, int reqtype)
 {
-  struct externalDevice* sd;
+  struct pluginDevice* sd;
   char *		ret;
-
-  if (!ISEXTERNALDEV(s)) {
-    PILCallLog(LOG, PIL_CRIT, "EXTERNAL_idinfo: invalid argument");
-    return NULL;
-  }
+  
+  ERRIFWRONGDEV(s,NULL);
   /*
    *	We look in the ST_TEXTDOMAIN catalog for our messages
    */
-  sd = (struct externalDevice *)s->pinfo;
+  sd = (struct pluginDevice *)s->pinfo;
 
   switch (reqtype) {
   case ST_DEVICEID:
-    ret = _("external STONITH device");
+    ret = _("External STONITH plugin");
     break;
 
   case ST_CONF_INFO_SYNTAX:
@@ -406,21 +316,19 @@ external_getinfo(Stonith * s, int reqtype)
 static void
 external_destroy(Stonith *s)
 {
-  struct externalDevice* sd;
+  struct pluginDevice* sd;
 
-  if (!ISEXTERNALDEV(s)) {
-    PILCallLog(LOG, PIL_CRIT, "%s: invalid argument", __FUNCTION__);
-    return;
-  }
-  sd = (struct externalDevice *)s->pinfo;
+  VOIDERRIFWRONGDEV(s);
 
-  sd->externalid = NOTexternalID;
+  sd = (struct pluginDevice *)s->pinfo;
+
+  sd->pluginid = NOTpluginID;
   if (sd->hostlist) {
-    external_free_hostlist(sd->hostlist);
+    stonith_free_hostlist(sd->hostlist);
     sd->hostlist = NULL;
   }
   if (sd->command) {
-	  free(sd->command);
+	  FREE(sd->command);
 	  sd->command = NULL;
 	  }
   sd->hostcount = -1;
@@ -431,14 +339,14 @@ external_destroy(Stonith *s)
 static void *
 external_new(void)
 {
-  struct externalDevice*	sd = MALLOCT(struct externalDevice);
+  struct pluginDevice*	sd = MALLOCT(struct pluginDevice);
 
   if (sd == NULL) {
-    PILCallLog(LOG, PIL_CRIT, "out of memory");
+    LOG(PIL_CRIT, "out of memory");
     return(NULL);
   }
   memset(sd, 0, sizeof(*sd));
-  sd->externalid = externalid;
+  sd->pluginid = pluginid;
   sd->hostlist = NULL;
   sd->command = NULL;
   sd->hostcount = -1;

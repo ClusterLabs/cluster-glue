@@ -1,4 +1,4 @@
-/* $Id: drac3.c,v 1.7 2004/09/20 18:42:41 msoffen Exp $ */
+/* $Id: drac3.c,v 1.8 2004/10/05 14:26:16 lars Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -23,40 +23,18 @@
  *
  */
 
-#include <portability.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <signal.h>
-#include <string.h>
-#include <errno.h>
-#include <libintl.h>
-#include <sys/wait.h>
-#include <glib.h>
+#define DEVICE  "Dell DRAC III Card"
+#include "stonith_plugin_common.h"
 
 #include <curl/curl.h>
 #include "drac3_command.h"
 
-#include <stonith/stonith.h>
-#define PIL_PLUGINTYPE          STONITH_TYPE
-#define PIL_PLUGINTYPE_S        STONITH_TYPE_S
 #define PIL_PLUGIN              drac3
 #define PIL_PLUGIN_S            "drac3"
 #define PIL_PLUGINLICENSE       LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL    URL_LGPL
 #include <pils/plugin.h>
 #include "stonith_signal.h"
-
-static void
-drac3closepi(PILPlugin *pi)
-{
-}
-
-static PIL_rc
-drac3closeintf(PILInterface *pi, void *pd)
-{
-	return PIL_OK;
-}
 
 static void *	drac3_new(void);
 static void		drac3_destroy(Stonith *);
@@ -66,7 +44,6 @@ static const char * drac3_getinfo(Stonith * s, int InfoType);
 static int		drac3_status(Stonith * );
 static int		drac3_reset_req(Stonith * s, int request, const char * host);
 static char **	drac3_hostlist(Stonith  *);
-static void		drac3_free_hostlist(char **);
 
 static struct stonith_ops drac3Ops ={
 	drac3_new,		/* Create new STONITH object	*/
@@ -77,22 +54,14 @@ static struct stonith_ops drac3Ops ={
 	drac3_status,			/* Return STONITH device status	*/
 	drac3_reset_req,		/* Request a reset */
 	drac3_hostlist,		/* Return list of supported hosts */
-	drac3_free_hostlist		/* free above list */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, drac3closepi);
+PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
 static StonithImports*		OurImports;
 static void*			interfprivate;
-
-#define LOG		PluginImports->log
-#define MALLOC		PluginImports->alloc
-#define STRDUP  	PluginImports->mstrdup
-#define FREE		PluginImports->mfree
-#define EXPECT_TOK	OurImports->ExpectToken
-#define STARTPROC	OurImports->StartProcess
 
 PIL_rc
 PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
@@ -113,40 +82,28 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  	return imports->register_interface(us, PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
 	,	&drac3Ops
-	,	drac3closeintf		/*close */
+	,	NULL		/*close */
 	,	&OurInterface
 	,	(void*)&OurImports
 	,	&interfprivate); 
 }
 
-#define DEVICE  "Dell DRAC III Card"
 #define BUFLEN	1024
 
-#define _(text) dgettext(ST_TEXTDOMAIN, text)
-
-struct DRAC3Device {
-	const char *DRAC3id;
+struct pluginDevice {
+	const char *pluginid;
 	CURL *curl;
+	int config;
 	char *host;
 	char *user;
 	char *pass;
 };
 
-static const char *DRAC3id = DEVICE;
-static const char *NOTdrac3ID = "destroyed (Dell DRAC III Card)";
-
-#define ISDRAC3DEV(i) (((i)!= NULL && (i)->pinfo != NULL) && \
-		                    ((struct DRAC3Device *)(i->pinfo))->DRAC3id == DRAC3id)
-
-#define ISCONFIGED(i) (((struct DRAC3Device *)(i->pinfo))->curl != NULL )
-
-
-#ifndef MALLOCT
-#  define MALLOCT(t) ((t *)(MALLOC(sizeof(t))))
-#endif
+static const char *pluginid = DEVICE;
+static const char *NOTpluginID = "destroyed (Dell DRAC III Card)";
 
 /* private function prototypes */
-static int DRAC3_parse_config_info(struct DRAC3Device * drac3d, const char * info);
+static int DRAC3_parse_config_info(struct pluginDevice * drac3d, const char * info);
 
 
 /* ------------------------------------------------------------------ */
@@ -155,15 +112,16 @@ static int DRAC3_parse_config_info(struct DRAC3Device * drac3d, const char * inf
 void *
 drac3_new(void)
 {
-	struct DRAC3Device *drac3d = MALLOCT(struct DRAC3Device);
+	struct pluginDevice *drac3d = MALLOCT(struct pluginDevice);
 
 	if (drac3d == NULL) {
-			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+			LOG(PIL_CRIT, "out of memory");
 			return(NULL);
 	}
 	memset(drac3d, 0, sizeof(*drac3d));
-	drac3d->DRAC3id = DRAC3id;
+	drac3d->pluginid = pluginid;
 	drac3d->curl = NULL;
+	drac3d->config = 0;
 	drac3d->host = NULL;
 	drac3d->user = NULL;
 	drac3d->pass = NULL;
@@ -175,15 +133,13 @@ drac3_new(void)
 void
 drac3_destroy(Stonith * s)
 {
-	struct DRAC3Device *drac3d;
+	struct pluginDevice *drac3d;
 
-	if (!ISDRAC3DEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-		return;
-	}
-	drac3d = (struct DRAC3Device *) s->pinfo;
+	VOIDERRIFWRONGDEV(s);
 
-	drac3d->DRAC3id = NOTdrac3ID;
+	drac3d = (struct pluginDevice *) s->pinfo;
+
+	drac3d->pluginid = NOTpluginID;
 
 	/* release curl connection */
 	if (drac3d->curl != NULL) {
@@ -215,17 +171,14 @@ drac3_set_config_file(Stonith * s, const char *configname)
 {
 	FILE *cfgfile;
 	char confline[BUFLEN];
-	struct DRAC3Device *drac3d;
+	struct pluginDevice *drac3d;
 
-	if (!ISDRAC3DEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-		return (S_INVAL);
-	}
+	ERRIFWRONGDEV(s,S_INVAL);
 
-	drac3d = (struct DRAC3Device *) s->pinfo;
+	drac3d = (struct pluginDevice *) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "Cannot open %s", configname);
+		LOG(PIL_CRIT, "Cannot open %s", configname);
 		return (S_BADCONFIG);
 	}
 
@@ -241,14 +194,11 @@ drac3_set_config_file(Stonith * s, const char *configname)
 int
 drac3_set_config_info(Stonith * s, const char *info)
 {
-	struct DRAC3Device *drac3d;
+	struct pluginDevice *drac3d;
 
-	if (!ISDRAC3DEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-		return (S_OOPS);
-	}
+	ERRIFWRONGDEV(s,S_INVAL);
 
-	drac3d = (struct DRAC3Device *) s->pinfo;
+	drac3d = (struct pluginDevice *) s->pinfo;
 
 	return (DRAC3_parse_config_info(drac3d, info));
 }
@@ -257,19 +207,16 @@ drac3_set_config_info(Stonith * s, const char *info)
 const char *
 drac3_getinfo(Stonith * s, int reqtype)
 {
-	struct DRAC3Device *drac3d;
+	struct pluginDevice *drac3d;
 	const char *ret = NULL;
 
-	if (!ISDRAC3DEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-		return (NULL);
-	}
+	ERRIFWRONGDEV(s,NULL);
 
-	drac3d = (struct DRAC3Device *) s->pinfo;
+	drac3d = (struct pluginDevice *) s->pinfo;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
-			ret = drac3d->DRAC3id;
+			ret = drac3d->pluginid;
 			break;
 		case ST_CONF_INFO_SYNTAX:
 			ret = _("<drac3-address> <user> <password>\n");
@@ -298,24 +245,16 @@ drac3_getinfo(Stonith * s, int reqtype)
 int
 drac3_status(Stonith  *s)
 {
-	struct DRAC3Device *drac3d;
+	struct pluginDevice *drac3d;
 
-	if (!ISDRAC3DEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-		return (S_INVAL);
-	}
+	ERRIFNOTCONFIGED(s,S_OOPS);
 
-	if (!ISCONFIGED(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device is UNCONFIGURED!", __FUNCTION__);
-		return (S_OOPS);
-	}
-
-	drac3d = (struct DRAC3Device *) s->pinfo;
+	drac3d = (struct pluginDevice *) s->pinfo;
 
 	if (drac3VerifyLogin(drac3d->curl, drac3d->host)) {
 		if (drac3Login(drac3d->curl, drac3d->host,
 		                drac3d->user, drac3d->pass)) {
-		 	PILCallLog(PluginImports->log,PIL_CRIT, "%s: cannot log into %s at %s", 
+		 	LOG(PIL_CRIT, "%s: cannot log into %s at %s", 
 							__FUNCTION__,
 							DEVICE,
 							drac3d->host);
@@ -333,25 +272,17 @@ drac3_status(Stonith  *s)
 int
 drac3_reset_req(Stonith * s, int request, const char *host)
 {
-	struct DRAC3Device *drac3d;
+	struct pluginDevice *drac3d;
 	int rc = S_OK;
 
-	if (!ISDRAC3DEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-		return (S_INVAL);
-	}
+	ERRIFNOTCONFIGED(s,S_OOPS);
 
-	if (!ISCONFIGED(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device is UNCONFIGURED!", __FUNCTION__);
-		return (S_OOPS);
-	}
-
-	drac3d = (struct DRAC3Device *) s->pinfo;
+	drac3d = (struct pluginDevice *) s->pinfo;
 
 	if (drac3VerifyLogin(drac3d->curl, drac3d->host)) {
 		if (drac3Login(drac3d->curl, drac3d->host,
 		                drac3d->user, drac3d->pass)) {
-		 	PILCallLog(PluginImports->log,PIL_CRIT, "%s: cannot log into %s at %s", 
+		 	LOG(PIL_CRIT, "%s: cannot log into %s at %s", 
 							__FUNCTION__,
 							DEVICE,
 							drac3d->host);
@@ -381,29 +312,21 @@ drac3_reset_req(Stonith * s, int request, const char *host)
 char **
 drac3_hostlist(Stonith * s)
 {
-	struct DRAC3Device *drac3d;
+	struct pluginDevice *drac3d;
 	char **hl;
 
-	if (!ISDRAC3DEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-		return (NULL);
-	}
+	ERRIFNOTCONFIGED(s,NULL);
 
-	if (!ISCONFIGED(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device is UNCONFIGURED!", __FUNCTION__);
-		return (NULL);
-	}
-
-	drac3d = (struct DRAC3Device *) s->pinfo;
+	drac3d = (struct pluginDevice *) s->pinfo;
 
 	hl = (char **)MALLOC(2*sizeof(char*));
 	if (hl == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory", __FUNCTION__);
+		LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
 	} else {
 		hl[1]=NULL;
 		hl[0]=STRDUP(drac3d->host);
 		if (hl[0]) {
-			PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory", __FUNCTION__);
+			LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
 			FREE(hl);
 			hl = NULL;
 		}
@@ -414,29 +337,11 @@ drac3_hostlist(Stonith * s)
 }
 
 /* ------------------------------------------------------------------ */
-void
-drac3_free_hostlist (char ** hlist)
-{
-	char ** hl = hlist;
-
-        if (hl == NULL) {
-                return;
-        }
-        while (*hl) {
-                FREE(*hl);
-                *hl = NULL;
-                ++hl;
-        }
-        FREE(hlist);
-}
-
-			         
-/* ------------------------------------------------------------------ */
 /* PRIVATE FUNCTIONS                                                  */
 /* ------------------------------------------------------------------ */
 
 static int
-DRAC3_parse_config_info(struct DRAC3Device * drac3d, const char * info)
+DRAC3_parse_config_info(struct pluginDevice * drac3d, const char * info)
 {
 	static char host[BUFLEN];
 	static char user[BUFLEN];
@@ -447,19 +352,19 @@ DRAC3_parse_config_info(struct DRAC3Device * drac3d, const char * info)
 	if (sscanf(info, "%s %s %s", host, user, pass) == 3) {
 
 			if ((drac3d->host = STRDUP(host)) == NULL) {
-					PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory", 
+					LOG(PIL_CRIT, "%s: out of memory", 
 							__FUNCTION__);
 					return(S_OOPS);
 			}
 			g_strdown(drac3d->host);
 			if ((drac3d->user = STRDUP(user)) == NULL) {
-					PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory", 
+					LOG(PIL_CRIT, "%s: out of memory", 
 							__FUNCTION__);
 					FREE(drac3d->host);
 					return(S_OOPS);
 			}
 			if ((drac3d->pass = STRDUP(pass)) == NULL) {
-					PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory", 
+					LOG(PIL_CRIT, "%s: out of memory", 
 							__FUNCTION__);
 					FREE(drac3d->host);
 					FREE(drac3d->user);
@@ -468,7 +373,7 @@ DRAC3_parse_config_info(struct DRAC3Device * drac3d, const char * info)
 
 			curl = curl_easy_init();
 			if ((drac3d->curl = curl_easy_init()) == NULL) { 
-					PILCallLog(PluginImports->log,PIL_CRIT, "%s: cannot init curl", 
+					LOG(PIL_CRIT, "%s: cannot init curl", 
 							__FUNCTION__);
 					FREE(drac3d->host);
 					FREE(drac3d->user);
@@ -477,6 +382,7 @@ DRAC3_parse_config_info(struct DRAC3Device * drac3d, const char * info)
 			}
 
 			drac3InitCurl(drac3d->curl);
+			drac3d->config = 1;
 
 			return(S_OK);
 	} else {
