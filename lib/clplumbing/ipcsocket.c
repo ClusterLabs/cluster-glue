@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.94 2004/05/14 21:13:39 andrew Exp $ */
+/* $Id: ipcsocket.c,v 1.95 2004/07/20 11:15:20 andrew Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -71,6 +71,29 @@
 #define         AF_LOCAL AF_UNIX
 #endif
 
+/***********************************************************************
+ *
+ * Determine the IPC authentication scheme...  More machine dependent than
+ * we'd like, but don't know any better way...
+ *
+ ***********************************************************************/
+#ifdef SO_PEERCRED
+#	define	USE_SO_PEERCRED
+#elif HAVE_GETPEEREID
+#	define USE_GETPEEREID
+#elif ON_DARWIN
+/* Darwin has SCM_CREDS but it has been crippled by Apple
+ *  - force USE_BINDSTAT_CREDS instead
+ */
+#	define	USE_BINDSTAT_CREDS
+#elif defined(SCM_CREDS)
+#	define	USE_SCM_CREDS
+#else
+#	define	USE_DUMMY_CREDS
+/* This will make it compile, but attempts to authenticate
+ * will fail.  This is a stopgap measure ;-)
+ */
+#endif
 
 /* wait connection private data. */
 struct SOCKET_WAIT_CONN_PRIVATE{
@@ -88,6 +111,12 @@ struct SOCKET_CH_PRIVATE{
   int s;
   /* the size of expecting data for below buffered message buf_msg */
   int remaining_data;
+
+  /* The address of our peer - used by USE_BINDSTAT_CREDS version of
+   *   socket_verify_auth()
+   */
+  struct sockaddr_un *peer_addr;
+		
   /* the buf used to save unfinished message */
   struct IPC_MESSAGE *buf_msg;
 };
@@ -453,7 +482,10 @@ static struct IPC_CHANNEL*
 socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 ,	struct IPC_AUTH *auth_info)
 {
-	struct sockaddr_un			peer_addr;
+	/* make peer_addr a pointer so it can be used by the
+	 *   USE_BINDSTAT_CREDS implementation of socket_verify_auth()
+	 */
+	struct sockaddr_un *			peer_addr;
 	struct IPC_CHANNEL *			ch;
 	int					sin_size;
 	int					s;
@@ -461,25 +493,33 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 	struct SOCKET_WAIT_CONN_PRIVATE*	conn_private;
 	struct SOCKET_CH_PRIVATE *		ch_private ;
 
+	peer_addr = g_new(struct sockaddr_un, 1);
+
 	/* get select fd */
 
 	s = wait_conn->ops->get_select_fd(wait_conn); 
 	if (s < 0) {
 		cl_log(LOG_ERR, "get_select_fd: invalid fd");
+		g_free(peer_addr);
+		peer_addr = NULL;
 		return NULL;
 	}
 
 	/* Get client connection. */
 	sin_size = sizeof(struct sockaddr_un);
-	if ((new_sock = accept(s, (struct sockaddr *)&peer_addr, &sin_size)) == -1){
+	if ((new_sock = accept(s, (struct sockaddr *)peer_addr, &sin_size)) == -1){
 		if (errno != EAGAIN && errno != EWOULDBLOCK) {
 			cl_perror("socket_accept_connection: accept");
 		}
+		g_free(peer_addr);
+		peer_addr = NULL;
 		return NULL;
 	}else{
 		if ((ch = socket_server_channel_new(new_sock)) == NULL) {
 			cl_log(LOG_ERR
 			,	"socket_accept_connection: Can't create new channel");
+			g_free(peer_addr);
+			peer_addr = NULL;
 			return NULL;
 		}else{
 			conn_private=(struct SOCKET_WAIT_CONN_PRIVATE*)
@@ -487,6 +527,8 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 			ch_private = (struct SOCKET_CH_PRIVATE *)(ch->ch_private);
 			strncpy(ch_private->path_name,conn_private->path_name
 			,		sizeof(conn_private->path_name));
+
+			ch_private->peer_addr = peer_addr;
 		}
 	}
 
@@ -498,6 +540,8 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 		return ch;
 	}
   
+	g_free(peer_addr);
+	peer_addr = NULL;
 	return NULL;
 
 }
@@ -510,7 +554,12 @@ socket_destroy_channel(struct IPC_CHANNEL * ch)
 	socket_destroy_queue(ch->send_queue);
 	socket_destroy_queue(ch->recv_queue);
 	if (ch->ch_private != NULL) {
-    		g_free((void*)(ch->ch_private));
+		struct SOCKET_CH_PRIVATE *priv = (struct SOCKET_CH_PRIVATE *)
+			ch->ch_private;
+		if(priv->peer_addr != NULL) {
+			g_free((void*)(priv->peer_addr));
+		}
+    		g_free((void*)(ch->ch_private));		
 	}
 	memset(ch, 0xff, sizeof(*ch));
 	g_free((void*)ch);
@@ -1461,6 +1510,32 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   temp_ch = g_new(struct IPC_CHANNEL, 1);
   conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
 
+#ifdef USE_BINDSTAT_CREDS
+  int len = 0;
+  char rand_id[16];
+  char uuid_str_tmp[40];
+  struct sockaddr_un sock_addr;
+
+  /* Prepare the socket */
+  memset(&sock_addr, 0, sizeof(sock_addr));
+  sock_addr.sun_family = AF_UNIX;
+
+  /* make sure socket paths never clash */
+  uuid_generate(rand_id);
+  uuid_unparse(rand_id, uuid_str_tmp);
+  
+  snprintf(sock_addr.sun_path, sizeof(sock_addr.sun_path),
+	   "%s/%s/%s", HA_VARLIBDIR, PACKAGE, uuid_str_tmp);
+  
+  len = sizeof(sock_addr);
+  sock_addr.sun_len = len;
+  
+  unlink(sock_addr.sun_path);
+  if(bind(sockfd, (struct sockaddr*)&sock_addr, len) < 0) {
+	  perror("Client bind() failure");
+	  return NULL;
+  }
+#endif
 
   conn_info->s = sockfd;
   conn_info->remaining_data = 0;
@@ -1493,6 +1568,7 @@ socket_server_channel_new(int sockfd){
   conn_info->s = sockfd;
   conn_info->remaining_data = 0;
   conn_info->buf_msg = NULL;
+  conn_info->peer_addr = NULL;
   strcpy(conn_info->path_name, "?");
 
 #ifdef DEBUG
@@ -1597,18 +1673,6 @@ socket_free_message(struct IPC_MESSAGE * msg) {
  *
  ***********************************************************************/
 
-#ifdef SO_PEERCRED
-#	define	USE_SO_PEERCRED
-#elif HAVE_GETPEEREID
-#	define USE_GETPEEREID
-#elif defined(SCM_CREDS)
-#	define	USE_SCM_CREDS
-#else
-#	define	USE_DUMMY_CREDS
-	/* This will make it compile, but attempts to authenticate
-	 * will fail.  This is a stopgap measure ;-)
-	 */
-#endif
 
 /***********************************************************************
  * SO_PEERCRED VERSION... (Linux)
@@ -1886,6 +1950,92 @@ socket_get_farside_pid(int sock)
 }
 #endif /* SCM_CREDS version */
 
+
+/***********************************************************************
+ * Bind/Stat VERSION... (Supported on OSX/Darwin and 4.3+BSD at least...)
+ *
+ * This is for use on systems such as OSX-Darwin and maybe Solaris where
+ *   none of the other options are available.
+ *
+ * This implementation has been adapted from "Advanced Programming
+ *   in the Unix Environment", Section 15.5.2, by W. Richard Stevens.
+ *
+ */
+#ifdef USE_BINDSTAT_CREDS
+static int 
+socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
+{
+	int len = 0;
+	int ret = IPC_OK;
+	struct stat stat_buf;
+	struct sockaddr_un *peer_addr = NULL;
+	struct sockaddr_un dummy;
+	struct SOCKET_CH_PRIVATE *ch_private = NULL;	
+
+	if(ch != NULL) {
+		ch_private = (struct SOCKET_CH_PRIVATE *)(ch->ch_private);
+		if(ch_private != NULL) {
+			peer_addr = ch_private->peer_addr;	
+		}
+	}
+
+	if(ch == NULL) {
+		cl_log(LOG_ERR, "No channel to authenticate");
+		return IPC_FAIL;
+		
+	} else if (auth_info == NULL
+	    ||	(auth_info->uid == NULL && auth_info->gid == NULL)) {
+		return IPC_OK;    /* no restriction for authentication */
+
+	} else if(ch_private == NULL) {
+		cl_log(LOG_ERR, "No channel private data available");
+		return IPC_FAIL;
+		
+	} else if(peer_addr == NULL) {	
+		cl_log(LOG_ERR, "No peer information available");
+		return IPC_FAIL;
+	}
+	
+	len = peer_addr->sun_len;
+	len -= sizeof(dummy.sun_len) - sizeof(dummy.sun_family);
+
+	if(len < 1) {
+		cl_log(LOG_ERR, "No peer information available");
+		return IPC_FAIL;
+	}
+	peer_addr->sun_path[len] = 0;
+	stat(peer_addr->sun_path, &stat_buf);
+
+	/* We may be able to do this if we never reauthenticate...
+	 * unlink(peer_addr->sun_path);  
+	 */
+	if ((auth_info->uid == NULL || g_hash_table_length(auth_info->uid) == 0)
+	    && auth_info->gid != NULL
+	    && g_hash_table_size(auth_info->gid) != 0) {
+		cl_log(LOG_ERR, "GID-Only IPC security is not supported"
+		       " on this platform.");
+		ret = IPC_FAIL;
+	}	
+	if (auth_info->uid
+	    && g_hash_table_lookup(
+		    auth_info->uid, GUINT_TO_POINTER(stat_buf.st_uid))==NULL) {
+		ret = IPC_FAIL;
+	}
+	if (auth_info->gid
+	    && g_hash_table_lookup(
+		    auth_info->gid, GUINT_TO_POINTER(stat_buf.st_gid))==NULL) {
+		ret = IPC_FAIL;
+	}
+
+	return ret;
+}
+
+pid_t
+socket_get_farside_pid(int sock)
+{
+	return -1;
+}
+#endif /* Bind/stat version */
 
 /***********************************************************************
  * DUMMY VERSION... (other systems...)
