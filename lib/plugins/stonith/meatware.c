@@ -1,4 +1,4 @@
-/* $Id: meatware.c,v 1.16 2005/01/31 10:06:33 sunjd Exp $ */
+/* $Id: meatware.c,v 1.17 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  * Stonith module for Human Operator Stonith device
  *
@@ -36,7 +36,7 @@
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
 
-static StonithPlugin *	meatware_new(void);
+static StonithPlugin *	meatware_new(const char *);
 static void		meatware_destroy(StonithPlugin *);
 static int		meatware_set_config(StonithPlugin *, StonithNVpair *);
 static const char**	meatware_get_confignames(StonithPlugin *);
@@ -386,7 +386,7 @@ meatware_destroy(StonithPlugin *s)
 /* Create a new Meatware Stonith device. */
 
 static StonithPlugin *
-meatware_new(void)
+meatware_new(const char *subplugin)
 {
 	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
 

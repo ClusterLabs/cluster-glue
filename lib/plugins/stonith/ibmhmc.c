@@ -113,7 +113,7 @@
 #define HMCURL	"http://publib-b.boulder.ibm.com/Redbooks.nsf/RedbookAbstracts"\
 		"/SG247038.html"
 
-static StonithPlugin *	ibmhmc_new(void);
+static StonithPlugin *	ibmhmc_new(const char *);
 static void		ibmhmc_destroy(StonithPlugin *);
 static const char *	ibmhmc_getinfo(StonithPlugin * s, int InfoType);
 static const char**	ibmhmc_get_confignames(StonithPlugin* p);
@@ -603,7 +603,7 @@ ibmhmc_destroy(StonithPlugin *s)
 }
 
 static StonithPlugin *
-ibmhmc_new(void)
+ibmhmc_new(const char *subplugin)
 {
 	struct pluginDevice* dev = MALLOCT(struct pluginDevice);
 	

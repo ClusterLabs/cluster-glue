@@ -1,4 +1,4 @@
-/* $Id: apcsmart.c,v 1.23 2005/01/08 06:01:17 alan Exp $ */
+/* $Id: apcsmart.c,v 1.24 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>
@@ -100,7 +100,7 @@ static const char *NOTpluginID = "destroyed (APCSmart)";
 
 #include "stonith_signal.h"
 
-static StonithPlugin *	apcsmart_new(void);
+static StonithPlugin *	apcsmart_new(const char *);
 static void		apcsmart_destroy(StonithPlugin *);
 static const char**	apcsmart_get_confignames(StonithPlugin*);
 static int		apcsmart_set_config(StonithPlugin *, StonithNVpair*);
@@ -930,7 +930,7 @@ apcsmart_destroy(StonithPlugin * s)
  */
 
 static StonithPlugin *
-apcsmart_new(void)
+apcsmart_new(const char *subplugin)
 {
     struct pluginDevice *ad = MALLOCT(struct pluginDevice);
 

@@ -1,4 +1,4 @@
-/* $Id: drac3.c,v 1.11 2005/01/31 09:45:31 sunjd Exp $ */
+/* $Id: drac3.c,v 1.12 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -38,7 +38,7 @@
 #include <pils/plugin.h>
 #include "stonith_signal.h"
 
-static StonithPlugin *	drac3_new(void);
+static StonithPlugin *	drac3_new(const char *);
 static void	drac3_destroy(StonithPlugin *);
 static const char ** drac3_get_confignames(StonithPlugin *);
 static int	drac3_set_config(StonithPlugin *, StonithNVpair *);
@@ -110,7 +110,7 @@ static const char *NOTpluginID = "destroyed (Dell DRAC III Card)";
 /* STONITH PLUGIN API                                                 */
 /* ------------------------------------------------------------------ */
 static StonithPlugin *
-drac3_new(void)
+drac3_new(const char *subplugin)
 {
 	struct pluginDevice *drac3d = MALLOCT(struct pluginDevice);
 

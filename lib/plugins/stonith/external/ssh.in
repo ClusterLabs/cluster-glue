@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # External STONITH module for ssh.
 #
@@ -23,53 +24,80 @@
 # Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
 #
 
-action="$1"
-
 #SSH_COMMAND "ssh -q -x -o PasswordAuthentication=no StrictHostKeyChecking=no" 
 SSH_COMMAND="ssh -q -x -n -l root"
-REBOOT_COMMAND="echo 'sleep 1; /sbin/reboot -nf' | at now"
+
+REBOOT_COMMAND="echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
 
 # Warning: If you select this poweroff command, it'll physically
 # power-off the machine, and quite a number of systems won't be remotely
 # revivable.
 # TODO: Probably should touch a file on the server instead to just
 # prevent heartbeat et al from being started after the reboot.
-# POWEROFF_COMMAND="echo 'sleep 1; /sbin/poweroff -nf' | at now"
-POWEROFF_COMMAND="echo 'sleep 1; /sbin/reboot -nf' | at now"
+# POWEROFF_COMMAND="echo 'sleep 2; /sbin/poweroff -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
+POWEROFF_COMMAND="echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
 
-case $action in
-hostlist)
-	# This one so sucks ;-)
-	echo "$ST_OPTS_1"
-	;;
-poweron)
-	# TODO: Can't really be implemented, unless with the above hack
-	# where this one would be used to start heartbeat remotely
-	# again.
+case $1 in
+gethosts)
+	for h in $ST_HOSTLIST ; do
+		echo $h
+	done
 	exit 0
 	;;
-poweroff)
-	$SSH_COMMAND $ST_HOST $POWEROFF_COMMAND
-	exit $?
+on)
+	# Can't really be implemented because ssh cannot power on a system
+	# when it is powered off.
+	exit 1
+	;;
+off)
+	# Shouldn't really be implemented because if ssh cannot power on a 
+	# system, it shouldn't be allowed to power it off.
+	exit 1
 	;;
 reset)
-	$SSH_COMMAND $ST_HOST $REBOOT_COMMAND
-	exit $?
+	for h in $ST_HOSTLIST ; do
+		if [ "$h" = "$2" ] ; then
+			$SSH_COMMAND $2 $REBOOT_COMMAND
+			rc=$?
+			if [ $rc == 0 ]; then 
+				sleep 2
+			fi
+			exit $rc
+		fi
+	done
+	exit 1
 	;;
 status)
-	# Just check whether we can actually login to every node in our
-	# hostlist, if any.
-	for h in $ST_OPTS_1 ; do
-		$SSH_COMMAND $h /bin/true
-		if [ $rc -ne 0 ]; then
+	for h in $ST_HOSTLIST ; do
+		host $h | grep "not found:"
+		if [ $? == 0 ]; then
 			exit 1
 		fi
 	done
+	exit 0
+	;;
+getconfignames)
+	echo "ST_HOSTLIST"
+	exit 0
+	;;
+getinfo-devid)
+	echo "ssh STONITH device"
+	exit 0
+	;;
+getinfo-devname)
+	echo "ssh STONITH external device"
+	exit 0
+	;;
+getinfo-devdescr)
+	echo "ssh-based Linux host reset"
+	echo "Fine for testing, but not suitable for production!"
+	exit 0
+	;;
+getinfo-devurl)
+	echo "http://openssh.org"
 	exit 0
 	;;
 *)
 	exit 1
 	;;
 esac
-
-

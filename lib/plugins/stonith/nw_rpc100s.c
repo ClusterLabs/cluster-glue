@@ -1,4 +1,4 @@
-/* $Id: nw_rpc100s.c,v 1.20 2005/03/16 21:59:25 blaschke Exp $ */
+/* $Id: nw_rpc100s.c,v 1.21 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  *	Stonith module for Night/Ware RPC100S 
  *
@@ -37,7 +37,7 @@
 #define MAX_CFGLINE		256
 #include <pils/plugin.h>
 
-static StonithPlugin *	nw_rpc100s_new(void);
+static StonithPlugin *	nw_rpc100s_new(const char *);
 static void		nw_rpc100s_destroy(StonithPlugin *);
 static int		nw_rpc100s_set_config(StonithPlugin *, StonithNVpair *);
 static const char**	nw_rpc100s_get_confignames(StonithPlugin *);
@@ -816,7 +816,7 @@ nw_rpc100s_destroy(StonithPlugin *s)
  *          object. 
  */
 static StonithPlugin *
-nw_rpc100s_new(void)
+nw_rpc100s_new(const char *subplugin)
 {
 	struct pluginDevice*	ctx = MALLOCT(struct pluginDevice);
 

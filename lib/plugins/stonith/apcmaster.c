@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.21 2005/03/16 21:59:25 blaschke Exp $ */
+/* $Id: apcmaster.c,v 1.22 2005/04/06 18:58:42 blaschke Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -51,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.21 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.22 $"; 
 
 #define	DEVICE	"APC MasterSwitch"
 
@@ -67,7 +67,7 @@ static const char *version __attribute__ ((unused)) = "$Revision: 1.21 $";
 
 #include "stonith_signal.h"
 
-static StonithPlugin *	apcmaster_new(void);
+static StonithPlugin *	apcmaster_new(const char *);
 static void		apcmaster_destroy(StonithPlugin *);
 static const char **	apcmaster_get_confignames(StonithPlugin *);
 static int		apcmaster_set_config(StonithPlugin *, StonithNVpair *);
@@ -791,7 +791,7 @@ apcmaster_destroy(StonithPlugin *s)
 /* Create a new APC Master Switch StonithPlugin device. */
 
 static StonithPlugin *
-apcmaster_new(void)
+apcmaster_new(const char *subplugin)
 {
 	struct pluginDevice*	ms = MALLOCT(struct pluginDevice);
 

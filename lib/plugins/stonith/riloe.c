@@ -30,7 +30,7 @@
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
 
-static StonithPlugin *	riloe_new(void);
+static StonithPlugin *	riloe_new(const char *);
 static void		riloe_destroy(StonithPlugin *);
 static int		riloe_set_config(StonithPlugin *, StonithNVpair *);
 static const char **	riloe_get_confignames(StonithPlugin * );
@@ -361,7 +361,7 @@ riloe_destroy(StonithPlugin *s)
 
 /* Create a new Riloe Stonith device.  Too bad this function can't be static */
 static StonithPlugin *
-riloe_new(void)
+riloe_new(const char *subplugin)
 {
 	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
 

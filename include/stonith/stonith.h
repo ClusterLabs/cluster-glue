@@ -1,4 +1,4 @@
-/* $Id: stonith.h,v 1.13 2005/01/11 04:57:59 alan Exp $ */
+/* $Id: stonith.h,v 1.14 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  *	S hoot
  *	T he
@@ -104,7 +104,13 @@ void	stonith_set_debug	(Stonith* s, int debuglevel);
 			
 int	stonith_set_config	(Stonith* s, StonithNVpair* list);
 int	stonith_set_config_file(Stonith* s, const char * configname);
+				/* uses get_confignames to determine which 
+				 * names to look for in file configname, which
+				 * is passed in by the -F option */
 int	stonith_set_config_info(Stonith* s, const char * info);
+				/* uses get_confignames to determine which 
+				 * names to look for in string info, which
+				 * is passed in by the -p option */
 	/*
 	 * Must call stonith_set_config() before calling functions below...
 	 */

@@ -9,8 +9,10 @@
  * Modified for external.c: Scott Kleihege <scott@tummy.com>
  * Reviewed, tested, and config parsing: Sean Reifschneider <jafo@tummy.com>
  * And overhauled by Lars Marowsky-Bree <lmb@suse.de>, so the circle
- * closes...
+ *   closes...
  * Mangled by Zhaokai <zhaokai@cn.ibm.com>, IBM, 2005
+ * Changed to allow full-featured external plugins by Dave Blaschke 
+ *   <debltc@us.ibm.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,18 +30,18 @@
  *
  */
 
+#include <dirent.h>
+
 #include "stonith_plugin_common.h"
 
 #define PIL_PLUGIN              external
 #define PIL_PLUGIN_S            "external"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
-#define ST_COMMAND		"command options"
-#define MAX_EXTERNALLINE	256
 
 #include <pils/plugin.h>
 
-static StonithPlugin *	external_new(void);
+static StonithPlugin *	external_new(const char *);
 static void		external_destroy(StonithPlugin *);
 static int		external_set_config(StonithPlugin *, StonithNVpair *);
 static const char**	external_get_confignames(StonithPlugin *);
@@ -49,14 +51,14 @@ static int		external_reset_req(StonithPlugin * s, int request, const char * host
 static char **		external_hostlist(StonithPlugin  *);
 
 static struct stonith_ops externalOps ={
-	external_new,			/* Create new STONITH object		*/
-	external_destroy,		/* Destroy STONITH object		*/
-	external_getinfo,		/* Return STONITH info string		*/
-	external_get_confignames,	/* Return STONITH info string		*/
-	external_set_config,		/* Get configuration from NVpairs	*/
-	external_status,		/* Return STONITH device status		*/
-	external_reset_req,		/* Request a reset 			*/
-	external_hostlist,		/* Return list of supported hosts 	*/
+	external_new,			/* Create new STONITH object	  */
+	external_destroy,		/* Destroy STONITH object	  */
+	external_getinfo,		/* Return STONITH info string	  */
+	external_get_confignames,	/* Return STONITH info string	  */
+	external_set_config,		/* Get configuration from NVpairs */
+	external_status,		/* Return STONITH device status	  */
+	external_reset_req,		/* Request a reset 		  */
+	external_hostlist,		/* Return list of supported hosts */
 };
 
 PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
@@ -96,11 +98,13 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  */
 
 struct pluginDevice {
-  StonithPlugin	sp;
-  const char *	pluginid;
-  int		config;
-  char *	command;
-  GHashTable *	cmd_opts;
+	StonithPlugin	sp;
+	const char *	pluginid;
+	int		config;
+	GHashTable *	cmd_opts;
+	char *		subplugin;
+	char **		confignames;
+	char *		outputbuf;
 };
 
 static const char * pluginid = "EXTERNALDevice-Stonith";
@@ -108,8 +112,8 @@ static const char * NOTpluginID = "EXTERNAL device has been destroyed";
 
 /* Prototypes */
 
-/* Run the command with op as a single command line argument and return
- * the exit status + the output (NULL -> discard output) */
+/* Run the command with op and return the exit status + the output 
+ * (NULL -> discard output) */
 static int external_run_cmd(struct pluginDevice *sd, const char *op, 
 		char **output);
 /* Just free up the configuration and the memory, if any */
@@ -118,93 +122,114 @@ static void external_unconfig(struct pluginDevice *sd);
 static int
 external_status(StonithPlugin  *s)
 {
-	int rc = 0;
-	struct pluginDevice *sd = NULL;
+	struct pluginDevice *	sd;
+	const char *		op = "status";
+	int			rc;
 	
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
+
 	ERRIFWRONGDEV(s,S_OOPS);
 
 	sd = (struct pluginDevice*) s;
-	
-	rc = external_run_cmd(sd, "status", NULL);
-	if (rc == 0) {
-		LOG(PIL_DEBUG, "%s: running %s status returned %d",
-			__FUNCTION__, sd->command, rc);
-	} else {	
-		LOG(PIL_INFO, "%s: running %s status returned %d",
-			__FUNCTION__, sd->command, rc);
+	if (sd->subplugin == NULL) {
+		LOG(PIL_CRIT, "%s: invoked without subplugin", __FUNCTION__);
+		return(S_OOPS);
 	}
 	
+	rc = external_run_cmd(sd, op, NULL);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: running '%s %s' returned %d",
+			__FUNCTION__, sd->subplugin, op, rc);
+	}
 	return rc;
+}
+
+static int
+get_num_tokens(char *str)
+{
+	int namecount = 0;
+
+	while (*str != EOS) {
+		str += strspn(str, WHITESPACE);
+		if (*str == EOS)
+			break;
+		str += strcspn(str, WHITESPACE);
+		namecount++;
+	}
+	return namecount;
 }
 
 static char **
 external_hostlist(StonithPlugin  *s)
 {
-	char **	ret = NULL;
-	char *	output;
-	char *	tmp;
 	struct pluginDevice*	sd;
-	int rc, i;
+	const char *		op = "gethosts";
+	int			rc, i, namecount;
+	char **			ret;
+	char *			output = NULL;
+	char *			tmp;
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
 	ERRIFNOTCONFIGED(s,NULL);
 
 	sd = (struct pluginDevice*) s;
+	if (sd->subplugin == NULL) {
+		LOG(PIL_CRIT, "%s: invoked without subplugin", __FUNCTION__);
+		return(NULL);
+	}
 
-	rc = external_run_cmd(sd, "hostlist", &output);
-	if (rc == 0) {
-		LOG(PIL_DEBUG, "%s: '%s hostlist' succeeded",
-			__FUNCTION__, sd->command);
-		return NULL;
-	} else {	
-		LOG(PIL_CRIT, "%s: '%s hostlist' failed with rc %d",
-			__FUNCTION__, sd->command, rc);
+	rc = external_run_cmd(sd, op, &output);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: running '%s %s' returned %d",
+			__FUNCTION__, sd->subplugin, op, rc);
+	}
+	if (rc != 0) {
+		LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
+			__FUNCTION__, sd->subplugin, op, rc);
 		if (output) { FREE(output); }
 		return NULL;
 	}
 
 	if (!output) {
-		LOG(PIL_CRIT, "%s: '%s hostlist' returned an empty hostlist",
-			__FUNCTION__, sd->command);
+		LOG(PIL_CRIT, "%s: '%s %s' returned an empty hostlist",
+			__FUNCTION__, sd->subplugin, op);
 		return NULL;
 	}
 	
-	ret = MALLOC(sizeof(char *) * 64);
+	namecount = get_num_tokens(output);	
+	ret = MALLOC((namecount+1)*sizeof(char *));
 	if (!ret) {
 		LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
+		FREE(output);
 		return NULL;
 	}
-	
+	memset(ret, 0, (namecount+1)*sizeof(char *));
+
 	/* White-space split the output here */
 	i = 0;
-	while ((tmp = strtok(output, WHITESPACE))) {
+	tmp = strtok(output, WHITESPACE);
+	while (tmp != NULL) {
 		ret[i] = STRDUP(tmp);
 		if (!ret[i]) {
 			LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
+			FREE(output);
 			stonith_free_hostlist(ret);
 			return NULL;
 		}
-
-		/* External scripts should be treated with care... 
-		 * Arbitary limits are bad, but who knows? 
-		 * XXX: Up this if it ever becomes a problem.
-		 * Though power switches driving >=32 nodes really
-		 * should be implemented as proper STONITH plug-ins.
-		 */
 		i++;
-		if (i > 32) {
-			LOG(PIL_CRIT, "%s: run away hostlist? >= 32 nodes", 
-					__FUNCTION__);
-			stonith_free_hostlist(ret);
-			return NULL;
-		}
-		
+		tmp = strtok(NULL, WHITESPACE);
 	}
 
-	if (output) { FREE(output); }
+	FREE(output);
 
 	if (i == 0) {
-		LOG(PIL_CRIT, "%s: '%s hostlist' returned an empty hostlist",
-			__FUNCTION__, sd->command);
+		LOG(PIL_CRIT, "%s: '%s %s' returned an empty hostlist",
+			__FUNCTION__, sd->subplugin, op);
 		stonith_free_hostlist(ret);
 		ret = NULL;
 	}
@@ -215,15 +240,27 @@ external_hostlist(StonithPlugin  *s)
 static int
 external_reset_req(StonithPlugin * s, int request, const char * host)
 {
-	struct pluginDevice *sd = NULL;
-	const char *op;
-	int rc;
+	struct pluginDevice *	sd;
+	const char *		op;
+	int			rc;
+	char *			args1and2;
+	int			argslen;
 	
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
+
 	ERRIFNOTCONFIGED(s,S_OOPS);
 	
-	LOG(PIL_INFO, "%s %s", _("Host external-reset initiating on "), host);
+	if (Debug) {
+		LOG(PIL_DEBUG, "Host external-reset initiating on %s", host);
+	}
 
 	sd = (struct pluginDevice*) s;
+	if (sd->subplugin == NULL) {
+		LOG(PIL_CRIT, "%s: invoked without subplugin", __FUNCTION__);
+		return(S_OOPS);
+	}
 
 	switch (request) {
 		case ST_GENERIC_RESET:
@@ -231,11 +268,11 @@ external_reset_req(StonithPlugin * s, int request, const char * host)
 			break;
 
 		case ST_POWEROFF:
-			op = "poweroff";
+			op = "off";
 			break;
 			
 		case ST_POWERON:
-			op = "poweron";
+			op = "on";
 			break;
 			
 		default:
@@ -245,112 +282,63 @@ external_reset_req(StonithPlugin * s, int request, const char * host)
 			break;
 	}
 	
-	g_hash_table_insert(sd->cmd_opts, g_strdup("ST_HOST"),
-			g_strdup(host));
+	argslen = strlen(op) + strlen(host) + 2 /* 1 for blank, 1 for EOS */;
+	args1and2 = (char *)MALLOC(argslen);
+	if (args1and2 == NULL) {
+		LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
+		return S_OOPS;
+	}
+	rc = snprintf(args1and2, argslen, "%s %s", op, host);
+	if (rc <= 0 || rc >= argslen) {
+		FREE(args1and2);
+		return S_OOPS;
+	}
 	
-	rc = external_run_cmd(sd, op, NULL);
+	rc = external_run_cmd(sd, args1and2, NULL);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: running '%s %s' returned %d",
+			__FUNCTION__, sd->subplugin, op, rc);
+	}
 
-	g_hash_table_remove(sd->cmd_opts, "ST_HOST");
+	FREE(args1and2);
 
-	if (rc == 0) {
-		LOG(PIL_INFO, "%s: '%s %s' for host %s succeeded",
-			__FUNCTION__, sd->command, op, host);
-		return S_OK;
-	} else {	
+	if (rc != 0) {
 		LOG(PIL_CRIT, "%s: '%s %s' for host %s failed with rc %d",
-			__FUNCTION__, sd->command, op, host, rc);
+			__FUNCTION__, sd->subplugin, op, host, rc);
 		return(S_RESETFAIL);
 	}
 	
-	/* notreached */
-	return S_OOPS;
+	return S_OK;
 }
 
 static int
-external_parse_config_info(struct pluginDevice* sd, const char * info)
+external_parse_config_info(struct pluginDevice* sd, StonithNVpair * info)
 {
-	int i;
-	int j;
-	char *command = NULL;
-	char *tmp, *key, *value, *tmp_val;
-	struct stat buf;
+	char * 		key;
+	char *		value;
+	StonithNVpair *	nv;
 	
 	/*  make sure that command has not already been set  */
 	if (sd->config) {
 		return(S_OOPS);
 	}
 
-	tmp = STRDUP(info);
-	if (!tmp) {
-		goto err_mem;
-	}
-	
-	command = strtok(tmp, WHITESPACE);		
-	if (!command) {
-		LOG(PIL_CRIT, "%s: cannot find command to call.", __FUNCTION__);
-		goto err;
-	}
-	
-	if (command[0] != '/') {
-		/* Not an absolute pathname. */
-		j = strlen(command) + strlen(STONITH_EXT_PLUGINDIR) + 2;
-		
-		sd->command = MALLOC(j);
-		if (!sd->command) {
-			goto err_mem;
-		}
-		if (snprintf(sd->command, j, "%s/%s", sd->command,
-			STONITH_EXT_PLUGINDIR) == j) {
-			goto err_mem;
-		}
-	} else {
-		sd->command = STRDUP(command);
-	}
-	
-	if (!sd->command) {
-		goto err_mem;
-	}
-
-        if (stat(sd->command, &buf) != 0) {
-		LOG(PIL_CRIT, "%s: stating %s failed.",
-			__FUNCTION__, sd->command);
-                goto err;
-        }
-
-        if (S_ISREG(buf.st_mode) 
-	  && (buf.st_mode & (S_IXUSR|S_IXOTH|S_IXGRP))) {
-		LOG(PIL_INFO, "%s: %s found to be executable.",
-			__FUNCTION__, sd->command);
-        } else {
-		LOG(PIL_CRIT, "%s: %s found NOT to be executable.",
-			__FUNCTION__, sd->command);
-		goto err;
-	}
-
 	sd->cmd_opts = g_hash_table_new(g_str_hash, g_str_equal);
 
-	/* white-space split the option string and put it into the
-	 * hashtable. TODO: Maybe treat "" as delimeters too so
+	/* TODO: Maybe treat "" as delimeters too so
 	 * whitespace can be passed to the plugins... */
-	i = 0;
-	while ((tmp_val = strtok(tmp, WHITESPACE))) {
-		key = MALLOC(10);
+	for (nv = info; nv->s_name; nv++) {
+		key = STRDUP(nv->s_name);
 		if (!key) {
 			goto err_mem;
 		}
-		if (snprintf(key, 10, "ST_OPT_%d", i) == 10) {
-			FREE(key);
-			goto err_mem;
-		}
-		value = STRDUP(tmp_val);
+		value = STRDUP(nv->s_value);
 		if (!value) {
 			FREE(key);
 			goto err_mem;
 		}
 		g_hash_table_insert(sd->cmd_opts, key, value);
-		i++;
 	}
-	FREE(tmp);
 		
 	sd->config = 1;
 	
@@ -358,10 +346,6 @@ external_parse_config_info(struct pluginDevice* sd, const char * info)
 
 err_mem:
 	LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
-err:
-	if (tmp) {
-		FREE(tmp);
-	}
 	external_unconfig(sd);
 	
 	return(S_OOPS);
@@ -384,10 +368,6 @@ external_unconfig(struct pluginDevice *sd) {
 		g_hash_table_destroy(sd->cmd_opts);	
 		sd->cmd_opts = NULL;
 	}
-	if (sd->command) {
-		FREE(sd->command);
-		sd->command = NULL;
-	}
 }
 
 /*
@@ -397,36 +377,67 @@ external_unconfig(struct pluginDevice *sd) {
 static int
 external_set_config(StonithPlugin* s, StonithNVpair *list)
 {
-	char	externalLine[MAX_EXTERNALLINE];
-	struct pluginDevice*	sd;
-	StonithNamesToGet	namestoget [] =
-	{	{ST_COMMAND,	NULL}
-	,	{NULL,		NULL}
-	};
-	int			rc;
+	struct pluginDevice *	sd;
+	char **			p;
 	
 	if (Debug) {
-		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 	}
 
 	ERRIFWRONGDEV(s,S_OOPS);
 
 	sd = (struct pluginDevice*) s;
+	if (sd->subplugin == NULL) {
+		LOG(PIL_CRIT, "%s: invoked without subplugin", __FUNCTION__);
+		return(S_OOPS);
+	}
+
+	if (sd->confignames == NULL) {
+		/* specified by name=value pairs, check required parms */
+		if (external_get_confignames(s) == NULL) {
+			return(S_OOPS);
+		}
+
+		for (p = sd->confignames; *p; p++) {
+			if (OurImports->GetValue(list, *p) == NULL) {
+				LOG(PIL_INFO, "Cannot get parameter %s from "
+					"StonithNVpair", *p);
+				return S_OOPS;
+			}
+		}
+	}
+
+	return external_parse_config_info(sd, list);
+}
 
 
-	if ((rc = OurImports->GetAllValues(namestoget, list)) != S_OK){
-		LOG(PIL_INFO, "Can not get parameter from StonithNVpair");
-		return rc;
+/* Only interested in regular files that are also executable */
+static int
+exec_select(const struct dirent *dire)
+{
+	struct stat	statf;
+	char		filename[FILENAME_MAX];
+	int		rc;
+
+	rc = snprintf(filename, FILENAME_MAX, "%s/%s", 
+		STONITH_EXT_PLUGINDIR, dire->d_name);
+	if (rc <= 0 || rc >= FILENAME_MAX) {
+		return 0;
 	}
 	
-
-	if ((snprintf(externalLine, MAX_EXTERNALLINE,"%s",  namestoget[0].s_value)) <= 0) {
-
-		LOG(PIL_CRIT,"Can not copy parameter to externalLine");
+	if ((stat(filename, &statf) == 0) &&
+	    (S_ISREG(statf.st_mode)) &&
+            (statf.st_mode & (S_IXUSR|S_IXGRP|S_IXOTH))) {
+		if (statf.st_mode & (S_IWGRP|S_IWOTH)) {
+			LOG(PIL_WARN, "Executable file %s ignored "
+				"(writable by group/others)", filename);
+			return 0;
+		}else{
+			return 1;
+		}
 	}
-	
-	return (external_parse_config_info(sd,externalLine));
 
+	return 0;
 }
 
 /*
@@ -435,8 +446,76 @@ external_set_config(StonithPlugin* s, StonithNVpair *list)
 static const char**
 external_get_confignames(StonithPlugin* p)
 {
-	static const char *	ExternalParams[] = {ST_COMMAND, NULL };
-	return ExternalParams;
+  	struct pluginDevice *	sd;
+	const char *		op = "getconfignames";
+	int 			i, rc;
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
+
+	sd = (struct pluginDevice *)p;
+
+	if (sd->subplugin != NULL) {
+		/* return list of subplugin's required parameters */
+		char	*output = NULL, *pch;
+		int	namecount;
+
+		rc = external_run_cmd(sd, op, &output);
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: '%s %s' returned %d",
+				__FUNCTION__, sd->subplugin, op, rc);
+		}
+		if (rc != 0) {
+			LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
+				__FUNCTION__, sd->subplugin, op, rc);
+			if (output) { FREE(output); }
+			return NULL;
+		}
+		
+		namecount = get_num_tokens(output);
+		sd->confignames = (char **)MALLOC((namecount+1)*sizeof(char *));
+		if (sd->confignames == NULL) {
+			LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
+			if (output) { FREE(output); }
+			return NULL;
+		}
+
+		/* now copy over confignames */
+		pch = strtok(output, WHITESPACE);		
+		for (i = 0; i < namecount; i++) {
+			sd->confignames[i] = STRDUP(pch);
+			pch = strtok(NULL, WHITESPACE);
+		}
+		FREE(output);
+		sd->confignames[namecount] = NULL;
+	}else{
+		/* return list of subplugins in external directory */
+		struct dirent **	files = NULL;
+		int			dircount;
+
+		/* get the external plugin's confignames (list of subplugins) */
+		dircount = scandir(STONITH_EXT_PLUGINDIR, &files,
+				SCANSEL_CAST exec_select, NULL);
+		if (dircount < 0) {
+			return NULL;
+		}
+	
+		sd->confignames = (char **)MALLOC((dircount+1)*sizeof(char *));
+		if (!sd->confignames) {
+			LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
+			return NULL;
+		}
+
+		for (i = 0; i < dircount; i++) {
+			sd->confignames[i] = STRDUP(files[i]->d_name);
+			free(files[i]);
+		}
+		free(files);
+		sd->confignames[dircount] = NULL;
+	}
+
+	return (const char **)sd->confignames;
 }
 
 /*
@@ -445,31 +524,58 @@ external_get_confignames(StonithPlugin* p)
 static const char *
 external_getinfo(StonithPlugin * s, int reqtype)
 {
-  struct pluginDevice* sd;
-  char *		ret;
+	struct pluginDevice* sd;
+	char *		ret = NULL;
+	const char *	op;
+	int rc;
   
-  ERRIFWRONGDEV(s,NULL);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
-  /* TODO: Retrieve from plugin...? */
+	ERRIFWRONGDEV(s,NULL);
 
-  /*
-   *	We look in the ST_TEXTDOMAIN catalog for our messages
-   */
-  sd = (struct pluginDevice *)s;
+	sd = (struct pluginDevice *)s;
+	if (sd->subplugin == NULL) {
+		LOG(PIL_CRIT, "%s: invoked without subplugin", __FUNCTION__);
+		return(NULL);
+	}
 
-  switch (reqtype) {
-  case ST_DEVICEID:
-    ret = _("External STONITH plugin");
-    break;
-    case ST_DEVICEDESCR:		/* Description of device type */
-	ret = _("EXTERNAL-program based STONITH plugin\n");
-	break;
+	switch (reqtype) {
+		case ST_DEVICEID:
+			op = "getinfo-devid";
+			break;
 
-  default:
-    ret = NULL;
-    break;
-  }
-  return ret;
+		case ST_DEVICENAME:
+			op = "getinfo-devname";
+			break;
+
+		case ST_DEVICEDESCR:
+			op = "getinfo-devdescr";
+			break;
+
+		case ST_DEVICEURL:
+			op = "getinfo-devurl";
+			break;
+
+		default:
+			return NULL;
+	}
+
+	rc = external_run_cmd(sd, op, &ret);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: '%s %s' returned %d",
+			__FUNCTION__, sd->subplugin, op, rc);
+	}
+
+	if (rc == 0) {
+		if (sd->outputbuf == NULL) {
+			FREE(sd->outputbuf);
+		}
+		sd->outputbuf =  ret;
+		return(ret);
+	}
+	return(NULL);
 }
 
 /*
@@ -478,7 +584,12 @@ external_getinfo(StonithPlugin * s, int reqtype)
 static void
 external_destroy(StonithPlugin *s)
 {
-	struct pluginDevice* sd;
+	struct pluginDevice *	sd;
+	char **			p;
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
 	VOIDERRIFWRONGDEV(s);
 
@@ -486,14 +597,33 @@ external_destroy(StonithPlugin *s)
 
 	sd->pluginid = NOTpluginID;
 	external_unconfig(sd);
+	if (sd->confignames != NULL) {
+		for (p = sd->confignames; *p; p++) {
+			FREE(*p);
+		}
+		FREE(sd->confignames);
+		sd->confignames = NULL;
+	}
+	if (sd->subplugin != NULL) {
+		FREE(sd->subplugin);
+		sd->subplugin = NULL;
+	}
+	if (sd->outputbuf != NULL) {
+		FREE(sd->outputbuf);
+		sd->outputbuf = NULL;
+	}
 	FREE(sd);
 }
 
 /* Create a new external Stonith device */
 static StonithPlugin *
-external_new(void)
+external_new(const char *subplugin)
 {
 	struct pluginDevice*	sd = MALLOCT(struct pluginDevice);
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
 	if (sd == NULL) {
 		LOG(PIL_CRIT, "out of memory");
@@ -501,8 +631,10 @@ external_new(void)
 	}
 	memset(sd, 0, sizeof(*sd));
 	sd->pluginid = pluginid;
+	if (subplugin != NULL) {
+		sd->subplugin = STRDUP(subplugin);
+	}
 	sd->sp.s_ops = &externalOps;
-	external_unconfig(sd);
 	return &(sd->sp);
 }
 
@@ -520,32 +652,59 @@ ext_del_from_env(gpointer key, gpointer value, gpointer user_data)
 	unsetenv((char *)key);
 }
 
-/* Run the command with op as a single command line argument and return
- * the exit status + the output */
+/* Run the command with op as command line argument(s) and return the exit
+ * status + the output */
 static int 
-external_run_cmd(struct pluginDevice *sd, const char *op, 
-		char **output)
+external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 {
-	const int BUFF_LEN=4096;
-	char buff[BUFF_LEN];
-	int read_len = 0;
-	int rc;
-	char* data = NULL;
-	FILE* file;
-	char cmd[BUFF_LEN];
-	GString* g_str_tmp = NULL;
+	const int		BUFF_LEN=4096;
+	char			buff[BUFF_LEN];
+	int			read_len = 0;
+	int			rc;
+	char * 			data = NULL;
+	FILE *			file;
+	char			cmd[FILENAME_MAX+64];
+	GString *		g_str_tmp = NULL;
+	struct stat		buf;
 
-	if (snprintf(cmd, BUFF_LEN, "%s %s", sd->command, op) == BUFF_LEN) {
-		LOG(PIL_CRIT, "%s: out of memory or command too long",
-				__FUNCTION__);
-		goto err;
+	rc = snprintf(cmd, FILENAME_MAX, "%s/%s", 
+		STONITH_EXT_PLUGINDIR, sd->subplugin);
+	if (rc <= 0 || rc >= FILENAME_MAX) {
+		LOG(PIL_CRIT, "%s: external command too long.", __FUNCTION__);
+		return -1;
 	}
 	
+        if (stat(cmd, &buf) != 0) {
+		LOG(PIL_CRIT, "%s: stating %s failed.", __FUNCTION__, cmd);
+                return -1;
+        }
+
+        if (!S_ISREG(buf.st_mode) 
+	    || (!(buf.st_mode & (S_IXUSR|S_IXGRP|S_IXOTH)))) {
+		LOG(PIL_CRIT, "%s: %s found NOT to be executable.",
+			__FUNCTION__, cmd);
+		return -1;
+	}
+
+	if (buf.st_mode & (S_IWGRP|S_IWOTH)) {
+		LOG(PIL_CRIT, "%s: %s found to be writable by group/others, "
+			"NOT executing for security purposes.",
+			__FUNCTION__, cmd);
+		return -1;
+	}
+
+	strcat(cmd, " ");
+	strcat(cmd, op);
+
 	/* We only have a global environment to use here. So we add our
 	 * options to it, and then later remove them again. */
-	g_hash_table_foreach(sd->cmd_opts, 
-			ext_add_to_env, NULL);
+	if (sd->cmd_opts) {
+		g_hash_table_foreach(sd->cmd_opts, ext_add_to_env, NULL);
+	}
 
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: Calling '%s'", __FUNCTION__, cmd );
+	}
 	file = popen(cmd, "r");
 	if (NULL==file) {
 		LOG(PIL_CRIT, "%s: Calling '%s' failed",
@@ -581,14 +740,16 @@ external_run_cmd(struct pluginDevice *sd, const char *op,
 		FREE(data);
 	}
 	
-	g_hash_table_foreach(sd->cmd_opts, 
-			ext_del_from_env, NULL);
-	
+	if (sd->cmd_opts) {
+		g_hash_table_foreach(sd->cmd_opts, ext_del_from_env, NULL); 
+	}
+
 	return(rc);
 
 err:
-	g_hash_table_foreach(sd->cmd_opts, 
-			ext_del_from_env, NULL);
+	if (sd->cmd_opts)  {
+		g_hash_table_foreach(sd->cmd_opts, ext_del_from_env, NULL);
+	}
 	if (data) {
 		FREE(data);
 	}
@@ -599,5 +760,3 @@ err:
 	return(-1);
 
 }
-
-

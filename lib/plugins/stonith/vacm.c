@@ -1,5 +1,5 @@
 
-/* $Id: vacm.c,v 1.10 2005/01/31 09:45:31 sunjd Exp $ */
+/* $Id: vacm.c,v 1.11 2005/04/06 18:58:42 blaschke Exp $ */
 /******************************************************************************
 *
 *    Copyright 2000 Sistina Software, Inc.
@@ -40,7 +40,7 @@
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
 
-static StonithPlugin *	vacm_new(void);
+static StonithPlugin *	vacm_new(const char *);
 static void		vacm_destroy(StonithPlugin *);
 static const char **	vacm_get_confignames(StonithPlugin *);
 static int		vacm_set_config(StonithPlugin *, StonithNVpair *);
@@ -387,7 +387,7 @@ vacm_destroy(StonithPlugin *s)
 }
 
 static StonithPlugin *
-vacm_new(void)
+vacm_new(const char *subplugin)
 {
 	struct pluginDevice *sd;
 
