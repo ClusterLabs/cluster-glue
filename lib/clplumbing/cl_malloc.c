@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.5 2005/02/06 00:00:20 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.6 2005/02/06 01:01:53 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -32,6 +32,7 @@ static volatile cl_mem_stats_t *	memstats = NULL;
 
 #define	MARK_PRISTINE	1	/* Expensive in CPU time */
 #define	MAKE_GUARD	1	/* Adds 'n' bytes memory - cheap in CPU*/
+#define	USE_ASSERTS	1
 
 
 /*
@@ -345,8 +346,8 @@ cl_free(void *ptr)
 		free(bhdr);
 	}else{
 		int	bucksize = cl_bucket_sizes[bucket];
-#if 0
-		ASSERT(bhdr->hdr.reqsize <= cl_bucket_sizes[bucket]);
+#if defined(USE_ASSERTS)
+		g_assert(bhdr->hdr.reqsize <= cl_bucket_sizes[bucket]);
 #endif
 		if (memstats) {
 			if (memstats->nbytes_alloc >= bhdr->hdr.reqsize) {
@@ -357,12 +358,108 @@ cl_free(void *ptr)
 		bhdr->next = cl_malloc_buckets[bucket];
 		cl_malloc_buckets[bucket] = bhdr;
 #ifdef MARK_PRISTINE
-		mark_pristine(ptr, bucksize);
+		cl_mark_pristine(ptr, bucksize);
 #endif
 	}
 	if (memstats) {
 		memstats->numfree++;
 	}
+}
+
+void*
+cl_realloc(void *ptr, size_t newsize)
+{
+	struct cl_bucket*	bhdr;
+	int			bucket;
+	int			bucksize;
+
+	if (!cl_malloc_inityet) {
+		cl_malloc_init();
+	}
+
+	if (memstats) {
+		memstats->numrealloc++;
+	}
+	if (ptr == NULL) {
+		/* NULL is a legal 'ptr' value for realloc... */
+		return cl_malloc(newsize);
+	}
+
+	/* Find the beginning of our "hidden" structure */
+
+	bhdr = BHDR(ptr);
+
+#ifdef HA_MALLOC_MAGIC
+	switch (bhdr->hdr.magic) {
+		case HA_MALLOC_MAGIC:
+			break;
+
+		case HA_FREE_MAGIC:
+			cl_log(LOG_ERR
+			,	"cl_realloc: attempt to realloc already-freed"
+			" object at 0x%lx"
+			,	(unsigned long)ptr);
+			cl_dump_item(bhdr);
+			return NULL;
+			break;
+		default:
+			cl_log(LOG_ERR, "cl_realloc: Bad magic number"
+			" in object at 0x%lx"
+			,	(unsigned long)ptr);
+			cl_dump_item(bhdr);
+			return NULL;
+			break;
+	}
+#endif
+	if (!GUARD_IS_OK(ptr)) {
+		cl_log(LOG_ERR
+		,	"cl_realloc: realloc()ing guard-corrupted"
+		" object at 0x%lx (!)", (unsigned long)ptr);
+		cl_dump_item(bhdr);
+	}
+	bucket = bhdr->hdr.bucket;
+
+	/*
+	 * Figure out which bucket it came from... If any...
+	 */
+
+	if (bucket >= NUMBUCKS) {
+		if (memstats) {
+			if (memstats->nbytes_alloc >= bhdr->hdr.reqsize) {
+				memstats->nbytes_req   -= bhdr->hdr.reqsize;
+				memstats->nbytes_alloc -= bhdr->hdr.reqsize;
+				memstats->mallocbytes  -= bhdr->hdr.reqsize;
+			}
+			memstats->nbytes_req   += newsize;
+			memstats->nbytes_alloc += newsize;
+			memstats->mallocbytes  += newsize;
+		}
+		/* Not from our bucket-area... Just call realloc... */
+		return realloc(bhdr, newsize);
+	}
+	bucksize = cl_bucket_sizes[bucket];
+#if defined(USE_ASSERTS)
+	g_assert(bhdr->hdr.reqsize <= bucksize);
+#endif
+	if (newsize > bucksize) {
+		/* Need to allocate new space for it */
+		void* newret = cl_malloc(newsize);
+		if (newret != NULL) {
+			memcpy(newret, ptr, bhdr->hdr.reqsize);
+		}
+		cl_free(ptr);
+		return newret;
+	}
+
+	/* Amazing! It fits into the space previously allocated for it! */
+	bhdr->hdr.reqsize = newsize;
+	if (memstats) {
+		if (memstats->nbytes_alloc >= bhdr->hdr.reqsize) {
+			memstats->nbytes_req  -= bhdr->hdr.reqsize;
+		}
+		memstats->nbytes_req  += newsize;
+	}
+	return ptr;
 }
 
 /*
