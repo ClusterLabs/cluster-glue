@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.21 2005/01/25 23:08:49 gshi Exp $ */
+/* $Id: GSource.c,v 1.22 2005/02/08 08:43:46 gshi Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -27,6 +27,7 @@ struct GFDSource_s {
 typedef gboolean 	(*GCHdispatch)(IPC_Channel* ch, gpointer user_data);
 
 struct GCHSource_s {
+	GSource source;
 	unsigned	magno;	/* MAG_GCHSOURCE */
 	void*		udata;
 	IPC_Channel*	ch;
@@ -268,8 +269,6 @@ static GSourceFuncs G_CH_SourceFuncs = {
 
 
 
-#define GET_CH_SOURCE(src)	(GCHSource*)(src +1)
-#define GET_SOURCE(chp)		(GSource*)(((char*)chp) - sizeof(GSource))
 
 void
 set_IPC_Channel_dnotify(GCHSource* chp,
@@ -293,12 +292,9 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 	GCHSource* chp;
 	
 	GSource * source = g_source_new(&G_CH_SourceFuncs, 
-					sizeof(GSource)
-					+ sizeof(GCHSource));
+					sizeof(GCHSource));
 	
-	chp = GET_CH_SOURCE(source);
-
-	memset(chp, 0, sizeof(GCHSource));
+	chp = (GCHSource*)source;
 	
 	chp->magno = MAG_GCHSOURCE;
 	chp->ch = ch;
@@ -353,9 +349,9 @@ G_main_IPC_Channel_pause(GCHSource* chp)
 	}
 	
 	chp->pausenow = TRUE;
-
-	source = GET_SOURCE(chp);
-
+	
+	source = &chp->source;
+	
 	g_source_remove_poll(source, &chp->infd);
 	return;
 }
@@ -374,8 +370,8 @@ G_main_IPC_Channel_resume(GCHSource* chp)
 	
 	chp->pausenow = FALSE;
 	
-	source = GET_SOURCE(chp);
-
+	source = &chp->source;
+	
 	g_source_add_poll(source, &chp->infd);
 
 	return;	
@@ -408,11 +404,11 @@ static gboolean
 G_CH_prepare(GSource* source,
 	     gint* timeout)
 {
-	GCHSource* chp = GET_CH_SOURCE(source);
+	GCHSource* chp = (GCHSource*)source;
 	
 	g_assert(IS_CHSOURCE(chp));
-
-
+	
+	
 	if (chp->pausenow){
 		return FALSE;
 	}
@@ -435,8 +431,8 @@ static gboolean
 G_CH_check(GSource* source)
 {
 
-	GCHSource* chp = GET_CH_SOURCE(source);
-	
+	GCHSource* chp = (GCHSource*)source;
+
 	g_assert(IS_CHSOURCE(chp));
 	
 	if (chp->pausenow){
@@ -457,7 +453,7 @@ G_CH_dispatch(GSource * source,
 	      GSourceFunc callback,
 	      gpointer user_data)
 {
-	GCHSource* chp = GET_CH_SOURCE(source);
+	GCHSource* chp = (GCHSource*)source;
 
 	g_assert(IS_CHSOURCE(chp));
 	/* Is output now unblocked? 
@@ -504,8 +500,8 @@ G_CH_dispatch(GSource * source,
 static void
 G_CH_destroy(GSource* source)
 {
-	GCHSource* chp = GET_CH_SOURCE(source);
-
+	GCHSource* chp = (GCHSource*)source;
+	
 
 	g_assert(IS_CHSOURCE(chp));
 	
