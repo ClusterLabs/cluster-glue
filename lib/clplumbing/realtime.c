@@ -25,10 +25,10 @@ static gboolean	cl_realtimepermitted = TRUE;
  * of stack so we have it pre-allocated inside our realtime code
  * as per suggestion from mlockall(2)
  */
+#ifdef _POSIX_MEMLOCK
 static int
 cl_stack_hogger(char * inbuf, int kbytes)
 {
-#ifdef _POSIX_MEMLOCK
 	unsigned char	buf[1024];
 	
 	if (inbuf == NULL) {
@@ -42,11 +42,11 @@ cl_stack_hogger(char * inbuf, int kbytes)
 	}else{
 		return buf[sizeof(buf)-1];
 	}
-#else
+/* #else
 	return HOGRET;
-#endif
+*/
 }
-
+#endif
 /*
  *	Make us behave like a soft real-time process.
  *	We need scheduling priority and being locked in memory.
