@@ -858,7 +858,7 @@ apcsmart_reset_req(Stonith * s, int request, const char *host)
     if (((rc = APC_init(ad)) == S_OK)
 	&& ((rc = APC_send_cmd(ad->upsfd, CMD_RESET)) == S_OK)
 	&& ((rc = APC_recv_rsp(ad->upsfd, resp)) == S_OK)
-	&& (strcmp(resp, RSP_RESET) == 0 || strcmp(resp, RSP_RESET) == 0)) {
+	&& (strcmp(resp, RSP_RESET) == 0 || strcmp(resp, RSP_RESET2) == 0)) {
 
 	/* ok, reset is initiated. ups don't accept any cmds until */
 	/* reboot -> reboot complete if status cmd accepted */
