@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.52 2004/12/01 09:09:55 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.53 2004/12/05 19:15:21 andrew Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1689,7 +1689,11 @@ perform_ra_op(lrmd_op_t* op)
 			return HA_OK;
 
 		case 0:		/* Child */
-			setpgrp();
+			/* Man: The call setpgrp() is equivalent to setpgid(0,0)
+			 * _and_ compiles on BSD variants too
+			 * need to investigate if it works the same too.
+			 */
+			setpgid(0,0);
 			close(fd[0]);
 			if ( STDOUT_FILENO != fd[1]) {
 				if (dup2(fd[1], STDOUT_FILENO)!=STDOUT_FILENO) {
@@ -2036,6 +2040,10 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.53  2004/12/05 19:15:21  andrew
+ * "man" says these are equivalent.  The advantage is that this form compiles
+ *  on BSD variants.
+ *
  * Revision 1.52  2004/12/01 09:09:55  zhenh
  * make the lrmd continue read from pipe after interupted by signal
  *
