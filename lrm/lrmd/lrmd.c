@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.58 2005/01/28 10:14:29 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.59 2005/01/31 06:26:22 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -34,6 +34,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <dirent.h>
+#include <pwd.h>
 
 #include <glib.h>
 #include <heartbeat.h>
@@ -57,7 +58,7 @@
 
 #define OPTARGS		"skrhV"
 #define PID_FILE 	HA_VARRUNDIR"/lrmd.pid"
-#define LRMD_COREDUMP_ROOT_DIR "/tmp/lrm"
+#define LRMD_COREDUMP_ROOT_DIR HA_COREDIR
 
 typedef struct
 {
@@ -429,6 +430,7 @@ init_start ()
 	DIR* dir = NULL;
 	PILPluginUniv * PluginLoadingSystem = NULL;
 	struct dirent* subdir;
+	struct passwd*	pw_entry;
 	char* dot = NULL;
 	char* ra_name = NULL;
         int len;
@@ -555,11 +557,23 @@ init_start ()
 	set_child_signal();
 
 	lrmd_log(LOG_DEBUG, "Enabling coredumps");
-	if (-1 == mkdir(LRMD_COREDUMP_ROOT_DIR, 
+	pw_entry = getpwuid(geteuid());
+	if (pw_entry == NULL) {
+		lrmd_log(LOG_ERR, "Cannot get the user name of uid [%d]"
+			 , geteuid());
+	} else {
+		char dir_buffer[80];
+		memset(dir_buffer, 0, 80);
+		snprintf(dir_buffer, 79, "%s/%s", LRMD_COREDUMP_ROOT_DIR
+			 ,  pw_entry->pw_name);
+		if (-1 == mkdir(dir_buffer, 
 			S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) ) {
-		/* I donnot want to check it more carefully. */
-		lrmd_log(LOG_INFO, "May fail to make corerootdir.");
+			/* I donnot want to check it more carefully. */
+			lrmd_log(LOG_INFO, "Fail to make coredir. Perhaps "
+				 "it already exist.");
+		}
 	}
+
 	if (cl_set_corerootdir(LRMD_COREDUMP_ROOT_DIR) < 0) {
 		lrmd_log(LOG_ERR, "cannot set corerootdir");
 	}
@@ -2068,6 +2082,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.59  2005/01/31 06:26:22  sunjd
+ * Change its coredump rootdir to HA_COREDIR and try to make user specific subdir
+ *
  * Revision 1.58  2005/01/28 10:14:29  sunjd
  * turn on coredump on lrmd
  *
