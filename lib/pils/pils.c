@@ -1,4 +1,4 @@
-/* $Id: pils.c,v 1.37 2004/09/03 18:13:11 gshi Exp $ */
+/* $Id: pils.c,v 1.38 2004/09/27 20:46:43 alan Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -39,6 +39,10 @@
 
 #define ENABLE_PIL_DEFS_PRIVATE
 #define ENABLE_PLUGIN_MANAGER_PRIVATE
+
+#ifndef STRLEN_CONST
+#	define STRLEN_CONST(con)	(sizeof(con)-1)
+#endif
 
 #include <pils/interface.h>
 
@@ -1834,7 +1838,7 @@ so_select (const struct dirent *dire)
     
 	const char obj_end [] = PLUGINSUFFIX;
 	const char *end = &dire->d_name[strlen(dire->d_name)
-	-	(STRLEN(obj_end))];
+	-	(STRLEN_CONST(obj_end))];
 	
 	
 	if (DEBUGPLUGIN) {
@@ -1893,17 +1897,26 @@ PILPluginTypeListPlugins(PILPluginType* pitype
 			}
 		}
 
-
 		files = NULL;
 		errno = 0;
 		dircount = scandir(path->str, &files
 		,	SCANSEL_CAST so_select, NULL);
+		if (DEBUGPLUGIN) {
+			PILLog(PIL_DEBUG, "PILS: Examining directory [%s]"
+			": [%d] files matching [%s] suffix found."
+			,	path->str, dircount, PLUGINSUFFIX);
+		}
 		g_string_free(path, 1); path=NULL;
 
 		if (dircount <= 0) {
 			if (files != NULL) {
 				FREE_DIRLIST(files, dircount);
 				files = NULL;
+			}
+			if (DEBUGPLUGIN) {
+				PILLog(PIL_DEBUG
+				,	"PILS: skipping empty directory"
+				" in PILPluginTypeListPlugins()");
 			}
 			continue;
 		}
@@ -1920,12 +1933,16 @@ PILPluginTypeListPlugins(PILPluginType* pitype
 		for (j=0; j < dircount; ++j) {
 			char*	s;
 			unsigned slen = strlen(files[j]->d_name)
-			-	STRLEN(PLUGINSUFFIX);
+			-	STRLEN_CONST(PLUGINSUFFIX);
 
 			s = g_malloc(slen+1);
 			strncpy(s, files[j]->d_name, slen);
 			s[slen] = EOS;
 			result[initoff+j] = s;
+			if (DEBUGPLUGIN) {
+				PILLog(PIL_DEBUG, "PILS: plugin [%s] found"
+				,	s);
+			}
 		}
 		FREE_DIRLIST(files, dircount);
 		files = NULL;
@@ -1938,6 +1955,11 @@ PILPluginTypeListPlugins(PILPluginType* pitype
 		result[plugincount] = NULL;
 		/* Return them in sorted order... */
 		qsort(result, plugincount, sizeof(char *), qsort_string_cmp);
+	}else{
+		if (DEBUGPLUGIN) {
+			PILLog(PIL_DEBUG, "PILS: NULL return"
+			" from PILPluginTypeListPlugins()");
+		}
 	}
 
 
