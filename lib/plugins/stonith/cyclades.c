@@ -1,4 +1,4 @@
- /* $Id: cyclades.c,v 1.4 2005/03/29 17:06:31 blaschke Exp $ */
+ /* $Id: cyclades.c,v 1.5 2005/03/29 17:58:26 blaschke Exp $ */
 /*
  * Stonith module for Cyclades AlterPath PM
  * Bases off the SSH plugin
@@ -242,7 +242,7 @@ static int CYCNametoOutlet(struct pluginDevice *sd, const char *host)
 		memset(locked, 0, sizeof(locked));
 		memset(on, 0, sizeof(on));
 
-		err = CYCScanLine(sd, 5, savebuf, sizeof(savebuf));
+		err = CYCScanLine(sd, 2, savebuf, sizeof(savebuf));
 
 		if ((err == S_OK) &&
 		    (sscanf(savebuf,"%2d %10s %10s %3s", &outlet, 
@@ -299,7 +299,7 @@ cyclades_hostlist(StonithPlugin  *s)
 		memset(locked, 0, sizeof(locked));
 		memset(on, 0, sizeof(on));
 
-		err = CYCScanLine(sd, 5, savebuf, sizeof(savebuf));
+		err = CYCScanLine(sd, 2, savebuf, sizeof(savebuf));
 
 		if ((err == S_OK) &&
 		    (sscanf(savebuf,"%2d %10s %10s %3s", &outlet, 
