@@ -26,8 +26,7 @@
 #include <stdio.h>
 #include <ha_msg.h>
 
-/* Calculate the length of this integer */
-int			intlen(int x);
+extern gboolean cl_msg_quiet_fmterr;
 
 /* Convert a message to netstring data */
 char*			msg2netstring(const struct ha_msg*, size_t*);
