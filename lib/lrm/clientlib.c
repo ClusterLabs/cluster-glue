@@ -44,15 +44,18 @@ static int lrm_delete (ll_lrm_t*);
 static int lrm_set_lrm_callback (ll_lrm_t* lrm,
 				 lrm_op_done_callback_t op_done_callback_func);
 static GList* lrm_get_rsc_class_supported (ll_lrm_t* lrm);
-static GList* lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rsc_class);
-static char* lrm_get_rsc_type_metadata(ll_lrm_t* lrm, const char* rsc_class,
-					     const char* rsc_type);
-static GHashTable* lrm_get_all_type_metadatas(ll_lrm_t*, const char* rsc_class);
+static GList* lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* class);
+static GList* lrm_get_rsc_provider_supported (ll_lrm_t* lrm
+				,const char* class, const char* type);
+static char* lrm_get_rsc_type_metadata(ll_lrm_t* lrm, const char* class
+				,const char* type, const char* provider);
+static GHashTable* lrm_get_all_type_metadatas(ll_lrm_t*, const char* class);
 static GList* lrm_get_all_rscs (ll_lrm_t* lrm);
 static lrm_rsc_t* lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id);
-static int lrm_add_rsc (ll_lrm_t*, const char* rsc_id, const char* rsc_class
-			,const char* rsc_type, GHashTable* parameter);
-static int lrm_delete_rsc (ll_lrm_t*, const char* rsc_id);
+static int lrm_add_rsc (ll_lrm_t*, const char* id, const char* class
+			,const char* type, const char* provider
+			,GHashTable* parameter);
+static int lrm_delete_rsc (ll_lrm_t*, const char* id);
 static int lrm_inputfd (ll_lrm_t*);
 static int lrm_msgready (ll_lrm_t*);
 static int lrm_rcvmsg (ll_lrm_t*, int blocking);
@@ -65,6 +68,7 @@ static struct lrm_ops lrm_ops_instance =
 	lrm_set_lrm_callback,
 	lrm_get_rsc_class_supported,
 	lrm_get_rsc_type_supported,
+	lrm_get_rsc_provider_supported,
 	lrm_get_rsc_type_metadata,
 	lrm_get_all_type_metadatas,
 	lrm_get_all_rscs,
@@ -429,6 +433,65 @@ lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rclass)
 
 	return type_list;
 }
+GList*
+lrm_get_rsc_provider_supported (ll_lrm_t* lrm, const char* class, const char* type)
+{
+	struct ha_msg* msg;
+	struct ha_msg* ret;
+	GList* provider_list = NULL;
+	/* check whether the channel to lrmd is available */
+	client_log(LOG_INFO, "lrm_get_rsc_provider_supported: start.");
+	if (NULL == ch_cmd)
+	{
+		client_log(LOG_ERR,
+			"lrm_get_rsc_provider_supported: ch_mod is null.");
+		return NULL;
+	}
+	/* create the get ra providers message */
+	msg = create_lrm_msg(GETPROVIDERS);
+	if ( NULL == msg) {
+		client_log(LOG_ERR,
+			"lrm_get_rsc_provider_supported: can not create types msg");
+		return NULL;
+	}
+	if ( HA_FAIL == ha_msg_add(msg, F_LRM_RCLASS, class))	{
+		return NULL;
+	}
+
+	if ( HA_FAIL == ha_msg_add(msg, F_LRM_RTYPE, type))	{
+		return NULL;
+	}
+
+	/* send the msg to lrmd */
+	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
+		ha_msg_del(msg);
+		client_log(LOG_ERR,
+			"lrm_get_rsc_provider_supported: can not send msg to lrmd");
+		return NULL;
+	}
+	ha_msg_del(msg);
+	/* get the return message */
+	ret = msgfromIPC_noauth(ch_cmd);
+	if (NULL == ret) {
+		client_log(LOG_ERR,
+			"lrm_get_rsc_provider_supported: can not recieve ret msg");
+		return NULL;
+	}
+	/* get the rc of the message */
+	if (HA_FAIL == get_rc_from_msg(ret)) {
+		ha_msg_del(ret);
+		client_log(LOG_ERR,
+			"lrm_get_rsc_provider_supported: rc from msg is fail");
+		return NULL;
+	}
+	/* get the ra provider list from message */
+	provider_list = ha_msg_value_list(ret,F_LRM_RPROVIDERS);
+
+	ha_msg_del(ret);
+	client_log(LOG_INFO, "lrm_get_rsc_provider_supported: end.");
+
+	return provider_list;
+}	
 
 GHashTable*
 lrm_get_all_type_metadatas (ll_lrm_t* lrm, const char* rclass)
@@ -440,7 +503,7 @@ lrm_get_all_type_metadatas (ll_lrm_t* lrm, const char* rclass)
 
 	client_log(LOG_INFO,"lrm_get_all_type_metadatas: start.");
 	for(node = g_list_first(types); NULL!=node; node=g_list_next(node)) {
-		meta = lrm_get_rsc_type_metadata(lrm,rclass,node->data);
+		meta = lrm_get_rsc_type_metadata(lrm,rclass,node->data,NULL);
 		if (NULL == meta) {
 			continue;
 		}
@@ -452,7 +515,8 @@ lrm_get_all_type_metadatas (ll_lrm_t* lrm, const char* rclass)
 }
 
 char*
-lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype)
+lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype,
+				const char* provider)
 {
 	struct ha_msg* msg;
 	struct ha_msg* ret;
@@ -480,6 +544,12 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype)
 
 	if ( HA_FAIL == ha_msg_add(msg, F_LRM_RTYPE, rtype))	{
 		return NULL;
+	}
+
+	if( provider ) {
+		if (HA_FAIL == ha_msg_add(msg, F_LRM_RPROVIDER, provider)) {
+			return NULL;
+		}
 	}
 
 	/* send the msg to lrmd */
@@ -621,6 +691,7 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	rsc->id = g_strdup(ha_msg_value(msg, F_LRM_RID));
 	rsc->type = g_strdup(ha_msg_value(msg, F_LRM_RTYPE));
 	rsc->class = g_strdup(ha_msg_value(msg, F_LRM_RCLASS));
+	rsc->provider = g_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
 	rsc->params = ha_msg_value_hash_table(msg,F_LRM_PARAM);
 
 	rsc->ops = &rsc_ops_instance;
@@ -632,7 +703,7 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 
 int
 lrm_add_rsc (ll_lrm_t* lrm, const char* rsc_id, const char* class
-, 			 const char* type, GHashTable* parameter)
+, 	     const char* type, const char* provider, GHashTable* parameter)
 {
 	struct ha_msg* msg;
 	client_log(LOG_INFO, "lrm_add_rsc: start.");
@@ -650,7 +721,7 @@ lrm_add_rsc (ll_lrm_t* lrm, const char* rsc_id, const char* class
 	}
 
 	/* create the message of add resource */
-	msg = create_lrm_addrsc_msg(rsc_id, type, class, parameter);
+	msg = create_lrm_addrsc_msg(rsc_id, class, type, provider, parameter);
 	if ( NULL == msg) {
 		client_log(LOG_ERR, "lrm_add_rsc: can not create types msg");
 		return HA_FAIL;

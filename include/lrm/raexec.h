@@ -22,12 +22,13 @@
 #ifndef RAEXEC_H
 #define RAEXEC_H
 #include <glib.h>
+#include <lrm/racommon.h>
 
 typedef enum UNIFORM_RET_EXECRA uniform_ret_execra_t;
 /* Uniform return value of executing RA */
 enum UNIFORM_RET_EXECRA {
-	EXECRA_EXEC_UNKNOWN_ERROR = -200,
-	EXECRA_NO_RA = -100,
+	EXECRA_EXEC_UNKNOWN_ERROR = 152,
+	EXECRA_NO_RA = 151,
 	EXECRA_OK = 0,
 	EXECRA_UNKNOWN_ERROR = 1,
 	EXECRA_INVALID_PARAM = 2,
@@ -44,15 +45,9 @@ enum UNIFORM_RET_EXECRA {
 	EXECRA_STATUS_UNKNOWN = 14
 };
 
-const int RA_MAX_DIRNAME_LENGTH  = 200,
-	  RA_MAX_BASENAME_LENGTH = 40; 
-
-
-typedef struct {
-	gchar * rsc_type;
-	/* As for version, no definite definition yet */
-	gchar * version;	
-} rsc_info_t;
+const int RA_MAX_NAME_LENGTH  = 240;
+const int RA_MAX_DIRNAME_LENGTH  = 200;
+const int RA_MAX_BASENAME_LENGTH  = 40;
 
 /* 
  * RA Execution Interfaces 
@@ -84,7 +79,8 @@ struct RAExecOps {
 	 *	-3: Other unkown error when launching the execution.
 	 */
 	int (*execra)(
-		const char * rsc_type,	
+		const char * rsc_type,
+		const char * provider,
 		const char * op_type,
 		GHashTable * cmd_params,
 		GHashTable * env_params);
@@ -104,7 +100,7 @@ struct RAExecOps {
 
 	/*
 	 * Description:
-	 * 	List all resource info of this class ( OCF )	
+	 * 	List all resource info of this class 
 	 *
 	 * Parameters:
 	 *	rsc_info: a GList which item data type is rsc_info_t as 
@@ -120,6 +116,21 @@ struct RAExecOps {
 	
 	/*
 	 * Description:
+	 * 	List all providers of this type
+	 *
+	 * Parameters:
+	 *	providers: a GList which item data type is string.
+	 *		   the name of providers of the resource agent
+	 *
+	 * Return Value:
+	 *	>=0 : succeed. the provider number of this RA
+	 *	-1: failed due to invalid RA directory such as not existing.
+	 *	-2: failed due to other factors
+	 */
+	int (*get_provider_list)(const char* op_type, GList ** providers);
+
+	/*
+	 * Description:
 	 * 	List the metadata of the resource agent this class
 	 *
 	 * Parameters:
@@ -129,7 +140,7 @@ struct RAExecOps {
 	 *	!NULL : succeed. the RA metadata.
 	 *	NULL: failed
 	 */
-	char* (*get_resource_meta)(const char* rsc_type);
+	char* (*get_resource_meta)(const char* rsc_type, const char* provider);
 };
 
 #define RA_EXEC_TYPE	RAExec
