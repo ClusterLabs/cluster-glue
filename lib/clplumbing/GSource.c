@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.29 2005/04/01 23:16:39 gshi Exp $ */
+/* $Id: GSource.c,v 1.30 2005/04/04 07:27:10 andrew Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -12,11 +12,13 @@
 #define	MAG_GCHSOURCE	0xfeed0002U
 #define	MAG_GWCSOURCE	0xfeed0003U
 #define	MAG_GSIGSOURCE	0xfeed0004U
+#define	MAG_GTRIGSOURCE	0xfeed0005U
 
 #define	IS_FDSOURCE(p)	((p)->magno == MAG_GFDSOURCE)
 #define	IS_CHSOURCE(p)	((p)->magno == MAG_GCHSOURCE)
 #define	IS_WCSOURCE(p)	((p)->magno == MAG_GWCSOURCE)
 #define	IS_SIGSOURCE(p)	((p)->magno == MAG_GSIGSOURCE)
+#define	IS_TRIGSOURCE(p) ((p)->magno == MAG_GTRIGSOURCE)
 
 #ifndef _NSIG
 # define _NSIG 2*NSIG
@@ -68,6 +70,16 @@ struct GSIGSource_s {
 	int		signal;
 	gboolean	signal_triggered;
 	gboolean 	(*dispatch)(int signal, gpointer user_data);
+	GDestroyNotify	dnotify;
+	guint		gsourceid;
+};
+
+struct GTRIGSource_s {
+	GSource source;
+	unsigned	magno;	/* MAG_GCHSOURCE */
+	void*		udata;
+	gboolean	manual_trigger;
+	gboolean 	(*dispatch)(gpointer user_data);
 	GDestroyNotify	dnotify;
 	guint		gsourceid;
 };
@@ -497,6 +509,7 @@ G_CH_dispatch(GSource * source,
 #endif
 
 	if(chp->dispatch) {
+		cl_log(LOG_DEBUG, "Mainloop: Invoking mainloop dispatch");
 		if(!(chp->dispatch(chp->ch, chp->udata))){
 			g_source_remove_poll(source, &chp->infd);
 			if (!chp->fd_fdx) {
@@ -505,6 +518,7 @@ G_CH_dispatch(GSource * source,
 			g_source_unref(source);
 			return FALSE;
 		}
+		cl_log(LOG_DEBUG, "Mainloop: Returning to mainloop");
 	}
 	
 	return TRUE;
@@ -895,3 +909,169 @@ G_main_signal_handler(int nsig)
 	g_assert(IS_SIGSOURCE(sig_src));
 	sig_src->signal_triggered = TRUE;
 }
+
+
+/************************************************************
+ *		Functions for Trigger inputs
+ ***********************************************************/
+static gboolean G_TRIG_prepare(GSource* source,
+			     gint* timeout);
+static gboolean G_TRIG_check(GSource* source);
+
+static gboolean G_TRIG_dispatch(GSource* source,
+			      GSourceFunc callback,
+			      gpointer user_data);
+static void G_TRIG_destroy(GSource* source);
+
+static GSourceFuncs G_TRIG_SourceFuncs = {
+	G_TRIG_prepare,
+	G_TRIG_check,
+	G_TRIG_dispatch,
+	G_TRIG_destroy
+};
+
+void
+set_TriggerHandler_dnotify(GTRIGSource* trig_src, GDestroyNotify notify)
+{
+	trig_src->dnotify = notify;	
+}
+
+/*
+ *	Add an Trigger to the gmainloop world...
+ */
+GTRIGSource*
+G_main_add_TriggerHandler(int priority,
+			 gboolean (*dispatch)(gpointer user_data),
+			 gpointer userdata, GDestroyNotify notify)
+{
+	GTRIGSource* trig_src = NULL;
+	GSource * source = g_source_new(&G_TRIG_SourceFuncs, sizeof(GTRIGSource));
+	gboolean failed = FALSE;
+	
+	trig_src = (GTRIGSource*)source;
+	
+	trig_src->magno		= MAG_GTRIGSOURCE;
+	trig_src->dispatch	= dispatch;
+	trig_src->udata		= userdata;
+	trig_src->dnotify	= notify;
+
+	trig_src->manual_trigger = FALSE;
+
+	g_source_set_priority(source, priority);
+	g_source_set_can_recurse(source, FALSE);
+
+	if(!failed) {
+		trig_src->gsourceid = g_source_attach(source, NULL);
+		if (trig_src->gsourceid < 1) {
+			cl_log(LOG_ERR, "G_main_add_TriggerHandler: Could not attach new source (%d)",
+			       trig_src->gsourceid);
+			failed = TRUE;
+		}
+	}
+	
+	if(failed) {
+		cl_log(LOG_ERR, "G_main_add_TriggerHandler: Trigger handler NOT added");
+		g_source_remove(trig_src->gsourceid);
+		g_source_unref(source);
+		source = NULL;
+		trig_src = NULL;
+	} else {
+		cl_log(LOG_INFO, "G_main_add_TriggerHandler: Added signal manual handler");
+	}
+	
+	return trig_src;
+}
+
+void 
+G_main_set_trigger(GTRIGSource* source)
+{
+	GTRIGSource* trig_src = (GTRIGSource*)source;
+	
+	g_assert(IS_TRIGSOURCE(trig_src));
+	
+	trig_src->manual_trigger = TRUE;
+}
+
+
+/*
+ *	Delete a Trigger from the gmainloop world...
+ */
+gboolean 
+G_main_del_TriggerHandler(GTRIGSource* trig_src)
+{
+	if (trig_src->gsourceid <= 0) {
+		cl_log(LOG_CRIT, "Bad gsource in G_main_del_TriggerHandler");
+		return FALSE;
+	}
+	trig_src->gsourceid = 0;
+	trig_src->manual_trigger = FALSE;
+	g_source_remove(trig_src->gsourceid);
+
+	return TRUE;
+}
+
+static gboolean
+G_TRIG_prepare(GSource* source, gint* timeout)
+{
+	GTRIGSource* trig_src = (GTRIGSource*)source;
+	
+	g_assert(IS_TRIGSOURCE(trig_src));
+	
+	return trig_src->manual_trigger;
+}
+
+/*
+ *	Did we notice any I/O events?
+ */
+
+static gboolean
+G_TRIG_check(GSource* source)
+{
+
+	GTRIGSource* trig_src = (GTRIGSource*)source;
+
+	g_assert(IS_TRIGSOURCE(trig_src));
+	
+	return trig_src->manual_trigger;
+}
+
+/*
+ *	Some kind of event occurred - notify the user.
+ */
+static gboolean
+G_TRIG_dispatch(GSource * source,
+	      GSourceFunc callback,
+	      gpointer user_data)
+{
+	GTRIGSource* trig_src = (GTRIGSource*)source;
+
+	g_assert(IS_TRIGSOURCE(trig_src));
+
+	trig_src->manual_trigger = FALSE;
+
+	if(trig_src->dispatch) {
+		if(!(trig_src->dispatch(trig_src->udata))){
+			G_main_del_TriggerHandler(trig_src);
+			return FALSE;
+		}
+	}
+	
+	return TRUE;
+}
+
+/*
+ *	Free up our data, and notify the user process...
+ */
+static void
+G_TRIG_destroy(GSource* source)
+{
+	GTRIGSource* trig_src = (GTRIGSource*)source;
+	
+	g_assert(IS_TRIGSOURCE(trig_src));
+	
+	if (trig_src->dnotify) {
+		trig_src->dnotify(trig_src->udata);
+	}	
+	g_source_destroy(source);
+}
+
