@@ -9,7 +9,7 @@
 /* We are a interface manager... */
 #define ENABLE_PLUGIN_MANAGER_PRIVATE
 
-#include <upmls/MLPlugin.h>
+#include <pils/interface.h>
  
 PIL_PLUGIN_BOILERPLATE("1.0", DebugFlag, Ourclose)
 
@@ -23,7 +23,7 @@ Ourclose	(PILPlugin* us)
  */
 static const PILPluginImports*	OurPIImports;	/* Imported plugin fcns */
 static PILPlugin*		OurPlugin;	/* Our plugin info */
-static PILInterfaceImports*		OurIfImports;	/* Interface imported fcns */
+static PILInterfaceImports*	OurIfImports;	/* Interface imported fcns */
 static PILInterface*		OurIf;		/* Pointer to interface info */
 
 /*

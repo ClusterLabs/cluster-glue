@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <upmls/MLPlugin.h>
+#include <pils/plugin.h>
 
 #define MOD	"/home/alanr/modules"
 
@@ -10,8 +10,8 @@ main(int argc, char ** argv)
 
 
 	u = NewPILPluginUniv(MOD);
+	PILSetDebugLevel(u, NULL, NULL, 100);
 	PILLogMemStats();
-	PILSetDebugLevel(100);
 
 	printf("Load of foo: %d\n"
 	,	PILLoadPlugin(u, PI_IFMANAGER, "test", NULL));
