@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.21 2004/09/09 20:34:49 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.22 2004/09/22 17:03:23 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -247,14 +247,17 @@ ha_msg_del(struct ha_msg *msg)
 		}
 		if (msg->values) {
 			for (j=0; j < msg->nfields; ++j) {
-				if (msg->values[j] && msg->types[j]
-				!=	FT_STRUCT) {
-					ha_free(msg->values[j]);
-					msg->values[j] = NULL;
-				}else{
-					ha_msg_del((struct ha_msg*)msg->values[j]);
-					msg->values[j] = NULL;
-				}
+				
+				if (msg->values[j] == NULL) {              
+					continue;                                
+				}   
+				if (msg->types[j] != FT_STRUCT) {   
+					ha_free(msg->values[j]);                 
+					msg->values[j] = NULL; 
+				}else{                                
+					ha_msg_del((struct ha_msg*)msg->values[j]);  
+				}   
+				msg->values[j] = NULL; 				
 			}
 			ha_free(msg->values);
 			msg->values = NULL;
@@ -284,9 +287,12 @@ ha_msg_copy(const struct ha_msg *msg)
 	struct ha_msg*		ret;
 	int			j;
 
-
+	
 	AUDITMSG(msg);
-	ret = MALLOCT(struct ha_msg);
+	if (msg == NULL || (ret = MALLOCT(struct ha_msg)) == NULL) {   
+		return NULL;   
+	} 
+
 	ret->nfields	= msg->nfields;
 	ret->nalloc	= msg->nalloc;
 	ret->stringlen	= msg->stringlen;
@@ -333,8 +339,12 @@ ha_msg_copy(const struct ha_msg *msg)
 	return ret;
 
 freeandleave:
-	ha_msg_del(ret);
-	ret=NULL;
+        /*   
+	 * ha_msg_del nicely handles partially constructed ha_msgs
+	 * so, there's not really a memory leak here at all, but BEAM   
+	 * thinks there is.   
+	 */   
+	ha_msg_del(ret);/* memory leak */       ret=NULL; 
 	return ret;
 }
 
@@ -448,18 +458,18 @@ static int
 ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		 void * value, size_t vallen, int type, int depth)
 {
-
+	
 	int	next;
 	size_t	startlen = sizeof(MSG_START)-1;
 	size_t	startlen_netstring = sizeof(MSG_START_NETSTRING) -1 ;
 	size_t	newstringlen;
 
-	char	*cp_name;
+	char	*cp_name = NULL;
 	size_t	cp_namelen;
 	size_t	cp_vallen;
-	char	*cp_value;
+	void	*cp_value = NULL;
 	int	internal_type;
-
+	
 	if (!msg || msg->names == NULL || msg->values == NULL) {
 		cl_log(LOG_ERR,	"ha_msg_addraw_ll: cannot add field to ha_msg");
 		return(HA_FAIL);
@@ -508,12 +518,16 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 	}
 	
 	if (namelen >= startlen && strncmp(name, MSG_START, startlen) == 0) {
-		cl_log(LOG_ERR, "ha_msg_addraw_ll: illegal field");
+		if(!cl_msg_quiet_fmterr) {
+			cl_log(LOG_ERR, "ha_msg_addraw_ll: illegal field");
+		}
 		return(HA_FAIL);
 	}
 	if (namelen >= startlen_netstring
 	    && strncmp(name, MSG_START_NETSTRING, startlen_netstring) == 0){
-		cl_log(LOG_ERR, "ha_msg_addraw_ll: illegal field");
+		if(!cl_msg_quiet_fmterr) {
+			cl_log(LOG_ERR, "ha_msg_addraw_ll: illegal field");
+		}
 	}
 
 	if (name == NULL || value == NULL
@@ -534,7 +548,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		cp_namelen = namelen;
 		cp_value = value;
 		cp_vallen = vallen;
-
+		internal_type = type;
 		break;
 	case FT_STRUCT:
 
@@ -553,19 +567,21 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		msg->types[next] = FT_STRUCT;
 
 		msg->nfields++;
-
+		internal_type = type;
 		return(HA_OK);
 
-	/*case FT_STRING: */
-	default: 
+
+	default: 	/*case FT_STRING: */
 		newstringlen =  msg->stringlen + (namelen+vallen+2);
 
 		internal_type = FT_STRING;
 		if (name[0] == '('){
-
+			
 			if (name[2] != ')'){
-				cl_log(LOG_ERR
-				, "ha_msg_addraw_ll(): no closing parentheses");
+				if (!cl_msg_quiet_fmterr) {
+					cl_log(LOG_ERR
+					       , "ha_msg_addraw_ll(): no closing parentheses");
+				}
 				return(HA_FAIL);
 			}
 			sscanf(name + 1, "%d", &internal_type);
@@ -615,7 +631,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 				return(HA_FAIL);
 			}
 			ha_free(value);
-			cp_value = (void*) tmpmsg;
+			cp_value = tmpmsg;
 			cp_vallen = sizeof(struct ha_msg);
 
 		}else{
@@ -631,6 +647,18 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 	if (newstringlen >= MAXMSG) {
 		cl_log(LOG_ERR, "ha_msg_addraw_ll(): "
 		       "cannot add name/value to ha_msg (value too big)");
+		if (cp_value) {   
+			if (internal_type == FT_STRUCT) {   
+				ha_msg_del((struct ha_msg *)cp_value);   
+			}else{   
+				cl_free(cp_value);   
+			}   
+			cp_value = NULL;   
+		}   
+		if (cp_name) {   
+			cl_free(cp_name);       cp_name = NULL;   
+		} 
+		
 		return(HA_FAIL);
 	}
 
@@ -1509,7 +1537,9 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 	if (strncmp(sp, MSG_START, startlen) != 0) {
 		/* This can happen if the sender gets killed */
 		/* at just the wrong time... */
-		cl_log(LOG_WARNING, "string2msg_ll: no MSG_START");
+		if (!cl_msg_quiet_fmterr) {
+			cl_log(LOG_WARNING, "string2msg_ll: no MSG_START");
+		}
 		ha_msg_del(ret);
 		return(NULL);
 	}else{
@@ -1864,8 +1894,8 @@ cl_log_message (const struct ha_msg *m)
 
 			break;
 
-		/* case(FT_STRING): */
-		default: 
+		
+		default: /* case(FT_STRING): */ 
 			cl_log(LOG_INFO, "MSG[%d] : [%s=%s]", j
 		       ,	m->names[j] ? m->names[j] : "NULL"
 		       ,	(const char*)(m->values[j] ? m->values[j] : "NULL"));
@@ -1897,6 +1927,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.22  2004/09/22 17:03:23  gshi
+ * brought STABLE change back to HEAD branch
+ *
  * Revision 1.21  2004/09/09 20:34:49  gshi
  * fixed a bug
  * the third argument of strncmp should not be netstring_startlen
