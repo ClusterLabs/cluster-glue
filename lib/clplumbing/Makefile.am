@@ -38,6 +38,7 @@ libplumb_la_SOURCES	= 		\
 			cl_log.c	\
 			cl_malloc.c	\
 			cl_msg.c	\
+			cl_msg_types.c  \
 			cl_netstring.c	\
 			cl_poll.c	\
 			cl_signal.c	\
