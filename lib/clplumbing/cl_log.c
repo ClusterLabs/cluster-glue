@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.45 2005/04/04 21:08:18 gshi Exp $ */
+/* $Id: cl_log.c,v 1.46 2005/04/04 21:16:35 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -522,7 +522,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 		chan->ops->destroy(chan);
 		
 		if (drop_msg_num > 0){
-			cl_log(LOG_ERR, "%d message were dropped ", drop_msg_num);
+			cl_log(LOG_ERR, "%d messages were dropped ", drop_msg_num);
 			drop_msg_num = 0;
 		}
 		
@@ -535,7 +535,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 		chan->ops->resume_io(chan);
 	}
 	if (drop_msg_num > 0 && chan->ops->is_sendq_full(chan)) {
-		cl_log(LOG_ERR, "cl_log: %d message were dropped ", drop_msg_num);
+		cl_log(LOG_ERR, "cl_log: %d messages were dropped ", drop_msg_num);
 		drop_msg_num = 0;
 	}	
 	
@@ -551,7 +551,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 			logging_daemon_chan = NULL;
 			
 			if (drop_msg_num > 0){
-				cl_log(LOG_ERR, "channel destroyed: %d message were dropped ", drop_msg_num);
+				cl_log(LOG_ERR, "channel destroyed: %d messages were dropped ", drop_msg_num);
 			}
 			
 			drop_msg_num=0;
