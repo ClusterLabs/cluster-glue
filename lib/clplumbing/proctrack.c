@@ -24,6 +24,8 @@
 #include <errno.h>
 #include <sys/wait.h>
 #include <heartbeat.h>
+#include <sys/types.h>
+#include <signal.h>
 #include <clplumbing/proctrack.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/Gmain_timeout.h>
