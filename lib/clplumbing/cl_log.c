@@ -9,6 +9,7 @@
 #include <clplumbing/cl_log.h>
 #include <clplumbing/loggingdaemon.h>
 #include <clplumbing/longclock.h>
+#include <clplumbing/uids.h>
 #include <glib.h>
 
 #ifndef MAXLINE
@@ -118,6 +119,7 @@ cl_log(int priority, const char * fmt, ...)
 	int		logpri = LOG_PRI(priority);
 	int		nbytes;
 	const char *	pristr;
+	int	needprivs = !cl_have_full_privs();
 
 	static const char *log_prio[8] = {
 		"EMERG",
@@ -141,9 +143,12 @@ cl_log(int priority, const char * fmt, ...)
 		pristr = log_prio[logpri];
 	}
 
+	if (needprivs) {
+		return_to_orig_privs();
+	}
 	if (use_logging_daemon) {
 		if (LogToLoggingDaemon(priority, buf, nbytes)) {
-			return;
+			goto LogDone;
 		}
 	}
 
@@ -159,7 +164,7 @@ cl_log(int priority, const char * fmt, ...)
 
 	fn = (priority == LOG_DEBUG ? debugfile_name : logfile_name);
 
-	if (fn) {
+	if (fn) { 
 		fp = fopen(fn, "a");
 		if (fp != NULL) {
 			fprintf(fp, "%s: %s %s: %s\n"
@@ -168,6 +173,11 @@ cl_log(int priority, const char * fmt, ...)
 			,	pristr,  buf);
 			fclose(fp);
 		}
+	}
+
+LogDone:
+	if (needprivs) {
+		return_to_dropped_privs();
 	}
 }
 
