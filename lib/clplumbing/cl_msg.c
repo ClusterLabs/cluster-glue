@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.20 2004/08/31 18:42:51 alan Exp $ */
+/* $Id: cl_msg.c,v 1.21 2004/09/09 20:34:49 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -512,7 +512,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		return(HA_FAIL);
 	}
 	if (namelen >= startlen_netstring
-	    && strncmp(name, MSG_START_NETSTRING, startlen_netstring == 0)){
+	    && strncmp(name, MSG_START_NETSTRING, startlen_netstring) == 0){
 		cl_log(LOG_ERR, "ha_msg_addraw_ll: illegal field");
 	}
 
@@ -1897,6 +1897,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.21  2004/09/09 20:34:49  gshi
+ * fixed a bug
+ * the third argument of strncmp should not be netstring_startlen
+ * instread of (netstring_startlen == 0)
+ *
  * Revision 1.20  2004/08/31 18:42:51  alan
  * Put in the code to suppress warnings about bad packets...
  *
