@@ -15,6 +15,5 @@ void get_ra_pathname(const char* class_path, const char* type, const char* provi
 gboolean filtered(char * file_name);
 int get_providers(const char* class_path, const char* op_type, GList ** providers);
 int get_ra_list(const char* class_path, GList ** rsc_info);
-int raexec_setenv(GHashTable * env_params);
 
 #endif /* RACOMMON_H */
