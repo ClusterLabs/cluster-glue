@@ -25,6 +25,7 @@ MAINTAINERCLEANFILES    = Makefile.in
 include_HEADERS	= 		\
 	Gmain_timeout.h	\
 	apphb_cs.h	\
+	base64.h	\
 	ipc.h		\
 	longclock.h	\
 	proctrack.h
