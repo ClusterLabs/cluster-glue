@@ -670,7 +670,7 @@ static char*
 do_shell_cmd(const char* cmd, int* status)
 {
 	const int BUFF_LEN=4096;
-	int read_len = NULL;
+	int read_len = 0;
 	char buff[BUFF_LEN];
 	char* data = NULL;
 	GString* g_str_tmp = NULL;
