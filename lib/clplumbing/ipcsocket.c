@@ -46,7 +46,7 @@
 #define UNIX_PATH_MAX 108
 #endif
 #define MAX_LISTEN_NUM 10
-#define SOCKET_ATTR "socket"
+
 
 /* channel and wait connection private data. */
 struct SOCKET_CH_PRIVATE{
@@ -112,6 +112,7 @@ struct OCF_IPC_CHANNEL* socket_client_channel_new(GHashTable *attrs);
 
 struct OCF_IPC_CHANNEL* socket_server_channel_new(int sockfd);
 
+pid_t socket_get_farside_pid(int sockfd);
 
 /* destroy socket wait channel */ 
 static void 
@@ -174,7 +175,8 @@ socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
   /* verify the client authentication information. */
   ch->auth_info = auth_info;
   if (ch->ops->verify_auth(ch) == IPC_OK) {
-    ch->ch_status = CH_CONNECT;
+    ch->ch_status = IPC_CONNECT;
+    ch->farside_pid = socket_get_farside_pid(new_sock);
     return ch;
   }
   
@@ -198,7 +200,7 @@ socket_destroy_channel(struct OCF_IPC_CHANNEL * ch)
 
 /* 
  * will called by the socket_destory. Disconnec the connection 
- * and set ch_status to CH_DISCONNECT. 
+ * and set ch_status to IPC_DISCONNECT. 
  *
  * parameters :
  *     ch (IN) the pointer to the channel.
@@ -215,7 +217,7 @@ socket_disconnect(struct OCF_IPC_CHANNEL* ch)
 
   conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
   close(conn_info->s);
-  ch->ch_status = CH_DISCONNECT;
+  ch->ch_status = IPC_DISCONNECT;
   return IPC_OK;
 }
 
@@ -244,8 +246,8 @@ socket_initiate_connection(struct OCF_IPC_CHANNEL * ch)
     return IPC_FAIL;
   }
   
-  ch->ch_status = CH_CONNECT;
-
+  ch->ch_status = IPC_CONNECT;
+  ch->farside_pid = socket_get_farside_pid(conn_info->s);
   return IPC_OK;
 }
 
@@ -492,9 +494,17 @@ socket_resume_io(struct OCF_IPC_CHANNEL *ch)
     }
 
     msg_len = recv(conn_info->s, msg->msg_body, len , MSG_DONTWAIT);  
-    if (msg_len < 0 && errno == EAGAIN) {
+    if (msg_len < 0){
       socket_free_message(msg);
-      break;
+      if(errno == EAGAIN) {
+	break;
+      }else if( errno == ECONNREFUSED){
+	ch->ch_status = IPC_DISCONNECT;
+	return IPC_BROKEN;
+      }else{
+	ch->ch_status = IPC_DISCONNECT;
+	return IPC_FAIL;
+      }
     }
 
     if (msg_len > 0) {
@@ -517,8 +527,16 @@ socket_resume_io(struct OCF_IPC_CHANNEL *ch)
     if (element != NULL) {
       msg = (struct OCF_IPC_MESSAGE *) (element->data);
       len=send(conn_info->s, msg->msg_body, msg->msg_len, MSG_DONTWAIT);
-      if (len < 0 && errno == EAGAIN) {
-	break;
+      if (len < 0){
+	if(errno == EAGAIN) {
+	  break;
+	}else if(errno == EPIPE){
+	  ch->ch_status = IPC_DISCONNECT;
+	  return IPC_BROKEN;
+	}else{
+	  ch->ch_status = IPC_DISCONNECT;
+	  return IPC_FAIL;	  
+	}
       }
     
       if (len > 0 ) {
@@ -710,7 +728,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   strncpy(wait_private->path_name, path_name, sizeof(wait_private->path_name));
   temp_ch = g_new(struct OCF_IPC_WAIT_CONNECTION, 1);
   temp_ch->ch_private = (void *) wait_private;
-  temp_ch->ch_status = CH_WAIT;
+  temp_ch->ch_status = IPC_WAIT;
   temp_ch->ops = (struct OCF_IPC_WAIT_OPS *)&socket_wait_ops;  
 
   return temp_ch;
@@ -779,7 +797,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
 
   
   strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
-  temp_ch->ch_status = CH_DISCONNECT;
+  temp_ch->ch_status = IPC_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
   temp_ch->auth_info = NULL;
   temp_ch->ops = (struct OCF_IPC_OPS *)&socket_ops;
@@ -802,7 +820,7 @@ socket_server_channel_new(int sockfd){
 
   conn_info->s = sockfd;
 
-  temp_ch->ch_status = CH_DISCONNECT;
+  temp_ch->ch_status = IPC_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
   temp_ch->auth_info = NULL;
   temp_ch->ops = (struct OCF_IPC_OPS *)&socket_ops;
@@ -848,3 +866,40 @@ socket_free_message(struct OCF_IPC_MESSAGE * msg) {
   free(msg->msg_body);
   free((void *)msg);
 }
+
+/* get farside pid through*/
+#ifdef SO_PEERCRED
+pid_t
+socket_get_farside_pid(int sockfd )
+{
+
+  ssize_t n;
+  struct ucred *cred;
+  pid_t f_pid;
+  
+  /* get the credential information for peer */
+  n = sizeof(struct ucred);
+  cred = g_new(struct ucred, 1); 
+  if (getsockopt(sockfd, SOL_SOCKET, SO_PEERCRED, cred, &n) != 0) {
+    free(cred);
+    return -1;
+  }
+  
+  f_pid = cred->pid;
+  free(cred);
+  return f_pid;
+}
+
+#elif defined(SCM_CREDS) || defined(HAVE_STRUCT_CMSGCRED) || defined(HAVE_STRUCT_FCRED) || (defined(HAVE_STRUCT_SOCKCRED) && defined(LOCAL_CREDS))
+  
+/* FIXME!  Need to implement SCM_CREDS mechanism for BSD-based systems
+ * this is similar to the SCM_CREDS mechanism for verify_auth() function.
+ * here we just want to get the pid of the other side from the credential 
+ * information.
+ */
+
+pid_t socket_get_farside_pid(int sock){
+  return -1;
+}
+
+#endif
