@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.35 2005/02/28 12:32:41 andrew Exp $ */
+/* $Id: cl_log.c,v 1.36 2005/02/28 22:51:10 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -372,6 +372,40 @@ ha_timestamp(TIME_T t)
 	return(ts);
 }
 
+static IPC_Channel* 
+create_logging_channel(void)
+{
+	GHashTable*	attrs;
+	char		path[] = IPC_PATH_ATTR;
+	char		sockpath[] = HA_LOGDAEMON_IPC;	
+	IPC_Channel*	chan;
+	
+	attrs = g_hash_table_new(g_str_hash, g_str_equal);
+	g_hash_table_insert(attrs, path, sockpath);	
+
+	chan =ipc_channel_constructor(IPC_ANYTYPE, attrs);       	
+	
+	g_hash_table_destroy(attrs);	
+	
+	if (chan == NULL) {
+		cl_log(LOG_ERR, "create_logging_channel:"
+		       "contructing ipc channel failed");
+		return NULL;
+	}
+			
+	if (chan->ops->initiate_connection(chan) != IPC_OK) {
+		cl_log(LOG_WARNING, "Initializing connection"
+		       " to logging daemon failed."
+		       " Logging daemon may not be running");
+		chan->ops->destroy(chan);
+		
+		return NULL;
+	}
+	
+	return chan;
+	
+}
+
 int
 cl_set_logging_wqueue_maxlen(int qlen)
 {
@@ -379,10 +413,22 @@ cl_set_logging_wqueue_maxlen(int qlen)
 	IPC_Channel*		chan = logging_daemon_chan;
 	
 	if (chan == NULL){
+		chan = logging_daemon_chan = create_logging_channel();
+	}
+	
+	if (chan == NULL){
 		return HA_FAIL;
 	}
-
-	sendrc =  chan->ops->set_recv_qlen(logging_daemon_chan, qlen);
+	
+	if (chan->ch_status != IPC_CONNECT){		
+		cl_log(LOG_ERR, "cl_set_logging_wqueue_maxle:"
+		       "channel is not connected");
+		chan->ops->destroy(chan);
+		logging_daemon_chan = NULL;
+		return HA_FAIL;
+	}
+	
+	sendrc =  chan->ops->set_send_qlen(logging_daemon_chan, qlen);
 	
 	if (sendrc == IPC_OK) {
 		return HA_OK;
@@ -390,6 +436,7 @@ cl_set_logging_wqueue_maxlen(int qlen)
 		return HA_FAIL;
 	}
 }
+
 
 int
 LogToLoggingDaemon(int priority, const char * buf, 
@@ -402,48 +449,33 @@ LogToLoggingDaemon(int priority, const char * buf,
 	int			intval = conn_logd_intval;
 
 	if (chan == NULL) {
-		GHashTable*	attrs;
-		char		path[] = IPC_PATH_ATTR;
-		char		sockpath[] = HA_LOGDAEMON_IPC;
 		longclock_t	lnow = time_longclock();
 		
 		if (cmp_longclock(lnow,  nexttime) >= 0){
 			nexttime = add_longclock(lnow, 
 						 msto_longclock(intval));
 			
-			attrs = g_hash_table_new(g_str_hash, g_str_equal);
-			g_hash_table_insert(attrs, path, sockpath);
 			
-			logging_daemon_chan = chan =
-				ipc_channel_constructor(IPC_ANYTYPE, attrs);
+			logging_daemon_chan = chan = create_logging_channel();
 			
-			g_hash_table_destroy(attrs);
-			
-			if (chan == NULL) {
-				return HA_FAIL;
-			}
-			
-			if (chan->ops->initiate_connection(chan) != IPC_OK) {
-				cl_log(LOG_WARNING, "Initializing connection"
-				       " to logging daemon failed."
-				       " Logging daemon may not be running");
-				chan->ops->destroy(chan);
-				logging_daemon_chan = NULL;
-				
-				return HA_FAIL;
-			}
-			
-		}else {
-			return HA_FAIL;
 		}
 	}
 
-
+	if (chan == NULL){
+		return HA_FAIL;
+	}
+	
 	msg = ChildLogIPCMessage(priority, buf, bufstrlen, use_pri_str, chan);	
 	if (msg == NULL) {
 		return HA_FAIL;
 	}
 	
+	if (chan->ch_status != IPC_CONNECT){		
+		cl_log(LOG_ERR, "channel is not connected");
+		chan->ops->destroy(chan);
+		logging_daemon_chan = NULL;
+		return HA_FAIL;
+	}
 	/* Logging_channel is all set up */
 	
 	sendrc =  chan->ops->send(chan, msg);
