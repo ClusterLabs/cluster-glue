@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.10 2005/02/08 18:49:07 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.11 2005/02/17 15:49:50 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -486,9 +486,9 @@ cl_realloc(void *ptr, size_t newsize)
 		void* newret = cl_malloc(newsize);
 		if (newret != NULL) {
 			memcpy(newret, ptr, bhdr->hdr.reqsize);
+			CHECK_GUARD_BYTES(newret, "cl_realloc - cl_malloc case");
 		}
 		cl_free(ptr);
-		CHECK_GUARD_BYTES(newret, "cl_realloc - cl_malloc case");
 		return newret;
 	}
 

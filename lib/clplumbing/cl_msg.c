@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.52 2005/02/16 20:38:29 alan Exp $ */
+/* $Id: cl_msg.c,v 1.53 2005/02/17 15:49:50 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -162,7 +162,9 @@ ha_msg_new(nfields)
 
 			cl_log(LOG_ERR, "%s"
 			,	"ha_msg_new: out of memory for ha_msg");
-			ha_msg_del(ret);
+			/* It is safe to give this to ha_msg_del() */
+			/* at this point.  It's well-enough-formed */
+			ha_msg_del(ret); /*violated property*/
 			ret = NULL;
 		}else if (msgstats) {
 			msgstats->allocmsgs++;
@@ -2149,6 +2151,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.53  2005/02/17 15:49:50  alan
+ * Fixed a few BEAM complaints (but not all of them yet)
+ *
  * Revision 1.52  2005/02/16 20:38:29  alan
  * tried to move around a BEAM comment so it makes it shut up at the right time.
  *
