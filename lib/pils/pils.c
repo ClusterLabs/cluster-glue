@@ -398,6 +398,7 @@ RemoveAPILPlugin(PILPlugin*Plugin)
 	}
 	if (g_hash_table_size(Pitype->Plugins) == 0) {
 		RemoveAPILPluginType(Pitype);
+		/* Pitype is now invalid */
 	}
 }
 
@@ -454,14 +455,12 @@ DelPILPluginUniv(PILPluginUniv* piuniv)
  */
 static gboolean	/* IsA GHFunc: required for g_hash_table_foreach_remove() */
 RmAPILPluginType
-(	gpointer pitname	/* Name of this plugin type */
+(	gpointer pitname	/* Name of this plugin type "real" key */
 ,	gpointer pitype	/* PILPluginType* */
 ,	gpointer notused
 )
 {
 	PILPluginType*	Plugintype = pitype;
-	PILPluginUniv*	Pluginuniv = Plugintype->piuniv;
-	gpointer	key;
 
 	g_assert(IS_PILPLUGINTYPE(Plugintype));
 	PILValidatePluginType(pitname, pitype, NULL);
@@ -474,14 +473,8 @@ RmAPILPluginType
 	 * g_hash_table_foreach_remove()
 	 */
 
-	if (g_hash_table_lookup_extended(Pluginuniv->PluginTypes
-	,	pitname, &key, &pitype)) {
-
-		DelPILPluginType(pitype);
-		DELETE(key);
-	}else{
-		g_assert_not_reached();
-	}
+	DelPILPluginType(pitype);
+	DELETE(pitname);
 	return TRUE;
 } 
 static void
@@ -492,8 +485,8 @@ RemoveAPILPluginType(PILPluginType*Plugintype)
 	if (g_hash_table_lookup_extended(Pluginuniv->PluginTypes
 	,	Plugintype->plugintype, &key, (void**)&Plugintype)) {
 
-		g_hash_table_remove(Pluginuniv->PluginTypes, key);
 		RmAPILPluginType(key, Plugintype, NULL);
+		g_hash_table_remove(Pluginuniv->PluginTypes, key);
 	}else{
 		g_assert_not_reached();
 	}
@@ -976,9 +969,10 @@ IfIncrRefCount(PILInterface*eifinfo, int plusminus)
 {
 	eifinfo->refcnt += plusminus;
 	if (eifinfo->refcnt <= 0) {
+		eifinfo->refcnt = 0;
 		/* Unregister this interface. */
 		PILunregister_interface(eifinfo);
-		eifinfo->refcnt = 0;
+		return 0;
 	}
 	return eifinfo->refcnt;
 }
@@ -998,6 +992,7 @@ PluginIncrRefCount(PILPlugin*pi, int plusminus)
 	if (pi->refcnt <= 0) {
 		pi->refcnt = 0;
 		RemoveAPILPlugin(pi);
+		return 0;
 	}
 	return pi->refcnt;
 }
@@ -1077,7 +1072,7 @@ static void
 IfForEachClientRemove
 (	PILInterface* mgrif
 ,	gboolean(*f)(PILInterface* clientif, void * passalong)
-,	void* passalong
+,	void* passalong		/* usually PILInterface* */
 )
 {
 	PILInterfaceType*	mgrt;
@@ -1109,7 +1104,8 @@ IfForEachClientRemove
 		return;
 	}
 
-	g_hash_table_foreach_remove(clientt->interfaces, IfForEachClientHelper, &h);
+	g_hash_table_foreach_remove(clientt->interfaces, IfForEachClientHelper
+	,	&h);
 }
 
 static PIL_rc
@@ -1456,6 +1452,7 @@ static PIL_rc
 PILunregister_interface(PILInterface* id)
 {
 	PILInterfaceType*	t;
+	PILPlugin*		loadingpi;
 	PILInterfaceUniv*	u;
 	PIL_rc		rc;
 	PILInterface*	ifmgr_info;	/* Pointer to our interface handler */
@@ -1494,14 +1491,17 @@ PILunregister_interface(PILInterface* id)
 
 	g_assert(exports != NULL && exports->UnRegisterInterface != NULL);
 
+	loadingpi = id->loadingpi;	/* id will become invalid */
 	/* Call the interface manager unregister function */
 	exports->UnRegisterInterface(id);
+	/* This makes "id" invalid */
 
 	/* Decrement reference count of interface manager */
 	IfIncrRefCount(ifmgr_info, -1);
+	/* This may make ifmgr_info invalid */
 
 	/* Decrement the reference count of the plugin that loaded us */
-	PluginIncrRefCount(id->loadingpi, -1);
+	PluginIncrRefCount(loadingpi, -1);
 
 	/* FIXME!! We need to delete this outside this function... */
 #if 0
