@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.24 2005/01/18 20:33:04 andrew Exp $ */
+/* $Id: cl_log.c,v 1.25 2005/01/26 13:58:14 andrew Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -106,6 +106,12 @@ void
 cl_log_set_debugfile(const char * path)
 {
 	debugfile_name = path;
+}
+
+const char *
+cl_log_get_debugfile(void)
+{
+	return debugfile_name;
 }
 
 /*
