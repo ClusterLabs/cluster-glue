@@ -96,19 +96,21 @@ static int socket_set_recv_qlen (struct OCF_IPC_CHANNEL* ch, int q_len);
 
 /* helper functions. */
 
-static int socket_disconnect(struct OCF_IPC_CHANNEL* ch);
+int socket_disconnect(struct OCF_IPC_CHANNEL* ch);
 
-static struct OCF_IPC_QUEUE* socket_queue_new(void);
+struct OCF_IPC_QUEUE* socket_queue_new(void);
 
-static void socket_destroy_queue(struct OCF_IPC_QUEUE * q);
+void socket_destroy_queue(struct OCF_IPC_QUEUE * q);
 
-static struct OCF_IPC_MESSAGE* socket_message_new(struct OCF_IPC_CHANNEL *ch, int msg_len);
+struct OCF_IPC_MESSAGE* socket_message_new(struct OCF_IPC_CHANNEL *ch, int msg_len);
 
-static void socket_free_message(struct OCF_IPC_MESSAGE * msg);
+void socket_free_message(struct OCF_IPC_MESSAGE * msg);
 
 struct OCF_IPC_WAIT_CONNECTION *socket_wait_conn_new(GHashTable* ch_attrs);
 
-struct OCF_IPC_CHANNEL* socket_channel_new(GHashTable *attrs);
+struct OCF_IPC_CHANNEL* socket_client_channel_new(GHashTable *attrs);
+
+struct OCF_IPC_CHANNEL* socket_server_channel_new(int sockfd);
 
 
 /* destroy socket wait channel */ 
@@ -144,9 +146,9 @@ socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
   struct OCF_IPC_CHANNEL *ch;
   int sin_size;
   int s, new_sock;
-  GHashTable* attrs;
-  static char SockATTR []= SOCKET_ATTR;
-
+  struct SOCKET_CH_PRIVATE *conn_private;
+  struct SOCKET_CH_PRIVATE *ch_private ;
+  
   /* get select fd */
   s = wait_conn->ops->get_select_fd(wait_conn); 
   if (s == -1) {
@@ -160,14 +162,13 @@ socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
     perror("accept");
     return NULL;
   }else{
-   
-    /* get new hash table containing the socket attribute. */
-    attrs = g_hash_table_new(g_str_hash, g_str_equal);
-    g_hash_table_insert(attrs, SockATTR, &new_sock);
-    if ((ch = socket_channel_new(attrs)) == NULL) {
+    if ((ch = socket_server_channel_new(new_sock)) == NULL) {
       printf("socket_accept_connection: Can't create new channel\n");
-      g_hash_table_destroy(attrs);
       return NULL;
+    }else{
+      conn_private = (struct SOCKET_CH_PRIVATE *)(wait_conn->ch_private);
+      ch_private = (struct SOCKET_CH_PRIVATE *)(ch->ch_private);
+      strncpy(ch_private->path_name,conn_private->path_name,sizeof(conn_private->path_name));
     }
   }
   /* verify the client authentication information. */
@@ -207,7 +208,7 @@ socket_destroy_channel(struct OCF_IPC_CHANNEL * ch)
  *      CH_FAIL     operation fails.
 */
 
-static int
+int
 socket_disconnect(struct OCF_IPC_CHANNEL* ch)
 {
   struct SOCKET_CH_PRIVATE* conn_info;
@@ -606,7 +607,7 @@ static struct OCF_IPC_OPS socket_ops = {
  * return the pointer to a new ipc queue or NULL is the queue can't be created.
  */
 
-static struct OCF_IPC_QUEUE*
+struct OCF_IPC_QUEUE*
 socket_queue_new(void)
 {
   struct OCF_IPC_QUEUE *temp_queue;
@@ -626,7 +627,7 @@ socket_queue_new(void)
  *      q  (IN) the pointer to the queue which should be destroied.
  */ 
 
-static void
+void
 socket_destroy_queue(struct OCF_IPC_QUEUE * q)
 {
   g_list_free(q->queue);
@@ -727,12 +728,11 @@ socket_wait_conn_new(GHashTable *ch_attrs)
 */
 
 struct OCF_IPC_CHANNEL * 
-socket_channel_new(GHashTable *ch_attrs) {
+socket_client_channel_new(GHashTable *ch_attrs) {
   struct OCF_IPC_CHANNEL * temp_ch;
   struct SOCKET_CH_PRIVATE* conn_info;
-  int *sock;
-  int sockfd;
   char *path_name;
+  int sockfd;
 
   /*
    * I don't really understand why the client and the server use different
@@ -755,7 +755,7 @@ socket_channel_new(GHashTable *ch_attrs) {
    * this function will take socketfd as the parameter to create a socket channel.
    */
 
-  if ((path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR)) != NULL) { /* client side connection */
+  if ((path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR)) != NULL) { 
     if (strlen(path_name) >= sizeof(conn_info->path_name)) {
       fprintf(stderr,"the max path length is %d\n"
       ,	sizeof(conn_info->path_name));
@@ -766,10 +766,8 @@ socket_channel_new(GHashTable *ch_attrs) {
       perror("socket");
       return NULL;
     }
-  }else if ((sock = (int *) g_hash_table_lookup(ch_attrs, SOCKET_ATTR)) != NULL) { /* server side connection */
-    sockfd = *sock;
   }else{
-    printf("socket_channel_new: Can't get required information from hash table\n");
+    printf("socket_client_channel_new: Can't get required information from hash table\n");
     return NULL;
   }
 
@@ -779,11 +777,31 @@ socket_channel_new(GHashTable *ch_attrs) {
 
   conn_info->s = sockfd;
 
-  if (path_name) {
-    strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
-  }else{
-    conn_info->path_name[0] = '\0';
-  }
+  
+  strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
+  temp_ch->ch_status = CH_DISCONNECT;
+  temp_ch->ch_private = (void*) conn_info;
+  temp_ch->auth_info = NULL;
+  temp_ch->ops = (struct OCF_IPC_OPS *)&socket_ops;
+  temp_ch->send_queue = socket_queue_new();
+  temp_ch->recv_queue = socket_queue_new();
+   
+  return temp_ch;
+  
+}
+
+struct OCF_IPC_CHANNEL * 
+socket_server_channel_new(int sockfd){
+  struct OCF_IPC_CHANNEL * temp_ch;
+  struct SOCKET_CH_PRIVATE* conn_info;
+  
+  
+  temp_ch = g_new(struct OCF_IPC_CHANNEL, 1);
+  conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
+
+
+  conn_info->s = sockfd;
+
   temp_ch->ch_status = CH_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
   temp_ch->auth_info = NULL;
@@ -806,7 +824,7 @@ socket_channel_new(GHashTable *ch_attrs) {
  */
 
 
-static struct OCF_IPC_MESSAGE*
+struct OCF_IPC_MESSAGE*
 socket_message_new(struct OCF_IPC_CHANNEL *ch, int msg_len)
 {
   struct OCF_IPC_MESSAGE * temp_msg;
@@ -824,7 +842,7 @@ socket_message_new(struct OCF_IPC_CHANNEL *ch, int msg_len)
 
 /* brief free the memory space allocated to msg and destroy msg. */
 
-static void
+void
 socket_free_message(struct OCF_IPC_MESSAGE * msg) {
 
   free(msg->msg_body);
