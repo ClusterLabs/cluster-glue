@@ -1,4 +1,4 @@
-/* $Id: ipctransientclient.c,v 1.9 2004/08/29 03:01:13 msoffen Exp $ */
+/* $Id: ipctransientclient.c,v 1.10 2004/09/15 20:50:50 andrew Exp $ */
 /* 
  * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
  * 
@@ -104,41 +104,38 @@ init_client_ipc_comms(const char *child,
 					   ,gpointer    user_data),
 		      void *user_data)
 {
-    IPC_Channel *ch;
-    GHashTable * attrs;
-    int local_sock_len = 2; /* 2 = '/' + '\0' */
-    char    *commpath = NULL;
-    static char 	path[] = IPC_PATH_ATTR;
-
+	IPC_Channel *ch;
+	GHashTable * attrs;
+	int local_sock_len = 2; /* 2 = '/' + '\0' */
+	char    *commpath = NULL;
+	static char 	path[] = IPC_PATH_ATTR;
+	
 	local_sock_len += strlen(child);
-    local_sock_len += strlen(WORKING_DIR);
-
+	local_sock_len += strlen(WORKING_DIR);
+	
 	commpath = (char*)malloc(sizeof(char)*local_sock_len);
-    sprintf(commpath, WORKING_DIR "/%s", child);
-    commpath[local_sock_len - 1] = '\0';
-    
-    cl_log(LOG_DEBUG, "[Client] Attempting to talk on: %s", commpath);
+	sprintf(commpath, WORKING_DIR "/%s", child);
+	commpath[local_sock_len - 1] = '\0';
+	
+	cl_log(LOG_DEBUG, "[Client] Attempting to talk on: %s", commpath);
 
-    attrs = g_hash_table_new(g_str_hash,g_str_equal);
-    g_hash_table_insert(attrs, path, commpath);
-    ch = ipc_channel_constructor(IPC_ANYTYPE, attrs);
-    g_hash_table_destroy(attrs);
-
-    if (ch == NULL) {
+	attrs = g_hash_table_new(g_str_hash,g_str_equal);
+	g_hash_table_insert(attrs, path, commpath);
+	ch = ipc_channel_constructor(IPC_ANYTYPE, attrs);
+	g_hash_table_destroy(attrs);
+	
+	if (ch == NULL) {
 		cl_log(LOG_ERR, "[Client] Could not access channel on: %s", commpath);
-    } else if(ch->ops->initiate_connection(ch) != IPC_OK) {
+	} else if(ch->ops->initiate_connection(ch) != IPC_OK) {
 		cl_log(LOG_ERR, "[Client] Could not init comms on: %s", commpath);
 		return NULL;
-    }
+	}
 
-    G_main_add_IPC_Channel(G_PRIORITY_LOW,
-						   ch,
-						   FALSE, 
-						   dispatch,
-						   user_data, 
-						   default_ipc_input_destroy);
-    
-    return ch;
+	G_main_add_IPC_Channel(G_PRIORITY_LOW,
+			       ch, FALSE, dispatch, user_data, 
+			       default_ipc_input_destroy);
+	
+	return ch;
 }
 
 
