@@ -20,4 +20,4 @@ MAINTAINERCLEANFILES = Makefile.in
                                                                                                                                                          
 includedir=$(base_includedir)/heartbeat
 
-include_HEADERS = lrm_api.h lrm_msg.h raexec.h
+include_HEADERS = lrm_api.h lrm_msg.h racommon.h raexec.h
