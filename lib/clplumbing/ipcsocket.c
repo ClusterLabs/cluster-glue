@@ -67,7 +67,9 @@ static int socket_recv(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE** mes
 
 static int socket_resume_io(struct OCF_IPC_CHANNEL *ch);
 
-static gboolean socket_is_queue_pending(struct OCF_IPC_CHANNEL *ch);
+static gboolean socket_is_message_pending(struct OCF_IPC_CHANNEL *ch);
+
+static gboolean socket_is_sending_block(struct OCF_IPC_CHANNEL *ch);
 
 static int socket_assert_auth(struct OCF_IPC_CHANNEL *ch, GHashTable *auth);
 
@@ -283,10 +285,17 @@ socket_recv(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE** message)
 }
 
 static gboolean
-socket_is_queue_pending(struct OCF_IPC_CHANNEL * ch)
+socket_is_message_pending(struct OCF_IPC_CHANNEL * ch)
 {
 
   return ch->recv_queue->current_qlen > 0;
+}
+
+static gboolean
+socket_is_sending_block(struct OCF_IPC_CHANNEL * ch)
+{
+
+  return ch->send_queue->current_qlen > 0;
 }
 
 
@@ -562,7 +571,8 @@ static struct OCF_IPC_OPS socket_ops = {
   socket_assert_auth,
   socket_send,
   socket_recv,
-  socket_is_queue_pending,
+  socket_is_message_pending,
+  socket_is_sending_block,
   socket_resume_io,
   socket_get_send_fd,
   socket_get_recv_fd,
