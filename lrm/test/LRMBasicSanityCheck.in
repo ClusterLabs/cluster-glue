@@ -1,6 +1,7 @@
 #!/bin/bash
 
- # Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
+ # Copyright (c) 2004 International Business Machines
+ # Author: Huang Zhen <zhenhltc@cn.ibm.com>
  # 
  # This program is free software; you can redistribute it and/or
  # modify it under the terms of the GNU General Public
@@ -40,6 +41,7 @@ $LRMD -k
 
 #start the new instance of lrm
 $LRMD -r &
+sleep 1
 
 #check is the new instance running
 $LRMD -s
