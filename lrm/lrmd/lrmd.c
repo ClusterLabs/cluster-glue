@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.70 2005/03/04 15:59:09 alan Exp $ */
+/* $Id: lrmd.c,v 1.71 2005/03/07 06:22:48 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -991,7 +991,7 @@ on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg)
 		return HA_FAIL;
 	}
 
-	ha_msg_add_str_list(ret,F_LRM_RCLASS,ra_class_list);
+	cl_msg_add_list(ret,F_LRM_RCLASS,ra_class_list);
 	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
 		lrmd_log(LOG_ERR,
 			"on_msg_get_rsc_classes: can not send the ret msg");
@@ -1028,7 +1028,7 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 			return HA_FAIL;
 		}
 		if (0 <= RAExec->get_resource_list(&types)) {
-			ha_msg_add_str_list(ret, F_LRM_RTYPES, types);
+			cl_msg_add_list(ret, F_LRM_RTYPES, types);
 			while (NULL != (type = g_list_first(types))) {
 				types = g_list_remove_link(types, type);
 				g_free(type->data);
@@ -1072,7 +1072,7 @@ on_msg_get_rsc_providers(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	else {
 		if (0 <= RAExec->get_provider_list(rtype, &providers)) {
-			ha_msg_add_str_list(ret, F_LRM_RPROVIDERS, providers);
+			cl_msg_add_list(ret, F_LRM_RPROVIDERS, providers);
 			while (NULL != (provider = g_list_first(providers))) {
 				providers = g_list_remove_link(providers, provider);
 				g_free(provider->data);
@@ -2164,6 +2164,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.71  2005/03/07 06:22:48  zhenh
+ * replace ha_msg_add_str_list with the new one cl_msg_add_list
+ *
  * Revision 1.70  2005/03/04 15:59:09  alan
  * Put in a largish number of signed/unsigned fixes
  *
