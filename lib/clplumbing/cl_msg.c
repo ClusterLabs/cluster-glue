@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.5 2004/04/17 07:54:50 alan Exp $ */
+/* $Id: cl_msg.c,v 1.6 2004/04/17 13:45:13 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -193,7 +193,7 @@ ha_msg_new(nfields)
 		ret->names     = (char **)ha_calloc(sizeof(char *), nalloc);
 		ret->nlens     = (int *)ha_calloc(sizeof(int), nalloc);
 		ret->values    = (void **)ha_calloc(sizeof(void *), nalloc);
-		ret->vlens     = (int *)ha_calloc(sizeof(int), nalloc);
+		ret->vlens     = (size_t *)ha_calloc(sizeof(size_t), nalloc);
 		ret->stringlen = sizeof(MSG_START)+sizeof(MSG_END)-1;
 		ret->netstringlen = sizeof(MSG_START_NETSTRING)
 		+	sizeof(MSG_END_NETSTRING) - 1 + MAX_AUTH_BYTES;
@@ -286,7 +286,7 @@ ha_msg_copy(const struct ha_msg *msg)
 	ret->names  = (char **)	ha_calloc(sizeof(char *), msg->nalloc);
 	ret->nlens  = (int *)	ha_calloc(sizeof(int), msg->nalloc);
 	ret->values = (void **)	ha_calloc(sizeof(void *), msg->nalloc);
-	ret->vlens  = (int *)	ha_calloc(sizeof(int), msg->nalloc);
+	ret->vlens  = (size_t *)	ha_calloc(sizeof(size_t), msg->nalloc);
 	ret->types  = (int *) ha_calloc(sizeof(int), msg->nalloc);
 	if (ret->names == NULL || ret->values == NULL
 	||	ret->nlens == NULL || ret->vlens == NULL || ret->types == NULL) {
@@ -1783,6 +1783,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.6  2004/04/17 13:45:13  alan
+ * More FreeBSD/64-bit problems fixed.  Problems found by ward.viaene@student.khleuven.be.
+ *
  * Revision 1.5  2004/04/17 07:54:50  alan
  * Fixed a number of 64-bit portability issues discovered by Ward Viaene in FreeBSD.
  *
