@@ -268,7 +268,6 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 	gchar** name_mode = NULL;
 	char get_lpar[MAX_CMD_LEN];
 	gchar** lparlist = NULL;
-	char ** ret = NULL;
 
 	if(Debug){
 		LOG(PIL_DEBUG , "%s called,info=%s\n" , __FUNCTION__,info);
@@ -352,7 +351,6 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 	g_strfreev(syslist);
 	dev->hmc = STRDUP(info);
 	
-	free(ret);
 	return S_OK;
 }
 
