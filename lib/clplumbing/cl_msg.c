@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.61 2005/03/15 00:01:23 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.62 2005/03/15 01:01:09 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -72,13 +72,14 @@ FT_strings[]={
 
 
 #undef DOAUDITS
+#define DOAUDITS
 #ifdef DOAUDITS
 
 void ha_msg_audit(const struct ha_msg* msg);
 
 #	define	AUDITMSG(msg)	ha_msg_audit(msg)
 #else
-#	define	AUDITMSG(msg)	/* Nothing */
+#	define	AUDITMSG(msg)	/*nothing*/
 #endif
 
 
@@ -249,7 +250,7 @@ ha_msg_copy(const struct ha_msg *msg)
 	memcpy(ret->types, msg->types, sizeof(msg->types[0])*msg->nfields);
 
 	for (j=0; j < msg->nfields; ++j) {
-
+		
 		if ((ret->names[j] = ha_malloc(msg->nlens[j]+1)) == NULL) {
 			goto freeandleave;
 		}
@@ -288,66 +289,79 @@ ha_msg_audit(const struct ha_msg* msg)
 		return;
 	}
 	if (!ha_is_allocated(msg)) {
-		cl_log(LOG_CRIT, "Message @ 0x%x is not allocated"
-		,	(unsigned) msg);
+		cl_log(LOG_CRIT, "Message @ %p is not allocated"
+		,	 msg);
 		abort();
 	}
 	if (msg->nfields < 0) {
-		cl_log(LOG_CRIT, "Message @ 0x%x has negative fields (%d)"
-		,	(unsigned) msg, msg->nfields);
+		cl_log(LOG_CRIT, "Message @ %p has negative fields (%d)"
+		,	msg, msg->nfields);
 		doabort = TRUE;
 	}
 	if (msg->nalloc < 0) {
-		cl_log(LOG_CRIT, "Message @ 0x%x has negative nalloc (%d)"
-		,	(unsigned) msg, msg->nalloc);
+		cl_log(LOG_CRIT, "Message @ %p has negative nalloc (%d)"
+		,	msg, msg->nalloc);
 		doabort = TRUE;
 	}
 	if (msg->stringlen <=0 
 	    || msg->netstringlen <= 0) {
 		cl_log(LOG_CRIT,
-		       "Message @ 0x%x has non-negative net/stringlen field"
-		       "stringlen=(%d), netstringlen=(%d)",
-		       (unsigned) msg, msg->stringlen, msg->netstringlen);
+		       "Message @ %p has non-negative net/stringlen field"
+		       "stringlen=(%ld), netstringlen=(%ld)",
+		       msg,(long)msg->stringlen, (long)msg->netstringlen);
 		doabort = TRUE;
 	}
 
 	if (!ha_is_allocated(msg->names)) {
 		cl_log(LOG_CRIT
-		,	"Message names @ 0x%x is not allocated"
-		,	(unsigned) msg->names);
+		,	"Message names @ %p is not allocated"
+		,	 msg->names);
 		doabort = TRUE;
 	}
 	if (!ha_is_allocated(msg->values)) {
 		cl_log(LOG_CRIT
-		,	"Message values @ 0x%x is not allocated"
-		,	(unsigned) msg->values);
+		,	"Message values @ %p is not allocated"
+		,	msg->values);
 		doabort = TRUE;
 	}
 	if (!ha_is_allocated(msg->nlens)) {
 		cl_log(LOG_CRIT
-		,	"Message nlens @ 0x%x is not allocated"
-		,	(unsigned) msg->nlens);
+		,	"Message nlens @ %p is not allocated"
+		,	msg->nlens);
 		doabort = TRUE;
 	}
 	if (!ha_is_allocated(msg->vlens)) {
 		cl_log(LOG_CRIT
-		,	"Message vlens @ 0x%x is not allocated"
-		,	(unsigned) msg->vlens);
+		,	"Message vlens @ %p is not allocated"
+		,	msg->vlens);
 		doabort = TRUE;
 	}
 	if (doabort) {
+		cl_log_message(LOG_INFO,msg);
 		abort();
 	}
 	for (j=0; j < msg->nfields; ++j) {
-		if (!ha_is_allocated(msg->names[j])) {
-			cl_log(LOG_CRIT, "Message name[%d] @ 0x%x"
-			" is not allocated."
-			,	j, (unsigned) msg->names[j]);
+		
+		
+		if (msg->types[j] == FT_STRING){
+			if (msg->vlens[j] != strlen(msg->values[j])){
+				cl_log(LOG_ERR, "stringlen does not match");
+				cl_log_message(LOG_INFO,msg);
+				abort();
+			}
 		}
-		if (!ha_is_allocated(msg->values[j])) {
-			cl_log(LOG_CRIT, "Message value [%d] @ 0x%x"
-			" is not allocated."
-			,	j, (unsigned) msg->values[j]);
+		
+		if (!ha_is_allocated(msg->names[j])) {
+			cl_log(LOG_CRIT, "Message name[%d] @ 0x%p"
+			       " is not allocated." ,	
+			       j, msg->names[j]);
+			abort();
+		}
+		if (msg->types[j]  != FT_LIST && !ha_is_allocated(msg->values[j])) {
+			cl_log(LOG_CRIT, "Message value [%d] @ 0x%p"
+			       " is not allocated.",  j, msg->values[j]);
+			cl_log_message(LOG_INFO, msg);
+			abort();
 		}
 	}
 }
@@ -1251,7 +1265,8 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 	       const void* value, size_t vlen, int type)
 {  
   	int j;
-	
+	int rc;	
+
 	AUDITMSG(msg);
 	if (msg == NULL || name == NULL || value == NULL) {
 		cl_log(LOG_ERR, "cl_msg_mod: NULL input.");
@@ -1274,7 +1289,7 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 			
 			newv = fieldtypefuncs[type].dup(value,vlen);
 			if (!newv){
-				cl_log(LOG_ERR, "dupliationg message fields failed"
+				cl_log(LOG_ERR, "duplicating message fields failed"
 				       "value=%p, vlen=%d, msg->names[j]=%s", 
 				       value, (int)vlen, msg->names[j]);
 				return HA_FAIL;
@@ -1300,8 +1315,10 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 		}
 	}
 	
-	return(ha_msg_nadd_type(msg, name,strlen(name), value, vlen, type));
+     rc = ha_msg_nadd_type(msg, name,strlen(name), value, vlen, type);
   
+	AUDITMSG(msg);
+	return rc;
 }
 
 int
@@ -2219,13 +2236,12 @@ void
 cl_log_message (int log_level, const struct ha_msg *m)
 {
 	int	j;
-
+	
 	if(m == NULL) {
 		cl_log(log_level, "MSG: No message to dump");
 		return;
 	}
 	
-	AUDITMSG(m);
 	cl_log(log_level, "MSG: Dumping message with %d fields", m->nfields);
 	
 	for (j=0; j < m->nfields; ++j) {
@@ -2261,6 +2277,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.62  2005/03/15 01:01:09  gshi
+ * enable message auditing
+ *
  * Revision 1.61  2005/03/15 00:01:23  gshi
  * size of msg->vlens[0] and msg->nlens[0] are diffent in ia64, don't mix them
  *
