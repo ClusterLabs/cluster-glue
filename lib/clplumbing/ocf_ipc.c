@@ -21,6 +21,8 @@
  *
  */
 #include <clplumbing/ipc.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 struct IPC_WAIT_CONNECTION * socket_wait_conn_new(GHashTable* ch_attrs);
