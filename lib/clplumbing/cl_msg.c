@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.40 2005/02/06 05:54:42 alan Exp $ */
+/* $Id: cl_msg.c,v 1.41 2005/02/07 11:46:42 andrew Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -411,13 +411,34 @@ ha_msg_expand(struct ha_msg* msg )
 	return HA_OK;
 }
 
+int
+cl_msg_remove_value(struct ha_msg* msg, const void* value)
+{
+	int j;
+	
+	if (msg == NULL || value == NULL){
+		cl_log(LOG_ERR, "cl_msg_remove: invalid argument");
+		return HA_FAIL;
+	}
+	
+	for (j = 0; j < msg->nfields; ++j){
+		if (value == msg->values[j]){
+			break;			
+		}
+	}
+	if (j == msg->nfields){		
+		cl_log(LOG_ERR, "cl_msg_remove: field %p not found", value);
+		return HA_FAIL;
+	}
+	return cl_msg_remove_offset(msg, j);
+	
+}
+
 
 int
 cl_msg_remove(struct ha_msg* msg, const char* name)
 {
 	int j;
-	int i;
-	int tmplen;
 	
 	if (msg == NULL || name == NULL){
 		cl_log(LOG_ERR, "cl_msg_remove: invalid argument");
@@ -431,18 +452,31 @@ cl_msg_remove(struct ha_msg* msg, const char* name)
 	}
 	
 	if (j == msg->nfields){		
-		cl_log(LOG_ERR, "cl_msg_remove: field %s not found",
-		       name);
+		cl_log(LOG_ERR, "cl_msg_remove: field %s not found", name);
 		return HA_FAIL;
 	}
+	return cl_msg_remove_offset(msg, j);
+}
+
+int
+cl_msg_remove_offset(struct ha_msg* msg, int offset)
+{
+	int j = offset;
+	int i;
+	int tmplen;
 	
+	if (j == msg->nfields){		
+		cl_log(LOG_ERR, "cl_msg_remove: field %d not found", j);
+		return HA_FAIL;
+	}
+
 	tmplen = msg->stringlen;
 	msg->stringlen -=  fieldtypefuncs[msg->types[j]].stringlen(msg->nlens[j],
 								   msg->vlens[j],
 								   msg->values[j]);
 	if (msg->stringlen <=0){
 		cl_log(LOG_ERR, "cl_msg_remove: stringlen <= 0 after removing"
-		       "field %s. Return failure", name);
+		       "field %s. Return failure", msg->names[j]);
 		msg->stringlen =tmplen;
 		return HA_FAIL;
 	}
@@ -453,7 +487,7 @@ cl_msg_remove(struct ha_msg* msg, const char* name)
 									 msg->values[j]);	
 	if (msg->netstringlen <=0){
 		cl_log(LOG_ERR, "cl_msg_remove: netstringlen <= 0 after removing"
-		       "field %s. return failure", name);
+		       "field %s. return failure", msg->names[j]);
 		msg->netstringlen =tmplen;
 		return HA_FAIL;
 	}
@@ -473,7 +507,7 @@ cl_msg_remove(struct ha_msg* msg, const char* name)
 	
 	return HA_OK;
 }
-	
+
 
 
 /* low level implementation for ha_msg_add
@@ -1786,6 +1820,7 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 				cl_log(LOG_ERR, "NV failure (string2msg_ll):");
 				cl_log(LOG_ERR, "Input string: [%s]", s);
 				cl_log(LOG_ERR, "sp=%s", sp);
+				abort();
 			}
 			ha_msg_del(ret);
 			return(NULL);
@@ -2064,6 +2099,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.41  2005/02/07 11:46:42  andrew
+ * Implement some needed variations of cl_msg_remove()
+ *
  * Revision 1.40  2005/02/06 05:54:42  alan
  * Miscellaneous BEAM fixes.
  * Memory leaks, use of NULL pointers, etc.
