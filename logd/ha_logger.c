@@ -34,8 +34,9 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <netinet/in.h>
-#define	HA_FAIL		0
-#define	HA_OK		1
+
+#define EXIT_OK		0
+#define EXIT_FAIL	1
 
 int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 
@@ -65,10 +66,14 @@ main(int argc, char** argv)
 		goto err_exit;
 	}
 	
+	if(!cl_log_test_logd()){
+		return EXIT_FAIL;
+	}
+	
 	if (LogToLoggingDaemon(priority, argv[2],strlen(argv[2]), FALSE) == HA_OK){
-		return 0;
+		return EXIT_OK;
 	}else {
-		return 1;
+		return EXIT_FAIL;
 	}
 	
  err_exit:
