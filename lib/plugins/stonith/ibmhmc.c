@@ -72,7 +72,7 @@
  *
  *	lssyscfg -m managed-system-name -r lpar -F name:boot_mode --all
  *
- *	Note that we should probably only consider partitions whose boot mode is 
+ *b	Note that we should probably only consider partitions whose boot mode is 
  *	normal (1).  (that's my guess, anyway...)
  *
  *
@@ -134,9 +134,12 @@
 
 
 #define MAX_HOST_NAME_LEN	(256*4)
-#define MAX_CMD_NAME_LEN	1024
+#define MAX_CMD_LEN		1024
 #define FULLSYSTEMPARTITION	"FullSystemPartition"
 #define MAX_POWERON_RETRY	10
+#define MAX_SYS_NUM		64
+#define MAX_LPAR_NUM		256
+#define MAX_HMC_NAME_LEN	256
 
 #define HMCURL	"http://publib-b.boulder.ibm.com/Redbooks.nsf/RedbookAbstracts/SG247038.html"
 
@@ -152,6 +155,10 @@ static void		ibmhmc_free_hostlist(char **);
 static void		ibmhmc_closepi(PILPlugin*pi);
 static PIL_rc		ibmhmc_closeintf(PILInterface* pi, void* pd);
 
+static char* do_shell_cmd(const char* cmd, int* status);
+static int check_hmc_status(const char* hmc);
+//static char* do_shell_cmd_fake(const char* cmd, int* status);
+
 static struct stonith_ops ibmhmcOps ={
 	ibmhmc_new,		/* Create new STONITH object	*/
 	ibmhmc_destroy,		/* Destroy STONITH object	*/
@@ -159,8 +166,8 @@ static struct stonith_ops ibmhmcOps ={
 	ibmhmc_set_config_info,	/* Get configuration from file	*/
 	ibmhmc_getinfo,		/* Return STONITH info string	*/
 	ibmhmc_status,		/* Return STONITH device status	*/
-	ibmhmc_reset_req,		/* Request a reset */
-	ibmhmc_hostlist,		/* Return list of supported hosts */
+	ibmhmc_reset_req,	/* Request a reset */
+	ibmhmc_hostlist,	/* Return list of supported hosts */
 	ibmhmc_free_hostlist	/* free above list */
 };
 
@@ -200,6 +207,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 
 struct HMCDevice {	
 	const char *		HMCid;
+	char *		hmc;
 	GList*		 	hostlist;
 };
 
@@ -236,8 +244,10 @@ ibmhmc_status(Stonith  *s)
 		PILCallLog(LOG, PIL_CRIT, "invalid argument to ibmhmc_status");
 		return(S_OOPS);
 	}
-	/* FIXME!!! REALLY NEED TO IMPLEMENT THIS!! */
-	return S_OK;
+
+	struct HMCDevice* dev = (struct HMCDevice*) s->pinfo;
+	
+	return check_hmc_status(dev->hmc);
 }
 
 
@@ -275,7 +285,7 @@ ibmhmc_hostlist(Stonith  *s)
 	memset(ret, 0, (numnames+1)*sizeof(char*));
 	for (node=g_list_first(dev->hostlist), j=0
 	;	NULL != node
-	;	j++, node = g_list_next(node))			{
+	;	j++, node = g_list_next(node))	{
 		char* host = (char*)node->data;
 		ret[j] = STRDUP(host);
 	}
@@ -302,28 +312,77 @@ ibmhmc_free_hostlist (char** hlist)
  *	Parse the config information, and stash it away...
  */
 static int
-ibmhmc_parse_config_info(struct HMCDevice* dev, const char * info)
+ibmhmc_parse_config_info(struct HMCDevice* dev, const char* info)
 {
-	char host[MAX_HOST_NAME_LEN];
-	gchar** strarray = g_strsplit(info, "/", 4);
+	int status;
+	char* output = NULL;
 
-	if (NULL == strarray[0] || NULL == strarray[1]||
-	    NULL == strarray[2] || NULL == strarray[3]) {
-		g_strfreev(strarray);
+	if (NULL == info || 0 == strlen(info)) 	{
 		return S_BADCONFIG;
 	}
-	g_strfreev(strarray);
-
-	/* You should get the lists of hosts from the adapter, not from a config string... */
-	/* FIXME!! */
-	memset(host, 0, MAX_HOST_NAME_LEN);
-	while(1) {
-		if (sscanf(info, "%s", host)<1) {
+	
+	//check whether the HMC is enable ssh command
+	if (S_OK!=check_hmc_status(info)) {
+		return S_BADCONFIG;
+	}		
+	//get the managed system's names of the hmc
+	char get_syslist[MAX_CMD_LEN];
+	snprintf(get_syslist, MAX_CMD_LEN,
+		 SSH_CMD " -l " HMCROOT
+		 " %s lssyscfg -r sys -F name:mode --all", info);
+	output = do_shell_cmd(get_syslist, &status);
+	gchar** syslist = g_strsplit(output, "\n", MAX_SYS_NUM);
+	FREE(output);
+	int i;
+	char host[MAX_HOST_NAME_LEN];
+	//for each managed system
+	for (i=0; i<MAX_SYS_NUM; i++) {
+		if (NULL==syslist[i]) {
 			break;
-		}	
-		dev->hostlist = g_list_append(dev->hostlist, STRDUP(host));
-		info += strlen(host);
+		}
+		gchar** name_mode = g_strsplit(syslist[i],":",2);
+		//if it is in fullsystempartition
+		if (NULL!=name_mode[1] && 0==strncmp(name_mode[1],"0",1)) {
+			//add the FullSystemPartition
+			snprintf(host,MAX_HOST_NAME_LEN,
+				 "%s/FullSystemPartition", name_mode[0]);
+			dev->hostlist = g_list_append(dev->hostlist,STRDUP(host));
+		}
+		else
+		//if it is in lpar
+		if (NULL!=name_mode[1] && 0==strncmp(name_mode[1],"255",3)) {
+			//get its lpars
+			char get_lpar[MAX_CMD_LEN];
+			snprintf(get_lpar, MAX_CMD_LEN,
+				 SSH_CMD " -l " HMCROOT
+				 " %s lssyscfg -m %s -r lpar -F name --all",
+				 info, name_mode[0]);
+			output = do_shell_cmd(get_lpar,&status);
+			gchar** lparlist = g_strsplit(output, "\n",MAX_LPAR_NUM);
+			FREE(output);
+			int j;
+			//for each lpar
+			for (j=0; j<MAX_LPAR_NUM; j++) {
+				if (NULL==lparlist[j]) {
+					break;
+				}
+				//skip the full system partition
+				if (0 == strncmp(lparlist[j],
+						 FULLSYSTEMPARTITION,
+						 strlen(FULLSYSTEMPARTITION))){
+					continue;
+				}
+				//add the lpar
+				snprintf(host,MAX_HOST_NAME_LEN,
+					 "%s/%s", name_mode[0],lparlist[j]);
+				dev->hostlist = g_list_append(dev->hostlist,STRDUP(host));
+			}
+			g_strfreev(lparlist);
+		}
+		g_strfreev(name_mode);
 	}
+	g_strfreev(syslist);
+	dev->hmc = STRDUP(info);
 	return S_OK;
 }
 
@@ -331,29 +390,34 @@ ibmhmc_parse_config_info(struct HMCDevice* dev, const char * info)
 /*
  *	Reset the given host, and obey the request type.
  *	We should reset without power cycle for the non-partitioned case
- *	(FIXME!)
  */
 static int
 ibmhmc_reset_req(Stonith * s, int request, const char * host)
 {
 	GList*			node = NULL;
 	struct HMCDevice*	dev = NULL;
-	char			off_cmd[MAX_CMD_NAME_LEN];
-	char			on_cmd[MAX_CMD_NAME_LEN];
-	gchar**			strarray = NULL;
+	char			off_cmd[MAX_CMD_LEN];
+	char			on_cmd[MAX_CMD_LEN];
+
+	//reset_cmd is only used by full system partition
+	char			reset_cmd[MAX_CMD_LEN];
+	gchar**			names = NULL;
 	int			i;
+	int			is_lpar = FALSE;
+	int			status;
 	
+
 	if (!ISHMCDEV(s) || (NULL == host)) {
 		PILCallLog(LOG, PIL_CRIT, "invalid argument to %s", __FUNCTION__);
 		return(S_OOPS);
 	}
-	
+
 	dev = (struct HMCDevice*) s->pinfo;
 
 	for (node=g_list_first(dev->hostlist)
 	;	NULL != node
 	;	node=g_list_next(node)) {
-		
+
 		if (strcasecmp((char*)node->data, host) == 0) {
 			break;
 		};
@@ -367,47 +431,91 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 		return (S_OOPS);
 	}
 
-	strarray = g_strsplit((char*)node->data, "/", 4);
+	names = g_strsplit((char*)node->data, "/", 2);
+	//names[0] will be the name of managed system
+	//names[1] will be the name of the lpar partition
+	
+	if (0 == strcasecmp(names[1], FULLSYSTEMPARTITION)) {
 
-	if (0 == strcasecmp(strarray[2], FULLSYSTEMPARTITION)) {
-
-		snprintf(off_cmd, MAX_CMD_NAME_LEN
+		is_lpar = FALSE;
+		
+		snprintf(off_cmd, MAX_CMD_LEN
 		,	SSH_CMD " -l " HMCROOT " %s chsysstate"
 		" -r sys -m %s -o off -n %s -c full"
-		,	 strarray[0], strarray[1], strarray[1]);
+		,	 dev->hmc, dev->hmc, names[0]);
 
-		snprintf(on_cmd, MAX_CMD_NAME_LEN
+		snprintf(on_cmd, MAX_CMD_LEN
 		,	SSH_CMD " -l " HMCROOT " %s chsysstate"
 		 " -r sys -m %s -o on -n %s -c full -b norm"
-		,	 strarray[0], strarray[1], strarray[1]);
+		,	 dev->hmc, names[0], names[0]);
+
+		snprintf(reset_cmd, MAX_CMD_LEN
+		,	SSH_CMD " -l " HMCROOT " %s chsysstate"
+		 " -r sys -m %s -o reset -n %s -c full -b norm"
+		,	 dev->hmc, names[0], names[0]);
+		
 	} else {
-		snprintf(off_cmd, MAX_CMD_NAME_LEN
-		,	SSH_CMD " -l " HMCROOT " %s reset_partition"
-			 " -m %s -p %s -t hard",
-			 strarray[0], strarray[1], strarray[2]);
-		snprintf(on_cmd, MAX_CMD_NAME_LEN,
-			 SSH_CMD " -l hscroot %s start_partition"
-			 " -p %s -f %s -m %s",
-			 strarray[0], strarray[2], strarray[3], strarray[1]);
+
+		is_lpar = TRUE;
+		
+		snprintf(off_cmd, MAX_CMD_LEN
+		,	 SSH_CMD " -l " HMCROOT " %s reset_partition"
+			 " -m %s -p %s -t hard"
+		,	 dev->hmc, names[0], names[1]);
+		snprintf(on_cmd, MAX_CMD_LEN
+		,	 SSH_CMD " -l " HMCROOT " %s chsysstate"
+			 " -r lpar -m %s -o on -n %s"
+		,	 dev->hmc, names[0], names[1]);
 
 	}
-	g_strfreev(strarray);
-
-	if (request != ST_POWERON && 0 != system(off_cmd)) {
-		PILCallLog(LOG, PIL_CRIT, "command %s failed", off_cmd);
-	}
-	for (i=0; i < MAX_POWERON_RETRY; i++) {	
-		if (request != ST_POWEROFF && 0 != system(on_cmd)) {
-			sleep(1);
-		}else{
+	g_strfreev(names);
+	switch (request) {
+	case ST_POWERON:
+		do_shell_cmd(on_cmd,&status);
+		if (0!=status) {
+			PILCallLog(LOG, PIL_CRIT, "command %s failed", on_cmd);
+		}
+		break;
+	case ST_POWEROFF:
+		do_shell_cmd(off_cmd,&status);
+		if (0!=status) {
+			PILCallLog(LOG, PIL_CRIT, "command %s failed", off_cmd);
+		}
+		break;
+	case ST_GENERIC_RESET:
+		if (is_lpar) {
+			do_shell_cmd(off_cmd,&status);
+			if (0!=status) {
+				PILCallLog(LOG, PIL_CRIT, "command %s failed", off_cmd);
+				break;
+			}
+			for (i=0; i < MAX_POWERON_RETRY; i++) {
+				do_shell_cmd(on_cmd,&status);
+				if (0!=status) {
+					sleep(1);
+				}else{
+					break;
+				}
+			}
+			if (MAX_POWERON_RETRY == i) {
+				PILCallLog(LOG, PIL_CRIT, "command %s failed", on_cmd);
+			}
+		}
+		else {
+			do_shell_cmd(reset_cmd,&status);
+			if (0!=status) {
+				PILCallLog(LOG, PIL_CRIT, "command %s failed", reset_cmd);
+			}
 			break;
 		}
+		break;
+	default:
+		PILCallLog(LOG, PIL_CRIT, "unknown reset request");
+	
 	}
-	if (MAX_POWERON_RETRY == i) {
-		PILCallLog(LOG, PIL_CRIT, "command %s failed", on_cmd);
-	}
-
+		
 	PILCallLog(LOG, PIL_INFO, _("Host %s ibmhmc-reset."), host);
+
 	return S_OK;
 }
 
@@ -420,7 +528,7 @@ ibmhmc_set_config_file(Stonith* s, const char * configname)
 {
 	FILE* cfgfile = NULL;
 	struct HMCDevice* dev = NULL;
-	char hostline[MAX_HOST_NAME_LEN];
+	char hmc[MAX_HMC_NAME_LEN];
 	
 	if (!ISHMCDEV(s)) {
 		PILCallLog(LOG, PIL_CRIT, "invalid argument to HMC_set_configfile");
@@ -435,13 +543,14 @@ ibmhmc_set_config_file(Stonith* s, const char * configname)
 		return(S_BADCONFIG);
 	}
 
-	while (fgets(hostline, sizeof(hostline), cfgfile) != NULL){
-		if (*hostline == '#' || *hostline == '\n' || *hostline == EOS){
+	while (fgets(hmc, sizeof(hmc), cfgfile) != NULL){
+		if (*hmc == '#' || *hmc == '\n' || *hmc == EOS){
 			continue;
 		}
-		if (S_OK != ibmhmc_parse_config_info(dev, hostline)) {
+		if (S_OK != ibmhmc_parse_config_info(dev, hmc)) {
 			return S_BADCONFIG;
 		}
+		break;
 	}
 	return S_OK;
 }
@@ -482,18 +591,15 @@ ibmhmc_getinfo(Stonith* s, int reqtype)
 			break;
 
 		case ST_CONF_INFO_SYNTAX:
-			/* FIXME!  hostnames should go away... */
-			ret = _("HMC_NAME/SYS_NAME/PAR_NAME/PROFILE_NAME hostname ...");
+			ret = _("SYS_NAME/PAR_NAME");
 			break;
 
 		case ST_CONF_FILE_SYNTAX:
-			/* FIXME!  hostnames should go away... */
-			ret = _("HMC_NAME/SYS_NAME/PAR_NAME/PROFILE_NAME hostname ..."
+			ret = _("SYS_NAME/PAR_NAME\n"
 			"Blank lines and lines beginning with # are ignored");
 			break;
 
 		case ST_DEVICEDESCR:
-			/* FIXME! */
 			ret = _("IBM pSeries Hardware Management Console (HMC)\n"
 			"Use for HMC-equipped IBM pSeries Server\n"
 			"Providing the list of hosts should go away (!)...\n"
@@ -523,6 +629,10 @@ ibmhmc_destroy(Stonith *s)
 	dev = (struct HMCDevice *)s->pinfo;
 
 	dev->HMCid = NOTibmhmcID;
+	if (dev->hmc) {
+		FREE(dev->hmc);
+		dev->hmc = NULL;
+	}
 	if (dev->hostlist) {
 		GList* node;
 		while (NULL != (node=g_list_first(dev->hostlist))) {
@@ -532,6 +642,7 @@ ibmhmc_destroy(Stonith *s)
 		}
 		dev->hostlist = NULL;
 	}
+	
 	FREE(dev);
 }
 
@@ -546,6 +657,66 @@ ibmhmc_new(void)
 	}
 	memset(dev, 0, sizeof(*dev));
 	dev->HMCid = HMCid;
+	dev->hmc = NULL;
 	dev->hostlist = NULL;
 	return((void *)dev);
 }
+
+
+static char*
+do_shell_cmd(const char* cmd, int* status)
+{
+	FILE* file = popen(cmd, "r");
+	if (NULL==file) {
+		return NULL;
+	}
+
+	const int BUFF_LEN=4096;
+	char buff[BUFF_LEN];
+
+	GString* g_str_tmp = g_string_new("");
+	while(!feof(file)) {
+		memset(buff, 0, BUFF_LEN);
+		int read_len = fread(buff, 1, BUFF_LEN, file);
+		if (0<read_len) {
+			g_string_append(g_str_tmp, buff);
+		}
+		else {
+			sleep(1);
+		}
+	}
+	char* data = (char*)MALLOC(g_str_tmp->len+1);
+	data[0] = data[g_str_tmp->len] = 0;
+	strncpy(data, g_str_tmp->str, g_str_tmp->len);
+	g_string_free(g_str_tmp, TRUE);
+
+	*status = pclose(file);
+	return data;
+
+}
+static int
+check_hmc_status(const char* hmc)
+{
+	char check_status[MAX_CMD_LEN];
+	snprintf(check_status, MAX_CMD_LEN,
+		 SSH_CMD " -l " HMCROOT " %s lshmc -r -F ssh", hmc);
+	int status;
+	char* output = do_shell_cmd(check_status, &status);
+	if (NULL==output || strncmp(output, "enable", 6)!= 0) {
+		return S_BADCONFIG;
+	}
+	FREE(output);
+	return S_OK;
+}
+
+/*
+static char*
+do_shell_cmd_fake(const char* cmd, int* status)
+{
+printf("%s()\n",__FUNCTION__);
+	printf("cmd:%s\n",cmd);
+	*status=0;
+	return NULL;
+
+}
+*/
