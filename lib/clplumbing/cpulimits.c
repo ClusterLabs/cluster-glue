@@ -120,8 +120,10 @@ update_cpu_interval(void)
 	if (rlim.rlim_max != RLIM_INFINITY && timesecs > rlim.rlim_max) {
 		timesecs = rlim.rlim_max;
 	}
+#if 0
 	cl_log(LOG_DEBUG
 	,	"Setting max CPU limit to %ld seconds", timesecs);
+#endif
 
 	/* Update the OS-level soft CPU limit */
 	rlim.rlim_cur = timesecs;
