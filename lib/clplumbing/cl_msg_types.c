@@ -225,7 +225,12 @@ string_memfree(void* value)
 {
 	if (value){
 		ha_free(value);
-	}
+	}else {
+		cl_log(LOG_ERR, "string_memfree: "
+		       "value is NULL");
+        }
+
+
 	return;
 }
 
@@ -273,9 +278,7 @@ binary_dup(const void* value, size_t len){
 	char* dupvalue;
 	
 	/* 0 byte binary field should be allowed*/
-	if (len == 0){
-		return NULL;
-	} else if (len < 0 ){
+	if (len < 0 ){
 		cl_log(LOG_ERR,"binary_dup:"
 		       "len < 0");
 		return NULL ;
@@ -402,6 +405,7 @@ string_display(int seq, char* name, void* value)
 static void
 binary_display(int seq, char* name, void* value)
 {
+	HA_MSG_ASSERT(value);	
 	HA_MSG_ASSERT(name);
 	cl_log(LOG_INFO, "MSG[%d] : [(%s)%s=%p]",
 	       seq,	FT_strings[FT_BINARY],
@@ -545,8 +549,8 @@ static int
 string_stringlen(size_t namlen, size_t vallen, const void* value)
 {
 	
-	HA_MSG_ASSERT(value || vallen == 0);
-	
+	HA_MSG_ASSERT(value);
+	HA_MSG_ASSERT( vallen == strlen(value));
 	return namlen + vallen+ 2;
 }
 
@@ -556,7 +560,8 @@ string_netstringlen(size_t namlen, size_t vallen, const void* value)
 	
 	int length;
 	
-	HA_MSG_ASSERT(value || vallen == 0);
+	HA_MSG_ASSERT(value);
+	HA_MSG_ASSERT( vallen == strlen(value));
 	
 	length = intlen(namlen) + (namlen)
 		+	intlen(vallen) + vallen + 4 ;
@@ -569,7 +574,7 @@ string_netstringlen(size_t namlen, size_t vallen, const void* value)
 static int
 binary_stringlen(size_t namlen, size_t vallen, const void* value)
 {
-	HA_MSG_ASSERT(value || (value ==0 && vallen ==0));
+	HA_MSG_ASSERT(value);
 	HA_MSG_ASSERT(vallen >=0  && namlen >= 0);
 	
 	return namlen + B64_stringlen(vallen)  + 2 + 3;
@@ -581,9 +586,9 @@ binary_netstringlen(size_t namlen, size_t vallen, const void* value)
 {
 	int length;
 	
-	HA_MSG_ASSERT(value || (value ==0 && vallen ==0));
+	HA_MSG_ASSERT(value);
 	HA_MSG_ASSERT(vallen >=0  && namlen >= 0);
-		      
+	
 	length = intlen(namlen) + (namlen)
 		+	intlen(vallen) + vallen + 4 ;
 	length  += 4; /* for type*/
@@ -665,7 +670,7 @@ add_binary_field(struct ha_msg* msg, char* name, size_t namelen,
 
 	int next;
 
-	if ( !msg || !name || (value == NULL && vallen >0)
+	if ( !msg || !name || !value
 	     || namelen <= 0 
 	     || vallen < 0
 	     || depth < 0){
@@ -1057,7 +1062,7 @@ string2netstring(char* sp, char* smax, void* value,
 		 size_t vallen, size_t* comlen)
 {
 	
-	if ( !sp || !smax || (!value && vallen >0)
+	if ( !sp || !smax || !value
 	     || vallen < 0 || !comlen ){
 		cl_log(LOG_ERR, "string2netstring:"
 		       "invalid input arguments");
@@ -1264,7 +1269,7 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 	int	netstringlen_add =0;
 
 
-	if ( !msg || !name || (value == NULL && vallen != 0)
+	if ( !msg || !name || !value
 	     || namelen <= 0 
 	     || vallen < 0
 	     || depth < 0){

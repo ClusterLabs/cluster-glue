@@ -244,7 +244,7 @@ peel_netstring(const char * s, const char * smax, int* len,
 
 	sp ++;
 	
-	*data = *len ==0? NULL: sp;
+	*data = sp;
 	
 	sp += (*len);
 	if (*sp != ','){
@@ -389,13 +389,15 @@ netstring2msg(const char *s, size_t length, int need_auth)
 		
 		if (memfree && ret_value){
 			memfree(ret_value);
-		} 
+		} else{
+			cl_log(LOG_ERR, "netstring2msg:"
+			       "memfree or ret_value is NULL");
+		}
 	}
-	
 	/* if program runs here,
 	   the message is generated but
 	   no authentication found*/
-	  
+	
 	if (!need_auth){
 		return(ret);
 	}else {
@@ -406,8 +408,6 @@ netstring2msg(const char *s, size_t length, int need_auth)
 		return(NULL);
 	}
 	
-
-
  happyexit:
 	return(ret);
 	
@@ -462,3 +462,4 @@ is_auth_netstring(const char * datap, size_t datalen,
 	}
 	return(FALSE);
 }
+ 
