@@ -20,6 +20,8 @@
  *
  */
 
+#include <portability.h>
+#include <string.h>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/md5.h>
@@ -104,4 +106,3 @@ drac3AuthHash(const char * chall,
     snprintf(token, len, "%s", responseb64);
     token[len-1]=0x00;
 }
-
