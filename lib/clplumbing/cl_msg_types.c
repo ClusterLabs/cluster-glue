@@ -854,8 +854,7 @@ str2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	
 	if ( strlen(s) != len){
 		cl_log(LOG_ERR, "str2string:"
-		       "the input len(%ld) != string length(%ld)",
-		       len, strlen(s));
+		       "the input len != string length");
 		return 0;
 	}
 	
