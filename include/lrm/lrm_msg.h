@@ -94,7 +94,7 @@
 #define FLUSHOPS		"flushops"
 #define CANCELOP		"cancelop"
 
-#define MAX_INT_LEN 		10
+#define MAX_INT_LEN 		64
 #define MAX_NAME_LEN 		255
 #define MAX_VALUE_LEN 		255
 #define MAX_PARAM_LEN 		1024
