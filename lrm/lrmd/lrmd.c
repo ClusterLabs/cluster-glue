@@ -545,7 +545,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 		return TRUE;
 	}
 	ha_msg_del(msg);
-	
+
 	/*get the client in the client list*/
 	client = lookup_client(pid);
 	if (NULL == client) {
@@ -631,7 +631,7 @@ on_remove_client (gpointer user_data)
 	if (NULL != lookup_client(client->pid)) {
 		on_msg_unregister(client,NULL);
 	}
-
+	client->ch_cbk->ops->destroy(client->ch_cbk);
 	g_free(client->app_name);
 	g_free(client);
 
