@@ -1,3 +1,20 @@
+/* 
+ * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
+ * 
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This software is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -20,114 +37,18 @@
 #define MAX_IPC_FAIL    10
 #define WORKING_DIR     HA_VARLIBDIR"/heartbeat/"
 #define FIFO_LEN        1024
+#define MAX_MESSAGES 3
+char *messages[MAX_MESSAGES];
 
-typedef int (*TestFunc_t)(IPC_Channel*chan, int count);
-
-gboolean echoserver_callback(IPC_Channel *client, gpointer user_data);
-gboolean echoserver_connect(IPC_Channel *client_channel, gpointer user_data);
-IPC_Message *create_simple_message(char *text, IPC_Channel *ch);
-int test_iter(int iteration, int child_iters, unsigned int wait_time);
-int init_server_ipc_comms(const char *child,
-			  gboolean (*channel_client_connect)(IPC_Channel *newclient, gpointer user_data),
-			  void (*channel_input_destroy)(gpointer user_data),
-			  gboolean usenormalpoll);
+IPC_Message *create_simple_message(const char *text, IPC_Channel *ch);
 IPC_Channel *init_client_ipc_comms(const char *child,
-				   gboolean (*dispatch)(IPC_Channel* source_data, gpointer    user_data),
-				   void *user_data);
-gboolean echoclient_callback(IPC_Channel* server, void* private_data);
+								   gboolean (*dispatch)(IPC_Channel* source_data, gpointer    user_data),
+								   void *user_data);
+gboolean transient_client_callback(IPC_Channel* server, void* private_data);
 void client_send_message(const char *message_text,
-			 IPC_Channel *server_channel,
-			 int iteration);
+						 IPC_Channel *server_channel,
+						 int iteration);
 void default_ipc_input_destroy(gpointer user_data);
-/*
-static int checksock(IPC_Channel* channel);
-static void checkifblocked(IPC_Channel* channel);
-
-static int (*PollFunc)(struct pollfd * fds, unsigned int, int)
-=	(int (*)(struct pollfd * fds, unsigned int, int))  poll;
-static gboolean checkmsg(IPC_Message* rmsg, const char * who, int rcount);
-static void
-checkifblocked(IPC_Channel* chan)
-{
-	if (chan->ops->is_sending_blocked(chan)) {
-		cl_log(LOG_INFO, "Sending is blocked.");
-		chan->ops->resume_io(chan);
-	}
-}
-
-
-static int
-checksock(IPC_Channel* channel)
-{
-
-	if (!IPC_ISRCONN(channel)) {
-		cl_log(LOG_ERR, "Channel status is %d"
-		", not IPC_CONNECT", channel->ch_status);
-		return 1;
-	}
-	return 0;
-}
-
-static void
-EOFcheck(IPC_Channel* chan)
-{
-	int		fd = chan->ops->get_recv_select_fd(chan);
-	struct pollfd 	pf[1];
-	int		rc;
-
-	cl_log(LOG_INFO, "channel state: %d", chan->ch_status);
-
-	if (chan->recv_queue->current_qlen > 0) {
-		cl_log(LOG_INFO, "EOF Receive queue has %d messages in it"
-		,	chan->recv_queue->current_qlen);
-	}
-	if (fd <= 0) {
-		cl_log(LOG_INFO, "EOF receive fd: %d", fd);
-	}
-
-
-	pf[0].fd	= fd;
-	pf[0].events	= POLLIN|POLLHUP;
-	pf[0].revents	= 0;
-
-	rc = poll(pf, 1, 0);
-
-	if (rc < 0) {
-		cl_perror("failed poll(2) call in EOFcheck");
-		return;
-	}
-
-	// Got input?
-	if (pf[0].revents & POLLIN) {
-		cl_log(LOG_INFO, "EOF socket %d (still) has input ready (real poll)"
-		,	fd);
-	}
-	if ((pf[0].revents & ~(POLLIN|POLLHUP)) != 0) {
-		cl_log(LOG_INFO, "EOFcheck poll(2) bits: 0x%lx"
-		,	(unsigned long)pf[0].revents);
-	}
-	pf[0].fd	= fd;
-	pf[0].events	= POLLIN|POLLHUP;
-	pf[0].revents	= 0;
-	rc = PollFunc(pf, 1, 0);
-	if (rc < 0) {
-		cl_perror("failed PollFunc() call in EOFcheck");
-		return;
-	}
-
-	// Got input?
-	if (pf[0].revents & POLLIN) {
-		cl_log(LOG_INFO, "EOF socket %d (still) has input ready (PollFunc())"
-		,	fd);
-	}
-	if ((pf[0].revents & ~(POLLIN|POLLHUP)) != 0) {
-		cl_log(LOG_INFO, "EOFcheck PollFunc() bits: 0x%lx"
-		,	(unsigned long)pf[0].revents);
-	}
-	abort();
-}
-*/
-
 
 int
 main(int argc, char ** argv)
@@ -144,20 +65,24 @@ main(int argc, char ** argv)
     client_main = g_main_new(FALSE);
     
     // connect, send messages
-    server_channel = init_client_ipc_comms("echo", echoclient_callback, client_main);
+	server_channel = init_client_ipc_comms("echo", transient_client_callback, client_main);
     
-    if(server_channel == NULL)
-    {
-	cl_log(LOG_ERR, "[Client %d] Could not connect to server", lpc);
-	return 1;
+    if(server_channel == NULL) {
+		cl_log(LOG_ERR, "[Client %d] Could not connect to server", lpc);
+		return 1;
     }
-    
-    client_send_message("hello", server_channel, lpc);
-    
-    client_send_message("hello world", server_channel, lpc);
-    
-    client_send_message("hello world again", server_channel, lpc);
 
+	for(lpc = 0; lpc < MAX_MESSAGES; lpc++) {
+		messages[lpc] = (char *)malloc(sizeof(char)*1000);
+	}
+	sprintf(messages[0], "%s_%ld%c", "hello", (long)getpid(), '\0');
+	sprintf(messages[1], "%s_%ld%c", "hello_world", (long)getpid(), '\0');
+	sprintf(messages[2], "%s_%ld%c", "hello_world_again", (long)getpid(), '\0');
+
+	for(lpc = 0; lpc < MAX_MESSAGES; lpc++) {
+		client_send_message(messages[lpc], server_channel, lpc);
+	}
+    
     server_channel->ops->waitout(server_channel);
     
     /* wait for the reply by creating a mainloop and running it until
@@ -174,54 +99,50 @@ main(int argc, char ** argv)
 
 IPC_Channel *
 init_client_ipc_comms(const char *child,
-		      gboolean (*dispatch)(IPC_Channel* source_data
-					   ,gpointer    user_data),
-		      void *user_data)
+					  gboolean (*dispatch)(IPC_Channel* source_data
+										   ,gpointer    user_data),
+					  void *user_data)
 {
     IPC_Channel *ch;
     GHashTable * attrs;
+    int local_sock_len = 2; // 2 = '/' + '\0'
+    char    *commpath = NULL;
     static char 	path[] = IPC_PATH_ATTR;
-    char * commpath = NULL;
 
-    int local_sock_len = 7; // 7 = '/' + ".fifo" + '\0'
-    local_sock_len += strlen(child);
+	local_sock_len += strlen(child);
     local_sock_len += strlen(WORKING_DIR);
 
-    commpath = (char *)malloc(local_sock_len);
-    sprintf(commpath, WORKING_DIR "/%s.sock", child);
+	commpath = (char*)malloc(sizeof(char)*local_sock_len);
+    sprintf(commpath, WORKING_DIR "/%s", child);
     commpath[local_sock_len - 1] = '\0';
     
     cl_log(LOG_DEBUG, "[Client] Attempting to talk on: %s", commpath);
 
     attrs = g_hash_table_new(g_str_hash,g_str_equal);
     g_hash_table_insert(attrs, path, commpath);
-//    ch = ipc_channel_constructor(IPC_DOMAIN_SOCKET, attrs);
     ch = ipc_channel_constructor(IPC_ANYTYPE, attrs);
     g_hash_table_destroy(attrs);
 
-    if (ch == NULL)
-    {
-	cl_log(LOG_CRIT, "[Client] Could not access channel on: %s", commpath);
-    }
-    else if(ch->ops->initiate_connection(ch) != IPC_OK)
-    {
-	cl_log(LOG_CRIT, "[Client] Could not init comms on: %s", commpath);
-	return NULL;
+    if (ch == NULL) {
+		cl_log(LOG_ERR, "[Client] Could not access channel on: %s", commpath);
+    } else if(ch->ops->initiate_connection(ch) != IPC_OK) {
+		cl_log(LOG_ERR, "[Client] Could not init comms on: %s", commpath);
+		return NULL;
     }
 
     G_main_add_IPC_Channel(G_PRIORITY_LOW,
-			   ch,
-			   FALSE, 
-			   dispatch,
-			   user_data, 
-			   default_ipc_input_destroy);
+						   ch,
+						   FALSE, 
+						   dispatch,
+						   user_data, 
+						   default_ipc_input_destroy);
     
     return ch;
 }
 
 
 gboolean
-echoclient_callback(IPC_Channel* server, void* private_data)
+transient_client_callback(IPC_Channel* server, void* private_data)
 {
     int lpc = 0;
     IPC_Message *msg = NULL;
@@ -230,42 +151,48 @@ echoclient_callback(IPC_Channel* server, void* private_data)
 
     GMainLoop *mainloop = (GMainLoop*)private_data;
 
-    while(server->ch_status != IPC_DISCONNECT && server->ops->is_message_pending(server) == TRUE)
+    while( server->ch_status != IPC_DISCONNECT && server->ops->is_message_pending(server) == TRUE)
     {
-	if(server->ops->recv(server, &msg) != IPC_OK)
-	{
-	    cl_log(LOG_ERR, "[Client] Error while invoking recv()");
-	    perror("[Client]Receive failure:");
-	    return FALSE;
-	}
-	
-	if(msg == NULL)
-	{
-	    cl_log(LOG_DEBUG, "[Client] No message this time");
-	    continue;
-	}
+		if(server->ops->recv(server, &msg) != IPC_OK) {
+			cl_log(LOG_ERR, "[Client] Error while invoking recv()");
+			perror("[Client] Receive failure:");
+			return FALSE;
+		}
+		
+		if(msg != NULL) {
+			buffer = (char*)msg->msg_body;
+			cl_log(LOG_DEBUG, "[Client] Got text [text=%s]", buffer);
+			recieved_responses++;
 
-	lpc++;
-	buffer = (char*)msg->msg_body;
-	cl_log(LOG_DEBUG, "[Client] Got text [text=%s]", buffer);
-	recieved_responses++;
+			if(lpc < MAX_MESSAGES && strcmp(messages[lpc], buffer) != 0)
+			{
+				cl_log(LOG_ERR, "[Client] Recieved someone else's message [%s] instead of [%s]", buffer, messages[lpc]);
+			}
+			else if(lpc >= MAX_MESSAGES)
+			{
+				cl_log(LOG_ERR, "[Client] Recieved an extra message [%s]", buffer);
+			}
+			
+			lpc++;
+			msg->msg_done(msg);
+		} else {
+			cl_log(LOG_ERR, "[Client] No message this time");
+		}
     }
     
-    if(server->ch_status == IPC_DISCONNECT)
-    {
-	cl_log(LOG_ERR, "[Client] Client received HUP");
-	return FALSE;
+    if(server->ch_status == IPC_DISCONNECT) {
+		cl_log(LOG_ERR, "[Client] Client received HUP");
+		return FALSE;
     }
 
     cl_log(LOG_DEBUG, "[Client] Processed %d IPC messages this time, %d total", lpc, recieved_responses);
 
-    if(recieved_responses > 2)
-    {
-	cl_log(LOG_INFO, "[Client] Processed %d IPC messages, all done.", recieved_responses);
-	recieved_responses = 0;
-	g_main_quit(mainloop);
-	cl_log(LOG_INFO, "[Client] Exiting.");
-	return FALSE;
+    if(recieved_responses > 2) {
+		cl_log(LOG_INFO, "[Client] Processed %d IPC messages, all done.", recieved_responses);
+		recieved_responses = 0;
+		g_main_quit(mainloop);
+		cl_log(LOG_INFO, "[Client] Exiting.");
+		return FALSE;
     }
     
     return TRUE;
@@ -273,32 +200,31 @@ echoclient_callback(IPC_Channel* server, void* private_data)
 
 void
 client_send_message(const char *message_text,
-		    IPC_Channel *server_channel,
-		    int iteration)
+					IPC_Channel *server_channel,
+					int iteration)
 {
-    IPC_Message *a_message = NULL;
-
-    if(server_channel->ch_status != IPC_OK)
-    {
-	cl_log(LOG_ERR, "[Client %d] Channel is disconnected (status=%d)",
-	       iteration, server_channel->ch_status);
-	return;
+	IPC_Message *a_message = NULL;
+    if(server_channel->ch_status != IPC_CONNECT) {
+		cl_log(LOG_WARNING, "[Client %d] Channel is in state %d before sending message [%s]",
+			   iteration, server_channel->ch_status, message_text);
+		return;
     }
     
-    cl_log(LOG_DEBUG, "[Client %d] Sending %s", iteration, message_text);
-    a_message = create_simple_message(strdup(message_text), server_channel);
-
-    while(server_channel->ops->send(server_channel, a_message) == IPC_FAIL)
-    {
-	cl_log(LOG_ERR, "[Client %d] IPC channel is blocked", iteration);
-	cl_shortsleep();
-    }
-    
-    if(server_channel->ch_status != IPC_CONNECT)
-    {
-	cl_log(LOG_ERR, "[Client %d] Channel is disconnected (status=%d) after first message",
-	       iteration, server_channel->ch_status);
-    }
+    a_message = create_simple_message(message_text, server_channel);
+	if(a_message == NULL) {
+		cl_log(LOG_ERR, "Could not create message to send");
+	} else {
+		cl_log(LOG_DEBUG, "[Client %d] Sending message: %s", iteration, (char*)a_message->msg_body);
+		while(server_channel->ops->send(server_channel, a_message) == IPC_FAIL) {
+			cl_log(LOG_ERR, "[Client %d] IPC channel is blocked", iteration);
+			cl_shortsleep();
+		}
+		
+		if(server_channel->ch_status != IPC_CONNECT) {
+			cl_log(LOG_WARNING, "[Client %d] Channel is in state %d after sending message [%s]",
+				   iteration, server_channel->ch_status, message_text);
+		}
+	}
 }
 
 void
@@ -308,29 +234,27 @@ default_ipc_input_destroy(gpointer user_data)
 }
 
 IPC_Message *
-create_simple_message(char *text, IPC_Channel *ch)
+create_simple_message(const char *text, IPC_Channel *ch)
 {
-    //    char	       str[256];
-    IPC_Message        *ack_msg = NULL;
-    int text_len = 0;
-    char *copy_text = NULL;
+	char *copy_text = NULL;
+	IPC_Message *ack_msg = NULL;
 
-    if(text == NULL) return NULL;
-
+	if(text == NULL) {
+		cl_log(LOG_ERR, "can't create IPC_Message with no text");
+		return NULL;
+    } else if(ch == NULL) {
+		cl_log(LOG_ERR, "can't create IPC_Message with no channel");
+		return NULL;
+    }
+	
     ack_msg = (IPC_Message *)malloc(sizeof(IPC_Message));
+	copy_text = strdup(text);
 
-    text_len = strlen(text) + 1;
-    copy_text = (char *)malloc(sizeof(char)*text_len);
-    strcpy(copy_text, text);
-    copy_text[text_len-1] = '\0';
-    
-    ack_msg->msg_private = NULL;
+	ack_msg->msg_private = NULL;
     ack_msg->msg_done    = NULL;
     ack_msg->msg_body    = copy_text;
     ack_msg->msg_ch      = ch;
-
-    ack_msg->msg_len = strlen(text)+1;
+	ack_msg->msg_len     = strlen(text)+1;
     
     return ack_msg;
 }
-
