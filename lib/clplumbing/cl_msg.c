@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.48 2005/02/14 21:06:11 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.49 2005/02/14 21:16:20 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1038,7 +1038,7 @@ cl_get_uuid(const struct ha_msg *msg, const char * name, uuid_t retval)
 	if (vretsize != sizeof(uuid_t)) {
 		cl_log(LOG_WARNING, "Binary field %s is not a uuid.", name);
 		cl_log(LOG_INFO, "expecting %d bytes, got %d bytes",
-		       sizeof(uuid_t), vretsize);
+		       (int)sizeof(uuid_t), (int)vretsize);
 		cl_log_message(LOG_INFO, msg);
 		return HA_FAIL;
 	}
@@ -2146,6 +2146,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.49  2005/02/14 21:16:20  gshi
+ * fix a warning in IA64 machine
+ *
  * Revision 1.48  2005/02/14 21:06:11  gshi
  * BEAM fix:
  *
