@@ -1,4 +1,4 @@
-/* $Id: ipmilan.c,v 1.5 2004/02/18 22:59:08 yixiong Exp $ */
+/* $Id: ipmilan.c,v 1.6 2004/03/25 11:58:22 lars Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
@@ -36,6 +36,7 @@
 #include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
+#include <glib.h>
 
 #include <stonith/stonith.h>
 
@@ -249,6 +250,7 @@ get_config_string(struct ipmilanDevice * nd, int index)
 	if (!buf) {
 		return (NULL);
 	}
+	g_strdown(buf);
 
 	return buf;
 }
@@ -294,6 +296,7 @@ ipmilan_hostlist(Stonith  *s)
 			ret = NULL;
 			break;
 		}
+		g_strdown(ret[j]);
 	}
 
 	return(ret);
@@ -392,6 +395,7 @@ ipmilan_parse_config_info(struct ipmilanDevice* nd, const char * info)
 			if ((hostinfo->hostname = STRDUP(name)) == NULL) {
 				break;
 			}
+			g_strdown(hostinfo->hostname);
 
 			if ((hostinfo->ipaddr = STRDUP(ip)) == NULL) {
 				FREE(hostinfo->hostname);
@@ -451,6 +455,7 @@ static int
 ipmilan_reset_req(Stonith * s, int request, const char * host)
 {
 	int rc = 0;
+	char *shost;
 	struct ipmilanDevice * nd;
 	struct ipmilanHostInfo * node;
 
@@ -458,6 +463,11 @@ ipmilan_reset_req(Stonith * s, int request, const char * host)
 		syslog(LOG_ERR, "invalid stonith device argument to %s", __FUNCTION__);
 		return(S_OOPS);
 	}
+	
+	if ((shost = STRDUP(host)) == NULL) {
+		syslog(LOG_ERR, "strdup failed in %s", __FUNCTION__);
+	}
+	g_strdown(shost);
 
 	nd = (struct ipmilanDevice *)s->pinfo;
 	node = nd->hostlist;
@@ -468,7 +478,9 @@ ipmilan_reset_req(Stonith * s, int request, const char * host)
 
 		node = node->next;
 	} while (node);
-
+	
+	free(shost);
+	
 	if (!node) {
 		syslog(LOG_ERR, _("host %s is not configured in this STONITH module. Please check you configuration file."), host);
 		return (S_OOPS);

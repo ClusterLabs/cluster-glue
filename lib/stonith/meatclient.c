@@ -1,4 +1,4 @@
-/* $Id: meatclient.c,v 1.5 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: meatclient.c,v 1.6 2004/03/25 11:58:22 lars Exp $ */
 /*
  * Stonith client for Human Operator Stonith device
  *
@@ -36,6 +36,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stonith/stonith.h>
+#include <glib.h>
 
 #define OPTIONS "c:"
 
@@ -57,7 +58,7 @@ main(int argc, char** argv)
 	const char *	meatpipe_pr = "/tmp/.meatware";	/* if you intend to
 							 change this, modify
 							 meatware.c as well */
-	const char *	opthost = NULL;
+	char *		opthost = NULL;
 	int		clearhost = 0;
 
 	int		c, argcount;
@@ -86,6 +87,8 @@ main(int argc, char** argv)
 	if (errors) {
 		usage(cmdname);
 	}
+	
+	g_strdown(opthost);
 
 	if (clearhost) {
 

@@ -1,4 +1,4 @@
-/* $Id: ssh.c,v 1.9 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: ssh.c,v 1.10 2004/03/25 11:58:22 lars Exp $ */
 /*
  * Stonith module for SSH Stonith device
  *
@@ -31,6 +31,7 @@
 #include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
+#include <glib.h>
 
 #include <stonith/stonith.h>
 
@@ -304,6 +305,7 @@ ssh_parse_config_info(struct sshDevice* sd, const char * info)
 	return S_OOPS;
       }
       strncpy(ret[j], start, (s-start));
+      g_strdown(ret[j]);
     }
   }
   sd->hostlist = ret;

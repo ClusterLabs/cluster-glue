@@ -1,4 +1,4 @@
-/* $Id: nw_rpc100s.c,v 1.11 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: nw_rpc100s.c,v 1.12 2004/03/25 11:58:22 lars Exp $ */
 /*
  *	Stonith module for Night/Ware RPC100S 
  *
@@ -39,6 +39,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <glib.h>
 
 #include <stonith/stonith.h>
 #define PIL_PLUGINTYPE          STONITH_TYPE
@@ -537,6 +538,8 @@ nw_rpc100s_hostlist(Stonith  *s)
 			syslog(LOG_ERR, "out of memory");
 			FREE(ret);
 			ret = NULL;
+		} else {
+			g_strdown(ret[0]);
 		}
 	}
 
@@ -754,10 +757,18 @@ RPCDisconnect(struct NW_RPC100S * ctx)
 static int
 RPCNametoOutlet ( struct NW_RPC100S * ctx, const char * host )
 {
+	char *shost;
+	int rc = -1;
+	
+	if ( (shost = strdup(host)) == NULL) {
+		syslog(LOG_ERR, "strdup failed in RPCNametoOutlet");
+		return -1;
+	}
 	if (!strcmp(ctx->node, host))
-		return 0;
+		rc = 0;
 
-	return -1;
+	free(shost);
+	return rc;
 }
 
 

@@ -1,4 +1,4 @@
-/* $Id: apcmastersnmp.c,v 1.9 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: apcmastersnmp.c,v 1.10 2004/03/25 11:58:21 lars Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
@@ -31,6 +31,7 @@
 #include <netdb.h>
 #include <string.h>
 #include <unistd.h>
+#include <glib.h>
 
 #ifdef HAVE_NET_SNMP_NET_SNMP_CONFIG_H
 #       include <net-snmp/net-snmp-config.h>
@@ -646,6 +647,7 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 	}
 	
 	// found one
+	g_strdown(outlet_name);
 	if (strcmp(outlet_name, host) == 0) {
 #ifdef APC_DEBUG
 	    	syslog(LOG_DEBUG, "%s: Found %s at outlet: %i",

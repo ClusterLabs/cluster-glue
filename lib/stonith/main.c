@@ -1,4 +1,4 @@
-/* $Id: main.c,v 1.9 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: main.c,v 1.10 2004/03/25 11:58:22 lars Exp $ */
 /*
  * Stonith: simple test program for exercising the Stonith API code
  *
@@ -28,6 +28,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <stonith/stonith.h>
+#include <glib.h>
 
 #define	OPTIONS	"F:p:t:sSlLvh"
 
@@ -284,7 +285,11 @@ main(int argc, char** argv)
 	}
 
 	if (optind < argc) {
-		rc = (s->s_ops->reset_req(s, ST_GENERIC_RESET, argv[optind]));
+		char *nodename;
+		nodename = strdup(argv[optind]);
+		g_strdown(nodename);
+		rc = s->s_ops->reset_req(s, ST_GENERIC_RESET, nodename);
+		free(nodename);
 	}
 	stonith_delete(s); s = NULL;
 	return(rc);
