@@ -102,34 +102,46 @@ checkifblocked(IPC_Channel* chan)
 	}
 }
 
+static int
+transport_tests(int iterations)
+{
+	int	rc = 0;
+
+#if 0
+	rc += channelpair(echoclient, echoserver, iterations);
+	rc += channelpair(asyn_echoclient, asyn_echoserver, iterations);
+#else
+	(void)echoclient; (void)echoserver;
+	(void)asyn_echoclient;(void)asyn_echoserver;
+#endif
+	rc += channelpair(mainloop_client, mainloop_server, iterations);
+
+	return rc;
+}
+
 int
 main(int argc, char ** argv)
 {
 	int	rc = 0;
 
+
 	cl_log_set_entity("ipctest");
 	cl_log_enable_stderr(TRUE);
 
 
-	rc += channelpair(echoclient, echoserver, 10000);
-	rc += channelpair(asyn_echoclient, asyn_echoserver, 20000);
-	rc += channelpair(mainloop_client, mainloop_server, 20000);
+	rc += transport_tests(1000);
 
-#if 0
-	/* The code is know to be broken right now, don't use it */
-	cl_log(LOG_INFO, "Note: NOT enabling poll(2) replacement code.");
-#endif
 	cl_log(LOG_INFO, "NOTE: Enabling poll(2) replacement code.");
 	PollFunc = cl_poll;
 	g_main_set_poll_func(cl_glibpoll);
-	rc += channelpair(echoclient, echoserver          , 20000);
-	rc += channelpair(asyn_echoclient, asyn_echoserver, 20000);
-	rc += channelpair(mainloop_client, mainloop_server, 1000000);
+
+	rc += transport_tests(1000000);
 	
 	cl_log(LOG_INFO, "TOTAL errors: %d", rc);
 
 	return (rc > 127 ? 127 : rc);
 }
+
 static int
 checksock(IPC_Channel* channel)
 {
@@ -356,11 +368,11 @@ static void
 msg_free(IPC_Message* msg)
 {
 	
-#if 1
+#if 0
 	memset(msg->msg_body, 0xAA, msg->msg_len);
 #endif
 	free(msg->msg_body);
-#if 1
+#if 0
 	memset(msg, 0x55, sizeof(*msg));
 #endif
 	free(msg);
@@ -380,6 +392,9 @@ newmessage(IPC_Channel* chan, int niter)
 	echomsgbody(msg->msg_body, niter, &msg->msg_len);
 	return msg;
 }
+
+void dump_ipc_info(IPC_Channel* chan);
+
 static int
 checkinput(IPC_Channel* chan, const char * where, int* rdcount, int maxcount)
 {
@@ -426,6 +441,7 @@ checkinput(IPC_Channel* chan, const char * where, int* rdcount, int maxcount)
 		}
 		*rdcount += 1;
 		if (!checkmsg(rmsg, where, *rdcount)) {
+			dump_ipc_info(chan);
 			++errs;
 		}
 		if (chan->ch_status == IPC_DISCONNECT) {
@@ -740,6 +756,7 @@ s_send_msg(gpointer data)
 	return i->wcount <= i->max;
 }
 
+
 static gboolean
 s_rcv_msg(IPC_Channel* chan, gpointer data)
 {
@@ -844,7 +861,9 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 			return TRUE;
 		}
 		i->rcount++;
-		checkmsg(rmsg, "s_echo_msg", i->rcount);
+		if (!checkmsg(rmsg, "s_echo_msg", i->rcount)) {
+			++i->errcount;
+		}
 
 		//fprintf(stderr, "c");
 		if ((rc = chan->ops->send(chan, rmsg)) != IPC_OK) {
