@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.23 2004/09/22 22:41:10 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.24 2004/09/23 03:46:43 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -546,7 +546,7 @@ string_list_pack_length(GList* list)
 	3:abc,4:defg,
   @list: the list to be converted
   @buf:  the converted string should be put in the @buf
-  @maxlen: size of the buf
+  @maxp: max pointer
 */
 
 
@@ -559,12 +559,13 @@ string_list_pack(GList* list, char* buf, char* maxp)
 	for (i = 0; i < g_list_length(list) ; i++){
 		
 		char * element = g_list_nth_data(list, i);
+		int element_len = strlen(element);
 		if (element == NULL){
 			cl_log(LOG_ERR, "string_list_pack: "
 			       "%dth element of the string list is NULL", i);
 			return 0;
 		}
-		p += sprintf(p, "%d:%s,",strlen(element),element);
+		p += sprintf(p, "%d:%s,", element_len,element);
 		
 		if (p >= maxp){
 			cl_log(LOG_ERR, "string_list_pack: "
@@ -581,7 +582,6 @@ string_list_pack(GList* list, char* buf, char* maxp)
 
 /* 
    this is reverse process of pack_string_list
-   @packed_str_list must be a string ending with '\0'
 */
 GList* 
 string_list_unpack(const char* packed_str_list, size_t length)
@@ -2388,6 +2388,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.24  2004/09/23 03:46:43  gshi
+ * fixed a sprintf format warning
+ * fixed some comments
+ *
  * Revision 1.23  2004/09/22 22:41:10  gshi
  * add list support for ha_msg
  * it supports list of strings only
