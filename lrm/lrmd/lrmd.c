@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.71 2005/03/07 06:22:48 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.72 2005/03/15 19:52:24 gshi Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -274,12 +274,12 @@ main(int argc, char ** argv)
 	cl_log_enable_stderr(debug_level?TRUE:FALSE);
 	cl_log_set_facility(LOG_DAEMON);
 
-        cl_log_send_to_logging_daemon(FALSE);
+        cl_log_set_uselogd(FALSE);
         if(HA_FAIL == LogToLoggingDaemon(LOG_INFO, test, strlen(test), TRUE)) {
                 lrmd_log(LOG_WARNING, "Not using log daemon");
 
         } else {
-                cl_log_send_to_logging_daemon(TRUE);
+                cl_log_set_uselogd(TRUE);
                 lrmd_log(LOG_INFO, "Enabled log daemon");
         }
 
@@ -2164,6 +2164,10 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.72  2005/03/15 19:52:24  gshi
+ * changed cl_log_send_to_logging_daemon() to cl_log_set_uselogd()
+ * added cl_log_get_uselogd()
+ *
  * Revision 1.71  2005/03/07 06:22:48  zhenh
  * replace ha_msg_add_str_list with the new one cl_msg_add_list
  *

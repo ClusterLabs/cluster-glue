@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.42 2005/03/15 19:28:41 gshi Exp $ */
+/* $Id: cl_log.c,v 1.43 2005/03/15 19:52:24 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -68,9 +68,15 @@ cl_log_enable_stderr(int truefalse)
 }
 
 void
-cl_log_send_to_logging_daemon(int truefalse)
+cl_log_set_uselogd(int truefalse)
 {
 	use_logging_daemon = truefalse;
+}
+
+gboolean
+cl_log_get_uselogd(void)
+{
+	return	use_logging_daemon;
 }
 
 static IPC_Channel* 
