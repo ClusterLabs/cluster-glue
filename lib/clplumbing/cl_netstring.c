@@ -42,14 +42,14 @@
 
 extern const char *	FT_strings[];
 
-static int (*authmethod)(int authmethod
+static int (*authmethod)(int whichauth
 ,	const void * data
 ,	size_t datalen
 ,	char * authstr
 ,	size_t authlen) = NULL;
 
 void
-cl_set_authentication_computation_method(int (*method)(int authmethod
+cl_set_authentication_computation_method(int (*method)(int whichauth
 ,	const void * data
 ,	size_t datalen
 ,	char * authstr
@@ -401,6 +401,12 @@ is_auth_netstring(const char * datap, size_t datalen,
 	char	authtoken[MAXLINE];
 
 
+	/*
+	 * If we don't have any authentication method - everything is authentic...
+	 */
+	if (!authmethod) {
+		return TRUE;
+	}
 	strncpy(authstr, authstring, MAXLINE);
 	authstr[authlen] = 0;
 	if (sscanf(authstr, "%d %s", &authwhich, authtoken) != 2) {
@@ -415,14 +421,14 @@ is_auth_netstring(const char * datap, size_t datalen,
 		cl_log(LOG_WARNING
 		,	"Invalid authentication [%d] in message!"
 		,	authwhich);
-		return(0);
+		return(FALSE);
 	}
 
 	if (strcmp(authtoken, authstr) == 0) {
-		return(1);
+		return(TRUE);
 	}
 
 	cl_log(LOG_ERR,"authtoken does not match, authtoken=%s, authstr=%s"
 	,	authtoken, authstr);
-	return(0);
+	return(FALSE);
 }
