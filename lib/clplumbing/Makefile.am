@@ -30,5 +30,8 @@ CFLAGS			= @CFLAGS@
 
 lib_LTLIBRARIES		= libplumb.la
 
-libplumb_la_SOURCES	= proctrack.c
+libplumb_la_SOURCES	= 		\
+			longclock.c	\
+			proctrack.c
+
 libplumb_la_LDFLAGS	= -version-info 0:0:0
