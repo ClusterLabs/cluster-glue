@@ -277,7 +277,8 @@ struct OCF_IPC_OPS{
   \retval the pointer to a new waiting connection or NULL if the connection can't be created.
   \note current channel types only  contain "domain_socket".
 */
-extern struct OCF_IPC_WAIT_CONNECTION * ipc_wait_conn_constructor(char * ch_type, GHashTable* ch_attrs);
+extern struct OCF_IPC_WAIT_CONNECTION * ipc_wait_conn_constructor(const char * ch_type
+,	GHashTable* ch_attrs);
 
 /* the common constructor for ipc channel. Use ch_type to identify the channel type. */
 /*! 
@@ -287,7 +288,8 @@ extern struct OCF_IPC_WAIT_CONNECTION * ipc_wait_conn_constructor(char * ch_type
   \retval the pointer to the new channel whose status is CH_DISCONNECT or NULL if the channel can't be created.
   \note current channel types only  contain "domain_socket".
 */
-extern struct OCF_IPC_CHANNEL * ipc_channel_constructor(char * ch_type, GHashTable* ch_attrs);
+extern struct OCF_IPC_CHANNEL * ipc_channel_constructor(const char * ch_type
+,	GHashTable* ch_attrs);
 
 /* the wapper function used to convert array of uid and gid into a authetication structure. */
 /*! 
@@ -300,4 +302,15 @@ extern struct OCF_IPC_CHANNEL * ipc_channel_constructor(char * ch_type, GHashTab
   Or NULL if this sturcture can't be created.
 */
 extern struct OCF_IPC_AUTH * ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid);			   
+
+#define	PATH_ATTR		"path"		/* pathname attribute */
+#define	SOCK_ATTR		"socket"	/* socket fd attribute */
+#define	IPC_DOMAIN_SOCKET	"uds"		/* Unix domain socket */
+
+#ifdef IPC_DOMAIN_SOCKET
+#	define	IPC_ANYTYPE		IPC_DOMAIN_SOCKET
+#else
+#	error "No IPC types defined(!)"
+#endif
+
 #endif
