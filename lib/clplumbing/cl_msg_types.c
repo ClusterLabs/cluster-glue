@@ -545,8 +545,7 @@ static int
 string_stringlen(size_t namlen, size_t vallen, const void* value)
 {
 	
-	HA_MSG_ASSERT(value);
-	HA_MSG_ASSERT( vallen == strlen(value));
+	HA_MSG_ASSERT(value || vallen == 0);
 	
 	return namlen + vallen+ 2;
 }
@@ -557,8 +556,7 @@ string_netstringlen(size_t namlen, size_t vallen, const void* value)
 	
 	int length;
 	
-	HA_MSG_ASSERT(value);
-	HA_MSG_ASSERT( vallen == strlen(value));
+	HA_MSG_ASSERT(value || vallen == 0);
 	
 	length = intlen(namlen) + (namlen)
 		+	intlen(vallen) + vallen + 4 ;
