@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.14 2004/07/07 19:07:15 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.15 2004/07/15 09:17:38 zhenh Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -451,12 +451,53 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 	char	*cp_value;
 	int	internal_type;
 
-	if (!msg || (msg->nfields >= msg->nalloc)
-	    ||	msg->names == NULL || msg->values == NULL) {
-		cl_log(LOG_ERR, "ha_msg_addraw_ll: cannot add field to ha_msg");
+	if (!msg || msg->names == NULL || msg->values == NULL) {
+		cl_log(LOG_ERR,	"ha_msg_addraw_ll: cannot add field to ha_msg");
 		return(HA_FAIL);
 	}
 
+	if (msg->nfields >= msg->nalloc) {
+		char **	names = msg->names;
+		int  *	nlens = msg->nlens;
+		void **	values = msg->values;
+		size_t*	vlens = msg->vlens;
+		int *	types = msg->types;
+
+		int nalloc = msg->nalloc + MINFIELDS;
+		msg->names = 	(char **)ha_calloc(sizeof(char *), nalloc);
+		msg->nlens = 	(int *)ha_calloc(sizeof(int), nalloc);
+		msg->values = 	(void **)ha_calloc(sizeof(void *), nalloc);
+		msg->vlens = 	(size_t *)ha_calloc(sizeof(size_t), nalloc);
+		msg->types= 	(int*)ha_calloc(sizeof(int), nalloc);
+
+		if (msg->names == NULL || msg->values == NULL
+		||	msg->nlens == NULL || msg->vlens == NULL
+		||	msg->types == NULL) {
+
+			cl_log(LOG_ERR, "%s"
+			,	"ha_msg_addraw_ll: out of memory for ha_msg");
+			ha_msg_del(msg);
+
+			cl_log(LOG_ERR,
+				"ha_msg_addraw_ll: cannot add field to ha_msg");
+			return(HA_FAIL);
+		}
+
+		memcpy(msg->names, names, msg->nalloc*sizeof(char *));
+		memcpy(msg->nlens, nlens, msg->nalloc*sizeof(int));
+		memcpy(msg->values, values, msg->nalloc*sizeof(void *));
+		memcpy(msg->vlens, vlens, msg->nalloc*sizeof(size_t));
+		memcpy(msg->types, types, msg->nalloc*sizeof(int));
+
+		ha_free(names);
+		ha_free(nlens);
+		ha_free(values);
+		ha_free(vlens);
+		ha_free(types);
+
+		msg->nalloc = nalloc;
+	}
+	
 	if (namelen >= startlen && strncmp(name, MSG_START, startlen) == 0) {
 		cl_log(LOG_ERR, "ha_msg_addraw_ll: illegal field");
 		return(HA_FAIL);
@@ -1822,6 +1863,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.15  2004/07/15 09:17:38  zhenh
+ * increase the size of ha_msg autmatically
+ *
  * Revision 1.14  2004/07/07 19:07:15  gshi
  * implemented uuid as nodeid
  *
