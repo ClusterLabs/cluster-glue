@@ -991,6 +991,20 @@ rsc_set_monitor (lrm_rsc_t* rsc, lrm_mon_t* mon_in)
 	if (rc > 0) {
 		mon->call_id = rc;
 		mon_list = g_list_append(mon_list, mon);
+		if(LRM_MONITOR_CLEAR==mon->mode) {
+			GList* mon_node = g_list_first(mon_list);
+			while (NULL != mon_node) {
+				mon = (lrm_mon_t*)mon_node->data;
+				if (0 == strncmp(mon->rsc->id, rsc->id, RID_LEN)) {
+					mon_node = g_list_next(mon_node);
+					mon_list = g_list_remove(mon_list, mon);
+					free_mon(mon);
+				}
+				else {
+					mon_node = g_list_next(mon_node);
+				}
+			}
+		}
 	}else {
 		client_log(LOG_ERR, "rsc_set_monitor: lrmd return 0");
 	}
