@@ -5,6 +5,8 @@
 #define	PIL_PLUGINTYPENAME	"test"
 #define	PIL_PLUGIN		test
 #define	PIL_PLUGINNAME		"test"
+#define	PIL_PLUGINLICENSE	LICENSE_LGPL
+#define	PIL_PLUGINLICENSEURL	URL_LGPL
 
 /* We are a interface manager... */
 #define ENABLE_PLUGIN_MANAGER_PRIVATE

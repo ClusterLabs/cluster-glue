@@ -359,6 +359,8 @@ struct PILPluginOps_s {
 	const char*	(*pluginversion) (void);
 	int		(*getdebuglevel) (void);
 	void		(*setdebuglevel) (int);
+	const char*	(*license) (void);
+	const char*	(*licenseurl) (void);
 	void		(*close) (PILPlugin*);
 };
 
@@ -416,6 +418,8 @@ struct PILPluginImports_s {
 	,	void*	plugin_private);
 
 	void	(*log)	(PILLogLevel priority, const char * fmt, ...);
+	void*	(*alloc)(unsigned long size);
+	void	(*mfree)(void* space);
 };
 
 /*
@@ -482,6 +486,9 @@ static const char*      Ourpluginversion(void);			\
 static int              GetOurDebugLevel(void);			\
 static void             SetOurDebugLevel(int);			\
 static void             CloseName(PILPlugin*);			\
+static const char *	ReturnOurLicense(void);			\
+static const char *	ReturnOurLicenseURL(void);		\
+								\
 								\
 /*								\
  * Initialize Plugin Exports structure				\
@@ -490,6 +497,8 @@ static PILPluginOps OurPIExports =				\
 {	Ourpluginversion					\
 ,	GetOurDebugLevel					\
 ,	SetOurDebugLevel					\
+,	ReturnOurLicense					\
+,	ReturnOurLicenseURL					\
 ,	CloseName						\
 };								\
 /*								\
@@ -507,8 +516,56 @@ GetOurDebugLevel(void)						\
 								\
 static void							\
 SetOurDebugLevel(int level)					\
-{ DebugName = level; }
+{ DebugName = level; }						\
+								\
+static const char *						\
+ReturnOurLicense(void)						\
+{ return PIL_PLUGINLICENSE; }					\
+								\
+static const char *						\
+ReturnOurLicenseURL(void)					\
+{ return PIL_PLUGINLICENSEURL; }
 
+/* A few sample licenses and URLs.  We can easily add to this */
+
+#define	LICENSE_GPL	 "gpl"
+#define	URL_GPL		"http://www.fsf.org/licenses/gpl.html"
+
+#define	LICENSE_LGPL	"lgpl"
+#define	URL_LGPL	"http://www.fsf.org/licenses/lgpl.html"
+
+#define	LICENSE_X11	"x11"
+#define	URL_X11		"http://www.x.org/terms.htm"
+
+#define	LICENSE_PUBDOM	"publicdomain"
+#define	URL_PUBDOM	"file:///dev/null"
+
+#define	LICENSE_MODBSD	"modbsd"
+#define	URL_MODBSD	"http://www.xfree86.org/3.3.6/COPYRIGHT2.html#5"
+
+#define	LICENSE_OLDBSD	"origbsd"
+#define	URL_OLDBSD	"http://www.xfree86.org/3.3.6/COPYRIGHT2.html#6"
+
+#define	LICENSE_EXPAT	"expat"
+#define	URL_EXPAT	"http://www.jclark.com/xml/copying.txt"
+
+#define LICENSE_ZLIB	"zlib"
+#define URL_ZLIB	"http://www.gzip.org/zlib/zlib_license.html"
+
+#define	LICENSE_APACHE_10 "apache1_0"
+#define	URL_APACHE_10	"http://www.apache.org/LICENSE-1.0"
+
+#define	LICENSE_APACHE_11 "apache1_1"
+#define	URL_APACHE_11	"http://www.apache.org/LICENSE-1.1"
+
+#define	LICENSE_MPL	"mpl"
+#define	URL_MPL		"http://www.mozilla.org/MPL/MPL-1.1.html"
+
+#define	LICENSE_PROP	"proprietary"
+#define	URL_PROP	""
+
+#define	LICENSE_IBMPL	"ibmpl"
+#define	URL_IBMPL	"http://oss.software.ibm.com/developerworks/opensource/license10.html"
 
 #ifdef ENABLE_PIL_DEFS_PRIVATE
 /* Perhaps these should be moved to a different header file */
