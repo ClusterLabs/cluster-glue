@@ -51,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.9 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.10 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -131,6 +131,7 @@ static void*			interfprivate;
 
 #define LOG		PluginImports->log
 #define MALLOC		PluginImports->alloc
+#define STRDUP  	PluginImports->mstrdup
 #define FREE		PluginImports->mfree
 #define EXPECT_TOK	OurImports->ExpectToken
 #define STARTPROC	OurImports->StartProcess
@@ -206,11 +207,9 @@ static const char * NOTnpsid = "Hey, dummy this has been destroyed (WTINPS)";
 				FREE(s);			\
 				(s)=NULL;			\
 			}					\
-			(s) = MALLOC(strlen(v)+1);		\
+			(s) = strdup(v);			\
 			if ((s) == NULL) {			\
 				syslog(LOG_ERR, _("out of memory"));\
-			}else{					\
-				strcpy((s),(v));		\
 			}					\
 			}
 
@@ -655,12 +654,10 @@ wti_nps_hostlist(Stonith  *s)
 			if (numnames >= DIMOF(NameList)-1) {
 				break;
 			}
-			if ((nm = (char*)MALLOC(strlen(sockname)+1)) == NULL) {
+			if ((nm = strdup(sockname)) == NULL) {
 				syslog(LOG_ERR, "out of memory");
 				return(NULL);
 			}
-			memset(nm, 0, strlen(sockname)+1);
-			strcpy(nm, sockname);
 			NameList[numnames] = nm;
 			++numnames;
 			NameList[numnames] = NULL;
@@ -716,18 +713,16 @@ NPS_parse_config_info(struct WTINPS* nps, const char * info)
 	if (sscanf(info, "%s %[^\n\r\t]", dev, passwd) == 2
 	&&	strlen(passwd) > 1) {
 
-		if ((nps->device = (char *)MALLOC(strlen(dev)+1)) == NULL) {
+		if ((nps->device = strdup(dev)) == NULL) {
 			syslog(LOG_ERR, "out of memory");
 			return(S_OOPS);
 		}
-		if ((nps->passwd = (char *)MALLOC(strlen(passwd)+1)) == NULL) {
+		if ((nps->passwd = strdup(passwd)) == NULL) {
 			free(nps->device);
 			nps->device=NULL;
 			syslog(LOG_ERR, "out of memory");
 			return(S_OOPS);
 		}
-		strcpy(nps->device, dev);
-		strcpy(nps->passwd, passwd);
 		nps->config = 1;
 		return(S_OK);
 	}

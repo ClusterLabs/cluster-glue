@@ -117,6 +117,7 @@ static void*			interfprivate;
 
 #define LOG		PluginImports->log
 #define MALLOC		PluginImports->alloc
+#define STRDUP  	PluginImports->mstrdup
 #define FREE		PluginImports->mfree
 #define EXPECT_TOK	OurImports->ExpectToken
 #define STARTPROC	OurImports->StartProcess
@@ -277,12 +278,6 @@ static const char * NOTrcd_serialID = "Hey, dummy this has been destroyed (RCD_S
 	&& ((struct RCD_SerialDevice *)(i->pinfo))->RCD_SERIALid == RCD_SERIALid)
 
 
-#ifndef MALLOC
-#	define	MALLOC	malloc
-#endif
-#ifndef FREE
-#	define	FREE	free
-#endif
 #ifndef MALLOCT
 #	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
 #endif
@@ -358,13 +353,12 @@ rcd_serial_hostlist(Stonith  *s)
 	memset(ret, 0, (rcd->hostcount+1)*sizeof(char*));
 
 	for (j=0; j < rcd->hostcount; ++j) {
-		ret[j] = MALLOC(strlen(rcd->hostlist[j])+1);
+		ret[j] = STRDUP(rcd->hostlist[j]);
 		if (ret[j] == NULL) {
 			rcd_serial_free_hostlist(ret);
 			ret = NULL;
 			return ret;
 		}
-		strcpy(ret[j], rcd->hostlist[j]);
 	}
 	return(ret);
 }
@@ -406,7 +400,7 @@ RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
 	   duration of this function.
 	*/
 
-	copy = strdup(info);
+	copy = STRDUP(info);
 	if (!copy) {
 		syslog(LOG_ERR, "%s: out of memory!", __FUNCTION__);
 		return S_OOPS;
@@ -429,7 +423,7 @@ RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
 	memset(rcd->hostlist, 0, 2*sizeof(char*));
 	rcd->hostcount = 0;
 
-	rcd->hostlist[0] = strdup(token);
+	rcd->hostlist[0] = STRDUP(token);
 	if (!rcd->hostlist[0]) {
 		syslog(LOG_ERR, "%s: out of memory!", __FUNCTION__);
 		ret = S_OOPS;
@@ -446,7 +440,7 @@ RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
 		goto token_error;
 	}
 
-	rcd->device = strdup(token);
+	rcd->device = STRDUP(token);
 	if (!rcd->device) {
 		syslog(LOG_ERR, "%s: out of memory!", __FUNCTION__);
 		ret = S_OOPS;
@@ -462,7 +456,7 @@ RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
 		goto token_error;
 	}
 
-	rcd->signal = strdup(token);
+	rcd->signal = STRDUP(token);
 	if (!rcd->signal) {
 		syslog(LOG_ERR, "%s: out of memory!", __FUNCTION__);
 		ret = S_OOPS;
@@ -505,11 +499,11 @@ RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
         /* free our private copy of the string we've been destructively
            parsing with strtok()
         */
-        free(copy);
+        FREE(copy);
         return S_OK;
 
 token_error:
-        free(copy);
+        FREE(copy);
         return(ret);
 }
 

@@ -105,6 +105,7 @@ static void*			interfprivate;
 
 #define LOG		PluginImports->log
 #define MALLOC		PluginImports->alloc
+#define STRDUP  	PluginImports->mstrdup
 #define FREE		PluginImports->mfree
 #define EXPECT_TOK	OurImports->ExpectToken
 #define STARTPROC	OurImports->StartProcess
@@ -243,12 +244,6 @@ static int gbl_debug = DEBUG;
 
 #define	ISCONFIGED(i)	(ISWTIRPS10(i) && ((struct WTI_RPS10 *)(i->pinfo))->config)
 
-#ifndef MALLOC
-#	define	MALLOC	malloc
-#endif
-#ifndef FREE
-#	define	FREE	free
-#endif
 #ifndef MALLOCT
 #	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
 #endif
@@ -260,11 +255,9 @@ static int gbl_debug = DEBUG;
 				FREE(s);			\
 				(s)=NULL;			\
 			}					\
-			(s) = MALLOC(strlen(v)+1);		\
+			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
 				syslog(LOG_ERR, _("out of memory"));\
-			}else{					\
-				strcpy((s),(v));		\
 			}					\
 			}
 
@@ -585,6 +578,7 @@ rps10_hostlist(Stonith  *s)
 {
 	char **		ret = NULL;	/* list to return */
 	int 		i;
+	int 		j;
 	struct WTI_RPS10*	ctx;
 
 	if (gbl_debug) printf ("Calling rps10_hostlist (%s)\n", WTIid);
@@ -608,7 +602,14 @@ rps10_hostlist(Stonith  *s)
 		} else {
 			ret[ctx->unit_count]=NULL; /* null terminate the array */
 			for (i=0;i<ctx->unit_count;i++) {
-				ret[i] = strdup(ctx->controllers[i].node);
+				ret[i] = STRDUP(ctx->controllers[i].node);
+				if (ret[i] != NULL) {
+					break;
+				}
+				for(j=0;j<i;j++) {
+					FREE(ret[j]);
+				}
+				break;
 			} /* end for each possible outlet */
 		} /* end if malloc() suceeded */
 	} /* end if any outlets are configured */
@@ -690,7 +691,7 @@ RPS_parse_config_info(struct WTI_RPS10* ctx, const char * info)
 	   duration of this function.
 	*/
 
-	copy = strdup(info);
+	copy = STRDUP(info);
 	if (!copy) {
 		syslog(LOG_ERR, "out of memory");
 		return S_OOPS;
@@ -705,7 +706,7 @@ RPS_parse_config_info(struct WTI_RPS10* ctx, const char * info)
 		goto token_error;		
 	}
 
-	ctx->device = strdup(token);
+	ctx->device = STRDUP(token);
 	if (!ctx->device) {
 		syslog(LOG_ERR, "out of memory");
 		goto token_error;
@@ -743,7 +744,7 @@ RPS_parse_config_info(struct WTI_RPS10* ctx, const char * info)
 			goto token_error;
 		}
 		
-		ctx->controllers[ctx->unit_count].node = strdup(node);
+		ctx->controllers[ctx->unit_count].node = STRDUP(node);
 		ctx->controllers[ctx->unit_count].outlet_id = outlet_id;
 		ctx->unit_count++;
 
@@ -752,12 +753,12 @@ RPS_parse_config_info(struct WTI_RPS10* ctx, const char * info)
 	/* free our private copy of the string we've been destructively 
 	 * parsing with strtok()
 	 */
-	free(copy);
+	FREE(copy);
 	ctx->config = 1;
 	return ((ctx->unit_count > 0) ? S_OK : S_BADCONFIG);
 
 token_error:
-	free(copy);
+	FREE(copy);
 	return(S_BADCONFIG);
 }
 

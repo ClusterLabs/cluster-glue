@@ -49,7 +49,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.9 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.10 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -128,6 +128,7 @@ static void*			interfprivate;
 
 #define LOG		PluginImports->log
 #define MALLOC		PluginImports->alloc
+#define STRDUP  	PluginImports->mstrdup
 #define FREE		PluginImports->mfree
 #define EXPECT_TOK	OurImports->ExpectToken
 #define STARTPROC	OurImports->StartProcess
@@ -187,12 +188,6 @@ static const char * NOTmsid = "Hey dummy, this has been destroyed (APCMS)";
 
 #define	ISCONFIGED(i)	(ISAPCMS(i) && ((struct APCMS *)(i->pinfo))->config)
 
-#ifndef MALLOC
-#	define	MALLOC	malloc
-#endif
-#ifndef FREE
-#	define	FREE	free
-#endif
 #ifndef MALLOCT
 #	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
 #endif
@@ -204,12 +199,10 @@ static const char * NOTmsid = "Hey dummy, this has been destroyed (APCMS)";
 				FREE(s);			\
 				(s)=NULL;			\
 			}					\
-			(s) = MALLOC(strlen(v)+1);		\
+			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
 				syslog(LOG_ERR, _("out of memory"));\
-			}else{					\
-				strcpy((s),(v));		\
-			}					\
+			} 					\
 			}
 
 /*
@@ -739,12 +732,10 @@ apcmaster_hostlist(Stonith  *s)
 			if (numnames >= DIMOF(NameList)-1) {
 				break;
 			}
-			if ((nm = (char*)MALLOC(strlen(sockname)+1)) == NULL) {
+			if ((nm = (char*)STRDUP(sockname)) == NULL) {
 				syslog(LOG_ERR, "out of memory");
 				return(NULL);
 			}
-			memset(nm, 0, strlen(sockname)+1);
-			strcpy(nm, sockname);
 			NameList[numnames] = nm;
 			++numnames;
 			NameList[numnames] = NULL;
@@ -809,27 +800,24 @@ apcmaster_parse_config_info(struct APCMS* ms, const char * info)
 	if (sscanf(info, "%s %s %[^\n\r\t]", dev, user, passwd) == 3
 	&&	strlen(passwd) > 1) {
 
-		if ((ms->device = (char *)MALLOC(strlen(dev)+1)) == NULL) {
+		if ((ms->device = STRDUP(dev)) == NULL) {
 			syslog(LOG_ERR, "out of memory");
 			return(S_OOPS);
 		}
-		if ((ms->user = (char *)MALLOC(strlen(user)+1)) == NULL) {
-			free(ms->device);
+		if ((ms->user = STRDUP(user)) == NULL) {
+			FREE(ms->device);
 			ms->device=NULL;
 			syslog(LOG_ERR, "out of memory");
 			return(S_OOPS);
 		}
-		if ((ms->passwd = (char *)MALLOC(strlen(passwd)+1)) == NULL) {
-			free(ms->device);
+		if ((ms->passwd = STRDUP(passwd)) == NULL) {
+			FREE(ms->device);
 			ms->device=NULL;
-			free(ms->user);
+			FREE(ms->user);
 			ms->user=NULL;
 			syslog(LOG_ERR, "out of memory");
 			return(S_OOPS);
 		}
-		strcpy(ms->device, dev);
-		strcpy(ms->user, user);
-		strcpy(ms->passwd, passwd);
 		ms->config = 1;
 		return(S_OK);
 	}

@@ -97,6 +97,7 @@ static void*			interfprivate;
 
 #define LOG		PluginImports->log
 #define MALLOC		PluginImports->alloc
+#define STRDUP  	PluginImports->mstrdup
 #define FREE		PluginImports->mfree
 #define EXPECT_TOK	OurImports->ExpectToken
 #define STARTPROC	OurImports->StartProcess
@@ -164,12 +165,6 @@ static const char * NOTsshID = "SSH device has been destroyed";
 	&& ((struct sshDevice *)(i->pinfo))->sshid == sshid)
 
 
-#ifndef MALLOC
-#	define	MALLOC	malloc
-#endif
-#ifndef FREE
-#	define	FREE	free
-#endif
 #ifndef MALLOCT
 #	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
 #endif
@@ -223,13 +218,12 @@ ssh_hostlist(Stonith  *s)
   memset(ret, 0, numnames*sizeof(char*));
 
   for (j=0; j < numnames-1; ++j) {
-    ret[j] = MALLOC(strlen(sd->hostlist[j])+1);
+    ret[j] = STRDUP(sd->hostlist[j]);
     if (ret[j] == NULL) {
       ssh_free_hostlist(ret);
       ret = NULL;
       return ret;
     }
-    strcpy(ret[j], sd->hostlist[j]);
   }
   return(ret);
 }

@@ -96,6 +96,7 @@ static void*			interfprivate;
 
 #define LOG		PluginImports->log
 #define MALLOC		PluginImports->alloc
+#define STRDUP  	PluginImports->mstrdup
 #define FREE		PluginImports->mfree
 #define EXPECT_TOK	OurImports->ExpectToken
 #define STARTPROC	OurImports->StartProcess
@@ -166,17 +167,11 @@ static const char * NOTbtid = "Hey, dummy this has been destroyed (BayTech)";
 #define	ISBAYTECH(i)	(((i)!= NULL && (i)->pinfo != NULL)	\
 	&& ((struct BayTech *)(i->pinfo))->BTid == BTid)
 
-#define	ISCONFIGED(i)	(ISBAYTECH(i) && ((struct BayTech *)(i->pinfo))->config)
-
-#ifndef MALLOC
-#	define	MALLOC	malloc
-#endif
-#ifndef FREE
-#	define	FREE	free
-#endif
 #ifndef MALLOCT
-#	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t))))
+#	define MALLOCT(t) ((t *)(MALLOC(sizeof(t))))
 #endif
+
+#define	ISCONFIGED(i)	(ISBAYTECH(i) && ((struct BayTech *)(i->pinfo))->config)
 
 #define WHITESPACE	" \t\n\r\f"
 
@@ -185,11 +180,9 @@ static const char * NOTbtid = "Hey, dummy this has been destroyed (BayTech)";
 				FREE(s);			\
 				(s)=NULL;			\
 			}					\
-			(s) = MALLOC(strlen(v)+1);		\
+			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
 				syslog(LOG_ERR, _("out of memory"));\
-			}else{					\
-				strcpy((s),(v));		\
 			}					\
 			}
 
@@ -787,11 +780,10 @@ baytech_hostlist(Stonith  *s)
 		if (numnames >= DIMOF(NameList)-1) {
 			break;
 		}
-		if ((nm = (char*)MALLOC(strlen(sockname)+1)) == NULL) {
+		if ((nm = (char*)STRDUP(sockname)) == NULL) {
 			syslog(LOG_ERR, "out of memory");
 			return(NULL);
 		}
-		strcpy(nm, sockname);
 		NameList[numnames] = nm;
 		++numnames;
 		NameList[numnames] = NULL;
@@ -846,27 +838,24 @@ RPC_parse_config_info(struct BayTech* bt, const char * info)
 	if (sscanf(info, "%s %s %[^\n\r\t]", dev, user, passwd) == 3
 	&&	strlen(passwd) > 1) {
 
-		if ((bt->device = (char *)MALLOC(strlen(dev)+1)) == NULL) {
+		if ((bt->device = STRDUP(dev)) == NULL) {
 			syslog(LOG_ERR, "out of memory");
 			return(S_OOPS);
 		}
-		if ((bt->user = (char *)MALLOC(strlen(user)+1)) == NULL) {
-			free(bt->device);
+		if ((bt->user = STRDUP(user)) == NULL) {
+			FREE(bt->device);
 			bt->device=NULL;
 			syslog(LOG_ERR, "out of memory");
 			return(S_OOPS);
 		}
-		if ((bt->passwd = (char *)MALLOC(strlen(passwd)+1)) == NULL) {
-			free(bt->user);
+		if ((bt->passwd = STRDUP(passwd)) == NULL) {
+			FREE(bt->user);
 			bt->user=NULL;
-			free(bt->device);
+			FREE(bt->device);
 			bt->device=NULL;
 			syslog(LOG_ERR, "out of memory");
 			return(S_OOPS);
 		}
-		strcpy(bt->device, dev);
-		strcpy(bt->user, user);
-		strcpy(bt->passwd, passwd);
 		bt->config = 1;
 		return(S_OK);
 	}

@@ -444,6 +444,7 @@ struct PILPluginImports_s {
 	void	(*log)	(PILLogLevel priority, const char * fmt, ...);
 	void*	(*alloc)(unsigned long size);
 	void	(*mfree)(void* space);
+	char*	(*mstrdup)(const char *s);
 };
 
 /*
