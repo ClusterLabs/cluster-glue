@@ -237,7 +237,7 @@ ha_timestamp(void)
 	TIME_T		now;
 
 	now = time(NULL);
-	ttm = localtime(&now);
+	ttm = localtime((time_t *)&now);
 
 	snprintf(ts, sizeof(ts), "%04d/%02d/%02d_%02d:%02d:%02d"
 	,	ttm->tm_year+1900, ttm->tm_mon+1, ttm->tm_mday
