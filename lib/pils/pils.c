@@ -639,6 +639,9 @@ PILSetDebugLevel(PILPluginUniv* u, const char * pitype, const char * piname
 {
 	struct set_debug_helper helper = {pitype, piname, level};
 
+	if (u == NULL)
+		return;
+
 	if (pitype == NULL) {
 		g_hash_table_foreach(u->PluginTypes
 			/*
