@@ -1,4 +1,4 @@
-/* $Id: pils.c,v 1.39 2004/09/28 06:34:43 alan Exp $ */
+/* $Id: pils.c,v 1.40 2004/10/05 14:26:16 lars Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -1625,8 +1625,7 @@ PILunregister_interface(PILInterface* id)
 	if (	 id == NULL
 	||	(t = id->interfacetype) == NULL
 	||	(u = t->universe) == NULL
-	|| 	id->interfacename == NULL
-	||	id->if_close == NULL) {
+	|| 	id->interfacename == NULL) {
 		PILLog(PIL_WARN, "PILunregister_interface: bad interfaceid");
 		return PIL_INVAL;
 	}
@@ -1643,10 +1642,13 @@ PILunregister_interface(PILInterface* id)
 
 	/* Call the close function supplied by the interface */
 
-	if ((rc=id->if_close(id, id->ud_interface)) != PIL_OK) {
+	if ((id->if_close != NULL) 
+	    && ((rc=id->if_close(id, id->ud_interface)) != PIL_OK)) {
 		PILLog(PIL_WARN, "InterfaceClose on %s/%s returned %s"
 		,	t->typename, id->interfacename
 		,	PIL_strerror(rc));
+	} else {
+		rc = PIL_OK;
 	}
 
 	/* Find the InterfaceManager that manages us */
@@ -2060,7 +2062,6 @@ PILValidateInterface(gpointer key, gpointer interface, gpointer iftype)
 	g_assert(strcmp(Interface->interfacetype->typename
 	,	Interface->ifmanager->interfacename)== 0);
 	g_assert(Interface->exports != NULL);
-	g_assert(Interface->if_close != NULL);
 }
 static void
 PILValidateInterfaceType(gpointer key, gpointer iftype, gpointer ifuniv)

@@ -1,4 +1,4 @@
-/* $Id: apcmastersnmp.c,v 1.13 2004/09/13 20:32:31 gshi Exp $ */
+/* $Id: apcmastersnmp.c,v 1.14 2004/10/05 14:26:16 lars Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
@@ -19,18 +19,10 @@
  *
  */
 
-#include <portability.h>
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <libintl.h>
-#include <netdb.h>
-#include <string.h>
-#include <unistd.h>
-#include <glib.h>
+/* device ID */
+#define	DEVICE				"APCMasterSNMP-Stonith"
+
+#include "stonith_plugin_common.h"
 
 #ifdef HAVE_NET_SNMP_NET_SNMP_CONFIG_H
 #       include <net-snmp/net-snmp-config.h>
@@ -51,39 +43,11 @@
 #       define  INIT_AGENT()    init_master_agent(161, NULL, NULL)
 #endif
 
-#include <stonith/stonith.h>
-#define PIL_PLUGINTYPE          STONITH_TYPE
-#define PIL_PLUGINTYPE_S        STONITH_TYPE_S
 #define PIL_PLUGIN              apcmastersnmp
 #define PIL_PLUGIN_S            "apcmastersnmp"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
-
-/*
- * apcmastersnmpclose is called as part of unloading the apcmastersnmp STONITH plugin.
- * If there was any global data allocated, or file descriptors opened, etc.
- * which is associated with the plugin, and not a single interface
- * in particular, here's our chance to clean it up.
- */
-
-static void
-apcmastersnmpclosepi(PILPlugin*pi)
-{
-}
-
-
-/*
- * apcmastersnmpcloseintf called as part of shutting down the apcmastersnmp STONITH
- * interface.  If there was any global data allocated, or file descriptors
- * opened, etc.  which is associated with the apcmastersnmp implementation,
- * here's our chance to clean it up.
- */
-static PIL_rc
-apcmastersnmpcloseintf(PILInterface* pi, void* pd)
-{
-	return PIL_OK;
-}
 
 void *		apcmastersnmp_new(void);
 void		apcmastersnmp_destroy(Stonith *);
@@ -93,7 +57,6 @@ const char *	apcmastersnmp_getinfo(Stonith * s, int InfoType);
 int		apcmastersnmp_status(Stonith * );
 int		apcmastersnmp_reset_req(Stonith * s, int request, const char * host);
 char **		apcmastersnmp_hostlist(Stonith  *);
-void		apcmastersnmp_free_hostlist(char **);
 
 static struct stonith_ops apcmastersnmpOps ={
 	apcmastersnmp_new,		/* Create new STONITH object	*/
@@ -104,19 +67,14 @@ static struct stonith_ops apcmastersnmpOps ={
 	apcmastersnmp_status,		/* Return STONITH device status	*/
 	apcmastersnmp_reset_req,		/* Request a reset */
 	apcmastersnmp_hostlist,		/* Return list of supported hosts */
-	apcmastersnmp_free_hostlist	/* free above list */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, apcmastersnmpclosepi);
+PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
 static StonithImports*		OurImports;
 static void*			interfprivate;
-
-#define APC_MALLOC		PluginImports->alloc
-#define APC_STRDUP  		PluginImports->mstrdup
-#define APC_FREE		PluginImports->mfree
 
 PIL_rc
 PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
@@ -137,7 +95,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  	return imports->register_interface(us, PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
 	,	&apcmastersnmpOps
-	,	apcmastersnmpcloseintf		/*close */
+	,	NULL		/*close */
 	,	&OurInterface
 	,	(void*)&OurImports
 	,	&interfprivate); 
@@ -146,9 +104,6 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 /*
  * APCMaster tested with APC Masterswitch 9212
  */
-
-/* device ID */
-#define	DEVICE				"APCMasterSNMP-Stonith"
 
 /* outlet commands / status codes */
 #define OUTLET_ON			1
@@ -168,8 +123,8 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 #define MAX_STRING			128
 
 /* structur of stonith object */
-struct APCDevice {
-    const char *APCid;		/* id of object */
+struct pluginDevice {
+    const char *pluginid;		/* id of object */
     struct snmp_session *sptr;	/* != NULL -> session created */
     char *hostname;		/* masterswitch's hostname or ip address */
     int port;			/* snmp port */
@@ -181,36 +136,15 @@ struct APCDevice {
 static const char* APC_tested_ident[] = {"AP9606","AP7920","AP_other_well_tested"};
 
 /* constant strings */
-static const char *APCid = DEVICE;
-static const char *NOTapcID = "destroyed (APCMasterswitch)";
-
-#ifndef MIN
-/* some macros */
-#	define MIN( i, j ) ( i > j ? j : i )
-#endif
-
-#define	ISAPCDEV(i) (((i)!= NULL && (i)->pinfo != NULL)	&& \
-                    ((struct APCDevice *)(i->pinfo))->APCid == APCid)
-
-#define ISCONFIGED(i) (((struct APCDevice *)(i->pinfo))->sptr != NULL )
-
-#define _(text) dgettext(ST_TEXTDOMAIN, text)
-
-#ifndef APC_MALLOCT
-#  define APC_MALLOCT(t) ((t *)(APC_MALLOC(sizeof(t))))
-#endif
-
-/*
- * stonith prototypes 
- */
-
+static const char *pluginid = DEVICE;
+static const char *NOTpluginID = "destroyed (APCMasterswitch)";
 
 /*
  * own prototypes 
  */
 
 struct snmp_session *APC_open(char *hostname, int port, char *community);
-int APC_parse_config_info(struct APCDevice *ad, const char *info);
+int APC_parse_config_info(struct pluginDevice *ad, const char *info);
 void *APC_read(struct snmp_session *sptr, const char *objname, int type);
 int APC_write(struct snmp_session *sptr, const char *objname, char type,
 	      char *value);
@@ -247,7 +181,7 @@ struct snmp_session *APC_open(char *hostname, int port, char *community)
 #ifdef APC_DEBUG
     if (sptr == NULL) {
 	snmp_error(&session, &cliberr, &snmperr, &errstr);
-	PILCallLog(PluginImports->log,PIL_DEBUG,
+	LOG(PIL_DEBUG,
 	       "%s: open error (cliberr: %i / snmperr: %i / error: %s\n",
 	       __FUNCTION__, cliberr, snmperr, errstr);
 	free(errstr);
@@ -263,7 +197,7 @@ struct snmp_session *APC_open(char *hostname, int port, char *community)
  */
 
 int
-APC_parse_config_info(struct APCDevice *ad, const char *info)
+APC_parse_config_info(struct pluginDevice *ad, const char *info)
 {
     static char hostname[MAX_STRING];
     static int port;
@@ -271,7 +205,7 @@ APC_parse_config_info(struct APCDevice *ad, const char *info)
     int *i;
 
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: called.", __FUNCTION__);
+    LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
     if (sscanf(info, "%s %i %s", hostname, &port, community) == 3) {
@@ -293,7 +227,7 @@ APC_parse_config_info(struct APCDevice *ad, const char *info)
 		if ((i = APC_read(ad->sptr, OID_NUM_OUTLETS, ASN_INTEGER))
 		    == NULL) {
 #ifdef APC_DEBUG
-		    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: cannot read number of outlets.",
+		    LOG(PIL_DEBUG, "%s: cannot read number of outlets.",
 			   __FUNCTION__);
 #endif
 		    return (S_ACCESS);
@@ -301,7 +235,7 @@ APC_parse_config_info(struct APCDevice *ad, const char *info)
 		/* store the number of outlets */
 		ad->num_outlets = *i;
 #ifdef APC_DEBUG
-		PILCallLog(PluginImports->log,PIL_DEBUG, "%s: number of outlets: %i",
+		LOG(PIL_DEBUG, "%s: number of outlets: %i",
 			   __FUNCTION__, ad->num_outlets );
 #endif
 
@@ -310,12 +244,12 @@ APC_parse_config_info(struct APCDevice *ad, const char *info)
 		return (S_OK);
 	    }
 #ifdef APC_DEBUG
-	    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: cannot create snmp session",
+	    LOG(PIL_DEBUG, "%s: cannot create snmp session",
 		   __FUNCTION__);
 #endif
 	}
 #ifdef APC_DEBUG
-	PILCallLog(PluginImports->log,PIL_DEBUG, "%s: cannot resolve hostname '%s'", __FUNCTION__,
+	LOG(PIL_DEBUG, "%s: cannot resolve hostname '%s'", __FUNCTION__,
 	       hostname);
 #endif
     }
@@ -337,7 +271,7 @@ void *APC_read(struct snmp_session *sptr, const char *objname, int type)
     static int response_int;
 
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: requested objname '%s'", __FUNCTION__, objname );
+    LOG(PIL_DEBUG, "%s: requested objname '%s'", __FUNCTION__, objname );
 #endif
 
     /* convert objname into oid; return NULL if invalid */
@@ -378,7 +312,7 @@ void *APC_read(struct snmp_session *sptr, const char *objname, int type)
 
 #ifdef APC_DEBUG
 	    } else {
-		PILCallLog(PluginImports->log,PIL_DEBUG, "%s: Error in packet - Reason: %s", __FUNCTION__,
+		LOG(PIL_DEBUG, "%s: Error in packet - Reason: %s", __FUNCTION__,
 		       snmp_errstring(resp->errstat));
 #endif
 	    }
@@ -403,7 +337,7 @@ APC_write(struct snmp_session *sptr, const char *objname, char type,
     struct snmp_pdu *resp;
 
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: requested objname '%s'", __FUNCTION__, objname );
+    LOG(PIL_DEBUG, "%s: requested objname '%s'", __FUNCTION__, objname );
 #endif
 
     /* convert objname into oid; return NULL if invalid */
@@ -428,7 +362,7 @@ APC_write(struct snmp_session *sptr, const char *objname, char type,
 
 #ifdef APC_DEBUG
 	    } else {
-		PILCallLog(PluginImports->log,PIL_DEBUG, "%s: Error in packet- Reason: %s", __FUNCTION__,
+		LOG(PIL_DEBUG, "%s: Error in packet- Reason: %s", __FUNCTION__,
 		       snmp_errstring(resp->errstat));
 #endif
 	    }
@@ -446,29 +380,21 @@ APC_write(struct snmp_session *sptr, const char *objname, char type,
 
 int apcmastersnmp_status(Stonith * s)
 {
-    struct APCDevice *ad;
+    struct pluginDevice *ad;
     char *ident;
     int i;
 
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: called.", __FUNCTION__);
+    LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    if (!ISAPCDEV(s)) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-	return (S_INVAL);
-    }
+    ERRIFNOTCONFIGED(s,S_OOPS);
 
-    if (!ISCONFIGED(s)) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "%s: device is UNCONFIGURED!", __FUNCTION__);
-	return (S_OOPS);
-    }
-
-    ad = (struct APCDevice *) s->pinfo;
+    ad = (struct pluginDevice *) s->pinfo;
 
     if ((ident = APC_read(ad->sptr, OID_IDENT, ASN_OCTET_STR)) == NULL) {
 #ifdef APC_DEBUG
-	PILCallLog(PluginImports->log,PIL_DEBUG, "%s: cannot read ident.", __FUNCTION__);
+	LOG(PIL_DEBUG, "%s: cannot read ident.", __FUNCTION__);
 #endif
 	return (S_ACCESS);
     }
@@ -477,7 +403,7 @@ int apcmastersnmp_status(Stonith * s)
     for(i=DIMOF(APC_tested_ident) -1; i >=0 ; i--)
       if (strcmp(ident, APC_tested_ident[i]) == 0) break;
     if (i<0) {
-	PILCallLog(PluginImports->log,PIL_WARN,
+	LOG(PIL_WARN,
 	       "%s: module not tested with this hardware '%s'",
 	       __FUNCTION__, ident);
     }
@@ -493,30 +419,22 @@ char **
 apcmastersnmp_hostlist(Stonith * s)
 {
     char **hl;
-    struct APCDevice *ad;
+    struct pluginDevice *ad;
     int j, h, num_outlets;
     char *outlet_name;
     char objname[MAX_STRING];
 
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: called.", __FUNCTION__);
+    LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    if (!ISAPCDEV(s)) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-	return (NULL);
-    }
+    ERRIFNOTCONFIGED(s,NULL);
 
-    if (!ISCONFIGED(s)) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "%s: device is UNCONFIGURED!", __FUNCTION__);
-	return (NULL);
-    }
-
-    ad = (struct APCDevice *) s->pinfo;
+    ad = (struct pluginDevice *) s->pinfo;
 
     /* allocate memory for array of up to NUM_OUTLETS strings */
-    if ((hl = (char **) APC_MALLOC(ad->num_outlets * sizeof(char *))) == NULL) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory.", __FUNCTION__);
+    if ((hl = (char **) MALLOC(ad->num_outlets * sizeof(char *))) == NULL) {
+	LOG(PIL_CRIT, "%s: out of memory.", __FUNCTION__);
 	return (NULL);
     }
     /* clear hostlist array */
@@ -532,7 +450,7 @@ apcmastersnmp_hostlist(Stonith * s)
 	/* read outlet name */
 	if ((outlet_name = APC_read(ad->sptr, objname, ASN_OCTET_STR)) ==
 	    NULL) {
-	    apcmastersnmp_free_hostlist(hl);
+	    stonith_free_hostlist(hl);
 	    hl = NULL;
 	    return (hl);
 	}
@@ -546,13 +464,13 @@ apcmastersnmp_hostlist(Stonith * s)
 	if (h >= num_outlets) {
 		/* put outletname in hostlist */
 #ifdef APC_DEBUG
-	        PILCallLog(PluginImports->log,PIL_DEBUG, "%s: added %s to hostlist", __FUNCTION__,
+	        LOG(PIL_DEBUG, "%s: added %s to hostlist", __FUNCTION__,
 				outlet_name);
 #endif
 		
-		if ((hl[num_outlets] = APC_STRDUP(outlet_name)) == NULL) {
-		    PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory.", __FUNCTION__);
-		    apcmastersnmp_free_hostlist(hl);
+		if ((hl[num_outlets] = STRDUP(outlet_name)) == NULL) {
+		    LOG(PIL_CRIT, "%s: out of memory.", __FUNCTION__);
+		    stonith_free_hostlist(hl);
 		    hl = NULL;
 		    return (hl);
 		}
@@ -562,40 +480,11 @@ apcmastersnmp_hostlist(Stonith * s)
 
 
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: %d unique hosts connected to %d outlets", 
+    LOG(PIL_DEBUG, "%s: %d unique hosts connected to %d outlets", 
 		    __FUNCTION__, num_outlets, j);
 #endif
     /* return list */
     return (hl);
-}
-
-/*
- * free the hostlist 
- */
-
-void
-apcmastersnmp_free_hostlist(char **hlist)
-{
-    char **hl = hlist;
-
-#ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
-
-    /* empty list */
-    if (hl == NULL)
-	return;
-
-    /* walk through the list and release the strings */
-    while (*hl) {
-	APC_FREE(*hl);
-	*hl = NULL;
-	++hl;
-    }
-
-    /* release the list itself */
-    APC_FREE(hlist);
-    hlist = NULL;
 }
 
 /*
@@ -605,7 +494,7 @@ apcmastersnmp_free_hostlist(char **hlist)
 int
 apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 {
-    struct APCDevice *ad;
+    struct pluginDevice *ad;
     char objname[MAX_STRING];
     char value[MAX_STRING];
     char *outlet_name;
@@ -614,20 +503,12 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 		       maximum of 8 outlets */
     
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: called.", __FUNCTION__);
+    LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    if (!ISAPCDEV(s)) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-	return (S_INVAL);
-    }
+    ERRIFNOTCONFIGED(s,S_OOPS);
 
-    if (!ISCONFIGED(s)) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "%s: device is UNCONFIGURED!", __FUNCTION__);
-	return (S_OOPS);
-    }
-
-    ad = (struct APCDevice *) s->pinfo;
+    ad = (struct pluginDevice *) s->pinfo;
 
     num_outlets = 0;
     reboot_duration = 0;
@@ -643,7 +524,7 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 	if ((outlet_name = APC_read(ad->sptr, objname, ASN_OCTET_STR)) ==
 	    NULL) {
 #ifdef APC_DEBUG
-	    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: cannot read outlet_names.",
+	    LOG(PIL_DEBUG, "%s: cannot read outlet_names.",
 		   __FUNCTION__);
 #endif
 	    return (S_ACCESS);
@@ -653,7 +534,7 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 	g_strdown(outlet_name);
 	if (strcmp(outlet_name, host) == 0) {
 #ifdef APC_DEBUG
-	    	PILCallLog(PluginImports->log,PIL_DEBUG, "%s: Found %s at outlet: %i",
+	    	LOG(PIL_DEBUG, "%s: Found %s at outlet: %i",
 		       __FUNCTION__, host, outlet);
 #endif
 		/* Check that the outlet is not administratively down */
@@ -664,14 +545,14 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 		/* get outlet's state */
 		if ((state = APC_read(ad->sptr, objname, ASN_INTEGER)) == NULL) {
 #ifdef APC_DEBUG
-			PILCallLog(PluginImports->log,PIL_DEBUG, "%s: cannot read outlet_state for outlet %d.", __FUNCTION__, outlet);
+			LOG(PIL_DEBUG, "%s: cannot read outlet_state for outlet %d.", __FUNCTION__, outlet);
 #endif
 			return (S_ACCESS);
 		}
 
 		if (*state == OUTLET_OFF) {
 #ifdef APC_DEBUG
-			PILCallLog(PluginImports->log,PIL_DEBUG, "%s: outlet %d is off.", __FUNCTION__, outlet);
+			LOG(PIL_DEBUG, "%s: outlet %d is off.", __FUNCTION__, outlet);
 #endif
 			continue;
 		}
@@ -683,7 +564,7 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 	        if ((state = APC_read(ad->sptr, 
 			objname, ASN_INTEGER)) == NULL) {
 #ifdef APC_DEBUG
-		   PILCallLog(PluginImports->log,PIL_DEBUG, 
+		   LOG(PIL_DEBUG, 
 			"%s: cannot read outlet's reboot duration.",
 		       __FUNCTION__);
 #endif
@@ -693,7 +574,7 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 		   /* save the inital value of the first port */
 		   reboot_duration = *state;
 	        } else if (reboot_duration != *state) {
-		  PILCallLog(PluginImports->log,PIL_WARN, "%s: Outlet %d has a different reboot duration!", 
+		  LOG(PIL_WARN, "%s: Outlet %d has a different reboot duration!", 
 				__FUNCTION__, outlet);
 	    	  if (reboot_duration < *state)
 				reboot_duration = *state;
@@ -705,14 +586,14 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 	}
     }
 #ifdef APC_DEBUG
-	    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: outlet: %i",
+	    LOG(PIL_DEBUG, "%s: outlet: %i",
 		   __FUNCTION__, outlet);
 #endif
 
     /* host not found in outlet names */
     if (num_outlets < 1) {
 #ifdef APC_DEBUG
-	PILCallLog(PluginImports->log,PIL_DEBUG, "%s: no active outlet '%s'.", __FUNCTION__, host);
+	LOG(PIL_DEBUG, "%s: no active outlet '%s'.", __FUNCTION__, host);
 #endif
 	return (S_BADHOST);
     }
@@ -727,14 +608,14 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 	    /* are there pending commands ? */
 	    if ((state = APC_read(ad->sptr, objname, ASN_INTEGER)) == NULL) {
 #ifdef APC_DEBUG
-		PILCallLog(PluginImports->log,PIL_DEBUG, "%s: cannot read outlet_pending.", __FUNCTION__);
+		LOG(PIL_DEBUG, "%s: cannot read outlet_pending.", __FUNCTION__);
 #endif
 		return (S_ACCESS);
 	    }
 
 	    if (*state != OUTLET_NO_CMD_PEND) {
 #ifdef APC_DEBUG
-		PILCallLog(PluginImports->log,PIL_DEBUG, "%s: command pending.", __FUNCTION__);
+		LOG(PIL_DEBUG, "%s: command pending.", __FUNCTION__);
 #endif
 		return (S_RESETFAIL);
 	    }
@@ -746,7 +627,7 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 	    /* send reboot cmd */
 	    if (!APC_write(ad->sptr, objname, 'i', value)) {
 #ifdef APC_DEBUG
-		PILCallLog(PluginImports->log,PIL_DEBUG, "%s: cannot send reboot cmd for outlet %d.", 
+		LOG(PIL_DEBUG, "%s: cannot send reboot cmd for outlet %d.", 
 				__FUNCTION__, outlet);
 #endif
 		return (S_ACCESS);
@@ -768,7 +649,7 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 		
 		if ((state = APC_read(ad->sptr, objname, ASN_INTEGER)) == NULL) {
 #ifdef APC_DEBUG
-		    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: cannot read outlet_state of %d.",
+		    LOG(PIL_DEBUG, "%s: cannot read outlet_state of %d.",
 			   __FUNCTION__, outlets[0]);
 #endif
 		    return (S_ACCESS);
@@ -784,12 +665,12 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
     
     if (bad_outlets == num_outlets) {
 	    /* reset failed */
-	    PILCallLog(PluginImports->log,PIL_CRIT, "%s: resetting host '%s' failed.", __FUNCTION__, host);
+	    LOG(PIL_CRIT, "%s: resetting host '%s' failed.", __FUNCTION__, host);
 	    return (S_RESETFAIL);
     } else {
 	    /* Not all outlets back on, but at least one; implies the node was */
 	    /* rebooted correctly */
-	    PILCallLog(PluginImports->log,PIL_WARN,"%s: Not all outlets came back online!", __FUNCTION__);
+	    LOG(PIL_WARN,"%s: Not all outlets came back online!", __FUNCTION__);
 	    return (S_OK); 
     }
 }
@@ -804,21 +685,18 @@ apcmastersnmp_set_config_file(Stonith * s, const char *configname)
 {
     FILE *cfgfile;
     char confline[MAX_STRING];
-    struct APCDevice *ad;
+    struct pluginDevice *ad;
 
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: called.", __FUNCTION__);
+    LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    if (!ISAPCDEV(s)) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-	return (S_INVAL);
-    }
+    ERRIFWRONGDEV(s,S_INVAL);    
 
-    ad = (struct APCDevice *) s->pinfo;
+    ad = (struct pluginDevice *) s->pinfo;
 
     if ((cfgfile = fopen(configname, "r")) == NULL) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "Cannot open %s", configname);
+	LOG(PIL_CRIT, "Cannot open %s", configname);
 	return (S_BADCONFIG);
     }
 
@@ -837,22 +715,19 @@ apcmastersnmp_set_config_file(Stonith * s, const char *configname)
 int
 apcmastersnmp_set_config_info(Stonith * s, const char *info)
 {
-    struct APCDevice *ad;
+    struct pluginDevice *ad;
 
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: called.", __FUNCTION__);
+    LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: info: '%s'.", __FUNCTION__, info);
+    LOG(PIL_DEBUG, "%s: info: '%s'.", __FUNCTION__, info);
 #endif
+    
+    ERRIFWRONGDEV(s,S_INVAL);
 
-    if (!ISAPCDEV(s)) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-	return (S_INVAL);
-    }
-
-    ad = (struct APCDevice *) s->pinfo;
+    ad = (struct pluginDevice *) s->pinfo;
 
     return (APC_parse_config_info(ad, info));
 }
@@ -864,23 +739,20 @@ apcmastersnmp_set_config_info(Stonith * s, const char *info)
 const char *
 apcmastersnmp_getinfo(Stonith * s, int reqtype)
 {
-    struct APCDevice *ad;
+    struct pluginDevice *ad;
     const char *ret = NULL;
 
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: called.", __FUNCTION__);
+    LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    if (!ISAPCDEV(s)) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-	return (NULL);
-    }
+    ERRIFWRONGDEV(s,NULL);
 
-    ad = (struct APCDevice *) s->pinfo;
+    ad = (struct pluginDevice *) s->pinfo;
 
     switch (reqtype) {
 	    case ST_DEVICEID:
-		ret = ad->APCid;
+		ret = ad->pluginid;
 		break;
 
 	    case ST_CONF_INFO_SYNTAX:
@@ -916,20 +788,17 @@ apcmastersnmp_getinfo(Stonith * s, int reqtype)
 void
 apcmastersnmp_destroy(Stonith * s)
 {
-    struct APCDevice *ad;
+    struct pluginDevice *ad;
 
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: called.", __FUNCTION__);
+    LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    if (!ISAPCDEV(s)) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
-	return;
-    }
+    VOIDERRIFWRONGDEV(s);
 
-    ad = (struct APCDevice *) s->pinfo;
+    ad = (struct pluginDevice *) s->pinfo;
 
-    ad->APCid = NOTapcID;
+    ad->pluginid = NOTpluginID;
 
     /* release snmp session */
     if (ad->sptr != NULL) {
@@ -942,7 +811,7 @@ apcmastersnmp_destroy(Stonith * s)
     ad->community = NULL;
     ad->num_outlets = 0;
 
-    APC_FREE(ad);
+    FREE(ad);
     /* Our caller will release the STONITH object itself */
 
 }
@@ -955,15 +824,15 @@ apcmastersnmp_destroy(Stonith * s)
 void *
 apcmastersnmp_new(void)
 {
-    struct APCDevice *ad = APC_MALLOCT(struct APCDevice);
+    struct pluginDevice *ad = MALLOCT(struct pluginDevice);
 
 #ifdef APC_DEBUG
-    PILCallLog(PluginImports->log,PIL_DEBUG, "%s: called.", __FUNCTION__);
+    LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
     /* no memory for stonith-object */
     if (ad == NULL) {
-	PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory.", __FUNCTION__);
+	LOG(PIL_CRIT, "%s: out of memory.", __FUNCTION__);
 	return (NULL);
     }
 
@@ -971,7 +840,7 @@ apcmastersnmp_new(void)
     memset(ad, 0, sizeof(*ad));
 
     /* set defaults */
-    ad->APCid = APCid;
+    ad->pluginid = pluginid;
     ad->sptr = NULL;
     ad->hostname = NULL;
     ad->community = NULL;

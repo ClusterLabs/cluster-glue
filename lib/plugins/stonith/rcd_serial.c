@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.16 2004/09/20 18:44:04 msoffen Exp $ */
+/* $Id: rcd_serial.c,v 1.17 2004/10/05 14:26:17 lars Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -31,58 +31,15 @@
  *
  */
 
-#include <portability.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <libintl.h>
-#include <sys/wait.h>
-#include <sys/ioctl.h>
-#include <fcntl.h>
-#include <sys/time.h>
-#ifdef HAVE_TERMIO_H
-#	include <termio.h>
-#endif
-#include <sys/termios.h>
-#include <glib.h>
-
-#include <stonith/stonith.h>
+#define	DEVICE	"RCD_SERIAL STONITH device"
+#include "stonith_plugin_common.h"
 #include "stonith_signal.h"
 
-#define PIL_PLUGINTYPE          STONITH_TYPE
-#define PIL_PLUGINTYPE_S        STONITH_TYPE_S
 #define PIL_PLUGIN              rcd_serial
 #define PIL_PLUGIN_S            "rcd_serial"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
-
-/*
- * rcd_serialclose is called as part of unloading the rcd_serial STONITH plugin.
- * If there was any global data allocated, or file descriptors opened, etc.
- * which is associated with the plugin, and not a single interface
- * in particular, here's our chance to clean it up.
- */
-
-static void
-rcd_serialclosepi(PILPlugin*pi)
-{
-}
-
-
-/*
- * rcd_serialcloseintf called as part of shutting down the rcd_serial STONITH
- * interface.  If there was any global data allocated, or file descriptors
- * opened, etc.  which is associated with the rcd_serial implementation,
- * here's our chance to clean it up.
- */
-static PIL_rc
-rcd_serialcloseintf(PILInterface* pi, void* pd)
-{
-	return PIL_OK;
-}
 
 static void *		rcd_serial_new(void);
 static void		rcd_serial_destroy(Stonith *);
@@ -92,7 +49,6 @@ static const char *	rcd_serial_getinfo(Stonith * s, int InfoType);
 static int		rcd_serial_status(Stonith * );
 static int		rcd_serial_reset_req(Stonith * s, int request, const char * host);
 static char **		rcd_serial_hostlist(Stonith  *);
-static void		rcd_serial_free_hostlist(char **);
 
 static struct stonith_ops rcd_serialOps ={
 	rcd_serial_new,			/* Create new STONITH object	*/
@@ -103,22 +59,14 @@ static struct stonith_ops rcd_serialOps ={
 	rcd_serial_status,		/* Return STONITH device status	*/
 	rcd_serial_reset_req,		/* Request a reset */
 	rcd_serial_hostlist,		/* Return list of supported hosts */
-	rcd_serial_free_hostlist	/* free above list */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, rcd_serialclosepi);
+PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
 static StonithImports*		OurImports;
 static void*			interfprivate;
-
-#define LOG		PluginImports->log
-#define MALLOC		PluginImports->alloc
-#define STRDUP  	PluginImports->mstrdup
-#define FREE		PluginImports->mfree
-#define EXPECT_TOK	OurImports->ExpectToken
-#define STARTPROC	OurImports->StartProcess
 
 PIL_rc
 PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
@@ -139,14 +87,11 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  	return imports->register_interface(us, PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
 	,	&rcd_serialOps
-	,	rcd_serialcloseintf		/*close */
+	,	NULL		/*close */
 	,	&OurInterface
 	,	(void*)&OurImports
 	,	&interfprivate); 
 }
-
-#define	DEVICE	"RCD_SERIAL STONITH device"
-#define WHITESPACE	" \t\n\r\f"
 
 /* ------------------- RCD specific stuff -------------- */
 
@@ -270,8 +215,8 @@ RCD_close_serial_port(int fd) {
 /*
  *	RCD_Serial STONITH device.
  */
-struct RCD_SerialDevice {
-	const char *	RCD_SERIALid;
+struct pluginDevice {
+	const char *	pluginid;
 	char **		hostlist;	/* name of single host we can reset */
 	int		hostcount;	/* i.e. 1 after initialisation */
 	char *		device;		/* serial device name */
@@ -279,34 +224,19 @@ struct RCD_SerialDevice {
 	int		msduration;	/* how long (ms) to assert the signal */
 };
 
-static const char * RCD_SERIALid = "RCD_SerialDevice-Stonith";
+static const char * pluginid = "pluginDevice-Stonith";
 static const char * NOTrcd_serialID = "Hey, dummy this has been destroyed (RCD_SerialDev)";
-
-#define	ISRCD_SERIALDEV(i)	(((i)!= NULL && (i)->pinfo != NULL)	\
-	&& ((struct RCD_SerialDevice *)(i->pinfo))->RCD_SERIALid == RCD_SERIALid)
-
-
-#ifndef MALLOCT
-#	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
-#endif
-
-#define N_(text)	(text)
-#define _(text)		dgettext(ST_TEXTDOMAIN, text)
-
 
 static int
 rcd_serial_status(Stonith  *s)
 {
-	struct RCD_SerialDevice*	rcd;
+	struct pluginDevice*	rcd;
 	int fd;
 	const char * err;
 
-	if (!ISRCD_SERIALDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RCD_SERIAL_status");
-		return(S_OOPS);
-	}
+	ERRIFWRONGDEV(s,S_OOPS);
 
-	rcd = (struct RCD_SerialDevice*) s->pinfo;
+	rcd = (struct pluginDevice*) s->pinfo;
 
 	/*
 	All we can do is make sure the serial device exists and
@@ -315,14 +245,14 @@ rcd_serial_status(Stonith  *s)
 
 	if ((fd = RCD_open_serial_port(rcd->device)) == -1) {
                 err = strerror(errno);
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: open of %s failed - %s",
+		LOG(PIL_CRIT, "%s: open of %s failed - %s",
 			__FUNCTION__, rcd->device, err);
 		return(S_OOPS);
 	}
 
 	if (RCD_close_serial_port(fd) != 0) {
                 err = strerror(errno);
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: close of %s failed - %s",
+		LOG(PIL_CRIT, "%s: close of %s failed - %s",
 			__FUNCTION__, rcd->device, err);
 		return(S_OOPS);
 	}
@@ -338,23 +268,20 @@ static char **
 rcd_serial_hostlist(Stonith  *s)
 {
 	char **		ret = NULL;
-	struct RCD_SerialDevice*	rcd;
+	struct pluginDevice*	rcd;
 	int		j;
 
-	if (!ISRCD_SERIALDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RCD_SERIAL_list_hosts");
-		return(NULL);
-	}
-	rcd = (struct RCD_SerialDevice*) s->pinfo;
+	ERRIFWRONGDEV(s,NULL);
+	rcd = (struct pluginDevice*) s->pinfo;
 	if (rcd->hostcount < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT
+		LOG(PIL_CRIT
 		,	"unconfigured stonith object in RCD_SERIAL_list_hosts");
 		return(NULL);
 	}
 
 	ret = (char **)MALLOC((rcd->hostcount+1)*sizeof(char*));
 	if (ret == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return ret;
 	}
 
@@ -363,7 +290,7 @@ rcd_serial_hostlist(Stonith  *s)
 	for (j=0; j < rcd->hostcount; ++j) {
 		ret[j] = STRDUP(rcd->hostlist[j]);
 		if (ret[j] == NULL) {
-			rcd_serial_free_hostlist(ret);
+			stonith_free_hostlist(ret);
 			ret = NULL;
 			return ret;
 		}
@@ -371,27 +298,11 @@ rcd_serial_hostlist(Stonith  *s)
 	return(ret);
 }
 
-static void
-rcd_serial_free_hostlist (char ** hlist)
-{
-	char **	hl = hlist;
-	if (hl == NULL) {
-		return;
-	}
-	while (*hl) {
-		FREE(*hl);
-		*hl = NULL;
-		++hl;
-	}
-	FREE(hlist);
-	hlist = NULL;
-}
-
 /*
  *	Parse the config information, and stash it away...
  */
 static int
-RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
+RCD_SERIAL_parse_config_info(struct pluginDevice* rcd, const char * info)
 {
 	char *copy;
 	char *token;
@@ -410,21 +321,21 @@ RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
 
 	copy = STRDUP(info);
 	if (!copy) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory!", __FUNCTION__);
+		LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
 		return S_OOPS;
 	}
 
 	/* Grab the hostname */
 	token = strtok (copy, WHITESPACE);
 	if (!token) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't find hostname on config line '%s'",
-			RCD_SERIALid, info);
+		LOG(PIL_CRIT, "%s: Can't find hostname on config line '%s'",
+			pluginid, info);
 		ret = S_BADCONFIG;
 		goto token_error;
 	}
 
 	if ((rcd->hostlist = (char **)MALLOC(2*sizeof(char*))) == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory!", __FUNCTION__);
+		LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
 		ret = S_OOPS;
 		goto token_error;
 	}
@@ -433,7 +344,7 @@ RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
 
 	rcd->hostlist[0] = STRDUP(token);
 	if (!rcd->hostlist[0]) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory!", __FUNCTION__);
+		LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
 		ret = S_OOPS;
 		goto token_error;
 	}
@@ -443,15 +354,15 @@ RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
 	/* Grab the device name */
 	token = strtok (NULL, WHITESPACE);
 	if (!token) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't find device on config line '%s'",
-			RCD_SERIALid, info);
+		LOG(PIL_CRIT, "%s: Can't find device on config line '%s'",
+			pluginid, info);
 		ret = S_BADCONFIG;
 		goto token_error;
 	}
 
 	rcd->device = STRDUP(token);
 	if (!rcd->device) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory!", __FUNCTION__);
+		LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
 		ret = S_OOPS;
 		goto token_error;
 	}
@@ -459,22 +370,22 @@ RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
 	/* Grab the signal name */
 	token = strtok (NULL, WHITESPACE);
 	if (!token) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't find signal on config line '%s'",
-			RCD_SERIALid, info);
+		LOG(PIL_CRIT, "%s: Can't find signal on config line '%s'",
+			pluginid, info);
 		ret = S_BADCONFIG;
 		goto token_error;
 	}
 
 	rcd->signal = STRDUP(token);
 	if (!rcd->signal) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory!", __FUNCTION__);
+		LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
 		ret = S_OOPS;
 		goto token_error;
 	}
 
         if (strcmp(rcd->signal, "rts") && strcmp(rcd->signal, "dtr")) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Invalid signal name on config line '%s'",
-			RCD_SERIALid, info);
+		LOG(PIL_CRIT, "%s: Invalid signal name on config line '%s'",
+			pluginid, info);
 		ret = S_BADCONFIG;
 		goto token_error;
         }
@@ -482,16 +393,16 @@ RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
 	/* Grab the duration in millisecs */
 	token = strtok (NULL, WHITESPACE);
 	if (!token) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't find msduration on config line '%s'",
-			RCD_SERIALid, info);
+		LOG(PIL_CRIT, "%s: Can't find msduration on config line '%s'",
+			pluginid, info);
 		ret = S_BADCONFIG;
 		goto token_error;
 	}
 
 	rcd->msduration = strtol(token, &endptr, 0);
 	if (*token == 0 || *endptr != 0 || rcd->msduration < 1) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Invalid msduration on config line '%s'",
-			RCD_SERIALid, info);
+		LOG(PIL_CRIT, "%s: Invalid msduration on config line '%s'",
+			pluginid, info);
 		ret = S_BADCONFIG;
 		goto token_error;
 	}
@@ -499,8 +410,8 @@ RCD_SERIAL_parse_config_info(struct RCD_SerialDevice* rcd, const char * info)
 	/* Make sure nothing extra provided */
 	token = strtok (NULL, WHITESPACE);
 	if (token) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Too many params on config line '%s'",
-			RCD_SERIALid, info);
+		LOG(PIL_CRIT, "%s: Too many params on config line '%s'",
+			pluginid, info);
 		ret = S_BADCONFIG;
 		goto token_error;
 	}
@@ -523,28 +434,25 @@ token_error:
 static int
 rcd_serial_reset_req(Stonith * s, int request, const char * host)
 {
-	struct RCD_SerialDevice*	rcd;
+	struct pluginDevice*	rcd;
 	int fd;
 	int sigbit;
 	struct itimerval timer;
 	const char * err;
 	char* shost;
 	
-	if (!ISRCD_SERIALDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to %s", __FUNCTION__);
-		return(S_OOPS);
-	}
+	ERRIFWRONGDEV(s,S_OOPS);
 
-	rcd = (struct RCD_SerialDevice *) s->pinfo;
+	rcd = (struct pluginDevice *) s->pinfo;
 
 	/* check that host matches */
 	if ((shost = STRDUP(host)) == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: strdup failed", __FUNCTION__);
+		LOG(PIL_CRIT, "%s: strdup failed", __FUNCTION__);
 		return(S_OOPS);
 	}
 	g_strdown(shost);
 	if (strcmp(host, rcd->hostlist[0])) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: host '%s' not in hostlist.",
+		LOG(PIL_CRIT, "%s: host '%s' not in hostlist.",
 			__FUNCTION__, host);
 		free(shost);
 		return(S_BADHOST);
@@ -567,7 +475,7 @@ rcd_serial_reset_req(Stonith * s, int request, const char * host)
 #else
 		err = sys_errlist[errno];
 #endif
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: open of %s failed - %s",
+		LOG(PIL_CRIT, "%s: open of %s failed - %s",
 			__FUNCTION__, rcd->device, err);
 		return(S_OOPS);
 	}
@@ -595,12 +503,12 @@ rcd_serial_reset_req(Stonith * s, int request, const char * host)
         /* Close the port */
 	if (RCD_close_serial_port(fd) != 0) {
                 err = strerror(errno);
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: close of %s failed - %s",
+		LOG(PIL_CRIT, "%s: close of %s failed - %s",
 			__FUNCTION__, rcd->device, err);
 		return(S_OOPS);
 	}
 
-	PILCallLog(PluginImports->log,PIL_INFO,"%s: %s", _("Host rcd_serial-reset"), host);
+	LOG(PIL_INFO,"%s: %s", _("Host rcd_serial-reset"), host);
 	return S_OK;
 }
 
@@ -615,16 +523,13 @@ rcd_serial_set_config_file(Stonith* s, const char * configname)
 
 	char	RCD_SERIALline[256];
 
-	struct RCD_SerialDevice*	rcd;
+	struct pluginDevice*	rcd;
 
-	if (!ISRCD_SERIALDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT,"invalid argument to RCD_SERIAL_set_configfile");
-		return(S_OOPS);
-	}
-	rcd = (struct RCD_SerialDevice*) s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+	rcd = (struct pluginDevice*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		PILCallLog(PluginImports->log,PIL_CRIT, "Cannot open %s", configname);
+		LOG(PIL_CRIT, "Cannot open %s", configname);
 		return(S_BADCONFIG);
 	}
 	while (fgets(RCD_SERIALline, sizeof(RCD_SERIALline), cfgfile) != NULL){
@@ -645,13 +550,10 @@ rcd_serial_set_config_file(Stonith* s, const char * configname)
 static int
 rcd_serial_set_config_info(Stonith* s, const char * info)
 {
-	struct RCD_SerialDevice* rcd;
+	struct pluginDevice* rcd;
 
-	if (!ISRCD_SERIALDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
-		return(S_OOPS);
-	}
-	rcd = (struct RCD_SerialDevice *)s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+	rcd = (struct pluginDevice *)s->pinfo;
 
 	return(RCD_SERIAL_parse_config_info(rcd, info));
 }
@@ -659,17 +561,14 @@ rcd_serial_set_config_info(Stonith* s, const char * info)
 static const char *
 rcd_serial_getinfo(Stonith * s, int reqtype)
 {
-	struct RCD_SerialDevice* rcd;
+	struct pluginDevice* rcd;
 	char *		ret;
 
-	if (!ISRCD_SERIALDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "RCD_SERIAL_idinfo: invalid argument");
-		return NULL;
-	}
+	ERRIFWRONGDEV(s,NULL);
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	rcd = (struct RCD_SerialDevice *)s->pinfo;
+	rcd = (struct pluginDevice *)s->pinfo;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
@@ -714,17 +613,15 @@ rcd_serial_getinfo(Stonith * s, int reqtype)
 static void
 rcd_serial_destroy(Stonith *s)
 {
-	struct RCD_SerialDevice* rcd;
+	struct pluginDevice* rcd;
 
-	if (!ISRCD_SERIALDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
-		return;
-	}
-	rcd = (struct RCD_SerialDevice *)s->pinfo;
+	VOIDERRIFWRONGDEV(s);
 
-	rcd->RCD_SERIALid = NOTrcd_serialID;
+	rcd = (struct pluginDevice *)s->pinfo;
+
+	rcd->pluginid = NOTrcd_serialID;
 	if (rcd->hostlist) {
-		rcd_serial_free_hostlist(rcd->hostlist);
+		stonith_free_hostlist(rcd->hostlist);
 		rcd->hostlist = NULL;
 	}
 	rcd->hostcount = -1;
@@ -740,15 +637,15 @@ rcd_serial_destroy(Stonith *s)
 static void *
 rcd_serial_new(void)
 {
-	struct RCD_SerialDevice*	rcd = MALLOCT(struct RCD_SerialDevice);
+	struct pluginDevice*	rcd = MALLOCT(struct pluginDevice);
 
 	if (rcd == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(rcd, 0, sizeof(*rcd));
 
-	rcd->RCD_SERIALid = RCD_SERIALid;
+	rcd->pluginid = pluginid;
 	rcd->hostlist = NULL;
 	rcd->hostcount = -1;
 	rcd->device = NULL;

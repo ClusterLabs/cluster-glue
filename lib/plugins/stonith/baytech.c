@@ -1,4 +1,4 @@
-/* $Id: baytech.c,v 1.17 2004/09/20 18:44:04 msoffen Exp $ */
+/* $Id: baytech.c,v 1.18 2004/10/05 14:26:16 lars Exp $ */
 /*
  *	Stonith module for BayTech Remote Power Controllers (RPC-x devices)
  *
@@ -20,19 +20,10 @@
  *
  */
 
-#include <portability.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <libintl.h>
-#include <sys/wait.h>
-#include <glib.h>
+#define	DEVICE	"BayTech power switch"
 
-#include <stonith/stonith.h>
-#define PIL_PLUGINTYPE          STONITH_TYPE
-#define PIL_PLUGINTYPE_S        STONITH_TYPE_S
+#include "stonith_plugin_common.h"
+
 #define PIL_PLUGIN              baytech
 #define PIL_PLUGIN_S            "baytech"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
@@ -40,31 +31,6 @@
 #include <pils/plugin.h>
 
 #include "stonith_signal.h"
-
-/*
- * baytechclosepi is called as part of unloading the baytech STONITH plugin.
- * If there was any global data allocated, or file descriptors opened, etc.
- * which is associated with the plugin, and not a single interface
- * in particular, here's our chance to clean it up.
- */
-
-static void
-baytechclosepi(PILPlugin*pi)
-{
-}
-
-
-/*
- * baytechcloseintf called as part of shutting down the baytech STONITH
- * interface.  If there was any global data allocated, or file descriptors
- * opened, etc.  which is associated with the baytech implementation,
- * here's our chance to clean it up.
- */
-static PIL_rc
-baytechcloseintf(PILInterface* pi, void* pd)
-{
-	return PIL_OK;
-}
 
 static void *		baytech_new(void);
 static void		baytech_destroy(Stonith *);
@@ -74,7 +40,6 @@ static const char *	baytech_getinfo(Stonith * s, int InfoType);
 static int		baytech_status(Stonith * );
 static int		baytech_reset_req(Stonith * s, int request, const char * host);
 static char **		baytech_hostlist(Stonith  *);
-static void		baytech_free_hostlist(char **);
 
 static struct stonith_ops baytechOps ={
 	baytech_new,		/* Create new STONITH object	*/
@@ -85,22 +50,16 @@ static struct stonith_ops baytechOps ={
 	baytech_status,			/* Return STONITH device status	*/
 	baytech_reset_req,		/* Request a reset */
 	baytech_hostlist,		/* Return list of supported hosts */
-	baytech_free_hostlist		/* free above list */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, baytechclosepi);
+PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
 static StonithImports*		OurImports;
 static void*			interfprivate;
 
-#define LOG		PluginImports->log
-#define MALLOC		PluginImports->alloc
-#define STRDUP  	PluginImports->mstrdup
-#define FREE		PluginImports->mfree
-#define EXPECT_TOK	OurImports->ExpectToken
-#define STARTPROC	OurImports->StartProcess
+#include "stonith_expect_helpers.h"
 
 PIL_rc
 PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
@@ -121,16 +80,11 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  	return imports->register_interface(us, PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
 	,	&baytechOps
-	,	baytechcloseintf		/*close */
+	,	NULL		/*close */
 	,	&OurInterface
 	,	(void*)&OurImports
 	,	&interfprivate); 
 }
-
-#define	DEVICE	"BayTech power switch"
-
-#define N_(text)	(text)
-#define _(text)		dgettext(ST_TEXTDOMAIN, text)
 
 /*
  *	I have an RPC-5.  This code has been tested with this switch.
@@ -139,8 +93,8 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  *	pain for mechanical parsing.
  */
 
-struct BayTech {
-	const char *			BTid;
+struct pluginDevice {
+	const char *			pluginid;
 	char *				idinfo;
 	char *				unitid;
 	const struct BayTechModelInfo*	modelinfo;
@@ -159,34 +113,11 @@ struct BayTechModelInfo {
 	struct Etoken *	expect;		/* Expect string before outlet list */
 };
 
-static int		parse_socket_line(struct BayTech*,const char *
+static int		parse_socket_line(struct pluginDevice*,const char *
 ,			int *, char *);
 
-static const char * BTid = "BayTech-Stonith";
-static const char * NOTbtid = "Hey, dummy this has been destroyed (BayTech)";
-
-#define	ISBAYTECH(i)	(((i)!= NULL && (i)->pinfo != NULL)	\
-	&& ((struct BayTech *)(i->pinfo))->BTid == BTid)
-
-#ifndef MALLOCT
-#	define MALLOCT(t) ((t *)(MALLOC(sizeof(t))))
-#endif
-
-#define	ISCONFIGED(i)	(ISBAYTECH(i) && ((struct BayTech *)(i->pinfo))->config)
-
-#define WHITESPACE	" \t\n\r\f"
-
-#define	REPLSTR(s,v)	{					\
-			if ((s) != NULL) {			\
-				FREE(s);			\
-				(s)=NULL;			\
-			}					\
-			(s) = STRDUP(v);			\
-			if ((s) == NULL) {			\
-				PILCallLog(PluginImports->log,PIL_CRIT,	\
-				"%s", _("out of memory"));		\
-			}					\
-			}
+static const char * pluginid = "BayTech-Stonith";
+static const char * NOTpluginID = "Hey, dummy this has been destroyed (BayTech)";
 
 /*
  *	Different expect strings that we get from the Baytech
@@ -214,8 +145,6 @@ static struct Etoken Break[] =		{ {"reaker: ", 0, 0}
 					,	{NULL,0,0}};
 static struct Etoken PowerApplied[] =	{ {"ower applied to outlet", 0, 0}
 					,	{NULL,0,0}};
-/* Accept either a CR/NL or an NL/CR */
-static struct Etoken CRNL[] =		{ {"\n\r",0,0},{"\r\n",0,0},{NULL,0,0}};
 
 /* We may get a notice about rebooting, or a request for confirmation */
 static struct Etoken Rebooting[] =	{ {"ebooting selected outlet", 0, 0}
@@ -231,99 +160,24 @@ static struct BayTechModelInfo ModelInfo [] = {
 	{NULL, 0, NULL},
 };
 
-static int	RPCLookFor(struct BayTech* bt, struct Etoken * tlist, int timeout);
-static int	RPC_connect_device(struct BayTech * bt);
-static int	RPCLogin(struct BayTech * bt);
-static int	RPCRobustLogin(struct BayTech * bt);
-static int	RPCNametoOutlet(struct BayTech*, const char * name);
-static int	RPCReset(struct BayTech*, int unitnum, const char * rebootid);
-static int	RPCScanLine(struct BayTech* bt, int timeout, char * buf, int max);
-static int	RPCLogout(struct BayTech * bt);
-static void	RPCkillcomm(struct BayTech * bt);
+static int	RPC_connect_device(struct pluginDevice * bt);
+static int	RPCLogin(struct pluginDevice * bt);
+static int	RPCRobustLogin(struct pluginDevice * bt);
+static int	RPCNametoOutlet(struct pluginDevice*, const char * name);
+static int	RPCReset(struct pluginDevice*, int unitnum, const char * rebootid);
+static int	RPCLogout(struct pluginDevice * bt);
 
 
-static int	RPC_parse_config_info(struct BayTech* bt, const char * info);
+static int	RPC_parse_config_info(struct pluginDevice* bt, const char * info);
 #if defined(ST_POWERON) && defined(ST_POWEROFF)
-static int	RPC_onoff(struct BayTech*, int unitnum, const char * unitid
+static int	RPC_onoff(struct pluginDevice*, int unitnum, const char * unitid
 ,		int request);
 #endif
-
-/*
- *	We do these things a lot.  Here are a few shorthand macros.
- */
-
-#define	SEND(s)	(write(bt->wrfd, (s), strlen(s)))
-
-#define	EXPECT(p,t)	{						\
-			if (RPCLookFor(bt, p, t) < 0)			\
-				return(errno == ETIMEDOUT			\
-			?	S_TIMEOUT : S_OOPS);			\
-			}
-
-#define	NULLEXPECT(p,t)	{						\
-				if (RPCLookFor(bt, p, t) < 0)		\
-					return(NULL);			\
-			}
-
-#define	SNARF(s, to)	{						\
-				if (RPCScanLine(bt,to,(s),sizeof(s))	\
-				!=	S_OK)				\
-					return(S_OOPS);			\
-			}
-
-#define	NULLSNARF(s, to)	{					\
-				if (RPCScanLine(bt,to,(s),sizeof(s))	\
-				!=	S_OK)				\
-					return(NULL);			\
-				}
-
-/* Look for any of the given patterns.  We don't care which */
-
-#define	MAXSAVE	512
-static int
-RPCLookFor(struct BayTech* bt, struct Etoken * tlist, int timeout)
-{
-	int	rc;
-	char	savebuf[MAXSAVE];
-	savebuf[MAXSAVE-1] = EOS;
-	savebuf[0] = EOS;
-
-	if ((rc = EXPECT_TOK(bt->rdfd, tlist, timeout, savebuf, MAXSAVE)) < 0){
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s '%s' %s " DEVICE ".",
-			   _("Did not find string:"), tlist[0].string, _("from"));
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s '%s' %s",
-			   _("Got"), savebuf,  _(" from " DEVICE " instead."));
-		RPCkillcomm(bt);
-		return(-1);
-	}
-#if 0
-	PILCallLog(PluginImports->log,PIL_INFO					   
-	,	"BayTech: Expecting [%s] Received [%s]"
-	,	tlist[0].string
-	,	savebuf);
-#endif
-	return(rc);
-}
-
-/* Read and return the rest of the line */
-
-static int
-RPCScanLine(struct BayTech* bt, int timeout, char * buf, int max)
-{
-	if (EXPECT_TOK(bt->rdfd, CRNL, timeout, buf, max) < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	
-			   ("Could not read line from " DEVICE "."));
-		RPCkillcomm(bt);
-		bt->pid = -1;
-		return(S_OOPS);
-	}
-	return(S_OK);
-}
 
 /* Login to the Baytech Remote Power Controller (RPC) */
 
 static int
-RPCLogin(struct BayTech * bt)
+RPCLogin(struct pluginDevice * bt)
 {
 	char		IDinfo[128];
 	static char	IDbuf[128];
@@ -332,13 +186,13 @@ RPCLogin(struct BayTech * bt)
 	int		j;
 
 
-	EXPECT(EscapeChar, 10);
+	EXPECT(bt->rdfd, EscapeChar, 10);
 	/* Look for the unit type info */
 	if (EXPECT_TOK(bt->rdfd, BayTechAssoc, 2, IDinfo
 	,	sizeof(IDinfo)) < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	 "%s",
+		LOG(PIL_CRIT,	 "%s",
 			   _("No initial response from " DEVICE "."));
-		RPCkillcomm(bt);
+		Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 		return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	}
 	idptr += strspn(idptr, WHITESPACE);
@@ -370,26 +224,26 @@ RPCLogin(struct BayTech * bt)
 	}
 
 	/* Look for the unit id info */
-	EXPECT(UnitId, 10);
-	SNARF(IDbuf, 2);
+	EXPECT(bt->rdfd, UnitId, 10);
+	SNARF(bt->rdfd, IDbuf, 2);
 	delim = IDbuf + strcspn(IDbuf, WHITESPACE);
 	*delim = EOS;
 	REPLSTR(bt->unitid, IDbuf);
 
 	/* Expect "username>" */
-	EXPECT(login, 2);
+	EXPECT(bt->rdfd, login, 2);
 
-	SEND(bt->user);
-	SEND("\r");
+	SEND(bt->wrfd, bt->user);
+	SEND(bt->wrfd, "\r");
 
 	/* Expect "password>" */
 
-	switch (RPCLookFor(bt, password, 5)) {
+	switch (StonithLookFor(bt->rdfd, password, 5)) {
 		case 0:	/* Good! */
 			break;
 
 		case 1:	/* OOPS!  got another username prompt */
-			PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
+			LOG(PIL_CRIT,	"%s",
 				   _("Invalid username for " DEVICE "."));
 			return(S_ACCESS);
 
@@ -397,32 +251,32 @@ RPCLogin(struct BayTech * bt)
 			return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	}
 
-	SEND(bt->passwd);
-	SEND("\r");
+	SEND(bt->wrfd, bt->passwd);
+	SEND(bt->wrfd, "\r");
 
 	/* Expect "RPC-x Menu" */
 
-	switch (RPCLookFor(bt, LoginOK, 5)) {
+	switch (StonithLookFor(bt->rdfd, LoginOK, 5)) {
 
 		case 0:	/* Good! */
 			break;
 
 		case 1:	/* Uh-oh - bad password */
-			PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
+			LOG(PIL_CRIT,	"%s",
 				   _("Invalid password for " DEVICE "."));
 			return(S_ACCESS);
 
 		default:
-			RPCkillcomm(bt);
+			Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 			return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	}
-	EXPECT(Menu, 2);
+	EXPECT(bt->rdfd, Menu, 2);
 
 	return(S_OK);
 }
 
 static int
-RPCRobustLogin(struct BayTech * bt)
+RPCRobustLogin(struct pluginDevice * bt)
 {
 	int	rc=S_OOPS;
 	int	j;
@@ -430,11 +284,11 @@ RPCRobustLogin(struct BayTech * bt)
 	for (j=0; j < 20 && rc != S_OK; ++j) {
 
 		if (bt->pid > 0) {
-			RPCkillcomm(bt);
+			Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 		}
 
 		if (RPC_connect_device(bt) != S_OK) {
-			RPCkillcomm(bt);
+			Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 			continue;
 		}
 
@@ -446,108 +300,99 @@ RPCRobustLogin(struct BayTech * bt)
 /* Log out of the Baytech RPC */
 
 static int
-RPCLogout(struct BayTech* bt)
+RPCLogout(struct pluginDevice* bt)
 {
 	int	rc;
 
 	/* Make sure we're in the right menu... */
-	SEND("\r");
+	SEND(bt->wrfd, "\r");
 
 	/* Expect "Selection>" */
-	rc = RPCLookFor(bt, Selection, 5);
+	rc = StonithLookFor(bt->rdfd, Selection, 5);
 
 	/* Option 6 is Logout */
-	SEND("6\r");
+	SEND(bt->wrfd, "6\r");
 
 	close(bt->wrfd);
 	close(bt->rdfd);
 	bt->wrfd = bt->rdfd = -1;
-	RPCkillcomm(bt);
+	Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 	return(rc >= 0 ? S_OK : (errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS));
-}
-static void
-RPCkillcomm(struct BayTech* bt)
-{
-	if (bt->pid > 0) {
-		STONITH_KILL(bt->pid, SIGKILL);
-		(void)waitpid(bt->pid, NULL, 0);
-		bt->pid = -1;
-	}
 }
 
 /* Reset (power-cycle) the given outlet number */
 static int
-RPCReset(struct BayTech* bt, int unitnum, const char * rebootid)
+RPCReset(struct pluginDevice* bt, int unitnum, const char * rebootid)
 {
 	char		unum[32];
 
 
-	SEND("\r");
+	SEND(bt->wrfd, "\r");
 
 	/* Make sure we're in the top level menu */
 
 	/* Expect "RPC-x Menu" */
-	EXPECT(RPC, 5);
-	EXPECT(Menu, 5);
+	EXPECT(bt->rdfd, RPC, 5);
+	EXPECT(bt->rdfd, Menu, 5);
 
 	/* OK.  Request sub-menu 1 (Outlet Control) */
-	SEND("1\r");
+	SEND(bt->wrfd, "1\r");
 
 	/* Verify that we're in the sub-menu */
 
 	/* Expect: "RPC-x>" */
-	EXPECT(RPC, 5);
-	EXPECT(GTSign, 5);
+	EXPECT(bt->rdfd, RPC, 5);
+	EXPECT(bt->rdfd, GTSign, 5);
 
 
 	/* Send REBOOT command for given outlet */
 	snprintf(unum, sizeof(unum), "REBOOT %d\r", unitnum);
-	SEND(unum);
+	SEND(bt->wrfd, unum);
 
 	/* Expect "ebooting "... or "(Y/N)" (if confirmation turned on) */
 
 	retry:
-	switch (RPCLookFor(bt, Rebooting, 5)) {
+	switch (StonithLookFor(bt->rdfd, Rebooting, 5)) {
 		case 0: /* Got "Rebooting" Do nothing */
 			break;
 
 		case 1: /* Got that annoying command confirmation :-( */
-			SEND("Y\r");
+			SEND(bt->wrfd, "Y\r");
 			goto retry;
 
 		case 2:	/* Outlet is turned off */
-			PILCallLog(PluginImports->log,PIL_CRIT,	"%s: %s.",
+			LOG(PIL_CRIT,	"%s: %s.",
 				   _("Host is OFF"), rebootid);
 			return(S_ISOFF);
 
 		default:
 			return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
-	PILCallLog(PluginImports->log,PIL_INFO,	"%s: %s",
+	LOG(PIL_INFO,	"%s: %s",
 		   _("Host being rebooted"), rebootid);
 	
 	/* Expect "ower applied to outlet" */
-	if (RPCLookFor(bt, PowerApplied, 30) < 0) {
+	if (StonithLookFor(bt->rdfd, PowerApplied, 30) < 0) {
 		return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
 
 	/* All Right!  Power is back on.  Life is Good! */
 	
-	PILCallLog(PluginImports->log,PIL_INFO,	"%s: %s",
+	LOG(PIL_INFO,	"%s: %s",
 		   _("Power restored to host"), rebootid);
 
 	/* Expect: "RPC-x>" */
-	EXPECT(RPC,5);
-	EXPECT(GTSign, 5);
+	EXPECT(bt->rdfd, RPC,5);
+	EXPECT(bt->rdfd, GTSign, 5);
 
 	/* Pop back to main menu */
-	SEND("MENU\r");
+	SEND(bt->wrfd, "MENU\r");
 	return(S_OK);
 }
 
 #if defined(ST_POWERON) && defined(ST_POWEROFF)
 static int
-RPC_onoff(struct BayTech* bt, int unitnum, const char * unitid, int req)
+RPC_onoff(struct pluginDevice* bt, int unitnum, const char * unitid, int req)
 {
 	char		unum[32];
 
@@ -556,48 +401,48 @@ RPC_onoff(struct BayTech* bt, int unitnum, const char * unitid, int req)
 
 
 	if ((rc = RPCRobustLogin(bt) != S_OK)) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
+		LOG(PIL_CRIT,	"%s",
 			   _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
-	SEND("\r");
+	SEND(bt->wrfd, "\r");
 
 	/* Make sure we're in the top level menu */
 
 	/* Expect "RPC-x Menu" */
-	EXPECT(RPC, 5);
-	EXPECT(Menu, 5);
+	EXPECT(bt->rdfd, RPC, 5);
+	EXPECT(bt->rdfd, Menu, 5);
 
 	/* OK.  Request sub-menu 1 (Outlet Control) */
-	SEND("1\r");
+	SEND(bt->wrfd, "1\r");
 
 	/* Verify that we're in the sub-menu */
 
 	/* Expect: "RPC-x>" */
-	EXPECT(RPC, 5);
-	EXPECT(GTSign, 5);
+	EXPECT(bt->rdfd, RPC, 5);
+	EXPECT(bt->rdfd, GTSign, 5);
 
 
 	/* Send ON/OFF command for given outlet */
 	snprintf(unum, sizeof(unum), "%s %d\r"
 	,	onoff, unitnum);
-	SEND(unum);
+	SEND(bt->wrfd, unum);
 
 	/* Expect "RPC->x "... or "(Y/N)" (if confirmation turned on) */
 
-	if (RPCLookFor(bt, RPC, 10) == 1) {
+	if (StonithLookFor(bt->rdfd, RPC, 10) == 1) {
 		/* They've turned on that annoying command confirmation :-( */
-		SEND("Y\r");
-		EXPECT(RPC, 10);
+		SEND(bt->wrfd, "Y\r");
+		EXPECT(bt->rdfd, RPC, 10);
 	}
 
-	EXPECT(GTSign, 10);
+	EXPECT(bt->rdfd, GTSign, 10);
 
 	/* All Right!  Command done. Life is Good! */
-	PILCallLog(PluginImports->log,PIL_INFO, "%s %s %s %s",
+	LOG(PIL_INFO, "%s %s %s %s",
 		   _("Power to host"), unitid, _("turned"), onoff);
 	/* Pop back to main menu */
-	SEND("MENU\r");
+	SEND(bt->wrfd, "MENU\r");
 	return(S_OK);
 }
 #endif /* defined(ST_POWERON) && defined(ST_POWEROFF) */
@@ -607,7 +452,7 @@ RPC_onoff(struct BayTech* bt, int unitnum, const char * unitid, int req)
  */
 
 static int
-RPCNametoOutlet(struct BayTech* bt, const char * name)
+RPCNametoOutlet(struct pluginDevice* bt, const char * name)
 {
 	char	NameMapping[128];
 	int	sockno;
@@ -617,35 +462,35 @@ RPCNametoOutlet(struct BayTech* bt, const char * name)
 
 
 	/* Verify that we're in the top-level menu */
-	SEND("\r");
+	SEND(bt->wrfd, "\r");
 
 	/* Expect "RPC-x Menu" */
-	EXPECT(RPC, 5);
-	EXPECT(Menu, 5);
+	EXPECT(bt->rdfd, RPC, 5);
+	EXPECT(bt->rdfd, Menu, 5);
 
 
 	/* OK.  Request sub-menu 1 (Outlet Control) */
-	SEND("1\r");
+	SEND(bt->wrfd, "1\r");
 
 	/* Verify that we're in the sub-menu */
 
 	/* Expect: "RPC-x>" */
-	EXPECT(RPC, 5);
-	EXPECT(GTSign, 5);
+	EXPECT(bt->rdfd, RPC, 5);
+	EXPECT(bt->rdfd, GTSign, 5);
 
 	/* The status command output contains mapping of hosts to outlets */
-	SEND("STATUS\r");
+	SEND(bt->wrfd, "STATUS\r");
 
 	/* Expect: "emperature:" so we can skip over it... */
-/*  	EXPECT(bt->modelinfo->expect, 5); */
-/*  	EXPECT(CRNL, 5); */
+/*  	EXPECT(bt->rdfd, bt->modelinfo->expect, 5); */
+/*  	EXPECT(bt->rdfd, CRNL, 5); */
 
 	/* Looks Good!  Parse the status output */
 
 	do {
 		char *	last;
 		NameMapping[0] = EOS;
-		SNARF(NameMapping, 5);
+		SNARF(bt->rdfd, NameMapping, 5);
 
 		if (!parse_socket_line(bt, NameMapping, &sockno, sockname)) {
 			continue;
@@ -670,40 +515,32 @@ RPCNametoOutlet(struct BayTech* bt, const char * name)
 	} while (strlen(NameMapping) > 2 && ret < 0);
 
 	/* Pop back out to the top level menu */
-	SEND("MENU\r");
+	SEND(bt->wrfd, "MENU\r");
 	return(ret);
 }
 
 static int
 baytech_status(Stonith  *s)
 {
-	struct BayTech*	bt;
+	struct pluginDevice*	bt;
 	int	rc;
-	
-	if (!ISBAYTECH(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s",
-			   "invalid argument to RPC_status");
-		return(S_OOPS);
-	}
-	if (!ISCONFIGED(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
-			   "unconfigured stonith object in RPC_status");
-		return(S_OOPS);
-	}
-	bt = (struct BayTech*) s->pinfo;
+
+	ERRIFNOTCONFIGED(s,S_OOPS);
+
+	bt = (struct pluginDevice*) s->pinfo;
 	
 	if ((rc = RPCRobustLogin(bt) != S_OK)) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	 "%s", 
+		LOG(PIL_CRIT,	 "%s", 
 			    _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
 
 	/* Verify that we're in the top-level menu */
-	SEND("\r");
+	SEND(bt->wrfd, "\r");
 
 	/* Expect "RPC-x Menu" */
-	EXPECT(RPC, 5);
-	EXPECT(Menu, 5);
+	EXPECT(bt->rdfd, RPC, 5);
+	EXPECT(bt->rdfd, Menu, 5);
 
 	return(RPCLogout(bt));
 }
@@ -718,52 +555,40 @@ baytech_hostlist(Stonith  *s)
 	char*		NameList[64];
 	unsigned int	numnames = 0;
 	char **		ret = NULL;
-	struct BayTech*	bt;
+	struct pluginDevice*	bt;
 
+	ERRIFNOTCONFIGED(s,NULL);
 
-	if (!ISBAYTECH(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
-			   "invalid argument to baytech_hostlist");
-		return(NULL);
-	}
-	if (!ISCONFIGED(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
-			   "unconfigured stonith object in baytech_hostlist");
-		return(NULL);
-	}
-	bt = (struct BayTech*) s->pinfo;
-	
-
+	bt = (struct pluginDevice*) s->pinfo;
 	
 	if (RPCRobustLogin(bt) != S_OK) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
+		LOG(PIL_CRIT,	"%s",
 			   _("Cannot log into " DEVICE "."));
 		return(NULL);
 	}
 
 	/* Verify that we're in the top-level menu */
-	SEND("\r");
+	SEND(bt->wrfd, "\r");
 
 	/* Expect "RPC-x Menu" */
-	NULLEXPECT(RPC, 5);
-	NULLEXPECT(Menu, 5);
-
+	NULLEXPECT(bt->rdfd, RPC, 5);
+	NULLEXPECT(bt->rdfd, Menu, 5);
 
 	/* OK.  Request sub-menu 1 (Outlet Control) */
-	SEND("1\r");
+	SEND(bt->wrfd, "1\r");
 
 	/* Verify that we're in the sub-menu */
 
 	/* Expect: "RPC-x>" */
-	NULLEXPECT(RPC, 5);
-	NULLEXPECT(GTSign, 5);
+	NULLEXPECT(bt->rdfd, RPC, 5);
+	NULLEXPECT(bt->rdfd, GTSign, 5);
 
 	/* The status command output contains mapping of hosts to outlets */
-	SEND("STATUS\r");
+	SEND(bt->wrfd, "STATUS\r");
 
 	/* Expect: "emperature:" so we can skip over it... */
-	NULLEXPECT(bt->modelinfo->expect, 5);
-	NULLEXPECT(CRNL, 5);
+	NULLEXPECT(bt->rdfd, bt->modelinfo->expect, 5);
+	NULLEXPECT(bt->rdfd, CRNL, 5);
 
 	/* Looks Good!  Parse the status output */
 
@@ -775,7 +600,7 @@ baytech_hostlist(Stonith  *s)
 
 		NameMapping[0] = EOS;
 
-		NULLSNARF(NameMapping, 5);
+		NULLSNARF(bt->rdfd, NameMapping, 5);
 
 		if (!parse_socket_line(bt, NameMapping, &sockno, sockname)) {
 			continue;
@@ -797,7 +622,7 @@ baytech_hostlist(Stonith  *s)
 			break;
 		}
 		if ((nm = (char*)STRDUP(sockname)) == NULL) {
-			PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
+			LOG(PIL_CRIT,	"%s",
 				   _("out of memory"));
 			return(NULL);
 		}
@@ -808,11 +633,11 @@ baytech_hostlist(Stonith  *s)
 	} while (strlen(NameMapping) > 2);
 
 	/* Pop back out to the top level menu */
-	SEND("MENU\r");
+	SEND(bt->wrfd, "MENU\r");
 	if (numnames >= 1) {
 		ret = (char **)MALLOC((numnames+1)*sizeof(char*));
 		if (ret == NULL) {
-			PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
+			LOG(PIL_CRIT,	"%s",
 				   _("out of memory"));
 		}else{
 			memcpy(ret, NameList, (numnames+1)*sizeof(char*));
@@ -822,28 +647,12 @@ baytech_hostlist(Stonith  *s)
 	return(ret);
 }
 
-static void
-baytech_free_hostlist (char ** hlist)
-{
-	char **	hl = hlist;
-	if (hl == NULL) {
-		return;
-	}
-	while (*hl) {
-		FREE(*hl);
-		*hl = NULL;
-		++hl;
-	}
-	FREE(hlist);
-}
-
-
 /*
  *	Parse the given configuration information, and stash it away...
  */
 
 static int
-RPC_parse_config_info(struct BayTech* bt, const char * info)
+RPC_parse_config_info(struct pluginDevice* bt, const char * info)
 {
 	static char dev[1024];
 	static char user[1024];
@@ -853,19 +662,18 @@ RPC_parse_config_info(struct BayTech* bt, const char * info)
 		return(S_OOPS);
 	}
 
-
 	if (sscanf(info, "%s %s %[^\n\r\t]", dev, user, passwd) == 3
 	&&	strlen(passwd) > 1) {
 
 		if ((bt->device = STRDUP(dev)) == NULL) {
-			PILCallLog(PluginImports->log,PIL_CRIT,	"%s", 
+			LOG(PIL_CRIT,	"%s", 
 				   _("out of memory"));
 			return(S_OOPS);
 		}
 		if ((bt->user = STRDUP(user)) == NULL) {
 			FREE(bt->device);
 			bt->device=NULL;
-			PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
+			LOG(PIL_CRIT,	"%s",
 				   _("out of memory"));
 			return(S_OOPS);
 		}
@@ -874,7 +682,7 @@ RPC_parse_config_info(struct BayTech* bt, const char * info)
 			bt->user=NULL;
 			FREE(bt->device);
 			bt->device=NULL;
-			PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
+			LOG(PIL_CRIT,	"%s",
 				   _("out of memory"));
 			return(S_OOPS);
 		}
@@ -889,7 +697,7 @@ RPC_parse_config_info(struct BayTech* bt, const char * info)
  *	eventually...
  */
 static int
-RPC_connect_device(struct BayTech * bt)
+RPC_connect_device(struct pluginDevice * bt)
 {
 	char	TelnetCommand[256];
 
@@ -911,34 +719,23 @@ baytech_reset_req(Stonith * s, int request, const char * host)
 {
 	int	rc = 0;
 	int	lorc = 0;
-	struct BayTech*	bt;
+	struct pluginDevice*	bt;
 
+	ERRIFNOTCONFIGED(s,S_OOPS);
 
+	bt = (struct pluginDevice*) s->pinfo;
 
-
-	if (!ISBAYTECH(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT,"%s", _("invalid argument to baytech_reset"));
-		return(S_OOPS);
-	}
-	if (!ISCONFIGED(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s", 
-			   _("unconfigured stonith object in baytech_reset"));
-		return(S_OOPS);
-	}
-	bt = (struct BayTech*) s->pinfo;
-
-	
 	if ((rc = RPCRobustLogin(bt)) != S_OK) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s",
+		LOG(PIL_CRIT, "%s",
 			   _("Cannot log into " DEVICE "."));
 	}else{
 		int	noutlet;
 		noutlet = RPCNametoOutlet(bt, host);
 
 		if (noutlet < 1) {
-			PILCallLog(PluginImports->log,PIL_WARN,	"%s %s %s [%s]",
+			LOG(PIL_WARN,	"%s %s %s [%s]",
 					bt->idinfo, bt->unitid, _("doesn't control hot"), host);
-			RPCkillcomm(bt);
+			Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 			return(S_BADHOST);
 		}
 		switch(request) {
@@ -959,7 +756,7 @@ baytech_reset_req(Stonith * s, int request, const char * host)
 	}
 
 	lorc = RPCLogout(bt);
-	RPCkillcomm(bt);
+	Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 
 	return(rc != S_OK ? rc : lorc);
 }
@@ -975,17 +772,14 @@ baytech_set_config_file(Stonith* s, const char * configname)
 
 	char	RPCid[256];
 
-	struct BayTech*	bt;
+	struct pluginDevice*	bt;
 
-	if (!ISBAYTECH(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
-			   _("invalid argument to baytech_set"));
-		return(S_OOPS);
-	}
-	bt = (struct BayTech*) s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+
+	bt = (struct pluginDevice*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s %s",
+		LOG(PIL_CRIT,	"%s %s",
 			   _("Cannot open"), configname);
 		return(S_BADCONFIG);
 	}
@@ -1004,14 +798,11 @@ baytech_set_config_file(Stonith* s, const char * configname)
 static int
 baytech_set_config_info(Stonith* s, const char * info)
 {
-	struct BayTech* bt;
+	struct pluginDevice* bt;
 
-	if (!ISBAYTECH(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
-			   _("baytech_set_config_info: invalid argument"));
-		return(S_OOPS);
-	}
-	bt = (struct BayTech *)s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+
+	bt = (struct pluginDevice *)s->pinfo;
 
 	return(RPC_parse_config_info(bt, info));
 }
@@ -1019,18 +810,15 @@ baytech_set_config_info(Stonith* s, const char * info)
 static const char *
 baytech_getinfo(Stonith * s, int reqtype)
 {
-	struct BayTech* bt;
+	struct pluginDevice* bt;
 	const char *		ret;
 
-	if (!ISBAYTECH(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
-			   _("RPC_idinfo: invalid argument"));
-		return NULL;
-	}
+	ERRIFWRONGDEV(s,NULL);
+
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	bt = (struct BayTech *)s->pinfo;
+	bt = (struct pluginDevice *)s->pinfo;
 
 	switch (reqtype) {
 
@@ -1077,17 +865,14 @@ baytech_getinfo(Stonith * s, int reqtype)
 static void
 baytech_destroy(Stonith *s)
 {
-	struct BayTech* bt;
+	struct pluginDevice* bt;
 
-	if (!ISBAYTECH(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
-			   _("baytech_del: invalid argument"));
-		return;
-	}
-	bt = (struct BayTech *)s->pinfo;
+	VOIDERRIFWRONGDEV(s);
 
-	bt->BTid = NOTbtid;
-	RPCkillcomm(bt);
+	bt = (struct pluginDevice *)s->pinfo;
+
+	bt->pluginid = NOTpluginID;
+	Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 	if (bt->rdfd >= 0) {
 		close(bt->rdfd);
 		bt->rdfd = -1;
@@ -1123,15 +908,15 @@ baytech_destroy(Stonith *s)
 static void *
 baytech_new(void)
 {
-	struct BayTech*	bt = MALLOCT(struct BayTech);
+	struct pluginDevice*	bt = MALLOCT(struct pluginDevice);
 
 	if (bt == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT,	"%s",
+		LOG(PIL_CRIT,	"%s",
 			   _("out of memory"));
 		return(NULL);
 	}
 	memset(bt, 0, sizeof(*bt));
-	bt->BTid = BTid;
+	bt->pluginid = pluginid;
 	bt->pid = -1;
 	bt->rdfd = -1;
 	bt->wrfd = -1;
@@ -1148,7 +933,7 @@ baytech_new(void)
 }
 
 static int
-parse_socket_line(struct BayTech * bt,	const char *NameMapping
+parse_socket_line(struct pluginDevice * bt,	const char *NameMapping
 ,	int *sockno, char *sockname)
 {
 #if 0

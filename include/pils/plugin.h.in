@@ -521,7 +521,7 @@ void PILLogMemStats(void);
 static const char*      Ourpluginversion(void);			\
 static int              GetOurDebugLevel(void);			\
 static void             SetOurDebugLevel(int);			\
-static void             CloseName(PILPlugin*);			\
+/* static void             CloseName(PILPlugin*);	*/	\
 static const char *	ReturnOurLicense(void);			\
 static const char *	ReturnOurLicenseURL(void);		\
 								\

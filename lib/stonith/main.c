@@ -1,4 +1,4 @@
-/* $Id: main.c,v 1.11 2004/09/27 21:02:34 alan Exp $ */
+/* $Id: main.c,v 1.12 2004/10/05 14:26:17 lars Exp $ */
 /*
  * Stonith: simple test program for exercising the Stonith API code
  *
@@ -291,7 +291,7 @@ main(int argc, char** argv)
 			for(this=hostlist; *this; ++this) {
 				printf("%s\n", *this);
 			}
-			s->s_ops->free_hostlist(hostlist);
+			stonith_free_hostlist(hostlist);
 		}
 	}
 

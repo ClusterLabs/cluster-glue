@@ -1,4 +1,4 @@
-/* $Id: null.c,v 1.13 2004/09/25 06:25:37 gshi Exp $ */
+/* $Id: null.c,v 1.14 2004/10/05 14:26:17 lars Exp $ */
 /*
  * Stonith module for NULL Stonith device
  *
@@ -20,50 +20,14 @@
  *
  */
 
-#include <portability.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <libintl.h>
-#include <sys/wait.h>
-#include <glib.h>
+#define	DEVICE	"NULL STONITH device"
+#include "stonith_plugin_common.h"
 
-#include <stonith/stonith.h>
-
-#define PIL_PLUGINTYPE          STONITH_TYPE
-#define PIL_PLUGINTYPE_S        STONITH_TYPE_S
 #define PIL_PLUGIN              null
 #define PIL_PLUGIN_S            "null"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
-
-/*
- * nullclose is called as part of unloading the null STONITH plugin.
- * If there was any global data allocated, or file descriptors opened, etc.
- * which is associated with the plugin, and not a single interface
- * in particular, here's our chance to clean it up.
- */
-
-static void
-nullclosepi(PILPlugin*pi)
-{
-}
-
-
-/*
- * nullcloseintf called as part of shutting down the null STONITH
- * interface.  If there was any global data allocated, or file descriptors
- * opened, etc.  which is associated with the null implementation,
- * here's our chance to clean it up.
- */
-static PIL_rc
-nullcloseintf(PILInterface* pi, void* pd)
-{
-	return PIL_OK;
-}
 
 static void *		null_new(void);
 static void		null_destroy(Stonith *);
@@ -73,7 +37,6 @@ static const char *	null_getinfo(Stonith * s, int InfoType);
 static int		null_status(Stonith * );
 static int		null_reset_req(Stonith * s, int request, const char * host);
 static char **		null_hostlist(Stonith  *);
-static void		null_free_hostlist(char **);
 
 static struct stonith_ops nullOps ={
 	null_new,		/* Create new STONITH object	*/
@@ -84,22 +47,14 @@ static struct stonith_ops nullOps ={
 	null_status,		/* Return STONITH device status	*/
 	null_reset_req,		/* Request a reset */
 	null_hostlist,		/* Return list of supported hosts */
-	null_free_hostlist	/* free above list */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, nullclosepi);
+PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
 static StonithImports*		OurImports;
 static void*			interfprivate;
-
-#define LOG		PluginImports->log
-#define MALLOC		PluginImports->alloc
-#define STRDUP  	PluginImports->mstrdup
-#define FREE		PluginImports->mfree
-#define EXPECT_TOK	OurImports->ExpectToken
-#define STARTPROC	OurImports->StartProcess
 
 PIL_rc
 PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
@@ -120,48 +75,30 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  	return imports->register_interface(us, PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
 	,	&nullOps
-	,	nullcloseintf		/*close */
+	,	NULL		/*close */
 	,	&OurInterface
 	,	(void*)&OurImports
 	,	&interfprivate); 
 }
 
-#define	DEVICE	"NULL STONITH device"
-#define WHITESPACE	" \t\n\r\f"
-
 /*
  *	Null STONITH device.  We are very agreeable, but don't do much :-)
  */
 
-struct NullDevice {
-	const char *	NULLid;
+struct pluginDevice {
+	const char *	pluginid;
 	char **		hostlist;
 	int		hostcount;
 };
 
-static const char * NULLid = "NullDevice-Stonith";
-static const char * NOTnullID = "Hey, dummy this has been destroyed (NullDev)";
-
-#define	ISNULLDEV(i)	(((i)!= NULL && (i)->pinfo != NULL)	\
-	&& ((struct NullDevice *)(i->pinfo))->NULLid == NULLid)
-
-
-#ifndef MALLOCT
-#	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
-#endif
-
-#define N_(text)	(text)
-#define _(text)		dgettext(ST_TEXTDOMAIN, text)
-
+static const char * pluginid = "pluginDevice-Stonith";
+static const char * NOTpluginID = "Hey, dummy this has been destroyed (NullDev)";
 
 static int
 null_status(Stonith  *s)
 {
 
-	if (!ISNULLDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to NULL_status");
-		return(S_OOPS);
-	}
+	ERRIFWRONGDEV(s,S_OOPS);
 	return S_OK;
 }
 
@@ -175,16 +112,13 @@ null_hostlist(Stonith  *s)
 {
 	int		numnames = 0;
 	char **		ret = NULL;
-	struct NullDevice*	nd;
+	struct pluginDevice*	nd;
 	int		j;
 
-	if (!ISNULLDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to NULL_list_hosts");
-		return(NULL);
-	}
-	nd = (struct NullDevice*) s->pinfo;
+	ERRIFWRONGDEV(s,NULL);
+	nd = (struct pluginDevice*) s->pinfo;
 	if (nd->hostcount < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT
+		LOG(PIL_CRIT
 		,	"unconfigured stonith object in NULL_list_hosts");
 		return(NULL);
 	}
@@ -192,7 +126,7 @@ null_hostlist(Stonith  *s)
 
 	ret = (char **)MALLOC(numnames*sizeof(char*));
 	if (ret == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return ret;
 	}
 
@@ -201,30 +135,13 @@ null_hostlist(Stonith  *s)
 	for (j=0; j < numnames-1; ++j) {
 		ret[j] = STRDUP(nd->hostlist[j]);
 		if (ret[j] == NULL) {
-			null_free_hostlist(ret);
+			stonith_free_hostlist(ret);
 			ret = NULL;
 			return ret;
 		}
 	}
 	return(ret);
 }
-
-static void
-null_free_hostlist (char ** hlist)
-{
-	char **	hl = hlist;
-	if (hl == NULL) {
-		return;
-	}
-	while (*hl) {
-		FREE(*hl);
-		*hl = NULL;
-		++hl;
-	}
-	FREE(hlist);
-	hlist = NULL;
-}
-
 
 static int
 WordCount(const char * s)
@@ -249,7 +166,7 @@ WordCount(const char * s)
  */
 
 static int
-NULL_parse_config_info(struct NullDevice* nd, const char * info)
+NULL_parse_config_info(struct pluginDevice* nd, const char * info)
 {
 	char **			ret;
 	int			wc;
@@ -266,7 +183,7 @@ NULL_parse_config_info(struct NullDevice* nd, const char * info)
 
 	ret = (char **)MALLOC(numnames*sizeof(char*));
 	if (ret == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return S_OOPS;
 	}
 
@@ -279,7 +196,7 @@ NULL_parse_config_info(struct NullDevice* nd, const char * info)
 			s += strcspn(s, WHITESPACE);
 			ret[j] = MALLOC((1+(s-start))*sizeof(char));
 			if (ret[j] == NULL) {
-				null_free_hostlist(ret);
+				stonith_free_hostlist(ret);
 				ret = NULL;
 				return S_OOPS;
 			}
@@ -301,15 +218,12 @@ static int
 null_reset_req(Stonith * s, int request, const char * host)
 {
 
-	if (!ISNULLDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to %s", __FUNCTION__);
-		return(S_OOPS);
-	}
+	ERRIFWRONGDEV(s,S_OOPS);
 
 	/* Real devices need to pay attention to the "request" */
 	/* (but we don't care ;-)) */
 
-	PILCallLog(PluginImports->log,PIL_INFO,"%s: %s",  _("Host null-reset"), host);
+	LOG(PIL_INFO,"%s: %s",  _("Host null-reset"), host);
 	return S_OK;
 }
 
@@ -324,16 +238,13 @@ null_set_config_file(Stonith* s, const char * configname)
 
 	char	NULLline[256];
 
-	struct NullDevice*	nd;
+	struct pluginDevice*	nd;
 
-	if (!ISNULLDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to NULL_set_configfile");
-		return(S_OOPS);
-	}
-	nd = (struct NullDevice*) s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+	nd = (struct pluginDevice*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		PILCallLog(PluginImports->log,PIL_CRIT, "Cannot open %s", configname);
+		LOG(PIL_CRIT, "Cannot open %s", configname);
 		return(S_BADCONFIG);
 	}
 	while (fgets(NULLline, sizeof(NULLline), cfgfile) != NULL){
@@ -351,13 +262,10 @@ null_set_config_file(Stonith* s, const char * configname)
 static int
 null_set_config_info(Stonith* s, const char * info)
 {
-	struct NullDevice* nd;
+	struct pluginDevice* nd;
 
-	if (!ISNULLDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
-		return(S_OOPS);
-	}
-	nd = (struct NullDevice *)s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+	nd = (struct pluginDevice *)s->pinfo;
 
 	return(NULL_parse_config_info(nd, info));
 }
@@ -365,17 +273,14 @@ null_set_config_info(Stonith* s, const char * info)
 static const char *
 null_getinfo(Stonith * s, int reqtype)
 {
-	struct NullDevice* nd;
+	struct pluginDevice* nd;
 	char *		ret;
 
-	if (!ISNULLDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "NULL_idinfo: invalid argument");
-		return NULL;
-	}
+	ERRIFWRONGDEV(s,NULL);
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	nd = (struct NullDevice *)s->pinfo;
+	nd = (struct pluginDevice *)s->pinfo;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
@@ -412,17 +317,14 @@ null_getinfo(Stonith * s, int reqtype)
 static void
 null_destroy(Stonith *s)
 {
-	struct NullDevice* nd;
+	struct pluginDevice* nd;
 
-	if (!ISNULLDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
-		return;
-	}
-	nd = (struct NullDevice *)s->pinfo;
+	VOIDERRIFWRONGDEV(s);
+	nd = (struct pluginDevice *)s->pinfo;
 
-	nd->NULLid = NOTnullID;
+	nd->pluginid = NOTpluginID;
 	if (nd->hostlist) {
-		null_free_hostlist(nd->hostlist);
+		stonith_free_hostlist(nd->hostlist);
 		nd->hostlist = NULL;
 	}
 	nd->hostcount = -1;
@@ -433,14 +335,14 @@ null_destroy(Stonith *s)
 static void *
 null_new(void)
 {
-	struct NullDevice*	nd = MALLOCT(struct NullDevice);
+	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
 
 	if (nd == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(nd, 0, sizeof(*nd));
-	nd->NULLid = NULLid;
+	nd->pluginid = pluginid;
 	nd->hostlist = NULL;
 	nd->hostcount = -1;
 	return((void *)nd);

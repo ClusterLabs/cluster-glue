@@ -19,50 +19,14 @@
  *
  */
 
-#include <portability.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <syslog.h>
-#include <libintl.h>
-#include <sys/wait.h>
+#define	DEVICE	"RILOE STONITH device"
+#include "stonith_plugin_common.h"
 
-#include <stonith/stonith.h>
-
-#define PIL_PLUGINTYPE          STONITH_TYPE
-#define PIL_PLUGINTYPE_S        STONITH_TYPE_S
 #define PIL_PLUGIN              riloe
 #define PIL_PLUGIN_S            "riloe"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
-
-/*
- * riloeclose is called as part of unloading the riloe STONITH plugin.
- * If there was any global data allocated, or file descriptors opened, etc.
- * which is associated with the plugin, and not a single interface
- * in particular, here's our chance to clean it up.
- */
-
-static void
-riloeclosepi(PILPlugin*pi)
-{
-}
-
- 
-/*
- * riloecloseintf called as part of shutting down the riloe STONITH
- * interface.  If there was any global data allocated, or file descriptors
- * opened, etc.  which is associated with the riloe implementation,
- * here's our chance to clean it up.
- */
-static PIL_rc
-riloecloseintf(PILInterface* pi, void* pd)
-{
-	return PIL_OK;
-}
 
 static void *		riloe_new(void);
 static void		riloe_destroy(Stonith *);
@@ -72,7 +36,6 @@ static const char *	riloe_getinfo(Stonith * s, int InfoType);
 static int		riloe_status(Stonith * );
 static int		riloe_reset_req(Stonith * s, int request, const char * host);
 static char **		riloe_hostlist(Stonith  *);
-static void		riloe_free_hostlist(char **);
 
 static struct stonith_ops riloeOps ={
 	riloe_new,		/* Create new STONITH object	*/
@@ -83,21 +46,14 @@ static struct stonith_ops riloeOps ={
 	riloe_status,		/* Return STONITH device status	*/
 	riloe_reset_req,		/* Request a reset */
 	riloe_hostlist,		/* Return list of supported hosts */
-	riloe_free_hostlist	/* free above list */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, riloeclosepi);
+PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
 static StonithImports*		OurImports;
 static void*			interfprivate;
-
-#define LOG		PluginImports->log
-#define MALLOC		PluginImports->alloc
-#define FREE		PluginImports->mfree
-#define EXPECT_TOK	OurImports->ExpectToken
-#define STARTPROC	OurImports->StartProcess
 
 PIL_rc
 PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
@@ -118,55 +74,32 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  	return imports->register_interface(us, PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
 	,	&riloeOps
-	,	riloecloseintf		/*close */ 
+	,	NULL		/*close */
 	,	&OurInterface
 	,	(void*)&OurImports
 	,	&interfprivate); 
 }
 
-#define	DEVICE	"RILOE STONITH device"
-#define WHITESPACE	" \t\n\r\f"
 #define RILOE_COMMAND   STONITH_MODULES "/ribcl.py"
 
 /*
  *	Riloe STONITH device.  We are very agreeable, but don't do much :-)
  */
 
-struct RiloeDevice {
-	const char *	RILOEid;
+struct pluginDevice {
+	const char *	pluginid;
 	char **		hostlist;
 	int		hostcount;
 };
 
-static const char * RILOEid = "RiloeDevice-Stonith";
+static const char * pluginid = "pluginDevice-Stonith";
 static const char * NOTriloeID = "Hey, dummy this has been destroyed (RiloeDev)";
-
-#define	ISRILOEDEV(i)	(((i)!= NULL && (i)->pinfo != NULL)	\
-	&& ((struct RiloeDevice *)(i->pinfo))->RILOEid == RILOEid)
-
-
-#ifndef MALLOC
-#	define	MALLOC	malloc
-#endif
-#ifndef FREE
-#	define	FREE	free
-#endif
-#ifndef MALLOCT
-#	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
-#endif
-
-#define N_(text)	(text)
-#define _(text)		dgettext(ST_TEXTDOMAIN, text)
-
 
 static int
 riloe_status(Stonith  *s)
 {
 
-	if (!ISRILOEDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RILOE_status");
-		return(S_OOPS);
-	}
+	ERRIFWRONGDEV(s,S_OOPS);
 	return S_OK;
 }
 
@@ -180,16 +113,13 @@ riloe_hostlist(Stonith  *s)
 {
 	int		numnames = 0;
 	char **		ret = NULL;
-	struct RiloeDevice*	nd;
+	struct pluginDevice*	nd;
 	int		j;
 
-	if (!ISRILOEDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RILOE_list_hosts");
-		return(NULL);
-	}
-	nd = (struct RiloeDevice*) s->pinfo;
+	ERRIFWRONGDEV(s,NULL);
+	nd = (struct pluginDevice*) s->pinfo;
 	if (nd->hostcount < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT
+		LOG(PIL_CRIT
 		,	"unconfigured stonith object in RILOE_list_hosts");
 		return(NULL);
 	}
@@ -197,7 +127,7 @@ riloe_hostlist(Stonith  *s)
 
 	ret = (char **)MALLOC(numnames*sizeof(char*));
 	if (ret == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return ret;
 	}
 
@@ -206,7 +136,7 @@ riloe_hostlist(Stonith  *s)
 	for (j=0; j < numnames-1; ++j) {
 		ret[j] = MALLOC(strlen(nd->hostlist[j])+1);
 		if (ret[j] == NULL) {
-			riloe_free_hostlist(ret);
+			stonith_free_hostlist(ret);
 			ret = NULL;
 			return ret;
 		}
@@ -214,23 +144,6 @@ riloe_hostlist(Stonith  *s)
 	}
 	return(ret);
 }
-
-static void
-riloe_free_hostlist (char ** hlist)
-{
-	char **	hl = hlist;
-	if (hl == NULL) {
-		return;
-	}
-	while (*hl) {
-		FREE(*hl);
-		*hl = NULL;
-		++hl;
-	}
-	FREE(hlist);
-	hlist = NULL;
-}
-
 
 static int
 WordCount(const char * s)
@@ -255,7 +168,7 @@ WordCount(const char * s)
  */
 
 static int
-RILOE_parse_config_info(struct RiloeDevice* nd, const char * info)
+RILOE_parse_config_info(struct pluginDevice* nd, const char * info)
 {
 	char **			ret;
 	int			wc;
@@ -272,7 +185,7 @@ RILOE_parse_config_info(struct RiloeDevice* nd, const char * info)
 
 	ret = (char **)MALLOC(numnames*sizeof(char*));
 	if (ret == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return S_OOPS;
 	}
 
@@ -285,7 +198,7 @@ RILOE_parse_config_info(struct RiloeDevice* nd, const char * info)
 			s += strcspn(s, WHITESPACE);
 			ret[j] = MALLOC((1+(s-start))*sizeof(char));
 			if (ret[j] == NULL) {
-				riloe_free_hostlist(ret);
+				stonith_free_hostlist(ret);
 				ret = NULL;
 				return S_OOPS;
 			}
@@ -307,18 +220,15 @@ riloe_reset_req(Stonith * s, int request, const char * host)
 {
 	char cmd[4096];
 
-	if (!ISRILOEDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to %s", __FUNCTION__);
-		return(S_OOPS);
-	}
-	PILCallLog(PluginImports->log,PIL_INFO, "%s '%s'", _("riloe-reset host"), host);
+	ERRIFWRONGDEV(s,S_OOPS);
+	LOG(PIL_INFO, _("Host %s riloe-reset."), host);
 
 	sprintf(cmd, "%s %s reset", RILOE_COMMAND, host);
 
 	if (system(cmd) == 0)
 		return S_OK;
 	else {
-		PILCallLog(PluginImports->log,PIL_CRIT, "command %s failed", cmd);
+		LOG(PIL_CRIT, "command %s failed", cmd);
 		return(S_RESETFAIL);
 	}
 }
@@ -334,16 +244,13 @@ riloe_set_config_file(Stonith* s, const char * configname)
 
 	char	RILOEline[256];
 
-	struct RiloeDevice*	nd;
+	struct pluginDevice*	nd;
 
-	if (!ISRILOEDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RILOE_set_configfile");
-		return(S_OOPS);
-	}
-	nd = (struct RiloeDevice*) s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+	nd = (struct pluginDevice*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		PILCallLog(PluginImports->log,PIL_CRIT, "Cannot open %s", configname);
+		LOG(PIL_CRIT, "Cannot open %s", configname);
 		return(S_BADCONFIG);
 	}
 	while (fgets(RILOEline, sizeof(RILOEline), cfgfile) != NULL){
@@ -361,13 +268,10 @@ riloe_set_config_file(Stonith* s, const char * configname)
 static int
 riloe_set_config_info(Stonith* s, const char * info)
 {
-	struct RiloeDevice* nd;
+	struct pluginDevice* nd;
 
-	if (!ISRILOEDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
-		return(S_OOPS);
-	}
-	nd = (struct RiloeDevice *)s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+	nd = (struct pluginDevice *)s->pinfo;
 
 	return(RILOE_parse_config_info(nd, info));
 }
@@ -375,17 +279,14 @@ riloe_set_config_info(Stonith* s, const char * info)
 static const char *
 riloe_getinfo(Stonith * s, int reqtype)
 {
-	struct RiloeDevice* nd;
+	struct pluginDevice* nd;
 	char *		ret;
 
-	if (!ISRILOEDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "RILOE_idinfo: invalid argument");
-		return NULL;
-	}
+	ERRIFWRONGDEV(s,NULL);
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	nd = (struct RiloeDevice *)s->pinfo;
+	nd = (struct pluginDevice *)s->pinfo;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
@@ -422,17 +323,14 @@ riloe_getinfo(Stonith * s, int reqtype)
 static void
 riloe_destroy(Stonith *s)
 {
-	struct RiloeDevice* nd;
+	struct pluginDevice* nd;
 
-	if (!ISRILOEDEV(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
-		return;
-	}
-	nd = (struct RiloeDevice *)s->pinfo;
+	VOIDERRIFWRONGDEV(s);
+	nd = (struct pluginDevice *)s->pinfo;
 
-	nd->RILOEid = NOTriloeID;
+	nd->pluginid = NOTriloeID;
 	if (nd->hostlist) {
-		riloe_free_hostlist(nd->hostlist);
+		stonith_free_hostlist(nd->hostlist);
 		nd->hostlist = NULL;
 	}
 	nd->hostcount = -1;
@@ -443,14 +341,14 @@ riloe_destroy(Stonith *s)
 static void *
 riloe_new(void)
 {
-	struct RiloeDevice*	nd = MALLOCT(struct RiloeDevice);
+	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
 
 	if (nd == NULL) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(nd, 0, sizeof(*nd));
-	nd->RILOEid = RILOEid;
+	nd->pluginid = pluginid;
 	nd->hostlist = NULL;
 	nd->hostcount = -1;
 	return((void *)nd);
