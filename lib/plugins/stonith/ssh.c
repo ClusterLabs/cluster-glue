@@ -1,4 +1,4 @@
-/* $Id: ssh.c,v 1.17 2005/01/03 18:12:11 alan Exp $ */
+/* $Id: ssh.c,v 1.18 2005/03/11 03:22:29 sunjd Exp $ */
 /*
  * Stonith module for SSH Stonith device
  *
@@ -147,15 +147,15 @@ ssh_hostlist(StonithPlugin  *s)
 	}
 	numnames = sd->hostcount;
 
-	ret = (char **)MALLOC(numnames*sizeof(char*));
+	ret = (char **)MALLOC((numnames+1)*sizeof(char*));
 	if (ret == NULL) {
 		LOG(PIL_CRIT, "out of memory");
 		return ret;
 	}
 
-	memset(ret, 0, numnames*sizeof(char*));
+	memset(ret, 0, (numnames+1)*sizeof(char*));
 
-	for (j=0; j < numnames-1; ++j) {
+	for (j=0; j < numnames; ++j) {
 		ret[j] = STRDUP(sd->hostlist[j]);
 		if (ret[j] == NULL) {
 			stonith_free_hostlist(ret);
