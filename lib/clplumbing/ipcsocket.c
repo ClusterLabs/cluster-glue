@@ -24,11 +24,19 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
+#ifdef BSD
+#include <sys/syslimits.h>
+#endif
+#include <sys/param.h>
+#include <sys/uio.h>
+#ifdef BSD
+#include <sys/ucred.h>
+#endif
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/un.h>
-#include <sys/param.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -364,7 +372,7 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
   return ret;
 }
 
-#elif defined(HAVE_STRUCT_CMSGCRED) || defined(HAVE_STRUCT_FCRED) || (defined(HAVE_STRUCT_SOCKCRED) && defined(LOCAL_CREDS))
+#elif defined(SCM_CREDS) || defined(HAVE_STRUCT_CMSGCRED) || defined(HAVE_STRUCT_FCRED) || (defined(HAVE_STRUCT_SOCKCRED) && defined(LOCAL_CREDS))
 
 /* FIXME!  Need to implement SCM_CREDS mechanism for BSD-based systems
  * This isn't an emergency, but should be done in the future...
@@ -382,44 +390,44 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
 #ifdef HAVE_STRUCT_CMSGCRED
   typedef struct cmsgcred Cred;
 #define cruid cmcred_uid
-  
+
 #elif HAVE_STRUCT_FCRED
   typedef struct fcred Cred;
-
 #define cruid fc_uid
+
 #elif HAVE_STRUCT_SOCKCRED
   typedef struct sockcred Cred;
-
 #define cruid sc_uid
+
+#else
+  typedef struct ucred Cred;
+#define cruid c_uid
 #endif
   Cred	   *cred;
   struct SOCKET_CH_PRIVATE *conn_info;
   struct OCF_IPC_AUTH *auth_info;
-  int tet = AUTH_OK;
+  int ret = AUTH_OK;
+  char         buf;
   
   /* Compute size without padding */
   char		cmsgmem[ALIGN(sizeof(struct cmsghdr)) + ALIGN(sizeof(Cred))];	/* for NetBSD */
 
+  /* Point to start of first structure */
+  struct cmsghdr *cmsg = (struct cmsghdr *) cmsgmem;
+  
   auth_info = (struct OCF_IPC_AUTH *) ch->auth_info;
 
   if (auth_info == NULL) { /* no restriction for authentication */
     return AUTH_OK;
   }
   
-  if (auth_info->check_uid == FALSE && auth_info->check_gid == FALSE) {
+  if (auth_info->uid == FALSE && auth_info->gid == FALSE) {
     return AUTH_OK;    /* no restriction for authentication */
   }
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 
-  /* Point to start of first structure */
-  struct cmsghdr *cmsg = (struct cmsghdr *) cmsgmem;
-  
-  struct iovec iov;
-  char	 buf;
-  struct passwd *pw;
-  
   memset(&msg, 0, sizeof(msg));
-  msg.msg_iov = &iov;
+  msg.msg_iov = (struct iovec *) malloc(sizeof(struct iovec));
   msg.msg_iovlen = 1;
   msg.msg_control = (char *) cmsg;
   msg.msg_controllen = sizeof(cmsgmem);
@@ -430,8 +438,8 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
    * purposes is only to make sure that recvmsg() blocks long enough for
    * the other side to send its credentials.
    */
-  iov.iov_base = &buf;
-  iov.iov_len = 1;
+  msg.msg_iov->iov_base = &buf;
+  msg.msg_iov->iov_len = 1;
   
   if (recvmsg(conn_info->s, &msg, 0) < 0 
       || cmsg->cmsg_len < sizeof(cmsgmem) 
@@ -443,11 +451,11 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
 
   cred = (Cred *) CMSG_DATA(cmsg);
   if (	auth_info->uid
-  &&	g_hash_table_lookup(auth_info->uid, &(cred->uid)) == NULL) {
+  &&	g_hash_table_lookup(auth_info->uid, &(cred->cr_uid)) == NULL) {
 		ret = AUTH_FAIL;
   }
   if (	auth_info->gid
-  &&	g_hash_table_lookup(auth_info->gid, &(cred->gid)) == NULL) {
+  &&	g_hash_table_lookup(auth_info->gid, &(cred->cr_groups)) == NULL) {
 		ret = AUTH_FAIL;
   }
 
