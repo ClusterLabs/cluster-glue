@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.55 2005/02/17 21:45:35 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.56 2005/02/24 20:46:29 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -47,7 +47,7 @@
 
 #define		NEEDAUTH	1
 #define		NOAUTH		0
-#define		MAX_INT_LEN 	10
+#define		MAX_INT_LEN 	64
 #define		MAX_NAME_LEN 	255
 #define		UUID_SLEN	64
 static enum cl_msgfmt msgfmt = MSGFMT_NVPAIR;
@@ -1135,6 +1135,122 @@ cl_msg_list_nth_data(struct ha_msg* msg, const char* name, int n)
 	
 }
 
+GList*
+cl_msg_get_list(struct ha_msg* msg, const char* name)
+{
+	GList*		ret;
+	int		type;
+	
+	ret = cl_get_value( msg, name, NULL, &type);
+	
+	if ( ret == NULL || type != FT_LIST){
+		cl_log(LOG_WARNING, "field %s not found "
+		       " or type mismatch", name);
+		return NULL;
+	}	
+	
+	return ret;
+}
+
+
+int
+cl_msg_add_list_int(struct ha_msg* msg, const char* name,
+		    int* buf, size_t n)
+{
+	
+	GList*		list = NULL;
+	int		i;
+	int		ret;
+	
+	if (n <= 0  || buf == NULL|| name ==NULL ||msg == NULL){
+		cl_log(LOG_ERR, "cl_msg_get_list_int:"
+		       "invalid parameter(%s)", 
+		       !n <= 0?"n is negative or zero": 
+		       !buf?"buf is NULL":
+		       !name?"name is NULL":
+		       "msg is NULL");
+		return HA_FAIL;
+	}
+	
+	for ( i = 0; i < n; i++){
+		char intstr[MAX_INT_LEN];		
+		sprintf(intstr,"%d", buf[i]);
+		list = g_list_append(list, cl_strdup(intstr));
+		if (list == NULL){
+			cl_log(LOG_ERR, "cl_msg_add_list_int:"
+			       "adding integer to list failed");
+			return HA_FAIL;
+		}
+	}
+	
+	ret = ha_msg_addraw(msg, name, strlen(name), list, 
+			    string_list_pack_length(list),
+			    FT_LIST, 0);
+	g_list_free(list);
+	
+	return ret;
+}
+int
+cl_msg_get_list_int(struct ha_msg* msg, const char* name,
+		     int* buf, size_t* n)
+{
+	GList* list;
+	size_t	len;
+	int	i;
+	GList* list_element;
+	
+
+	if (n == NULL || buf == NULL|| name ==NULL ||msg == NULL){
+		cl_log(LOG_ERR, "cl_msg_get_list_int:"
+		       "invalid parameter(%s)", 
+		       !n?"n is NULL": 
+		       !buf?"buf is NULL":
+		       !name?"name is NULL":
+		       "msg is NULL");
+		return HA_FAIL;
+	}
+	
+	list = cl_msg_get_list(msg, name);
+	if (list == NULL){
+		cl_log(LOG_ERR, "cl_msg_get_list_int:"
+		       "list of integers %s not found", name);
+		return HA_FAIL;
+	}
+
+	len = g_list_length(list);
+	if (len > *n){
+		cl_log(LOG_ERR, "cl_msg_get_list_int:"
+		       "buffer too small: *n=%d, required len=%d",
+		       *n, len);
+		*n = len;
+		return HA_FAIL;	
+	}
+	
+	*n = len; 
+	i = 0;
+	list_element = g_list_first(list);
+	while( list_element != NULL){
+		char* intstr = list_element->data;
+		if (intstr == NULL){
+			cl_log(LOG_ERR, "cl_msg_get_list_int:"
+			       "element data is NULL");
+			return HA_FAIL;
+		}		
+		
+		if (sscanf(intstr,"%d", &buf[i]) != 1){
+			cl_log(LOG_ERR, "cl_msg_get_list_int:"
+			       "element data is NULL");
+			return HA_FAIL;
+		}
+		
+		i++;
+		list_element = g_list_next(list_element);
+	}
+	
+	return HA_OK;
+}
+
+
 
 static int
 cl_msg_mod(struct ha_msg * msg, const char * name,
@@ -2151,6 +2267,12 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.56  2005/02/24 20:46:29  gshi
+ * BEAM FIX:
+ *
+ * add list of int support in ha_msg
+ * beam fix in ccm
+ *
  * Revision 1.55  2005/02/17 21:45:35  gshi
  *  use DIMOF to calculate dimention of an array
  *
