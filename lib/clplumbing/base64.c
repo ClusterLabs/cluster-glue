@@ -33,6 +33,7 @@ static char b64chars[]
 int binary_to_base64(void * data, int nbytes, char * output, int outlen);
 int base64_to_binary(char * input, int inlen, void * output, int outlen);
 
+/* Convert from binary to a base64 string (~ according to RFC1341) */
 int
 binary_to_base64(void * data, int nbytes, char * output, int outlen)
 {
@@ -48,7 +49,7 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
 
 	assert(strlen(b64chars) == 64);
 	if (outlen < requiredlen) {
-		ha_log(LOG_ERR, "binary_to_base64: output area too small.");
+		syslog(LOG_ERR, "binary_to_base64: output area too small.");
 		return -1;
 	}
 
@@ -71,21 +72,14 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
 		sixbits = (chunk >> 18) & MASK6;
 		*outptr = b64chars[sixbits]; ++outptr;
 
-//fprintf(stderr, "Adding char [%c] [%d]\n", b64chars[sixbits], sixbits);
-
 		sixbits = (chunk >> 12) & MASK6;
 		*outptr = b64chars[sixbits]; ++outptr;
-
-//fprintf(stderr, "Adding char [%c] [%d]\n", b64chars[sixbits], sixbits);
 
 		sixbits = (chunk >> 6) & MASK6;
 		*outptr = b64chars[sixbits]; ++outptr;
 
-//fprintf(stderr, "Adding char [%c] [%d]\n", b64chars[sixbits], sixbits);
-
 		sixbits = (chunk & MASK6);
 		*outptr = b64chars[sixbits]; ++outptr;
-//fprintf(stderr, "Adding char [%c] [%d]\n", b64chars[sixbits], sixbits);
 	}
 
 	/* Do we have anything left over? */
@@ -129,24 +123,28 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
 }
 
 
-/* This macro usable only in base64_to_binary() */
+/* This macro is only usable by the base64_to_binary() function.
+ *
+ * There are faster ways of doing this, but I didn't spend the time
+ * to implement one of them.  If we have an array of six bit values, 
+ * sized by 256 or so, then we could look it up.
+ * FIXME: This is how it really ought to be done...
+ */
 
 #define	Char2SixBits(in, out)  {				\
 	char * ptmp;						\
 	ptmp = memchr(b64chars, (in), sizeof(b64chars)-1);	\
 	if (ptmp == NULL) {					\
-		ha_log(LOG_ERR					\
-		,	"base64_to_binary: invalid input. %d [%c]!"	\
-					,	in, in);	\
-		fprintf(stderr, "Line #: %d :", __LINE__);	\
-		ha_log(LOG_ERR					\
-		,	"string input. [%s] %d", input, inlen);\
+		syslog(LOG_ERR					\
+		,	"base64_to_binary: invalid input [%c]!"	\
+					,	in);		\
 		return -1;					\
 	}							\
 	out = ((ptmp-b64chars) & MASK6);			\
 	}							\
 	
 
+/* Convert from a base64 string (~ according to RFC1341) to binary */
 int
 base64_to_binary(char * in, int inlen, void * output, int outlen)
 {
@@ -162,7 +160,6 @@ base64_to_binary(char * in, int inlen, void * output, int outlen)
 	unsigned	sixbits4;
 	unsigned long	chunk;
 
-//fprintf(stderr, "Processing [%s]\n", input);
 	/* Make sure we have enough room */
 	if (outlen < maxbinlen) {
 		int	residue = maxbinlen - outlen;
@@ -170,13 +167,13 @@ base64_to_binary(char * in, int inlen, void * output, int outlen)
 		if (residue > 2
 		||	input[inlen-1] != EQUALS
 		||	(residue == 2 && input[inlen-2] != EQUALS))  {
-			ha_log(LOG_ERR
+			syslog(LOG_ERR
 			,	"base64_to_binary: output area too small.");
 			return -1;
 		}
 	}
 	if ((inlen % 4) != 0) {
-		ha_log(LOG_ERR
+		syslog(LOG_ERR
 		,	"base64_to_binary: input length invalid.");
 		return -1;
 	}
@@ -189,10 +186,8 @@ base64_to_binary(char * in, int inlen, void * output, int outlen)
 
 	startout = out = (char *)output;
 
-
 	while (input < lastinput) {
 		unsigned long	chunk;
-
 
 		Char2SixBits(*input, sixbits1); ++input;
 		Char2SixBits(*input, sixbits2); ++input;
@@ -202,7 +197,6 @@ base64_to_binary(char * in, int inlen, void * output, int outlen)
 		chunk = (sixbits1 << 18)
 		|	(sixbits2 << 12) | (sixbits3 << 6) | sixbits4;
 
-
 		*out = ((chunk >> 16) & 0xff);	++out;
 		*out = ((chunk >>  8) & 0xff);	++out;
 		*out = (chunk & 0xff);		++out;
@@ -210,14 +204,9 @@ base64_to_binary(char * in, int inlen, void * output, int outlen)
 
 	/* Process last 4 chars of input (1 to 3 bytes of output) */
 
-//fprintf(stderr, "Whole string: [%s], remaining [%s] lastinput[%s]\n", in, input, lastinput);
-
-
 	/* The first two input chars must be normal chars */
 	Char2SixBits(*input, sixbits1); ++input;
-//fprintf(stderr, "Got six bits as: %d\n", sixbits1);
 	Char2SixBits(*input, sixbits2); ++input;
-//fprintf(stderr, "Got six bits as: %d\n", sixbits2);
 
 	/* We should find one of: (char,char) (char,=) or (=,=) */
 	/* We then output:         (3 bytes)  (2 bytes)  (1 byte) */
@@ -231,7 +220,6 @@ base64_to_binary(char * in, int inlen, void * output, int outlen)
 	}else{
 		/* We have either the (char,char) or (char,=) case */
 		Char2SixBits(*input, sixbits3); ++input;
-//fprintf(stderr, "Got six bits as: %d\n", sixbits3);
 		if (*input == EQUALS) {
 			/* The (char, =): 2 bytes case */
 			equalcount=1;
@@ -239,18 +227,12 @@ base64_to_binary(char * in, int inlen, void * output, int outlen)
 		}else{
 			/* The (char, char): 3 bytes case */
 			Char2SixBits(*input, sixbits4); ++input;
-//fprintf(stderr, "Got six bits as: %d\n", sixbits4);
 			equalcount=0;
 		}
 	}
 
 	chunk = (sixbits1 << 18)
 	|	(sixbits2 << 12) | (sixbits3 << 6) | sixbits4;
-// fprintf(stderr, "Got chunk of: 0x%06lx %ld\n", chunk, chunk);
-// fprintf(stderr, "Sixbits1 : 0x%06o\n", sixbits1);
-// fprintf(stderr, "Sixbits2 : 0x%06o\n", sixbits2);
-// fprintf(stderr, "Sixbits3 : 0x%06o\n", sixbits3);
-// fprintf(stderr, "Sixbits4 : 0x%06o\n", sixbits4);
 
 	/* We always have one more char to output... */
 	*out = ((chunk >> 16) & 0xff); ++out;
@@ -304,7 +286,7 @@ randbin(void * Bin, int length)
 
 #define MAXLEN	320
 #define	MAXSTRING B64_stringlen(MAXLEN)+1
-#define	MAXITER	3000000
+#define	MAXITER	300000
 int
 main(int argc, char ** argv)
 {
@@ -321,7 +303,9 @@ main(int argc, char ** argv)
 		int	slen;
 		int	blen;
 
-fprintf(stderr, "+");
+		if ((j%100) == 99) {
+			fprintf(stderr, "+");
+		}
 
 		memset(origbin, 0, MAXLEN+1);
 		memset(sourcebin, 0, MAXLEN+1);
@@ -396,7 +380,8 @@ fprintf(stderr, "+");
 
 	}
 
-	fprintf(stderr, "%d errors.\n", errcount);
+	fprintf(stderr, "\n%d iterations, %d errors.\n"
+	,	maxiter, errcount);
 
 	return errcount;
 }

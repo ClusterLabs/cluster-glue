@@ -103,7 +103,7 @@ static gboolean socket_is_sending_blocked(struct IPC_CHANNEL *ch);
 
 static int socket_assert_auth(struct IPC_CHANNEL *ch, GHashTable *auth);
 
-static int socket_verify_auth(struct IPC_CHANNEL* ch);
+static int socket_verify_auth(struct IPC_CHANNEL*ch, struct IPC_AUTH*auth_info);
 
 /* for domain socket, reve_fd = send_fd. */
 
@@ -195,8 +195,7 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
     }
   }
   /* verify the client authentication information. */
-  ch->auth_info = auth_info;
-  if (ch->ops->verify_auth(ch) == IPC_OK) {
+  if (ch->ops->verify_auth(ch, auth_info) == IPC_OK) {
     ch->ch_status = IPC_CONNECT;
     ch->farside_pid = socket_get_farside_pid(new_sock);
     return ch;
@@ -215,7 +214,6 @@ socket_destroy_channel(struct IPC_CHANNEL * ch)
   socket_destroy_queue(ch->recv_queue);
   if(ch->ch_private != NULL)
     free((void*)(ch->ch_private));
-  ipc_destroy_auth(ch->auth_info);
   
   free((void*) ch);
 }
@@ -740,7 +738,6 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
   temp_ch->ch_status = IPC_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
-  temp_ch->auth_info = NULL;
   temp_ch->ops = (struct IPC_OPS *)&socket_ops;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
@@ -765,7 +762,6 @@ socket_server_channel_new(int sockfd){
 
   temp_ch->ch_status = IPC_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
-  temp_ch->auth_info = NULL;
   temp_ch->ops = (struct IPC_OPS *)&socket_ops;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
@@ -838,22 +834,17 @@ socket_free_message(struct IPC_MESSAGE * msg) {
 #ifdef USE_SO_PEERCRED
 /* verify the authentication information. */
 static int 
-socket_verify_auth(struct IPC_CHANNEL* ch)
+socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 {
   struct SOCKET_CH_PRIVATE *conn_info;
-  struct IPC_AUTH *auth_info;
   socklen_t n;
   int ret = IPC_OK;
   struct ucred *cred;
   
   
-  auth_info = (struct IPC_AUTH *) ch->auth_info;
 
-  if (auth_info == NULL) { /* no restriction for authentication */
-    return IPC_OK;
-  }
-  
-  if (auth_info->uid == NULL && auth_info->gid == NULL) {
+  if (auth_info == NULL
+  ||	(auth_info->uid == NULL && auth_info->gid == NULL)) {
     return IPC_OK;    /* no restriction for authentication */
   }
 
@@ -917,7 +908,9 @@ socket_get_farside_pid(int sockfd )
 
 /* Done.... Haven't tested yet. */
 static int 
-socket_verify_auth(struct IPC_CHANNEL* ch)
+socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
+{
+  struct SOCKET_CH_PRIVATE *conn_info;
 {
   struct msghdr msg;
   /* Credentials structure */
@@ -942,7 +935,6 @@ socket_verify_auth(struct IPC_CHANNEL* ch)
 #endif
   Cred	   *cred;
   struct SOCKET_CH_PRIVATE *conn_info;
-  struct IPC_AUTH *auth_info;
   int ret = IPC_OK;
   char         buf;
   
@@ -952,13 +944,9 @@ socket_verify_auth(struct IPC_CHANNEL* ch)
   /* Point to start of first structure */
   struct cmsghdr *cmsg = (struct cmsghdr *) cmsgmem;
   
-  auth_info = (struct IPC_AUTH *) ch->auth_info;
 
-  if (auth_info == NULL) { /* no restriction for authentication */
-    return IPC_OK;
-  }
-  
-  if (auth_info->uid == FALSE && auth_info->gid == FALSE) {
+  if (auth_info == NULL
+  ||	(auth_info->uid == NULL && auth_info->gid == NULL)) {
     return IPC_OK;    /* no restriction for authentication */
   }
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
@@ -1010,7 +998,8 @@ socket_verify_auth(struct IPC_CHANNEL* ch)
  */
 
 pid_t
-socket_get_farside_pid(int sock){
+socket_get_farside_pid(int sock)
+{
 	/* FIXME! */
 	return -1;
 }
@@ -1023,7 +1012,7 @@ socket_get_farside_pid(int sock){
 
 #ifdef USE_DUMMY_CREDS
 static int 
-socket_verify_auth(struct IPC_CHANNEL* ch)
+socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 {
 	return IPC_FAIL;
 }
