@@ -39,21 +39,21 @@
 #include <stdlib.h>
 #endif
 
-//constants
+/* constants */
 #define DEFAULT_MAX_QLEN 20
 #define MAX_MESSAGE_SIZE 4096
 
-//Authentication status
+/* Authentication status */
 #define AUTH_OK 0
 #define AUTH_FAIL 1
 
 
-//channel and connection status
+/* channel and connection status */
 #define CH_CONNECT 0
 #define CH_WAIT 1
 #define CH_DISCONNECT 2
 
-//general return values
+/* general return values */
 #define CH_SUCCESS 0
 #define CH_FAIL 1
 #define CH_BROKEN 2
@@ -76,9 +76,13 @@ struct OCF_IPC_CHANNEL{
   struct OCF_IPC_AUTH* auth_info;
   /* the channel private data. May contain the connection information*/
   void* ch_private;
-  /*! below two queues are channel's internal queues. They should not be 
-     accessed by user directly.*/
-  /* the queue used to contain sending messages.*/
+  /*
+   *  There two queues in channel. One is for sending and the other
+   *  is for receiving. 
+   *  Those two queues are channel's internal queues. They should not be 
+   *  accessed by user directly.
+   *
+   */
   struct OCF_IPC_QUEUE* send_queue; 
   /* the queue used to contain receving messages.*/
   struct OCF_IPC_QUEUE* recv_queue; 
@@ -103,9 +107,13 @@ struct OCF_IPC_AUTH {
 struct OCF_IPC_MESSAGE{
   unsigned long msg_len;
   void* msg_body;
-  /*! 
-    \brief the callback function pointer which will be called after this message is sent, received or processed.
-    \param msg \b (IN) the pointer points back to the message.
+  /* 
+   * OCF_IPC_MESSAGE::msg_done 
+   *   the callback function pointer which can be called after this 
+   *   message is sent, received or processed.
+   * Parameter:
+   *   msg: the back pointer to the message which contains this function pointer.
+   * 
   */
   void (* msg_done)(struct OCF_IPC_MESSAGE * msg);
   /* the message private data. Sometimes can also be used by above callback function. */
@@ -115,157 +123,254 @@ struct OCF_IPC_MESSAGE{
 };
 
 struct OCF_IPC_WAIT_OPS{
-  /*!
-    \brief detroy the wait connection and free the memory space used by this wait connection.
-    \param wait_conn \b (IN) the pointer to the wait connection.
+  /*
+   * OCF_IPC_WAIT_OPS::destroy
+   *   detroy the wait connection and free the memory space used by this wait connection.
+   * 
+   * parameters:
+   *   wait_conn (IN):  the pointer to the wait connection.
+   *
   */ 
   void (* destroy)(struct OCF_IPC_WAIT_CONNECTION *wait_conn);
-  /*! 
-    \brief provide a fd which user can listen on for a new coming connection.
-    \param wait_conn \b (IN) the pointer to the wait connection which contains the select id.
-    \retval integer >= 0  the select_fd.
-    \retval -1   can't get the select fd.
+  /*
+   * OCF_IPC_WAIT_OPS::get_select_fd
+   *   provide a fd which user can listen on for a new coming connection.
+   * parameters: 
+   *   wait_conn (IN) : the pointer to the wait connection which contains the select id.
+   * return values:
+   *   integer >= 0 :  the select_fd.
+   *       -1       :  can't get the select fd.
+   *
   */
   int (* get_select_fd)(struct OCF_IPC_WAIT_CONNECTION *wait_conn);
-  /*! 
-    \brief accept and create a new connection and verify the authentication.
-    \param wait_conn \b (IN) the waiting connection which will accept create the new connection.
-    \param auth_info \b (IN) the authentication infromation which will be assigned to the new connection.
-    \retval the pointer to the new IPC channel; NULL if the creation or authentication fail.
+  /*
+   * OCF_IPC_WAIT_OPS::accept_connection
+   *   accept and create a new connection and verify the authentication.
+   * parameters:
+   *   wait_conn (IN) : the waiting connection which will accept create the new connection.
+   *   auth_info (IN) : the authentication infromation which will be assigned to the new connection.
+   * return values:
+   *   the pointer to the new IPC channel; NULL if the creation or authentication fail.
+   *
   */
   struct OCF_IPC_CHANNEL* (* accept_connection)(struct OCF_IPC_WAIT_CONNECTION * wait_conn, struct OCF_IPC_AUTH *auth_info);
 };
 
 /* channel function table. */
 struct OCF_IPC_OPS{
-  /*!
-    \brief destory the channel object.
-    \param ch \b (IN) the pointer to the channel which will be destroied.
+  /*
+   * OCF_IPC_OPS::destroy
+   *   brief destory the channel object.
+   * parameters:
+   *   ch  (IN) : the pointer to the channel which will be destroied.
+   *
   */
   void  (*destroy) (struct OCF_IPC_CHANNEL* ch);
-  /*! 
-    \brief used by service user side to set up a connection.
-    \param ch \b (IN) the pointer to channel used to initiate the connection. 
-    \retval CH_SUCCESS the channel set up the connection succesully.
-    \retval CH_FAIL the connection initiation fails.
+  /*
+   * OCF_IPC_OPS::initiate_connection
+   *   used by service user side to set up a connection.
+   * parameters:
+   *   ch (IN) : the pointer to channel used to initiate the connection. 
+   * return values:
+   *   CH_SUCCESS  : the channel set up the connection succesully.
+   *   CH_FAIL     : the connection initiation fails.
+   *
   */
   int (* initiate_connection) (struct OCF_IPC_CHANNEL* ch);
-  /*! 
-    \brief used by service provider to verify the authentication of peer.
-    \param ch \b (IN) the pointer to the channel.
-    \retval AUTH_OK the peer is trust.
-    \retval AUTH_FAIL verifying authentication fails.
+  /*
+   * OCF_IPC_OPS::verify_auth
+   *   used by service provider to verify the authentication of peer.
+   * parameters
+   *   ch (IN) : the pointer to the channel.
+   * return values:
+   *   AUTH_OK   : the peer is trust.
+   *   AUTH_FAIL : verifying authentication fails.
+   *
   */
   int (* verify_auth) (struct OCF_IPC_CHANNEL* ch);
-  /*! 
-   \brief service user asserts to be certain qualified service user.
-   \param ch \b (IN) the avtive channel.
-   \param auth \b (IN) the hash table contain the asserting information.
-   \retval CH_SUCCESS assert the authentication succefully.
-   \retval CH_FAIL assertion fails.
+  /*
+   * OCF_IPC_OPS::assert_auth
+   *   service user asserts to be certain qualified service user.
+   * parameters:
+   *   ch    (IN):  the active channel.
+   *   auth  (IN):  the hash table contain the asserting information.
+   * return values:
+   *   CH_SUCCESS :  assert the authentication succefully.
+   *   CH_FAIL    : assertion fails.
   */
   int (* assert_auth) (struct OCF_IPC_CHANNEL* ch, GHashTable * auth);
-  /*!
-    \brief  send the message through the sending connection.
-    \param ch \b (IN) the channel which contains the connection.
-    \param msg \b (IN) pointer to the sending message. User should allocate the message space.
-    \retval CH_SUCCESS the message was either sent out successfully or appended in the send_queue.
-    \retval CH_FAIL the send operation fails.
-    \retval CH_BROKEN the channel is broken.
+  /*
+   * OCF_IPC_OPS::send
+   *   send the message through the sending connection.
+   * parameters:
+   *   ch  (IN) : the channel which contains the connection.
+   *   msg (IN) : pointer to the sending message. User should allocate the message space.
+   * return values:
+   *   CH_SUCCESS : the message was either sent out successfully or appended in the send_queue.
+   *   CH_FAIL    : the send operation fails.
+   *   CH_BROKEN  : the channel is broken.
+   *
   */    
   int (* send) (struct OCF_IPC_CHANNEL* ch, struct OCF_IPC_MESSAGE* msg);
-  /*!
-    \brief receive the message through receving queue.
-    \param ch \b (IN) the channel which contains the connection.
-    \param msg \b (OUT) the OCF_IPC_MESSAGE** which contain the pointer to the recevied message or NULL if there is no message available.
-    \retval CH_SUCCESS reveive operation is finished successfully.
-    \retval CH_FAIL operation fails.
-    \retval CH_BROKEN the channel is broken.
-    \note return value CH_SUCCESS doesn't mean the message is already sent out to the peer. It may be pending
-     in the send_queue. In order to make sure the message it out, please specify the msg_done function in the
-     message structure and once this function is called, the message is out.
+  /*
+   * OCF_IPC_OPS::recv
+   *   receive the message through receving queue.
+   * parameters:
+   *   ch  (IN) : the channel which contains the connection.
+   *   msg (OUT): the OCF_IPC_MESSAGE** pointer which contains the pointer to the recevied message 
+   *              or NULL if there is no message available.
+   * return values:
+   *   CH_SUCCESS : reveive operation is finished successfully.
+   *   CH_FAIL    : operation fails.
+   *   CH_BROKEN  : the channel is broken.
+   *
+   * note: 
+   *   return value CH_SUCCESS doesn't mean the message is already 
+   *   sent out to the peer. It may be pending in the send_queue. In order to 
+   *   make sure the message it out, please specify the msg_done function in the
+   *   message structure and once this function is called, the message is out.
+   *
+   *   is_sending_blocked() is another way to check if there is message 
+   *   pending in the send_queue. 
   */
   int (* recv) (struct OCF_IPC_CHANNEL* ch, struct OCF_IPC_MESSAGE** msg);
-  /*! 
-    \brief check the recv_queue to see if there is any messages available. 
-    \param ch \b (IN) the pointer to the channel. 
-    \retval TRUE there are messages pending in the rece_queue.
-    \return FALSE there is no message pending in the rece_queue.
+  /*
+   * OCF_IPC_OPS::is_message_pending
+   *   check the recv_queue to see if there is any messages available. 
+   * parameters:
+   *   ch (IN) : the pointer to the channel.
+   * return values:
+   *   TRUE : there are messages pending in the rece_queue.
+   *   FALSE: there is no message pending in the rece_queue.
+   *
   */
   gboolean (* is_message_pending) (struct OCF_IPC_CHANNEL * ch);
-  
-  /* check the send_queue to see if there is any message blocking. */
+  /*
+   * OCF_IPC_OPS::is_sending_blocked
+   *   check the send_queue to see if there is any messages blocked. 
+   * parameters:
+   *   ch (IN) : the pointer to the channel.
+   * return values:
+   *   TRUE : there are messages blocked in the send_queue.
+   *   FALSE: there is no message blocked in the send_queue.
+   *
+  */  
   gboolean (* is_sending_blocked) (struct OCF_IPC_CHANNEL *ch);
-  /*! 
-    \brief resume all possible IO operations through the inner connection . 
-    \param the pointer to the channel.
-    \retval CH_SUCCSS resume all the possible I/O operation succefully.
-    \retval CH_FAIL the operation fails.
-    \retval CH_BROEKN the channel is broken.
+  /*
+   * OCF_IPC_OPS::resume_io
+   *   brief resume all possible IO operations through the inner connection . 
+   * parameters:
+   *   the pointer to the channel.
+   * return values:
+   *   CH_SUCCSS : resume all the possible I/O operation succefully.
+   *   CH_FAIL   : the operation fails.
+   *   CH_BROEKN : the channel is broken.
+   *
   */
   int (* resume_io) (struct OCF_IPC_CHANNEL *ch);
-  /*! 
-    \brief return a file descriptor which can be given to select.
-    \param ch \b (IN) the pointer to the channel.
-    \retval interger >= 0 : the send fd for selection.
-    \retval -1 there is no send fd.
+  /*
+   * OCF_IPC_OPS::get_send_select_fd 
+   *   return a file descriptor which can be given to select. this fd is
+   *   for sending.
+   * parameters:
+   *   ch (IN) : the pointer to the channel.
+   * return values:
+   *   interger >= 0 : the send fd for selection.
+   *      -1         : there is no send fd.
+   *
   */
   int   (* get_send_select_fd) (struct OCF_IPC_CHANNEL* ch);
-  /*! 
-    \brief return a file descriptor which can be given to select.
-    \param ch \b (IN) the pointer to the channel.
-    \retval interger >= 0 : the recv fd for selection.
-    \retval -1 there is no recv fd.
+  /*
+   * OCF_IPC_OPS::get_recv_select_fd
+   *   return a file descriptor which can be given to select. This fd
+   *   is for receiving.
+   * parameters:
+   *   ch (IN) : the pointer to the channel.
+   * return values:
+   *   interger >= 0 : the recv fd for selection.
+   *       -1        : there is no recv fd.
+   *
   */
   int   (* get_recv_select_fd) (struct OCF_IPC_CHANNEL* ch);
-  /*!
-    \brief allow user to set the maximum send_queue length.
-    \param ch \b (IN) the pointer to the channel.
-    \param q_len \b (IN) the max length for the send_queue.
-    \retval CH_SUCCESS set the send queue length successfully.
-    \retval CH_FAIL there is no send queue.
+  /*
+   * OCF_IPC_OPS::set_send_qlen
+   *   allow user to set the maximum send_queue length.
+   * parameters
+   *   ch    (IN) : the pointer to the channel.
+   *   q_len (IN) : the max length for the send_queue.
+   * return values:
+   *   CH_SUCCESS : set the send queue length successfully.
+   *   CH_FAIL    : there is no send queue.we are not supposed to get this return value.
+   *                It means something bad happened.
+   *
   */
   int  (* set_send_qlen) (struct OCF_IPC_CHANNEL* ch, int q_len);
-  /*!
-    \brief allow user to set the maximum recv_queue length.
-    \param ch \b (IN) the pointer to the channel.
-    \param q_len \b (IN) the max length for the recv_queue.
-    \retval CH_SUCCESS set the recv queue length successfully.
-    \retval CH_FAIL there is no recv queue.
+  /*
+   * OCF_IPC_OPS::set_recv_qlen
+   *   allow user to set the maximum recv_queue length.
+   * parameters:
+   *   ch    (IN) : the pointer to the channel.
+   *   q_len (IN) : the max length for the recv_queue.
+   * return values:
+   *   CH_SUCCESS : set the recv queue length successfully.
+   *   CH_FAIL    : there is no recv queue.
+   *
   */
   int  (* set_recv_qlen) (struct OCF_IPC_CHANNEL* ch, int q_len);
 };
 
 /* below functions are implemented in ocf_ipc.c */
 
-/*! 
-  \brief the common constructor for ipc waiting connection. Use ch_type to identify the connection type. 
-  \param ch_type \b (IN) the type of the waiting connection you want to create.
-  \param ch_attrs \b (IN) the hash table which contains the attributes needed by this waiting connection.
-  \retval the pointer to a new waiting connection or NULL if the connection can't be created.
-  \note current channel types only  contain "domain_socket".
+/*
+ * ipc_wait_conn_constructor:
+ *    the common constructor for ipc waiting connection. 
+ *    Use ch_type to identify the connection type. Usually it's only
+ *    needed by server side.
+ * parameters:
+ *    ch_type   (IN) : the type of the waiting connection you want to create.
+ *    ch_attrs  (IN) : the hash table which contains the attributes needed by this waiting connection.
+ *                     For example, the only attribute needed by doamin socket is path name.
+ * return values:
+ *    the pointer to a new waiting connection or NULL if the connection can't be created.
+ * note:
+ *    current implementation only support unix domain socket 
+ *    whose type is IPC_DOMAIN_SOCKET 
+ *
 */
 extern struct OCF_IPC_WAIT_CONNECTION * ipc_wait_conn_constructor(const char * ch_type
 ,	GHashTable* ch_attrs);
 
-/*! 
-  \brief the common constructor for ipc channel. Use ch_type to identify the channel type.
-  \param ch_type \b (IN) the type of the channel you want to create.
-  \param ch_attrs \b (IN) the hash table which contains the attributes needed by this channel.
-  \retval the pointer to the new channel whose status is CH_DISCONNECT or NULL if the channel can't be created.
-  \note current channel types only  contain "domain_socket".
+/*
+ * ipc_channel_constructor:
+ *   brief the common constructor for ipc channel. 
+ *   Use ch_type to identify the channel type.
+ *   Usually this function is only called by client side.
+ * parameters:
+ *   ch_type  (IN): the type of the channel you want to create.
+ *   ch_attrs (IN): the hash table which contains the attributes needed by this channel.
+ *                  For example, the only attribute needed by doamin socket is path name.
+ * return values:
+ *   the pointer to the new channel whose status is CH_DISCONNECT or NULL if the channel can't be created.
+ * note:
+ *   current implementation only support unix domain socket 
+ *   whose type is IPC_DOMAIN_SOCKET 
+ *
 */
 extern struct OCF_IPC_CHANNEL * ipc_channel_constructor(const char * ch_type
 ,	GHashTable* ch_attrs);
 
-/*! 
-  \brief the wapper function used to convert array of uid and gid into a authetication structure.
-  \param a_uid \b (IN) the array of a set of user ids.
-  \param a_gid \b (IN) the array of a set of group ids.
-  \param num_uid \b (IN) the number of user ids.
-  \param num_gid \b (IN) the number of group ids.
-  \retval the pointer to the authentication structure which contain the set of uid and the set of gid.
-  Or NULL if this sturcture can't be created.
+/*
+ * ipc_set_auth:
+ *   the wapper function used to convert array of uid and gid into a authetication structure.
+ * parameters:
+ *   a_uid    (IN): the array of a set of user ids.
+ *   a_gid    (IN): the array of a set of group ids.
+ *   num_uid  (IN): the number of user ids.
+ *   num_gid  (IN): the number of group ids.
+ * return values:
+ *   the pointer to the authentication structure which contains the 
+ *   set of uid and the set of gid. Or NULL if this sturcture can't be created.
+ *
 */
 extern struct OCF_IPC_AUTH * ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid);			   
 
@@ -273,7 +378,6 @@ extern void ipc_destroy_auth(struct OCF_IPC_AUTH * auth);
 
 
 #define	PATH_ATTR		"path"		/* pathname attribute */
-#define	SOCK_ATTR		"socket"	/* socket fd attribute */
 #define	IPC_DOMAIN_SOCKET	"uds"		/* Unix domain socket */
 
 #ifdef IPC_DOMAIN_SOCKET
