@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.9 2005/02/08 18:27:35 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.10 2005/02/08 18:49:07 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -165,11 +165,21 @@ static void	cl_dump_item(const struct cl_bucket*b);
 #endif
 #	define GUARDSIZE	sizeof(cl_malloc_guard)
 #	define	ADD_GUARD(cp)	(memcpy((((char*)cp)+MEMORYSIZE(cp)), cl_malloc_guard, sizeof(cl_malloc_guard)))
-#	define	GUARD_IS_OK(cp)	(memcmp((((const char*)cp)+MEMORYSIZE(cp)), cl_malloc_guard, sizeof(cl_malloc_guard)) == 0)
+#	define	GUARD_IS_OK(cp)	(memcmp((((const char*)cp)+MEMORYSIZE(cp)),	\
+				cl_malloc_guard, sizeof(cl_malloc_guard)) == 0)
+#	define CHECK_GUARD_BYTES(cp, msg)	{					\
+		if (!GUARD_IS_OK(cp)) {							\
+			cl_log(LOG_ERR, "%s: guard corrupted at 0x%lx", msg		\
+			,	(unsigned long)cp);					\
+			cl_dump_item(CBHDR(cp));					\
+			DUMPIFASKED();							\
+		}									\
+	}
 #else
 #	define GUARDSIZE	0
 #	define ADD_GUARD(cp)	/* */
 #	define GUARD_IS_OK(cp)	(1)
+#	define CHECK_GUARD_BYTES(cp, msg)	/* */
 #endif
 
 
@@ -283,7 +293,7 @@ cl_is_allocated(const void *ptr)
 		return TRUE;
 	}
 	cl_log(LOG_ERR
-	,	"cl_is_allocated: storage is guard-corrupted  at 0x%lx"
+	,	"cl_is_allocated: supplied storage is guard-corrupted at 0x%lx"
 	,	(unsigned long)ptr);
 	cl_dump_item(CBHDR(ptr));
 	DUMPIFASKED();
@@ -437,13 +447,7 @@ cl_realloc(void *ptr, size_t newsize)
 			break;
 	}
 #endif
-	if (!GUARD_IS_OK(ptr)) {
-		cl_log(LOG_ERR
-		,	"cl_realloc: realloc()ing guard-corrupted"
-		" object at 0x%lx (!)", (unsigned long)ptr);
-		cl_dump_item(bhdr);
-		DUMPIFASKED();
-	}
+	CHECK_GUARD_BYTES(ptr, "cl_realloc");
 	bucket = bhdr->hdr.bucket;
 
 	/*
@@ -451,6 +455,7 @@ cl_realloc(void *ptr, size_t newsize)
 	 */
 
 	if (bucket >= NUMBUCKS) {
+		/* Not from our bucket-area... Call realloc... */
 		if (memstats) {
 			if (memstats->nbytes_alloc >= bhdr->hdr.reqsize) {
 				memstats->nbytes_req   -= bhdr->hdr.reqsize;
@@ -461,7 +466,6 @@ cl_realloc(void *ptr, size_t newsize)
 			memstats->nbytes_alloc += newsize;
 			memstats->mallocbytes  += newsize;
 		}
-		/* Not from our bucket-area... Call realloc... */
 		bhdr = realloc(bhdr, newsize + cl_malloc_hdr_offset + GUARDSIZE);
 		if (!bhdr) {
 			return NULL;
@@ -469,6 +473,7 @@ cl_realloc(void *ptr, size_t newsize)
 		bhdr->hdr.reqsize = newsize;
 		ptr = (((char*)bhdr)+cl_malloc_hdr_offset);
 		ADD_GUARD(ptr);
+		CHECK_GUARD_BYTES(ptr, "cl_realloc - real realloc return value");
 		/* Not really a  memory leak...  BEAM thinks so though... */
 		return ptr; /*memory leak*/
 	}
@@ -483,6 +488,7 @@ cl_realloc(void *ptr, size_t newsize)
 			memcpy(newret, ptr, bhdr->hdr.reqsize);
 		}
 		cl_free(ptr);
+		CHECK_GUARD_BYTES(newret, "cl_realloc - cl_malloc case");
 		return newret;
 	}
 
@@ -495,6 +501,7 @@ cl_realloc(void *ptr, size_t newsize)
 		memstats->nbytes_req  += newsize;
 	}
 	ADD_GUARD(ptr);
+	CHECK_GUARD_BYTES(ptr, "cl_realloc - fits in existing space");
 	return ptr;
 }
 
