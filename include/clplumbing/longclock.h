@@ -1,4 +1,4 @@
-/* $Id: longclock.h,v 1.6 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: longclock.h,v 1.7 2004/03/25 08:20:33 alan Exp $ */
 /*
  * Longclock operations
  *
@@ -46,6 +46,10 @@
  *
  *	unsigned long	longclockto_ms(longclock_t);
  *			Converts quantity in longclock_t to milliseconds
+ *			NOTE: Can overflow!
+ *
+ *	unsigned long	longclockto_long(longclock_t);
+ *			Converts quantity in longclock_t to clock_t
  *			NOTE: Can overflow!
  *
  *	longclock_t	secsto_longclock(unsigned long);
@@ -100,7 +104,8 @@ longclock_t	dsecsto_longclock(double);
 
 longclock_t	msto_longclock(unsigned long);
 
-unsigned long	longclockto_ms(longclock_t);	/* Can overflow! */
+unsigned long	longclockto_ms(longclock_t);		/* Can overflow! */
+long		longclockto_long(longclock_t);		/* May overflow! */
 
 longclock_t	secsto_longclock(unsigned long);
 
@@ -122,6 +127,7 @@ int		cmp_longclock(longclock_t l, longclock_t r);
 
 #	define	longclockto_ms(l)				\
 	(unsigned long)(secs_to_longclock(l)/1000)
+#	define	longclockto_long(lc)	((long)(lc))
 
 #	define	add_longclock(l,r)			\
 	((longclock_t)(l) + (longclock_t)(r))
