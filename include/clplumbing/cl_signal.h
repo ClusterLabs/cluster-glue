@@ -35,7 +35,11 @@ typedef struct {
 
 #define CL_SIGNAL(_sig, _handler) \
 	cl_signal_set_simple_handler((_sig), (_handler), NULL)
+#if HAVE_SIGIGNORE
+#define CL_IGNORE_SIG(_sig) sigignore((_sig))
+#else
 #define CL_IGNORE_SIG(_sig) CL_SIGNAL((_sig), SIG_IGN)
+#endif
 #define CL_DEFAULT_SIG(_sig) CL_SIGNAL((_sig), SIG_DFL)
 
 #define CL_SIGINTERRUPT(_sig, _flag) siginterrupt((_sig), (_flag))
