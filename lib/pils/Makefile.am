@@ -24,7 +24,7 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 
 
-CFLAGS			= @CFLAGS@
+AM_CFLAGS			= @CFLAGS@
 
 ## include files
 #pkginclude_HEADERS	= $(top_srcdir)/include/pils/plugin.h \
