@@ -1,4 +1,4 @@
-/* $Id: stonith.c,v 1.13 2005/01/08 06:01:17 alan Exp $ */
+/* $Id: stonith.c,v 1.14 2005/01/10 08:35:43 alan Exp $ */
 /*
  * Stonith API infrastructure.
  *
@@ -374,5 +374,5 @@ free_NVpair(StonithNVpair* nv)
 			free(this->s_value);
 		}
 	}
-	free(this);
+	free(nv);
 }
