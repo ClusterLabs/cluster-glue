@@ -128,7 +128,7 @@ struct RAExecOps {
 	 *	-1: failed due to invalid RA directory such as not existing.
 	 *	-2: failed due to other factors
 	 */
-	int (*get_provider_list)(const char* op_type, GList ** providers);
+	int (*get_provider_list)(const char* ra_type, GList ** providers);
 
 	/*
 	 * Description:
