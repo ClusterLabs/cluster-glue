@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.24 2004/09/23 03:46:43 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.25 2004/09/27 08:47:13 zhenh Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1267,8 +1267,6 @@ cl_get_struct(const struct ha_msg *msg, const char* name)
 	ret = (struct ha_msg *)cl_get_value(msg, name, &vallen, &type);
 	
 	if (ret == NULL || type != FT_STRUCT){
-		cl_log(LOG_WARNING, "field %s not found "
-		       " or type mismatch", name);
 		return(NULL);
 	}
 	return(ret);
@@ -1283,8 +1281,6 @@ cl_msg_list_length(struct ha_msg* msg, const char* name)
 	ret = cl_get_value( msg, name, NULL, &type);
 	
 	if ( ret == NULL || type != FT_LIST){
-		cl_log(LOG_WARNING, "field %s not found "
-		       " or type mismatch", name);
 		return -1;
 	}
 
@@ -2388,6 +2384,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.25  2004/09/27 08:47:13  zhenh
+ * getting a non-existing field should not get a warning
+ *
  * Revision 1.24  2004/09/23 03:46:43  gshi
  * fixed a sprintf format warning
  * fixed some comments
