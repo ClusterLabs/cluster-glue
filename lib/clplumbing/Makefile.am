@@ -48,7 +48,7 @@ libplumb_la_SOURCES	= 		\
 			uids.c
 
 testdir = $(libdir)/@HB_PKG@
-test_PROGRAMS = ipctest ipctransientclient ipctransientserver
+test_PROGRAMS = ipctest # ipctransientclient ipctransientserver
 
 libplumb_la_LDFLAGS	= -version-info 0:0:0
 
@@ -58,8 +58,12 @@ ipctest_LDADD = libplumb.la $(GLIBLIB)
 #ipctransient_SOURCES = ipctransient.c
 #ipctransient_LDADD = libplumb.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
 
-ipctransientclient_SOURCES = ipctransientclient.c
-ipctransientclient_LDADD = libplumb.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
+# Cannot put things in the lib directory which depend on libs not in this directory
+# It won't build.
+#ipctransientclient_SOURCES = ipctransientclient.c
+#ipctransientclient_LDADD = libplumb.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
 
-ipctransientserver_SOURCES = ipctransientserver.c
-ipctransientserver_LDADD = libplumb.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
+# Cannot put things in the lib directory which depend on other libraries...
+# It won't build.
+#ipctransientserver_SOURCES = ipctransientserver.c
+#ipctransientserver_LDADD = libplumb.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
