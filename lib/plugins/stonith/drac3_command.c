@@ -128,7 +128,9 @@ writeFunction (void *ptr, size_t size, size_t nmemb, void *data)
 int 
 drac3InitCurl (CURL *curl)
 {
+#ifdef CURLOPT_NOSIGNAL
     if (curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1)) return(1);
+#endif
     if (curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30)) return(1);
     if (curl_easy_setopt(curl, CURLOPT_VERBOSE, 0)) return(1);
     if (curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeFunction)) return(1);
