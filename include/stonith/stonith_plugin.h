@@ -1,4 +1,4 @@
-/* $Id: stonith_plugin.h,v 1.2 2005/01/05 04:04:02 alan Exp $ */
+/* $Id: stonith_plugin.h,v 1.3 2005/01/08 06:01:16 alan Exp $ */
 /*
  *	S hoot
  *	T he
@@ -97,7 +97,7 @@ typedef struct {
 
 struct StonithImports_s {
 	int (*ExpectToken)(int fd, struct Etoken * toklist, int to_secs
-	,	char * buf, int maxline);
+	,	char * buf, int maxline, int debug);
 	int (*StartProcess)(const char * cmd, int * readfd, int * writefd);
 	int (*OpenStreamSocket) (const char * host, int port
 	,		const char * service);

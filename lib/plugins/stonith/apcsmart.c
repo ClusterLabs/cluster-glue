@@ -1,4 +1,4 @@
-/* $Id: apcsmart.c,v 1.22 2005/01/04 07:31:29 alan Exp $ */
+/* $Id: apcsmart.c,v 1.23 2005/01/08 06:01:17 alan Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>
@@ -23,7 +23,6 @@
  *  Significantly mangled by Alan Robertson <alanr@unix.sh>
  */
 
-/* #define APC_DEBUG	1 */
 #define	DEVICE	                "APCSmart-Stonith"
 
 #include "stonith_plugin_common.h"
@@ -236,15 +235,15 @@ file_unlock(int fd)
 void
 APC_sh_serial_timeout(int sig)
 {
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
 	STONITH_IGNORE_SIG(SIGALRM);
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: serial port timed out.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: serial port timed out.", __FUNCTION__);
+	}
 
 	f_serialtimeout = TRUE;
 
@@ -261,9 +260,9 @@ APC_open_serialport(const char *port, speed_t speed)
 	struct termios tio;
 	int fd;
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
 	STONITH_SIGNAL(SIGALRM, APC_sh_serial_timeout);
 
@@ -277,18 +276,16 @@ APC_open_serialport(const char *port, speed_t speed)
 	STONITH_IGNORE_SIG(SIGALRM);
 
 	if (fd < 0) {
-
-#ifdef APC_DEBUG
-		LOG(PIL_DEBUG, "%s: 1st open failed.", __FUNCTION__);
-#endif
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: 1st open failed.", __FUNCTION__);
+		}
 		return (f_serialtimeout ? S_TIMEOUT : S_OOPS);
 	}
 
 	if (file_lock(fd) != 0) {
-
-#ifdef APC_DEBUG
-		LOG(PIL_DEBUG, "%s: 1st lock failed.", __FUNCTION__);
-#endif
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: 1st lock failed.", __FUNCTION__);
+		}
 		return (S_OOPS);
 	}
 
@@ -319,18 +316,16 @@ APC_open_serialport(const char *port, speed_t speed)
 	STONITH_IGNORE_SIG(SIGALRM);
 
 	if (fd < 0) {
-
-#ifdef APC_DEBUG
-		LOG(PIL_DEBUG, "%s: 2nd open failed.", __FUNCTION__);
-#endif
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: 2nd open failed.", __FUNCTION__);
+		}
 		return (f_serialtimeout ? S_TIMEOUT : S_OOPS);
 	}
 
 	if (file_lock(fd) != 0) {
-
-#ifdef APC_DEBUG
-		LOG(PIL_DEBUG, "%s: 2nd lock failed.", __FUNCTION__);
-#endif
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: 2nd lock failed.", __FUNCTION__);
+		}
 
 		return (f_serialtimeout ? S_TIMEOUT : S_OOPS);
 	}
@@ -361,9 +356,9 @@ void
 APC_close_serialport(int upsfd)
 {
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
 	file_unlock(upsfd);
 
@@ -381,9 +376,9 @@ APC_send_cmd(int upsfd, const char *cmd)
 {
 	int i;
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s(\"%s\")", __FUNCTION__, cmd);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s(\"%s\")", __FUNCTION__, cmd);
+	}
 
 	tcflush(upsfd, TCIFLUSH);
 	for (i = strlen(cmd); i > 0; i--) {
@@ -407,9 +402,9 @@ APC_recv_rsp(int upsfd, char *rsp)
 	char inp;
 	int num = 0;
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
 	*p = '\0';
 
@@ -433,10 +428,10 @@ APC_recv_rsp(int upsfd, char *rsp)
 				STONITH_IGNORE_SIG(SIGALRM);
 
 				*p = '\0';
-#ifdef APC_DEBUG
-				LOG(PIL_DEBUG, "return(\"%s\")/*%s*/;"
-				,	rsp, __FUNCTION__);
-#endif
+				if (Debug) {
+					LOG(PIL_DEBUG, "return(\"%s\")/*%s*/;"
+					,	rsp, __FUNCTION__);
+				}
 				return (S_OK);
 			}
 
@@ -464,9 +459,9 @@ APC_enter_smartmode(int upsfd)
     int rc;
     char resp[MAX_STRING];
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
 	strcpy(resp, RSP_SMART_MODE);
 
@@ -490,9 +485,9 @@ APC_set_ups_var(int upsfd, const char *cmd, char *newval)
 	char orig[MAX_STRING];
 	int rc;
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
 	if (((rc = APC_enter_smartmode(upsfd)) != S_OK)
 	||	((rc = APC_send_cmd(upsfd, cmd)) != S_OK)
@@ -542,9 +537,9 @@ APC_init(struct pluginDevice *ad)
 	int upsfd;
 	char value[MAX_STRING];
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
 	/* if ad->upsfd == -1 -> dev configured! */
 	if(ad->upsfd >= 0 ) {
@@ -596,9 +591,9 @@ static const char**
 apcsmart_get_confignames(StonithPlugin* sp)
 {
 	static const char * names[] =  {ST_TTYDEV, ST_HOSTLIST, NULL};
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 	return names;
 }
 
@@ -617,9 +612,9 @@ apcsmart_set_config(StonithPlugin * s, StonithNVpair* list)
 	};
 	int			rc;
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 	ERRIFWRONGDEV(s, S_OOPS);
 
 	if ((rc=OurImports->GetAllValues(namestoget, list)) != S_OK) {
@@ -655,9 +650,9 @@ apcsmart_status(StonithPlugin * s)
 	char resp[MAX_STRING];
 	int rc;
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
@@ -668,9 +663,9 @@ apcsmart_status(StonithPlugin * s)
 	&&	((rc = APC_recv_rsp(ad->upsfd, resp)) == S_OK))) {
 		return (S_OK);		/* everything ok. */
 	}
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: failed.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: failed.", __FUNCTION__);
+	}
 	return (rc);
 }
 
@@ -684,9 +679,9 @@ apcsmart_hostlist(StonithPlugin * s)
 {
 	struct pluginDevice *ad = (struct pluginDevice *) s;
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 	ERRIFNOTCONFIGED(s,NULL);
 
 	return OurImports->CopyHostList((const char **)ad->hostlist);
@@ -699,9 +694,10 @@ apcsmart_RegisterBitsSet(struct pluginDevice * ad, int nreg, unsigned bits
 	const char*	reqregs[4] = {"?", "~", "'", "8"};
 	unsigned	regval;
 	char		resp[MAX_STRING];
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
 
 	if (APC_enter_smartmode(ad->upsfd) != S_OK
@@ -728,9 +724,10 @@ apcsmart_ReqOnOff(struct pluginDevice * ad, int request)
 {
 	const char *	cmdstr;
 	int		rc;
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 	cmdstr = (request == ST_POWEROFF ? CMD_OFF : CMD_ON);
 	/* enter smartmode, send on/off command */
 	if ((rc =APC_enter_smartmode(ad->upsfd)) != S_OK
@@ -765,9 +762,9 @@ apcsmart_ReqGenericReset(struct pluginDevice *ad)
 	char		resp[MAX_STRING];
 	int		rc = S_RESETFAIL;
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 	/* enter smartmode, send reset command */
 	if (((rc = APC_init(ad)) == S_OK)
 		&& ((rc = APC_send_cmd(ad->upsfd, CMD_RESET)) == S_OK)
@@ -861,38 +858,38 @@ apcsmart_req_reset(StonithPlugin * s, int request, const char *host)
 static const char *
 apcsmart_get_info(StonithPlugin * s, int reqtype)
 {
-    struct pluginDevice *ad = (struct pluginDevice *) s;
-    const char *ret;
+	struct pluginDevice *ad = (struct pluginDevice *) s;
+	const char *ret;
 
-#ifdef APC_DEBUG
-    LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+    		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 
-    ERRIFWRONGDEV(s,NULL);
+	ERRIFWRONGDEV(s,NULL);
    
 
-    switch (reqtype) {
-    	case ST_DEVICEID:
+	switch (reqtype) {
+    		case ST_DEVICEID:
 		ret = ad->pluginid;
 		break;
 
-	case ST_DEVICEDESCR:
+		case ST_DEVICEDESCR:
 		ret = "APC Smart UPS"
-		" (via serial port - NOT USB!). "
-		" Works with higher-end APC UPSes, like"
-		" Back-UPS Pro, Smart-UPS, Matrix-UPS, etc. "
-		" (Smart-UPS may have to be >= Smart-UPS 700?)\n"
+			" (via serial port - NOT USB!). "
+			" Works with higher-end APC UPSes, like"
+			" Back-UPS Pro, Smart-UPS, Matrix-UPS, etc. "
+			" (Smart-UPS may have to be >= Smart-UPS 700?)\n"
 		" See http://us1.networkupstools.org/protocols/apcsmart.html"
-		" for protocol compatibility details.";
-		break;
+			" for protocol compatibility details.";
+			break;
 
-	case ST_DEVICEURL:
-		ret = "http://www.apc.com/";
-		break;
+		case ST_DEVICEURL:
+			ret = "http://www.apc.com/";
+			break;
 
-	default:
-		ret = NULL;
-		break;
+		default:
+			ret = NULL;
+			break;
 	}
 	return (ret);
 }
@@ -906,9 +903,9 @@ apcsmart_destroy(StonithPlugin * s)
 {
     struct pluginDevice *ad = (struct pluginDevice *) s;
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+    	}
 	VOIDERRIFWRONGDEV(s);
 
 	APC_deinit( ad->upsfd );
@@ -937,10 +934,9 @@ apcsmart_new(void)
 {
     struct pluginDevice *ad = MALLOCT(struct pluginDevice);
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
-#endif
-
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
 	if (ad == NULL) {
 		LOG(PIL_CRIT, "%s: out of memory.", __FUNCTION__);
 		return (NULL);
@@ -954,8 +950,8 @@ apcsmart_new(void)
 	ad->upsfd = -1;
 	ad->sp.s_ops = &apcsmartOps;
 
-#ifdef APC_DEBUG
-	LOG(PIL_DEBUG, "%s: returning successfully.", __FUNCTION__);
-#endif
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: returning successfully.", __FUNCTION__);
+	}
 	return &(ad->sp);
 }

@@ -1,4 +1,4 @@
-/* $Id: stonith_expect_helpers.h,v 1.1 2004/10/05 14:26:17 lars Exp $ */
+/* $Id: stonith_expect_helpers.h,v 1.2 2005/01/08 06:01:17 alan Exp $ */
 /*
  * stonith_expect_helpers.h: Some common expect defines.
  *
@@ -29,30 +29,40 @@
  *	Many expect/telnet plugins use these defines and functions.
  */
 
-#define	SEND(fd,s)         (write(fd, (s), strlen(s)))
+#define	SEND(fd,s)	{						\
+				if (Debug) {				\
+					LOG(PIL_DEBUG			\
+					,	"Sending [%s] (len %d)"	\
+					,	(s)		\
+					,	(int)strlen(s));	\
+				}					\
+				write((fd), (s), strlen(s));		\
+			}
 
 #define	EXPECT(fd,p,t)	{						\
-			if (StonithLookFor(fd, p, t) < 0)			\
-				return(errno == ETIMEDOUT			\
+			if (StonithLookFor(fd, p, t) < 0)		\
+				return(errno == ETIMEDOUT		\
 			?	S_TIMEOUT : S_OOPS);			\
 			}
 
-#define	NULLEXPECT(fd,p,t)	{						\
-				if (StonithLookFor(fd, p, t) < 0)		\
+#define	NULLEXPECT(fd,p,t)	{					\
+				if (StonithLookFor(fd, p, t) < 0)	\
 					return(NULL);			\
 			}
 
 #define	SNARF(fd,s, to)	{						\
-				if (StonithScanLine(fd,to,(s),sizeof(s))	\
-				!=	S_OK)				\
+				if (StonithScanLine(fd,to,(s),sizeof(s))\
+				!=	S_OK){				\
 					return(S_OOPS);			\
+				}					\
 			}
 
-#define	NULLSNARF(fd,s, to)	{					\
-				if (StonithScanLine(fd,to,(s),sizeof(s))	\
-				!=	S_OK)				\
+#define	NULLSNARF(fd,s, to){						\
+				if (StonithScanLine(fd,to,(s),sizeof(s))\
+				!=	S_OK) {				\
 					return(NULL);			\
-				}
+				}					\
+			}
 
 /* Look for any of the given patterns.  We don't care which */
 static int
@@ -60,9 +70,10 @@ StonithLookFor(int fd, struct Etoken * tlist, int timeout)
 {
 	int	rc;
 
-	if ((rc = EXPECT_TOK(fd, tlist, timeout, NULL, 0)) < 0) {
+	if ((rc = EXPECT_TOK(fd, tlist, timeout, NULL, 0, Debug)) < 0) {
 		LOG(PIL_CRIT, "%s %s %s"
-		,	_("Did not find string"), tlist[0].string, _("from " DEVICE "."));
+		,	"Did not find string", tlist[0].string
+		,	"from " DEVICE ".");
 	}
 	return(rc);
 }
@@ -74,7 +85,7 @@ static struct Etoken CRNL[] =		{ {"\n\r",0,0},{"\r\n",0,0},{NULL,0,0}};
 static int
 StonithScanLine(int fd, int timeout, char * buf, int max)
 {
-	if (EXPECT_TOK(fd, CRNL, timeout, buf, max) < 0) {
+	if (EXPECT_TOK(fd, CRNL, timeout, buf, max, Debug) < 0) {
 		LOG(PIL_CRIT, "%s", _("Could not read line from" DEVICE "."));
 		return(S_OOPS);
 	}
@@ -101,5 +112,3 @@ Stonithkillcomm(int *rdfd, int *wrfd, int *pid)
 	}
 }
 #endif
-
-

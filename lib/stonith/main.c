@@ -1,4 +1,4 @@
-/* $Id: main.c,v 1.14 2005/01/04 07:38:35 alan Exp $ */
+/* $Id: main.c,v 1.15 2005/01/08 06:01:17 alan Exp $ */
 /*
  * Stonith: simple test program for exercising the Stonith API code
  *
@@ -286,11 +286,14 @@ main(int argc, char** argv)
 #endif
 	openlog(cmdname, (LOG_CONS|(silent ? 0 : LOG_PERROR)), LOG_USER);
 	s = stonith_new(SwitchType);
-
 	if (s == NULL) {
 		syslog(LOG_ERR, "Invalid device type: '%s'", SwitchType);
 		exit(S_OOPS);
 	}
+	if (debug) {
+		stonith_set_debug(s, debug);
+	}
+
 #if 0
 	/* Old STONITH version 1 stuff... */
 	if (optfile) {

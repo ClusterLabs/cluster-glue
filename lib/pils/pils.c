@@ -1,4 +1,4 @@
-/* $Id: pils.c,v 1.44 2004/10/07 12:59:02 alan Exp $ */
+/* $Id: pils.c,v 1.45 2005/01/08 06:01:17 alan Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -238,10 +238,11 @@ static PILPluginImports PILPluginImportSet =
 {	PILregister_plugin	/* register_plugin */
 ,	PILunregister_plugin	/* unregister_plugin */
 ,	PILRegisterInterface	/* register_interface */
-,	RemoveAPILInterface /* unregister_interface */
+,	RemoveAPILInterface	/* unregister_interface */
 ,	PILLoadPlugin		/* load_plugin */
 ,	PILLog			/* Logging function */
 ,	g_malloc		/* Malloc function */
+,	g_realloc		/* realloc function */
 ,	g_free			/* Free function */
 ,	g_strdup		/* Strdup function */
 };
@@ -487,6 +488,29 @@ NewPILPluginUniv(const char * basepluginpath)
 	ret->ifuniv = NewPILInterfaceUniv(ret);
 	PILValidatePluginUniv(NULL, ret, NULL);
 	return ret;
+}
+
+/* Change memory allocation functions immediately  after creating universe */
+void
+PilPluginUnivSetMemalloc(PILPluginUniv* u
+,	void*	(*allocfun)(size_t size)
+,	void*	(*reallocfun)(void * ptr, size_t size)
+,	void	(*freefun)(void* space)
+,	char*	(*strdupfun)(const char *s))
+{
+	u->imports->alloc	= allocfun;
+	u->imports->mrealloc	= reallocfun;
+	u->imports->mfree	= freefun;
+	u->imports->mstrdup	= strdupfun;
+}
+
+
+/* Change logging functions - preferably right after creating universe */
+void
+PilPluginUnivSetLog(PILPluginUniv* u
+,	void	(*logfun)	(PILLogLevel priority, const char * fmt, ...))
+{
+	u->imports->log	= logfun;
 }
 
 void

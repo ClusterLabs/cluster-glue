@@ -1,4 +1,4 @@
-/* $Id: expect.c,v 1.14 2005/01/04 07:38:07 alan Exp $ */
+/* $Id: expect.c,v 1.15 2005/01/08 06:01:17 alan Exp $ */
 /*
  * Simple expect module for the STONITH library
  *
@@ -43,6 +43,8 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#define ENABLE_PIL_DEFS_PRIVATE
+#include <pils/plugin.h>
 #ifdef _POSIX_PRIORITY_SCHEDULING
 #	include <sched.h>
 #endif
@@ -50,6 +52,12 @@
 #include <stonith/stonith.h>
 #include <stonith/stonith_plugin.h>
 
+extern 	PILPluginUniv*	StonithPIsys;
+
+#define	LOG(args...) PILCallLog(StonithPIsys->imports->log, args)
+#define DEBUG(args...) LOG(PIL_DEBUG, args)
+#undef DEBUG
+#define	DEBUG(args...) PILCallLog(StonithPIsys->imports->log, PIL_DEBUG, args)
 
 /*
  *	Look for ('expect') any of a series of tokens in the input
@@ -57,8 +65,8 @@
  */
 
 static int
-ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
-,	int maxline)
+ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * savebuf
+,	int maxline, int Debug)
 {
 	/*
 	 * We use unsigned long instead of clock_t here because it's signed,
@@ -74,6 +82,7 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
 	unsigned long	ticks;
 	int		nchars = 1; /* reserve space for an EOS */
 	struct timeval	tv;
+	char *		buf = savebuf;
 
 	struct Etoken *	this;
 
@@ -136,9 +145,9 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
 			*buf = EOS;
 			++nchars;
 		}
-#if 0
-		fprintf(stderr, "%c", ch);
-#endif
+		if (Debug) {
+			DEBUG("Got '%c'", ch);
+		}
 
 		/* See how this character matches our expect strings */
 
@@ -151,6 +160,15 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
 			 	++this->matchto;
 				if (this->string[this->matchto] == EOS){
 					/* Hallelujah! We matched */
+					if (Debug) {
+						DEBUG("Matched [%s] [%d]"
+						,	this->string
+						,	this->toktype);
+						if (savebuf) {
+							DEBUG("Saved [%s]"
+							,	savebuf);
+						}
+					}
 					return(this->toktype);
 				}
 			}else{
