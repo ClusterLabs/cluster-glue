@@ -853,7 +853,7 @@ g_get_rsc_description(gpointer data, gpointer user_data)
 	}
 
 	memset(rsc_id_tmp, '\0', sizeof(rsc_id_t));
-	strncpy(rsc_id_tmp, data, sizeof(rsc_id_t));
+	uuid_copy(rsc_id_tmp, data);
 
 	lrm_rsc = lrmd->lrm_ops->get_rsc(lrmd, rsc_id_tmp);
 	if (lrm_rsc) {
