@@ -366,6 +366,9 @@ typedef PIL_rc(*PILInterfaceFun)(PILInterface*, void* ud_interface);
 #define IS_PILINTERFACETYPE(s)	((s)->MagicNum == PIL_MAGIC_INTERFACETYPE)
 #define IS_PILINTERFACEUNIV(s)	((s)->MagicNum == PIL_MAGIC_INTERFACEUNIV)
 
+/* This is the place where PILS installs its own plugins */
+#define	PILS_BASE_PLUGINDIR	"@pils_plugindir@"
+
 /* The type of a Plugin Initialization Function */
 typedef PIL_rc (*PILPluginInitFun) (PILPlugin*us
 ,		PILPluginImports* imports
@@ -662,7 +665,7 @@ struct PILPluginType_s {
 
 struct PILPluginUniv_s {
 	unsigned long		MagicNum;	
-	char *			rootdirectory;
+	char **			rootdirlist;
 			/* key is plugin type, data is PILPluginType* */
 	GHashTable*		PluginTypes;
 	struct PILInterfaceUniv_s*ifuniv; /* Universe of interfaces */
