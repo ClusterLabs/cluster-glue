@@ -1,4 +1,4 @@
-/* $Id: nw_rpc100s.c,v 1.19 2005/02/18 07:32:09 zhaokai Exp $ */
+/* $Id: nw_rpc100s.c,v 1.20 2005/03/16 21:59:25 blaschke Exp $ */
 /*
  *	Stonith module for Night/Ware RPC100S 
  *
@@ -808,6 +808,7 @@ nw_rpc100s_destroy(StonithPlugin *s)
 		FREE(ctx->unitid);
 		ctx->unitid = NULL;
 	}
+	FREE(ctx);
 }
 
 /* 

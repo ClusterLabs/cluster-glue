@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.20 2005/03/16 18:31:11 blaschke Exp $ */
+/* $Id: apcmaster.c,v 1.21 2005/03/16 21:59:25 blaschke Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -51,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.20 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.21 $"; 
 
 #define	DEVICE	"APC MasterSwitch"
 
@@ -785,6 +785,7 @@ apcmaster_destroy(StonithPlugin *s)
 		FREE(ms->unitid);
 		ms->unitid = NULL;
 	}
+	FREE(ms);
 }
 
 /* Create a new APC Master Switch StonithPlugin device. */
