@@ -89,6 +89,12 @@ Gmain_timeout_add_full(gint priority
 	,	&Gmain_timeout_funcs, h, data, notify);
 }
 
+void
+Gmain_timeout_remove(guint tag)
+{
+	g_source_remove(tag);
+}
+
 /* g_main_loop-style prepare function */
 static gboolean
 Gmain_timeout_prepare(gpointer src, GTimeVal* t, gint* timeout
