@@ -1,4 +1,4 @@
-#include <linux-ha/portability.h>
+#include <portability.h>
 #include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>

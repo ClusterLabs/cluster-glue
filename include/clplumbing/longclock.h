@@ -134,4 +134,12 @@ int		cmp_longclock(longclock_t l, longclock_t r);
 	: (((longclock_t)(l) > (longclock_t)(r))	\
 	?	+1 : 0))
 #endif
+
+
+/* N.B: Possibly not the best place for this, but it will do for now */
+/* This is consistent with OpenBSD, and is a good choice anyway */
+#define TIME_T  unsigned long
+#define TIME_F  "%lu"
+#define TIME_X  "%lx"
+
 #endif

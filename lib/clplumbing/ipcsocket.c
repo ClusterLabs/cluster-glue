@@ -19,7 +19,7 @@
  *
  */
 
-#include <linux-ha/portability.h>
+#include <portability.h>
 
 #include <clplumbing/ipc.h>
 #include <clplumbing/cl_log.h>

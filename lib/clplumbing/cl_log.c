@@ -1,4 +1,4 @@
-#include <linux-ha/portability.h>
+#include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,6 +7,7 @@
 #include <clplumbing/ipc.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/loggingdaemon.h>
+#include <clplumbing/longclock.h>
 #include <glib.h>
 
 #ifndef MAXLINE

@@ -21,7 +21,6 @@
 #ifndef _CL_SIGNAL_H
 #define _CL_SIGNAL_H
 
-#include <linux-ha/portability.h>
 #include <stdio.h>
 #include <signal.h>
 #include <sys/signal.h>
