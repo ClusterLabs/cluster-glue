@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.31 2004/09/06 12:41:52 lars Exp $ */
+/* $Id: lrmd.c,v 1.32 2004/09/09 03:30:24 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -836,6 +836,7 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	/* remove from client_list */
 	client_list = g_list_remove(client_list, client);
+	
 	/* remove all monitors and pending ops */
 	for(rsc_node = g_list_first(rsc_list);
 		NULL != rsc_node; rsc_node = g_list_next(rsc_node)){
@@ -902,9 +903,8 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 {
 	struct ha_msg* ret = NULL;
 	struct RAExecOps * RAExec = NULL;
-	GList* typeinfos = NULL;
 	GList* types = NULL;
-	GList* typeinfo;
+	GList* type;
 	const char* rclass = NULL;
 
 	lrmd_log(LOG_INFO, "on_msg_get_rsc_types: start.");
@@ -918,29 +918,19 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 		lrmd_log(LOG_INFO,"on_msg_get_rsc_types: can not find class");
 	}
 	else {
-		if (0 <= RAExec->get_resource_list(&typeinfos)) {
-			for ( 	typeinfo = g_list_first(typeinfos);
-				NULL != typeinfo;
-				typeinfo = g_list_next(typeinfo)) {
-				rsc_info_t* info = typeinfo->data;
-				types = g_list_append(types, info->rsc_type);
-			}
-		}
 		if (NULL == ret) {
 			lrmd_log(LOG_ERR,
 				"on_msg_get_rsc_types: can not create msg.");
 			return HA_FAIL;
 		}
-		ha_msg_add_list(ret, F_LRM_RTYPES, types);
-		g_list_free(types);
-		while (NULL != (typeinfo = g_list_first(typeinfos))) {
-			rsc_info_t* info = typeinfo->data;
-			typeinfos = g_list_remove(typeinfos, typeinfo->data);
-			g_free(info->rsc_type);
-			g_free(info->version);
-			g_free(info);
+		if (0 <= RAExec->get_resource_list(&types)) {
+			ha_msg_add_list(ret, F_LRM_RTYPES, types);
+			while (NULL != (type = g_list_first(types))) {
+				types = g_list_remove(types, type->data);
+				g_free(type->data);
+			}
+			g_list_free(types);
 		}
-		
 	}
 
 
@@ -2005,6 +1995,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.32  2004/09/09 03:30:24  zhenh
+ * remove the unused struct
+ *
  * Revision 1.31  2004/09/06 12:41:52  lars
  * Add some additional required mandatory OCF environment variables.
  *
