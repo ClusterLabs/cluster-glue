@@ -39,7 +39,7 @@ stonith_SOURCES		= main.c
 
 stonith_LDADD		= $(top_builddir)/libltdl/libltdlc.la \
 			libstonith.la $(GLIBLIB)
-stonith_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self -lintl
+stonith_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self
 
 meatclient_SOURCES	= meatclient.c 
 meatclient_LDADD	= $(GLIBLIB)
