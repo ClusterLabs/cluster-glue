@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.34 2004/12/01 22:04:42 gshi Exp $ */
+/* $Id: ipc.h,v 1.35 2004/12/09 20:28:15 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -610,9 +610,10 @@ struct ipc_bufpool{
 	char* consumepos;
 	char* startpos;
 	char* endpos;
+	int size;
 };
 
-struct ipc_bufpool* ipc_bufpool_new(void);
+struct ipc_bufpool* ipc_bufpool_new(int);
 
 void	ipc_bufpool_del(struct ipc_bufpool* pool);
 
@@ -624,7 +625,8 @@ int	ipc_bufpool_update(struct ipc_bufpool* pool,
 			   IPC_Queue* rqueue);
 
 gboolean	ipc_bufpool_full(struct ipc_bufpool* pool,
-				 struct IPC_CHANNEL* ch);
+				 struct IPC_CHANNEL* ch,
+				 int*);
 int		ipc_bufpool_partial_copy(struct ipc_bufpool* dstpool,
 					 struct ipc_bufpool* srcpool);
 

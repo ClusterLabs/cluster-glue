@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.20 2004/12/01 19:48:12 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.21 2004/12/09 20:28:15 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -113,17 +113,41 @@ ipc_destroy_auth(struct IPC_AUTH *auth)
 
 	
 struct ipc_bufpool*
-ipc_bufpool_new(void)
+ipc_bufpool_new(int size)
 {
 	struct ipc_bufpool* pool;
+	int	totalsize;
 	
-	pool = (struct ipc_bufpool*)g_malloc(POOL_SIZE);
-	memset(pool, 0, POOL_SIZE);
+	
+	/* there are memories for two struct SOCKET_MSG_HEAD
+	 * one for the big message, the other one for the next
+	 * message. This code prevents allocating 
+	 *	<big memory> <4k> <big memory><4k> ... 
+	 * from happening when a client sends big messages
+	 * constantly*/
+
+	totalsize = size + sizeof(struct ipc_bufpool) 
+		+ sizeof(struct SOCKET_MSG_HEAD) * 2 ;		
+	
+	if (totalsize < POOL_SIZE){
+		totalsize = POOL_SIZE;
+	}
+	
+	if (totalsize > MAXDATASIZE){
+		cl_log(LOG_INFO, "ipc_bufpool_new: "
+		       "asking for buffer with size %d"
+		       "corrupted data len???", totalsize);
+		return NULL;
+	}
+	
+	pool = (struct ipc_bufpool*)g_malloc(totalsize);
+	memset(pool, 0, totalsize);
 	pool->refcount = 1;
 	pool->startpos = pool->currpos = pool->consumepos =
 		((char*)pool) + sizeof(struct ipc_bufpool); 
 	
-	pool->endpos = ((char*)pool)  + POOL_SIZE;
+	pool->endpos = ((char*)pool)  + totalsize;
+	pool->size = totalsize;
 	
 	return pool;
 }
@@ -143,7 +167,7 @@ ipc_bufpool_del(struct ipc_bufpool* pool)
 		return;
 	}
 	
-	memset(pool, 0, POOL_SIZE);
+	memset(pool, 0, pool->size);
 	g_free(pool);	
 	return;
 }
@@ -280,11 +304,15 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 
 
 gboolean
-ipc_bufpool_full(struct ipc_bufpool* pool, struct IPC_CHANNEL* ch)
+ipc_bufpool_full(struct ipc_bufpool* pool, 
+		 struct IPC_CHANNEL* ch, 
+		 int* dataspaceneeded)
 {
 	
 	struct SOCKET_MSG_HEAD  localhead;
 	struct SOCKET_MSG_HEAD* head = &localhead;
+
+	*dataspaceneeded = 0;
 	/* not enough space for head */
 	if (pool->endpos - pool->consumepos < ch->msgpad){
 		return TRUE;
@@ -296,6 +324,7 @@ ipc_bufpool_full(struct ipc_bufpool* pool, struct IPC_CHANNEL* ch)
 		
 		/* not enough space for data*/
 		if ( pool->consumepos + ch->msgpad + head->msg_len >= pool->endpos){
+			*dataspaceneeded = head->msg_len;
 			return TRUE;
 		}
 	}
