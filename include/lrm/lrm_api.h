@@ -55,7 +55,13 @@
 #ifndef __LRM_API_H
 #define __LRM_API_H 1
 
+#ifdef HAVE_UUID_H
+#include <uuid.h>
+#endif
+
+#ifdef HAVE_UUID_UUID_H
 #include <uuid/uuid.h>
+#endif
 #include <glib.h>
 
 #define	LRM_PROTOCOL_VERSION	0.1
