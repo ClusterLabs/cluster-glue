@@ -55,7 +55,13 @@ stonith_signal_set_simple_handler(int sig, void (*handler)(int)
 
 #define STONITH_SIGNAL(_sig, _handler) \
 	stonith_signal_set_simple_handler((_sig), (_handler), NULL)
-#define STONITH_IGNORE_SIG(_sig) STONITH_SIGNAL((_sig), SIG_IGN)
+#ifdef HAVE_SIGIGNORE
+#define STONITH_IGNORE_SIG(_sig) \
+	sigignore((_sig))
+#else
+#define STONITH_IGNORE_SIG(_sig) \
+	STONITH_SIGNAL((_sig), SIG_IGN)
+#endif
 #define STONITH_DEFAULT_SIG(_sig) STONITH_SIGNAL((_sig), SIG_DFL)
 
 #define STONITH_KILL(_pid, _sig) kill((_pid), (_sig))
