@@ -1,4 +1,4 @@
-/* $Id: null.c,v 1.12 2004/09/20 18:44:04 msoffen Exp $ */
+/* $Id: null.c,v 1.13 2004/09/25 06:25:37 gshi Exp $ */
 /*
  * Stonith module for NULL Stonith device
  *
@@ -309,7 +309,7 @@ null_reset_req(Stonith * s, int request, const char * host)
 	/* Real devices need to pay attention to the "request" */
 	/* (but we don't care ;-)) */
 
-	PILCallLog(PluginImports->log,PIL_INFO,"%s: %s",  _("Host null-reset."), host);
+	PILCallLog(PluginImports->log,PIL_INFO,"%s: %s",  _("Host null-reset"), host);
 	return S_OK;
 }
 
