@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.3 2004/03/31 23:34:44 alan Exp $ */
+/* $Id: cl_msg.c,v 1.4 2004/04/02 12:06:39 andrew Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -37,7 +37,7 @@
 #include <clplumbing/base64.h>
 #include <clplumbing/netstring.h>
 
-#define		MAXMSGLINE	16536
+#define		MAXMSGLINE	MAXMSG
 #define		MINFIELDS	30
 #define		CRNL		"\r\n"
 #define		MAX_AUTH_BYTES	64
@@ -1783,6 +1783,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.4  2004/04/02 12:06:39  andrew
+ * Link the size of the receive buffer/limit to that of the send buffer/limit
+ *
  * Revision 1.3  2004/03/31 23:34:44  alan
  * Fixed a bug I introduced into the netstrings stuff - when I moved things
  * from the heartbeat directory to the lib directory
