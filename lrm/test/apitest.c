@@ -71,7 +71,7 @@ int main (int argc, char* argv[])
 	op->params = param;
 	op->timeout = 0;
 	op->user_data = strdup("It is a start op!");
-	op->user_data_len = strlen(op->user_data);
+	op->user_data_len = strlen(op->user_data)+1;
 	op->interval = 0;
 	op->target_rc = EVERYTIME;
 	rsc->ops->perform_op(rsc,op);
@@ -83,7 +83,7 @@ int main (int argc, char* argv[])
 	op->params = param;
 	op->timeout = 0;
 	op->user_data = strdup("It is a status op!");
-	op->user_data_len = strlen(op->user_data);
+	op->user_data_len = strlen(op->user_data)+1;
 	op->interval = 1000;
 	op->target_rc=EVERYTIME;
 	call_id = rsc->ops->perform_op(rsc,op);
@@ -95,7 +95,7 @@ int main (int argc, char* argv[])
 	op->params = param;
 	op->timeout = 0;
 	op->user_data = strdup("It is a stop op!");
-	op->user_data_len = strlen(op->user_data);
+	op->user_data_len = strlen(op->user_data)+1;
 	op->interval = 0;
 	op->target_rc=EVERYTIME;
 	rsc->ops->perform_op(rsc,op);
@@ -120,6 +120,7 @@ int main (int argc, char* argv[])
 
 	puts("signoff...");
 	lrm->lrm_ops->signoff(lrm);
+	
 	return 0;
 }
 void lrm_op_done_callback(lrm_op_t* op)
