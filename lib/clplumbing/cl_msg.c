@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.11 2004/06/24 20:44:29 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.12 2004/06/24 20:49:49 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -671,34 +671,9 @@ ha_msg_addbin(struct ha_msg * msg, const char * name,
 int
 ha_msg_addstruct(struct ha_msg * msg, const char * name, void * value)
 {
-
+	
 	/* size is 0 because size is useless in this case*/
 	return ha_msg_addraw(msg, name, strlen(name), value, 0, FT_STRUCT, 0);
-
-
-/*  	char	*cpname; */
-/*  	int	namelen = strlen(name); */
-/*  	int	ret; */
-
-/*  	if ((cpname = ha_malloc(namelen+1)) == NULL) { */
-/*  		cl_log(LOG_ERR, "ha_msg_addstruct():" */
-/*  		       "allocate memory for name failed"); */
-
-/*  		return(HA_FAIL); */
-
-/*  	} */
-/*  	strncpy(cpname, name, namelen); */
-/*  	cpname[namelen] = EOS; */
-
-/*  	ret = ha_msg_addraw_ll(msg, cpname, namelen, value, */
-/*  			       sizeof(struct ha_msg), FT_STRUCT, 0); */
-
-/*  	if (ret !=  HA_OK){ */
-/*  		cl_log(LOG_ERR, "ha_msg_addstruct(): ha_msg_addraw_ll failed"); */
-/*  		ha_free(cpname); */
-/*  	} */
-
-/*  	return(ret); */
 }
 
 
@@ -1841,13 +1816,8 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
- * Revision 1.11  2004/06/24 20:44:29  gshi
- * added cl_msg_modstring() cl_msg_modstruct() cl_msg_modbin()
- * they call call cl_msg_mod()
- *
- *
- * fixed a bug in cl_msg_addstruct() that will cause memory getting freed twice
- * if a parent and its child message is deleted.
+ * Revision 1.12  2004/06/24 20:49:49  gshi
+ * remove commented code
  *
  * Revision 1.10  2004/06/18 03:04:33  alan
  * Changed a few checks for non-existent fields to return NULL
