@@ -863,7 +863,7 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 			i->sendingsuspended = TRUE;
 			cl_log(LOG_INFO
 			,	"s_echo_msg: Sending suspended.");
-			return TRUE;
+			goto retout;
 		}
 		i->sendingsuspended = FALSE;
 		if ((rc = chan->ops->recv(chan, &rmsg)) != IPC_OK) {
@@ -873,7 +873,7 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 			,	rc, i->rcount+1, errno);
 			cl_perror("recv");
 			++i->errcount;
-			return TRUE;
+			goto retout;
 		}
 		i->rcount++;
 		if (!checkmsg(rmsg, "s_echo_msg", i->rcount)) {
@@ -891,12 +891,14 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 			i->wcount+=1;
 		}
 	}
+retout:
 	//fprintf(stderr, "%%");
 	if (i->rcount >= i->max || chan->ch_status == IPC_DISCONNECT) {
 		chan->ops->waitout(chan);
 		g_main_quit(loop);
+		return FALSE;
 	}
-	return i->rcount < i->max;
+	return TRUE;
 }
 
 static void
