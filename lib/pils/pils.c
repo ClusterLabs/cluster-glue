@@ -1868,7 +1868,7 @@ PILPluginTypeListPlugins(PILPluginType* pitype
 ,	int *		picount	/* Can be NULL ... */)
 {
 	const char *	piclass = pitype->plugintype;
-	int		plugincount = 0;
+	unsigned	plugincount = 0;
 	char **		result = NULL;
 	int		initoff = 0;
 	char **		pelem;
@@ -1917,7 +1917,7 @@ PILPluginTypeListPlugins(PILPluginType* pitype
 
 		for (j=0; j < dircount; ++j) {
 			char*	s;
-			int	slen = strlen(files[j]->d_name)
+			unsigned slen = strlen(files[j]->d_name)
 			-	STRLEN(PLUGINSUFFIX);
 
 			s = g_malloc(slen+1);
