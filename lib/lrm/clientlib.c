@@ -445,11 +445,12 @@ lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rclass)
 GHashTable*
 lrm_get_all_type_metadatas (ll_lrm_t* lrm, const char* rclass)
 {
-	client_log(LOG_INFO,"lrm_get_all_type_metadatas: start.");
-	const char* meta;
 	GHashTable* metas = g_hash_table_new(g_str_hash, g_str_equal);
 	GList* types = lrm_get_rsc_type_supported (lrm, rclass);
 	GList* node = NULL;
+        const char* meta;
+
+	client_log(LOG_INFO,"lrm_get_all_type_metadatas: start.");
 	for(node = g_list_first(types); NULL!=node; node=g_list_next(node)) {
 		meta = lrm_get_rsc_type_metadata(lrm,rclass,node->data);
 		if (NULL == meta) {

@@ -245,13 +245,14 @@ merge_pair(gpointer key, gpointer value, gpointer user_data)
 GHashTable*
 merge_hash_tables(GHashTable* old, GHashTable* new)
 {
+	GHashTable* ret = NULL;
 	if ( NULL == old ) {
 		return copy_hash_table(new);
 	}
 	if ( NULL == new ) {
 		return copy_hash_table(old);
 	}
-	GHashTable* ret = copy_hash_table(old);
+	ret = copy_hash_table(old);
 	g_hash_table_foreach(new, merge_pair, ret);
 	return ret;
 }
