@@ -8,3 +8,4 @@ Makefile
 *.beam
 parser-messages
 MISC_ERRORS
+ribcl.py
