@@ -371,7 +371,7 @@ lrm_get_rsc_class_supported (ll_lrm_t* lrm)
 		return NULL;
 	}
 	/* get the ra type list from message */
-	class_list = ha_msg_value_list(ret,F_LRM_RCLASS);
+	class_list = ha_msg_value_str_list(ret,F_LRM_RCLASS);
 
 	ha_msg_del(ret);
 	client_log(LOG_INFO, "lrm_get_rsc_class_supported: end.");
@@ -426,7 +426,7 @@ lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rclass)
 		return NULL;
 	}
 	/* get the ra type list from message */
-	type_list = ha_msg_value_list(ret,F_LRM_RTYPES);
+	type_list = ha_msg_value_str_list(ret,F_LRM_RTYPES);
 
 	ha_msg_del(ret);
 	client_log(LOG_INFO, "lrm_get_rsc_type_supported: end.");
@@ -485,7 +485,7 @@ lrm_get_rsc_provider_supported (ll_lrm_t* lrm, const char* class, const char* ty
 		return NULL;
 	}
 	/* get the ra provider list from message */
-	provider_list = ha_msg_value_list(ret,F_LRM_RPROVIDERS);
+	provider_list = ha_msg_value_str_list(ret,F_LRM_RPROVIDERS);
 
 	ha_msg_del(ret);
 	client_log(LOG_INFO, "lrm_get_rsc_provider_supported: end.");
@@ -630,7 +630,7 @@ lrm_get_all_rscs (ll_lrm_t* lrm)
 		return NULL;
 	}
 	/* get the rsc_id list from msg */
-	rid_list = ha_msg_value_list(ret,F_LRM_RID);
+	rid_list = ha_msg_value_str_list(ret,F_LRM_RID);
 
 	ha_msg_del(ret);
 	client_log(LOG_INFO, "lrm_get_all_rscs: end.");
@@ -692,7 +692,7 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	rsc->type = g_strdup(ha_msg_value(msg, F_LRM_RTYPE));
 	rsc->class = g_strdup(ha_msg_value(msg, F_LRM_RCLASS));
 	rsc->provider = g_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
-	rsc->params = ha_msg_value_hash_table(msg,F_LRM_PARAM);
+	rsc->params = ha_msg_value_str_table(msg,F_LRM_PARAM);
 
 	rsc->ops = &rsc_ops_instance;
 	ha_msg_del(ret);
@@ -1118,7 +1118,7 @@ msg_to_op(struct ha_msg* msg)
 	op->op_type = g_strdup(op_type);
 
 	/* op->params */
-	op->params = ha_msg_value_hash_table(msg, F_LRM_PARAM);
+	op->params = ha_msg_value_str_table(msg, F_LRM_PARAM);
 
 	/* op->timeout */
 	if (HA_FAIL == ha_msg_value_int(msg,F_LRM_TIMEOUT, &op->timeout)) {
@@ -1215,7 +1215,7 @@ op_to_msg (lrm_op_t* op)
 	}
 
 	if (NULL != op->params) {
-		ha_msg_add_hash_table(msg,F_LRM_PARAM,op->params);
+		ha_msg_add_str_table(msg,F_LRM_PARAM,op->params);
 	}
 
 	if (HA_FAIL == ha_msg_add_int(msg, F_LRM_INTERVAL, op->interval)) {
