@@ -77,6 +77,7 @@
 #define RSP_GET_STATUS		NULL
 #define CMD_RESET               "S@000"
 #define RSP_RESET		"*"
+#define RSP_RESET2		"OK"
 #define CMD_SHUTDOWN_DELAY	"p"
 #define CMD_WAKEUP_DELAY	"r"
 
@@ -853,15 +854,16 @@ apcsmart_reset_req(Stonith * s, int request, const char *host)
       return( S_BADHOST );
     }
 
-    /* enter smartmode and get status */
-    if (((rc = APC_init(ad)) == S_OK) &&
-	((rc = APC_send_cmd(ad->upsfd, CMD_RESET)) == S_OK) &&
-	((rc = APC_recv_rsp(ad->upsfd, resp)) == S_OK) &&
-	(strcmp(resp, RSP_RESET) == 0)) {
+    /* enter smartmode, send reset command */
+    if (((rc = APC_init(ad)) == S_OK)
+	&& ((rc = APC_send_cmd(ad->upsfd, CMD_RESET)) == S_OK)
+	&& ((rc = APC_recv_rsp(ad->upsfd, resp)) == S_OK)
+	&& (strcmp(resp, RSP_RESET) == 0 || strcmp(resp, RSP_RESET) == 0)) {
 
 	/* ok, reset is initiated. ups don't accept any cmds until */
 	/* reboot -> reboot complete if status cmd accepted */
 	/* we wait max. 30 sec after shutdown */
+	/* (shutdown delay + 10 seconds) */
 
 	sleep(atoi(SHUTDOWN_DELAY));
 
