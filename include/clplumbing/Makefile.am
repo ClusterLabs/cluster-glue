@@ -28,4 +28,5 @@ include_HEADERS	= 		\
 	base64.h	\
 	ipc.h		\
 	longclock.h	\
+	mkstemp_mode.h	\
 	proctrack.h
