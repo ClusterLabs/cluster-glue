@@ -42,6 +42,11 @@
 #	define MAX(a,b)	(((a) > (b)) ? (a) : (b))
 #endif
 
+
+extern const char* FT_strings[];
+
+
+
 #define		NL_TO_SYM	0
 #define		SYM_TO_NL	1
 
@@ -58,8 +63,7 @@ int		SPECIAL_SYMS[]={
 	29
 };
 
-extern const char* FT_strings[];
-
+#define	       SPECIAL_SYM	19
 
 struct ha_msg* string2msg_ll(const char*, size_t, int, int);
 int compose_netstring(char*, const char*, const char*, size_t, size_t*);
@@ -69,6 +73,7 @@ int struct_display_as_xml(int log_level, int depth, struct ha_msg *data,
 			  const char *prefix, gboolean formatted);
 int struct_stringlen(size_t namlen, size_t vallen, const void* value);
 int struct_netstringlen(size_t namlen, size_t vallen, const void* value);
+int	convert_nl_sym(char* s, int len, char sym, int direction);
  
 static int
 intlen(int x)
@@ -603,34 +608,29 @@ list_display(int log_level, int seq, char* name, void* value)
  * into a special symbol, or the other way around
  */
 
-static int
-convert(char* s, int len, int depth, int direction)
+int
+convert_nl_sym(char* s, int len, char sym, int direction)
 {
 	int	i;
 
 	if (direction != NL_TO_SYM && direction != SYM_TO_NL){
-		cl_log(LOG_ERR, "convert(): direction not defined!");
+		cl_log(LOG_ERR, "convert_nl_sym(): direction not defined!");
 		return(HA_FAIL);
 	}
 
-
-	if (depth >= MAXDEPTH ){
-		cl_log(LOG_ERR, "convert(): MAXDEPTH exceeded");
-		return(HA_FAIL);
-	}
 
 	for (i = 0; i < len && s[i] != EOS; i++){
-
+		
 		switch(direction){
 		case NL_TO_SYM :
 			if (s[i] == '\n'){
-				s[i] = SPECIAL_SYMS[depth];
+				s[i] = sym;
 				break;
 			}
 
-			if (s[i] == SPECIAL_SYMS[depth]){
+			if (s[i] == sym){
 				cl_log(LOG_ERR
-				, "convert(): special symbol \'%c\' found"
+				, "convert_nl_sym(): special symbol \'0x%x\' found"
 				" in string at %d (len=%d)", s[i], i, len);
 				return(HA_FAIL);
 			}
@@ -638,28 +638,44 @@ convert(char* s, int len, int depth, int direction)
 			break;
 
 		case SYM_TO_NL:
-
-			if (s[i] == '\n'){
-				cl_log(LOG_ERR
-				,	"convert(): new line found in"
-				" converted string");
-				return(HA_FAIL);
-			}
-
-			if (s[i] == SPECIAL_SYMS[depth]){
+						
+			if (s[i] == sym){
 				s[i] = '\n';
 				break;
 			}
 			break;
 		default:
 			/* nothing, never executed*/;
-
+			
 		}
 	}
-
+	
 	return(HA_OK);
 }
 
+
+/*
+ * This function changes each new line in the input string
+ * into a special symbol, or the other way around
+ */
+
+static int
+convert(char* s, int len, int depth, int direction)
+{
+	
+	if (direction != NL_TO_SYM && direction != SYM_TO_NL){
+		cl_log(LOG_ERR, "convert(): direction not defined!");
+		return(HA_FAIL);
+	}
+	
+	
+	if (depth >= MAXDEPTH ){
+		cl_log(LOG_ERR, "convert(): MAXDEPTH exceeded");
+		return(HA_FAIL);
+	}
+	
+	return convert_nl_sym(s, len, SPECIAL_SYMS[depth], direction);
+}
 
 
 
@@ -938,7 +954,7 @@ static int
 str2string(char* buf, char* maxp, void* value, size_t len, int depth)
 {
 	char* s =  value;
-	
+	char* p = buf;
 	(void)maxp;
 	(void)depth;
 	if ( strlen(s) != len){
@@ -948,6 +964,13 @@ str2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	}
 	
 	strcat(buf, s);
+	while(*p != '\0'){
+		if (*p == '\n'){
+			*p = SPECIAL_SYM;
+		}
+		p++;
+	}
+
 	return len;
 	
 }
@@ -1045,7 +1068,12 @@ string2str(void* value, size_t len, int depth, void** nv, size_t* nlen )
 		cl_log(LOG_ERR, "string2str:invalid input");
 		return HA_FAIL;
 	}
-
+	
+	if (convert_nl_sym(value, len, SPECIAL_SYM, SYM_TO_NL) !=  HA_OK){
+		cl_log(LOG_ERR, "string2str:convert_nl_sym"
+		       "from symbol to new line failed");
+		return HA_FAIL;
+	}
 	*nv = value;
 	*nlen = len;
 	
@@ -1389,8 +1417,7 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 		
 	}
 	
-	if(internal_type  < sizeof(fieldtypefuncs) 
-	   / sizeof(fieldtypefuncs[0])){					
+	if(internal_type  < DIMOF(fieldtypefuncs)){
 		int (*stringtofield)(void*, size_t, int depth, void**, size_t* );
 		int (*fieldstringlen)( size_t, size_t, const void*);
 		int (*fieldnetstringlen)( size_t, size_t, const void*);
