@@ -320,6 +320,8 @@ static gboolean
 socket_is_sending_blocked(struct OCF_IPC_CHANNEL * ch)
 {
 
+  socket_resume_io(ch);
+
   return ch->send_queue->current_qlen > 0;
 }
 
