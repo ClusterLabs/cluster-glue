@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.46 2005/04/04 21:16:35 gshi Exp $ */
+/* $Id: cl_log.c,v 1.47 2005/04/05 16:44:48 andrew Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -40,6 +40,7 @@
 #define	cl_free		free
 #define	DFLT_ENTITY	"cluster"
 #define NULLTIME 	0
+#define QUEUE_SATURATION_FUZZ 10
 
 char	log_entity[MAXENTITY];
 static IPC_Channel*	logging_daemon_chan = NULL;
@@ -48,6 +49,7 @@ int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use
 IPC_Message* ChildLogIPCMessage(int priority, const char *buf, int bstrlen, 
 				gboolean use_priority_str, IPC_Channel* ch);
 void	FreeChildLogIPCMessage(IPC_Message* msg);
+gboolean send_dropped_message(gboolean use_pri_str, IPC_Channel *chan);
 
 int			use_logging_daemon =  FALSE;
 int			conn_logd_intval = 0;
@@ -330,6 +332,8 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
  * non-blocking IPC.
  */
 
+gboolean last_log_failed = FALSE;
+
 /* Cluster logging function */
 void
 cl_log(int priority, const char * fmt, ...)
@@ -376,15 +380,13 @@ cl_log(int priority, const char * fmt, ...)
 		return_to_orig_privs();
 	}
 	
-	if ( use_logging_daemon && 
-	     cl_log_depth <= 1){
+	if ( use_logging_daemon && cl_log_depth <= 1) {
 		LogToLoggingDaemon(priority, buf, nbytes + 1, TRUE);
-		goto LogDone;
 	}else {
+		/* this may cause blocking... maybe should make it optional? */ 
 		cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);
 	}
 	
- LogDone:
 	cl_log_depth--;
 	return;
 }
@@ -483,6 +485,8 @@ cl_set_logging_wqueue_maxlen(int qlen)
 }
 
 
+static int		drop_msg_num = 0;
+
 int
 LogToLoggingDaemon(int priority, const char * buf, 
 		   int bufstrlen, gboolean use_pri_str)
@@ -490,60 +494,58 @@ LogToLoggingDaemon(int priority, const char * buf,
 	IPC_Channel*		chan = logging_daemon_chan;
 	static longclock_t	nexttime = 0;
 	IPC_Message*		msg;
-	int			sendrc;
+	int			sendrc = IPC_FAIL;
 	int			intval = conn_logd_intval;
-	static int		drop_msg_num = 0;
 	
 	if (chan == NULL) {
 		longclock_t	lnow = time_longclock();
 		
 		if (cmp_longclock(lnow,  nexttime) >= 0){
-			nexttime = add_longclock(lnow, 
-						 msto_longclock(intval));
-			
+			nexttime = add_longclock(
+				lnow,  msto_longclock(intval));
 			
 			logging_daemon_chan = chan = create_logging_channel();
-			
 		}
 	}
 
 	if (chan == NULL){
-		cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);
+		cl_direct_log(
+			priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);
 		return HA_FAIL;
 	}
 	
 	msg = ChildLogIPCMessage(priority, buf, bufstrlen, use_pri_str, chan);	
 	if (msg == NULL) {
+		drop_msg_num++;
 		return HA_FAIL;
 	}
 	
-	if (chan->ch_status != IPC_CONNECT){		
-		cl_log(LOG_ERR, "channel is not connected");
-		chan->ops->destroy(chan);
+	if (chan->ch_status == IPC_CONNECT){		
 		
-		if (drop_msg_num > 0){
-			cl_log(LOG_ERR, "%d messages were dropped ", drop_msg_num);
-			drop_msg_num = 0;
+		if (chan->ops->is_sending_blocked(chan)) {
+			chan->ops->resume_io(chan);
 		}
-		
-		logging_daemon_chan = NULL;
-		return HA_FAIL;
-	}
-	/* Logging_channel is all set up */
-
-	if (chan->ops->is_sending_blocked(chan)) {
-		chan->ops->resume_io(chan);
-	}
-	if (drop_msg_num > 0 && chan->ops->is_sendq_full(chan)) {
-		cl_log(LOG_ERR, "cl_log: %d messages were dropped ", drop_msg_num);
-		drop_msg_num = 0;
-	}	
+		/* Make sure there is room for the drop message _and_ the
+		 * one we wish to log.  Otherwise there is no point.
+		 *
+		 * Try to avoid bouncing on the limit by additionally
+		 * waiting until there is room for QUEUE_SATURATION_FUZZ
+		 * messages.
+		 */
+		if (drop_msg_num > 0
+		    && chan->send_queue->current_qlen
+		    < (chan->send_queue->max_qlen -1 -QUEUE_SATURATION_FUZZ)) {
+			/* have to send it this way so the order is correct */
+			send_dropped_message(use_pri_str, chan);
+		}
 	
-	sendrc =  chan->ops->send(chan, msg);
+		sendrc =  chan->ops->send(chan, msg);
+	}
+	
 	if (sendrc == IPC_OK) {		
 		return HA_OK;
 		
-	}else{
+	} else {
 		drop_msg_num++;
 		
 		if (chan->ops->get_chan_status(chan) != IPC_CONNECT) {
@@ -551,17 +553,44 @@ LogToLoggingDaemon(int priority, const char * buf,
 			logging_daemon_chan = NULL;
 			
 			if (drop_msg_num > 0){
-				cl_log(LOG_ERR, "channel destroyed: %d messages were dropped ", drop_msg_num);
+				/* Direct logging here is ok since we're
+				 *    switching to that for everything
+				 *    "for a while"
+				 */
+				cl_log(LOG_ERR,
+				       "cl_log: %d messages were dropped"
+				       " : channel destroyed", drop_msg_num);
 			}
 			
 			drop_msg_num=0;
 		}
-		
 	}
 	
 	FreeChildLogIPCMessage(msg);
 	return HA_FAIL;
 }
+
+
+gboolean
+send_dropped_message(gboolean use_pri_str, IPC_Channel *chan)
+{
+	int sendrc;
+	char buf[64];
+	IPC_Message *drop_msg = NULL;
+
+	snprintf(buf, 64, "cl_log: %d messages were dropped", drop_msg_num);
+	drop_msg = ChildLogIPCMessage(
+		LOG_ERR, buf, strlen(buf), use_pri_str, chan);	
+	sendrc = chan->ops->send(chan, drop_msg);
+
+	if(sendrc == IPC_OK) {
+		drop_msg_num = 0;
+	}
+
+	FreeChildLogIPCMessage(drop_msg);
+	return sendrc == IPC_OK;
+}
+
 
 IPC_Message*
 ChildLogIPCMessage(int priority, const char *buf, int bufstrlen, 
