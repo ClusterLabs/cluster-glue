@@ -64,6 +64,9 @@ extern const char* FT_strings[];
 struct ha_msg* string2msg_ll(const char*, size_t, int, int);
 int compose_netstring(char*, const char*, const char*, size_t, size_t*);
 int msg2netstring_buf(const struct ha_msg*, char*, size_t, size_t*);
+int struct_display_print_spaces(char *buffer, int depth);
+int struct_display_as_xml(int log_level, int depth, struct ha_msg *data,
+			  const char *prefix, gboolean formatted);
 
 
 static int
@@ -425,9 +428,117 @@ struct_display(int log_level, int seq, char* name, void* value)
 	cl_log(log_level, "MSG[%d] : [(%s)%s=%p]",
 	       seq,	FT_strings[FT_STRUCT],
 	       name,	value);
-	cl_log_message(log_level, (struct ha_msg*) value);
-	
+	if(cl_get_string((struct ha_msg*) value, F_XML_TAGNAME) == NULL) {
+		cl_log_message(log_level, (struct ha_msg*) value);
+	} else {
+		/* use a more friendly output format for nested messages */
+		struct_display_as_xml(log_level, 0, value, NULL, TRUE);
+	}
 }
+
+#define update_buffer_head(buffer, len) if(len < 0) {	\
+		(*buffer) = EOS; return -1;		\
+	} else {					\
+		buffer += len;				\
+	}
+
+int
+struct_display_print_spaces(char *buffer, int depth) 
+{
+	int lpc = 0;
+	int spaces = 2*depth;
+	/* <= so that we always print 1 space - prevents problems with syslog */
+	for(lpc = 0; lpc <= spaces; lpc++) {
+		if(sprintf(buffer, "%c", ' ') < 1) {
+			return -1;
+		}
+		buffer += 1;
+	}
+	return lpc;
+}
+
+int
+struct_display_as_xml(
+	int log_level, int depth, struct ha_msg *data,
+	const char *prefix, gboolean formatted) 
+{
+	int lpc = 0;
+	int printed = 0;
+	gboolean has_children = FALSE;
+	char print_buffer[1000];
+	char *buffer = print_buffer;
+	const char *name = cl_get_string(data, F_XML_TAGNAME);
+
+	if(data == NULL) {
+		return 0;
+
+	} else if(name == NULL) {
+		cl_log(LOG_WARNING, "Struct at depth %d had no name", depth);
+		cl_log_message(log_level, data);
+		return 0;
+	}
+	
+	if(formatted) {
+		printed = struct_display_print_spaces(buffer, depth);
+		update_buffer_head(buffer, printed);
+	}
+	
+	printed = sprintf(buffer, "<%s", name);
+	update_buffer_head(buffer, printed);
+	
+	for (lpc = 0; lpc < data->nfields; lpc++) {
+		const char *prop_name = data->names[lpc];
+		const char *prop_value = data->values[lpc];
+		if(data->types[lpc] != FT_STRING) {
+			continue;
+		} else if(prop_name == NULL) {
+			continue;
+			
+		/* hide the next two */
+		} else if(strcmp(F_XML_TAGNAME, prop_name)) {
+			continue;
+		} else if(strcmp(F_XML_PARENT, prop_name)) {
+			continue;
+		}
+		printed = sprintf(buffer, " %s=\"%s\"", prop_name, prop_value);
+		update_buffer_head(buffer, printed);
+	}
+
+	for (lpc = 0; lpc < data->nfields; lpc++) {
+		if(data->types[lpc] == FT_STRUCT) {
+			has_children = TRUE;
+			break;
+		}
+	}
+
+	printed = sprintf(buffer, "%s>", has_children==0?"/":"");
+	update_buffer_head(buffer, printed);
+	cl_log(log_level, "%s%s", prefix?prefix:"", print_buffer);
+	buffer = print_buffer;
+	
+	if(has_children == FALSE) {
+		return 0;
+	}
+	
+	for (lpc = 0; lpc < data->nfields; lpc++) {
+		if(data->types[lpc] != FT_STRUCT) {
+			continue;
+		} else if(0 > struct_display_as_xml(
+				  log_level, depth+1, data->values[lpc],
+				  prefix, formatted)) {
+			return -1;
+		}
+	}
+
+	if(formatted) {
+		printed = struct_display_print_spaces(buffer, depth);
+		update_buffer_head(buffer, printed);
+	}
+	cl_log(log_level, "%s%s</%s", prefix?prefix:"", print_buffer, name);
+
+	return 0;
+}
+
 
 
 
