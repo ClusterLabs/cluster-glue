@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <stdlib.h>
 #include <unistd.h>
 #ifdef _POSIX_MEMLOCK
 #	include <sys/mman.h>
@@ -10,7 +11,7 @@
 #include <clplumbing/cl_log.h>
 #include <clplumbing/realtime.h>
 
-static gboolean	__cl_realtimepermitted = TRUE;
+static gboolean	cl_realtimepermitted = TRUE;
 
 #if defined(SCHED_RR) && defined(_POSIX_PRIORITY_SCHEDULING)
 #	define DEFAULT_REALTIME	SCHED_RR
@@ -31,7 +32,7 @@ cl_make_realtime(int spolicy, int priority,  int heapgrowK)
 	struct sched_param	sp;
 	int			staticp;
 
-	if (!__cl_realtimepermitted) {
+	if (!cl_realtimepermitted) {
 		cl_log(LOG_INFO
 		,	"Request to set pid %ld to realtime ignored."
 		,	(long)getpid());
@@ -68,28 +69,21 @@ cl_make_realtime(int spolicy, int priority,  int heapgrowK)
 #endif
 
 #ifdef MCL_FUTURE
-#ifdef	HAVE_USABLE_BRK
-	{
+	if (heapgrowK > 0) {
 	/*
 	 *	Try and pre-allocate a little memory before locking
 	 *	ourselves into memory...
 	 */
-		long	currbrk;
+		void*	mval = malloc(heapgrowK*1024);
 
-		currbrk = brk(NULL);
-
-		if (currbrk >= 0) {
-			if (brk((void*)(currbrk+heapgrowK*1024)) < 0) {
-				cl_log(LOG_ERR
-				,	"Got bad return from brk(0x%x)"
-				,	heapgrowK*1024);
-			}
-		}else{
-			cl_log(LOG_INFO
-			,	"Could not retrieve current brk value");
+			if (mval != NULL) {
+				free(mval);
+			}else{
+				cl_log(LOG_INFO
+				,	"Could not preallocate (%d) bytes"
+			,	heapgrowK);
 		}
 	}
-#endif
 	if (mlockall(MCL_FUTURE) < 0) {
 		cl_perror("Unable to lock pid %d in memory", (int) getpid());
 	}else{
@@ -119,11 +113,11 @@ cl_make_normaltime()
 void
 cl_disable_realtime(void)
 {
-	__cl_realtimepermitted = FALSE;
+	cl_realtimepermitted = FALSE;
 }
 
 void
 cl_enable_realtime(void)
 {
-	__cl_realtimepermitted = TRUE;
+	cl_realtimepermitted = TRUE;
 }
