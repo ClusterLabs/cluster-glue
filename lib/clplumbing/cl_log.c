@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.33 2005/02/17 22:30:29 gshi Exp $ */
+/* $Id: cl_log.c,v 1.34 2005/02/17 23:20:02 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -37,6 +37,7 @@
 #define	cl_malloc	malloc
 #define	cl_free		free
 #define	DFLT_ENTITY	"cluster"
+#define NULLTIME 	0
 
 char	log_entity[MAXENTITY];
 static IPC_Channel*	logging_daemon_chan = NULL;
@@ -45,7 +46,6 @@ int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use
 IPC_Message* ChildLogIPCMessage(int priority, const char *buf, int bstrlen, 
 				gboolean use_priority_str, IPC_Channel* ch);
 void	FreeChildLogIPCMessage(IPC_Message* msg);
-static char *	ha_timestamp(void);
 
 int			use_logging_daemon =  FALSE;
 int			conn_logd_intval = 0;
@@ -124,7 +124,7 @@ cl_log_get_debugfile(void)
 /* Cluster logging function */
 void
 cl_direct_log(int priority, char* buf, gboolean use_priority_str,
-	      const char* entity, int entity_pid)
+	      const char* entity, int entity_pid, TIME_T ts)
 {
 	FILE *		fp = NULL;
 	int		logpri;
@@ -181,13 +181,13 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 			fprintf(stderr, "%s[%d]: %s %s: %s\n"
 				,	(entity ? entity : DFLT_ENTITY)
 				,       entity_pid
-				,	ha_timestamp()
+				,	ha_timestamp(ts)
 				,	pristr,  buf);
 		}else {
 			fprintf(stderr, "%s[%d]: %s %s\n"
 				,	(entity ? entity : DFLT_ENTITY)
 				,       entity_pid
-				,	ha_timestamp()
+				,	ha_timestamp(ts)
 				,	buf);
 			
 		}
@@ -201,13 +201,13 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 				fprintf(fp, "%s[%d]: %s %s: %s\n"
 					,	(entity ? entity : DFLT_ENTITY)
 					,       entity_pid
-					,	ha_timestamp()
+					,	ha_timestamp(ts)
 					,	pristr,  buf);
 			}else{
 				fprintf(fp, "%s[%d]: %s %s\n"
 					,	(entity ? entity : DFLT_ENTITY)
 					,       entity_pid
-					,	ha_timestamp()
+					,	ha_timestamp(ts)
 					,	buf);
 				
 			}
@@ -223,13 +223,13 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 				fprintf(fp, "%s[%d]: %s %s: %s\n"
 				,	(entity ? entity : DFLT_ENTITY)
 				,       entity_pid
-				,	ha_timestamp()
+				,	ha_timestamp(ts)
 				,	pristr,  buf);
 			}else {
 				fprintf(fp, "%s[%d]: %s %s\n"
 					,	(entity ? entity : DFLT_ENTITY)
 					,       entity_pid
-					,	ha_timestamp()
+					,	ha_timestamp(ts)
 					,	buf);	
 			}
 			
@@ -303,7 +303,7 @@ cl_log(int priority, const char * fmt, ...)
 	     LogToLoggingDaemon(priority, buf, nbytes + 1, TRUE) == HA_OK){
 		goto LogDone;
 	}else {
-		cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid);
+		cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);
 	}
 	
  LogDone:
@@ -348,16 +348,21 @@ cl_glib_msg_handler(const gchar *log_domain,	GLogLevelFlags log_level
 
 	cl_log(ha_level, "glib: %s", message);
 }
-static char *
-ha_timestamp(void)
+char *
+ha_timestamp(TIME_T t)
 {
 	static char ts[64];
 	struct tm*	ttm;
 	TIME_T		now;
 	time_t		nowtt;
-
+	
 	/* Work around various weridnesses in different OSes and time_t definitions */
-	now = time(NULL);
+	if(t == 0){
+		now = time(NULL);
+	}else{
+		now = t;
+	}
+
 	nowtt = (time_t)now;
 	ttm = localtime(&nowtt);
 
@@ -491,6 +496,7 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	logbuf.priority = priority;
 	logbuf.use_pri_str = use_prio_str;
 	logbuf.entity_pid = getpid();
+	logbuf.timestamp = time(NULL);
 	if (cl_log_entity){
 		strncpy(logbuf.entity,cl_log_entity,MAXENTITY);
 	}else {
