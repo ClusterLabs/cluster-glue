@@ -302,7 +302,6 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* message)
         
   }
   
-  
   return IPC_FAIL;
   
 }
@@ -310,36 +309,31 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* message)
 static int 
 socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 {
-	int result;
+	GList *element;
 
-	result = ch->ops->resume_io(ch);
+	int	result = ch->ops->resume_io(ch);
 
 	*message = NULL;
 
-	if (ch->recv_queue->current_qlen != 0) {
-		GList *element = g_list_first(ch->recv_queue->queue);
-
-		if (element != NULL) {
-			*message = (struct IPC_MESSAGE *) (element->data);
-	      
-			ch->recv_queue->queue
-			=	g_list_remove(ch->recv_queue->queue
-			,	element->data);
-			ch->recv_queue->current_qlen--;
-			return IPC_OK;
-		}else{
-			/* Internal accounting error, but correctable */
-			cl_log(LOG_ERR
-			, "recv failure: qlen (%d) > 0, but no message found."
-			,	ch->recv_queue->current_qlen);
-			ch->recv_queue->current_qlen = 0;
-			return result;
-		}
-	}else{
-		return result;	
+	if (ch->recv_queue->current_qlen == 0) {
+		return result != IPC_OK ? result : IPC_FAIL;
 	}
-	
-	/* Not reached */
+	element = g_list_first(ch->recv_queue->queue);
+
+	if (element == NULL) {
+		/* Internal accounting error, but correctable */
+		cl_log(LOG_ERR
+		, "recv failure: qlen (%d) > 0, but no message found."
+		,	ch->recv_queue->current_qlen);
+		ch->recv_queue->current_qlen = 0;
+		return IPC_FAIL;
+	}
+	*message = (struct IPC_MESSAGE *) (element->data);
+
+	ch->recv_queue->queue =	g_list_remove(ch->recv_queue->queue
+	,	element->data);
+	ch->recv_queue->current_qlen--;
+	return IPC_OK;
 }
 
 static int
