@@ -1,4 +1,4 @@
-/* $Id: cpulimits.c,v 1.6 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: cpulimits.c,v 1.7 2004/09/07 15:33:12 alan Exp $ */
 /*
  * Functions to put dynamic limits on CPU consumption.
  *
@@ -45,7 +45,7 @@
  * The process is basically this:
  *  - Set the CPU percentage limit with cl_cpu_limit_setpercent()
  *	according to what you expect the CPU percentage to top out at
- *	measured over an interval at >= 30 seconds
+ *	measured over an interval at >= 60 seconds
  *  - Call cl_cpu_limit_ms_interval() to figure out how often to update
  *	the CPU limit (it returns milliseconds)
  *  - At least as often as indicated above, call cl_cpu_limit_update()
@@ -55,7 +55,7 @@
  * If you've gone into an infinite loop, it'll likely get caught ;-)
  *
  * As of this writing, this code will never set the soft CPU limit less
- * than four seconds, or greater than 30 seconds.
+ * than four seconds, or greater than 60 seconds.
  *
  */
 #include <sys/time.h>
@@ -131,7 +131,7 @@ update_cpu_interval(void)
 	return setrlimit(RLIMIT_CPU, &rlim);
 }
 
-#define	MININTERVAL	30 /* seconds */
+#define	MININTERVAL	60 /* seconds */
 
 int
 cl_cpu_limit_setpercent(int ipercent)
@@ -156,7 +156,7 @@ cl_cpu_limit_setpercent(int ipercent)
 	 *
 	 * Rules:
 	 *  - we won't require checking more often than
-	 *    every 30 seconds
+	 *    every 60 seconds
 	 *  - we won't limit ourselves to less than
 	 *	4 seconds of CPU per checking interval
 	 */
@@ -208,4 +208,12 @@ cl_cpu_limit_update()
 		return update_cpu_interval();
 	}
 	return 0;
+}
+int
+cl_cpu_limit_disable(void)
+{
+	struct rlimit	rlim;
+	getrlimit(RLIMIT_CPU, &rlim);
+	rlim.rlim_cur = rlim.rlim_max;
+	return setrlimit(RLIMIT_CPU, &rlim);
 }

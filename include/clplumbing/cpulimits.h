@@ -1,4 +1,4 @@
-/* $Id: cpulimits.h,v 1.2 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: cpulimits.h,v 1.3 2004/09/07 15:33:12 alan Exp $ */
 /*
  * Functions to put limits on CPU consumption.
  * This allows us to better catch runaway realtime processes that
@@ -46,3 +46,6 @@ int	cl_cpu_limit_update(void);
  * Note:  return result is in milliseconds
  */
 int	cl_cpu_limit_ms_interval(void);
+
+/*	Disable further CPU limits... */
+int 	cl_cpu_limit_disable(void);
