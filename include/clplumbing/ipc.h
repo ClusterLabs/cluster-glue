@@ -1,10 +1,8 @@
-/*!
- \file
- \brief IPC abstraction data structures.
- \author Alan Robertson , Xiaoxiang Liu
- \author  Xiaoxiang Liu <xiliu@ncsa.uiuc.edu>, Alan Robertson <alanr@unix.sh>
- */
 /*
+ * ipc.h IPC abstraction data structures.
+ *
+ * author  Xiaoxiang Liu <xiliu@ncsa.uiuc.edu>, Alan Robertson <alanr@unix.sh>
+ *
  *
  * Copyright (c) 2002 International Business Machines
  * Copyright (c) 2002  Xiaoxiang Liu <xiliu@ncsa.uiuc.edu>
@@ -32,6 +30,10 @@
 #undef MIN
 #undef MAX
 #include <sys/types.h>
+
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif
 
 //constants
 #define DEFAULT_MAX_QLEN 20
