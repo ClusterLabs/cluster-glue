@@ -20,7 +20,7 @@
  *
  */
 
-#include <config.h>
+#include <portability.h>
 #include <unistd.h>
 #include <sys/times.h>
 #include <clplumbing/longclock.h>
