@@ -30,6 +30,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/param.h>
 #include <sys/uio.h>
 #ifdef HAVE_SYS_FILIO_H
@@ -739,11 +740,20 @@ socket_wait_conn_new(GHashTable *ch_attrs)
 {
   struct IPC_WAIT_CONNECTION * temp_ch;
   char *path_name;
+  char *mode_attr;
   struct sockaddr_un my_addr;
   int s;
   struct SOCKET_WAIT_CONN_PRIVATE *wait_private;
+  mode_t s_mode;
   
   path_name = (char *) g_hash_table_lookup(ch_attrs, IPC_PATH_ATTR);
+  mode_attr = (char *) g_hash_table_lookup(ch_attrs, IPC_MODE_ATTR);
+
+  if (mode_attr != NULL) {
+    s_mode = (mode_t)strtoul((const char *)mode_attr, NULL, 8);
+  }else{
+    s_mode = 0777;
+  }
   if (path_name == NULL) {
     return NULL;
   }
@@ -769,6 +779,14 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     
   if (bind(s, (struct sockaddr *)&my_addr, sizeof(my_addr)) == -1) {
     cl_perror("socket_wait_conn_new: trying to create in %s bind:", path_name);
+    close(s);
+    return NULL;
+  }
+
+  /* Change the permission of the socket */
+  if (chmod(path_name,s_mode) < 0){
+    cl_perror("socket_wait_conn_new: failure trying to chmod %s"
+    ,	path_name);
     close(s);
     return NULL;
   }
