@@ -20,8 +20,6 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <portability.h>
-
 #include <glib.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,10 +34,7 @@ int main(void)
 	PILPluginUniv * PluginLoadingSystem = NULL;
 	GHashTable * RAExecFuncs = NULL;
 	struct RAExecOps * RAExec;
-	int key;
-	int result, ret;
-	char * meta_data;
-	GHashTable * cmd_params;
+	int ret;
 
 	PILGenericIfMgmtRqst RegisterRqsts[]= { 
 		{"RAExec", &RAExecFuncs, NULL, NULL, NULL},
@@ -49,49 +44,22 @@ int main(void)
 
 	PILLoadPlugin(PluginLoadingSystem , "InterfaceMgr", "generic" , &RegisterRqsts);
 
-	PILLoadPlugin(PluginLoadingSystem , "RAExec", "lsb", NULL);
 
+	PILLoadPlugin(PluginLoadingSystem , "RAExec", "lsb", NULL);
 	RAExec = g_hash_table_lookup(RAExecFuncs,"lsb");
-//	RAExec->execra("/root/linux-ha-checkout/linux-ha/lrm/test.sh",
+	GHashTable * cmd_params;
 	cmd_params = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(cmd_params, g_strdup("1"), g_strdup("par1"));
 	g_hash_table_insert(cmd_params, g_strdup("2"), g_strdup("par2"));
-	RAExec->execra("/tmp/test.sh",
-			"start",cmd_params,NULL, TRUE, &key);
-	sleep(1);
-	printf("meta_data is %lx\n", (long)meta_data);
-	do {
-		ret = RAExec->post_query_result(key, &result, &meta_data); 
-	} while (ret == 0);
-
-	if ( ret > 0 ) {
-		printf("ret: %d\n", ret);
-		printf("exit status: %d\n", result);
-		printf("meta_data is %lx\n", (long)meta_data);
-		printf("Metadata is as below\n%s\n", meta_data);
-	}
-
-
+	ret = RAExec->execra("/tmp/test.sh", "start", cmd_params,NULL);
+	
+	/* For test the dealing with directory appended to RA */
+	/*
 	PILLoadPlugin(PluginLoadingSystem , "RAExec", "ocf", NULL);
 	RAExec = g_hash_table_lookup(RAExecFuncs,"ocf");
 	if (0>RAExec->execra("/root/linux-ha-checkout/linux-ha/lrm/test.sh",
-//	RAExec->execra("/tmp/test.sh",
-			"stop",NULL,NULL, TRUE, &key)) {
-		printf("Execution error\n");
-		return -1;
-	}
-	sleep(1);
-	printf("meta_data is %lx\n", (long)meta_data);
-	do {
-		ret = RAExec->post_query_result(key, &result, &meta_data); 
-	} while (ret == 0);
-
-	if ( ret > 0 ) {
-		printf("ret: %d\n", ret);
-		printf("exit status: %d\n", result);
-		printf("meta_data is %lx\n", (long)meta_data);
-		printf("Metadata is as below\n%s\n", meta_data);
-	}
-
-	return 0;
+			"stop",NULL,NULL, TRUE, &key)) 
+	*/
+	printf("execra error: ret = %d\n", ret);
+	return -1;
 }

@@ -20,7 +20,6 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
 #include <portability.h>
 
 #include <stdio.h>
@@ -36,13 +35,14 @@
 #include <string.h>
 #endif
 #include <errno.h>
+#ifdef HAVE_GETOPT_H
 #include <getopt.h>
+#endif /* HAVE_GETOPT_H */
+#include <uuid/uuid.h>
+#include <uuid/uuid.h>
 #include <clplumbing/cl_log.h>
 #include <lrm/lrm_api.h>
-/*
-#include <portability.h>
 #include <clplumbing/lsb_exitcodes.h>
-*/
 
 const char * optstring = "AD:dEF:d:Msg:c:S:LI:Rh";
 
@@ -99,19 +99,19 @@ static gboolean ASYN_OPS = FALSE;
 static int call_id = 0;
 
 const char * simple_help_screen =
-"lrmadmin {-d|--deamon}\n"\
-"         {-A|--add} <rscid> <ratype> <raname> [<rsc_params_list>]\n"\
-"         {-D|--delete} <rscid>\n"\
-"         {-F|--flush} <rscid>\n"\
-"         {-E|--execute} <rscid> <operator> <timeout> [<operator_parameters_"\
+"lrmadmin {-d|--deamon}\n"
+"         {-A|--add} <rscid> <ratype> <raname> [<rsc_params_list>]\n"
+"         {-D|--delete} <rscid>\n"
+"         {-F|--flush} <rscid>\n"
+"         {-E|--execute} <rscid> <operator> <timeout> [<operator_parameters_"
 "list>]\n"\
-"         {-M|--monitor} -s <rscid> <operator> <timeout> <interval> "\
+"         {-M|--monitor} -s <rscid> <operator> <timeout> <interval> "
 "[<operator_parameters_list>]\n"
-"         {-M|--monitor} {-g|-c} <rscid>\n"\
-"         {-S|--status} <rscid>\n"\
-"         {-L|--listall}\n"\
-"         {-I|--information} <rsc_id>\n"\
-"         {-R|--rasupported}\n"\
+"         {-M|--monitor} {-g|-c} <rscid>\n"
+"         {-S|--status} <rscid>\n"
+"         {-L|--listall}\n"
+"         {-I|--information} <rsc_id>\n"
+"         {-R|--rasupported}\n"
 "         {-h|--help}\n";
 
 #define OPTION_OBSCURE_CHECK \
@@ -125,12 +125,12 @@ static int resource_operation(ll_lrm_t * lrmd, int argc, int optind,
 			      char * argv[]);
 static int add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
 static int transfer_cmd_params(int amount, int start, char * argv[], 
-			   const char * ra_type, GHashTable ** params_ht);
+			   const char * class, GHashTable ** params_ht);
 static void g_ratype_supported(gpointer data, gpointer user_data);
 static void g_print_ops(gpointer data, gpointer user_data);
 static void g_get_rsc_description(gpointer data, gpointer user_data);
 static void print_rsc_inf(lrm_rsc_t * lrmrsc);
-static char * params_hashtable_to_str(const char * ra_type, GHashTable * ht);
+static char * params_hashtable_to_str(const char * class, GHashTable * ht);
 static void free_stritem_of_hashtable(gpointer key, gpointer value, 
 				      gpointer user_data);
 static void ocf_params_hash_to_str(gpointer key, gpointer value, 
@@ -386,7 +386,7 @@ int main(int argc, char **argv)
 			break;	
 
 		case RATYPE_SUPPORTED:
-			ratype = lrmd->lrm_ops->get_ra_supported(lrmd);
+			ratype = lrmd->lrm_ops->get_rsc_class_supported(lrmd);
 			printf("List size: %d\n", g_list_length(ratype));
 			if (ratype) {
 				g_list_foreach(ratype, g_ratype_supported, NULL);
@@ -554,7 +554,8 @@ int main(int argc, char **argv)
 static void
 lrm_op_done_callback(lrm_op_t* op)
 {
-	char * tmp = NULL;
+	char * tmp;
+
 	if (!op) {
 		cl_log(LOG_ERR, "In callback function, op is NULL pointer.");
 		return;
@@ -562,9 +563,10 @@ lrm_op_done_callback(lrm_op_t* op)
 
 	printf("Operation result: %s\n", status_msg[op->status-LRM_OP_DONE]);
 	printf("Operation type: %s\n", op->op_type);
-	tmp = params_hashtable_to_str(op->rsc->ra_type, op->params);
+	tmp = params_hashtable_to_str(op->rsc->class, op->params);
 	printf("Opration parameters: %s\n", tmp);
 	g_free(tmp);
+	printf("Meta data is as following:\n%s\n", op->data);
 
 	printf("\nThe corresponding resource description as below\n");
 	print_rsc_inf(op->rsc);
@@ -625,7 +627,7 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 
 	if ((argc - optind) > 3) {
 		if (0 > transfer_cmd_params(argc, optind+3, argv, 
-				lrm_rsc->ra_type, &params_ht) ) {
+				lrm_rsc->class, &params_ht) ) {
 			return -2;
 		}
 	}
@@ -643,31 +645,29 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 static int 
 add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 {
-	int tmp_ret = 0;
 	rsc_id_t rsc_id;
-	const char * ra_type = NULL;
-	const char * ra_name = NULL;
-	GHashTable * params_ht = NULL;
+	const char * class = argv[optind+1];
+	const char * type = argv[optind+2];
+	int tmp_ret;
 
 	if ((argc - optind) < 3) {
 		cl_log(LOG_ERR,"No enough parameters.");
 		return -2;
 	}
 
-	ra_type = argv[optind+1];
-	ra_name = argv[optind+2];
 	uuid_parse(argv[optind], rsc_id);
 
+	GHashTable * params_ht = NULL;
 	/* delete Hashtable */
 	if ((argc - optind) > 3) {
-		if ( 0 > transfer_cmd_params(argc, optind+3, argv, ra_type,
+		if ( 0 > transfer_cmd_params(argc, optind+3, argv, class,
 					&params_ht) ) {
 			return -1;
 		}
 	}
 
-	tmp_ret = lrmd->lrm_ops->add_rsc(lrmd, rsc_id, ra_type, 
-						ra_name, params_ht);
+	tmp_ret = lrmd->lrm_ops->add_rsc(lrmd, rsc_id, class, 
+						type, params_ht);
 
 	/*delete params_ht*/
 	if (params_ht) {
@@ -679,22 +679,20 @@ add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 }
 
 static int
-transfer_cmd_params(int amount, int start, char * argv[], const char * ra_type, 
+transfer_cmd_params(int amount, int start, char * argv[], const char * class, 
 GHashTable ** params_ht)
 {
-	int i;
-	int len_tmp;
-	char buffer[21];
-	char * delimit, * key, * value;
-
 	if (amount < start) {
 		return -1;
 	}
 
-	if (strncmp("ocf", ra_type, 4)==0) {
+	if (strncmp("ocf", class, 4)==0) {
+		int i;
+		char * delimit, * key, * value;
 		*params_ht = g_hash_table_new(g_str_hash, g_str_equal);
 
 		for (i=start; i<amount; i++) {
+			int len_tmp;
 			delimit = strchr(argv[i], '=');
 			if (!delimit) {
 				cl_log(LOG_ERR, "parameter %s is invalid for " \
@@ -714,8 +712,11 @@ GHashTable ** params_ht)
 			
 			g_hash_table_insert(*params_ht, key, value);
 		}
-	} else if ( strncmp("lsb", ra_type, 4) == 0 || 
-		    strncmp("heartbeat", ra_type, 10) == 0 ) {
+	} else if ( strncmp("lsb", class, 4) == 0 || 
+		    strncmp("heartbeat", class, 10) == 0 ) {
+		int i;
+		char buffer[21];
+
 		/* Pay attention: for parameter ordring issue */
 		*params_ht = g_hash_table_new(g_str_hash, g_str_equal);
 
@@ -742,7 +743,7 @@ error_return:
 }
 
 static char * 
-params_hashtable_to_str(const char * ra_type, GHashTable * ht)
+params_hashtable_to_str(const char * class, GHashTable * ht)
 {
 	gchar * params_str = NULL;
 	GString * gstr_tmp;
@@ -751,14 +752,14 @@ params_hashtable_to_str(const char * ra_type, GHashTable * ht)
 		 return NULL;
 	}
 
-	if (strncmp("ocf", ra_type, 4)==0) {
+	if (strncmp("ocf", class, 4)==0) {
 		gstr_tmp = g_string_new("");
 		g_hash_table_foreach(ht, ocf_params_hash_to_str, &gstr_tmp);
 		params_str = g_new(gchar, gstr_tmp->len+1);		
 		strncpy(params_str, gstr_tmp->str, gstr_tmp->len+1);
 		g_string_free(gstr_tmp, TRUE);
-	} else if ( strncmp("lsb", ra_type, 4) == 0 || 
-		    strncmp("heartbeat", ra_type, 10) == 0 ) {
+	} else if ( strncmp("lsb", class, 4) == 0 || 
+		    strncmp("heartbeat", class, 10) == 0 ) {
 		int i;
 		int ht_size = g_hash_table_size(ht);
 		gchar * tmp_str = g_new(gchar, ht_size*ARGVI_MAX_LEN); 	
@@ -795,16 +796,14 @@ g_print_ops(gpointer data, gpointer user_data)
 static void
 g_get_rsc_description(gpointer data, gpointer user_data)
 {
-	ll_lrm_t* lrmd = NULL;
+	ll_lrm_t* lrmd = (ll_lrm_t *)user_data;
 	lrm_rsc_t * lrm_rsc;
 	rsc_id_t rsc_id_tmp;
-
+	
 	if (!(user_data)) {
 		return;
 	}
 
-	lrmd = (ll_lrm_t *)user_data;
-	
 	memset(rsc_id_tmp, '\0', sizeof(rsc_id_t));
 	strncpy(rsc_id_tmp, data, sizeof(rsc_id_t));
 
@@ -822,8 +821,8 @@ g_get_rsc_description(gpointer data, gpointer user_data)
 static void
 print_rsc_inf(lrm_rsc_t * lrm_rsc)
 {
-	char * tmp = NULL;
 	char rscid_str_tmp[40];
+	char * tmp = NULL;
 
 	if (!lrm_rsc) {
 		return;
@@ -831,10 +830,11 @@ print_rsc_inf(lrm_rsc_t * lrm_rsc)
 
 	uuid_unparse(lrm_rsc->id, rscid_str_tmp);
 	printf("Resource ID:                %s\n", rscid_str_tmp);
-	printf("Resource agency name:       %s\n", lrm_rsc->name);
-	printf("Resource agency type:       %s\n", lrm_rsc->ra_type);
+	printf("Resource agency name:       %s\n", lrm_rsc->type);
+	printf("Resource agency type:       %s\n", lrm_rsc->class);
+
 	if (lrm_rsc->params) {
-		tmp = params_hashtable_to_str(lrm_rsc->ra_type, 
+		tmp = params_hashtable_to_str(lrm_rsc->class, 
 				lrm_rsc->params);
 	}
 	printf("Resource agency parameters: %s\n", tmp);
@@ -886,18 +886,17 @@ get_lrm_rsc(ll_lrm_t * lrmd, rsc_id_t rscid)
 static void
 g_print_monitor(gpointer data, gpointer user_data)
 {
-	char * tmp;
-
 	/* Don't need to free it */
 	lrm_mon_t * lrm_mon = (lrm_mon_t *) data;
 	if (lrm_mon) {
+		char * tmp;
 		printf("MONITOR:\n");
 		printf("Mode: %d\n", lrm_mon->mode);
 		printf("Interval: %d\n", lrm_mon->interval);
 		printf("Target: %d\n", lrm_mon->target);
 		printf("Operation type: %s\n", lrm_mon->op_type);
 		printf("Timeout: %d\n", lrm_mon->timeout);
-		tmp = params_hashtable_to_str(lrm_mon->rsc->ra_type, 
+		tmp = params_hashtable_to_str(lrm_mon->rsc->class, 
 						lrm_mon->params);
 		printf("Parameters: %s\n", tmp);
 		g_free(tmp);
@@ -905,7 +904,7 @@ g_print_monitor(gpointer data, gpointer user_data)
 	}
 }
 
-int 
+static int 
 set_monitor(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 {
 	rsc_id_t rsc_id;
@@ -932,7 +931,7 @@ set_monitor(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 
 	if ((argc - optind) > 4) {
 		if ( 0 > transfer_cmd_params(argc, optind+4, argv, 
-				lrm_rsc->ra_type, &params_ht) ) {
+				lrm_rsc->class, &params_ht) ) {
 			return -1;
 		}
 	}
