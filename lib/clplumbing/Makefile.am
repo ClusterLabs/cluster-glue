@@ -42,6 +42,7 @@ libplumb_la_SOURCES	= 		\
 			cl_netstring.c	\
 			cl_poll.c	\
 			cl_signal.c	\
+			coredumps.c	\
 			cpulimits.c	\
 			longclock.c	\
 			mkstemp_mode.c	\
