@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.37 2004/09/16 09:14:14 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.38 2004/09/27 08:29:07 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1056,7 +1056,6 @@ on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg)
 	GList* node;
 	int i = 1;
 	struct ha_msg* ret = NULL;
-	char key[MAX_NAME_LEN];
 
 	lrmd_log(LOG_INFO, "on_msg_get_all: start.");
 	ret = create_lrm_ret(HA_OK, g_list_length(rsc_list) + 1);
@@ -1067,8 +1066,7 @@ on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg)
 
 	for(node=g_list_first(rsc_list); NULL!=node; node=g_list_next(node)) {
 		lrmd_rsc_t* rsc = (lrmd_rsc_t*)node->data;
-		snprintf(key,MAX_NAME_LEN,"%s%d",F_LRM_RID,i);
-		if (HA_OK != ha_msg_add(ret,key,rsc->id)) {
+		if (HA_OK != cl_msg_list_add_string(ret,F_LRM_RID,rsc->id)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_get_all: can not add resource id.");
 		}	
@@ -2034,6 +2032,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.38  2004/09/27 08:29:07  zhenh
+ * apply the new cl_msg_list_xxx() funcions in lrm
+ *
  * Revision 1.37  2004/09/16 09:14:14  zhenh
  * fix some memory leaks
  * add more return value checking
