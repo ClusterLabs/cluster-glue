@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.32 2004/11/17 22:03:43 lars Exp $ */
+/* $Id: cl_msg.c,v 1.33 2004/11/18 00:34:37 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1330,8 +1330,8 @@ ipcmsg_done(IPC_Message* m)
 	if (!m) {
 		return;
 	}
-	if (m->msg_body) {
-		ha_free(m->msg_body);
+	if (m->msg_buf) {
+		ha_free(m->msg_buf);
 	}
 	ha_free(m);
 	m = NULL;
@@ -1351,6 +1351,12 @@ wirefmt2ipcmsg(void* p, size_t len, IPC_Channel* ch)
 	if (!ret) {
 		return(NULL);
 	}
+	
+	ret->msg_buf = cl_malloc(len + ch->msgpad);
+	ret->msg_body = (char*)ret->msg_buf + ch->msgpad;
+	memcpy(ret->msg_body, p, len);
+	cl_free(p);
+
 	ret->msg_done = ipcmsg_done;
 	ret->msg_private = NULL;
 	ret->msg_ch = ch;
@@ -1369,7 +1375,6 @@ hamsg2ipcmsg(struct ha_msg* m, IPC_Channel* ch)
 	IPC_Message*	ret = NULL;
 
 
-
 	if (s == NULL) {
 		return ret;
 	}
@@ -1378,10 +1383,15 @@ hamsg2ipcmsg(struct ha_msg* m, IPC_Channel* ch)
 		ha_free(s);
 		return ret;
 	}
+	
+	ret->msg_buf = cl_malloc(len + ch->msgpad);
+	ret->msg_body = (char*)ret->msg_buf + ch->msgpad;
+	memcpy(ret->msg_body, s, len);
+	cl_free(s);
+	
 	ret->msg_done = ipcmsg_done;
 	ret->msg_private = NULL;
 	ret->msg_ch = ch;
-	ret->msg_body = s;
 	ret->msg_len = len;
 
 	return ret;
@@ -1756,6 +1766,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.33  2004/11/18 00:34:37  gshi
+ * 1. use one system call send() instead of two for each message in IPC.
+ * 2. fixed a bug: heartbeat could crash if IPC pipe beween heartbeat and a client
+ * is full.
+ *
  * Revision 1.32  2004/11/17 22:03:43  lars
  * Fix another type error.
  *

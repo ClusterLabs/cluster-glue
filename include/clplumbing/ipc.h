@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.31 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: ipc.h,v 1.32 2004/11/18 00:34:37 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -42,9 +42,9 @@
 #endif
 
 /* constants */
-#define DEFAULT_MAX_QLEN 20
+#define DEFAULT_MAX_QLEN 40
 #define MAX_MESSAGE_SIZE 4096
-
+#define MAX_MSGPAD 128
 /* channel and connection status */
 #define IPC_CONNECT		1	/* Connected: can read, write */
 #define IPC_WAIT		2	/* Waiting for connection */
@@ -62,7 +62,6 @@
 #define IPC_FAIL 1
 #define IPC_BROKEN 2
 #define IPC_INTR 3
-
 /*
  *	IPC:  Sockets-like Interprocess Communication Abstraction
  *
@@ -125,16 +124,32 @@ struct IPC_CHANNEL{
 	void*		ch_private;	/* channel private data. */
 					/* (may contain conn. info.) */
 	IPC_Ops*	ops;		/* IPC_Channel function table.*/
-/*
- *  There are two queues in channel. One is for sending and the other
+
+	/* number of bytes needed
+	 * at the begginging of <ipcmessage>->msg_body
+	 * it's for msg head needed to tranmit in wire	 
+	 */
+	unsigned int	msgpad;
+	
+	/* the number of bytes remainng to send for the first message in send queue
+	   0 means nothing has been sent thus all bytes needs to be send
+	   n != 0 means there are still n bytes needs to be sent
+	*/
+	unsigned int	bytes_remaining;
+
+
+	/* is the send blocking or nonblocking*/
+	gboolean	is_send_blocking;
+	
+/*  There are two queues in channel. One is for sending and the other
  *  is for receiving. 
  *  Those two queues are channel's internal queues. They should not be 
  *  accessed directly.
  */
-/* private: */
+	/* private: */
 	IPC_Queue*	send_queue; 
 	IPC_Queue*	recv_queue; 
-
+	
 };
 
 struct IPC_QUEUE{
@@ -152,6 +167,7 @@ struct IPC_AUTH {
 /* Message structure. */
 struct IPC_MESSAGE{
 	size_t	msg_len;
+	void*	msg_buf;
 	void*	msg_body;
 /* 
  * IPC_MESSAGE::msg_done 
