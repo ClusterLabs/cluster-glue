@@ -117,7 +117,7 @@ typedef struct{
 	op_status_t		op_status;
 	int			rc;
 	int			call_id;
-	const char*		output;
+	char*			output;
 	const char*		rsc_id;
 	/*please notice the client needs release the memory of rsc.*/
 	lrm_rsc_t*		rsc;
