@@ -1,4 +1,4 @@
-/* $Id: GSource.h,v 1.9 2005/02/17 17:49:57 alan Exp $ */
+/* $Id: GSource.h,v 1.10 2005/04/04 07:27:10 andrew Exp $ */
 #ifndef _CLPLUMBING_GSOURCE_H
 #	define _CLPLUMBING_GSOURCE_H
 #	include <clplumbing/ipc.h>
@@ -7,6 +7,7 @@ typedef	struct GFDSource_s	GFDSource;
 typedef struct GCHSource_s	GCHSource;
 typedef struct GWCSource_s	GWCSource;
 typedef struct GSIGSource_s	GSIGSource;
+typedef struct GTRIGSource_s	GTRIGSource;
 
 
 
@@ -128,5 +129,34 @@ gboolean G_main_del_SignalHandler(GSIGSource* chp);
  *
  */
 void	set_SignalHandler_dnotify(GSIGSource* chp, GDestroyNotify notify);
+
+
+
+/**************************************************************
+ *	Functions for interfacing Manual triggers to the mainloop
+ **************************************************************/
+/*
+ *	Add an Trigger to the gmainloop world...
+ */
+GTRIGSource* G_main_add_TriggerHandler(
+	int priority, gboolean (*dispatch)(gpointer user_data),
+	gpointer userdata, GDestroyNotify notify);
+
+/*
+ *	Delete an signal from the gmainloop world...
+ *	Note: destroys the GTRIGSource object, and the removes the
+ *	Trigger Handler automatically.
+ */
+gboolean G_main_del_TriggerHandler(GTRIGSource* chp);
+
+
+/*
+ *	Set the destroy notify function
+ *
+ */
+void	set_TriggerHandler_dnotify(GTRIGSource* chp, GDestroyNotify notify);
+
+
+void G_main_set_trigger(GTRIGSource* man_src);
 
 #endif
