@@ -126,7 +126,7 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 
 	for (i=0; i < m->nfields; i++) {
 		int comlen;
-		int llen;
+		size_t llen;
 
 		if (compose_netstring(sp, smax, m->nlens[i]
 		,	m->names[i],&comlen) != HA_OK){
@@ -151,7 +151,7 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 		sp += comlen;
 		datalen +=comlen;
 
-		llen = m->nlens[i];
+		llen = (size_t)m->nlens[i];
 
 		if (m->types[i] == FT_STRUCT) {
 			size_t	tmplen;
