@@ -38,7 +38,6 @@
 #define UNIX_PATH_MAX 108
 #endif
 #define MAX_LISTEN_NUM 10
-#define PATH_ATTR "path_name"
 #define SOCKET_ATTR "socket"
 
 /* channel and wait connection private data. */
@@ -211,7 +210,7 @@ socket_initiate_connection(struct OCF_IPC_CHANNEL * ch)
   conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
   
   /* prepare the socket */
-  bzero(&peer_addr, sizeof(peer_addr));
+  memset(&peer_addr, 0, sizeof(peer_addr));
   peer_addr.sun_family = AF_LOCAL;    /* host byte order */ 
 
   if (strlen(conn_info->path_name) >= sizeof(peer_addr.sun_path)) {
@@ -606,23 +605,27 @@ socket_destroy_queue(struct OCF_IPC_QUEUE * q)
 
 
 /* 
- * will be called by ipc_wait_conn_constructor to get a new socket waiting connection.
+ * socket_wait_conn_new:
+ * Called by ipc_wait_conn_constructor to get a new socket
+ * waiting connection.
+ * (better explanation of this role might be nice)
  * 
- * papameters :
+ * Parameters :
  *     ch_attrs (IN) the attributes used to create this connection.
- 
- * return :
- *     the pointer to the new waiting connection or NULL if the connection can't be created.
+ *
+ * Return :
+ *	the pointer to the new waiting connection or NULL if the connection
+ *	can't be created.
  * 
- * note :
- *   for domain socket implementation, the only attribute needed is path name. so the user should 
+ * NOTE :
+ *   for domain socket implementation, the only attribute needed is path name.
+ *	so the user should 
  *   create the hash table like this: 
  *     GHashTable * attrs; 
  *     attrs = g_hash_table_new(g_str_hash, g_str_equal); 
  *     g_hash_table_insert(attrs, PATH_ATTR, path_name);   
- *     here PATH_ATTR is defined as "path_name". 
+ *     here PATH_ATTR is defined as "path". 
  */
-struct OCF_IPC_WAIT_CONNECTION *socket_wait_conn_new(GHashTable* ch_attrs);
 struct OCF_IPC_WAIT_CONNECTION *
 socket_wait_conn_new(GHashTable *ch_attrs)
 {
@@ -647,7 +650,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   }
   
   unlink(path_name);
-  bzero(&my_addr, sizeof(my_addr));
+  memset(&my_addr, 0, sizeof(my_addr));
   my_addr.sun_family = AF_LOCAL;         /* host byte order */
 
   if (strlen(path_name) >= sizeof(my_addr.sun_path)) {
