@@ -187,6 +187,7 @@ ha_msg_add_hash_table(struct ha_msg * msg, const char * name,
 
 	hash_msg = hash_table_to_msg(hash_table);
 	ha_msg_addstruct(msg, name, hash_msg);
+	ha_msg_del(hash_msg);
 	return HA_OK;
 }
 GHashTable*
