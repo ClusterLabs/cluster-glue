@@ -58,7 +58,7 @@
  */
 typedef enum {
 	PIL_REGISTER,	/* Someone has registered an implementation */
-	PIL_UNREGISTER,	/* Someone has unregistered an implementation */
+	PIL_UNREGISTER 	/* Someone has unregistered an implementation */
 }GenericPILCallbackType;
  
 /* A user callback for the generic interface manager */
