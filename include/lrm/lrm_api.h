@@ -106,7 +106,7 @@ typedef enum {
 
 typedef struct{
 	/*input fields*/
-	const char* 		op_type;
+	char* 			op_type;
 	GHashTable*		params;
 	int			timeout;
 	gpointer		user_data;
@@ -118,10 +118,10 @@ typedef struct{
 	int			rc;
 	int			call_id;
 	char*			output;
-	const char*		rsc_id;
+	char*			rsc_id;
 	/*please notice the client needs release the memory of rsc.*/
 	lrm_rsc_t*		rsc;
-	const char*		app_name;
+	char*			app_name;
 }lrm_op_t;
 
 /*this enum is used in get_cur_state*/
