@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.3 2004/09/28 06:36:03 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.4 2004/10/24 14:47:31 lge Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -145,7 +145,7 @@ static void	cl_dump_item(struct cl_bucket*b);
 
 #ifdef MAKE_GUARD
 #	define GUARDLEN 2
-	static const char cl_malloc_guard[] =
+	static const unsigned char cl_malloc_guard[] =
 #if GUARDLEN == 1
 	{0xA5};
 #endif
