@@ -1,0 +1,158 @@
+#!@PYTHON@
+#
+# Stonith module for RILOE Stonith device
+#
+# Copyright (c) 2004 Alain St-Denis <alain.st-denis@ec.gc.ca>
+#
+# Modified by Alan Robertson <alanr@unix.sh> for STONITH external compatibility.
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+# 
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+# 
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+import sys
+import os
+import socket
+from httplib import *
+from time import sleep
+
+
+argv = sys.argv
+sys.stdout = sys.stderr
+
+#	We assume the device name for node X.foo.bar.com is X-rm
+#	and is accessible as a local (non-FQDN) DNS name.
+try:
+        cmd = argv[1]
+except IndexError:
+        print "Not enough arguments"
+        sys.exit(1)
+
+try:
+        password = os.environ['RIPASSWORD']
+        anypass=1
+        os.environ['RIPASSWORD'] = "********"
+except KeyError:
+        password = ""
+        anypass=0
+
+try:
+        host = os.environ['RIHOST']
+        rihost = host.split('.')[0]+'-rm'
+except KeyError:
+        rihost = ""
+        host = "<unconfigured>"
+
+#	Some old RILOE devices don't support the reset command
+#	This variable is 1 if it does.
+try:
+        reset_ok = os.environ["reset_supported"]
+        if reset_ok == '':
+                reset_ok = None
+except KeyError:
+        reset_ok = None
+login = [ '<RIBCL VERSION="1.2">',
+          '<LOGIN USER_LOGIN="Administrator" PASSWORD="'
+	  + password + '">' ]
+
+
+logout = [ '</LOGIN>', '</RIBCL>' ]
+
+
+status = [ '<SERVER_INFO MODE="read">', '<GET_HOST_POWER_STATUS/>',
+           '</SERVER_INFO>' ]
+
+
+reset = [ '<SERVER_INFO MODE="write">', '<RESET_SERVER/>', '</SERVER_INFO>' ]
+
+
+off = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "N"/>',
+          '</SERVER_INFO>' ]
+
+
+on = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "Y"/>',
+          '</SERVER_INFO>' ]
+
+
+todo = { 'reset':reset, 'on':on, 'off':off, 'status':status }
+
+info = {
+        'getinfo-devid':	'RILOE',
+        'getinfo-devname':	'riloe ' + rihost,
+        'getinfo-devdescr':	'COMPAQ RILOE STONITH device',
+        'getinfo-devurl':	'http://www.hp.com/',
+	'gethosts':		host,
+        'getinfo-xml':		'<Something XMLish/>'
+}
+
+try:
+        print info[cmd]
+        sys.exit(0)
+except KeyError:
+        None
+
+if cmd == 'getconfignames':
+        for arg in ['host', 'password']:
+            print arg
+        sys.exit(0)
+
+#
+#	All remaining commands need host and password to succeed...
+#
+
+if host == '<unconfigured>':
+        print "Missing 'RIHOST' environment variable"
+        sys.exit(1)
+if not anypass:
+        print "Missing 'RIPASSWORD' environment variable"
+
+acmds=[]
+
+
+try:
+        if cmd == 'reset' and not reset_ok:
+                acmds.append(login + todo['off'] + logout)
+                acmds.append(login + todo['on'] + logout)
+        else:   
+                acmds.append(login + todo[cmd] + logout)
+except KeyError:
+        print 'Invalid command: '+ cmd
+        sys.exit(1)
+
+
+try:
+        for cmds in acmds:
+
+                c=HTTPSConnection(host)
+                c.send('<?xml version="1.0"?>\r\n')
+                c.sock.recv(1024)
+
+
+                for line in cmds:
+                        c.send(line+'\r\n')
+                        c.sock.recv(1024)
+
+
+                c.close()
+                sleep(1)
+
+
+except socket.gaierror, msg:
+        print "ERROR: " + str(msg) + ": " + rihost
+        sys.exit(1)
+except socket.sslerror, msg:
+        print "ERROR: " + str(msg) + "for " + rihost
+        sys.exit(1)
+except socket.error, msg:
+        print "ERROR: " + str(msg) + "talking to " + rihost
+        sys.exit(1)
