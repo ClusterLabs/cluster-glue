@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.30 2004/12/01 22:04:42 gshi Exp $ */
+/* $Id: ipctest.c,v 1.31 2004/12/08 19:17:54 gshi Exp $ */
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -795,6 +795,7 @@ s_rcv_msg(IPC_Channel* chan, gpointer data)
 
 	if (i->sendingsuspended
 	&&	!chan->ops->is_sending_blocked(chan)) {
+		i->sendingsuspended = FALSE;
 		g_idle_add(s_send_msg, data);
 	}
 
