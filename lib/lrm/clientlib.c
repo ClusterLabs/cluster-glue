@@ -1157,6 +1157,10 @@ msg_to_op(struct ha_msg* msg)
 		else {
 			op->output = NULL;
 		}
+		/* check the rc to revise the op_status */
+		if (0 != op->rc) {
+			op->op_status = LRM_OP_ERROR;
+		}
 	}
 	else  {
 		op->rc = EXECRA_EXEC_UNKNOWN_ERROR;
