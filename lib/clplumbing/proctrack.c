@@ -20,6 +20,7 @@
  *
  */
 
+#include <config.h>
 #include <sys/wait.h>
 #include <glib.h>
 #include <heartbeat.h>
@@ -50,7 +51,6 @@ NewTrackedProc(pid_t pid, int isapgrp, ProcTrackLogType loglevel
 ,	void * privatedata, ProcTrack_ops* ops)
 {
 	ProcTrack*	p = g_new(ProcTrack, 1);
-	struct tms	dummy;
 
 	InitProcTable();
 	p->pid = pid;
@@ -58,7 +58,7 @@ NewTrackedProc(pid_t pid, int isapgrp, ProcTrackLogType loglevel
 	p->loglevel = loglevel;
 	p->privatedata = privatedata;
 	p->ops = ops;
-	p->startticks = times(&dummy);
+	p->startticks = time_longclock();
 	p->starttime = time(NULL);
 
 	g_hash_table_insert(ProcessTable, GINT_TO_POINTER(pid), p);
