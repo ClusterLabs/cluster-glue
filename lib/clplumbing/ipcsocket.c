@@ -414,7 +414,6 @@ socket_waitin(struct IPC_CHANNEL * ch)
 static gboolean
 socket_is_message_pending(struct IPC_CHANNEL * ch)
 {
-  struct SOCKET_CH_PRIVATE * conn_info = ch->ch_private;
   struct pollfd sockpoll;
 
   if (ch->recv_queue->current_qlen > 0) {
