@@ -42,6 +42,7 @@
 #	include <sched.h>
 #endif
 
+#include <clplumbing/longclock.h>
 #include <stonith/stonith.h>
 
 
@@ -54,26 +55,20 @@ static int
 ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
 ,	int maxline)
 {
-	clock_t		starttime;
-	clock_t		endtime;
-	int		wraparound=0;
-	int		tickstousec = (1000000/CLK_TCK);
-	clock_t		now;
+	longclock_t	starttime;
+	longclock_t	endtime;
+	longclock_t	now;
 	clock_t		ticks;
 	int		nchars = 1; /* reserve space for an EOS */
 	struct timeval	tv;
 
 	struct Etoken *	this;
 
-	/* Figure out when to give up.  Handle lbolt wraparound */
+	/* Figure out when to give up. */
 
 	starttime = times(NULL);
 	ticks = (to_secs*CLK_TCK);
 	endtime = starttime + ticks;
-
-	if (endtime < starttime) {
-		wraparound = 1;
-	}
 
 	if (buf) {
 		*buf = EOS;
@@ -84,24 +79,20 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
 	}
 
 
-	while (now = times(NULL),
-		(wraparound && (now > starttime || now <= endtime))
-		||	(!wraparound && now <= endtime)) {
+	while (now = time_longclock(), (cmp_longclock(now, endtime) < 0)) {
 
-		fd_set infds;
-		char	ch;
-		clock_t		timeleft;
+		fd_set 		infds;
+		char		ch;
+		longclock_t	timeleft;
+		long		msleft;
 		int		retval;
 
-		timeleft = endtime - now;
+		timeleft = sub_longclock(endtime, now);
+		msleft = longclockto_ms(timeleft);
 
-		tv.tv_sec = timeleft / CLK_TCK;
-		tv.tv_usec = (timeleft % CLK_TCK) * tickstousec;
+		tv.tv_sec = msleft / 1000;
+		tv.tv_usec = (msleft % 1000) * 1000;
 
-		if (tv.tv_sec == 0 && tv.tv_usec < tickstousec) {
-			/* Give 'em a little chance */
-			tv.tv_usec = tickstousec;
-		}
 
 		/* Watch our FD to see when it has input. */
            	FD_ZERO(&infds);

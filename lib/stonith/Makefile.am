@@ -38,6 +38,7 @@ sbin_PROGRAMS		= stonith meatclient
 stonith_SOURCES		= main.c
 
 stonith_LDADD		= $(top_builddir)/libltdl/libltdlc.la \
+			$(top_builddir)/lib/clplumbing/libplumb.la \
 			libstonith.la
 stonith_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self
 
