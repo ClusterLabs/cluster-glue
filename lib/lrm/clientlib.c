@@ -32,7 +32,6 @@
 #include <ha_msg.h>
 #include <lrm/lrm_api.h>
 #include <lrm/lrm_msg.h>
-
 /* Notice: this define should be replaced when merge to the whole pkg*/
 #define	LRM_MAXPIDLEN 	256
 #define LRM_ID		"lrm"
@@ -1359,4 +1358,44 @@ client_log (int priority, const char* fmt)
 	{
 		printf("client_log:INFO:%s\n",fmt);
 	}
+}
+
+const char *
+execra_code2string(uniform_ret_execra_t code)
+{
+	switch(code) {
+		case EXECRA_EXEC_UNKNOWN_ERROR:
+			return "unknown exec error";
+		case EXECRA_NO_RA:
+			return "no RA";
+		case EXECRA_OK:
+			return "ok";
+		case EXECRA_UNKNOWN_ERROR:
+			return "unknown error";
+		case EXECRA_INVALID_PARAM:
+			return "invalid parameter";
+		case EXECRA_UNIMPLEMENT_FEATURE:
+			return "unimplemented feature";
+		case EXECRA_INSUFFICIENT_PRIV:
+			return "insufficient privileges";
+		case EXECRA_NOT_INSTALLED:
+			return "not installed";
+		case EXECRA_NOT_CONFIGURED:
+			return "not configured";
+		case EXECRA_NOT_RUNNING:
+			return "not running";
+		/* For status command only */
+		case EXECRA_RA_DEAMON_DEAD1:
+			return "status: deamon dead";
+		case EXECRA_RA_DEAMON_DEAD2:
+			return "status: deamon dead";
+		case EXECRA_RA_DEAMON_STOPPED:
+			return "status: deamon stopped";
+		case EXECRA_STATUS_UNKNOWN:
+			return "status: unknown";
+		default:
+		break;
+	}
+
+	return "<unknown>";
 }

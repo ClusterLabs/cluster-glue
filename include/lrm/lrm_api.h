@@ -56,6 +56,7 @@
 #include <portability.h>
 
 #include <glib.h>
+#include <lrm/raexec.h>
 
 #define LRM_PROTOCOL_MAJOR 0
 #define LRM_PROTOCOL_MINOR 1
@@ -355,6 +356,13 @@ ll_lrm_t* ll_lrm_new(const char * llctype);
  *		LOG_INFO: print out LOG_INFO and LOG_ERR messages
  */
 void set_debug_level(int level);
- 
+
+/*
+ *execra_code2string:
+ *		Translate the return code of the operation to string
+ *
+ *code:		the rc field in lrm_op_t structure
+ */
+const char *execra_code2string(uniform_ret_execra_t code); 
 #endif /* __LRM_API_H */
 
