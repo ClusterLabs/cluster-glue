@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.21 2004/10/11 02:11:07 zhenh Exp $ */
+/* $Id: lrmadmin.c,v 1.22 2004/10/24 12:38:33 lge Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -565,6 +565,7 @@ ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	const char * class = argv[optind-1];
 	const char * type = argv[optind];
 	const char * provider = argv[optind+1];
+	char* metadata;
 
 	if(argc < 5) {
 		cl_log(LOG_ERR,"No enough parameters.");
@@ -574,13 +575,13 @@ ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	if (0==strncmp(provider,"NULL",4)) {
 		provider=NULL;
 	}
-	
-	char* metadata = lrmd->lrm_ops->get_rsc_type_metadata(lrmd, class, type, provider);
+
+	metadata = lrmd->lrm_ops->get_rsc_type_metadata(lrmd, class, type, provider);
 	if (NULL!=metadata) {
 		printf ("metadata of %s(%s) is: %s\n",type,class,metadata);
 		g_free (metadata);
 	}
-	return 0; 
+	return 0;
 }
 
 static int
@@ -879,6 +880,10 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.22  2004/10/24 12:38:33  lge
+ * -pedantic-errors fixes take one:
+ * * error: ISO C89 forbids mixed declarations and code
+ *
  * Revision 1.21  2004/10/11 02:11:07  zhenh
  * remove comment line with //
  *
