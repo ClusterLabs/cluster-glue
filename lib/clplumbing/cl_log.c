@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.48 2005/04/05 20:55:42 gshi Exp $ */
+/* $Id: cl_log.c,v 1.49 2005/04/06 14:39:49 andrew Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -626,11 +626,17 @@ send_dropped_message(gboolean use_pri_str, IPC_Channel *chan)
 {
 	int sendrc;
 	char buf[64];
+	int buf_len = 0;
 	IPC_Message *drop_msg = NULL;
 
 	snprintf(buf, 64, "cl_log: %d messages were dropped", drop_msg_num);
-	drop_msg = ChildLogIPCMessage(
-		LOG_ERR, buf, strlen(buf), use_pri_str, chan);	
+	buf_len = strlen(buf);
+	drop_msg = ChildLogIPCMessage(LOG_ERR, buf, buf_len, use_pri_str, chan);
+
+	if(drop_msg == NULL || drop_msg->msg_len == 0) {
+		return FALSE;
+	}
+	
 	sendrc = chan->ops->send(chan, drop_msg);
 
 	if(sendrc == IPC_OK) {
