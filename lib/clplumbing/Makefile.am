@@ -51,6 +51,8 @@ libplumb_la_SOURCES	= 		\
 			ttylock.c	\
 			uids.c
 
+libplumb_la_LIBADD      = $(top_builddir)/replace/libreplace.la
+
 testdir = $(libdir)/@HB_PKG@
 test_PROGRAMS = ipctest ipctransientclient ipctransientserver
 
