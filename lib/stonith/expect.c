@@ -58,7 +58,7 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
 	longclock_t	starttime;
 	longclock_t	endtime;
 	longclock_t	now;
-	clock_t		ticks;
+	longclock_t	ticks;
 	int		nchars = 1; /* reserve space for an EOS */
 	struct timeval	tv;
 
@@ -67,8 +67,8 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
 	/* Figure out when to give up. */
 
 	starttime = times(NULL);
-	ticks = (to_secs*CLK_TCK);
-	endtime = starttime + ticks;
+	ticks = secsto_longclock(to_secs);
+	endtime = add_longclock(starttime, ticks);
 
 	if (buf) {
 		*buf = EOS;
