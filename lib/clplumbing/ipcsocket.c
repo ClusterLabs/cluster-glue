@@ -641,7 +641,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
 
   
   
-  path_name = (char *) g_hash_table_lookup(ch_attrs, "path_name");
+  path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR);
   if (path_name == NULL) {
     printf("GHash look up : Can't get the path_name from the hash table\n");
     return NULL;
