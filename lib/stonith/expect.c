@@ -1,4 +1,4 @@
-/* $Id: expect.c,v 1.16 2005/02/03 20:07:07 msoffen Exp $ */
+/* $Id: expect.c,v 1.17 2005/03/29 22:05:11 alan Exp $ */
 /*
  * Simple expect module for the STONITH library
  *
@@ -412,6 +412,7 @@ GetAllValues(StonithNamesToGet* output, StonithNVpair * input)
 		const char * value = GetValue(input, output[j].s_name);
 		if (value == NULL) {
 			rc = S_INVAL;
+			output[j].s_value = NULL;
 			goto fail;
 		}
 		if ((output[j].s_value = strdup(value)) == NULL) {
