@@ -1,4 +1,4 @@
-/* $Id: pils.c,v 1.43 2004/10/06 17:59:56 gshi Exp $ */
+/* $Id: pils.c,v 1.44 2004/10/07 12:59:02 alan Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -220,7 +220,7 @@ PILRegisterInterface
 ,	PILInterfaceFun	closefunc	/* Ops exported by this interface */
 ,	PILInterface**	interfaceid	/* Interface id 	(OP)	*/
 ,	void**		Imports		/* Functions imported by	*/
-					 /* this interface	(OP)	*/
+					/* this interface	(OP)	*/
 ,	void*		ud_interface	/* interface user data 		*/
 );
 static PIL_rc	PILunregister_interface(PILInterface* interfaceid);
