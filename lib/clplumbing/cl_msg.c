@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.19 2004/08/29 04:05:23 msoffen Exp $ */
+/* $Id: cl_msg.c,v 1.20 2004/08/31 18:42:51 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -91,6 +91,8 @@ void ha_msg_audit(const struct ha_msg* msg);
 
 static volatile hb_msg_stats_t*	msgstats = NULL;
 
+gboolean cl_msg_quiet_fmterr = FALSE;
+
 extern int		netstring_format;
 
 static struct ha_msg* wirefmt2msg_ll(const char* s, size_t length, int need_auth);
@@ -170,6 +172,13 @@ convert(char* s, int len, int depth, int direction)
 	return(HA_OK);
 }
 
+
+static int
+intlen(int x)
+{
+	char	buf[20];
+	return snprintf(buf, sizeof(buf), "%d", x);
+}
 
 
 /* Create a new (empty) message */
@@ -762,8 +771,11 @@ ha_msg_add_nv_depth(struct ha_msg* msg, const char * nvline,
 	/* How many characters before the '='? */
 	if ((namelen = strcspn(nvline, EQUAL)) <= 0
 	||	nvline[namelen] != '=') {
-		cl_log(LOG_WARNING, "ha_msg_add_nv: line doesn't contain '='");
-		cl_log(LOG_INFO, "%s", nvline);
+		if (!cl_msg_quiet_fmterr) {
+			cl_log(LOG_WARNING
+			,	"ha_msg_add_nv: line doesn't contain '='");
+			cl_log(LOG_INFO, "%s", nvline);
+		}
 		return(HA_FAIL);
 	}
 	valp = nvline + namelen +1; /* Point just *past* the '=' */
@@ -1090,9 +1102,11 @@ msgfromstream_netstring(FILE * f)
 		char *	typebuf;
 
 		if (fscanf(f, "%d:", &namelen) <= 0 || namelen <= 0){
-			cl_log(LOG_WARNING
-			,	" msgfromstream_netstring()"
-			": scanning for namelen failed");
+			if (!cl_msg_quiet_fmterr) {
+				cl_log(LOG_WARNING
+				,	" msgfromstream_netstring()"
+				": scanning for namelen failed");
+			}
 			ha_msg_del(ret);
 			return(NULL);
 		}
@@ -1109,9 +1123,11 @@ msgfromstream_netstring(FILE * f)
 		}
 
 		if (*(namebuf + namelen) != ',' ){
-			cl_log(LOG_WARNING
-			,	"msgfromstream_netstring()"
-			": \",\" is missing in netstring for name");
+			if (!cl_msg_quiet_fmterr) {
+				cl_log(LOG_WARNING
+				,	"msgfromstream_netstring()"
+				": \",\" is missing in netstring for name");
+			}
 			ha_msg_del(ret);
 			return(NULL);
 		}
@@ -1123,10 +1139,12 @@ msgfromstream_netstring(FILE * f)
 
 			if (!is_auth_netstring(total_databuf
 			,	sp - total_databuf, name,namelen) ){
-				cl_log(LOG_ERR
-				,	"msgfromstream_netstring()"
-				": netstring authentication"
-				" failed msgfromstream_netstring()");
+				if (!cl_msg_quiet_fmterr) {
+					cl_log(LOG_ERR
+					,	"msgfromstream_netstring()"
+					": netstring authentication"
+					" failed msgfromstream_netstring()");
+				}
 				cl_log_message(ret);
 				ha_msg_del(ret);
 				return(NULL);
@@ -1147,9 +1165,11 @@ msgfromstream_netstring(FILE * f)
 		}
 
 		if (*(typebuf + typelen) != ',' ){
-			cl_log(LOG_WARNING
-			,	"msgfromstream_netstring()"
-			": \",\" is missing in netstring for type");
+			if  (!cl_msg_quiet_fmterr) {
+				cl_log(LOG_WARNING
+				,	"msgfromstream_netstring()"
+				": \",\" is missing in netstring for type");
+			}
 			ha_msg_del(ret);
 			return(NULL);
 		}
@@ -1158,9 +1178,11 @@ msgfromstream_netstring(FILE * f)
 		type = typebuf;
 
 		if (fscanf(f, "%d:", &datalen) <= 0) {
-			cl_log(LOG_WARNING
-			,	"msgfromstream_netstring()"
-			": scanning for datalen failed");
+			if (!cl_msg_quiet_fmterr) {
+				cl_log(LOG_WARNING
+				,	"msgfromstream_netstring()"
+				": scanning for datalen failed");
+			}
 			ha_msg_del(ret);
 			return(NULL);
 		}
@@ -1178,9 +1200,11 @@ msgfromstream_netstring(FILE * f)
 		}
 
 		if (*(databuf + datalen ) != ',' ){
-			cl_log(LOG_WARNING
-			,	"msgfromstream_netstring()"
-			": \",\" is missing in netstring for data");
+			if (!cl_msg_quiet_fmterr) {
+				cl_log(LOG_WARNING
+				,	"msgfromstream_netstring()"
+				": \",\" is missing in netstring for data");
+			}
 			ha_msg_del(ret);
 			return(NULL);
 		}
@@ -1509,8 +1533,10 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 		}
 		/* Add the "name=value" string on this line to the message */
 		if (ha_msg_add_nv_depth(ret, sp, smax, depth) != HA_OK) {
-			cl_log(LOG_ERR, "NV failure (string2msg_ll):");
-			cl_log(LOG_ERR, "Input string: [%s]", s);
+			if (!cl_msg_quiet_fmterr) {
+				cl_log(LOG_ERR, "NV failure (string2msg_ll):");
+				cl_log(LOG_ERR, "Input string: [%s]", s);
+			}
 			ha_msg_del(ret);
 			return(NULL);
 		}
@@ -1523,9 +1549,11 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 	if (need_auth && msg_authentication_method
 	&&		!msg_authentication_method(ret)) {
 		const char* from = ha_msg_value(ret, F_ORIG);
-		cl_log(LOG_WARNING
-	       ,       "string2msg_ll: node [%s]"
-	       " failed authentication", from ? from : "?");
+		if (!cl_msg_quiet_fmterr) {
+			cl_log(LOG_WARNING
+		       ,       "string2msg_ll: node [%s]"
+		       " failed authentication", from ? from : "?");
+		}
 		ha_msg_del(ret);
 		ret = NULL;
 	}
@@ -1869,6 +1897,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.20  2004/08/31 18:42:51  alan
+ * Put in the code to suppress warnings about bad packets...
+ *
  * Revision 1.19  2004/08/29 04:05:23  msoffen
  * Fixed end comment in previous log.
  *
