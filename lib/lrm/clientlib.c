@@ -58,7 +58,6 @@ static int lrm_delete_rsc (ll_lrm_t*, const char* id);
 static int lrm_inputfd (ll_lrm_t*);
 static int lrm_msgready (ll_lrm_t*);
 static int lrm_rcvmsg (ll_lrm_t*, int blocking);
-static struct ha_msg* msgfromIPC_noauth_noINTR(IPC_Channel * ch);
 
 static struct lrm_ops lrm_ops_instance =
 {
@@ -341,7 +340,7 @@ lrm_get_rsc_class_supported (ll_lrm_t* lrm)
 	}
 	ha_msg_del(msg);
 	/* get the return message */
-	ret = msgfromIPC_noauth_noINTR(ch_cmd);
+	ret = msgfromIPC(ch_cmd, 0);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"lrm_get_rsc_class_supported: can not recieve ret msg");
@@ -397,7 +396,7 @@ lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rclass)
 	}
 	ha_msg_del(msg);
 	/* get the return message */
-	ret = msgfromIPC_noauth_noINTR(ch_cmd);
+	ret = msgfromIPC(ch_cmd, 0);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"lrm_get_rsc_type_supported: can not recieve ret msg");
@@ -454,7 +453,7 @@ lrm_get_rsc_provider_supported (ll_lrm_t* lrm, const char* class, const char* ty
 	}
 	ha_msg_del(msg);
 	/* get the return message */
-	ret = msgfromIPC_noauth_noINTR(ch_cmd);
+	ret = msgfromIPC(ch_cmd, 0);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"lrm_get_rsc_provider_supported: can not recieve ret msg");
@@ -550,7 +549,7 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype,
 	}
 	ha_msg_del(msg);
 	/* get the return message */
-	ret = msgfromIPC_noauth_noINTR(ch_cmd);
+	ret = msgfromIPC(ch_cmd, 0);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"lrm_get_rsc_type_supported: can not recieve ret msg");
@@ -602,7 +601,7 @@ lrm_get_all_rscs (ll_lrm_t* lrm)
 	}
 	ha_msg_del(msg);
 	/* get the return msg */
-	ret = msgfromIPC_noauth_noINTR(ch_cmd);
+	ret = msgfromIPC(ch_cmd, 0);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"lrm_get_all_rscs: can not recieve ret msg");
@@ -656,7 +655,7 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	}
 	ha_msg_del(msg);
 	/* get the return msg from lrmd */
-	ret = msgfromIPC_noauth_noINTR(ch_cmd);
+	ret = msgfromIPC(ch_cmd, 0);
 	if (NULL == ret) {
 		cl_log(LOG_ERR, "lrm_get_rsc: can not recieve ret msg");
 		return NULL;
@@ -806,7 +805,7 @@ lrm_rcvmsg (ll_lrm_t* lrm, int blocking)
 	}
 	while (lrm_msgready(lrm)) {
 		/* get the message */
-		msg = msgfromIPC_noauth_noINTR(ch_cbk);
+		msg = msgfromIPC(ch_cbk, 0);
 		if (msg == NULL) {
 			cl_log(LOG_WARNING,
 				"lrm_rcvmsg: recieve a null msg.");
@@ -980,7 +979,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 	ha_msg_del(msg);
 
 	/* get the return msg */
-	ret = msgfromIPC_noauth_noINTR(ch_cmd);
+	ret = msgfromIPC(ch_cmd, 0);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"rsc_get_cur_state: can not receive ret msg");
@@ -1019,7 +1018,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 		ha_msg_del(ret);
 		for (i = 0; i < op_count; i++) {
 			/* one msg for one pending op */
-			op_msg = msgfromIPC_noauth_noINTR(ch_cmd);
+			op_msg = msgfromIPC(ch_cmd, 0);
 
 			if (NULL == op_msg) {
 				cl_log(LOG_WARNING,
@@ -1195,7 +1194,7 @@ get_rc_from_ch(IPC_Channel* ch)
 	int rc;
 	struct ha_msg* msg;
 
-	msg = msgfromIPC_noauth_noINTR(ch);
+	msg = msgfromIPC(ch, 0);
 
 	if (NULL == msg) {
 		cl_log(LOG_ERR, "get_rc_from_ch: can not recieve msg");
@@ -1288,24 +1287,4 @@ execra_code2string(uniform_ret_execra_t code)
 	}
 
 	return "<unknown>";
-}
-/* This function deal with the INTR internally. it should be in clplumbing */
-static struct ha_msg* msgfromIPC_noauth_noINTR(IPC_Channel * ch)
-{
-	int rc;
-	struct ha_msg* msg = NULL;
-        
-	while(ch->ops->get_chan_status(ch) == IPC_CONNECT) {
-		rc = ch->ops->waitin(ch);
-
-		if(rc == IPC_OK) {
-			msg = msgfromIPC_noauth(ch);
-			break;
-		} else if(rc == IPC_INTR) {
-			cl_log(LOG_DEBUG, "a signal arrived, retry the read");
-		} else {
-			break;
-		}
-	}
-	return msg;
 }
