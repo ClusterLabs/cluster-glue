@@ -159,7 +159,7 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 
 			llen =  get_netstringlen((struct ha_msg *)m->values[i]
 			,	0);
-			sp += sprintf(sp, "%ld:", llen);
+			sp += sprintf(sp, "%ld:", (long int)llen);
 
 			if (msg2netstring_buf((struct ha_msg * )m->values[i]
 			,	sp, llen, &tmplen) != HA_OK){
