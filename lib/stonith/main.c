@@ -1,4 +1,4 @@
-/* $Id: main.c,v 1.13 2005/01/03 18:12:11 alan Exp $ */
+/* $Id: main.c,v 1.14 2005/01/04 07:38:35 alan Exp $ */
 /*
  * Stonith: simple test program for exercising the Stonith API code
  *
@@ -31,7 +31,7 @@
 #include <pils/plugin.h>
 #include <glib.h>
 
-#define	OPTIONS	"F:p:t:sSlLvhd"
+#define	OPTIONS	"F:p:t:T:sSlLvhd"
 #define	EQUAL	'='
 
 extern char *	optarg;
@@ -67,6 +67,7 @@ usage(const char * cmd, int exit_status)
 	fprintf(stream, "\t-S\treport stonith device status\n");
 	fprintf(stream, "\t-s\tsilent\n");
 	fprintf(stream, "\t-v\tverbose\n");
+	fprintf(stream, "\t-T\t(reset|on|off)\n");
 	fprintf(stream, "\t-h\tget this help message\n");
 
 	confhelp(cmd, stream);
@@ -142,6 +143,7 @@ main(int argc, char** argv)
 	const char *	SwitchType = NULL;
 	const char *	optfile = NULL;
 	const char *	parameters = NULL;
+	int		reset_type = ST_GENERIC_RESET;
 	int		verbose = 0;
 	int		status = 0;
 	int		silent = 0;
@@ -189,6 +191,21 @@ main(int argc, char** argv)
 				break;
 
 		case 't':	SwitchType = optarg;
+				break;
+
+		case 'T':	if (strcmp(optarg, "on")== 0) {
+					reset_type = ST_POWERON;
+				}else if (strcmp(optarg, "off")== 0) {
+					reset_type = ST_POWEROFF;
+				}else if (strcmp(optarg, "reset")== 0) {
+					reset_type = ST_GENERIC_RESET;
+				}else{
+					fprintf(stderr
+					,	"bad reset type [%s]\n"
+					,	optarg);
+					usage(cmdname, 1);
+				}
+			
 				break;
 
 		case 'v':	++verbose;
@@ -366,7 +383,7 @@ main(int argc, char** argv)
 		char *nodename;
 		nodename = strdup(argv[optind]);
 		g_strdown(nodename);
-		rc = stonith_req_reset(s, ST_GENERIC_RESET, nodename);
+		rc = stonith_req_reset(s, reset_type, nodename);
 		free(nodename);
 	}
 	stonith_delete(s); s = NULL;
