@@ -26,8 +26,7 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 
 AM_CFLAGS			= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 			-DSTONITH_MODULES='"$(stonithlibdir)"' \
-			-DLOCALEDIR='"@LOCALE@"' 		\
-			-DHALIB='$(halibdir)'
+			-DLOCALEDIR='"@LOCALE@"' 		
 
 
 EXTRA_DIST = README.meatware README.rcd_serial README.vacm README.drac3 README.ipmilan
@@ -169,6 +168,6 @@ riloe_la_SOURCES         = riloe.c
 riloe_la_LDFLAGS         = -export-dynamic -module -avoid-version
 riloe_la_LIBADD          = $(GLIBLIB)
 
-halibdir                = "$(libdir)/@HB_PKG@"
+stonithscriptdir                =  $(stonith_plugindir)/stonith
 
-halib_SCRIPTS  		= ribcl.py 
+stonithscript_SCRIPTS  		= ribcl.py 

@@ -118,7 +118,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  	return imports->register_interface(us, PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
 	,	&riloeOps
-	,	riloecloseintf		/*close */
+	,	riloecloseintf		/*close */ 
 	,	&OurInterface
 	,	(void*)&OurImports
 	,	&interfprivate); 
@@ -126,7 +126,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 
 #define	DEVICE	"RILOE STONITH device"
 #define WHITESPACE	" \t\n\r\f"
-#define RILOE_COMMAND   HALIB "/ribcl.py"
+#define RILOE_COMMAND   STONITH_MODULES "/ribcl.py"
 
 /*
  *	Riloe STONITH device.  We are very agreeable, but don't do much :-)
