@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.18 2004/11/08 23:11:04 gshi Exp $ */
+/* $Id: cl_log.c,v 1.19 2004/11/08 23:16:40 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -417,7 +417,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 		return HA_OK;
 	}else {
 		chan->ops->destroy(chan);
-		chan = NULL;
+		logging_daemon_chan = NULL;
 	}
 	FreeChildLogIPCMessage(msg);
 	return HA_FAIL;
