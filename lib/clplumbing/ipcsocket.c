@@ -256,7 +256,8 @@ socket_initiate_connection(struct IPC_CHANNEL * ch)
   peer_addr.sun_family = AF_UNIX;    /* host byte order */ 
 
   if (strlen(conn_info->path_name) >= sizeof(peer_addr.sun_path)) {
-    fprintf(stderr,"the max path length is %zu\n", sizeof(peer_addr.sun_path));
+    fprintf(stderr,"the max path length is %lu\n"
+    ,	(unsigned long) sizeof(peer_addr.sun_path));
     return IPC_FAIL;
   }
   strncpy(peer_addr.sun_path, conn_info->path_name, sizeof(peer_addr.sun_path));
@@ -716,8 +717,8 @@ socket_client_channel_new(GHashTable *ch_attrs) {
 
   if ((path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR)) != NULL) { 
     if (strlen(path_name) >= sizeof(conn_info->path_name)) {
-      fprintf(stderr,"the max path length is %zu\n"
-      ,	sizeof(conn_info->path_name));
+      fprintf(stderr,"the max path length is %lu\n"
+      ,	(unsigned long) sizeof(conn_info->path_name));
       	return NULL;
     }
     /* prepare the socket */
