@@ -1,4 +1,4 @@
-/* $Id: stonith_plugin_common.h,v 1.1 2004/10/05 14:26:17 lars Exp $ */
+/* $Id: stonith_plugin_common.h,v 1.2 2005/01/03 18:12:11 alan Exp $ */
 /*
  * stonith_plugin_common.h: common macros easing the writing of STONITH
  * 			    plugins. Only a STONITH plugin should
@@ -47,6 +47,7 @@
 
 
 #include <stonith/stonith.h>
+#include <stonith/stonith_plugin.h>
 
 #define LOG(w...)	PILCallLog(PluginImports->log, w)
 
@@ -70,16 +71,18 @@
 #	define MIN( i, j ) ( i > j ? j : i )
 #endif
 
-#define	REPLSTR(s,v)	{					\
+#define	REPLSTR(s,v) {					\
 			if ((s) != NULL) {			\
 				FREE(s);			\
 				(s)=NULL;			\
 			}					\
 			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
-				PILCallLog(PluginImports->log,PIL_CRIT, "%s",  _("out of memory"));\
+				PILCallLog(PluginImports->log,	\
+				PIL_CRIT, "%s",			\
+				_("out of memory"));		\
 			} 					\
-			}
+		     }
 
 #ifndef DEVICE
 #define DEVICE "Dummy"
@@ -88,10 +91,10 @@
 #define PIL_PLUGINTYPE          STONITH_TYPE
 #define PIL_PLUGINTYPE_S        STONITH_TYPE_S
 
-#define	ISCORRECTDEV(i)	(((i)!= NULL && (i)->pinfo != NULL)	\
-	&& ((struct pluginDevice *)(i->pinfo))->pluginid == pluginid)
+#define	ISCORRECTDEV(i)	((i)!= NULL				\
+	&& ((struct pluginDevice *)(i))->pluginid == pluginid)
 
-#define ERRIFWRONGDEV(s,retval) if (!ISCORRECTDEV(s)) { \
+#define ERRIFWRONGDEV(s, retval) if (!ISCORRECTDEV(s)) { \
     LOG(PIL_CRIT, "%s: invalid argument", __FUNCTION__); \
     return(retval); \
   }
@@ -101,7 +104,7 @@
     return; \
   }
 
-#define	ISCONFIGED(i)	(((struct pluginDevice *)(i->pinfo))->config)
+#define	ISCONFIGED(i)	(i->isconfigured)
 
 #define ERRIFNOTCONFIGED(s,retval) ERRIFWRONGDEV(s,retval); \
     if (!ISCONFIGED(s)) { \
