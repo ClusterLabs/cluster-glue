@@ -43,7 +43,9 @@
 #include <sys/ioctl.h>
 #include <fcntl.h>
 #include <sys/time.h>
-#include <termio.h>
+#ifdef HAVE_TERMIO_H
+#	include <termio.h>
+#endif
 #include <sys/termios.h>
 
 #include <stonith/stonith.h>
