@@ -3,8 +3,7 @@
 #include <syslog.h>
 #include <string.h>
 #include <stdlib.h>
-#include <assert.h>
-#include <clplumbing/base64.h>
+#include "clplumbing/base64.h"
 /*
  *
  * Base64 conversion functions.
@@ -38,7 +37,6 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
 	(void)_ha_msg_h_Id;
 	(void)_heartbeat_h_Id;
 
-	assert(strlen(b64chars) == 64);
 	if (outlen < requiredlen) {
 		syslog(LOG_ERR, "binary_to_base64: output area too small.");
 		return -1;
@@ -82,7 +80,6 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
 		unsigned long	chunk;
 		unsigned int	sixbits;
 
-		assert(bytesleft == 1 || bytesleft == 2);
 
 		/* Grab first byte */
 		chunk =	(*inptr) << 16;
@@ -122,16 +119,31 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
  * FIXME: This is how it really ought to be done...
  */
 
+static unsigned char b64values [256];
+#define	BADVALUE	0xff
+
+static void
+init_b64_values(void)
+{
+	int	j;
+	memset(b64values, BADVALUE, sizeof(b64values));
+
+	for (j=0; b64chars[j] != EOS; ++j) {
+		b64values[(int)b64chars[j]] = (unsigned char)j;
+	}
+}
+
+
 #define	Char2SixBits(in, out)  {				\
-	char * ptmp;						\
-	ptmp = memchr(b64chars, (in), sizeof(b64chars)-1);	\
-	if (ptmp == NULL) {					\
+	unsigned char  ch;					\
+	ch = b64values[(unsigned int)in];			\
+	if (ch == BADVALUE) {					\
 		syslog(LOG_ERR					\
 		,	"base64_to_binary: invalid input [%c]!"	\
 					,	in);		\
 		return -1;					\
 	}							\
-	out = ((ptmp-b64chars) & MASK6);			\
+	out = ch;						\
 	}							\
 	
 
@@ -150,6 +162,12 @@ base64_to_binary(char * in, int inlen, void * output, int outlen)
 	unsigned	sixbits3;
 	unsigned	sixbits4;
 	unsigned long	chunk;
+	static	int	inityet = 0;
+
+	if (!inityet) {
+		inityet=1;
+		init_b64_values();
+	}
 
 	/* Make sure we have enough room */
 	if (outlen < maxbinlen) {
