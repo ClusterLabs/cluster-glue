@@ -25,21 +25,21 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 
 
 CFLAGS			= @CFLAGS@
-gliblib			= @GLIBLIB@
 
 ## include files
 #pkginclude_HEADERS	= $(top_srcdir)/include/pils/plugin.h \
 #			$(top_srcdir)/include/pils/interface.h
 
 ## binaries
-sbin_PROGRAMS		= main
+#sbin_PROGRAMS		= main
 
 
-main_SOURCES		= main.c
+#main_SOURCES		= main.c
 
-main_LDADD		= libpils.la $(top_builddir)/libltdl/libltdlc.la \
-			$(top_builddir)/replace/libreplace.la $(gliblib)
-main_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self
+#main_LDADD		= libpils.la $(top_builddir)/libltdl/libltdlc.la \
+#			$(GLIBLIB) \
+#			$(top_builddir)/replace/libreplace.la
+#main_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self
 
 
 ## libraries
@@ -51,6 +51,6 @@ plugin_LTLIBRARIES	= test.la
 
 libpils_la_SOURCES	= pils.c
 libpils_la_LDFLAGS	= -version-info 0:0:0
-
+libpils_la_LIBADD	= $(top_builddir)/libltdl/libltdlc.la $(GLIBLIB)
 test_la_SOURCES		= test.c
 test_la_LDFLAGS		= -export-dynamic -module -avoid-version

@@ -20,4 +20,4 @@
 #
 MAINTAINERCLEANFILES    = Makefile.in
 
-SOURCES		        = generic.h interface.h plugin.h
+include_HEADERS	        = generic.h interface.h plugin.h
