@@ -36,7 +36,8 @@ sbin_PROGRAMS		= main
 
 main_SOURCES		= main.c
 
-main_LDADD		= libpils.la $(top_builddir)/libltdl/libltdlc.la
+main_LDADD		= libpils.la $(top_builddir)/libltdl/libltdlc.la \
+			$(top_builddir)/replace/libreplace.la 
 main_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self
 
 
