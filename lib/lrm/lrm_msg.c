@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.12 2004/08/29 04:38:08 msoffen Exp $ */
+/* $Id: lrm_msg.c,v 1.13 2004/09/03 01:07:08 zhenh Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -332,8 +332,8 @@ create_lrm_reg_msg(const char* app_name)
 }
 
 struct ha_msg*
-create_lrm_addrsc_msg(const char* rid, const char* rtype,
-					  const char* rclass, GHashTable* params)
+create_lrm_addrsc_msg(const char* rid, const char* class, const char* type,
+			const char* provider, GHashTable* params)
 {
 	struct ha_msg* msg = ha_msg_new(5);
 	if (HA_FAIL == ha_msg_add(msg, F_LRM_TYPE, ADDRSC)) {
@@ -344,13 +344,20 @@ create_lrm_addrsc_msg(const char* rid, const char* rtype,
 		return NULL;
 	}
 
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_RTYPE, rtype)) {
+	if (HA_FAIL == ha_msg_add(msg, F_LRM_RCLASS, class))	{
 		return NULL;
 	}
 
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_RCLASS, rclass))	{
+	if (HA_FAIL == ha_msg_add(msg, F_LRM_RTYPE, type)) {
 		return NULL;
 	}
+
+	if( provider ) {
+		if (HA_FAIL == ha_msg_add(msg, F_LRM_RPROVIDER, provider)) {
+			return NULL;
+		}
+	}
+	
 	if (NULL != params) {
 		ha_msg_add_hash_table(msg,F_LRM_PARAM,params);
 	}
@@ -409,6 +416,9 @@ ha_msg_print(struct ha_msg * msg)
 
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.13  2004/09/03 01:07:08  zhenh
+ * add provider for resource
+ *
  * Revision 1.12  2004/08/29 04:38:08  msoffen
  * Added log for history to end of file.
  *

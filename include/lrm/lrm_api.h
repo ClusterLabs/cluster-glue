@@ -69,6 +69,7 @@ typedef struct
 	const char*	id;
 	const char*	type;
 	const char*	class;
+	const char*	provider;
 	GHashTable* 	params;
 	struct rsc_ops*	ops;
 }lrm_rsc_t;
@@ -229,20 +230,37 @@ struct lrm_ops
 	GList* 	(*get_rsc_type_supported)(ll_lrm_t*, const char* rsc_class);
 
 /*
+ *get_rsc_provider_supported:
+ *		Returns the provider list of the given resource types 
+ *		e.g. heartbeat, failsafe...
+ *
+ *rsc_provider:	if it is null, the default one will used.
+ *
+ *return:	a list of the names of supported resource provider.
+ *
+ */
+	GList* 	(*get_rsc_provider_supported)(ll_lrm_t*,
+		const char* rsc_class, const char* rsc_type);
+
+/*
  *get_rsc_type_metadata:
  *		Returns the metadata of the resource type
+ *
+ *rsc_provider:	if it is null, the default one will used.
  *
  *return:	the metadata.
  *
  */
 	char* (*get_rsc_type_metadata)(ll_lrm_t*, const char* rsc_class,
-			const char* rsc_type);
+			const char* rsc_type, const char* rsc_provider);
 
 /*
  *get_all_type_metadatas:
  *		Returns all the metadata of the resource type of the class
  *
- *return:	A GHashtable, the key is the RA type, the value is the metadata.
+ *return:	A GHashtable, the key is the RA type,
+ *		the value is the metadata.
+ *		Now only default RA's metadata will be returned.
  *
  */
 	GHashTable* (*get_all_type_metadata)(ll_lrm_t*, const char* rsc_class);
@@ -277,12 +295,14 @@ struct lrm_ops
  *
  *type:		the type of the resource.
  *
+ *rsc_provider:	if it is null, the default provider will used.
+ *	
  *params:	the parameters for the resource.
  *
  *return:	HA_OK for success, HA_FAIL for failure
  */
 	int	(*add_rsc)(ll_lrm_t*, const char* rsc_id, const char* class,
-	 	const char* type, GHashTable* params);
+	 	const char* type, const char* provider, GHashTable* params);
 
 /*
  *delete_rsc:	delete the resource by the rsc_id

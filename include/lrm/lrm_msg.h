@@ -47,13 +47,15 @@
 #define F_LRM_RTYPE		"lrm_rtype"
 #define F_LRM_RTYPES		"lrm_rtypes"
 #define F_LRM_RCLASS		"lrm_rclass"
+#define F_LRM_RPROVIDER		"lrm_rprovider"
+#define F_LRM_RPROVIDERS	"lrm_rproviders"
 #define F_LRM_PARAM		"lrm_param"
 #define F_LRM_TIMEOUT		"lrm_timeout"
 #define F_LRM_OP		"lrm_op"
 #define F_LRM_OPCNT		"lrm_opcount"
 #define F_LRM_OPSTATUS		"lrm_opstatus"
 #define F_LRM_RC		"lrm_rc"
-#define F_LRM_CALLID		"lrm_callid"		
+#define F_LRM_CALLID		"lrm_callid"
 #define F_LRM_RCOUNT		"lrm_rcount"
 #define F_LRM_RIDS		"lrm_rids"
 #define F_LRM_DATALEN		"lrm_datalen"
@@ -73,6 +75,7 @@
 #define UNREGISTER		"unreg"
 #define GETRSCCLASSES		"rclasses"
 #define GETRSCTYPES		"rtypes"
+#define GETPROVIDERS		"rproviders"
 #define GETRSCMETA		"rmetadata"
 #define GETALLRCSES		"getall"
 #define GETRSC			"getrsc"
@@ -145,8 +148,8 @@ struct ha_msg* create_lrm_reg_msg(const char* app_name);
  * according to the opinion of Lars, it is awkward that we combine all
  * parameters in to one string. I think so too. So this call may changed soon
  */ 
-struct ha_msg* create_lrm_addrsc_msg(const char* rid, const char* rname,
-				const char* rtype, GHashTable* parameter);
+struct ha_msg* create_lrm_addrsc_msg(const char* rid, const char* class,
+	const char* type, const char* provider, GHashTable* parameter);
 
 /*  
  *
