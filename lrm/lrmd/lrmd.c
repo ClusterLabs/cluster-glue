@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.56 2005/01/03 19:35:00 msoffen Exp $ */
+/* $Id: lrmd.c,v 1.57 2005/01/27 01:39:37 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1443,6 +1443,7 @@ on_op_done(lrmd_op_t* op)
 	int last_rc = 0;
 	int op_rc = 0;
 	op_status_t op_status;
+	int op_status_int;
 	int need_notify = 0;
 
 
@@ -1466,12 +1467,13 @@ on_op_done(lrmd_op_t* op)
 		return HA_FAIL;
 	}
 	if (HA_OK !=
-		ha_msg_value_int(op->msg, F_LRM_OPSTATUS, (int*)&op_status)) {
+		ha_msg_value_int(op->msg, F_LRM_OPSTATUS, &op_status_int)) {
 		lrmd_log(LOG_ERR,
 			"on_op_done: can not get op status from msg.");
 		return HA_FAIL;
 	}
-
+	op_status = (op_status_t)op_status_int;
+	
 	if (LRM_OP_DONE!= op_status) {
 		need_notify = 1;
 	}
@@ -2047,6 +2049,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.57  2005/01/27 01:39:37  zhenh
+ * make it pass gcc 3.4.3. Thanks gshi.
+ *
  * Revision 1.56  2005/01/03 19:35:00  msoffen
  * Moved var declaration from assignment
  *
