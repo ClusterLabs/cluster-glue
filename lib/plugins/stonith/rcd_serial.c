@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.13 2004/03/25 11:58:22 lars Exp $ */
+/* $Id: rcd_serial.c,v 1.14 2004/08/29 03:01:13 msoffen Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -87,14 +87,11 @@ rcd_serialcloseintf(PILInterface* pi, void* pd)
 
 static void *		rcd_serial_new(void);
 static void		rcd_serial_destroy(Stonith *);
-static int		rcd_serial_set_config_file(Stonith *,
-						const char * cfgname);
-static int		rcd_serial_set_config_info(Stonith *,
-						const char * info);
+static int		rcd_serial_set_config_file(Stonith *, const char * cfgname);
+static int		rcd_serial_set_config_info(Stonith *, const char * info);
 static const char *	rcd_serial_getinfo(Stonith * s, int InfoType);
 static int		rcd_serial_status(Stonith * );
-static int		rcd_serial_reset_req(Stonith * s,
-						int request, const char * host);
+static int		rcd_serial_reset_req(Stonith * s, int request, const char * host);
 static char **		rcd_serial_hostlist(Stonith  *);
 static void		rcd_serial_free_hostlist(char **);
 
@@ -245,12 +242,22 @@ RCD_alarm_handler(int sig) {
 static int
 RCD_open_serial_port(char *device) {
 	int fd;
-	int bothbits = TIOCM_RTS | TIOCM_DTR;
+	int status;
+	int bothbits;
+
+	bothbits = TIOCM_RTS | TIOCM_DTR;
+	fd = 0;
 
 	if ((fd = open(device, O_RDONLY | O_NDELAY)) != -1) {
-		// Opening the device always sets DTR & CTS high.
-		// Clear them down immediately.
-		ioctl(fd, TIOCMBIC, &bothbits);
+		/*
+			Opening the device always sets DTR & CTS high.
+			Clear them down immediately.
+		*/
+		status = ioctl(fd, TIOCMBIC, &bothbits);
+		/* If there was an error clearing bits, set the fd to -1 ( indicates error ) */
+		if (status != 0 ) { 
+			fd = -1;
+		}
 	}
 
 	return fd;

@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.16 2004/08/03 06:01:19 zhenh Exp $ */
+/* $Id: cl_msg.c,v 1.17 2004/08/29 03:01:13 msoffen Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -540,14 +540,15 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		msg->stringlen = newstringlen;
 		msg->netstringlen += 0;
 		/*  intlen(namelen) + (namelen) + intlen(vallen) + vallen + 4 */
-		msg->netstringlen += 0; //4; /* for type*/
+		msg->netstringlen += 0; /* 4 for type*/
 		msg->types[next] = FT_STRUCT;
 
 		msg->nfields++;
 
 		return(HA_OK);
 
-	default: //case FT_STRING:
+	/*case FT_STRING: */
+	default: 
 		newstringlen =  msg->stringlen + (namelen+vallen+2);
 
 		internal_type = FT_STRING;
@@ -570,7 +571,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 
 		if (internal_type == FT_BINARY){
 			char	tmpbuf[MAXMSG];
-			int	nlo = 3; //name length overhead
+			int	nlo = 3; /*name length overhead */
 
 			cp_name = name;
 			cp_namelen = namelen - nlo ;
@@ -584,7 +585,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 
 		}else if (internal_type ==  FT_STRUCT ){
 			struct ha_msg	*tmpmsg;
-			int	nlo = 3; //name length overhead
+			int	nlo = 3; /*name length overhead */
 
 			cp_name = name;
 			cp_namelen = namelen - nlo ;
@@ -824,8 +825,10 @@ cl_get_binary(const struct ha_msg *msg,
 	ret = cl_get_value( msg, name, vallen, &type);
 	
 	if (ret == NULL){
-		//cl_log(LOG_WARNING, "field %s not found", name);
-		//cl_log_message(msg);
+		/*
+		cl_log(LOG_WARNING, "field %s not found", name);
+		cl_log_message(msg);
+		*/
 		return(NULL);
 	}
 	if ( type != FT_BINARY){
@@ -1769,9 +1772,11 @@ msg2wirefmt(const struct ha_msg*m, size_t* len)
 		char	*tmp;
 
 		tmp = msg2string(m);
-		//*len = m->stringlen;
-		//cl_log(LOG_INFO, "m->stringlen =%d,strlen(tmp)=%d",
-		//m->stringlen, strlen(tmp));
+		/*
+		*len = m->stringlen;
+		cl_log(LOG_INFO, "m->stringlen =%d,strlen(tmp)=%d",
+		m->stringlen, strlen(tmp));
+		*/
 		*len = strlen(tmp) + 1;
 		return(tmp);
 	}
@@ -1831,7 +1836,8 @@ cl_log_message (const struct ha_msg *m)
 
 			break;
 
-		default: /* case(FT_STRING): */
+		/* case(FT_STRING): */
+		default: 
 			cl_log(LOG_INFO, "MSG[%d] : [%s=%s]", j
 		       ,	m->names[j] ? m->names[j] : "NULL"
 		       ,	(const char*)(m->values[j] ? m->values[j] : "NULL"));
@@ -1863,6 +1869,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.17  2004/08/29 03:01:13  msoffen
+ * Replaced all // COMMENTs with /* COMMENT */
+ *
  * Revision 1.16  2004/08/03 06:01:19  zhenh
  * fix a memory leak
  *

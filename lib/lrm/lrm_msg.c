@@ -1,3 +1,4 @@
+/* $Id: lrm_msg.c,v 1.11 2004/08/29 03:01:13 msoffen Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -31,7 +32,7 @@
 #include <lrm/lrm_api.h>
 #include <lrm/lrm_msg.h>
 
-//static void pair_to_string(gpointer key, gpointer value, gpointer user_data);
+/* static void pair_to_string(gpointer key, gpointer value, gpointer user_data); */
 static gboolean free_pair(gpointer key, gpointer value, gpointer user_data);
 static void pair_to_msg(gpointer key, gpointer value, gpointer user_data);
 static void copy_pair(gpointer key, gpointer value, gpointer user_data);

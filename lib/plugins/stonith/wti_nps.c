@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.12 2004/03/25 11:58:22 lars Exp $ */
+/* $Id: wti_nps.c,v 1.13 2004/08/29 03:01:13 msoffen Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -382,7 +382,9 @@ NPSLogout(struct WTINPS* nps)
 	int	rc;
 
 	/* Send "/h" help command and expect back prompt */
-	//SEND("/h\r");
+	/*
+	SEND("/h\r");
+	*/
 	/* Expect "PS>" */
 	rc = NPSLookFor(nps, Prompt, 5);
 

@@ -157,7 +157,7 @@ static PIL_rc		ibmhmc_closeintf(PILInterface* pi, void* pd);
 
 static char* do_shell_cmd(const char* cmd, int* status);
 static int check_hmc_status(const char* hmc);
-//static char* do_shell_cmd_fake(const char* cmd, int* status);
+/* static char* do_shell_cmd_fake(const char* cmd, int* status); */
 
 static struct stonith_ops ibmhmcOps ={
 	ibmhmc_new,		/* Create new STONITH object	*/
@@ -329,34 +329,34 @@ ibmhmc_parse_config_info(struct HMCDevice* dev, const char* info)
 		return S_BADCONFIG;
 	}
 	
-	//check whether the HMC is enable ssh command
+	/*check whether the HMC is enable ssh command */
 	if (S_OK!=check_hmc_status(info)) {
 		return S_BADCONFIG;
 	}		
-	//get the managed system's names of the hmc
+	/*get the managed system's names of the hmc */
 	snprintf(get_syslist, MAX_CMD_LEN,
 		 SSH_CMD " -l " HMCROOT
 		 " %s lssyscfg -r sys -F name:mode --all", info);
 	output = do_shell_cmd(get_syslist, &status);
 	syslist = g_strsplit(output, "\n", MAX_SYS_NUM);
 	FREE(output);
-	//for each managed system
+	/* for each managed system */
 	for (i=0; i<MAX_SYS_NUM; i++) {
 		if (NULL==syslist[i]) {
 			break;
 		}
 		name_mode = g_strsplit(syslist[i],":",2);
-		//if it is in fullsystempartition
+		/* if it is in fullsystempartition */
 		if (NULL!=name_mode[1] && 0==strncmp(name_mode[1],"0",1)) {
-			//add the FullSystemPartition
+			/* add the FullSystemPartition */
 			snprintf(host,MAX_HOST_NAME_LEN,
 				 "%s/FullSystemPartition", name_mode[0]);
 			dev->hostlist = g_list_append(dev->hostlist,STRDUP(host));
 		}
 		else
-		//if it is in lpar
+		/* if it is in lpar */
 		if (NULL!=name_mode[1] && 0==strncmp(name_mode[1],"255",3)) {
-			//get its lpars
+			/* get its lpars */
 			snprintf(get_lpar, MAX_CMD_LEN,
 				 SSH_CMD " -l " HMCROOT
 				 " %s lssyscfg -m %s -r lpar -F name --all",
@@ -364,18 +364,18 @@ ibmhmc_parse_config_info(struct HMCDevice* dev, const char* info)
 			output = do_shell_cmd(get_lpar,&status);
 			lparlist = g_strsplit(output, "\n",MAX_LPAR_NUM);
 			FREE(output);
-			//for each lpar
+			/* for each lpar */
 			for (j=0; j<MAX_LPAR_NUM; j++) {
 				if (NULL==lparlist[j]) {
 					break;
 				}
-				//skip the full system partition
+				/* skip the full system partition */
 				if (0 == strncmp(lparlist[j],
 						 FULLSYSTEMPARTITION,
 						 strlen(FULLSYSTEMPARTITION))){
 					continue;
 				}
-				//add the lpar
+				/* add the lpar */
 				snprintf(host,MAX_HOST_NAME_LEN,
 					 "%s/%s", name_mode[0],lparlist[j]);
 				dev->hostlist = g_list_append(dev->hostlist,STRDUP(host));
@@ -402,7 +402,7 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 	char			off_cmd[MAX_CMD_LEN];
 	char			on_cmd[MAX_CMD_LEN];
 
-	//reset_cmd is only used by full system partition
+	/* reset_cmd is only used by full system partition */
 	char			reset_cmd[MAX_CMD_LEN];
 	gchar**			names = NULL;
 	int			i;
@@ -435,8 +435,8 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 	}
 
 	names = g_strsplit((char*)node->data, "/", 2);
-	//names[0] will be the name of managed system
-	//names[1] will be the name of the lpar partition
+	/* names[0] will be the name of managed system */
+	/* names[1] will be the name of the lpar partition */
 	
 	if (0 == strcasecmp(names[1], FULLSYSTEMPARTITION)) {
 

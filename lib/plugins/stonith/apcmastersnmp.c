@@ -1,4 +1,4 @@
-/* $Id: apcmastersnmp.c,v 1.11 2004/07/07 07:01:35 lars Exp $ */
+/* $Id: apcmastersnmp.c,v 1.12 2004/08/29 03:01:13 msoffen Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
@@ -86,15 +86,15 @@ apcmastersnmpcloseintf(PILInterface* pi, void* pd)
 	return PIL_OK;
 }
 
-static void *		apcmastersnmp_new(void);
-static void		apcmastersnmp_destroy(Stonith *);
-static int		apcmastersnmp_set_config_file(Stonith *, const char * cfgname);
-static int		apcmastersnmp_set_config_info(Stonith *, const char * info);
-static const char *	apcmastersnmp_getinfo(Stonith * s, int InfoType);
-static int		apcmastersnmp_status(Stonith * );
-static int		apcmastersnmp_reset_req(Stonith * s, int request, const char * host);
-static char **		apcmastersnmp_hostlist(Stonith  *);
-static void		apcmastersnmp_free_hostlist(char **);
+void *		apcmastersnmp_new(void);
+void		apcmastersnmp_destroy(Stonith *);
+int		apcmastersnmp_set_config_file(Stonith *, const char * cfgname);
+int		apcmastersnmp_set_config_info(Stonith *, const char * info);
+const char *	apcmastersnmp_getinfo(Stonith * s, int InfoType);
+int		apcmastersnmp_status(Stonith * );
+int		apcmastersnmp_reset_req(Stonith * s, int request, const char * host);
+char **		apcmastersnmp_hostlist(Stonith  *);
+void		apcmastersnmp_free_hostlist(char **);
 
 static struct stonith_ops apcmastersnmpOps ={
 	apcmastersnmp_new,		/* Create new STONITH object	*/
@@ -148,16 +148,16 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  * APCMaster tested with APC Masterswitch 9212
  */
 
-// device ID
+/* device ID */
 #define	DEVICE				"APCMasterSNMP-Stonith"
 
-// outlet commands / status codes
+/* outlet commands / status codes */
 #define OUTLET_ON			1
 #define OUTLET_OFF			2
 #define OUTLET_REBOOT			3
 #define OUTLET_NO_CMD_PEND		2
 
-// oids
+/* oids */
 #define OID_IDENT			".1.3.6.1.4.1.318.1.1.4.1.4.0"
 #define OID_NUM_OUTLETS			".1.3.6.1.4.1.318.1.1.4.4.1.0"
 #define OID_OUTLET_NAMES		".1.3.6.1.4.1.318.1.1.4.5.2.1.3.%i"
@@ -165,28 +165,28 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 #define OID_OUTLET_COMMAND_PENDING	".1.3.6.1.4.1.318.1.1.4.4.2.1.2.%i"
 #define OID_OUTLET_REBOOT_DURATION	".1.3.6.1.4.1.318.1.1.4.5.2.1.5.%i"
 
-// own defines
+/* own defines */
 #define MAX_STRING			128
 
-// structur of stonith object
+/* structur of stonith object */
 struct APCDevice {
-    const char *APCid;		// id of object
-    struct snmp_session *sptr;	// != NULL -> session created
-    char *hostname;		// masterswitch's hostname or ip address
-    int port;			// snmp port
-    char *community;		// snmp community (r/w access)
-    int num_outlets;		// number of outlets
+    const char *APCid;		/* id of object */
+    struct snmp_session *sptr;	/* != NULL -> session created */
+    char *hostname;		/* masterswitch's hostname or ip address */
+    int port;			/* snmp port */
+    char *community;		/* snmp community (r/w access) */
+    int num_outlets;		/* number of outlets */
 };
 
-// for checking hardware (issue a warning if mismatch)
+/* for checking hardware (issue a warning if mismatch) */
 static const char* APC_tested_ident[] = {"AP9606","AP7920","AP_other_well_tested"};
 
-// constant strings
+/* constant strings */
 static const char *APCid = DEVICE;
 static const char *NOTapcID = "destroyed (APCMasterswitch)";
 
 #ifndef MIN
-// some macros
+/* some macros */
 #	define MIN( i, j ) ( i > j ? j : i )
 #endif
 
@@ -230,10 +230,10 @@ struct snmp_session *APC_open(char *hostname, int port, char *community)
     char *errstr;
 #endif
 
-    // create session
+    /* create session */
     snmp_sess_init(&session);
 
-    // fill session
+    /* fill session */
     session.peername = hostname;
     session.version = SNMP_VERSION_1;
     session.remote_port = port;
@@ -242,7 +242,7 @@ struct snmp_session *APC_open(char *hostname, int port, char *community)
     session.retries = 5;
     session.timeout = 1000000;
 
-    // open session
+    /* open session */
     sptr = snmp_open(&session);
 
 #ifdef APC_DEBUG
@@ -255,7 +255,7 @@ struct snmp_session *APC_open(char *hostname, int port, char *community)
     }
 #endif
 
-    // return pointer to opened session
+    /* return pointer to opened session */
     return (sptr);
 }
 
@@ -281,16 +281,16 @@ APC_parse_config_info(struct APCDevice *ad, const char *info)
 	ad->port = port;
 	ad->community = community;
 
-	// try to resolve the hostname/ip-address
+	/* try to resolve the hostname/ip-address */
 	if (gethostbyname(hostname) != NULL) {
 
-        // init snmp library
+        /* init snmp library */
         init_snmp("apcmastersnmp");
 
-	    // now try to get a snmp session
+	    /* now try to get a snmp session */
 	    if ((ad->sptr = APC_open(hostname, port, community)) != NULL) {
 
-		// ok, get the number of outlets from the masterswitch
+		/* ok, get the number of outlets from the masterswitch */
 		if ((i = APC_read(ad->sptr, OID_NUM_OUTLETS, ASN_INTEGER))
 		    == NULL) {
 #ifdef APC_DEBUG
@@ -299,7 +299,7 @@ APC_parse_config_info(struct APCDevice *ad, const char *info)
 #endif
 		    return (S_ACCESS);
 		}
-		// store the number of outlets
+		/* store the number of outlets */
 		ad->num_outlets = *i;
 #ifdef APC_DEBUG
 		syslog(LOG_DEBUG, "%s: number of outlets: %i",
@@ -307,7 +307,7 @@ APC_parse_config_info(struct APCDevice *ad, const char *info)
 #endif
 
 
-		// everythin went well
+		/* everythin went well */
 		return (S_OK);
 	    }
 #ifdef APC_DEBUG
@@ -320,7 +320,7 @@ APC_parse_config_info(struct APCDevice *ad, const char *info)
 	       hostname);
 #endif
     }
-    // no valid config
+    /* no valid config */
     return (S_BADCONFIG);
 }
 
@@ -341,27 +341,27 @@ void *APC_read(struct snmp_session *sptr, const char *objname, int type)
     syslog(LOG_DEBUG, "%s: requested objname '%s'", __FUNCTION__, objname );
 #endif
 
-    // convert objname into oid; return NULL if invalid
+    /* convert objname into oid; return NULL if invalid */
     if (!read_objid(objname, name, &namelen))
 	return (NULL);
 
-    // create pdu
+    /* create pdu */
     if ((pdu = snmp_pdu_create(SNMP_MSG_GET)) != NULL) {
 
-	// get-request have no values
+	/* get-request have no values */
 	snmp_add_null_var(pdu, name, namelen);
 
-	// send pdu and get response; return NULL if error
+	/* send pdu and get response; return NULL if error */
 	if (snmp_synch_response(sptr, pdu, &resp) == SNMPERR_SUCCESS) {
 
-	    // request succeed, got valid response ?
+	    /* request succeed, got valid response ? */
 	    if (resp->errstat == SNMP_ERR_NOERROR) {
 
-		// go through the returned vars
+		/* go through the returned vars */
 		for (vars = resp->variables; vars;
 		     vars = vars->next_variable) {
 
-		    // return response as string
+		    /* return response as string */
 		    if ((vars->type == type) && (type == ASN_OCTET_STR)) {
 			memset(response_str, 0, MAX_STRING);
 			strncpy(response_str, vars->val.string,
@@ -369,7 +369,7 @@ void *APC_read(struct snmp_session *sptr, const char *objname, int type)
 			snmp_free_pdu(resp);
 			return ((void *) response_str);
 		    }
-		    // return response as integer
+		    /* return response as integer */
 		    if ((vars->type == type) && (type == ASN_INTEGER)) {
 			response_int = *vars->val.integer;
 			snmp_free_pdu(resp);
@@ -384,10 +384,10 @@ void *APC_read(struct snmp_session *sptr, const char *objname, int type)
 #endif
 	    }
 	}
-	// free repsonse pdu (neccessary?)
+	/* free repsonse pdu (neccessary?) */
 	snmp_free_pdu(resp);
     }
-    // error: return nothing
+    /* error: return nothing */
     return (NULL);
 }
 
@@ -407,23 +407,23 @@ APC_write(struct snmp_session *sptr, const char *objname, char type,
     syslog(LOG_DEBUG, "%s: requested objname '%s'", __FUNCTION__, objname );
 #endif
 
-    // convert objname into oid; return NULL if invalid
+    /* convert objname into oid; return NULL if invalid */
     if (!read_objid(objname, name, &namelen))
 	return (FALSE);
 
-    // create pdu
+    /* create pdu */
     if ((pdu = snmp_pdu_create(SNMP_MSG_SET)) != NULL) {
 
-	// add to be written value to pdu
+	/* add to be written value to pdu */
 	snmp_add_var(pdu, name, namelen, type, value);
 
-	// send pdu and get response; return NULL if error
+	/* send pdu and get response; return NULL if error */
 	if (snmp_synch_response(sptr, pdu, &resp) == STAT_SUCCESS) {
 
-	    // go through the returned vars
+	    /* go through the returned vars */
 	    if (resp->errstat == SNMP_ERR_NOERROR) {
 
-		// request successful done
+		/* request successful done */
 		snmp_free_pdu(resp);
 		return (TRUE);
 
@@ -434,10 +434,10 @@ APC_write(struct snmp_session *sptr, const char *objname, char type,
 #endif
 	    }
 	}
-	// free pdu (again: neccessary?)
+	/* free pdu (again: neccessary?) */
 	snmp_free_pdu(resp);
     }
-    // error
+    /* error */
     return (FALSE);
 }
 
@@ -474,7 +474,7 @@ int apcmastersnmp_status(Stonith * s)
 	return (S_ACCESS);
     }
 
-    // issue a warning if ident mismatches
+    /* issue a warning if ident mismatches */
     for(i=DIMOF(APC_tested_ident) -1; i >=0 ; i--)
       if (strcmp(ident, APC_tested_ident[i]) == 0) break;
     if (i<0) {
@@ -482,7 +482,7 @@ int apcmastersnmp_status(Stonith * s)
 	       "%s: module not tested with this hardware '%s'",
 	       __FUNCTION__, ident);
     }
-    // status ok
+    /* status ok */
     return (S_OK);
 }
 
@@ -515,22 +515,22 @@ apcmastersnmp_hostlist(Stonith * s)
 
     ad = (struct APCDevice *) s->pinfo;
 
-    // allocate memory for array of up to NUM_OUTLETS strings
+    /* allocate memory for array of up to NUM_OUTLETS strings */
     if ((hl = (char **) APC_MALLOC(ad->num_outlets * sizeof(char *))) == NULL) {
 	syslog(LOG_ERR, "%s: out of memory.", __FUNCTION__);
 	return (NULL);
     }
-    // clear hostlist array
+    /* clear hostlist array */
     memset(hl, 0, (ad->num_outlets + 1) * sizeof(char *));
     num_outlets = 0;
 
-    // read NUM_OUTLETS values and put them into hostlist array
+    /* read NUM_OUTLETS values and put them into hostlist array */
     for (j = 0; j < ad->num_outlets; ++j) {
 
-	// prepare objname
+	/* prepare objname */
 	snprintf(objname, MAX_STRING, OID_OUTLET_NAMES, j + 1);
 
-	// read outlet name
+	/* read outlet name */
 	if ((outlet_name = APC_read(ad->sptr, objname, ASN_OCTET_STR)) ==
 	    NULL) {
 	    apcmastersnmp_free_hostlist(hl);
@@ -538,14 +538,14 @@ apcmastersnmp_hostlist(Stonith * s)
 	    return (hl);
 	}
 
-	// Check whether the host is already listed
+	/* Check whether the host is already listed */
 	for (h = 0; h < num_outlets; ++h) {
 		if (strcmp(hl[h],outlet_name) == 0)
 			break;
 	}
 
 	if (h >= num_outlets) {
-		// put outletname in hostlist
+		/* put outletname in hostlist */
 #ifdef APC_DEBUG
 	        syslog(LOG_DEBUG, "%s: added %s to hostlist", __FUNCTION__,
 				outlet_name);
@@ -566,7 +566,7 @@ apcmastersnmp_hostlist(Stonith * s)
     syslog(LOG_DEBUG, "%s: %d unique hosts connected to %d outlets", 
 		    __FUNCTION__, num_outlets, j);
 #endif
-    // return list
+    /* return list */
     return (hl);
 }
 
@@ -583,18 +583,18 @@ apcmastersnmp_free_hostlist(char **hlist)
     syslog(LOG_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    // empty list
+    /* empty list */
     if (hl == NULL)
 	return;
 
-    // walk through the list and release the strings
+    /* walk through the list and release the strings */
     while (*hl) {
 	APC_FREE(*hl);
 	*hl = NULL;
 	++hl;
     }
 
-    // release the list itself
+    /* release the list itself */
     APC_FREE(hlist);
     hlist = NULL;
 }
@@ -634,13 +634,13 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
     reboot_duration = 0;
     bad_outlets = 0;
 
-    // read max. as->num_outlets values
+    /* read max. as->num_outlets values */
     for (outlet = 1; outlet <= ad->num_outlets; outlet++) {
 
-	// prepare objname
+	/* prepare objname */
 	snprintf(objname, MAX_STRING, OID_OUTLET_NAMES, outlet);
 
-	// read outlet name
+	/* read outlet name */
 	if ((outlet_name = APC_read(ad->sptr, objname, ASN_OCTET_STR)) ==
 	    NULL) {
 #ifdef APC_DEBUG
@@ -650,7 +650,7 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 	    return (S_ACCESS);
 	}
 	
-	// found one
+	/* found one */
 	g_strdown(outlet_name);
 	if (strcmp(outlet_name, host) == 0) {
 #ifdef APC_DEBUG
@@ -659,10 +659,10 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 #endif
 		/* Check that the outlet is not administratively down */
 		
-		// prepare objname
+		/* prepare objname */
 		snprintf(objname, MAX_STRING, OID_OUTLET_STATE, outlet);
 
-		// get outlet's state
+		/* get outlet's state */
 		if ((state = APC_read(ad->sptr, objname, ASN_INTEGER)) == NULL) {
 #ifdef APC_DEBUG
 			syslog(LOG_DEBUG, "%s: cannot read outlet_state for outlet %d.", __FUNCTION__, outlet);
@@ -677,10 +677,10 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 			continue;
 		}
 		
-	        // prepare oid
+	        /* prepare oid */
 	        snprintf(objname, MAX_STRING, OID_OUTLET_REBOOT_DURATION, outlet);
 
-	        // read reboot_duration of the port
+	        /* read reboot_duration of the port */
 	        if ((state = APC_read(ad->sptr, 
 			objname, ASN_INTEGER)) == NULL) {
 #ifdef APC_DEBUG
@@ -691,7 +691,7 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 		   return (S_ACCESS);
 	        }
 	        if (num_outlets == 0) {
-		   // save the inital value of the first port
+		   /* save the inital value of the first port */
 		   reboot_duration = *state;
 	        } else if (reboot_duration != *state) {
 		  syslog(LOG_WARNING, "%s: Outlet %d has a different reboot duration!", 
@@ -710,7 +710,7 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 		   __FUNCTION__, outlet);
 #endif
 
-    // host not found in outlet names
+    /* host not found in outlet names */
     if (num_outlets < 1) {
 #ifdef APC_DEBUG
 	syslog(LOG_DEBUG, "%s: no active outlet '%s'.", __FUNCTION__, host);
@@ -718,14 +718,14 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 	return (S_BADHOST);
     }
 
-    // Turn them all off
+    /* Turn them all off */
 
     for (outlet=outlets[0], i=0 ; i < num_outlets; i++, 
 		    outlet = outlets[i]) {
-	    // prepare objname
+	    /* prepare objname */
 	    snprintf(objname, MAX_STRING, OID_OUTLET_COMMAND_PENDING, outlet);
 
-	    // are there pending commands ?
+	    /* are there pending commands ? */
 	    if ((state = APC_read(ad->sptr, objname, ASN_INTEGER)) == NULL) {
 #ifdef APC_DEBUG
 		syslog(LOG_DEBUG, "%s: cannot read outlet_pending.", __FUNCTION__);
@@ -740,11 +740,11 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 		return (S_RESETFAIL);
 	    }
 	    
-	    // prepare objnames
+	    /* prepare objnames */
 	    snprintf(objname, MAX_STRING, OID_OUTLET_STATE, outlet);
 	    snprintf(value, MAX_STRING, "%i", OUTLET_REBOOT);
 
-	    // send reboot cmd
+	    /* send reboot cmd */
 	    if (!APC_write(ad->sptr, objname, 'i', value)) {
 #ifdef APC_DEBUG
 		syslog(LOG_DEBUG, "%s: cannot send reboot cmd for outlet %d.", 
@@ -754,7 +754,7 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 	    }
     }
   
-    // wait max. 2*reboot_duration for all outlets to go back on
+    /* wait max. 2*reboot_duration for all outlets to go back on */
     for (i = 0; i < reboot_duration << 1; i++) {
 	    
 	    sleep(1);
@@ -763,9 +763,9 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 	    for (outlet=outlets[0], h=0 ; h < num_outlets; h++, 
 			    outlet = outlets[h]) {
 
-		// prepare objname of the first outlet
+		/* prepare objname of the first outlet */
 		snprintf(objname, MAX_STRING, OID_OUTLET_STATE, outlet);
-	    	// get outlet's state
+	    	/* get outlet's state */
 		
 		if ((state = APC_read(ad->sptr, objname, ASN_INTEGER)) == NULL) {
 #ifdef APC_DEBUG
@@ -784,12 +784,12 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
     }
     
     if (bad_outlets == num_outlets) {
-	    // reset failed
+	    /* reset failed */
 	    syslog(LOG_ERR, "%s: resetting host '%s' failed.", __FUNCTION__, host);
 	    return (S_RESETFAIL);
     } else {
-	    // Not all outlets back on, but at least one; implies the node was
-	    // rebooted correctly
+	    /* Not all outlets back on, but at least one; implies the node was */
+	    /* rebooted correctly */
 	    syslog(LOG_WARNING,"%s: Not all outlets came back online!", __FUNCTION__);
 	    return (S_OK); 
     }
@@ -932,13 +932,13 @@ apcmastersnmp_destroy(Stonith * s)
 
     ad->APCid = NOTapcID;
 
-    // release snmp session
+    /* release snmp session */
     if (ad->sptr != NULL) {
 	snmp_close(ad->sptr);
 	ad->sptr = NULL;
     }
 
-    // reset defaults
+    /* reset defaults */
     ad->hostname = NULL;
     ad->community = NULL;
     ad->num_outlets = 0;
@@ -962,22 +962,22 @@ apcmastersnmp_new(void)
     syslog(LOG_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    // no memory for stonith-object
+    /* no memory for stonith-object */
     if (ad == NULL) {
 	syslog(LOG_ERR, "%s: out of memory.", __FUNCTION__);
 	return (NULL);
     }
 
-    // clear stonith-object
+    /* clear stonith-object */
     memset(ad, 0, sizeof(*ad));
 
-    // set defaults
+    /* set defaults */
     ad->APCid = APCid;
     ad->sptr = NULL;
     ad->hostname = NULL;
     ad->community = NULL;
     ad->num_outlets = 0;
 
-    // return the object
+    /* return the object */
     return ((void *) ad);
 }

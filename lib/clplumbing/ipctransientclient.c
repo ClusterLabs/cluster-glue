@@ -1,4 +1,4 @@
-/* $Id: ipctransientclient.c,v 1.8 2004/05/14 21:12:49 andrew Exp $ */
+/* $Id: ipctransientclient.c,v 1.9 2004/08/29 03:01:13 msoffen Exp $ */
 /* 
  * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
  * 
@@ -61,11 +61,11 @@ main(int argc, char ** argv)
     cl_log_set_entity("ipc_transient_client_test");
     cl_log_enable_stderr(TRUE);
     
-    // give the server a chance to start
+    /* give the server a chance to start */
     cl_log(LOG_INFO, "#--#--#--#--# Beginning test run %d against server %d...", lpc, iteration);
     client_main = g_main_new(FALSE);
     
-    // connect, send messages
+    /* connect, send messages */
 	server_channel = init_client_ipc_comms("echo", transient_client_callback, client_main);
     
     if(server_channel == NULL) {
@@ -106,7 +106,7 @@ init_client_ipc_comms(const char *child,
 {
     IPC_Channel *ch;
     GHashTable * attrs;
-    int local_sock_len = 2; // 2 = '/' + '\0'
+    int local_sock_len = 2; /* 2 = '/' + '\0' */
     char    *commpath = NULL;
     static char 	path[] = IPC_PATH_ATTR;
 
