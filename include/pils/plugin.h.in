@@ -466,6 +466,9 @@ PILPluginUniv*	NewPILPluginUniv(const char * baseplugindirectory);
 /*	Best if used carefully ;-) */
 void		DelPILPluginUniv(PILPluginUniv*);
 
+/* Set the debug level for the plugin system itself */
+void		PILpisysSetDebugLevel (int level);
+
 /* Return a list of plugins of the given type */
 char **		PILListPlugins(PILPluginUniv* u, const char *plugintype
 ,		int* plugincount /*can be NULL*/);
