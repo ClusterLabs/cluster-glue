@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.16 2004/09/29 07:08:35 andrew Exp $ */
+/* $Id: cl_log.c,v 1.17 2004/11/08 20:48:36 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -12,6 +12,7 @@
 #include <clplumbing/longclock.h>
 #include <clplumbing/uids.h>
 #include <glib.h>
+#include <netinet/in.h>
 
 #ifndef MAXLINE
 #	define MAXLINE	512
@@ -36,13 +37,14 @@
 
 
 
-static gboolean	LogToLoggingDaemon(int priority, const char * buf, int bstrlen);
-static IPC_Message*
-		ChildLogIPCMessage(int priority, const char *buf, int bstrlen);
-static void	FreeChildLogIPCMessage(IPC_Message* msg);
+int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
+IPC_Message* ChildLogIPCMessage(int priority, const char *buf, int bstrlen, 
+				gboolean use_priority_str );
+void	FreeChildLogIPCMessage(IPC_Message* msg);
 static char *	ha_timestamp(void);
 
-static int		use_logging_daemon = 0;
+int			use_logging_daemon =  FALSE;
+int			conn_logd_intval = 0;
 static int		cl_log_facility = LOG_USER;
 static const char *	cl_log_entity = DFLT_ENTITY;
 
@@ -102,7 +104,6 @@ cl_log_set_debugfile(const char * path)
 	debugfile_name = path;
 }
 
-
 /*
  * This function can cost us realtime unless use_logging_daemon
  * is enabled.  Then we log everything through a child process using
@@ -111,13 +112,10 @@ cl_log_set_debugfile(const char * path)
 
 /* Cluster logging function */
 void
-cl_log(int priority, const char * fmt, ...)
+cl_direct_log(int priority, char* buf, gboolean use_priority_str)
 {
-	va_list		ap;
 	FILE *		fp = NULL;
-	char		buf[MAXLINE];
-	int		logpri = LOG_PRI(priority);
-	int		nbytes;
+	int		logpri;
 	const char *	pristr;
 	int	needprivs = !cl_have_full_privs();
 
@@ -131,6 +129,126 @@ cl_log(int priority, const char * fmt, ...)
 		"info",
 		"debug"
 	};
+	
+	if (use_priority_str){
+		logpri =  LOG_PRI(priority);
+		
+		if (logpri < 0 || logpri >= DIMOF(log_prio)) {
+			pristr = "(undef)";
+		}else{
+			pristr = log_prio[logpri];
+		}
+	}else{
+		pristr = NULL;
+	}
+	
+	if (needprivs) {
+		return_to_orig_privs();
+	}
+	
+	if (syslog_enabled) {
+		if (pristr){
+			syslog(priority, "%s: %s", pristr,  buf);
+		}else {
+			syslog(priority, "%s", buf);			
+		}
+		
+	}
+	
+	if (stderr_enabled) {
+		if (pristr){
+			fprintf(stderr, "%s: %s %s: %s\n"
+				,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+				,	ha_timestamp()
+				,	pristr,  buf);
+		}else {
+			fprintf(stderr, "%s: %s %s\n"
+				,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+				,	ha_timestamp()
+				,	buf);
+			
+		}
+		
+	}
+	
+	if (debugfile_name != NULL) {
+		fp = fopen(debugfile_name, "a");
+		if (fp != NULL) {
+			if (pristr){
+				fprintf(fp, "%s: %s %s: %s\n"
+					,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+					,	ha_timestamp()
+					,	pristr,  buf);
+			}else{
+				fprintf(fp, "%s: %s %s\n"
+					,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+					,	ha_timestamp()
+					,	buf);
+				
+			}
+			
+			fclose(fp);
+		}
+	}
+	
+	if (priority != LOG_DEBUG && logfile_name != NULL) { 
+		fp = fopen(logfile_name, "a");
+		if (fp != NULL) {
+			if (pristr){
+				fprintf(fp, "%s: %s %s: %s\n"
+				,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+				,	ha_timestamp()
+				,	pristr,  buf);
+			}else {
+				fprintf(fp, "%s: %s %s\n"
+					,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+					,	ha_timestamp()
+					,	buf);	
+			}
+			
+				fclose(fp);
+		}
+	}
+	
+	if (needprivs) {
+		return_to_dropped_privs();
+	}
+	
+	return;
+}
+
+
+
+/*
+ * This function can cost us realtime unless use_logging_daemon
+ * is enabled.  Then we log everything through a child process using
+ * non-blocking IPC.
+ */
+
+/* Cluster logging function */
+void
+cl_log(int priority, const char * fmt, ...)
+{
+	va_list		ap;
+	char		buf[MAXLINE];
+	int		logpri = LOG_PRI(priority);
+	int		nbytes;
+	const char *	pristr;
+	int	needprivs = !cl_have_full_privs();
+	static int	cl_log_depth = 0;
+
+	static const char *log_prio[8] = {
+		"EMERG",
+		"ALERT",
+		"CRIT",
+		"ERROR",
+		"WARN",
+		"notice",
+		"info",
+		"debug"
+	};
+
+	cl_log_depth++;
 
 	buf[MAXLINE-1] = EOS;
 	va_start(ap, fmt);
@@ -146,49 +264,18 @@ cl_log(int priority, const char * fmt, ...)
 	if (needprivs) {
 		return_to_orig_privs();
 	}
-	if (use_logging_daemon) {
-		if (LogToLoggingDaemon(priority, buf, nbytes)) {
-			goto LogDone;
-		}
-	}
-
-	if (syslog_enabled) {
-		syslog(priority, "%s: %s", pristr,  buf);
-	}
-
-	if (stderr_enabled) {
-		fprintf(stderr, "%s: %s %s: %s\n"
-		,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
-		,	ha_timestamp()
-		,	pristr,  buf);
-	}
-
-	if (debugfile_name != NULL) {
-		fp = fopen(debugfile_name, "a");
-		if (fp != NULL) {
-			fprintf(fp, "%s: %s %s: %s\n"
-			,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
-			,	ha_timestamp()
-			,	pristr,  buf);
-			fclose(fp);
-		}
-	}
-
-	if (priority != LOG_DEBUG && logfile_name != NULL) { 
-		fp = fopen(logfile_name, "a");
-		if (fp != NULL) {
-			fprintf(fp, "%s: %s %s: %s\n"
-			,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
-			,	ha_timestamp()
-			,	pristr,  buf);
-			fclose(fp);
-		}
+	
+	if ( use_logging_daemon && 
+	     cl_log_depth <= 1 &&
+	     LogToLoggingDaemon(priority, buf, nbytes, TRUE) == HA_OK){
+		goto LogDone;
+	}else {
+		cl_direct_log(priority, buf, TRUE);
 	}
 	
-LogDone:
-	if (needprivs) {
-		return_to_dropped_privs();
-	}
+ LogDone:
+	cl_log_depth--;
+	return;
 }
 
 void
@@ -248,55 +335,77 @@ ha_timestamp(void)
 }
 
 
-static gboolean
-LogToLoggingDaemon(int priority, const char * buf, int bufstrlen)
+int
+LogToLoggingDaemon(int priority, const char * buf, 
+		   int bufstrlen, gboolean use_pri_str)
 {
-	static IPC_Channel*	logging_channel;
-
+	static IPC_Channel*	chan;
+	static longclock_t	nexttime = 0;
 	IPC_Message*		msg;
 	int			sendrc;
+	int			intval = conn_logd_intval;
+	/*	cl_log(LOG_INFO, "LogToLoggingDaemon is called");*/
 
-	msg = ChildLogIPCMessage(priority, buf, bufstrlen);
-
+	msg = ChildLogIPCMessage(priority, buf, bufstrlen, use_pri_str);
+	
 	if (msg == NULL) {
-		return FALSE;
+		return HA_FAIL;
 	}
-	if (logging_channel == NULL) {
+	if (chan == NULL) {
 		GHashTable*	attrs;
 		char		path[] = IPC_PATH_ATTR;
 		char		sockpath[] = HA_LOGDAEMON_IPC;
-	
-		attrs = g_hash_table_new(g_str_hash, g_str_equal);
-		g_hash_table_insert(attrs, path, sockpath);
-
-		logging_channel = ipc_channel_constructor(IPC_ANYTYPE, attrs);
-		g_hash_table_destroy(attrs);
-
-		if (logging_channel == NULL) {
+		longclock_t	lnow = time_longclock();
+		
+		if (cmp_longclock(lnow,  nexttime) >= 0){
+			nexttime = add_longclock(lnow, 
+						 msto_longclock(intval));
+			
+			attrs = g_hash_table_new(g_str_hash, g_str_equal);
+			g_hash_table_insert(attrs, path, sockpath);
+			
+			chan = ipc_channel_constructor(IPC_ANYTYPE, attrs);
+			g_hash_table_destroy(attrs);
+			
+			if (chan == NULL) {
+				FreeChildLogIPCMessage(msg);
+				return HA_FAIL;
+			}
+			
+			cl_log(LOG_DEBUG,"Initialize connection"
+			       "to logging daemon");
+			
+			if (chan->ops->initiate_connection(chan) != IPC_OK) {
+				cl_log(LOG_WARNING, "Initializing connection"
+				       " to logging daemon failed."
+				       " Logging daemon may not be running");
+				
+				FreeChildLogIPCMessage(msg);
+				return HA_FAIL;
+			}
+			
+		}else {
 			FreeChildLogIPCMessage(msg);
-			return FALSE;
+			return HA_FAIL;
 		}
 	}
-
+	
 	/* Logging_channel is all set up */
-
-	sendrc =  logging_channel->ops->send(logging_channel, msg);
+	
+	sendrc =  chan->ops->send(chan, msg);
 	if (sendrc == IPC_OK) {
-		return TRUE;
-	}
-
-	/* Too bad we can't log a message ;-) */
-
-	if (sendrc == IPC_BROKEN) {
-		logging_channel->ops->destroy(logging_channel);
-		logging_channel = NULL;
+		return HA_OK;
+	}else {
+		chan->ops->destroy(chan);
+		chan = NULL;
 	}
 	FreeChildLogIPCMessage(msg);
-	return FALSE;
+	return HA_FAIL;
 }
 
-static IPC_Message*
-ChildLogIPCMessage(int priority, const char *buf, int bufstrlen)
+IPC_Message*
+ChildLogIPCMessage(int priority, const char *buf, int bufstrlen, 
+		   gboolean use_prio_str)
 {
 	IPC_Message*	ret;
 	LogDaemonMsg*	logbuf;
@@ -316,11 +425,12 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen)
 		cl_free(ret);
 		return NULL;
 	}
-
+	
 	logbuf->msgtype = LD_LOGIT;
 	logbuf->facility = cl_log_facility;
 	logbuf->priority = priority;
-	logbuf->msglen = bufstrlen+1;
+	logbuf->use_pri_str = use_prio_str;
+	logbuf->msglen = bufstrlen + 1;
 	strncpy(logbuf->message, buf, bufstrlen);
 	logbuf->message[bufstrlen] = EOS;
 
@@ -331,7 +441,7 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen)
 }
 
 
-static void
+void
 FreeChildLogIPCMessage(IPC_Message* msg)
 {
 	if (msg == NULL) {
