@@ -39,4 +39,6 @@ guint Gmain_timeout_add_full(gint priority
 ,	GSourceFunc	function
 ,	gpointer	data
 ,	GDestroyNotify	notify);
+
+void Gmain_timeout_remove(guint tag);
 #endif
