@@ -42,9 +42,10 @@
 #include <uuid/uuid.h>
 #include <clplumbing/cl_log.h>
 #include <lrm/lrm_api.h>
+#include <lrm/raexec.h>
 #include <clplumbing/lsb_exitcodes.h>
 
-const char * optstring = "AD:dEF:d:Msg:c:S:LI:Rh";
+const char * optstring = "AD:dEF:d:Msg:c:S:LI:CT:h";
 
 static struct option long_options[] = {
 	{"daemon", 0, 0, 'd'},
@@ -56,7 +57,8 @@ static struct option long_options[] = {
 	{"information",1,0,'I'},
 	{"add",1,0,'A'},
 	{"delete",1,0,'D'},
-	{"rasupported",1,0,'R'},
+	{"raclass_supported",1,0,'C'},
+	{"ratype_supported",1,0,'T'},
 	{"help",0,0,'h'},
 	{0,0,0,0}
 };
@@ -81,6 +83,7 @@ typedef enum {
 	INF_RSC,
 	ADD_RSC,
 	DEL_RSC,
+	RACLASS_SUPPORTED,
 	RATYPE_SUPPORTED,
 	HELP
 } lrmadmin_cmd_t;
@@ -100,7 +103,7 @@ static int call_id = 0;
 
 const char * simple_help_screen =
 "lrmadmin {-d|--deamon}\n"
-"         {-A|--add} <rscid> <ratype> <raname> [<rsc_params_list>]\n"
+"         {-A|--add} <rscid> <raclass> <ratype> [<rsc_params_list>]\n"
 "         {-D|--delete} <rscid>\n"
 "         {-F|--flush} <rscid>\n"
 "         {-E|--execute} <rscid> <operator> <timeout> [<operator_parameters_"
@@ -111,7 +114,8 @@ const char * simple_help_screen =
 "         {-S|--status} <rscid>\n"
 "         {-L|--listall}\n"
 "         {-I|--information} <rsc_id>\n"
-"         {-R|--rasupported}\n"
+"         {-C|--raclass_supported}\n"
+"         {-T|--ratype_supported} <raclss>\n"
 "         {-h|--help}\n";
 
 #define OPTION_OBSCURE_CHECK \
@@ -126,7 +130,8 @@ static int resource_operation(ll_lrm_t * lrmd, int argc, int optind,
 static int add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
 static int transfer_cmd_params(int amount, int start, char * argv[], 
 			   const char * class, GHashTable ** params_ht);
-static void g_ratype_supported(gpointer data, gpointer user_data);
+static void g_print_stringitem(gpointer data, gpointer user_data);
+static void g_print_rainfo_item(gpointer data, gpointer user_data);
 static void g_print_ops(gpointer data, gpointer user_data);
 static void g_get_rsc_description(gpointer data, gpointer user_data);
 static void print_rsc_inf(lrm_rsc_t * lrmrsc);
@@ -154,7 +159,10 @@ int main(int argc, char **argv)
 	int ret_value = 0; 
         ll_lrm_t* lrmd;
 	lrm_rsc_t * lrm_rsc;
-	GList *ratype, *rscid_list;
+	GList 	*raclass_list = 0, 
+		*ratype_list = 0,
+		*rscid_list;
+	char raclass[20];
 
 	/* Prevent getopt_long to print error message on stderr isself */
 	/*opterr = 0; */  
@@ -197,9 +205,17 @@ int main(int argc, char **argv)
 				}
 				break;
 
-			case 'R':
+			case 'C':
+				OPTION_OBSCURE_CHECK 
+				lrmadmin_cmd = RACLASS_SUPPORTED;
+				break;
+
+			case 'T':
 				OPTION_OBSCURE_CHECK 
 				lrmadmin_cmd = RATYPE_SUPPORTED;
+				if (optarg) {
+					strncpy(raclass, optarg, 19);
+				}
 				break;
 
 			case 'F':
@@ -385,18 +401,37 @@ int main(int argc, char **argv)
 			ASYN_OPS = FALSE;
 			break;	
 
-		case RATYPE_SUPPORTED:
-			ratype = lrmd->lrm_ops->get_rsc_class_supported(lrmd);
-			printf("List size: %d\n", g_list_length(ratype));
-			if (ratype) {
-				g_list_foreach(ratype, g_ratype_supported, NULL);
-				g_list_free(ratype);
+		case RACLASS_SUPPORTED:
+			raclass_list = lrmd->lrm_ops->
+					get_rsc_class_supported(lrmd);
+			printf("Support %d RA classes\n", 
+					g_list_length(raclass_list));
+			if (raclass_list) {
+				g_list_foreach(raclass_list, g_print_stringitem,
+						NULL);
+				g_list_free(raclass_list);
 			} else {
-				printf("No resource agency is supported\n");
+				printf("No any RA class is supported\n");
 			}
 
 			ASYN_OPS = FALSE;
 			break;	
+
+		case RATYPE_SUPPORTED:
+		     	ratype_list = lrmd->lrm_ops->
+				get_rsc_type_supported(lrmd, raclass);
+			printf("List size: %d\n", g_list_length(ratype_list));
+			if (ratype_list) {
+				g_list_foreach(ratype_list, g_print_rainfo_item,
+						NULL);
+				//g_list_free(ratype_list);
+			} else {
+				printf("For this RA class, no any RA type is "
+					"supported\n");
+			}
+
+			ASYN_OPS = FALSE;
+			break;
 
 		case LIST_ALLRSC:
 			rscid_list = lrmd->lrm_ops->get_all_rscs(lrmd);
@@ -723,11 +758,12 @@ GHashTable ** params_ht)
 		buffer[20] = '\0';
 		for (i=start; i<amount; i++) {
 			snprintf(buffer, 20, "%d", i-start+1);
-			g_hash_table_insert( *params_ht, g_strdup(buffer), g_strdup(argv[i]));
+			g_hash_table_insert( *params_ht, g_strdup(buffer), 
+						g_strdup(argv[i]));
 			//printf("index: %d  value: %s \n", i-start+1, argv[i]);
 		}
 	} else {
-		fprintf(stderr, "Not supported resource agency type.\n");
+		fprintf(stderr, "Not supported resource agency class.\n");
 		return -1;
 	}
 
@@ -773,17 +809,29 @@ params_hashtable_to_str(const char * class, GHashTable * ht)
 		strncpy(params_str, gstr_tmp->str, gstr_tmp->len+1);
 		g_string_free(gstr_tmp, TRUE);
 	} else {
-		fprintf(stderr, "Not supported resource agency type.\n");
+		fprintf(stderr, "Not supported resource agency class.\n");
 	}
 
 	return params_str;
 }
 
 static void
-g_ratype_supported(gpointer data, gpointer user_data)
+g_print_stringitem(gpointer data, gpointer user_data)
 {
 	printf("%s\n", (char*)data);
 	g_free(data);  /*  ?  */
+}
+
+static void
+g_print_rainfo_item(gpointer data, gpointer user_data)
+{
+/*	rsc_info_t * rsc_info = (rsc_info_t *) data; */
+	printf("RA type name: %s\n", (char *)data);
+/*
+	printf("RA type name: %s  Version: %s\n", 
+		rsc_info->rsc_type, rsc_info->version);
+*/
+	g_free(data); /*  ?  */
 }
 
 static void
@@ -830,8 +878,8 @@ print_rsc_inf(lrm_rsc_t * lrm_rsc)
 
 	uuid_unparse(lrm_rsc->id, rscid_str_tmp);
 	printf("Resource ID:                %s\n", rscid_str_tmp);
-	printf("Resource agency name:       %s\n", lrm_rsc->type);
-	printf("Resource agency type:       %s\n", lrm_rsc->class);
+	printf("Resource agency class:       %s\n", lrm_rsc->class);
+	printf("Resource agency type:       %s\n", lrm_rsc->type);
 
 	if (lrm_rsc->params) {
 		tmp = params_hashtable_to_str(lrm_rsc->class, 

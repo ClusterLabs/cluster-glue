@@ -29,6 +29,15 @@
 #include <pils/generic.h>
 #include <lrm/raexec.h>
 
+static void
+g_print_item(gpointer data, gpointer user_data)
+{
+	rsc_info_t * tmp = (rsc_info_t *)data;
+	printf("%s\n", tmp->rsc_type);
+	g_free(data);  /*  ?  */
+}
+
+
 int main(void)
 {
 	PILPluginUniv * PluginLoadingSystem = NULL;
@@ -44,7 +53,16 @@ int main(void)
 
 	PILLoadPlugin(PluginLoadingSystem , "InterfaceMgr", "generic" , &RegisterRqsts);
 
+	PILLoadPlugin(PluginLoadingSystem , "RAExec", "ocf", NULL);
+	RAExec = g_hash_table_lookup(RAExecFuncs,"ocf");
+	GList * ratype_list;
+	ret = RAExec->get_resource_list(&ratype_list);
+	printf("length=%d\n", g_list_length(ratype_list));
+	if (ret >= 0) {
+		g_list_foreach(ratype_list, g_print_item, NULL);
+	}
 
+	/*
 	PILLoadPlugin(PluginLoadingSystem , "RAExec", "lsb", NULL);
 	RAExec = g_hash_table_lookup(RAExecFuncs,"lsb");
 	GHashTable * cmd_params;
@@ -52,7 +70,8 @@ int main(void)
 	g_hash_table_insert(cmd_params, g_strdup("1"), g_strdup("par1"));
 	g_hash_table_insert(cmd_params, g_strdup("2"), g_strdup("par2"));
 	ret = RAExec->execra("/tmp/test.sh", "start", cmd_params,NULL);
-	
+	*/
+
 	/* For test the dealing with directory appended to RA */
 	/*
 	PILLoadPlugin(PluginLoadingSystem , "RAExec", "ocf", NULL);
@@ -60,6 +79,6 @@ int main(void)
 	if (0>RAExec->execra("/root/linux-ha-checkout/linux-ha/lrm/test.sh",
 			"stop",NULL,NULL, TRUE, &key)) 
 	*/
-	printf("execra error: ret = %d\n", ret);
+	printf("execra result: ret = %d\n", ret);
 	return -1;
 }
