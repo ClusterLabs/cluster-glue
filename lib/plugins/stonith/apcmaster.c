@@ -49,7 +49,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.5 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.6 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -315,7 +315,11 @@ MSScanLine(struct APCMS* ms, int timeout, char * buf, int max)
 static int
 MSLogin(struct APCMS * ms)
 {
-        EXPECT(EscapeChar, 10);
+        /*EXPECT(EscapeChar, 10);*/
+        if (MSLookFor(ms, EscapeChar, 10) < 0) {
+		sleep(1);
+		return (errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
+	}
 
   	/* 
 	 * We should be looking at something like this:
@@ -333,6 +337,7 @@ MSLogin(struct APCMS * ms)
 	switch (MSLookFor(ms, LoginOK, 30)) {
 
 		case 0:	/* Good! */
+			syslog(LOG_INFO, _("Successful login to " DEVICE "."));
 			break;
 
 		case 1:	/* Uh-oh - bad password */
@@ -352,22 +357,23 @@ MSLogin(struct APCMS * ms)
 static int
 MSRobustLogin(struct APCMS * ms)
 {
-	int	rc=S_OOPS;
-	int	j;
+	int rc = S_OOPS;
+	int j = 0;
 
-	for (j=0; j < 20 && rc != S_OK; ++j) {
-
-	  if (ms->pid > 0) {
-			MSkillcomm(ms);
-		}
-
-		if (MS_connect_device(ms) != S_OK) {	
-		        MSkillcomm(ms);
-			continue;
-		}
-
-		rc = MSLogin(ms);
+	for ( ; ; ) {
+	  if (ms->pid > 0)
+	    MSkillcomm(ms);
+	  if (MS_connect_device(ms) != S_OK) {	
+	    MSkillcomm(ms);
+	  }
+	  else {
+	    rc = MSLogin(ms);
+	    if( rc == S_OK ) break;
+	  }
+	  if ((++j) == 20) break;
+	  else sleep(1);
 	}
+
 	return rc;
 }
 
