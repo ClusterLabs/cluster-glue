@@ -26,7 +26,9 @@ include_HEADERS	= 		\
 	Gmain_timeout.h	\
 	apphb_cs.h	\
 	base64.h	\
+	cl_log.h	\
 	ipc.h		\
+	loggingdaemon.h	\
 	longclock.h	\
 	mkstemp_mode.h	\
 	proctrack.h
