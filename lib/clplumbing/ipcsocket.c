@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.135 2005/04/01 23:16:39 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.136 2005/04/04 07:30:44 andrew Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -27,6 +27,7 @@
 #include <clplumbing/realtime.h>
 #include <clplumbing/cl_poll.h>
 
+#include <ha_msg.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -299,9 +300,15 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 				       ch->farside_pid);			
 				hamsg = wirefmt2msg(ipcmsg->msg_body, ipcmsg->msg_len);
 				if (hamsg != NULL){
+					struct ha_msg *crm_data = cl_get_struct(
+						hamsg, F_CRM_DATA);
+					if(crm_data != NULL) {
+						cl_msg_remove_value(
+							hamsg, crm_data);
+					}
 					cl_log_message(LOG_INFO, hamsg);
 					ha_msg_del(hamsg);
-				}			
+				}
 			}
 			break;
 		default:
