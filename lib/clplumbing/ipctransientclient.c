@@ -1,4 +1,4 @@
-/* $Id: ipctransientclient.c,v 1.14 2004/11/22 19:03:01 gshi Exp $ */
+/* $Id: ipctransientclient.c,v 1.15 2004/12/05 19:13:01 andrew Exp $ */
 /* 
  * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
  * 
@@ -44,36 +44,36 @@
 char *messages[MAX_MESSAGES];
 
 IPC_Message *create_simple_message(const char *text, IPC_Channel *ch);
-IPC_Channel *init_client_ipc_comms(const char *child,
-								   gboolean (*dispatch)(IPC_Channel* source_data, gpointer    user_data),
-								   void *user_data);
+IPC_Channel *init_client_ipctest_comms(
+	const char *child, gboolean (*dispatch)(
+		IPC_Channel* source_data, gpointer    user_data),
+	void *user_data);
 gboolean transient_client_callback(IPC_Channel* server, void* private_data);
-void client_send_message(const char *message_text,
-						 IPC_Channel *server_channel,
-						 int iteration);
-void default_ipc_input_destroy(gpointer user_data);
+void client_send_message(
+	const char *message_text, IPC_Channel *server_channel, int iteration);
+void default_ipctest_input_destroy(gpointer user_data);
 
 int
 main(int argc, char ** argv)
 {
-    int	lpc =0, iteration=0;
-    GMainLoop* client_main = NULL;
-    IPC_Channel *server_channel = NULL;
+	int	lpc =0, iteration=0;
+	GMainLoop* client_main = NULL;
+	IPC_Channel *server_channel = NULL;
     
-    cl_log_set_entity("ipc_transient_client_test");
-    cl_log_enable_stderr(TRUE);
+	cl_log_set_entity("ipc_transient_client_test");
+	cl_log_enable_stderr(TRUE);
     
-    /* give the server a chance to start */
-    cl_log(LOG_INFO, "#--#--#--#--# Beginning test run %d against server %d...", lpc, iteration);
-    client_main = g_main_new(FALSE);
+	/* give the server a chance to start */
+	cl_log(LOG_INFO, "#--#--#--#--# Beginning test run %d against server %d...", lpc, iteration);
+	client_main = g_main_new(FALSE);
     
-    /* connect, send messages */
-	server_channel = init_client_ipc_comms("echo", transient_client_callback, client_main);
+	/* connect, send messages */
+	server_channel = init_client_ipctest_comms("echo", transient_client_callback, client_main);
     
-    if(server_channel == NULL) {
+	if(server_channel == NULL) {
 		cl_log(LOG_ERR, "[Client %d] Could not connect to server", lpc);
 		return 1;
-    }
+	}
 
 	for(lpc = 0; lpc < MAX_MESSAGES; lpc++) {
 		messages[lpc] = (char *)malloc(sizeof(char)*1000);
@@ -86,25 +86,25 @@ main(int argc, char ** argv)
 		client_send_message(messages[lpc], server_channel, lpc);
 	}
     
-    server_channel->ops->waitout(server_channel);
+	server_channel->ops->waitout(server_channel);
     
-    /* wait for the reply by creating a mainloop and running it until
-     * the callbacks are invoked...
-     */
+	/* wait for the reply by creating a mainloop and running it until
+	 * the callbacks are invoked...
+	 */
     
-    cl_log(LOG_DEBUG, "Waiting for replies from the echo server");
-    g_main_run(client_main);
-    cl_log(LOG_INFO, "[Iteration %d] Client %d completed successfully", iteration, lpc);
+	cl_log(LOG_DEBUG, "Waiting for replies from the echo server");
+	g_main_run(client_main);
+	cl_log(LOG_INFO, "[Iteration %d] Client %d completed successfully", iteration, lpc);
     
-    return 0;
+	return 0;
 }
 
 
 IPC_Channel *
-init_client_ipc_comms(const char *child,
-		      gboolean (*dispatch)(IPC_Channel* source_data
-					   ,gpointer    user_data),
-		      void *user_data)
+init_client_ipctest_comms(const char *child,
+			  gboolean (*dispatch)(IPC_Channel* source_data
+					       ,gpointer    user_data),
+			  void *user_data)
 {
 	IPC_Channel *ch;
 	GHashTable * attrs;
@@ -141,7 +141,7 @@ init_client_ipc_comms(const char *child,
 
 	G_main_add_IPC_Channel(G_PRIORITY_LOW,
 			       ch, FALSE, dispatch, user_data, 
-			       default_ipc_input_destroy);
+			       default_ipctest_input_destroy);
 	
 	return ch;
 }
@@ -150,14 +150,14 @@ init_client_ipc_comms(const char *child,
 gboolean
 transient_client_callback(IPC_Channel* server, void* private_data)
 {
-    int lpc = 0;
-    IPC_Message *msg = NULL;
-    static int recieved_responses = 0;
-    char *buffer = NULL;
+	int lpc = 0;
+	IPC_Message *msg = NULL;
+	static int recieved_responses = 0;
+	char *buffer = NULL;
 
-    GMainLoop *mainloop = (GMainLoop*)private_data;
+	GMainLoop *mainloop = (GMainLoop*)private_data;
 
-    while(server->ops->is_message_pending(server) == TRUE) {
+	while(server->ops->is_message_pending(server) == TRUE) {
 		if (server->ch_status == IPC_DISCONNECT) {
 			/* The message which was pending for us is the
 			 * new status of IPC_DISCONNECT */
@@ -188,39 +188,39 @@ transient_client_callback(IPC_Channel* server, void* private_data)
 		} else {
 			cl_log(LOG_ERR, "[Client] No message this time");
 		}
-    }
+	}
     
-    if(server->ch_status == IPC_DISCONNECT) {
+	if(server->ch_status == IPC_DISCONNECT) {
 		cl_log(LOG_ERR, "[Client] Client received HUP");
 		return FALSE;
-    }
+	}
 
-    cl_log(LOG_DEBUG, "[Client] Processed %d IPC messages this time, %d total", lpc, recieved_responses);
+	cl_log(LOG_DEBUG, "[Client] Processed %d IPC messages this time, %d total", lpc, recieved_responses);
 
-    if(recieved_responses > 2) {
+	if(recieved_responses > 2) {
 		cl_log(LOG_INFO, "[Client] Processed %d IPC messages, all done.", recieved_responses);
 		recieved_responses = 0;
 		g_main_quit(mainloop);
 		cl_log(LOG_INFO, "[Client] Exiting.");
 		return FALSE;
-    }
+	}
     
-    return TRUE;
+	return TRUE;
 }
 
 void
 client_send_message(const char *message_text,
-					IPC_Channel *server_channel,
-					int iteration)
+		    IPC_Channel *server_channel,
+		    int iteration)
 {
 	IPC_Message *a_message = NULL;
-    if(server_channel->ch_status != IPC_CONNECT) {
+	if(server_channel->ch_status != IPC_CONNECT) {
 		cl_log(LOG_WARNING, "[Client %d] Channel is in state %d before sending message [%s]",
-			   iteration, server_channel->ch_status, message_text);
+		       iteration, server_channel->ch_status, message_text);
 		return;
-    }
+	}
     
-    a_message = create_simple_message(message_text, server_channel);
+	a_message = create_simple_message(message_text, server_channel);
 	if(a_message == NULL) {
 		cl_log(LOG_ERR, "Could not create message to send");
 	} else {
@@ -231,16 +231,17 @@ client_send_message(const char *message_text,
 		}
 		
 		if(server_channel->ch_status != IPC_CONNECT) {
-			cl_log(LOG_WARNING, "[Client %d] Channel is in state %d after sending message [%s]",
-				   iteration, server_channel->ch_status, message_text);
+			cl_log(LOG_WARNING,
+			       "[Client %d] Channel is in state %d after sending message [%s]",
+			       iteration, server_channel->ch_status, message_text);
 		}
 	}
 }
 
 void
-default_ipc_input_destroy(gpointer user_data)
+default_ipctest_input_destroy(gpointer user_data)
 {
-    cl_log(LOG_INFO, "default_ipc_input_destroy:received HUP");
+	cl_log(LOG_INFO, "default_ipc_input_destroy:received HUP");
 }
 
 IPC_Message *
