@@ -442,7 +442,8 @@ struct PILPluginImports_s {
 	,	void*	plugin_private);
 
 	void	(*log)	(PILLogLevel priority, const char * fmt, ...);
-	void*	(*alloc)(unsigned long size);
+	void*	(*alloc)(size_t size);
+	void*	(*mrealloc)(void * ptr, size_t size);
 	void	(*mfree)(void* space);
 	char*	(*mstrdup)(const char *s);
 };
@@ -461,6 +462,18 @@ void PILCallLog(PILLogFun logfun, PILLogLevel priority, const char * fmt, ...)
 
 /* Create a new plugin universe - start the plugin loading system up */
 PILPluginUniv*	NewPILPluginUniv(const char * baseplugindirectory);
+
+/* Change memory allocation functions right after creating universe */
+void PilPluginUnivSetMemalloc(PILPluginUniv*
+,	void*	(*alloc)(size_t size)
+,	void*	(*mrealloc)(void *, size_t size)
+,	void	(*mfree)(void* space)
+,	char*	(*mstrdup)(const char *s));
+
+
+void PilPluginUnivSetLog(PILPluginUniv*
+,	void	(*log)	(PILLogLevel priority, const char * fmt, ...));
+
 
 /* Delete a plugin universe - shut the plugin loading system down */
 /*	Best if used carefully ;-) */
