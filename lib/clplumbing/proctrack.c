@@ -136,7 +136,9 @@ ReportProcHasDied(int pid, int status)
 
 	if (doreport) {
 		if (deathbyexit) {
-			g_log(PT, (exitcode == 0 ? LOG_INFO :  LOG_WARNING)
+			g_log(PT
+			,	(exitcode == 0 ? G_LOG_LEVEL_INFO
+			:		G_LOG_LEVEL_WARNING)
 			,	"Exiting %s process %d returned rc %d."
 			,	type, pid, exitcode);
 		}else if (deathbysig) {
