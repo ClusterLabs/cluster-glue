@@ -1,3 +1,4 @@
+/* $Id: stonith_signal.h,v 1.7 2004/02/17 22:12:00 lars Exp $ */
 /*
  * stonith_signal.h: signal handling routines to be used by stonith
  *                   plugin libraries

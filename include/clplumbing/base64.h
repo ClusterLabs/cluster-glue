@@ -1,3 +1,4 @@
+/* $Id: base64.h,v 1.3 2004/02/17 22:11:58 lars Exp $ */
 #ifndef _CLPLUMBING_BASE64_H
 #	define _CLPLUMBING_BASE64_H
 /*

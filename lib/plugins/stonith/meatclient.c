@@ -1,3 +1,4 @@
+/* $Id: meatclient.c,v 1.5 2004/02/17 22:12:00 lars Exp $ */
 /*
  * Stonith client for Human Operator Stonith device
  *

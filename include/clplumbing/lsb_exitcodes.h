@@ -1,3 +1,4 @@
+/* $Id: lsb_exitcodes.h,v 1.2 2004/02/17 22:11:58 lars Exp $ */
 /* LSB status exit codes.
  *
  * All of these and the supporting text are taken from the LSB.

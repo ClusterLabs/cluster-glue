@@ -1,3 +1,4 @@
+/* $Id: mkstemp_mode.c,v 1.5 2004/02/17 22:11:59 lars Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <unistd.h>

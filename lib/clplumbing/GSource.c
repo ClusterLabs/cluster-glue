@@ -1,3 +1,4 @@
+/* $Id: GSource.c,v 1.14 2004/02/17 22:11:58 lars Exp $ */
 #include <portability.h>
 #include <string.h>
 

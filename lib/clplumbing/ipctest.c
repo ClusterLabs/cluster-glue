@@ -1,3 +1,4 @@
+/* $Id: ipctest.c,v 1.23 2004/02/17 22:11:59 lars Exp $ */
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>

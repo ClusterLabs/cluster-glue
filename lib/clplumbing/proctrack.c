@@ -1,3 +1,4 @@
+/* $Id: proctrack.c,v 1.17 2004/02/17 22:11:59 lars Exp $ */
 /*
  * Process tracking object.
  *
@@ -44,8 +45,6 @@ static gboolean TrackedProcTimeoutFunction(gpointer p);
 static void
 InitProcTable()
 {
-	(void)_heartbeat_h_Id;
-	(void)_ha_msg_h_Id;
 	if (ProcessTable) {
 		return;
 	}

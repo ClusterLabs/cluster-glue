@@ -1,3 +1,4 @@
+/* $Id: rcd_serial.c,v 1.12 2004/02/17 22:12:00 lars Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *

@@ -1,3 +1,4 @@
+/* $Id: cl_log.c,v 1.12 2004/02/17 22:11:58 lars Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>

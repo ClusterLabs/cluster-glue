@@ -1,3 +1,4 @@
+/* $Id: test.c,v 1.9 2004/02/17 22:11:59 lars Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.

@@ -1,3 +1,4 @@
+/* $Id: cl_log.h,v 1.3 2004/02/17 22:11:58 lars Exp $ */
 #ifndef _CLPLUMBING_CL_LOG_H
 #	define _CLPLUMBING_CL_LOG_H
 #	include <glib.h>

@@ -1,3 +1,4 @@
+/* $Id: realtime.h,v 1.6 2004/02/17 22:11:58 lars Exp $ */
 #ifndef _CLPLUMBING_REALTIME_H
 #	define _CLPLUMBING_REALTIME_H
 #	include <sched.h>
