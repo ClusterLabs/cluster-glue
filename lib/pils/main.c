@@ -1,4 +1,4 @@
-/* $Id: main.c,v 1.9 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: main.c,v 1.10 2004/09/01 17:50:19 gshi Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -41,7 +41,8 @@ static int TestCallBack
 );
 
 static PILGenericIfMgmtRqst RegRqsts [] =
-{	{"test",	&test1functions, &one, TestCallBack, &two}
+  {	{"test",	&test1functions, &one, TestCallBack, &two},
+	{NULL,		NULL,		NULL,	NULL,	NULL}
 };
 
 int
