@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.127 2005/03/08 20:54:51 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.128 2005/03/15 18:40:06 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -761,7 +761,7 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 	
 	ch->ops->resume_io(ch);
 
-	if ( !ch->should_send_blocking &&
+	if ( !ch->should_send_block &&
 	    ch->send_queue->current_qlen >= ch->send_queue->max_qlen) {
 		/*cl_log(LOG_WARNING, "send queue maximum length(%d) exceeded",
 		  ch->send_queue->max_qlen );*/
@@ -1723,7 +1723,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   temp_ch->ops = (struct IPC_OPS *)&socket_ops;
   temp_ch->msgpad = sizeof(struct SOCKET_MSG_HEAD);
   temp_ch->bytes_remaining = 0;
-  temp_ch->should_send_blocking = FALSE;
+  temp_ch->should_send_block = FALSE;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
   temp_ch->pool = NULL;
@@ -1780,7 +1780,7 @@ socket_server_channel_new(int sockfd){
   temp_ch->ops = (struct IPC_OPS *)&socket_ops;
   temp_ch->msgpad = sizeof(struct SOCKET_MSG_HEAD);
   temp_ch->bytes_remaining = 0;
-  temp_ch->should_send_blocking = FALSE;
+  temp_ch->should_send_block = FALSE;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
   temp_ch->pool = NULL;
