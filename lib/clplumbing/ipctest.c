@@ -102,18 +102,23 @@ checkifblocked(IPC_Channel* chan)
 	}
 }
 
+extern long	SeqNums[32];
+
 static int
 transport_tests(int iterations)
 {
 	int	rc = 0;
 
-#if 0
-	rc += channelpair(echoclient, echoserver, iterations);
-	rc += channelpair(asyn_echoclient, asyn_echoserver, iterations);
+#if 1
+	memset(SeqNums, 0, sizeof(SeqNums));
+	rc += channelpair(echoclient, echoserver, iterations/100);
+	memset(SeqNums, 0, sizeof(SeqNums));
+	rc += channelpair(asyn_echoclient, asyn_echoserver, iterations/100);
 #else
 	(void)echoclient; (void)echoserver;
 	(void)asyn_echoclient;(void)asyn_echoserver;
 #endif
+	memset(SeqNums, 0, sizeof(SeqNums));
 	rc += channelpair(mainloop_client, mainloop_server, iterations);
 
 	return rc;
@@ -129,13 +134,15 @@ main(int argc, char ** argv)
 	cl_log_enable_stderr(TRUE);
 
 
+#if 0
 	rc += transport_tests(1000);
+#endif
 
 	cl_log(LOG_INFO, "NOTE: Enabling poll(2) replacement code.");
 	PollFunc = cl_poll;
 	g_main_set_poll_func(cl_glibpoll);
 
-	rc += transport_tests(1000000);
+	rc += transport_tests(10000000);
 	
 	cl_log(LOG_INFO, "TOTAL errors: %d", rc);
 
@@ -752,6 +759,11 @@ s_send_msg(gpointer data)
 		,	i->chan->ch_status
 		,	i->chan->send_queue->current_qlen);
 		++i->errcount;
+		if (i->chan->ch_status != IPC_CONNECT) {
+			cl_log(LOG_ERR,	"s_send_msg: Exiting.");
+			return FALSE;
+		}
+			
 	}
 	return i->wcount <= i->max;
 }
@@ -839,6 +851,8 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 	int			rc;
 	IPC_Message*		rmsg;
 
+	cl_log(LOG_INFO, "Starting s_echo_msg in pid %d"
+	,	(int)getpid());
 	while (chan->ops->is_message_pending(chan)) {
 		if (chan->ch_status == IPC_DISCONNECT) {
 			break;
