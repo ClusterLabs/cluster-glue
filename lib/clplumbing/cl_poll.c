@@ -12,6 +12,11 @@
 #include <glib.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/cl_poll.h>
+#define	TIME_CALLS	1
+#ifdef	TIME_CALLS
+#	include <clplumbing/longclock.h>
+#	include <clplumbing/cl_log.h>
+#endif
 
 static int	debug = 0;
 
@@ -410,6 +415,12 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 	siginfo_t			info;
 	int				eventcount = 0;
 	int				j;
+#ifdef TIME_CALLS
+	longclock_t			starttime;
+	int				maxsleep = timeoutms;
+	const int			msfudge
+	=				2* 1000/hz_longclock();
+#endif
 
 	/* Do we have any old news to report? */
 	if ((nready=cl_init_poll_sig(fds, nfds)) != 0) {
@@ -431,6 +442,9 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 	}else{
 		ts.tv_sec = G_MAXLONG;
 		ts.tv_nsec = 99999999UL;
+#ifdef TIME_CALLS
+		maxsleep = G_MAXINT;
+#endif
 	}
 
 
@@ -447,14 +461,35 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 		,	(long)itertime->tv_sec, itertime->tv_nsec);
 	}
 
+#ifdef TIME_CALLS
+	starttime = time_longclock();
+#endif
 	while (sigtimedwait(&SignalSet, &info, itertime) >= 0) {
 		int	nsig;
+#ifdef TIME_CALLS
+		int		mselapsed;
+		longclock_t	endtime = time_longclock();
+
+
+		mselapsed = longclockto_ms(sub_longclock(endtime, starttime));
+
+		if (maxsleep != G_MAXINT && mselapsed > maxsleep + msfudge) {
+			/* We slept too long... */
+			cl_log(LOG_WARNING
+			,	"sigtimedwait() for %d ms took %d ms"
+			,	maxsleep, mselapsed);
+		}
+#endif
 
 		itertime = &zerotime;
 		nsig = info.si_signo;
 
 		/* Simulated signal reception */
 		cl_poll_sigaction(nsig, &info, NULL);
+#ifdef TIME_CALLS
+		maxsleep = 0;
+		starttime = time_longclock();
+#endif
 	}
 
 	/* Post observed events and count them... */

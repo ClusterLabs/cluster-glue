@@ -34,4 +34,6 @@ include_HEADERS	= 		\
 	longclock.h	\
 	mkstemp_mode.h	\
 	proctrack.h	\
-	timers.h
+	realtime.h	\
+	timers.h	\
+	uids.h

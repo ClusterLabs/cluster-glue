@@ -40,6 +40,8 @@ libplumb_la_SOURCES	= 		\
 			mkstemp_mode.c	\
 			ocf_ipc.c	\
 			proctrack.c	\
-			timers.c
+			realtime.c	\
+			timers.c	\
+			uids.c
 
 libplumb_la_LDFLAGS	= -version-info 0:0:0
