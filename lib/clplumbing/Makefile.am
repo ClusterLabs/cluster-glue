@@ -24,7 +24,7 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 
 
-CFLAGS			= @CFLAGS@
+CFLAGS			= @CFLAGS@  -DALIGNFUNC=@ALIGN@ -DMSGHDR_TYPE=@MSGHDR_TYPE@
 
 ## libraries
 
@@ -32,7 +32,7 @@ lib_LTLIBRARIES		= libplumb.la
 
 libplumb_la_SOURCES	= 		\
 			Gmain_timeout.c	\
-			ipcsocket.c	\
+			@IPCSOCKET_C@	\
 			longclock.c	\
 			ocf_ipc.c	\
 			proctrack.c
