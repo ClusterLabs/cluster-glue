@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.49 2004/11/25 03:27:31 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.50 2004/11/30 00:42:33 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -104,6 +104,7 @@ static gboolean on_connect_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_connect_cbk(IPC_Channel* ch_cbk, gpointer user_data);
 static gboolean on_receive_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_timeout_op_done(gpointer data);
+static gboolean on_timeout_shutdown(gpointer data);
 static gboolean on_repeat_op_done(gpointer data);
 static void on_remove_client(gpointer user_data);
 
@@ -120,6 +121,7 @@ static int on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg);
+static void sigterm_action(int nsig);
 
 /* functions wrap the call to ra plugins */
 static int perform_ra_op(lrmd_op_t* op);
@@ -212,7 +214,6 @@ GList* ra_class_list		= NULL;
  */
 void usage(const char* cmd, int exit_status);
 int init_start(void);
-void lrmd_shutdown(int nsig);
 int init_stop(const char *pid_file);
 int init_status(const char *pid_file, const char *client_name);
 long get_running_pid(const char *pid_file, gboolean* anypidfile);
@@ -371,21 +372,22 @@ usage(const char* cmd, int exit_status)
 	exit(exit_status);
 }
 
-void
-lrmd_shutdown(int nsig)
+static gboolean
+on_timeout_shutdown(gpointer data)
 {
-	static int shuttingdown = 0;
-	CL_SIGNAL(nsig, lrmd_shutdown);
-
-	if (!shuttingdown) {
-		shuttingdown = 1;
-	}
-	
 	if (mainloop != NULL && g_main_is_running(mainloop)) {
 		g_main_quit(mainloop);
 	}else {
 		exit(LSB_EXIT_OK);
 	}
+	return FALSE;
+}
+
+void
+sigterm_action(int nsig)
+{
+	CL_SIGNAL(nsig, sigterm_action);
+	g_timeout_add(5000, on_timeout_shutdown, NULL);	
 }
 
 void
@@ -452,7 +454,7 @@ init_start ()
 		exit(100);
 	}
 
-	register_pid(PID_FILE, TRUE, FALSE);
+	register_pid(PID_FILE, FALSE, sigterm_action);
 
 
 	/* load RA plugins   */
@@ -1987,6 +1989,7 @@ read_pipe(int fd, char ** data)
 	gstr_tmp = g_string_new("");
 	do {
 		memset(buffer, 0, BUFFLEN);
+		errno = 0;
 		readlen = read(fd, buffer, BUFFLEN - 1);
 		if ( readlen > 0 ) {
 			g_string_append(gstr_tmp, buffer);
@@ -2032,6 +2035,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.50  2004/11/30 00:42:33  zhenh
+ * make lrm wait a while when catch the SIGTERM signal for some cleanup work
+ *
  * Revision 1.49  2004/11/25 03:27:31  zhenh
  * 1. Let the resource save the param of last operation.
  * 2. Let LRM execute  the pending operations from disconnected client.
