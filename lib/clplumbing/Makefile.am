@@ -32,6 +32,7 @@ lib_LTLIBRARIES		= libplumb.la
 
 libplumb_la_SOURCES	= 		\
 			Gmain_timeout.c	\
+			base64.c	\
 			ipcsocket.c	\
 			longclock.c	\
 			ocf_ipc.c	\
