@@ -26,7 +26,7 @@
 #include <clplumbing/longclock.h>
 
 #ifndef CLOCK_T_IS_LONG_ENOUGH
-static	clock_t		lasttimes = 0L;
+static	unsigned long	lasttimes = 0L;
 static	unsigned long	wrapcount = 0;
 static	longclock_t	lc_wrapcount;
 #endif
@@ -83,10 +83,11 @@ longclock_t
 time_longclock(void)
 {
 	struct tms	longclock_dummy_tms_struct;
-	clock_t		timesval;
+	unsigned long	timesval;
 	
 	
-	timesval = times(&longclock_dummy_tms_struct);
+	/* times really returns an unsigned value ... */
+	timesval = (unsigned long) times(&longclock_dummy_tms_struct);
 
 	if (timesval < lasttimes) {
 		++wrapcount;
