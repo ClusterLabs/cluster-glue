@@ -270,7 +270,14 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 gboolean 
 G_main_del_IPC_Channel(GCHSource* fdp)
 {
-	return g_source_remove(fdp->gsourceid);
+	gboolean	rc;
+	if (fdp->gsourceid <= 0) {
+		cl_log(LOG_CRIT, "Bad gsource in G_main_del_IPC_channel");
+		return FALSE;
+	}
+	rc = g_source_remove(fdp->gsourceid);
+	fdp->gsourceid = 0;
+	return rc;
 }
 
 /*
