@@ -37,7 +37,7 @@ cl_signal_set_handler(int sig, void (*handler)(int), sigset_t *mask
 	sa.sa_mask = *mask;
 	sa.sa_flags = flags;
 
-	if(sigaction(sig, &sa, oldact) < 0) {
+	if (sigaction(sig, &sa, oldact) < 0) {
 		cl_perror("cl_signal_set_handler(): sigaction()");
 		return(-1);
 	}
