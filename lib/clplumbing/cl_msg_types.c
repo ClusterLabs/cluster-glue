@@ -535,7 +535,7 @@ struct_display_as_xml(
 		printed = struct_display_print_spaces(buffer, depth);
 		update_buffer_head(buffer, printed);
 	}
-	cl_log(log_level, "%s%s</%s", prefix?prefix:"", print_buffer, name);
+	cl_log(log_level, "%s%s</%s>", prefix?prefix:"", print_buffer, name);
 
 	return 0;
 }
@@ -619,7 +619,7 @@ convert(char* s, int len, int depth, int direction)
 		return(HA_FAIL);
 	}
 
-	for (i = 0; i < len; i++){
+	for (i = 0; i < len && s[i] != EOS; i++){
 
 		switch(direction){
 		case NL_TO_SYM :
@@ -630,7 +630,8 @@ convert(char* s, int len, int depth, int direction)
 
 			if (s[i] == SPECIAL_SYMS[depth]){
 				cl_log(LOG_ERR
-				, "convert(): special symbol found in string");
+				, "convert(): special symbol \'%c\' found"
+				" in string at %d (len=%d)", s[i], i, len);
 				return(HA_FAIL);
 			}
 
