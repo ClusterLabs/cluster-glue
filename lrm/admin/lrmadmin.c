@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.22 2004/10/24 12:38:33 lge Exp $ */
+/* $Id: lrmadmin.c,v 1.23 2004/11/23 20:58:18 andrew Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -532,6 +532,8 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	op.op_type = argv[optind+1];
 	op.timeout = atoi(argv[optind+2]);
 	op.interval = atoi(argv[optind+3]);
+	op.user_data = NULL;
+	op.user_data_len = 0;
 	if (0 == strcmp(argv[optind+4], "EVERYTIME")) {
 		op.target_rc = EVERYTIME;
 	}
@@ -880,6 +882,10 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.23  2004/11/23 20:58:18  andrew
+ * Commit zhenh's patch for preserving user data across connections
+ * Only supports flat objects (ie. char* or structs without pointers in them)
+ *
  * Revision 1.22  2004/10/24 12:38:33  lge
  * -pedantic-errors fixes take one:
  * * error: ISO C89 forbids mixed declarations and code

@@ -74,6 +74,7 @@ int main (int argc, char* argv[])
 	op->params = NULL;
 	op->timeout = 0;
 	op->user_data = strdup("It is a start op!");
+	op->user_data_len = strlen(op->user_data)+1;
 	op->interval = 0;
 	op->target_rc = EVERYTIME;
 	rsc->ops->perform_op(rsc,op);
@@ -85,6 +86,7 @@ int main (int argc, char* argv[])
 	op->params = NULL;
 	op->timeout = 0;
 	op->user_data = strdup("It is a status op!");
+	op->user_data_len = strlen(op->user_data)+1;
 	op->interval = 1000;
 	op->target_rc=EVERYTIME;
 	call_id = rsc->ops->perform_op(rsc,op);
@@ -96,6 +98,7 @@ int main (int argc, char* argv[])
 	op->params = NULL;
 	op->timeout = 0;
 	op->user_data = strdup("It is a stop op!");
+	op->user_data_len = strlen(op->user_data)+1;
 	op->interval = 0;
 	op->target_rc=EVERYTIME;
 	rsc->ops->perform_op(rsc,op);
@@ -161,6 +164,7 @@ void printf_op(lrm_op_t* op)
 	printf_hash_table(op->params);
 	printf("\ttimeout:%d\n",op->timeout);
 	printf("\tuser_data:%s\n",op->user_data?(char*)op->user_data:"null");
+	printf("\tuser_data pointer:%p\n",op->user_data);
 	printf("\top_status:%d\n",op->op_status);
 	printf("\tapp_name:%s\n",op->app_name?op->app_name:"null");
 	printf("\toutput:%s\n",op->output?op->output:"null");

@@ -109,7 +109,8 @@ typedef struct{
 	char* 			op_type;
 	GHashTable*		params;
 	int			timeout;
-	gpointer		user_data;
+	char*			user_data;
+	int			user_data_len;
 	int			interval;
 	int			target_rc;
 
