@@ -8,3 +8,6 @@ Makefile
 ipctest
 ipctransientclient
 ipctransientserver
+*.beam
+parser-messages
+MISC_ERRORS

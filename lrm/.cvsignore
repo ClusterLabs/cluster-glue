@@ -5,3 +5,6 @@ Makefile
 *.la
 *.lo
 .*.swp
+*.beam
+parser-messages
+MISC_ERRORS
