@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.22 2004/11/18 02:26:33 gshi Exp $ */
+/* $Id: cl_log.c,v 1.23 2004/11/22 19:03:01 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -443,7 +443,9 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	if (ret == NULL) {
 		return ret;
 	}
-
+	
+	memset(ret, 0, sizeof(IPC_Message));
+	
 	/* Compute msg len: including room for the EOS byte */
 	msglen = sizeof(LogDaemonMsg)+bufstrlen;
 	bodybuf = cl_malloc(msglen + ch->msgpad + 1);
