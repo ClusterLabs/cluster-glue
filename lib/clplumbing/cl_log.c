@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.21 2004/11/18 01:24:18 gshi Exp $ */
+/* $Id: cl_log.c,v 1.22 2004/11/18 02:26:33 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -392,6 +392,8 @@ LogToLoggingDaemon(int priority, const char * buf,
 				cl_log(LOG_WARNING, "Initializing connection"
 				       " to logging daemon failed."
 				       " Logging daemon may not be running");
+				chan->ops->destroy(chan);
+				logging_daemon_chan = NULL;
 				
 				return HA_FAIL;
 			}
@@ -400,7 +402,6 @@ LogToLoggingDaemon(int priority, const char * buf,
 			return HA_FAIL;
 		}
 	}
-
 
 
 	msg = ChildLogIPCMessage(priority, buf, bufstrlen, use_pri_str, chan);	
@@ -429,6 +430,13 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	LogDaemonMsg	logbuf;
 	int		msglen;
 	char*		bodybuf;
+	
+	if (ch->msgpad > MAX_MSGPAD){
+		cl_log(LOG_ERR, "ChildLogIPCMessage: invalid msgpad(%d)",
+		       ch->msgpad);
+		return NULL;
+	}
+
 
 	ret = (IPC_Message*)cl_malloc(sizeof(IPC_Message));
 
@@ -438,21 +446,23 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 
 	/* Compute msg len: including room for the EOS byte */
 	msglen = sizeof(LogDaemonMsg)+bufstrlen;
-	bodybuf = cl_malloc(msglen + ch->msgpad);
+	bodybuf = cl_malloc(msglen + ch->msgpad + 1);
 	if (bodybuf == NULL) {
 		cl_free(ret);
 		return NULL;
 	}
 	
+	memset(bodybuf, 0, msglen + ch->msgpad);
 	logbuf.msgtype = LD_LOGIT;
 	logbuf.facility = cl_log_facility;
 	logbuf.priority = priority;
 	logbuf.use_pri_str = use_prio_str;
 	logbuf.msglen = bufstrlen + 1;
-	strncpy(logbuf.message, buf, bufstrlen);
-	logbuf.message[bufstrlen] = EOS;
 	memcpy(bodybuf + ch->msgpad, &logbuf, sizeof(logbuf));
-
+	memcpy(bodybuf + ch->msgpad + sizeof(logbuf),
+	       buf, 
+	       bufstrlen);
+	
 	ret->msg_len = msglen;
 	ret->msg_buf = bodybuf;
 	ret->msg_body = bodybuf + ch->msgpad;
@@ -468,9 +478,9 @@ FreeChildLogIPCMessage(IPC_Message* msg)
 	if (msg == NULL) {
 		return;
 	}
-	if (msg->msg_body != NULL) {
+	if (msg->msg_buf != NULL) {
 		memset(msg->msg_body, 0, msg->msg_len);
-		cl_free(msg->msg_body);
+		cl_free(msg->msg_buf);
 	}
 	memset(msg, 0, sizeof (*msg));
 	free(msg);
