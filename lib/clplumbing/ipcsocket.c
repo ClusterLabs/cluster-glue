@@ -253,7 +253,7 @@ socket_disconnect(struct OCF_IPC_CHANNEL* ch)
   close(conn_info->s);
   ch->ch_status = CH_DISCONNECT;
   /*FIXME! return value??? */
-  return 0;
+  return CH_SUCCESS;
 }
 
 
