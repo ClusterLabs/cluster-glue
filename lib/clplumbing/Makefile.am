@@ -38,6 +38,7 @@ libplumb_la_SOURCES	= 		\
 			cl_log.c	\
 			cl_signal.c	\
 			cl_poll.c	\
+			cpulimits.c	\
 			longclock.c	\
 			mkstemp_mode.c	\
 			ocf_ipc.c	\

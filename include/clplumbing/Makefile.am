@@ -32,6 +32,7 @@ include_HEADERS	= 		\
 	cl_log.h	\
 	cl_poll.h	\
 	cl_signal.h     \
+	cpulimits.h     \
 	ipc.h		\
 	lsb_exitcodes.h	\
 	loggingdaemon.h	\
