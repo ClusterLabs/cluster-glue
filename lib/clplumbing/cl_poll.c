@@ -88,7 +88,7 @@ cl_glibpoll(GPollFD* ufds, guint nfsd, gint timeout)
 int
 cl_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 {
-	return poll(fds, nfds, timeout);
+	return poll(fds, (nfds_t)nfds, timeout);
 }
 
 int
