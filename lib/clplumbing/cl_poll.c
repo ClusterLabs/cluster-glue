@@ -1,4 +1,4 @@
-/* $Id: cl_poll.c,v 1.21 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: cl_poll.c,v 1.22 2005/03/16 17:11:15 lars Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -198,7 +198,7 @@ cl_poll_prepsig(int nsig)
 	if (debug) {
 		cl_log(LOG_DEBUG
 		,	"Signal %d belongs to us...", nsig);
-		cl_log(LOG_DEBUG, "cl_poll_prepsig(%d) succeeded.\n", nsig);
+		cl_log(LOG_DEBUG, "cl_poll_prepsig(%d) succeeded.", nsig);
 	}
 	
 	return 0;
@@ -481,7 +481,7 @@ cl_poll_sigaction(int nsig, siginfo_t* info, void* v)
 
 	/* We should not call logging functions in (real) signal handlers */
 	if (nsig != monitorinfo[fd].nsig) {
-		cl_log(LOG_ERR, "cl_poll_sigaction called with signal %d/%d\n"
+		cl_log(LOG_ERR, "cl_poll_sigaction called with signal %d/%d"
 		,	nsig, monitorinfo[fd].nsig);
 	}
 

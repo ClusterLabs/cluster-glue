@@ -22,14 +22,13 @@
 # along with this program; if not, write the Free Software Foundation,
 # Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
 #
-#
 
-# This all still pretty much sucks
 action="$1"
 
 #SSH_COMMAND "ssh -q -x -o PasswordAuthentication=no StrictHostKeyChecking=no" 
 SSH_COMMAND="ssh -q -x -n -l root"
 REBOOT_COMMAND="echo 'sleep 1; /sbin/reboot -nf' | at now"
+
 # Warning: If you select this poweroff command, it'll physically
 # power-off the machine, and quite a number of systems won't be remotely
 # revivable.
