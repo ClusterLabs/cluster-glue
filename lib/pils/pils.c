@@ -429,7 +429,7 @@ RemoveAPILPlugin(PILPlugin*Plugin)
 		,	Plugin->plugin_name);
 	}
 	if (g_hash_table_lookup_extended(Pitype->Plugins
-	,	Plugin->plugin_name, &key, (void**)&Plugin)) {
+	,	Plugin->plugin_name, &key, (void*)&Plugin)) {
 
 		g_hash_table_remove(Pitype->Plugins, key);
 		RmAPILPlugin(key, Plugin, NULL);
@@ -542,7 +542,7 @@ RemoveAPILPluginType(PILPluginType*Plugintype)
 	PILPluginUniv*	Pluginuniv = Plugintype->piuniv;
 	gpointer	key;
 	if (g_hash_table_lookup_extended(Pluginuniv->PluginTypes
-	,	Plugintype->plugintype, &key, (void**)&Plugintype)) {
+	,	Plugintype->plugintype, &key, (void*)&Plugintype)) {
 
 		RmAPILPluginType(key, Plugintype, NULL);
 		g_hash_table_remove(Pluginuniv->PluginTypes, key);
@@ -1782,7 +1782,7 @@ RemoveAPILInterfaceType(PILInterfaceType*Iftype, PILInterfaceType* t2)
 		return;
 	}
 	if (g_hash_table_lookup_extended(Ifuniv->iftypes
-	,	Iftype->typename, &key, (gpointer*)&Iftype)) {
+	,	Iftype->typename, &key, (gpointer)&Iftype)) {
 
 		g_hash_table_remove(Ifuniv->iftypes, key);
 		RmAPILInterfaceType(key, Iftype, t2);
