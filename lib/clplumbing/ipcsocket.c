@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.131 2005/03/29 18:20:06 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.132 2005/03/31 18:33:26 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -244,6 +244,23 @@ static struct IPC_OPS socket_ops = {
 };
 
 
+#ifdef IPC_TIME_DEBUG
+
+extern struct ha_msg* wirefmt2msg(const char* s, size_t length);
+void cl_log_message (int log_level, const struct ha_msg *m);
+int timediff(longclock_t t1, longclock_t t2);
+
+int 
+timediff(longclock_t t1, longclock_t t2)
+{
+	longclock_t	remain;
+	
+	remain = sub_longclock(t1, t2);
+	
+	return longclockto_ms(remain);
+}
+
+#endif 
 
 
 void dump_ipc_info(const IPC_Channel* chan);
@@ -255,6 +272,7 @@ void dump_ipc_info(const IPC_Channel* chan);
 #else
 #	define CHANAUDIT(ch)	socket_chan_audit(ch)
 #	define MAXPID	65535
+
 
 
 static void
@@ -750,6 +768,8 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 {
 
 	int orig_qlen;
+	int diff;
+	struct IPC_MESSAGE* newmsg;
 	
 	if (msg->msg_len < 0 || msg->msg_len > MAXDATASIZE) {
 		cl_log(LOG_ERR, "socket_send: "
@@ -784,6 +804,38 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 	/* add the message into the send queue */
 	CHECKFOO(0,ch, msg, SavedQueuedBody, "queued message");
 	SocketIPCStats.noutqueued++;
+
+	
+	diff = 0;
+	if (msg->msg_buf ){
+		diff = (char*)msg->msg_body - (char*)msg->msg_buf;				
+	}
+	if ( diff < (int)sizeof(struct SOCKET_MSG_HEAD) ){
+		/* either we don't have msg->msg_buf set
+		 * or we don't have enough bytes for socket head
+		 * we delete this message and creates 
+		 * a new one and delete the old one
+		 */
+		
+		newmsg= socket_message_new(ch, msg->msg_len);
+		if (newmsg == NULL){
+			cl_log(LOG_ERR, "socket_resume_io_write: "
+			       "allocating memory for new ipc msg failed");
+			return IPC_FAIL;
+		}
+		
+		memcpy(newmsg->msg_body, msg->msg_body, msg->msg_len);
+		
+		if(msg->msg_done){
+			msg->msg_done(msg);
+		};
+		msg = newmsg;
+	}		
+	
+
+#ifdef IPC_TIME_DEBUG
+	SET_ENQUEUE_TIME(msg, time_longclock());
+#endif
 	ch->send_queue->queue = g_list_append(ch->send_queue->queue,
 					      msg);
 	orig_qlen = ch->send_queue->current_qlen++;
@@ -804,7 +856,8 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 
 	int		nbytes;
 	int		result;
-	
+	struct IPC_MESSAGE* ipcmsg;
+
 	socket_resume_io(ch);
 	result = socket_resume_io_read(ch, &nbytes, TRUE);
 
@@ -824,7 +877,29 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 		ch->recv_queue->current_qlen = 0;
 		return IPC_FAIL;
 	}
-	*message = (struct IPC_MESSAGE *) (element->data);
+	ipcmsg = *message = (struct IPC_MESSAGE *) (element->data);
+	
+	
+#ifdef IPC_TIME_DEBUG				
+	{
+		int msdiff = 0;
+		SET_DEQUEUE_TIME(ipcmsg, time_longclock());
+		msdiff = timediff(GET_DEQUEUE_TIME(ipcmsg), GET_ENQUEUE_TIME(ipcmsg));
+		if (msdiff > MAXIPCTIME){
+			struct ha_msg* hamsg;
+			cl_log(LOG_WARNING, "socket_recv:"
+			       " message delayed from enqueue to dequeue %d ms "
+			       "(enqueue-time=%ld, peer pid=%d) ",
+			       msdiff,
+			       longclockto_ms(GET_ENQUEUE_TIME(ipcmsg)),
+			       ch->farside_pid);			
+			hamsg = wirefmt2msg(ipcmsg->msg_body, ipcmsg->msg_len);
+			if (hamsg != NULL){
+				cl_log_message(LOG_INFO, hamsg);
+			}
+		}	
+	}
+#endif	
 
 	CHECKFOO(1,ch, *message, SavedReadBody, "read message");
 	SocketIPCStats.nreceived++;
@@ -1188,6 +1263,31 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 		head->magic = HEADMAGIC;
 		
 		if (ch->bytes_remaining == 0){
+			/*we start to send a new message*/
+#ifdef IPC_TIME_DEBUG				
+			{
+				int msdiff = 0;
+				struct IPC_MESSAGE* ipcmsg = msg;
+				SET_SEND_TIME(ipcmsg, time_longclock());
+				msdiff = timediff(GET_SEND_TIME(ipcmsg), GET_ENQUEUE_TIME(ipcmsg));
+				if (msdiff > MAXIPCTIME){
+					struct ha_msg* hamsg;
+					cl_log(LOG_WARNING, "socket_resume_io_write:"
+					       " message delayed from enqueue to send %d ms "
+					       "(enqueue-time=%ld, peer pid=%d) ", 
+					       msdiff,
+					       longclockto_ms(GET_ENQUEUE_TIME(ipcmsg)),
+					       ch->farside_pid
+					       );			
+					hamsg = wirefmt2msg(ipcmsg->msg_body, ipcmsg->msg_len);
+					if (hamsg != NULL){
+						cl_log_message(LOG_INFO, hamsg);
+					}
+				}	
+			}
+#endif				
+
+
 			bytes_remaining = msg->msg_len + ch->msgpad;
 			p = msg->msg_buf;
 		}else {
