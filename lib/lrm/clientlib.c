@@ -80,14 +80,14 @@ static struct lrm_ops lrm_ops_instance =
 };
 /* declare the functions used by the lrm_rsc_ops structure*/
 static int rsc_perform_op (lrm_rsc_t*, lrm_op_t* op);
-static int rsc_stop_op (lrm_rsc_t*, int call_id);
+static int rsc_cancel_op (lrm_rsc_t*, int call_id);
 static int rsc_flush_ops (lrm_rsc_t*);
 static GList* rsc_get_cur_state (lrm_rsc_t*, state_flag_t* cur_state);
 
 static struct rsc_ops rsc_ops_instance =
 {
 	rsc_perform_op,
-	rsc_stop_op,
+	rsc_cancel_op,
 	rsc_flush_ops,
 	rsc_get_cur_state,
 };
@@ -914,30 +914,30 @@ rsc_perform_op (lrm_rsc_t* rsc, lrm_op_t* op)
 }
 
 static int
-rsc_stop_op (lrm_rsc_t* rsc, int call_id)
+rsc_cancel_op (lrm_rsc_t* rsc, int call_id)
 {
 	int rc;
 	struct ha_msg* msg = NULL;
 
-	client_log(LOG_INFO, "rsc_stop_ops: start.");
+	client_log(LOG_INFO, "rsc_cancel_op: start.");
 	/* check whether the channel to lrmd is available */
 	if (NULL == ch_cmd)	{
-		client_log(LOG_ERR, "rsc_stop_ops: ch_mod is null.");
+		client_log(LOG_ERR, "rsc_cancel_op: ch_mod is null.");
 		return HA_FAIL;
 	}
 	/* check parameter */
 	if (NULL == rsc) {
-		client_log(LOG_ERR, "rsc_stop_ops: rsc is null.");
+		client_log(LOG_ERR, "rsc_cancel_op: rsc is null.");
 		return HA_FAIL;
 	}
 	/* create the msg of flush ops */
-	msg = create_lrm_rsc_msg(rsc->id,STOPOP);
+	msg = create_lrm_rsc_msg(rsc->id,CANCELOP);
 	if (NULL == msg) {
-		client_log(LOG_ERR, "rsc_stop_ops: can not create msg");
+		client_log(LOG_ERR, "rsc_cancel_op: can not create msg");
 		return HA_FAIL;
 	}
 	if (HA_OK != ha_msg_add_int(msg, F_LRM_CALLID, call_id))	{
-		client_log(LOG_ERR, "rsc_stop_ops: can not add call_id");
+		client_log(LOG_ERR, "rsc_cancel_op: can not add call_id");
 		ha_msg_del(msg);
 		return HA_FAIL;
 	}
@@ -946,14 +946,14 @@ rsc_stop_op (lrm_rsc_t* rsc, int call_id)
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		ha_msg_del(msg);
 		client_log(LOG_ERR,
-			"rsc_stop_ops: can not send msg to lrmd");
+			"rsc_cancel_op: can not send msg to lrmd");
 		return HA_FAIL;
 	}
 	ha_msg_del(msg);
 
 	rc = get_rc_from_ch(ch_cmd);
 
-	client_log(LOG_INFO, "rsc_stop_ops: end.");
+	client_log(LOG_INFO, "rsc_cancel_op: end.");
 
 	return rc;
 }

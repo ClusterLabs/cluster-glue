@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.46 2004/10/21 03:13:07 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.47 2004/10/22 02:47:16 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -192,7 +192,7 @@ struct msg_map msg_maps[] = {
 	{DELRSC,	TRUE,	on_msg_del_rsc},
 	{PERFORMOP,	TRUE,	on_msg_perform_op},
 	{FLUSHOPS,	TRUE,	on_msg_perform_op},
-	{STOPOP,	TRUE,	on_msg_perform_op},
+	{CANCELOP,	TRUE,	on_msg_perform_op},
 	{GETRSCSTATE,	FALSE,	on_msg_get_state},
 	{GETRSCMETA,	FALSE, 	on_msg_get_metadata},
 };
@@ -1289,32 +1289,35 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		}
 	}
 	else
-	if (0 == strncmp(type, STOPOP, strlen(STOPOP))) {
-		int call_id;
-		ha_msg_value_int(msg, F_LRM_CALLID, &call_id);
+	if (0 == strncmp(type, CANCELOP, strlen(CANCELOP))) {
+		int cancel_op_id;
+		ha_msg_value_int(msg, F_LRM_CALLID, &cancel_op_id);
 		
 		node = g_list_first(rsc->op_list);
 		while (NULL != node ) {
 			op = (lrmd_op_t*)node->data;
 			node = g_list_next(node);
-			if ( op->call_id == call_id) {
+			if ( op->call_id == cancel_op_id) {
 				rsc->op_list = g_list_remove(rsc->op_list, op);
 				flush_op(op);
-				break;
+				lrmd_log(LOG_DEBUG, "on_msg_perform_op: end.");
+				return HA_OK;
 			}
 		}
 		node = g_list_first(rsc->repeat_op_list);
 		while (NULL != node ) {
 			op = (lrmd_op_t*)node->data;
 			node = g_list_next(node);
-			if ( op->call_id == call_id) {
+			if ( op->call_id == cancel_op_id) {
 				rsc->repeat_op_list =
 					g_list_remove(rsc->repeat_op_list, op);
 				flush_op(op);
-				break;
+				lrmd_log(LOG_DEBUG, "on_msg_perform_op: end.");
+				return HA_OK;
 			}
 		}
-		
+		lrmd_log(LOG_DEBUG, "on_msg_perform_op: end.");
+		return HA_FAIL;		
 	}
 	else {
 		if (HA_OK != ha_msg_add_int(msg, F_LRM_CALLID, call_id)) {
@@ -2040,6 +2043,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.47  2004/10/22 02:47:16  zhenh
+ * rename the stop_op() to cancel_op()
+ *
  * Revision 1.46  2004/10/21 03:13:07  zhenh
  * call callback function with op_status==LRM_OP_CANCELLED when we stop an operation
  *
