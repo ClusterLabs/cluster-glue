@@ -1,4 +1,4 @@
-/* $Id: ipmilan.c,v 1.4 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: ipmilan.c,v 1.5 2004/02/18 22:59:08 yixiong Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
@@ -600,14 +600,16 @@ ipmilan_destroy(Stonith *s)
 
 	nd->ipmiid = NOTipmilanID;
 
-	host = nd->hostlist->prev;
-	for (i = 0; i < nd->hostcount; i++) {
+	if (nd->hostlist) {
+		host = nd->hostlist->prev;
+		for (i = 0; i < nd->hostcount; i++) {
 
-		FREE(host->hostname);
-		FREE(host->ipaddr);
+			FREE(host->hostname);
+			FREE(host->ipaddr);
 
-		FREE(host);
-		host = host->prev;
+			FREE(host);
+			host = host->prev;
+		}
 	}
 
 	nd->hostcount = -1;
