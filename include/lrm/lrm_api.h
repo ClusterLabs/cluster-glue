@@ -48,6 +48,26 @@
  *
  * "op_status" indicates how the op exit. like LRM_OP_DONE,LRM_OP_CANCELLED,
  * LRM_OP_TIMEOUT,LRM_OP_NOTSUPPORTED.
+ *
+ * "rc" is the return code of an opertioan. it's value is in following enum 
+ * which is defined in "raexec.h"
+  * enum UNIFORM_RET_EXECRA {
+ *	EXECRA_EXEC_UNKNOWN_ERROR = 152,
+ *	EXECRA_NO_RA = 151,
+ *	EXECRA_OK = 0,
+ *	EXECRA_UNKNOWN_ERROR = 1,
+ *	EXECRA_INVALID_PARAM = 2,
+ *	EXECRA_UNIMPLEMENT_FEATURE = 3,
+ *	EXECRA_INSUFFICIENT_PRIV = 4,
+ *	EXECRA_NOT_INSTALLED = 5,
+ *	EXECRA_NOT_CONFIGURED = 6,
+ *	EXECRA_NOT_RUNNING = 7,
+ *		
+ *	EXECRA_RA_DEAMON_DEAD1 = 11,
+ *	EXECRA_RA_DEAMON_DEAD2 = 12,
+ *	EXECRA_RA_DEAMON_STOPPED = 13,
+ *	EXECRA_STATUS_UNKNOWN = 14
+ * };	
  */
 
 #ifndef __LRM_API_H
