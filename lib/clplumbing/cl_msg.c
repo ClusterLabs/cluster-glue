@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.41 2005/02/07 11:46:42 andrew Exp $ */
+/* $Id: cl_msg.c,v 1.42 2005/02/07 13:56:15 andrew Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1820,7 +1820,6 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 				cl_log(LOG_ERR, "NV failure (string2msg_ll):");
 				cl_log(LOG_ERR, "Input string: [%s]", s);
 				cl_log(LOG_ERR, "sp=%s", sp);
-				abort();
 			}
 			ha_msg_del(ret);
 			return(NULL);
@@ -2099,6 +2098,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.42  2005/02/07 13:56:15  andrew
+ * Back out some test code
+ *
  * Revision 1.41  2005/02/07 11:46:42  andrew
  * Implement some needed variations of cl_msg_remove()
  *
