@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.114 2005/01/04 19:58:23 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.115 2005/01/20 19:17:50 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -763,10 +763,10 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 		return IPC_FAIL;
 	}
 	
-	do{
+	while (ch->send_queue->current_qlen >= ch->send_queue->max_qlen){
+		cl_shortsleep();
 		ch->ops->resume_io(ch);
 	}
-	while (ch->send_queue->current_qlen >= ch->send_queue->max_qlen);
 	
 	/* add the message into the send queue */
 	CHECKFOO(0,ch, msg, SavedQueuedBody, "queued message");
@@ -997,7 +997,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 		if (pool == NULL){			
 			cl_log(LOG_ERR, "socket_resume_io_read: "
 			       "memory allocation for ipc pool failed");
-			return IPC_FAIL;
+			exit(1);
 		}
 	}
 	
@@ -1009,7 +1009,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 		if (newpool == NULL){			
 			cl_log(LOG_ERR, "socket_resume_io_read: "
 			       "memory allocation for a new ipc pool failed");
-			return IPC_FAIL;
+			exit(1);
 		}
 		
 		ipc_bufpool_partial_copy(newpool, pool);

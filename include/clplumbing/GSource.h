@@ -1,4 +1,4 @@
-/* $Id: GSource.h,v 1.6 2004/12/09 20:56:48 gshi Exp $ */
+/* $Id: GSource.h,v 1.7 2005/01/20 19:17:50 gshi Exp $ */
 #ifndef _CLPLUMBING_GSOURCE_H
 #	define _CLPLUMBING_GSOURCE_H
 #	include <clplumbing/ipc.h>
@@ -54,6 +54,14 @@ GCHSource* G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 ,		gpointer        user_data)
 ,	gpointer userdata
 ,	GDestroyNotify notify);
+
+/*
+ *	the events in this source is paused/resumed
+ */
+
+void	G_main_IPC_Channel_pause(GCHSource* chp);
+void	G_main_IPC_Channel_resume(GCHSource* chp);
+
 
 /*
  *	Delete an IPC_channel from the gmainloop world...

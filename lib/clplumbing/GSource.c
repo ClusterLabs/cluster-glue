@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.19 2004/12/16 19:25:02 gshi Exp $ */
+/* $Id: GSource.c,v 1.20 2005/01/20 19:17:50 gshi Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -36,6 +36,7 @@ struct GCHSource_s {
 	GPollFD		infd;
 	GPollFD		outfd;
 	guint		gsourceid;
+	gboolean	pausenow;
 };
 
 struct GWCSource_s {
@@ -268,6 +269,7 @@ static GSourceFuncs G_CH_SourceFuncs = {
 
 
 #define GET_CH_SOURCE(src)	(GCHSource*)(src +1)
+#define GET_SOURCE(chp)		(GSource*)(((char*)chp) - sizeof(GSource))
 
 void
 set_IPC_Channel_dnotify(GCHSource* chp,
@@ -303,6 +305,7 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 	chp->dispatch = dispatch;
 	chp->udata=userdata;
 	chp->dnotify = notify;
+	chp->pausenow = FALSE;
 
 	rfd = ch->ops->get_recv_select_fd(ch);
 	wfd = ch->ops->get_send_select_fd(ch);
@@ -338,6 +341,47 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 }
 
 
+void
+G_main_IPC_Channel_pause(GCHSource* chp)
+{
+	GSource* source;	
+	
+	if (chp == NULL){
+		cl_log(LOG_ERR, "G_main_IPC_Channel_remove_source:"
+		       "invalid input");
+		return;
+	}
+	
+	chp->pausenow = TRUE;
+
+	source = GET_SOURCE(chp);
+
+	g_source_remove_poll(source, &chp->infd);
+	return;
+}
+
+
+void 
+G_main_IPC_Channel_resume(GCHSource* chp)
+{
+	GSource* source;	
+
+	if (chp == NULL){
+		cl_log(LOG_ERR, "G_main_IPC_Channel_remove_source:"
+		       "invalid input");
+		return;
+	}
+	
+	chp->pausenow = FALSE;
+	
+	source = GET_SOURCE(chp);
+
+	g_source_add_poll(source, &chp->infd);
+
+	return;	
+
+}
+
 /*
  *	Delete an IPC_channel from the gmainloop world...
  */
@@ -367,6 +411,12 @@ G_CH_prepare(GSource* source,
 	GCHSource* chp = GET_CH_SOURCE(source);
 	
 	g_assert(IS_CHSOURCE(chp));
+
+
+	if (chp->pausenow){
+		return FALSE;
+	}
+	
 	if (chp->ch->ops->is_sending_blocked(chp->ch)) {
 		if (chp->fd_fdx) {
 			chp->infd.events |= OUTPUT_EVENTS;
@@ -388,6 +438,12 @@ G_CH_check(GSource* source)
 	GCHSource* chp = GET_CH_SOURCE(source);
 	
 	g_assert(IS_CHSOURCE(chp));
+	
+	if (chp->pausenow){
+		return FALSE;
+	}
+	
+	
 	return (chp->infd.revents != 0
 		||	(!chp->fd_fdx && chp->outfd.revents != 0)
 		||	chp->ch->ops->is_message_pending(chp->ch));
@@ -450,6 +506,8 @@ G_CH_destroy(GSource* source)
 {
 	GCHSource* chp = GET_CH_SOURCE(source);
 
+
+	cl_log(LOG_INFO, "channel destroy function gets called");
 	g_assert(IS_CHSOURCE(chp));
 	
 	if (chp->dnotify) {
