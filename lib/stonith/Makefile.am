@@ -22,7 +22,6 @@ MAINTAINERCLEANFILES    = Makefile.in
 INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/linux-ha -I$(top_srcdir)/linux-ha \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
-			
 
 
 AM_CFLAGS			= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
@@ -39,7 +38,7 @@ stonith_SOURCES		= main.c
 
 stonith_LDADD		= $(top_builddir)/libltdl/libltdlc.la \
 			libstonith.la $(GLIBLIB)
-stonith_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self
+stonith_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self @LIBADD_INTL@
 
 meatclient_SOURCES	= meatclient.c 
 meatclient_LDADD	= $(GLIBLIB)
