@@ -800,7 +800,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 
 		if (sendrc != msg->msg_len) {
 			cl_perror("Sent %d byte message body: rc = %d"
-			,	msg->msg_len, sendrc);
+			,	(int)msg->msg_len, sendrc);
 		}
 
 #if 0
