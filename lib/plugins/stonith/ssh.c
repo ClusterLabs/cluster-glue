@@ -181,7 +181,7 @@ static const char * NOTsshID = "SSH device has been destroyed";
 #define _(text)		dgettext(ST_TEXTDOMAIN, text)
 
 
-int
+static int
 ssh_status(Stonith  *s)
 {
   if (!ISSSHDEV(s)) {
@@ -197,7 +197,7 @@ ssh_status(Stonith  *s)
  *	Return the list of hosts configured for this SSH device
  */
 
-char **
+static char **
 ssh_hostlist(Stonith  *s)
 {
   int		numnames = 0;
@@ -237,7 +237,7 @@ ssh_hostlist(Stonith  *s)
   return(ret);
 }
 
-void
+static void
 ssh_free_hostlist (char ** hlist)
 {
   char **	hl = hlist;
@@ -323,7 +323,7 @@ ssh_parse_config_info(struct sshDevice* sd, const char * info)
 /*
  *	Reset the given host on this Stonith device.
  */
-int
+static int
 ssh_reset_req(Stonith * s, int request, const char * host)
 {
   char cmd[4096];
@@ -348,7 +348,7 @@ ssh_reset_req(Stonith * s, int request, const char * host)
  *	Parse the information in the given configuration file,
  *	and stash it away...
  */
-int
+static int
 ssh_set_config_file(Stonith* s, const char * configname)
 {
   FILE *	cfgfile;
@@ -377,7 +377,7 @@ ssh_set_config_file(Stonith* s, const char * configname)
 /*
  *	Parse the config information in the given string, and stash it away...
  */
-int
+static int
 ssh_set_config_info(Stonith* s, const char * info)
 {
   struct sshDevice* sd;
@@ -391,7 +391,7 @@ ssh_set_config_info(Stonith* s, const char * info)
   return(ssh_parse_config_info(sd, info));
 }
 
-const char *
+static const char *
 ssh_getinfo(Stonith * s, int reqtype)
 {
   struct sshDevice* sd;
@@ -439,7 +439,7 @@ ssh_getinfo(Stonith * s, int reqtype)
 /*
  *	SSH Stonith destructor...
  */
-void
+static void
 ssh_destroy(Stonith *s)
 {
   struct sshDevice* sd;
@@ -460,7 +460,7 @@ ssh_destroy(Stonith *s)
 }
 
 /* Create a new ssh Stonith device */
-void *
+static void *
 ssh_new(void)
 {
   struct sshDevice*	sd = MALLOCT(struct sshDevice);

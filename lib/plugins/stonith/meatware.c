@@ -424,7 +424,7 @@ meatware_set_config_info(Stonith* s, const char * info)
 	return(Meat_parse_config_info(nd, info));
 }
 
-const char *
+static const char *
 meatware_getinfo(Stonith * s, int reqtype)
 {
 	struct MeatDevice* nd;
