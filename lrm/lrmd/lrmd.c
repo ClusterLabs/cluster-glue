@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.39 2004/09/30 13:26:57 alan Exp $ */
+/* $Id: lrmd.c,v 1.40 2004/10/08 04:56:14 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -55,11 +55,7 @@
 #define	MAX_PROC_NAME 256
 
 #define OPTARGS		"skrhV"
-#define PID_FILE 	"/var/run/lrmd.pid"
-#define DAEMON_LOG   	"/var/log/lrmd.log"
-#define DAEMON_DEBUG 	"/var/log/lrmd.debug"
-/* #define PLUGIN_DIR	"/usr/lib/pils/plugins" */
-/* #define RA_PLUGIN_DIR	"/usr/lib/heartbeat/plugins/RAExec" */
+#define PID_FILE 	HA_VARRUNDIR"/lrmd.pid"
 
 typedef struct
 {
@@ -233,9 +229,6 @@ main(int argc, char ** argv)
 	int argerr = 0;
 	int flag;
 
-	cl_log_set_entity(lrm_system_name);
-	cl_log_enable_stderr(TRUE);
-	cl_log_set_facility(LOG_USER);
 
 
 	while ((flag = getopt(argc, argv, OPTARGS)) != EOF) {
@@ -268,6 +261,12 @@ main(int argc, char ** argv)
 	if (argerr) {
 		usage(lrm_system_name, LSB_EXIT_GENERIC);
 	}
+
+	cl_log_set_entity(lrm_system_name);
+	cl_log_enable_stderr(debug_level?TRUE:FALSE);
+	cl_log_set_facility(LOG_DAEMON);
+	cl_log_send_to_logging_daemon(TRUE);
+	
 	
 	if (req_status){
 		return init_status(PID_FILE, lrm_system_name);
@@ -447,10 +446,6 @@ init_start ()
 	PILGenericIfMgmtRqst RegisterRqsts[]= {
 		{"RAExec", &RAExecFuncs, NULL, NULL, NULL},
 		{ NULL, NULL, NULL, NULL, NULL} };
-
-	cl_log_send_to_logging_daemon(TRUE);
-	cl_log_set_logfile(DAEMON_LOG);
-	cl_log_set_debugfile(DAEMON_DEBUG);
 
 	if ((pid = get_running_pid(PID_FILE, NULL)) > 0) {
 		lrmd_log(LOG_ERR, "already running: [pid %ld].", pid);
@@ -1024,6 +1019,7 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 			"on_msg_get_metadata: can not create msg.");
 		return HA_FAIL;
 	}
+	
 	RAExec = g_hash_table_lookup(RAExecFuncs,rclass);
 	if (NULL == RAExec) {
 		lrmd_log(LOG_INFO,"on_msg_get_metadata: can not find class");
@@ -2032,6 +2028,11 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.40  2004/10/08 04:56:14  zhenh
+ * According to the Bugzilla Bug 74.
+ * 1. change the logging setting of lrm.
+ * 2. remove the hardcode of pathname in the code.
+ *
  * Revision 1.39  2004/09/30 13:26:57  alan
  * Redeclared signal_pending as volatile.
  *
