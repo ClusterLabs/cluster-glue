@@ -38,8 +38,6 @@
 #ifdef HAVE_GETOPT_H
 #include <getopt.h>
 #endif /* HAVE_GETOPT_H */
-#include <uuid/uuid.h>
-#include <uuid/uuid.h>
 #include <clplumbing/cl_log.h>
 #include <lrm/lrm_api.h>
 #include <lrm/raexec.h>
@@ -142,7 +140,7 @@ static void ocf_params_hash_to_str(gpointer key, gpointer value,
 				   gpointer user_data);
 static void normal_params_hash_to_str(gpointer key, gpointer value, 
 				      gpointer user_data);
-static lrm_rsc_t * get_lrm_rsc(ll_lrm_t * lrmd, rsc_id_t rscid);
+static lrm_rsc_t * get_lrm_rsc(ll_lrm_t * lrmd, char * rscid);
 static void g_print_monitor(gpointer lrm_mon, gpointer user_data);
 static int set_monitor(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
 /* the end of the internal used function list */
@@ -155,7 +153,7 @@ static gboolean post_query_call_result(gpointer data);
 int main(int argc, char **argv)
 {
 	int option_char;
-	rsc_id_t rscid_arg_tmp;
+	char rscid_arg_tmp[RID_LEN];
 	int ret_value = 0; 
         ll_lrm_t* lrmd;
 	lrm_rsc_t * lrm_rsc;
@@ -176,7 +174,8 @@ int main(int argc, char **argv)
 	cl_log_enable_stderr(TRUE);
 	cl_log_set_facility(LOG_USER);
 
-	memset(rscid_arg_tmp, '\0', sizeof(rsc_id_t));
+	memset(rscid_arg_tmp, '\0', RID_LEN);
+	memset(raclass, '\0', 20);
 	do {
 		option_char = getopt_long (argc, argv, optstring,
 			long_options, NULL);
@@ -201,7 +200,7 @@ int main(int argc, char **argv)
 				OPTION_OBSCURE_CHECK 
 				lrmadmin_cmd = DEL_RSC;
 				if (optarg) {
-					uuid_parse(optarg, rscid_arg_tmp);
+					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				}
 				break;
 
@@ -222,7 +221,7 @@ int main(int argc, char **argv)
 				OPTION_OBSCURE_CHECK 
 				lrmadmin_cmd = FLUSH;
 				if (optarg) {
-					uuid_parse(optarg, rscid_arg_tmp);
+					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				}
 				break;
 
@@ -251,7 +250,7 @@ int main(int argc, char **argv)
 				}
 				lrmadmin_cmd = MONITOR_GET;
 				if (optarg) {
-					uuid_parse(optarg, rscid_arg_tmp);
+					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				}
 				break;
 
@@ -262,7 +261,7 @@ int main(int argc, char **argv)
 				}
 				lrmadmin_cmd = MONITOR_CLS;
 				if (optarg) {
-					uuid_parse(optarg, rscid_arg_tmp);
+					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				}
 				break;
 
@@ -270,7 +269,7 @@ int main(int argc, char **argv)
 				OPTION_OBSCURE_CHECK 
 				lrmadmin_cmd = RSC_STATUS;
 				if (optarg) {
-					uuid_parse(optarg, rscid_arg_tmp);
+					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				}
 				break;
 
@@ -282,7 +281,7 @@ int main(int argc, char **argv)
 			case 'I':
 				OPTION_OBSCURE_CHECK 
 				if (optarg) {
-					uuid_parse(optarg, rscid_arg_tmp);
+					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				}
 				lrmadmin_cmd = INF_RSC;
 				break;
@@ -640,7 +639,7 @@ post_query_call_result(gpointer data)
 static int 
 resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 {
-	rsc_id_t rsc_id;
+	char rsc_id[RID_LEN];
 	GHashTable * params_ht = NULL;
 	lrm_op_t op;
 	lrm_rsc_t * lrm_rsc;
@@ -650,8 +649,9 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 		cl_log(LOG_ERR,"No enough parameters.");
 		return -2;
 	}
-	
-	uuid_parse(argv[optind], rsc_id);
+
+	rsc_id[RID_LEN-1] = '\0';
+	strncpy(rsc_id, argv[optind], RID_LEN-1);
 	lrm_rsc = lrmd->lrm_ops->get_rsc(lrmd, rsc_id);	
 	if (!lrm_rsc) {
 		return -1;
@@ -680,7 +680,7 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 static int 
 add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 {
-	rsc_id_t rsc_id;
+	char rsc_id[RID_LEN];
 	const char * class = argv[optind+1];
 	const char * type = argv[optind+2];
 	GHashTable * params_ht = NULL;
@@ -691,8 +691,8 @@ add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 		return -2;
 	}
 
-	uuid_parse(argv[optind], rsc_id);
-
+	rsc_id[RID_LEN-1]='\0';
+	strncpy(rsc_id, argv[optind], RID_LEN-1);
 	/* delete Hashtable */
 	if ((argc - optind) > 3) {
 		if ( 0 > transfer_cmd_params(argc, optind+3, argv, class,
@@ -754,7 +754,7 @@ GHashTable ** params_ht)
 		/* Pay attention: for parameter ordring issue */
 		*params_ht = g_hash_table_new(g_str_hash, g_str_equal);
 
-		buffer[20] = '\0';
+		memset(buffer, '0', 21);
 		for (i=start; i<amount; i++) {
 			snprintf(buffer, 20, "%d", i-start+1);
 			g_hash_table_insert( *params_ht, g_strdup(buffer), 
@@ -799,11 +799,14 @@ params_hashtable_to_str(const char * class, GHashTable * ht)
 		    strncmp("heartbeat", class, 10) == 0 ) {
 		ht_size = g_hash_table_size(ht);
 		tmp_str = g_new(gchar, ht_size*ARGVI_MAX_LEN); 	
-		memset(tmp_str, '\0', ht_size*ARGVI_MAX_LEN);
+		memset(tmp_str, ' ', ht_size*ARGVI_MAX_LEN);
+		tmp_str[ht_size*ARGVI_MAX_LEN-1] = '\0';
 		g_hash_table_foreach(ht, normal_params_hash_to_str, &tmp_str);
 		gstr_tmp = g_string_new("");
 		for (i=0; i< ht_size; i++) {
-			g_string_append(gstr_tmp, tmp_str + i*ARGVI_MAX_LEN );
+			gstr_tmp = g_string_append(gstr_tmp
+						, tmp_str + i*ARGVI_MAX_LEN );
+			gstr_tmp = g_string_append(gstr_tmp, "  ");
 		}
 		params_str = g_new(gchar, gstr_tmp->len+1);		
 		strncpy(params_str, gstr_tmp->str, gstr_tmp->len+1);
@@ -846,14 +849,14 @@ g_get_rsc_description(gpointer data, gpointer user_data)
 {
 	ll_lrm_t* lrmd = (ll_lrm_t *)user_data;
 	lrm_rsc_t * lrm_rsc;
-	rsc_id_t rsc_id_tmp;
+	char rsc_id_tmp[RID_LEN];
 	
 	if (!(user_data)) {
 		return;
 	}
 
-	memset(rsc_id_tmp, '\0', sizeof(rsc_id_t));
-	uuid_copy(rsc_id_tmp, data);
+	memset(rsc_id_tmp, '\0', RID_LEN);
+	strncpy(rsc_id_tmp, data, RID_LEN-1);
 
 	lrm_rsc = lrmd->lrm_ops->get_rsc(lrmd, rsc_id_tmp);
 	if (lrm_rsc) {
@@ -869,15 +872,16 @@ g_get_rsc_description(gpointer data, gpointer user_data)
 static void
 print_rsc_inf(lrm_rsc_t * lrm_rsc)
 {
-	char rscid_str_tmp[40];
+	char rscid_str_tmp[RID_LEN];
 	char * tmp = NULL;
 
 	if (!lrm_rsc) {
 		return;
 	}
 
-	uuid_unparse(lrm_rsc->id, rscid_str_tmp);
-	printf("Resource ID:                %s\n", rscid_str_tmp);
+	rscid_str_tmp[RID_LEN-1] = '\0';
+	strncpy(rscid_str_tmp, lrm_rsc->id, RID_LEN-1);
+	printf("\nResource ID:                %s\n", rscid_str_tmp);
 	printf("Resource agency class:       %s\n", lrm_rsc->class);
 	printf("Resource agency type:       %s\n", lrm_rsc->type);
 
@@ -885,6 +889,7 @@ print_rsc_inf(lrm_rsc_t * lrm_rsc)
 		tmp = params_hashtable_to_str(lrm_rsc->class, 
 				lrm_rsc->params);
 	}
+
 	printf("Resource agency parameters: %s\n", tmp);
 	g_free(tmp);
 }
@@ -901,31 +906,36 @@ static void
 ocf_params_hash_to_str(gpointer key, gpointer value, gpointer user_data)
 {
 	GString * gstr_tmp = *(GString **)user_data;
-	g_string_append(gstr_tmp, (char*)key);
-	g_string_append(gstr_tmp, "=");
-	g_string_append(gstr_tmp, (char *)value);
-	g_string_append(gstr_tmp, "\n");
+	gstr_tmp = g_string_append(gstr_tmp, (char*)key);
+	gstr_tmp = g_string_append(gstr_tmp, "=");
+	gstr_tmp = g_string_append(gstr_tmp, (char *)value);
+	gstr_tmp = g_string_append(gstr_tmp, "  ");
 }
 
 static void
 normal_params_hash_to_str(gpointer key, gpointer value, gpointer user_data)
 {
+	gint key_int;
+
 	gchar * str_tmp = *(gchar **) user_data;
 	if (str_tmp == NULL ) {
 		return;
 	}
-	strncpy(str_tmp + *(gint *)key * ARGVI_MAX_LEN, (char*)value,
+
+	key_int = atoi((char *)key) - 1;
+	strncpy(str_tmp + key_int * ARGVI_MAX_LEN, (char*)value,
 		ARGVI_MAX_LEN - 1);
 }
 
 static lrm_rsc_t * 
-get_lrm_rsc(ll_lrm_t * lrmd, rsc_id_t rscid)
+get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 {
-	char uuid_str_tmp[40];
+	char uuid_str_tmp[RID_LEN];
 	lrm_rsc_t * lrm_rsc;
 	lrm_rsc = lrmd->lrm_ops->get_rsc(lrmd, rscid);
 	if (!(lrm_rsc)) {
-		uuid_unparse(rscid, uuid_str_tmp);
+		uuid_str_tmp[RID_LEN-1] = '\0';
+		strncpy(uuid_str_tmp, rscid, RID_LEN-1);
 		cl_log(LOG_ERR,"No this resource %s.", uuid_str_tmp);
 	}
 	return lrm_rsc;
@@ -955,7 +965,7 @@ g_print_monitor(gpointer data, gpointer user_data)
 static int 
 set_monitor(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 {
-	rsc_id_t rsc_id;
+	char rsc_id[RID_LEN];
 	GHashTable * params_ht = NULL;
 	lrm_mon_t mon;
 	lrm_rsc_t * lrm_rsc;
@@ -966,7 +976,8 @@ set_monitor(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 		return -2;
 	}
 	
-	uuid_parse(argv[optind], rsc_id);
+	rsc_id[RID_LEN-1] = '\0';
+	strncpy(rsc_id, argv[optind], RID_LEN-1);
 	lrm_rsc = lrmd->lrm_ops->get_rsc(lrmd, rsc_id);	
 	if (!lrm_rsc) {
 		return -1;

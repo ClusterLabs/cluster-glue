@@ -27,6 +27,7 @@
 #include <string.h>
 #include <glib.h>
 #include <lrm/lrm_api.h>
+#include <syslog.h>
 
 void lrm_op_done_callback (lrm_op_t* op);
 void lrm_monitor_callback (lrm_mon_t* monitor);
@@ -39,10 +40,11 @@ void get_cur_state(lrm_rsc_t* rsc);
 
 int main (int argc, char* argv[])
 {
+	set_debug_level(LOG_INFO);
 	ll_lrm_t* lrm;
 	lrm_rsc_t* rsc = NULL;
 	lrm_op_t* op = NULL;
-	rsc_id_t rid;
+	const char* rid = "NEWID2";
 	GList * class, * type, * classes, * types;
 	GHashTable* param = NULL;
 
@@ -74,8 +76,7 @@ int main (int argc, char* argv[])
 	g_hash_table_insert(param, strdup("2"), strdup("second"));
 	g_hash_table_insert(param, strdup("3"), strdup("third"));
 	puts("add_rsc...");
-	uuid_generate(rid);
-	lrm->lrm_ops->add_rsc(lrm, rid, "ocf", "/home/zhenh/linux-ha/lrm/test/ocf_script_sim.sh", param);
+	lrm->lrm_ops->add_rsc(lrm, rid, "heartbeat", "/home/zhenh/linux-ha/lrm/test/ocf_script_sim.sh", param);
 
 	puts("get_rsc...");
 	rsc = lrm->lrm_ops->get_rsc(lrm, rid);
@@ -112,16 +113,13 @@ void lrm_monitor_callback(lrm_mon_t* monitor)
 
 void printf_rsc(lrm_rsc_t* rsc)
 {
-	char buf[37];
-
 	printf("print resource\n");
 	if (NULL == rsc) {
 		printf("resource is null\n");
 		printf("print end\n");
 		return;
 	}
-	uuid_unparse(rsc->id, buf);
-	printf("\tresource of id:%s\n", buf);
+	printf("\tresource of id:%s\n", rsc->id);
 	printf("\ttype:%s\n", rsc->type);
 	printf("\tclass:%s\n", rsc->class);
 	printf("\tparams:\n");
@@ -131,7 +129,6 @@ void printf_rsc(lrm_rsc_t* rsc)
 
 void printf_op(lrm_op_t* op)
 {
-	char buf[37];
 	printf("print op\n");
 
 	if (NULL == op) {
@@ -142,8 +139,7 @@ void printf_op(lrm_op_t* op)
 	if (NULL == op->rsc) {
 		printf("\tresource is null\n");
 	} else {
-		uuid_unparse(op->rsc->id, buf);
-		printf("\trsc->id:%s\n", buf);
+		printf("\trsc->id:%s\n", op->rsc->id);
 	}
 
 	printf("\top_type:%s\n",op->op_type?op->op_type:"null");
@@ -162,7 +158,6 @@ void printf_op(lrm_op_t* op)
 void printf_mon(lrm_mon_t* mon)
 {
 	
-	char buf[37];
 	printf("print mon\n");
 	if (NULL == mon) {
 		printf("mon is null\n");
@@ -172,8 +167,7 @@ void printf_mon(lrm_mon_t* mon)
 	if (NULL == mon->rsc) {
 		printf("\tresource is null\n");
 	} else {
-		uuid_unparse(mon->rsc->id, buf);
-		printf("\trsc->id:%s\n", buf);
+		printf("\trsc->id:%s\n", mon->rsc->id);
 	}
 	switch(mon->mode)
 	{
@@ -220,8 +214,6 @@ printf_hash_table(GHashTable* hash_table)
 void
 get_all_rsc(ll_lrm_t* lrm)
 {
-	char buf[37];
-	rsc_id_t rid;
 	GList* element = NULL, * rid_list = NULL;
 
 	puts("get_all_rscs...");
@@ -229,9 +221,7 @@ get_all_rsc(ll_lrm_t* lrm)
 	if (NULL != rid_list) {
 		element = g_list_first(rid_list);
 		while (NULL != element) {
-			uuid_copy(rid,element->data);
-			uuid_unparse(rid, buf);
-			printf("\tid:%s\n",buf);
+			printf("\tid:%s\n",(char*)element->data);
 			element = g_list_next(element);
 		}
 	} else {

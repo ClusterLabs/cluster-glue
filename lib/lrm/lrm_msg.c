@@ -55,7 +55,7 @@ ha_msg_value_int(struct ha_msg * msg, const char * name, int* value)
 
 	return HA_OK;
 }
-
+/*
 int
 ha_msg_add_uuid(struct ha_msg * msg, const char * name, const uuid_t id)
 {
@@ -80,7 +80,7 @@ ha_msg_value_uuid(struct ha_msg * msg, const char * name, uuid_t id)
 
 	return HA_OK;
 }
-
+*/
 
 GList* 
 ha_msg_value_list(struct ha_msg * msg, const char * name)
@@ -295,7 +295,7 @@ create_lrm_reg_msg(const char* app_name)
 }
 
 struct ha_msg*
-create_lrm_addrsc_msg(rsc_id_t rid, const char* rtype,
+create_lrm_addrsc_msg(const char* rid, const char* rtype,
 					  const char* rclass, GHashTable* params)
 {
 	struct ha_msg* msg = ha_msg_new(5);
@@ -303,7 +303,7 @@ create_lrm_addrsc_msg(rsc_id_t rid, const char* rtype,
 		return NULL;
 	}
 
-	if (HA_FAIL == ha_msg_add_uuid(msg, F_LRM_RID, rid)) {
+	if (HA_FAIL == ha_msg_add(msg, F_LRM_RID, rid)) {
 		return NULL;
 	}
 
@@ -323,7 +323,7 @@ create_lrm_addrsc_msg(rsc_id_t rid, const char* rtype,
 
 
 struct ha_msg*
-create_lrm_rsc_msg(rsc_id_t rid, const char* msg)
+create_lrm_rsc_msg(const char* rid, const char* msg)
 {
 	struct ha_msg* ret;
 	if ((NULL == msg) || (0 == strlen(msg))) {
@@ -335,7 +335,7 @@ create_lrm_rsc_msg(rsc_id_t rid, const char* msg)
 		return NULL;
 	}
 
-	if (HA_FAIL == ha_msg_add_uuid(ret, F_LRM_RID, rid)) {
+	if (HA_FAIL == ha_msg_add(ret, F_LRM_RID, rid)) {
 		return NULL;
 	}
 	return ret;
@@ -358,14 +358,14 @@ create_lrm_ret(int rc, int fields)
 }
 
 struct ha_msg*
-create_rsc_perform_op_msg (rsc_id_t rid, lrm_op_t* op)
+create_rsc_perform_op_msg (const char* rid, lrm_op_t* op)
 {
 	struct ha_msg* msg = ha_msg_new(5);
 	if (HA_FAIL == ha_msg_add(msg, F_LRM_TYPE, PERFORMOP)) {
 		return NULL;
 	}
 
-	if (HA_FAIL == ha_msg_add_uuid(msg, F_LRM_RID, rid)) {
+	if (HA_FAIL == ha_msg_add(msg, F_LRM_RID, rid)) {
 		return NULL;
 	}
 
@@ -383,7 +383,7 @@ create_rsc_perform_op_msg (rsc_id_t rid, lrm_op_t* op)
 }
 
 struct ha_msg*
-create_rsc_set_monitor_msg (rsc_id_t rid, lrm_mon_t* monitor)
+create_rsc_set_monitor_msg (const char* rid, lrm_mon_t* monitor)
 {
 	struct ha_msg* msg = ha_msg_new(5);
 	if (HA_FAIL == ha_msg_add(msg, F_LRM_TYPE, SETMONITOR)) {
@@ -399,7 +399,7 @@ create_rsc_set_monitor_msg (rsc_id_t rid, lrm_mon_t* monitor)
 	if (HA_FAIL == ha_msg_add_int(msg, F_LRM_MONTGT, monitor->target)) {
 		return NULL;
 	}
-	if (HA_FAIL == ha_msg_add_uuid(msg, F_LRM_RID, rid)) {
+	if (HA_FAIL == ha_msg_add(msg, F_LRM_RID, rid)) {
 		return NULL;
 	}
 

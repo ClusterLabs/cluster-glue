@@ -107,7 +107,7 @@ struct lrmd_mon
 
 struct lrmd_rsc
 {
-	rsc_id_t	id;
+	char*		id;
 	char*		type;
 	char*		class;
 	GHashTable* 	params;
@@ -149,7 +149,8 @@ static void free_mon(lrmd_mon_t* mon);
 static void free_rsc(lrmd_rsc_t* rsc);
 static int send_rc_msg ( IPC_Channel* ch, int rc);
 static lrmd_client_t* lookup_client (pid_t pid);
-static lrmd_rsc_t* lookup_rsc (rsc_id_t rid);
+static lrmd_rsc_t* lookup_rsc (char* rid);
+static lrmd_rsc_t* lookup_rsc_by_msg (struct ha_msg* msg);
 static struct ha_msg* op_to_msg(lrmd_op_t* op);
 static int read_pipe(int fd, char ** data);
 
@@ -661,14 +662,11 @@ on_timeout_op_done(gpointer data)
 			"on_timeout_op_done: can not add opstatus to msg");
 	}
 	kill(op->exec_pid, 9);
-	rsc = op->rsc;	if (NULL != rsc->params ) {
-		cl_log(LOG_ERR, "rsc->params:%p\n",rsc->params);
-		cl_log(LOG_ERR, "rsc->params:%d\n",g_hash_table_size(rsc->params));
-		cl_log(LOG_ERR, "lookup:%s\n",(char*)g_hash_table_lookup(rsc->params,strdup("1")));
-	}
 
+	rsc = op->rsc;
 	op_done(op);
 	perform_op(rsc);
+
 	cl_log(LOG_INFO, "on_timeout_op_done: end.");
 	return TRUE;
 }
@@ -896,7 +894,6 @@ on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg)
 	GList* node;
 	int i = 1;
 	struct ha_msg* ret = NULL;
-	char value[UUID_SLEN];
 	char key[MAX_NAME_LEN];
 
 	cl_log(LOG_INFO, "on_msg_get_all: start.");
@@ -908,9 +905,8 @@ on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg)
 
 	for(node=g_list_first(rsc_list); NULL!=node; node=g_list_next(node)) {
 		lrmd_rsc_t* rsc = (lrmd_rsc_t*)node->data;
-		uuid_unparse(rsc->id, value);
 		snprintf(key,MAX_NAME_LEN,"%s%d",F_LRM_RID,i);
-		ha_msg_add(ret,key,value);
+		ha_msg_add(ret,key,rsc->id);
 		i++;
 	}
 
@@ -925,14 +921,11 @@ on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg)
 int
 on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 {
-	rsc_id_t id;
 	struct ha_msg* ret = NULL;
 	lrmd_rsc_t* rsc = NULL;
 	cl_log(LOG_INFO, "on_msg_get_rsc: start.");
 
-	ha_msg_value_uuid(msg,F_LRM_RID,id);
-	rsc = lookup_rsc(id);
-
+	rsc = lookup_rsc_by_msg(msg);
 	if (NULL == rsc) {
 		cl_log(LOG_INFO, "on_msg_get_rsc: no rsc with such id.");
 		ret = create_lrm_ret(HA_FAIL, 1);
@@ -949,7 +942,7 @@ on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 				"on_msg_get_rsc: can not create msg.");
 			return HA_FAIL;
 		}
-		if (HA_FAIL == ha_msg_add_uuid(ret, F_LRM_RID, rsc->id)) {
+		if (HA_FAIL == ha_msg_add(ret, F_LRM_RID, rsc->id)) {
 			return HA_FAIL;
 		}
 
@@ -974,15 +967,13 @@ on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 int
 on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 {
-	rsc_id_t id;
 	lrmd_rsc_t* rsc = NULL;
 	GList* mon_node = NULL;
 	GList* op_node = NULL;
 	
 	cl_log(LOG_INFO, "on_msg_del_rsc: start.");
 
-	ha_msg_value_uuid(msg,F_LRM_RID,id);
-	rsc = lookup_rsc(id);
+	rsc = lookup_rsc_by_msg(msg);
 
 	if (NULL == rsc) {
 		cl_log(LOG_INFO, "on_msg_del_rsc: no rsc with such id.");
@@ -1043,19 +1034,23 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	gboolean ra_type_exist = FALSE;
 	char* type = NULL;
 	lrmd_rsc_t* rsc = NULL;
-	rsc_id_t id;
+	char* id = NULL;
 
 	cl_log(LOG_INFO, "on_msg_add_rsc: start.");
 
-	ha_msg_value_uuid(msg,F_LRM_RID,id);
+	id = g_strdup(ha_msg_value(msg,F_LRM_RID));
+	if (RID_LEN <= strlen(id))	{
+		cl_log(LOG_ERR, "on_msg_add_rsc: rsc_id is too long.");
+		return HA_FAIL;
+	}
+	
 	if (NULL != lookup_rsc(id)) {
-		cl_log(LOG_ERR,
-				"on_msg_add_rsc: same id resource exists.");
+		cl_log(LOG_ERR, "on_msg_add_rsc: same id resource exists.");
 		return HA_FAIL;
 	}
 
 	rsc = g_new(lrmd_rsc_t,1);
-	uuid_copy(rsc->id,id);
+	rsc->id = id;
 	rsc->type = g_strdup(ha_msg_value(msg, F_LRM_RTYPE));
 	rsc->class = g_strdup(ha_msg_value(msg, F_LRM_RCLASS));
 
@@ -1087,7 +1082,6 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 int
 on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 {
-	rsc_id_t id;
 	lrmd_rsc_t* rsc = NULL;
 	GList* node = NULL;
 	const char* type = NULL;
@@ -1096,8 +1090,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	
 	cl_log(LOG_INFO, "on_msg_perform_op: start.");
 
-	ha_msg_value_uuid(msg,F_LRM_RID,id);
-	rsc = lookup_rsc(id);
+	rsc = lookup_rsc_by_msg(msg);
 	if (NULL == rsc) {
 		cl_log(LOG_ERR,
 			"on_msg_perform_op: no rsc with such id.");
@@ -1150,15 +1143,14 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 int
 on_msg_set_monitor(lrmd_client_t* client, struct ha_msg* msg)
 {
-	rsc_id_t id;
 	lrmd_rsc_t* rsc = NULL;
 	mon_mode_t mode;
 	lrmd_mon_t* mon = NULL;
 	
 	cl_log(LOG_INFO, "on_msg_set_monitor: start.");
 
-	ha_msg_value_uuid(msg,F_LRM_RID,id);
-	rsc = lookup_rsc(id);
+	rsc = lookup_rsc_by_msg(msg);
+
 	if (NULL == rsc) {
 		cl_log(LOG_ERR,
 			"on_msg_set_monitor: no rsc with such id.");
@@ -1235,7 +1227,6 @@ on_msg_set_monitor(lrmd_client_t* client, struct ha_msg* msg)
 int
 on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 {
-	rsc_id_t id;
 	int op_count = 0;
 	lrmd_rsc_t* rsc = NULL;
 	GList* node;
@@ -1245,8 +1236,7 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 
 	cl_log(LOG_INFO, "on_msg_get_state: start.");
 
-	ha_msg_value_uuid(msg,F_LRM_RID,id);
-	rsc = lookup_rsc(id);
+	rsc = lookup_rsc_by_msg(msg);
 	if (NULL == rsc) {
 		cl_log(LOG_ERR, "on_msg_get_state: no rsc with such id.");
 		send_rc_msg(client->ch_cmd, HA_FAIL);
@@ -1776,7 +1766,7 @@ lookup_client (pid_t pid)
 }
 
 lrmd_rsc_t*
-lookup_rsc (rsc_id_t rid)
+lookup_rsc (char* rid)
 {
 	GList* node;
 	lrmd_rsc_t* rsc = NULL;
@@ -1785,7 +1775,7 @@ lookup_rsc (rsc_id_t rid)
 
 	for(node=g_list_first(rsc_list); NULL!=node; node=g_list_next(node)){
 		rsc = (lrmd_rsc_t*)node->data;
-		if (0 == uuid_compare(rid,rsc->id)) {
+		if (0 == strncmp(rid,rsc->id, RID_LEN)) {
 			cl_log(LOG_INFO, "lookup_rsc: end.");
 			return rsc;
 		}
@@ -1793,6 +1783,22 @@ lookup_rsc (rsc_id_t rid)
 
 	cl_log(LOG_INFO, "lookup_rsc: end.");
 	return NULL;
+}
+
+lrmd_rsc_t*
+lookup_rsc_by_msg (struct ha_msg* msg)
+{
+	char* id = NULL;
+	lrmd_rsc_t* rsc = NULL;
+	
+	id = g_strdup(ha_msg_value(msg,F_LRM_RID));
+	if (RID_LEN <= strlen(id))	{
+		cl_log(LOG_ERR, "lookup_rsc_by_msg: rsc id is too long.");
+		return NULL;
+	}
+	rsc = lookup_rsc(id);
+	g_free(id);
+	return rsc;
 }
 
 void
