@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.137 2005/04/04 15:59:51 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.138 2005/04/04 21:06:43 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -218,8 +218,10 @@ static IPC_Message* socket_new_ipcmsg(IPC_Channel* ch,
 				      int len,
 				      void* private);
 
-
 static int	socket_get_chan_status(IPC_Channel* ch);
+static gboolean	socket_is_sendq_full(struct IPC_CHANNEL * ch);
+static gboolean	socket_is_recvq_full(struct IPC_CHANNEL * ch);
+
 
 /* socket object of the function table */
 static struct IPC_OPS socket_ops = {
@@ -242,6 +244,8 @@ static struct IPC_OPS socket_ops = {
   socket_set_low_flow_callback,
   socket_new_ipcmsg,
   socket_get_chan_status,
+  socket_is_sendq_full,
+  socket_is_recvq_full,
 };
 
 
@@ -1095,6 +1099,22 @@ socket_is_output_pending(struct IPC_CHANNEL * ch)
 	return 	ch->ch_status == IPC_CONNECT
 	&&	 ch->send_queue->current_qlen > 0;
 }
+
+static gboolean
+socket_is_sendq_full(struct IPC_CHANNEL * ch)
+{
+	ch->ops->resume_io(ch);
+	return(ch->send_queue->current_qlen == ch->send_queue->max_qlen);
+}
+
+
+static gboolean
+socket_is_recvq_full(struct IPC_CHANNEL * ch)
+{
+	ch->ops->resume_io(ch);
+	return(ch->recv_queue->current_qlen == ch->recv_queue->max_qlen);	
+}
+
 
 
 static int 
