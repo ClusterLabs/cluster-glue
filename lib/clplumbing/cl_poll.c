@@ -314,8 +314,8 @@ cl_init_poll_sig(struct pollfd *fds, unsigned int nfds)
 				cl_real_poll_fd(fd);
 			}
 		}else if (fcntl(fd, F_GETFD) < 0) {
-			cl_log(LOG_DEBUG, "bad fd(%d)", fd);
-			RECORDFDEVENT(fd, POLLERR);
+			cl_log(LOG_ERR, "bad fd(%d)", fd);
+			RECORDFDEVENT(fd, POLLNVAL);
 			badfd = TRUE;
 		}
 
@@ -375,15 +375,25 @@ cl_real_poll_fd(int fd)
 	pfd[0].fd = fd;
 	pfd[0].revents = 0;
 	pfd[0].events = ~0;
-	if (poll(pfd, 1, -1) > 0) {
+	if (poll(pfd, 1, 0) >= 0) {
 		RECORDFDEVENT(fd, pfd[0].revents);
+		if (pfd[0].revents & (POLLNVAL|POLLERR)) {
+			cl_log(LOG_INFO, "cl_poll_real_fd(%d): error in revents [%d]"
+			,	fd, pfd[0].revents);
+		}
 		if (debug) {
 			cl_log(LOG_DEBUG
 			,	"Old news from poll(2) for fd %d: 0x%x"
 			,	fd, pfd[0].revents);
 		}
 	}else{
-		RECORDFDEVENT(fd, POLLERR);
+		if (fcntl(fd, F_GETFL) < 0) {
+			cl_perror("cl_poll_real_fd(%d): F_GETFL failure"
+			,	fd);
+			RECORDFDEVENT(fd, POLLNVAL);
+		}else{
+			RECORDFDEVENT(fd, POLLERR);
+		}
 	}
 }
 
@@ -545,6 +555,8 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 	siginfo_t			info;
 	int				eventcount = 0;
 	unsigned int			j;
+	int				savederrno = errno;
+	int				rc;
 #ifdef TIME_CALLS
 	longclock_t			starttime;
 	int				maxsleep = timeoutms;
@@ -607,6 +619,7 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 		check_fd_info(fds, nfds);
 		dump_fd_info(fds, nfds, timeoutms);
 	}
+waitagain:
 	while (sigtimedwait(&SignalSet, &info, itertime) >= 0) {
 		int	nsig;
 #ifdef TIME_CALLS
@@ -655,7 +668,15 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 			}
 		}
 	}
-	return (eventcount > 0 ? eventcount : (errno == EAGAIN ? 0 : -1));
+	if (eventcount == 0 && timeoutms < 0 && errno == EAGAIN) {
+		goto waitagain;
+	}
+	rc = (eventcount > 0 ? eventcount : (errno == EAGAIN ? 0 : -1));
+
+	if (rc >= 0) {
+		errno = savederrno;
+	}
+	return rc;
 }
 /*
  * Debugging routine for printing current poll arguments, etc.
