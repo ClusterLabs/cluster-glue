@@ -421,11 +421,8 @@ socket_waitout(struct IPC_CHANNEL * ch)
 	if (rc != IPC_OK) {
 		cl_log(LOG_ERR
 		,	"socket_waitout failure: rc = %d", rc);
-		fprintf(stderr
-		,	"socket_waitout failure: rc = %d", rc);
 	}else if (ch->ops->is_sending_blocked(ch)) {
 		cl_log(LOG_ERR, "socket_waitout output still blocked");
-		fprintf(stderr, "socket_waitout output still blocked");
 	}
 	return rc;
 }
