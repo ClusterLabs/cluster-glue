@@ -496,9 +496,9 @@ struct_display_as_xml(
 			continue;
 			
 		/* hide the next two */
-		} else if(strcmp(F_XML_TAGNAME, prop_name)) {
+		} else if(strcmp(F_XML_TAGNAME, prop_name) == 0) {
 			continue;
-		} else if(strcmp(F_XML_PARENT, prop_name)) {
+		} else if(strcmp(F_XML_PARENT, prop_name) == 0) {
 			continue;
 		}
 		printed = sprintf(buffer, " %s=\"%s\"", prop_name, prop_value);
