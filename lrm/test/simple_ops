@@ -1,16 +1,54 @@
 #!/bin/bash
-echo "../admin/lrmadmin -A ip heartbeat IPaddr NULL 192.168.58.4"
-../admin/lrmadmin -A ip heartbeat IPaddr NULL 192.168.58.4
-echo "../admin/lrmadmin -E ip status 0 0 EVERYTIME"
-../admin/lrmadmin -E ip status 0 0 EVERYTIME
-echo "../admin/lrmadmin -E ip start  0 0 EVERYTIME"
-../admin/lrmadmin -E ip start  0 0 EVERYTIME
-echo "../admin/lrmadmin -E ip status 0 0 EVERYTIME"
-../admin/lrmadmin -E ip status 0 0 EVERYTIME
-echo "../admin/lrmadmin -E ip stop   0 0 EVERYTIME"
-../admin/lrmadmin -E ip stop   0 0 EVERYTIME
-echo "../admin/lrmadmin -E ip status 0 0 EVERYTIME"
-../admin/lrmadmin -E ip status 0 0 EVERYTIME
-echo "../admin/lrmadmin -D ip"
-../admin/lrmadmin -D ip
+echo "../admin/lrmadmin -A ip-hb heartbeat IPaddr NULL 192.168.58.4"
+../admin/lrmadmin -A ip-hb heartbeat IPaddr NULL 192.168.58.4
+echo "../admin/lrmadmin -E ip-hb status 0 0 EVERYTIME"
+../admin/lrmadmin -E ip-hb status 0 0 EVERYTIME
+echo "../admin/lrmadmin -E ip-hb start  0 0 EVERYTIME"
+../admin/lrmadmin -E ip-hb start  0 0 EVERYTIME
+echo "../admin/lrmadmin -E ip-hb status 0 0 EVERYTIME"
+../admin/lrmadmin -E ip-hb status 0 0 EVERYTIME
+echo "../admin/lrmadmin -E ip-hb stop   0 0 EVERYTIME"
+../admin/lrmadmin -E ip-hb stop   0 0 EVERYTIME
+echo "../admin/lrmadmin -E ip-hb status 0 0 EVERYTIME"
+../admin/lrmadmin -E ip-hb status 0 0 EVERYTIME
+echo "../admin/lrmadmin -D ip-hb"
+../admin/lrmadmin -D ip-hb
 
+echo "../admin/lrmadmin -A ip-ocf ocf IPaddr heartbeat ipaddr=192.168.58.4"
+../admin/lrmadmin -A ip-ocf ocf IPaddr heartbeat ipaddr=192.168.58.4
+echo "../admin/lrmadmin -E ip-ocf meta-data 0 0 EVERYTIME"
+../admin/lrmadmin -E ip-ocf meta-data 0 0 EVERYTIME
+echo "../admin/lrmadmin -E ip-ocf monitor 0 0 EVERYTIME OCF_CHECK_LEVEL=0"
+../admin/lrmadmin -E ip-ocf monitor 0 0 EVERYTIME
+echo "../admin/lrmadmin -E ip-ocf start  0 0 EVERYTIME"
+../admin/lrmadmin -E ip-ocf start  0 0 EVERYTIME
+echo "../admin/lrmadmin -E ip-ocf monitor 0 0 EVERYTIME OCF_CHECK_LEVEL=0"
+../admin/lrmadmin -E ip-ocf monitor 0 0 EVERYTIME
+echo "../admin/lrmadmin -E ip-ocf stop   0 0 EVERYTIME"
+../admin/lrmadmin -E ip-ocf stop   0 0 EVERYTIME
+sleep 10
+echo "../admin/lrmadmin -E ip-ocf monitor 0 0 EVERYTIME OCF_CHECK_LEVEL=0"
+../admin/lrmadmin -E ip-ocf monitor 0 0 EVERYTIME
+echo "../admin/lrmadmin -D ip-ocf"
+../admin/lrmadmin -D ip-ocf
+
+if [ ! -e /etc/init.d/Dummy-lsb ]; then
+	cp ./Dummy-lsb /etc/init.d/
+fi
+
+echo "../admin/lrmadmin -A dummy lsb Dummy-lsb NULL"
+../admin/lrmadmin -A dummy lsb Dummy-lsb NULL
+echo "../admin/lrmadmin -E dummy status 0 0 EVERYTIME"
+../admin/lrmadmin -E dummy status 0 0 EVERYTIME
+echo "../admin/lrmadmin -E dummy start  0 0 EVERYTIME"
+../admin/lrmadmin -E dummy start  0 0 EVERYTIME
+echo "../admin/lrmadmin -E dummy status 0 0 EVERYTIME"
+../admin/lrmadmin -E dummy status 0 0 EVERYTIME
+echo "../admin/lrmadmin -E dummy stop   0 0 EVERYTIME"
+../admin/lrmadmin -E dummy stop   0 0 EVERYTIME
+echo "../admin/lrmadmin -E dummy status 0 0 EVERYTIME"
+../admin/lrmadmin -E dummy status 0 0 EVERYTIME
+echo "../admin/lrmadmin -D dummy"
+../admin/lrmadmin -D dummy
+
+rm /etc/init.d/Dummy-lsb -f
