@@ -185,7 +185,9 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
   /* get client connection. */
   sin_size = sizeof(struct sockaddr_un);
   if ((new_sock = accept(s, (struct sockaddr *)&peer_addr, &sin_size)) == -1) {
-    cl_perror("socket_accept_connection: accept");
+    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+        cl_perror("socket_accept_connection: accept");
+    }
     return NULL;
   }else{
     if ((ch = socket_server_channel_new(new_sock)) == NULL) {
@@ -462,12 +464,13 @@ socket_resume_io(struct IPC_CHANNEL *ch)
       head.msg_len = msg->msg_len;
 
       len=send(conn_info->s, (char *)&head
-      ,			sizeof(struct SOCKET_MSG_HEAD), MSG_DONTWAIT);
+      ,			sizeof(struct SOCKET_MSG_HEAD)
+      ,			MSG_DONTWAIT|MSG_NOSIGNAL);
 
       if (len < 0){
 	if(errno == EAGAIN) {
 	  break;
-	}else if(errno == EPIPE){
+	}else if (errno == EPIPE){
 	  ch->ch_status = IPC_DISCONNECT;
 	  return IPC_BROKEN;
 	}else{
@@ -480,11 +483,12 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 		break;
       }
 
-      len=send(conn_info->s, msg->msg_body, msg->msg_len, MSG_DONTWAIT);
+      len=send(conn_info->s, msg->msg_body, msg->msg_len
+      ,			MSG_DONTWAIT|MSG_NOSIGNAL);
       if (len < 0){
-	if(errno == EAGAIN) {
+	if (errno == EAGAIN) {
 	  break;
-	}else if(errno == EPIPE){
+	}else if (errno == EPIPE){
 	  ch->ch_status = IPC_DISCONNECT;
 	  return IPC_BROKEN;
 	}else{
@@ -494,7 +498,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
       }
     
       if (len > 0 ) {
-	if(len < msg->msg_len){
+	if (len < msg->msg_len){
 	  /* 
 	   * FIXME! for stream domain socket, if the message is too big, it 
 	   * may cause part of the message cut instead of being sent out.
@@ -667,6 +671,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   my_addr.sun_family = AF_UNIX;         /* host byte order */
 
   if (strlen(path_name) >= sizeof(my_addr.sun_path)) {
+    close(s);
     return NULL;
   }
     
@@ -674,12 +679,19 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     
   if (bind(s, (struct sockaddr *)&my_addr, sizeof(my_addr)) == -1) {
     cl_perror("socket_wait_conn_new: bind");
+    close(s);
     return NULL;
   }
 
   /* listen to the socket */
   if (listen(s, MAX_LISTEN_NUM) == -1) {
     cl_perror("socket_wait_conn_new: listen(MAX_LISTEN_NUM)");
+    close(s);
+    return NULL;
+  }
+  if (fcntl(s, F_SETFL, O_NONBLOCK) < 0) {
+    cl_perror("socket_wait_conn_new: cannot set O_NONBLOCK");
+    close(s);
     return NULL;
   }
   
