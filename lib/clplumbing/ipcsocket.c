@@ -632,6 +632,9 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 		if (msg_len < 0) {
 			switch (errno) {
 				case EAGAIN:
+					if (conn_info->remaining_data > 0) {
+						*started = TRUE;
+					}
 					break;
 
 				case ECONNREFUSED:
