@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.15 2004/09/13 20:32:31 gshi Exp $ */
+/* $Id: rcd_serial.c,v 1.16 2004/09/20 18:44:04 msoffen Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -600,7 +600,7 @@ rcd_serial_reset_req(Stonith * s, int request, const char * host)
 		return(S_OOPS);
 	}
 
-	PILCallLog(PluginImports->log,PIL_INFO, _("Host %s rcd_serial-reset."), host);
+	PILCallLog(PluginImports->log,PIL_INFO,"%s: %s", _("Host rcd_serial-reset"), host);
 	return S_OK;
 }
 

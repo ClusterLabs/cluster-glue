@@ -1,4 +1,4 @@
-/* $Id: nw_rpc100s.c,v 1.13 2004/09/13 20:32:31 gshi Exp $ */
+/* $Id: nw_rpc100s.c,v 1.14 2004/09/20 18:44:04 msoffen Exp $ */
 /*
  *	Stonith module for Night/Ware RPC100S 
  *
@@ -238,7 +238,7 @@ static int gbl_debug = DEBUG;
 			}					\
 			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
-				PILCallLog(PluginImports->log,PIL_CRIT, _("out of memory"));\
+				PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("out of memory"));\
 			}					\
 			}
 
@@ -306,8 +306,7 @@ RPCLookFor(struct NW_RPC100S* ctx, struct Etoken * tlist, int timeout)
 {
 	int	rc;
 	if ((rc = EXPECT_TOK(ctx->fd, tlist, timeout, NULL, 0)) < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Did not find string: '%s' from" DEVICE ".")
-		,	tlist[0].string);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: '%s' %s", _("Did not find string"), tlist[0].string, _(" from" DEVICE "."));
 		RPCDisconnect(ctx);
 		return(-1);
 	}
@@ -805,9 +804,8 @@ nw_rpc100s_reset_req(Stonith * s, int request, const char * host)
 	outletnum = RPCNametoOutlet(ctx, host);
 
 	if (outletnum < 0) {
-		PILCallLog(PluginImports->log,PIL_WARN, _("%s %s "
-				      "doesn't control host [%s]."), 
-		       ctx->idinfo, ctx->unitid, host);
+		PILCallLog(PluginImports->log,PIL_WARN, "%s %s %s[%s]",
+		       ctx->idinfo, ctx->unitid, _("doesn't control host"), host);
 		RPCDisconnect(ctx);
 		return(S_BADHOST);
 	}
@@ -857,7 +855,7 @@ nw_rpc100s_set_config_file(Stonith* s, const char * configname)
 	ctx = (struct NW_RPC100S*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot open %s"), configname);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s %s", _("Cannot open"), configname);
 		return(S_BADCONFIG);
 	}
 

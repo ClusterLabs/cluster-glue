@@ -427,9 +427,9 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 	}
 
 	if (!node) {
-		PILCallLog(LOG, PIL_CRIT,
-			_("host %s is not configured in this STONITH module."
-			 "Please check you configuration information."),
+		PILCallLog(LOG, PIL_CRIT, "%s %s",
+			_("host s is not configured in this STONITH module."
+			 "Please check you configuration information."), 
 			host);
 		return (S_OOPS);
 	}
@@ -517,7 +517,7 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 	
 	}
 		
-	PILCallLog(LOG, PIL_INFO, _("Host %s ibmhmc-reset."), host);
+	PILCallLog(LOG, PIL_INFO, "%s: %s", _("Host ibmhmc-reset."), host);
 
 	return S_OK;
 }
@@ -534,7 +534,7 @@ ibmhmc_set_config_file(Stonith* s, const char * configname)
 	char hmc[MAX_HMC_NAME_LEN];
 	
 	if (!ISHMCDEV(s)) {
-		PILCallLog(LOG, PIL_CRIT, "invalid argument to HMC_set_configfile");
+		PILCallLog(LOG, PIL_CRIT, "%s", "invalid argument to HMC_set_configfile");
 		return(S_OOPS);
 	}
 

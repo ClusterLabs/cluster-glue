@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.14 2004/09/13 20:32:31 gshi Exp $ */
+/* $Id: wti_nps.c,v 1.15 2004/09/20 18:44:04 msoffen Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -204,7 +204,7 @@ static const char * NOTnpsid = "Hey, dummy this has been destroyed (WTINPS)";
 			}					\
 			(s) = strdup(v);			\
 			if ((s) == NULL) {			\
-				PILCallLog(PluginImports->log,PIL_CRIT, _("out of memory"));\
+				PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("out of memory"));\
 			}					\
 			}
 
@@ -282,8 +282,8 @@ NPSLookFor(struct WTINPS* nps, struct Etoken * tlist, int timeout)
 {
 	int	rc;
 	if ((rc = EXPECT_TOK(nps->rdfd, tlist, timeout, NULL, 0)) < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Did not find string: '%s' from " DEVICE ".")
-		,	tlist[0].string);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: '%s' %s"
+		,	 _("Did not find string"), tlist[0].string, _("from " DEVICE "."));
 		NPSkillcomm(nps);
 	}
 	return(rc);
@@ -295,7 +295,7 @@ static int
 NPSScanLine(struct WTINPS* nps, int timeout, char * buf, int max)
 {
 	if (EXPECT_TOK(nps->rdfd, CRNL, timeout, buf, max) < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, ("Could not read line from " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s",  ("Could not read line from " DEVICE "."));
 		NPSkillcomm(nps);
 		return(S_OOPS);
 	}
@@ -342,7 +342,7 @@ NPSLogin(struct WTINPS * nps)
 	/* Look for the unit type info */
 	if (EXPECT_TOK(nps->rdfd, password, 2, IDinfo
 	,	sizeof(IDinfo)) < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("No initial response from " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("No initial response from " DEVICE "."));
 		NPSkillcomm(nps);
  		return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	}
@@ -359,11 +359,11 @@ NPSLogin(struct WTINPS * nps)
 	switch (NPSLookFor(nps, LoginOK, 5)) {
 
 		case 0:	/* Good! */
-			PILCallLog(PluginImports->log,PIL_INFO, _("Successful login to " DEVICE "."));
+			PILCallLog(PluginImports->log,PIL_INFO, "%s", _("Successful login to " DEVICE "."));
 			break;
 
 		case 1:	/* Uh-oh - bad password */
-			PILCallLog(PluginImports->log,PIL_CRIT, _("Invalid password for " DEVICE "."));
+			PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Invalid password for " DEVICE "."));
 			return(S_ACCESS);
 
 		default:
@@ -440,7 +440,7 @@ NPSReset(struct WTINPS* nps, char * outlets, const char * rebootid)
 		default: 
 			return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
-	PILCallLog(PluginImports->log,PIL_INFO, _("Host %s being rebooted."), rebootid);
+	PILCallLog(PluginImports->log,PIL_INFO, "%s: %s", _("Host is being rebooted"), rebootid);
 
 	/* Expect "PS>" */
 	if (NPSLookFor(nps, Prompt, 60) < 0) {
@@ -449,7 +449,7 @@ NPSReset(struct WTINPS* nps, char * outlets, const char * rebootid)
 
 	/* All Right!  Power is back on.  Life is Good! */
 
-	PILCallLog(PluginImports->log,PIL_INFO, _("Power restored to host %s."), rebootid);
+	PILCallLog(PluginImports->log,PIL_INFO, "%s: %s", _("Power restored to host"), rebootid);
 	SEND("/h\r");
 	return(S_OK);
 }
@@ -464,7 +464,7 @@ NPS_onoff(struct WTINPS* nps, const char * outlets, const char * unitid, int req
 	int	rc;
 
 	if ((rc = NPSRobustLogin(nps) != S_OK)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
        
@@ -486,7 +486,7 @@ NPS_onoff(struct WTINPS* nps, const char * outlets, const char * unitid, int req
 	EXPECT(Prompt, 60);
 
 	/* All Right!  Command done. Life is Good! */
-	PILCallLog(PluginImports->log,PIL_INFO, _("Power to NPS outlet(s) %s turned %s."), outlets, onoff);
+	PILCallLog(PluginImports->log,PIL_INFO, "%s %s %s %s", _("Power to NPS outlet(s)"), outlets, _("turned"), onoff);
 	return(S_OK);
 }
 #endif /* defined(ST_POWERON) && defined(ST_POWEROFF) */
@@ -571,7 +571,7 @@ wti_nps_status(Stonith  *s)
 	nps = (struct WTINPS*) s->pinfo;
 
        	if ((rc = NPSRobustLogin(nps) != S_OK)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
 
@@ -612,7 +612,7 @@ wti_nps_hostlist(Stonith  *s)
 	}
  
 	if (NPSRobustLogin(nps) != S_OK) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
 		return(NULL);
 	}
 	
@@ -769,7 +769,7 @@ wti_nps_reset_req(Stonith * s, int request, const char * host)
 	nps = (struct WTINPS*) s->pinfo;
 
         if ((rc = NPSRobustLogin(nps)) != S_OK) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
         }else{
 	        char *outlets;
 		char *shost;
@@ -784,9 +784,9 @@ wti_nps_reset_req(Stonith * s, int request, const char * host)
 		free(shost);
 
 		if (noutlet < 1) {
-			PILCallLog(PluginImports->log,PIL_WARN, _("%s %s "
-			"doesn't control host [%s]."), nps->idinfo
-			,	nps->unitid, host);
+			PILCallLog(PluginImports->log,PIL_WARN, "%s %s %s[%s]"
+			,	nps->idinfo,	nps->unitid
+			,	_("doesn't control host [%s]."),	host);
 			NPSkillcomm(nps);
 			return(S_BADHOST);
 		}
@@ -843,7 +843,7 @@ wti_nps_set_config_file(Stonith* s, const char * configname)
 	nps = (struct WTINPS*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot open %s"), configname);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s %s", _("Cannot open"), configname);
 		return(S_BADCONFIG);
 	}
 	while (fgets(WTINPSid, sizeof(WTINPSid), cfgfile) != NULL){

@@ -293,7 +293,7 @@ external_reset_req(Stonith * s, int request, const char * host)
 		PILCallLog(LOG, PIL_CRIT, "invalid argument to %s", __FUNCTION__);
 		return(S_OOPS);
 		}
-	PILCallLog(LOG, PIL_INFO, _("Host %s external-reset initiating"), host);
+	PILCallLog(LOG, PIL_INFO, "%s %s", _("Host external-reset initiating on "), host);
 
 	sd = (struct externalDevice*) s->pinfo;
 	if (sd->command == NULL) {
