@@ -43,20 +43,15 @@
 #define DEFAULT_MAX_QLEN 20
 #define MAX_MESSAGE_SIZE 4096
 
-/* Authentication status */
-#define AUTH_OK 0
-#define AUTH_FAIL 1
-
-
 /* channel and connection status */
 #define CH_CONNECT 0
 #define CH_WAIT 1
 #define CH_DISCONNECT 2
 
 /* general return values */
-#define CH_SUCCESS 0
-#define CH_FAIL 1
-#define CH_BROKEN 2
+#define IPC_OK 0
+#define IPC_FAIL 1
+#define IPC_BROKEN 2
 
 /* wait connection structure. */
 struct OCF_IPC_WAIT_CONNECTION{
@@ -172,8 +167,8 @@ struct OCF_IPC_OPS{
    * parameters:
    *   ch (IN) : the pointer to channel used to initiate the connection. 
    * return values:
-   *   CH_SUCCESS  : the channel set up the connection succesully.
-   *   CH_FAIL     : the connection initiation fails.
+   *   IPC_OK  : the channel set up the connection succesully.
+   *   IPC_FAIL     : the connection initiation fails.
    *
   */
   int (* initiate_connection) (struct OCF_IPC_CHANNEL* ch);
@@ -183,8 +178,8 @@ struct OCF_IPC_OPS{
    * parameters
    *   ch (IN) : the pointer to the channel.
    * return values:
-   *   AUTH_OK   : the peer is trust.
-   *   AUTH_FAIL : verifying authentication fails.
+   *   IPC_OK   : the peer is trust.
+   *   IPC_FAIL : verifying authentication fails.
    *
   */
   int (* verify_auth) (struct OCF_IPC_CHANNEL* ch);
@@ -195,8 +190,8 @@ struct OCF_IPC_OPS{
    *   ch    (IN):  the active channel.
    *   auth  (IN):  the hash table contain the asserting information.
    * return values:
-   *   CH_SUCCESS :  assert the authentication succefully.
-   *   CH_FAIL    : assertion fails.
+   *   IPC_OK :  assert the authentication succefully.
+   *   IPC_FAIL    : assertion fails.
   */
   int (* assert_auth) (struct OCF_IPC_CHANNEL* ch, GHashTable * auth);
   /*
@@ -206,8 +201,8 @@ struct OCF_IPC_OPS{
    *   ch  (IN) : the channel which contains the connection.
    *   msg (IN) : pointer to the sending message. User should allocate the message space.
    * return values:
-   *   CH_SUCCESS : the message was either sent out successfully or appended in the send_queue.
-   *   CH_FAIL    : the send operation fails.
+   *   IPC_OK : the message was either sent out successfully or appended in the send_queue.
+   *   IPC_FAIL    : the send operation fails.
    *   CH_BROKEN  : the channel is broken.
    *
   */    
@@ -220,12 +215,12 @@ struct OCF_IPC_OPS{
    *   msg (OUT): the OCF_IPC_MESSAGE** pointer which contains the pointer to the recevied message 
    *              or NULL if there is no message available.
    * return values:
-   *   CH_SUCCESS : reveive operation is finished successfully.
-   *   CH_FAIL    : operation fails.
+   *   IPC_OK : reveive operation is finished successfully.
+   *   IPC_FAIL    : operation fails.
    *   CH_BROKEN  : the channel is broken.
    *
    * note: 
-   *   return value CH_SUCCESS doesn't mean the message is already 
+   *   return value IPC_OK doesn't mean the message is already 
    *   sent out to the peer. It may be pending in the send_queue. In order to 
    *   make sure the message it out, please specify the msg_done function in the
    *   message structure and once this function is called, the message is out.
@@ -263,7 +258,7 @@ struct OCF_IPC_OPS{
    *   the pointer to the channel.
    * return values:
    *   CH_SUCCSS : resume all the possible I/O operation succefully.
-   *   CH_FAIL   : the operation fails.
+   *   IPC_FAIL   : the operation fails.
    *   CH_BROEKN : the channel is broken.
    *
   */
@@ -299,8 +294,8 @@ struct OCF_IPC_OPS{
    *   ch    (IN) : the pointer to the channel.
    *   q_len (IN) : the max length for the send_queue.
    * return values:
-   *   CH_SUCCESS : set the send queue length successfully.
-   *   CH_FAIL    : there is no send queue.we are not supposed to get this return value.
+   *   IPC_OK : set the send queue length successfully.
+   *   IPC_FAIL    : there is no send queue.we are not supposed to get this return value.
    *                It means something bad happened.
    *
   */
@@ -312,8 +307,8 @@ struct OCF_IPC_OPS{
    *   ch    (IN) : the pointer to the channel.
    *   q_len (IN) : the max length for the recv_queue.
    * return values:
-   *   CH_SUCCESS : set the recv queue length successfully.
-   *   CH_FAIL    : there is no recv queue.
+   *   IPC_OK : set the recv queue length successfully.
+   *   IPC_FAIL    : there is no recv queue.
    *
   */
   int  (* set_recv_qlen) (struct OCF_IPC_CHANNEL* ch, int q_len);
