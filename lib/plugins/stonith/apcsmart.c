@@ -1,4 +1,4 @@
-/* $Id: apcsmart.c,v 1.18 2004/10/07 23:53:18 alan Exp $ */
+/* $Id: apcsmart.c,v 1.19 2004/10/07 23:56:56 alan Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>
@@ -45,7 +45,7 @@
 #define MAX_DEVICES		1
 
 #define SERIAL_TIMEOUT		3	/* timeout in sec */
-#define SEND_DELAY		50000	/* in s */
+#define SEND_DELAY		50000	/* in microseconds */
 #define ENDCHAR			10	/* use LF */
 #define MAX_STRING              512
 #define SHUTDOWN_DELAY		"020"
