@@ -123,16 +123,17 @@
 #define MAX_LPAR_NUM		256
 #define MAX_HMC_NAME_LEN	256
 
-#define HMCURL	"http://publib-b.boulder.ibm.com/Redbooks.nsf/RedbookAbstracts/SG247038.html"
+#define HMCURL	"http://publib-b.boulder.ibm.com/Redbooks.nsf/RedbookAbstracts"\
+		"/SG247038.html"
 
-static void *		ibmhmc_new(void);
-static void		ibmhmc_destroy(Stonith *);
-static int		ibmhmc_set_config_file(Stonith *, const char * cfgname);
-static int		ibmhmc_set_config_info(Stonith *, const char * info);
-static const char *	ibmhmc_getinfo(Stonith * s, int InfoType);
-static int		ibmhmc_status(Stonith * );
-static int		ibmhmc_reset_req(Stonith* s,int request,const char* host);
-static char **		ibmhmc_hostlist(Stonith  *);
+static StonithPlugin *	ibmhmc_new(void);
+static void		ibmhmc_destroy(StonithPlugin *);
+static const char *	ibmhmc_getinfo(StonithPlugin * s, int InfoType);
+static const char**	ibmhmc_get_confignames(StonithPlugin* p);
+static int		ibmhmc_status(StonithPlugin * );
+static int		ibmhmc_reset_req(StonithPlugin * s,int request,const char* host);
+static char **		ibmhmc_hostlist(StonithPlugin  *);
+static int		ibmhmc_set_config(StonithPlugin *, StonithNVpair*);
 
 static char* do_shell_cmd(const char* cmd, int* status);
 static int check_hmc_status(const char* hmc);
@@ -141,9 +142,9 @@ static int check_hmc_status(const char* hmc);
 static struct stonith_ops ibmhmcOps = {
 	ibmhmc_new,		/* Create new STONITH object	*/
 	ibmhmc_destroy,		/* Destroy STONITH object	*/
-	ibmhmc_set_config_file,	/* set configuration from file	*/
-	ibmhmc_set_config_info,	/* Get configuration from file	*/
 	ibmhmc_getinfo,		/* Return STONITH info string	*/
+	ibmhmc_get_confignames,	/* Return configuration parameters */
+	ibmhmc_set_config,      /* Set configuration            */
 	ibmhmc_status,		/* Return STONITH device status	*/
 	ibmhmc_reset_req,	/* Request a reset */
 	ibmhmc_hostlist,	/* Return list of supported hosts */
@@ -184,22 +185,27 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 }
 
 struct pluginDevice {	
+	StonithPlugin		sp;
 	const char *		pluginid;
-	char *		hmc;
+	char *			hmc;
 	GList*		 	hostlist;
 };
 
 static const char * pluginid = 	"pluginDevice-Stonith";
-static const char * NOTpluginID = 	"This has been destroyed (HMC Dev)";
+static const char * NOTpluginID = "This has been destroyed (HMC Dev)";
 
 static int
-ibmhmc_status(Stonith  *s)
+ibmhmc_status(StonithPlugin  *s)
 {
 	struct pluginDevice* dev = NULL;
+	
+	if(Debug){
+		LOG(PIL_DEBUG , "%s : called\n" , __FUNCTION__);
+	}
 
 	ERRIFWRONGDEV(s,S_OOPS);
 
-	dev = (struct pluginDevice*) s->pinfo;
+	dev = (struct pluginDevice*) s;
 	
 	return check_hmc_status(dev->hmc);
 }
@@ -210,7 +216,7 @@ ibmhmc_status(Stonith  *s)
  */
 
 static char **
-ibmhmc_hostlist(Stonith  *s)
+ibmhmc_hostlist(StonithPlugin  *s)
 {
 	int j;
 	struct pluginDevice* dev;
@@ -218,8 +224,13 @@ ibmhmc_hostlist(Stonith  *s)
 	char** ret = NULL;
 	GList* node = NULL;
 
+	if(Debug){
+		LOG(PIL_DEBUG, "%s : called\n" , __FUNCTION__);
+	}
+
+
 	ERRIFWRONGDEV(s,NULL);
-	dev = (struct pluginDevice*) s->pinfo;
+	dev = (struct pluginDevice*) s;
 	numnames = g_list_length(dev->hostlist);
 	if (numnames<0) {
 		LOG( PIL_CRIT
@@ -257,6 +268,11 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 	gchar** name_mode = NULL;
 	char get_lpar[MAX_CMD_LEN];
 	gchar** lparlist = NULL;
+	char ** ret = NULL;
+
+	if(Debug){
+		LOG(PIL_DEBUG , "%s called,info=%s\n" , __FUNCTION__,info);
+	}
 
 	if (NULL == info || 0 == strlen(info)) 	{
 		return S_BADCONFIG;
@@ -270,6 +286,11 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 	snprintf(get_syslist, MAX_CMD_LEN,
 		 SSH_CMD " -l " HMCROOT
 		 " %s lssyscfg -r sys -F name:mode --all", info);
+	if(Debug){
+		LOG(PIL_DEBUG , "%s: get_syslist=%s" , __FUNCTION__ , 
+		    get_syslist);
+	}
+
 	output = do_shell_cmd(get_syslist, &status);
 	syslist = g_strsplit(output, "\n", MAX_SYS_NUM);
 	FREE(output);
@@ -279,12 +300,17 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 			break;
 		}
 		name_mode = g_strsplit(syslist[i],":",2);
+		if(Debug){
+			LOG(PIL_DEBUG , "%s: name_mode0 = %s,name_mode1=%s\n"
+			    , __FUNCTION__ , name_mode[0] , name_mode[1]);
+		}
 		/* if it is in fullsystempartition */
 		if (NULL!=name_mode[1] && 0==strncmp(name_mode[1],"0",1)) {
 			/* add the FullSystemPartition */
 			snprintf(host,MAX_HOST_NAME_LEN,
 				 "%s/FullSystemPartition", name_mode[0]);
-			dev->hostlist = g_list_append(dev->hostlist,STRDUP(host));
+			dev->hostlist = g_list_append(dev->hostlist 
+						      ,STRDUP(host));
 		}
 		else
 		/* if it is in lpar */
@@ -294,6 +320,11 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 				 SSH_CMD " -l " HMCROOT
 				 " %s lssyscfg -m %s -r lpar -F name --all",
 				 info, name_mode[0]);
+			if(Debug){
+				LOG(PIL_DEBUG, "%s: get_lpar = %s\n"
+				    , __FUNCTION__ , get_lpar);
+			}
+
 			output = do_shell_cmd(get_lpar,&status);
 			lparlist = g_strsplit(output, "\n",MAX_LPAR_NUM);
 			FREE(output);
@@ -305,13 +336,14 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 				/* skip the full system partition */
 				if (0 == strncmp(lparlist[j],
 						 FULLSYSTEMPARTITION,
-						 strlen(FULLSYSTEMPARTITION))){
+						 strlen(FULLSYSTEMPARTITION))) {
 					continue;
 				}
 				/* add the lpar */
 				snprintf(host,MAX_HOST_NAME_LEN,
 					 "%s/%s", name_mode[0],lparlist[j]);
-				dev->hostlist = g_list_append(dev->hostlist,STRDUP(host));
+				dev->hostlist = g_list_append(  dev->hostlist
+							      , STRDUP(host));
 			}
 			g_strfreev(lparlist);
 		}
@@ -319,8 +351,22 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 	}
 	g_strfreev(syslist);
 	dev->hmc = STRDUP(info);
+	
+	free(ret);
 	return S_OK;
 }
+
+
+static const char**     
+ibmhmc_get_confignames(StonithPlugin* p)
+{
+	static const char * names[] =  { ST_HOSTLIST, NULL};
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
+	return names;
+}
+
 
 
 /*
@@ -328,7 +374,7 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
  *	We should reset without power cycle for the non-partitioned case
  */
 static int
-ibmhmc_reset_req(Stonith * s, int request, const char * host)
+ibmhmc_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	GList*			node = NULL;
 	struct pluginDevice*	dev = NULL;
@@ -342,6 +388,11 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 	int			is_lpar = FALSE;
 	int			status;
 	
+	status = 0;
+	if(Debug){
+		LOG(PIL_DEBUG , "%s : called , host=%s\n" , __FUNCTION__,host);
+	}
+	
 	ERRIFWRONGDEV(s,S_OOPS);
 	
 	if (NULL == host) {
@@ -349,12 +400,16 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 		return(S_OOPS);
 	}
 
-	dev = (struct pluginDevice*) s->pinfo;
+	dev = (struct pluginDevice*) s;
 
 	for (node=g_list_first(dev->hostlist)
 	;	NULL != node
 	;	node=g_list_next(node)) {
-
+		if(Debug){
+			LOG(PIL_DEBUG , "%s:node->data = %s\n" , __FUNCTION__ 
+			    , (char*)node->data);
+		}
+		
 		if (strcasecmp((char*)node->data, host) == 0) {
 			break;
 		};
@@ -371,7 +426,11 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 	names = g_strsplit((char*)node->data, "/", 2);
 	/* names[0] will be the name of managed system */
 	/* names[1] will be the name of the lpar partition */
-	
+	if(Debug){
+		LOG(PIL_DEBUG , "%s:names[0]=%s, names[1]=%s\n" , __FUNCTION__ 
+		    , names[0] , names[1]);
+	}
+
 	if (0 == strcasecmp(names[1], FULLSYSTEMPARTITION)) {
 
 		is_lpar = FALSE;
@@ -405,6 +464,12 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
 		,	 dev->hmc, names[0], names[1]);
 
 	}
+	
+	if(Debug){
+		LOG(PIL_DEBUG , "%s: off_cmd=%s , on_cmd=%s , reset_cmd=%s\n" 
+		    , __FUNCTION__ , off_cmd , on_cmd , reset_cmd);
+	}
+
 	g_strfreev(names);
 	switch (request) {
 	case ST_POWERON:
@@ -461,78 +526,55 @@ ibmhmc_reset_req(Stonith * s, int request, const char * host)
  *	and stash it away...
  */
 static int
-ibmhmc_set_config_file(Stonith* s, const char * configname)
+ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 {
-	FILE* cfgfile = NULL;
 	struct pluginDevice* dev = NULL;
-	char hmc[MAX_HMC_NAME_LEN];
+	const char * hlist;	
 	
 	ERRIFWRONGDEV(s,S_OOPS);
-
-	dev = (struct pluginDevice*) s->pinfo;
-
-	cfgfile = fopen(configname, "r");
-	if (cfgfile == NULL)  {
-		LOG( PIL_CRIT, "Cannot open %s", configname);
-		return(S_BADCONFIG);
+	if(Debug){
+		LOG(PIL_DEBUG , "%s: called\n" , __FUNCTION__);
+	}
+	
+	dev = (struct pluginDevice*) s;
+	if(( hlist = OurImports->GetValue(list , ST_HOSTLIST)) == NULL){
+		return S_OOPS;
+	
 	}
 
-	while (fgets(hmc, sizeof(hmc), cfgfile) != NULL){
-		if (*hmc == '#' || *hmc == '\n' || *hmc == EOS){
-			continue;
-		}
-		if (S_OK != ibmhmc_parse_config_info(dev, hmc)) {
-			return S_BADCONFIG;
-		}
-		break;
+	if(Debug){
+		LOG(PIL_DEBUG, "%s:  hlist = %s\n" , __FUNCTION__ , hlist);	
 	}
+	
+	if (S_OK != ibmhmc_parse_config_info(dev , hlist)){
+		return S_BADCONFIG;
+	}
+	
 	return S_OK;
 }
 
-/*
- *	Parse the config information in the given string, and stash it away...
- */
-static int
-ibmhmc_set_config_info(Stonith* s, const char * info)
-{
-	struct pluginDevice* dev;
-
-	ERRIFWRONGDEV(s,S_OOPS);
-	dev = (struct pluginDevice *)s->pinfo;
-
-	return(ibmhmc_parse_config_info(dev, info));
-}
-
 static const char*
-ibmhmc_getinfo(Stonith* s, int reqtype)
+ibmhmc_getinfo(StonithPlugin* s, int reqtype)
 {
 	struct pluginDevice* dev;
 	char* ret;
 
 	ERRIFWRONGDEV(s,NULL);
 
-	dev = (struct pluginDevice *)s->pinfo;
+	dev = (struct pluginDevice *)s;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
 			ret = _("IBM pSeries HMC");
 			break;
 
-		case ST_CONF_INFO_SYNTAX:
-			ret = _("SYS_NAME/PAR_NAME");
-			break;
-
-		case ST_CONF_FILE_SYNTAX:
-			ret = _("SYS_NAME/PAR_NAME\n"
-			"Blank lines and lines beginning with # are ignored");
-			break;
-
 		case ST_DEVICEDESCR:
 			ret = _("IBM pSeries Hardware Management Console (HMC)\n"
 			"Use for HMC-equipped IBM pSeries Server\n"
 			"Providing the list of hosts should go away (!)...\n"
-			"This code probably only works on the POWER4 architecture systems\n"
-			" See " HMCURL " for more information.");
+			"This code probably only works on the POWER4 "
+			"architecture systems\n See " HMCURL " for more "
+			"information.\n");
 			break;
 
 		default:
@@ -546,13 +588,16 @@ ibmhmc_getinfo(Stonith* s, int reqtype)
  *	HMC Stonith destructor...
  */
 static void
-ibmhmc_destroy(Stonith *s)
+ibmhmc_destroy(StonithPlugin *s)
 {
 	struct pluginDevice* dev;
 
 	VOIDERRIFWRONGDEV(s);
+	if(Debug){
+		LOG(PIL_DEBUG , "%s : called\n" , __FUNCTION__);
+	}
 
-	dev = (struct pluginDevice *)s->pinfo;
+	dev = (struct pluginDevice *)s;
 
 	dev->pluginid = NOTpluginID;
 	if (dev->hmc) {
@@ -572,19 +617,32 @@ ibmhmc_destroy(Stonith *s)
 	FREE(dev);
 }
 
-static void *
+static StonithPlugin *
 ibmhmc_new(void)
 {
 	struct pluginDevice* dev = MALLOCT(struct pluginDevice);
+	
+	if(Debug){
+		LOG(PIL_DEBUG , "%s: called\n" , __FUNCTION__);
+	}
 
+	
 	if (dev == NULL) {
-		LOG( PIL_CRIT, "out of memory");
+		LOG( PIL_CRIT, "%s: out of memory" , __FUNCTION__);
 		return(NULL);
 	}
+
 	memset(dev, 0, sizeof(*dev));
+
 	dev->pluginid = pluginid;
 	dev->hmc = NULL;
 	dev->hostlist = NULL;
+	dev->sp.s_ops = &ibmhmcOps;
+
+	if(Debug){
+		LOG(PIL_DEBUG , "%s: returning successfully\n" , __FUNCTION__);
+	}
+
 	return((void *)dev);
 }
 
@@ -630,9 +688,23 @@ check_hmc_status(const char* hmc)
 	char check_status[MAX_CMD_LEN];
 	char* output = NULL;
 
+	if(Debug){
+		LOG(PIL_DEBUG , "%s: called,hmc=%s\n" , __FUNCTION__,hmc);
+	}
+
 	snprintf(check_status, MAX_CMD_LEN,
 		 SSH_CMD " -l " HMCROOT " %s lshmc -r -F ssh", hmc);
+	if(Debug){
+		LOG(PIL_INFO , "%s: check_status=%s\n" , __FUNCTION__ 
+		    , check_status);
+	}
+
 	output = do_shell_cmd(check_status, &status);
+	
+	if (Debug) {
+		LOG(PIL_DEBUG , "%s : output=%s\n" , __FUNCTION__ , output);
+	}
+
 	if (NULL==output || strncmp(output, "enable", 6)!= 0) {
 		return S_BADCONFIG;
 	}
