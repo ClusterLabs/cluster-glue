@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.18 2005/01/31 09:45:31 sunjd Exp $ */
+/* $Id: apcmaster.c,v 1.19 2005/02/17 09:20:18 sunjd Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -51,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.18 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.19 $"; 
 
 #define	DEVICE	"APC MasterSwitch"
 
@@ -220,17 +220,22 @@ MSRobustLogin(struct pluginDevice * ms)
 	int j = 0;
 
 	for ( ; ; ) {
-	  if (ms->pid > 0)
-	    Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
+	  if (ms->pid > 0) {
+		Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
+	  }
 	  if (MS_connect_device(ms) != S_OK) {	
-	    Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
+		Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
+	  } else {
+		rc = MSLogin(ms);
+		if( rc == S_OK ) {
+			break;
+	    	}
 	  }
-	  else {
-	    rc = MSLogin(ms);
-	    if( rc == S_OK ) break;
+	  if ((++j) == 20) {
+		break;
+	  } else {
+		sleep(1);
 	  }
-	  if ((++j) == 20) break;
-	  else sleep(1);
 	}
 
 	return rc;
