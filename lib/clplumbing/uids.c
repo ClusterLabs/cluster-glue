@@ -99,7 +99,7 @@ return_to_dropped_privs(void)
 
 /* Return TRUE if we have full privileges at the moment */
 int
-Cl_have_full_privs(void)
+cl_have_full_privs(void)
 {
 	return privileged_state != 0;
 }
