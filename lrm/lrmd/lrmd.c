@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.74 2005/03/18 12:18:25 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.75 2005/04/04 10:21:09 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1583,7 +1583,7 @@ on_op_done(lrmd_op_t* op)
 	if (CHANGED == target_rc) {
 		if (HA_OK != ha_msg_value_int(op->msg,F_LRM_LASTRC,
 						&last_rc)){
-			need_notify = 0;
+			need_notify = 1;
 		}
 		else {
 			if (last_rc != op_rc) {
@@ -2169,6 +2169,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.75  2005/04/04 10:21:09  zhenh
+ * the first result of monitor should be return
+ *
  * Revision 1.74  2005/03/18 12:18:25  sunjd
  * changes for returning correct RC for heartbeat RA by check its string output to stdout
  *
