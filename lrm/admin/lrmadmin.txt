@@ -5,7 +5,7 @@ NAME
 
 SYNOPSIS
 lrmadmin {-d|--deamon}
-	 {-A|--add} <rscid> <ratype> <raname> [<rsc_params_list>] 
+	 {-A|--add} <rscid> <rsc_class> <rsc_type> [<rsc_params_list>] 
 	 {-D|--delete} <rscid>
 	 {-F|--flush} <rscid>
 	 {-E|--execute} <rscid> <operator> <timeout> [<operator_parameters_list>]
@@ -26,7 +26,7 @@ Lrmd deamon options
 #		-r	    Reset lrmd (?)
 
 Resource options
-	 {-A|--add} <rscid> <ratype> <raname> [<rsc_params_list>] 
+	 {-A|--add} <rscid> <rsc_class> <rsc_type> [<rsc_params_list>] 
 		Add a resource.
 
 	 {-D|--delete} <rscid>

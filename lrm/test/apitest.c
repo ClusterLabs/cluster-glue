@@ -19,7 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#include <portability.h>
 
 #include <unistd.h>
 #include <stdio.h>
@@ -39,12 +38,7 @@ void get_cur_state(lrm_rsc_t* rsc);
 
 int main (int argc, char* argv[])
 {
-	ll_lrm_t* lrm = NULL;
-	lrm_rsc_t* rsc = NULL;
-	rsc_id_t rid;
-	lrm_mon_t* mon = NULL;
-	lrm_op_t* op = NULL;
-
+	ll_lrm_t* lrm;
 	lrm = ll_lrm_new("lrm");	
 	if(NULL == lrm)
 	{
@@ -54,66 +48,46 @@ int main (int argc, char* argv[])
 	puts("sigon...");
 	lrm->lrm_ops->signon(lrm,"apitest");
 
+	puts("get_rsc_class_supported...");
+	GList* classes = lrm->lrm_ops->get_rsc_class_supported(lrm);
+	GList* class;
+	for(class = g_list_first(classes); NULL!=class; class = g_list_next(class)) {
+		printf("class:%s\n", (char*)class->data);
+		GList* types = lrm->lrm_ops->get_rsc_type_supported(lrm, class->data);
+		GList* type;
+		for(type = g_list_first(types); NULL!=type; type = g_list_next(type)) {
+			printf("\ntype:%s\n", (char*)type->data);
+		}
+	}
+
 	puts("set_lrm_callback...");
 	lrm->lrm_ops->set_lrm_callback(lrm, lrm_op_done_callback,
 					lrm_monitor_callback);
 	
+	rsc_id_t rid;
+	GHashTable* param = g_hash_table_new(g_str_hash,g_str_equal);
+	g_hash_table_insert(param, strdup("1"), strdup("first"));
+	g_hash_table_insert(param, strdup("2"), strdup("second"));
+	g_hash_table_insert(param, strdup("3"), strdup("third"));
 	puts("add_rsc...");
 	uuid_generate(rid);
-	lrm->lrm_ops->add_rsc(lrm, rid, "lsb", "lsb_initscript_sim.sh", NULL);
+	lrm->lrm_ops->add_rsc(lrm, rid, "ocf", "/home/zhenh/linux-ha/lrm/test/ocf_script_sim.sh", param);
 
 	puts("get_rsc...");
-	rsc = lrm->lrm_ops->get_rsc(lrm, rid);
+	lrm_rsc_t* rsc = lrm->lrm_ops->get_rsc(lrm, rid);
 	printf_rsc(rsc);
 
-	
-	puts("set_monitor...");
-	mon = g_new(lrm_mon_t, 1);
-	mon->op_type = "status";
-	mon->params = NULL;
-	mon->timeout = 0;
-	mon->user_data = NULL;
-	mon->mode = LRM_MONITOR_SET;
-	mon->interval = 2;
-	mon->target = 1;
-	rsc->ops->set_monitor(rsc,mon);
-	printf_mon(mon);
-	mon = g_new(lrm_mon_t, 1);
-
-	mon->op_type = "status";
-	mon->params = NULL;
-	mon->timeout = 0;
-	mon->user_data = NULL;
-	mon->mode = LRM_MONITOR_CHANGE;
-	mon->interval = 2;
-	mon->target = 1;
-	rsc->ops->set_monitor(rsc,mon);
-	printf_mon(mon);
-
 	puts("perform_op...");
-	op = g_new(lrm_op_t, 1);
+	lrm_op_t* op = g_new(lrm_op_t, 1);
 	op->op_type = "start";
-	op->params = NULL;
+	op->params = param;
 	op->timeout = 0;
 	op->user_data = strdup("It is a start op!");
 	rsc->ops->perform_op(rsc,op);
 	printf_op(op);
-
-	sleep(10);
 	
-	op = g_new(lrm_op_t, 1);
-	op->op_type = "stop";
-	op->params = NULL;
-	op->timeout = 0;
-	op->user_data = strdup("It is a stop op!");
-	rsc->ops->perform_op(rsc,op);
-	printf_op(op);
-
-	sleep(10);
 	puts("rcvmsg...");
-	while (TRUE) {
-		lrm->lrm_ops->rcvmsg(lrm,TRUE);
-	}
+	lrm->lrm_ops->rcvmsg(lrm,TRUE);
 
 	puts("signoff...");
 	lrm->lrm_ops->signoff(lrm);
@@ -134,17 +108,17 @@ void lrm_monitor_callback(lrm_mon_t* monitor)
 
 void printf_rsc(lrm_rsc_t* rsc)
 {
-	char buf[37];
 	printf("print resource\n");
 	if (NULL == rsc) {
 		printf("resource is null\n");
 		printf("print end\n");
 		return;
 	}
+	char buf[37];
 	uuid_unparse(rsc->id, buf);
 	printf("\tresource of id:%s\n", buf);
-	printf("\tname:%s\n", rsc->name);
-	printf("\ttype:%s\n", rsc->ra_type);
+	printf("\ttype:%s\n", rsc->type);
+	printf("\tclass:%s\n", rsc->class);
 	printf("\tparams:\n");
 	printf_hash_table(rsc->params);
 	printf("print end\n");
@@ -240,15 +214,12 @@ printf_hash_table(GHashTable* hash_table)
 void
 get_all_rsc(ll_lrm_t* lrm)
 {
-	char buf[37];
-	rsc_id_t rid;
-	GList* rid_list = NULL;
-	GList* element = NULL;
-
 	puts("get_all_rscs...");
-	rid_list = lrm->lrm_ops->get_all_rscs(lrm);
+	GList* rid_list = lrm->lrm_ops->get_all_rscs(lrm);
 	if (NULL != rid_list) {
-		element = g_list_first(rid_list);
+		char buf[37];
+		rsc_id_t rid;
+		GList* element = g_list_first(rid_list);
 		while (NULL != element) {
 			uuid_copy(rid,element->data);
 			uuid_unparse(rid, buf);
@@ -262,14 +233,12 @@ get_all_rsc(ll_lrm_t* lrm)
 void
 get_cur_state(lrm_rsc_t* rsc)
 {
-	GList* node;
-	GList* op_list = NULL;
-	state_flag_t state;
-
 	puts("get_cur_state...");
-	op_list = rsc->ops->get_cur_state(rsc, &state);
+	state_flag_t state;
+	GList* op_list = rsc->ops->get_cur_state(rsc, &state);
 	printf("\tcurrent state:%s\n",state==LRM_RSC_IDLE?"Idel":"Busy");
 
+	GList* node;
 	for(node = g_list_first(op_list); NULL != node; node = g_list_next(node)) {
 		lrm_op_t* op = (lrm_op_t*)node->data;
 		printf_op(op);
