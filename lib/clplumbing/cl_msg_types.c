@@ -38,6 +38,10 @@
 #include <clplumbing/netstring.h>
 #include <glib.h>
 
+#ifndef MAX
+#	define MAX(a,b)	(((a) > (b)) ? (a) : (b))
+#endif
+
 #define		NL_TO_SYM	0
 #define		SYM_TO_NL	1
 
@@ -1348,8 +1352,10 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 	if (msg->stringlen + stringlen_add >= MAXMSG ||
 	    msg->netstringlen + netstringlen_add >= MAXMSG) {
 
-		cl_log(LOG_ERR, "add_string_field(): "
-		       "cannot add name/value to ha_msg (value too big)");
+		cl_log(LOG_ERR, "add_string_field()"
+		": cannot add name/value to ha_msg (value too big: %ld bytes)"
+		,	(long)MAX(msg->stringlen + stringlen_add
+		,	msg->netstringlen + netstringlen_add));
 
 		if (cp_value) {   
 			if(internal_type  < sizeof(fieldtypefuncs) 
