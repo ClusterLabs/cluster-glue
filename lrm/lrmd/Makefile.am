@@ -18,18 +18,32 @@
 #
 MAINTAINERCLEANFILES = Makefile.in
 
-INCLUDES        = -I$(top_builddir)/include -I$(top_srcdir)/include     \
-                  -I$(top_builddir)/libltdl   -I$(top_srcdir)/libltdl     \
-		  -I$(top_builddir)/linux-ha  -I$(top_srcdir)/linux-ha \
-		   -I$(top_builddir)           -I$(top_srcdir)
+INCLUDES        = -I$(top_builddir)/include  -I$(top_srcdir)/include     \
+                  -I$(top_builddir)/libltdl  -I$(top_srcdir)/libltdl     \
+		  -I$(top_builddir)/linux-ha -I$(top_srcdir)/linux-ha    \
+		  -I$(top_builddir)          -I$(top_srcdir)
 
 halibdir	=  $(libdir)/@HB_PKG@
 
 COMMONLIBS	=  $(top_builddir)/lib/clplumbing/libplumb.la   \
 		   $(top_builddir)/lib/hbclient/libhbclient.la  \
-               	   $(GLIBLIB)
+		   $(GLIBLIB)
+
 halib_PROGRAMS 	=  lrmd
 
 lrmd_SOURCES 	=  lrmd.c
-lrmd_CFLAGS	=  -DPLUGIN_DIR='"@PLUGIN_DIR@"' -DRA_PLUGIN_DIR='"@RA_PLUGIN_DIR@"'
-lrmd_LDFLAGS 	=  $(top_builddir)/lib/lrm/liblrm_la-lrm_msg.lo $(COMMONLIBS) -luuid -L$(top_builddir)/lib/pils -lpils
+
+lrmd_CFLAGS	=  -DPLUGIN_DIR='"@PLUGIN_DIR@"' 			\
+		   -DRA_PLUGIN_DIR='"@RA_PLUGIN_DIR@"'
+
+lrmd_LDFLAGS 	=  $(top_builddir)/lib/lrm/liblrm_la-lrm_msg.lo 	\
+		   $(COMMONLIBS) -luuid 				\
+		   -L$(top_builddir)/lib/pils -lpils
+
+lrmlibdir	= $(libdir)/$(HB_PKG)/lrm
+
+install-exec-local:
+	$(mkinstalldirs) $(DESTDIR)/$(lrmlibdir)
+	-chown $(HA_CCMUSER) $(DESTDIR)/$(lrmlibdir)
+	-chgrp $(HA_APIGROUP) $(DESTDIR)/$(lrmlibdir)
+	-chmod g+w $(DESTDIR)/$(lrmlibdir)
