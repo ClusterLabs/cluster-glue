@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.14 2004/09/10 02:07:16 zhenh Exp $ */
+/* $Id: lrm_msg.c,v 1.15 2004/09/10 10:09:43 sunjd Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -264,8 +264,9 @@ merge_pair(gpointer key, gpointer value, gpointer user_data)
 	gpointer oldvalue;
 	gpointer oldkey;
 	GHashTable* ret = (GHashTable*)user_data;
-	
+
 	if (g_hash_table_lookup_extended(ret, key, &oldkey, &oldvalue)){
+		g_hash_table_remove(ret, oldkey);
 		g_free(oldvalue);
 		g_free(oldkey);
 	}
@@ -419,6 +420,9 @@ create_lrm_ret(int rc, int fields)
 
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.15  2004/09/10 10:09:43  sunjd
+ * Fix a bug: duplicate keys in GHashtable, is not expected
+ *
  * Revision 1.14  2004/09/10 02:07:16  zhenh
  * make names of functions more clear,fix some bug and  make it more robust
  *
