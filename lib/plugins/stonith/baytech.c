@@ -1,4 +1,4 @@
-/* $Id: baytech.c,v 1.21 2005/01/03 18:12:11 alan Exp $ */
+/* $Id: baytech.c,v 1.22 2005/01/08 06:01:17 alan Exp $ */
 /*
  *	Stonith module for BayTech Remote Power Controllers (RPC-x devices)
  *
@@ -62,6 +62,8 @@ static StonithImports*		OurImports;
 static void*			interfprivate;
 
 #include "stonith_expect_helpers.h"
+
+#define	MAXOUTLET		32
 
 PIL_rc
 PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
@@ -152,6 +154,11 @@ static struct Etoken Rebooting[] =	{ {"ebooting selected outlet", 0, 0}
 					,	{"already off.", 2, 0}
 					,	{NULL,0,0}};
 
+static struct Etoken TurningOnOff[] =	{ {"RPC", 0, 0}
+					,	{"(Y/N)>", 1, 0}
+					,	{"already ", 2, 0}
+					,	{NULL,0,0}};
+
 
 static struct BayTechModelInfo ModelInfo [] = {
 	{"RPC-5",	18, Temp},/* This first model will be the default */
@@ -163,15 +170,14 @@ static struct BayTechModelInfo ModelInfo [] = {
 static int	RPC_connect_device(struct pluginDevice * bt);
 static int	RPCLogin(struct pluginDevice * bt);
 static int	RPCRobustLogin(struct pluginDevice * bt);
-static int	RPCNametoOutlet(struct pluginDevice*, const char * name);
+static int	RPCNametoOutletList(struct pluginDevice*, const char * name
+,		int outletlist[]);
 static int	RPCReset(struct pluginDevice*, int unitnum, const char * rebootid);
 static int	RPCLogout(struct pluginDevice * bt);
 
 
-#if defined(ST_POWERON) && defined(ST_POWEROFF)
 static int	RPC_onoff(struct pluginDevice*, int unitnum, const char * unitid
 ,		int request);
-#endif
 
 /* Login to the Baytech Remote Power Controller (RPC) */
 
@@ -184,10 +190,11 @@ RPCLogin(struct pluginDevice * bt)
 	char *		delim;
 	int		j;
 
+	EXPECT(bt->rdfd, RPC, 10);
 
 	/* Look for the unit type info */
 	if (EXPECT_TOK(bt->rdfd, BayTechAssoc, 2, IDinfo
-	,	sizeof(IDinfo)) < 0) {
+	,	sizeof(IDinfo), Debug) < 0) {
 		LOG(PIL_CRIT,	 "%s",
 			   "No initial response from " DEVICE ".");
 		return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
@@ -204,7 +211,7 @@ RPCLogin(struct pluginDevice * bt)
 	if ((delim = strchr(idptr, ' ')) != NULL) {
 		*delim = EOS;
 	}
-	snprintf(IDbuf, sizeof(IDbuf), "BayTech %s", idptr);
+	snprintf(IDbuf, sizeof(IDbuf), "BayTech RPC%s", idptr);
 	REPLSTR(bt->idinfo, IDbuf);
 
 	bt->modelinfo = &ModelInfo[0];
@@ -359,8 +366,8 @@ RPCReset(struct pluginDevice* bt, int unitnum, const char * rebootid)
 		default:
 			return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
-	LOG(PIL_INFO,	"%s: %s"
-	,	"Host being rebooted", rebootid);
+	LOG(PIL_INFO,	"Host %s (outlet %d) being rebooted."
+	,	rebootid, unitnum);
 	
 	/* Expect "ower applied to outlet" */
 	if (StonithLookFor(bt->rdfd, PowerApplied, 30) < 0) {
@@ -369,8 +376,8 @@ RPCReset(struct pluginDevice* bt, int unitnum, const char * rebootid)
 
 	/* All Right!  Power is back on.  Life is Good! */
 	
-	LOG(PIL_INFO,	"%s: %s"
-	,	"Power restored to host", rebootid);
+	LOG(PIL_INFO,	"%s %s (outlet %d)."
+	,	"Power restored to host", rebootid, unitnum);
 
 	/* Expect: "RPC-x>" */
 	EXPECT(bt->rdfd, RPC,5);
@@ -381,7 +388,6 @@ RPCReset(struct pluginDevice* bt, int unitnum, const char * rebootid)
 	return(S_OK);
 }
 
-#if defined(ST_POWERON) && defined(ST_POWEROFF)
 static int
 RPC_onoff(struct pluginDevice* bt, int unitnum, const char * unitid, int req)
 {
@@ -421,34 +427,34 @@ RPC_onoff(struct pluginDevice* bt, int unitnum, const char * unitid, int req)
 
 	/* Expect "RPC->x "... or "(Y/N)" (if confirmation turned on) */
 
-	if (StonithLookFor(bt->rdfd, RPC, 10) == 1) {
+	if (StonithLookFor(bt->rdfd, TurningOnOff, 10) == 1) {
 		/* They've turned on that annoying command confirmation :-( */
 		SEND(bt->wrfd, "Y\r");
-		EXPECT(bt->rdfd, RPC, 10);
+		EXPECT(bt->rdfd, TurningOnOff, 10);
 	}
 
 	EXPECT(bt->rdfd, GTSign, 10);
 
 	/* All Right!  Command done. Life is Good! */
-	LOG(PIL_INFO, "%s %s %s %s"
-	,	"Power to host", unitid, "turned", onoff);
+	LOG(PIL_INFO, "%s %s (outlet %d) %s %s."
+	,	"Power to host", unitid, unitnum, "turned", onoff);
 	/* Pop back to main menu */
 	SEND(bt->wrfd, "MENU\r");
 	return(S_OK);
 }
-#endif /* defined(ST_POWERON) && defined(ST_POWEROFF) */
 
 /*
  *	Map the given host name into an (AC) Outlet number on the power strip
  */
 
 static int
-RPCNametoOutlet(struct pluginDevice* bt, const char * name)
+RPCNametoOutletList(struct pluginDevice* bt, const char * name
+,		int outletlist[])
 {
 	char	NameMapping[128];
 	int	sockno;
 	char	sockname[32];
-	int	ret = -1;
+	int	maxfound = 0;
 
 
 
@@ -501,13 +507,14 @@ RPCNametoOutlet(struct pluginDevice* bt, const char * name)
 		}
 		g_strdown(sockname);
 		if (strcmp(name, sockname) == 0) {
-			ret = sockno;
+			outletlist[maxfound] = sockno;
+			++maxfound;
 		}
-	} while (strlen(NameMapping) > 2 && ret < 0);
+	} while (strlen(NameMapping) > 2  && maxfound < MAXOUTLET);
 
 	/* Pop back out to the top level menu */
 	SEND(bt->wrfd, "MENU\r");
-	return(ret);
+	return(maxfound);
 }
 
 static int
@@ -660,7 +667,7 @@ RPC_connect_device(struct pluginDevice * bt)
 static int
 baytech_reset_req(StonithPlugin * s, int request, const char * host)
 {
-	int	rc = 0;
+	int	rc = S_OK;
 	int	lorc = 0;
 	struct pluginDevice*	bt;
 
@@ -671,25 +678,44 @@ baytech_reset_req(StonithPlugin * s, int request, const char * host)
 	if ((rc = RPCRobustLogin(bt)) != S_OK) {
 		LOG(PIL_CRIT, "%s", "Cannot log into " DEVICE ".");
 	}else{
-		int	noutlet;
-		noutlet = RPCNametoOutlet(bt, host);
+		int	noutlets;
+		int	outlets[MAXOUTLET];
+		int	j;
+		noutlets = RPCNametoOutletList(bt, host, outlets);
 
-		if (noutlet < 1) {
-			LOG(PIL_WARN,	"%s %s %s [%s]"
+		if (noutlets < 1) {
+			LOG(PIL_CRIT,	"%s %s %s [%s]"
 			,	bt->idinfo, bt->unitid
 			,	"doesn't control host", host);
 			return(S_BADHOST);
 		}
 		switch(request) {
 
-#if defined(ST_POWERON) && defined(ST_POWEROFF)
 		case ST_POWERON:
 		case ST_POWEROFF:
-			rc = RPC_onoff(bt, noutlet, host, request);
+			for (j=0; rc == S_OK && j < noutlets;++j) {
+				rc = RPC_onoff(bt, outlets[j], host, request);
+			}
 			break;
-#endif
 		case ST_GENERIC_RESET:
-			rc = RPCReset(bt, noutlet, host);
+			/*
+			 * Our strategy here:
+			 *   1. Power off all outlets except the last one
+			 *   2. reset the last outlet
+			 *   3. power the other outlets back on
+			 */
+
+			for (j=0; rc == S_OK && j < noutlets-1; ++j) {
+				rc = RPC_onoff(bt,outlets[j],host
+				,	ST_POWEROFF);
+			}
+			if (rc == S_OK) {
+				rc = RPCReset(bt, outlets[j], host); 
+			}
+			for (j=0; rc == S_OK && j < noutlets-1; ++j) {
+				rc = RPC_onoff(bt, outlets[j], host
+				,	ST_POWERON);
+			}
 			break;
 		default:
 			rc = S_INVAL;

@@ -1,4 +1,4 @@
-/* $Id: stonith.c,v 1.12 2005/01/03 18:12:11 alan Exp $ */
+/* $Id: stonith.c,v 1.13 2005/01/08 06:01:17 alan Exp $ */
 /*
  * Stonith API infrastructure.
  *
@@ -43,7 +43,7 @@
 #define MALLOCT(t)	(t*)(malloc(sizeof(t)))
 #define FREE(p)		{free(p); (p) = NULL;}
 
-PILPluginUniv*		PIsys = NULL;
+PILPluginUniv*		StonithPIsys = NULL;
 static GHashTable*	Splugins = NULL;
 static int		init_pluginsys(void);
 extern StonithImports	stonithimports;
@@ -59,26 +59,26 @@ void PILpisysSetDebugLevel(int);
 static int
 init_pluginsys(void) {
 
-	if (PIsys) {
+	if (StonithPIsys) {
 		return TRUE;
 	}
 
 
 	/* PILpisysSetDebugLevel(10); */
-	PIsys = NewPILPluginUniv(STONITH_MODULES);
+	StonithPIsys = NewPILPluginUniv(STONITH_MODULES);
 	
-	if (PIsys) {
-		if (PILLoadPlugin(PIsys, PI_IFMANAGER, "generic", Reqs)
+	if (StonithPIsys) {
+		if (PILLoadPlugin(StonithPIsys, PI_IFMANAGER, "generic", Reqs)
 		!=	PIL_OK){
 			fprintf(stderr, "generic plugin load failed\n");
-			DelPILPluginUniv(PIsys);
-			PIsys = NULL;
+			DelPILPluginUniv(StonithPIsys);
+			StonithPIsys = NULL;
 		}
-		/*PILSetDebugLevel(PIsys, PI_IFMANAGER, "generic", 10);*/
+		/*PILSetDebugLevel(StonithPIsys, PI_IFMANAGER, "generic", 10);*/
 	}else{
 		fprintf(stderr, "pi univ creation failed\n");
 	}
-	return PIsys != NULL;
+	return StonithPIsys != NULL;
 }
 
 /*
@@ -103,10 +103,10 @@ stonith_new(const char * type)
 	if (g_hash_table_lookup_extended(Splugins, type
 	,	(gpointer)&key, (gpointer)&ops)) {
 		/* Yes!  Increment reference count */
-		PILIncrIFRefCount(PIsys, STONITH_TYPE_S, type, 1);
+		PILIncrIFRefCount(StonithPIsys, STONITH_TYPE_S, type, 1);
 
 	}else{		/* No.  Try and load it... */
-		if (PILLoadPlugin(PIsys, STONITH_TYPE_S, type, NULL)
+		if (PILLoadPlugin(StonithPIsys, STONITH_TYPE_S, type, NULL)
 		!=	PIL_OK) {
 			return NULL;
 		}
@@ -115,7 +115,7 @@ stonith_new(const char * type)
 		if (!g_hash_table_lookup_extended(Splugins, type
 		,		(void*)&key, (void*)&ops)) {
 			/* OOPS! didn't find it(!?!)... */
-			PILIncrIFRefCount(PIsys, STONITH_TYPE_S, type, -1);
+			PILIncrIFRefCount(StonithPIsys, STONITH_TYPE_S, type, -1);
 			return NULL;
 		}
 	}
@@ -145,7 +145,7 @@ stonith_types(void)
 		lasttypelist=NULL;
 	}
 
-	lasttypelist = PILListPlugins(PIsys, STONITH_TYPE_S, NULL);
+	lasttypelist = PILListPlugins(StonithPIsys, STONITH_TYPE_S, NULL);
 	return lasttypelist;
 }
 
@@ -159,7 +159,7 @@ stonith_delete(Stonith *s)
 	if (sp && sp->s_ops) {
 		char *	st = sp->s.stype;
 		sp->s_ops->destroy(sp);
-		PILIncrIFRefCount(PIsys, STONITH_TYPE_S, st, -1);
+		PILIncrIFRefCount(StonithPIsys, STONITH_TYPE_S, st, -1);
 		/* destroy should not free it */
 		free(st);
 	}
@@ -186,6 +186,16 @@ stonith_get_info(Stonith* s, int infotype)
 	}
 	return NULL;
 
+}
+
+void
+stonith_set_debug	(Stonith* s, int debuglevel)
+{
+	StonithPlugin*	sp = (StonithPlugin*)s;
+	if (StonithPIsys == NULL) {
+		return;
+	}
+	PILSetDebugLevel(StonithPIsys, STONITH_TYPE_S, sp->s.stype, debuglevel);
 }
 
 int
