@@ -62,8 +62,9 @@ struct RAExecOps {
 	 * 	Launch a exection of a resource agency -- normally is a script
 	 *
 	 * Parameters:
+	 *	rsc_id:    The resource instance id.
 	 * 	rsc_type:  The basename of a RA.
-	 *	op_type:  The operation that hope RA to do, such as "start",
+	 *	op_type:   The operation that hope RA to do, such as "start",
 	 *		    "stop" and so on.
 	 *	cmd_params: The command line parameters need to be passed to 
 	 *		      the RA for a execution. 
@@ -79,6 +80,7 @@ struct RAExecOps {
 	 *	-3: Other unkown error when launching the execution.
 	 */
 	int (*execra)(
+		const char * rsc_id,
 		const char * rsc_type,
 		const char * provider,
 		const char * op_type,
