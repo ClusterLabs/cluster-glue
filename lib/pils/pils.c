@@ -1479,6 +1479,7 @@ PILLoadPlugin(PILPluginUniv* universe, const char * plugintype
 	}
 	/* Save away the user_data for later */
 	piinfo->ud_plugin = plugin_user_data;
+	/* initfun is allowed to change ud_plugin if they want */
 	initfun(piinfo, universe->imports, plugin_user_data);
 
 	return PIL_OK;
