@@ -25,7 +25,7 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir) -I$(top_srcdir) \
 			-I$(top_builddir) @SYS_INCLUDES@
 
-CFLAGS			= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
+AM_CFLAGS			= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 			-DSTONITH_MODULES='"$(stonithlibdir)"' \
 			-DLOCALEDIR='"@LOCALE@"' 
 
