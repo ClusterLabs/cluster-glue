@@ -590,7 +590,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	  return IPC_FAIL;	  
 	}
       }
-      len=send(conn_info->s, msg->msg_body, msg->msg_len, MSG_DONTWAIT&MSG_OOB);
+      len=send(conn_info->s, msg->msg_body, msg->msg_len, MSG_DONTWAIT);
       if (len < 0){
 	if(errno == EAGAIN) {
 	  break;
@@ -604,6 +604,15 @@ socket_resume_io(struct IPC_CHANNEL *ch)
       }
     
       if (len > 0 ) {
+	if(len < msg->msg_len){
+	  /* 
+	   * FIXME! for stream domain socket, if the message is too big, it 
+	   * may cause part of the message cutted instead of being sent out.
+	   * We may need to implement the fragmentaion for sending. 
+	   * 
+	   */
+	  printf("can't send all data out %d\n",len);
+	}
 	ch->send_queue->queue = g_list_remove(ch->send_queue->queue, msg);
 	if (msg->msg_done != NULL) {
 	  msg->msg_done(msg);
