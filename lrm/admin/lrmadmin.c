@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.19 2004/10/08 04:47:54 zhenh Exp $ */
+/* $Id: lrmadmin.c,v 1.20 2004/10/10 09:27:53 zhenh Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -169,9 +169,9 @@ int main(int argc, char **argv)
 	}
 	
         cl_log_set_entity(lrmadmin_name);
-	cl_log_enable_stderr(TRUE);
+	cl_log_enable_stderr(FALSE);
 	cl_log_set_facility(LOG_USER);
-
+//	set_debug_level(LOG_INFO);
 	memset(rscid_arg_tmp, '\0', RID_LEN);
 	memset(raclass, '\0', 20);
 	do {
@@ -289,8 +289,8 @@ int main(int argc, char **argv)
 	lrmd->lrm_ops->set_lrm_callback(lrmd, lrm_op_done_callback);
 
         if (lrmd->lrm_ops->signon(lrmd, lrmadmin_name) != 1) { /* != HA_OK */
+		printf("lrmd daemon is not running.\n");
 		if (lrmadmin_cmd == DAEMON_OP) { 
-			printf("lrmd daemon is not running.\n");
 			return LSB_STATUS_STOPPED;
 		} else {
 			cl_log(LOG_ERR,"Can't connect to lrmd, quit!");
@@ -376,7 +376,7 @@ int main(int argc, char **argv)
 				if (lrm_rsc->ops->flush_ops(lrm_rsc) == 1 ) {
 					printf("Succeeded in flushing.\n");
 				} else {
-					printf("Falied to flush.\n");
+					printf("Failed to flush.\n");
 					ret_value = -3;
 				}
 			}
@@ -879,6 +879,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.20  2004/10/10 09:27:53  zhenh
+ * change some output information to make it more clear
+ *
  * Revision 1.19  2004/10/08 04:47:54  zhenh
  * fix a bug: checking the return value of get_rsc_type_metadata
  *
