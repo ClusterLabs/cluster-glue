@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.2 2004/04/29 15:25:27 kevin Exp $ */
+/* $Id: cl_malloc.c,v 1.3 2004/09/28 06:36:03 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -385,7 +385,7 @@ cl_new_mem(size_t size, int numbuck)
 	mallocsize = allocsize + cl_malloc_hdr_offset + GUARDSIZE;
 
 	if ((hdrret = malloc(mallocsize)) == NULL) {
-		return(NULL);
+		return NULL;
 	}
 
 	hdrret->hdr.reqsize = size;
@@ -399,7 +399,8 @@ cl_new_mem(size_t size, int numbuck)
 		memstats->nbytes_req += size;
 		memstats->mallocbytes += mallocsize;
 	}
-	return(((char*)hdrret)+cl_malloc_hdr_offset);
+	/* BEAM BUG -- this is NOT a leak */
+	return(((char*)hdrret)+cl_malloc_hdr_offset); /*memory leak*/
 }
 
 
