@@ -35,20 +35,18 @@
  *    restart, stop and so on.
  * 4. Provide the information of the lrm itself, including what types of
  *    resource are supporting by lrm.
- * 5. Notify the clients if they want when the status of a certain resource
- *    changed.
  *
  * The typical clients of lrm are crm and lrmadmin.
  */
  
  /*
  * Notice:
- *"status" indicates the exit status code of "status" operation
+ * "status" indicates the exit status code of "status" operation
  * its value is defined in LSB, OCF...
  *
- *"state" indicates the state of resource, maybe LRM_RSC_BUSY, LRM_RSC_IDLE
+ * "state" indicates the state of resource, maybe LRM_RSC_BUSY, LRM_RSC_IDLE
  *
- *"op_status" indicates how the op exit. like LRM_OP_DONE,LRM_OP_CANCELLED,
+ * "op_status" indicates how the op exit. like LRM_OP_DONE,LRM_OP_CANCELLED,
  * LRM_OP_TIMEOUT,LRM_OP_NOTSUPPORTED.
  */
 
@@ -59,11 +57,9 @@
 
 #include <glib.h>
 
-#define	LRM_PROTOCOL_VERSION	0.1
-
-#ifndef NULL
-#define NULL ((void*)0)
-#endif
+#define LRM_PROTOCOL_MAJOR 0
+#define LRM_PROTOCOL_MINOR 1
+#define LRM_PROTOCOL_VERSION ((LRM_PROTCOL_MAJOR << 16) | LRM_PROTOCOL_MINOR)
 
 #define RID_LEN 	128
 
@@ -77,17 +73,6 @@ typedef struct
 	struct rsc_ops*	ops;
 }lrm_rsc_t;
 
-/*
- *mon_mode_t is used in lrm_mon_t to indicate its behave.
- *LRM_MONITOR_SET: callback will be called when the target status is set.
- *LRM_MONITOR_CHANGE: callback will be called when the status is changed.
- *LRM_MONITOR_CLEAR: the monitors set on this resource will be all cleared.
- */
-typedef enum {
-	LRM_MONITOR_SET = 0,
-	LRM_MONITOR_CHANGE,
-	LRM_MONITOR_CLEAR,
-}mon_mode_t;
 
 /*used in struct lrm_op_t to show how an operation exits*/
 typedef enum {
@@ -98,43 +83,42 @@ typedef enum {
 	LRM_OP_ERROR,
 }op_status_t;
 
-/*for all timeouts: in seconds. 0 for no timeout*/
+/*for all timeouts: in milliseconds. 0 for no timeout*/
 
-/*this structure is used to represent the monitor*/
-typedef struct{
-	//input fields
-	mon_mode_t		mode;
-	int			interval;
-	int			target;
-	gpointer 		user_data;
-	//op_type here normally should be "status"
-	const char* 		op_type;
-	GHashTable*		params;
-	int			timeout;
+/*this structure is the information of the operation.*/
 
-	//output fields
-	lrm_rsc_t*		rsc;
-	op_status_t		status;
-	int			rc;
-	int			call_id;
-}lrm_mon_t;
+#define EVERYTIME -1
+#define CHANGED   -2
 
+/* Notice the interval and target_rc
+ *
+ * when interval==0, the operation will be executed only once
+ * when interval>0, the operation will be executed repeatly with the interval
+ *
+ * when target_rc==EVERYTIME, the client will be notified every time the
+ * 	operation executed.
+ * when target_rc==CHANGED, the client will be notified when the return code
+ *	is different with the return code of last execute of the operation
+ * when target_rc is other value, only when the return code is the same of
+ *	target_rc, the client will be notified.
+ */
 
-/*this structure is the information of the operation.*/                        
 typedef struct{
 	/*input fields*/
 	const char* 		op_type;
 	GHashTable*		params;
 	int			timeout;
 	gpointer		user_data;
+	int			interval;
+	int			target_rc;
 
 	/*output fields*/
-	lrm_rsc_t*		rsc;
-	op_status_t		status;
-	char*			app_name;
-	char*			data;
+	op_status_t		op_status;
 	int			rc;
 	int			call_id;
+	char*			output;
+	char*			rsc_id;
+	char*			app_name;
 }lrm_op_t;
 
 /*this enum is used in get_cur_state*/
@@ -161,28 +145,22 @@ struct rsc_ops
 
 
 /*
+ *stop_op:	stop the operation on the resource.
+ *
+ *callid:	the call id returned by perform_op()
+ *
+ *return:	if the operation has been stopped then return HA_OK
+ *		else return HA_FAIL
+ */
+	int (*stop_op) (lrm_rsc_t*, int call_id);
+
+/*
  *flush_ops:	throw away all operations queued for this resource,
  *		and return them as cancelled.
+ *
  *return:	HA_OK for success, HA_FAIL for failure
  */
 	int (*flush_ops) (lrm_rsc_t*);
-
-/*
- *set_monitor:
- *		add a monitor to a resource.
- *
- *mon:		the pointer to monitor structure.
- *
- *return: 	the monitor_id used in the callback function.
- */
-	int (*set_monitor) (lrm_rsc_t*, lrm_mon_t* mon);
-
-/*
- * get_monitors:
- *		return the monitor list on this resource.
- *
- */
-	GList* (*get_monitors) (lrm_rsc_t*);
 
 /*
  *get_cur_state:
@@ -207,21 +185,9 @@ struct rsc_ops
  *lrm_op_done_callback_t:
  *		this type of callback functions are called when some
  *		asynchronous operation is done.
- *
- *op:		the informtion of the finished opeartion.
- *
  */
 typedef void (*lrm_op_done_callback_t)	(lrm_op_t* op);
 
-/*
- *lrm_monitor_callback_t:
- *		this type of callback functions are called when the status
- *		of resource changed in a monitored mode.
- *
- *mon:		the monitor invoked
- *
- */
-typedef void (*lrm_monitor_callback_t)	(lrm_mon_t* mon);
 
 typedef struct ll_lrm
 {
@@ -237,8 +203,7 @@ struct lrm_ops
 	int		(*delete)  	(ll_lrm_t*);
 
 	int		(*set_lrm_callback) (ll_lrm_t*,
-			lrm_op_done_callback_t op_done_callback_func,
-	 		lrm_monitor_callback_t montior_callback_func);
+			lrm_op_done_callback_t op_done_callback_func);
 
 
 /*
@@ -278,7 +243,7 @@ struct lrm_ops
  *return:	A GHashtable, the key is the RA type, the value is the metadata.
  *
  */
-	GHashTable* (*get_all_type_metadatas)(ll_lrm_t*, const char* rsc_class);
+	GHashTable* (*get_all_type_metadata)(ll_lrm_t*, const char* rsc_class);
 
 /*
  *get_all_rscs:
@@ -308,7 +273,7 @@ struct lrm_ops
  *
  *class: 	the class of the resource
  *
- *type:	the type of the resource.
+ *type:		the type of the resource.
  *
  *params:	the parameters for the resource.
  *
@@ -366,7 +331,7 @@ ll_lrm_t* ll_lrm_new(const char * llctype);
  *		LOG_ERR: print LOG_ERR messages.
  *		LOG_INFO: print out LOG_INFO and LOG_ERR messages
  */
- void	set_debug_level(int level);
+void set_debug_level(int level);
  
 #endif /* __LRM_API_H */
 

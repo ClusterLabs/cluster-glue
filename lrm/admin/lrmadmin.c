@@ -43,7 +43,7 @@
 #include <lrm/raexec.h>
 #include <clplumbing/lsb_exitcodes.h>
 
-const char * optstring = "AD:dEF:d:Msg:c:S:LI:CT:h";
+const char * optstring = "AD:dEF:d:sg:M:c:S:LI:CT:h";
 
 static struct option long_options[] = {
 	{"daemon", 0, 0, 'd'},
@@ -57,6 +57,7 @@ static struct option long_options[] = {
 	{"delete",1,0,'D'},
 	{"raclass_supported",1,0,'C'},
 	{"ratype_supported",1,0,'T'},
+	{"metadata",1,0,'M'},
 	{"help",0,0,'h'},
 	{0,0,0,0}
 };
@@ -72,10 +73,6 @@ typedef enum {
  	DAEMON_OP,
 	EXECUTE_RA,
 	FLUSH,
-	MONITOR,
-	MONITOR_SET,
-	MONITOR_GET,
-	MONITOR_CLS,
 	RSC_STATE,
 	LIST_ALLRSC,
 	INF_RSC,
@@ -83,6 +80,7 @@ typedef enum {
 	DEL_RSC,
 	RACLASS_SUPPORTED,
 	RATYPE_SUPPORTED,
+	RA_METADATA,
 	HELP
 } lrmadmin_cmd_t;
 
@@ -104,16 +102,15 @@ const char * simple_help_screen =
 "         {-A|--add} <rscid> <raclass> <ratype> [<rsc_params_list>]\n"
 "         {-D|--delete} <rscid>\n"
 "         {-F|--flush} <rscid>\n"
-"         {-E|--execute} <rscid> <operator> <timeout> [<operator_parameters_"
+"         {-E|--execute} <rscid> <operator> <timeout> <interval> <target_rc> [<operator_parameters_"
 "list>]\n"\
-"         {-M|--monitor} -s <rscid> <operator> <timeout> <interval> "
 "[<operator_parameters_list>]\n"
-"         {-M|--monitor} {-g|-c} <rscid>\n"
 "         {-S|--state} <rscid>\n"
 "         {-L|--listall}\n"
 "         {-I|--information} <rsc_id>\n"
 "         {-C|--raclass_supported}\n"
 "         {-T|--ratype_supported} <raclss>\n"
+"         {-M|--metadata} <raclss> <ratype>\n"
 "         {-h|--help}\n";
 
 #define OPTION_OBSCURE_CHECK \
@@ -141,14 +138,10 @@ static void ocf_params_hash_to_str(gpointer key, gpointer value,
 static void normal_params_hash_to_str(gpointer key, gpointer value, 
 				      gpointer user_data);
 static lrm_rsc_t * get_lrm_rsc(ll_lrm_t * lrmd, char * rscid);
-static void g_print_monitor(gpointer lrm_mon, gpointer user_data);
-static int set_monitor(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
 /* the end of the internal used function list */
+static int ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
 
 static void lrm_op_done_callback(lrm_op_t* op);
-static void lrm_monitor_callback(lrm_mon_t* mon);
-
-static gboolean post_query_call_result(gpointer data);
 
 int main(int argc, char **argv)
 {
@@ -231,38 +224,8 @@ int main(int argc, char **argv)
 				break;
 
 			case 'M':
-				OPTION_OBSCURE_CHECK 
-				lrmadmin_cmd = MONITOR;
-				break;
-
-			case 's':
-				if (lrmadmin_cmd != MONITOR) {
-					cl_log(LOG_ERR,"Option error.");
-					return -1;
-				}
-				lrmadmin_cmd = MONITOR_SET;
-				break;
-
-			case 'g':
-				if (lrmadmin_cmd != MONITOR) {
-					cl_log(LOG_ERR,"Option error.");
-					return -1;
-				}
-				lrmadmin_cmd = MONITOR_GET;
-				if (optarg) {
-					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
-				}
-				break;
-
-			case 'c':
-				if (lrmadmin_cmd != MONITOR) {
-					cl_log(LOG_ERR,"Option error.");
-					return -1;
-				}
-				lrmadmin_cmd = MONITOR_CLS;
-				if (optarg) {
-					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
-				}
+				OPTION_OBSCURE_CHECK
+				lrmadmin_cmd = RA_METADATA;
 				break;
 
 			case 'S':
@@ -313,6 +276,8 @@ int main(int argc, char **argv)
                	return -2;
         }
 
+	lrmd->lrm_ops->set_lrm_callback(lrmd, lrm_op_done_callback);
+
         if (lrmd->lrm_ops->signon(lrmd, lrmadmin_name) != 1) { /* != HA_OK */
 		if (lrmadmin_cmd == DAEMON_OP) { 
 			printf("lrmd daemon is not running.\n");
@@ -361,6 +326,11 @@ int main(int argc, char **argv)
 				}
 			}
 			break;	
+
+		case RA_METADATA:
+			ra_metadata(lrmd, argc, optind, argv);
+			ASYN_OPS = FALSE;
+			break;
 
 		case ADD_RSC:
 			if (add_resource(lrmd, argc, optind, argv) == 0) {
@@ -480,77 +450,6 @@ int main(int argc, char **argv)
 			ASYN_OPS = FALSE;
 			break;
 
-		case MONITOR: 
-			fprintf(stderr, "Need one more definite option.\n");
-			ret_value = -1;
-			ASYN_OPS = FALSE;
-			break;
-
-		/* Don't finished ops */
-	  	case MONITOR_SET: 
-			call_id = set_monitor(lrmd, argc, optind, argv);
-			if (call_id < 0) {
-				cl_log(LOG_ERR, "There are invalid parameters");
-				ret_value = -3;
-				ASYN_OPS = FALSE;
-			} else { 
-				/* Return value: HA_OK = 1 Or  HA_FAIL = 0 */
-				if ( call_id == 0 ) {
-					cl_log(LOG_ERR, "Monitor settting "\
-					"Failed." );
-					ret_value = -3;
-					ASYN_OPS = FALSE;
-				} else { 
-					ASYN_OPS = FALSE;
-				}
-			}
-			break;
-
-		case MONITOR_GET: 
-			lrm_rsc = get_lrm_rsc(lrmd, rscid_arg_tmp);
-			if (!(lrm_rsc)) {
-				ret_value = -3;
-			} else { 
-				GList* monitor_list = NULL;
-				monitor_list = 
-					lrm_rsc->ops->get_monitors(lrm_rsc);
-				if ( monitor_list == NULL) {
-					printf("No monitor on this resource.\n");
-				} else {
-					printf("Monitors on this resource:\n");
-					g_list_foreach(monitor_list, 
-						g_print_monitor, NULL);
-					g_list_free(monitor_list);
-				}
-			}
-			
-			ASYN_OPS = FALSE;
-			break;
-
-		case MONITOR_CLS: 
-			lrm_rsc = get_lrm_rsc(lrmd, rscid_arg_tmp);
-			if (!(lrm_rsc)) {
-				ret_value = -3;
-			} else { 
-				lrm_mon_t mon_ops;
-				mon_ops.mode = LRM_MONITOR_CLEAR;
-				mon_ops.op_type = "status";
-				mon_ops.params = NULL;
-				
-				if (lrm_rsc->ops->set_monitor(lrm_rsc, &mon_ops)
-					!= 0 ) { /* HA_OK */
-					printf("clearing all "\
-						"monitors on this resource.\n");
-					ASYN_OPS = FALSE;
-				} else {
-					fprintf(stderr, "Failed to clear all "\
-						"monitors on this resource.\n");
-					ret_value = -1;
-					ASYN_OPS = FALSE;
-				}
-			}
-			
-			break;
 
 		default:
 			fprintf(stderr, "This option is not supported yet.\n");
@@ -561,13 +460,8 @@ int main(int argc, char **argv)
 
 	if (ASYN_OPS) {
 		printf( "waiting for calling result from the lrmd.\n");
-		lrmd->lrm_ops->set_lrm_callback(lrmd, lrm_op_done_callback, 
-			lrm_monitor_callback);
+		lrmd->lrm_ops->rcvmsg(lrmd,TRUE);
 
-		mainloop = g_main_new(FALSE);
-
-		g_idle_add(post_query_call_result, lrmd);
-		g_main_run(mainloop);
 	}
 
 	lrmd->lrm_ops->signoff(lrmd);
@@ -583,40 +477,19 @@ lrm_op_done_callback(lrm_op_t* op)
 		return;
 	}
 
-	printf("operation execution result:%s\n", status_msg[op->status-LRM_OP_DONE]);
-	printf("resource agent return code:%d\n", op->rc);
-	printf("output data from resource agent:\n%s\n", op->data);
+	printf("----------------operation--------------\n");
+	printf("type:%s\n", op->op_type);
+	printf("operation status:%s\n", status_msg[op->op_status-LRM_OP_DONE]);
+	if ( op->op_status==LRM_OP_DONE ) {
+		printf("return code:%d\n", op->rc);
+		printf("output data:\n%s\n", op->output);
+	}
+	printf("---------------------------------------\n\n");
 
 	/* Don't need ?
 	 * g_free(op->rsc);  
 	 * g_free(op);
 	 */
-}
-
-static void
-lrm_monitor_callback(lrm_mon_t* mon)
-{
-	if (mon) {
-		g_print_monitor(mon, NULL);
-	}
-}
-
-static gboolean
-post_query_call_result(gpointer data)
-{
-	ll_lrm_t * lrmd = (ll_lrm_t *) data;
-
-	if  (!(lrmd->lrm_ops->msgready(lrmd)) )  {
-		return TRUE;
-	}
-
-	if (0 > lrmd->lrm_ops->rcvmsg(lrmd, TRUE)) {
-		cl_log(LOG_ERR, "Error when post query calling result.");
-	}
-
-	g_main_quit(mainloop);
-
-	return FALSE;
 }
 
 static int 
@@ -642,9 +515,20 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 
 	op.op_type = argv[optind+1];
 	op.timeout = atoi(argv[optind+2]);
+	op.interval = atoi(argv[optind+3]);
+	if (0 == strcmp(argv[optind+4], "EVERYTIME")) {
+		op.target_rc = EVERYTIME;
+	}
+	else
+	if (0 == strcmp(argv[optind+4], "CHANGED")) {
+		op.target_rc = CHANGED;
+	}
+	else {
+		op.target_rc = atoi(argv[optind+4]);
+	}
 
 	if ((argc - optind) > 3) {
-		if (0 > transfer_cmd_params(argc, optind+3, argv, 
+		if (0 > transfer_cmd_params(argc, optind+5, argv, 
 				lrm_rsc->class, &params_ht) ) {
 			return -2;
 		}
@@ -658,6 +542,17 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 		g_hash_table_destroy(params_ht);
 	}
 	return call_id;
+}
+static int
+ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
+{
+	const char * class = argv[optind-1];
+	const char * type = argv[optind];
+	char* metadata = lrmd->lrm_ops->get_rsc_type_metadata(lrmd, class, type);
+	printf ("metadata of %s(%s) is: %s\n",type,class,metadata);
+	g_free (metadata);
+		
+	return 0; 
 }
 
 static int 
@@ -924,66 +819,3 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 	return lrm_rsc;
 }
 
-static void
-g_print_monitor(gpointer data, gpointer user_data)
-{
-	/* Don't need to free it */
-	lrm_mon_t * lrm_mon = (lrm_mon_t *) data;
-	if (lrm_mon) {
-		char * tmp;
-		printf("MONITOR:\n");
-		printf("Mode: %d\n", lrm_mon->mode);
-		printf("Interval: %d\n", lrm_mon->interval);
-		printf("Target: %d\n", lrm_mon->target);
-		printf("Operation type: %s\n", lrm_mon->op_type);
-		printf("Timeout: %d\n", lrm_mon->timeout);
-		tmp = params_hashtable_to_str(lrm_mon->rsc->class, 
-						lrm_mon->params);
-		printf("Parameters: %s\n", tmp);
-		g_free(tmp);
-		/* Other fields ? */
-	}
-}
-
-static int 
-set_monitor(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
-{
-	char rsc_id[RID_LEN];
-	GHashTable * params_ht = NULL;
-	lrm_mon_t mon;
-	lrm_rsc_t * lrm_rsc;
-	int call_id;
-	
-	if ((argc - optind) < 4) {
-		cl_log(LOG_ERR,"No enough parameters.");
-		return -2;
-	}
-	
-	rsc_id[RID_LEN-1] = '\0';
-	strncpy(rsc_id, argv[optind], RID_LEN-1);
-	lrm_rsc = lrmd->lrm_ops->get_rsc(lrmd, rsc_id);	
-	if (!lrm_rsc) {
-		return -1;
-	}
-
-	mon.mode = LRM_MONITOR_CHANGE;
-	mon.op_type = argv[optind+1];
-	mon.timeout = atoi(argv[optind+2]);
-	mon.interval = atoi(argv[optind+3]);
-
-	if ((argc - optind) > 4) {
-		if ( 0 > transfer_cmd_params(argc, optind+4, argv, 
-				lrm_rsc->class, &params_ht) ) {
-			return -1;
-		}
-	}
-	mon.params = params_ht;
-
-	call_id = lrm_rsc->ops->set_monitor(lrm_rsc, &mon);
-	/* g_free(lrm_rsc);  Don't need to free it? */
-	if (params_ht) {
-		g_hash_table_foreach(params_ht, free_stritem_of_hashtable, NULL);
-		g_hash_table_destroy(params_ht);
-	}
-	return call_id;
-}

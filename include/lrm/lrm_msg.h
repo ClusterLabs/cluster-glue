@@ -59,9 +59,9 @@
 #define F_LRM_DATALEN		"lrm_datalen"
 #define F_LRM_DATA		"lrm_data"
 #define F_LRM_STATE		"lrm_state"
-#define F_LRM_MONMODE		"lrm_monmode"
-#define F_LRM_MONINTVL		"lrm_monintvl"
-#define F_LRM_MONTGT		"lrm_montgt"
+#define F_LRM_INTERVAL		"lrm_interval"
+#define F_LRM_TARGETRC		"lrm_targetrc"
+#define F_LRM_LASTRC		"lrm_lastrc"
 #define F_LRM_STATUS		"lrm_status"
 #define F_LRM_METADATA		"lrm_metadata"
 
@@ -88,6 +88,7 @@
 #define MONITOR			"monitor"
 #define RETURN			"return"
 #define FLUSHOPS		"flushops"
+#define STOPOP			"stopop"
 
 #define MAX_INT_LEN 		10
 #define MAX_NAME_LEN 		255
@@ -100,6 +101,8 @@
  */
 int ha_msg_add_int(struct ha_msg * msg, const char * name, int value);
 int ha_msg_value_int(struct ha_msg * msg, const char * name, int* value);
+int ha_msg_mod_int(struct ha_msg * msg, const char * name, int value);
+
 /*
 int ha_msg_add_uuid(struct ha_msg * msg, const char * name, const uuid_t id);
 int ha_msg_value_uuid(struct ha_msg * msg, const char * name, uuid_t id);
@@ -159,7 +162,5 @@ struct ha_msg* create_lrm_ret(int rc, int fields);
  */ 
 
 struct ha_msg* create_rsc_perform_op_msg (const char* rid, lrm_op_t* op);
-
-struct ha_msg* create_rsc_set_monitor_msg(const char* rid, lrm_mon_t* monitor);
-				
+		
 #endif /* __LRM_MSG_H */
