@@ -41,7 +41,7 @@
 
 
 int msg2netstring_buf(const struct ha_msg*, char*, size_t, size_t*);
-int compose_netstring(char*, const char*, const char*, size_t, int*);
+int compose_netstring(char*, const char*, const char*, size_t, size_t*);
 int is_auth_netstring(const char*, size_t, const char*, size_t);
 char* msg2netstring(const struct ha_msg*, size_t*);
 struct ha_msg* netstring2msg(const char *, size_t, int);
@@ -67,7 +67,7 @@ cl_set_authentication_computation_method(int (*method)(int whichauth
 
 int
 compose_netstring(char * s, const char * smax, const char* data,
-		  size_t len, int* comlen)
+		  size_t len, size_t* comlen)
 {
 
 	char *	sp = s;
@@ -117,7 +117,7 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 	datap = sp;
 
 	for (i=0; i < m->nfields; i++) {
-		int comlen;
+		size_t comlen;
 		size_t llen;
 
 		if (compose_netstring(sp, smax, m->names[i],
