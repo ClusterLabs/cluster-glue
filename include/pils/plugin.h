@@ -443,6 +443,11 @@ PIL_rc		PILLoadPlugin(PILPluginUniv* piuniv
 ,		const char *	pluginname
 ,		void *		pi_private);
 
+/* Return  PIL_OK if the given  plugin exists */
+PIL_rc		PILPluginExists(PILPluginUniv* piuniv
+,		const char *	plugintype
+,		const char *	pluginname);
+
 /* Either or both of pitype and piname may be NULL */
 void		PILSetDebugLevel(PILPluginUniv*u, const char * pitype
 ,		const char * piname
