@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.68 2005/02/24 10:34:49 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.69 2005/03/01 08:41:29 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -211,7 +211,8 @@ const char* lrm_system_name 	= "lrmd";
 GHashTable * RAExecFuncs 	= NULL;
 GList* ra_class_list		= NULL;
 gboolean shutdown_in_progress	= FALSE;
-
+extern int use_logging_daemon;
+extern int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 /*
  * Daemon functions
  *
@@ -235,7 +236,7 @@ main(int argc, char ** argv)
 	int argerr = 0;
 	int flag;
 
-
+        const char *test = "Testing log daemon connection";
 
 	while ((flag = getopt(argc, argv, OPTARGS)) != EOF) {
 		switch(flag) {
@@ -272,8 +273,16 @@ main(int argc, char ** argv)
 	cl_log_set_entity(lrm_system_name);
 	cl_log_enable_stderr(debug_level?TRUE:FALSE);
 	cl_log_set_facility(LOG_DAEMON);
-	/* waiting for it becomes stable */
-	cl_log_send_to_logging_daemon(FALSE); 
+
+        cl_log_send_to_logging_daemon(FALSE);
+        if(HA_FAIL == LogToLoggingDaemon(LOG_INFO, test, strlen(test), TRUE)) {
+                lrmd_log(LOG_WARNING, "Not using log daemon");
+
+        } else {
+                cl_log_send_to_logging_daemon(TRUE);
+                lrmd_log(LOG_INFO, "Enabled log daemon");
+        }
+
 	if (req_status){
 		return init_status(PID_FILE, lrm_system_name);
 	}
@@ -1809,6 +1818,8 @@ perform_ra_op(lrmd_op_t* op)
 				timeout = 0;
 				lrmd_log(LOG_ERR,"perform_ra_op: can not find timeout");
 			}
+			/*should we use logging daemon or not in script*/
+			setenv(HALOGD, use_logging_daemon?"yes":"no",1);
 
 			/* Name of the resource and some others also
 			 * need to be passed in. Maybe pass through the
@@ -2153,6 +2164,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.69  2005/03/01 08:41:29  zhenh
+ * make lrmd and the scripts started by lrmd log to log daemon if the daemon is running
+ *
  * Revision 1.68  2005/02/24 10:34:49  zhenh
  * when lrm deletes a resource, notifies the clients who are monitoring the resource
  *
