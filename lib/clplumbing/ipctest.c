@@ -768,7 +768,7 @@ s_send_msg(gpointer data)
 		}
 			
 	}
-	return i->wcount <= i->max;
+	return i->wcount < i->max;
 }
 
 
