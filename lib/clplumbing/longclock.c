@@ -25,16 +25,35 @@
 #include <sys/times.h>
 #include <clplumbing/longclock.h>
 
+#ifndef CLOCK_T_IS_LONG_ENOUGH
 static	clock_t		lasttimes = 0L;
 static	unsigned long	wrapcount = 0;
-
 static	longclock_t	lc_wrapcount;
+#endif
+
 static	unsigned 	Hz = 0;
 static	longclock_t 	Lc_Hz;
 static	double		d_Hz;
 static	longclock_t	ms_per_tick;
 
 #define	WRAPSHIFT	32
+
+const longclock_t	zero_longclock = 0UL;
+
+#ifndef CLOCK_T_IS_LONG_ENOUGH
+#	undef time_longclock
+#endif
+
+#ifdef HAVE_LONGCLOCK_ARITHMETIC
+#	undef	msto_longclock
+#	undef	longclockto_ms
+#	undef	secsto_longclock
+#	undef	add_longclock
+#	undef	sub_longclock
+#	undef	cmp_longclock
+#endif
+
+struct tms	longclock_dummy_tms_struct;
 
 unsigned
 hz_longclock(void)
@@ -50,14 +69,23 @@ hz_longclock(void)
 	return Hz;
 }
 
+#ifdef CLOCK_T_IS_LONG_ENOUGH
+
+longclock_t
+time_longclock(void)
+{
+	return (longclock_t)times(&longclock_dummy_tms_struct);
+}
+
+#else	/* clock_t is shorter than 64 bits */
+
 longclock_t
 time_longclock(void)
 {
 	clock_t	timesval;
-	struct tms	dummy;
 	
 	
-	timesval = times(&dummy);
+	timesval = times(&longclock_dummy_tms_struct);
 
 	if (timesval < lasttimes) {
 		++wrapcount;
@@ -65,6 +93,7 @@ time_longclock(void)
 	}
 	return (lc_wrapcount | (longclock_t)timesval);
 }
+#endif	/* ! CLOCK_T_IS_LONG_ENOUGH */
 
 longclock_t
 msto_longclock(unsigned long ms)
@@ -106,7 +135,7 @@ dsecsto_longclock(double v)
 }
 
 unsigned long
-longclock_to_ms(longclock_t t)
+longclockto_ms(longclock_t t)
 {
 	(void)(Hz == 0 && hz_longclock());
 
