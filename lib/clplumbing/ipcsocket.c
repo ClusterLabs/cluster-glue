@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.108 2004/12/01 22:22:48 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.109 2004/12/04 00:47:45 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1125,9 +1125,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
                         ++SocketIPCStats.send_count;
 
 			if (sendrc <= 0){
-				if(errno == EAGAIN){
-					break;
-				}
+				break;
 			}else {				
 				p = p + sendrc;
 				bytes_remaining -= sendrc;
@@ -1617,6 +1615,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   temp_ch->ops = (struct IPC_OPS *)&socket_ops;
   temp_ch->msgpad = sizeof(struct SOCKET_MSG_HEAD);
   temp_ch->bytes_remaining = 0;
+  temp_ch->is_send_blocking = TRUE;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
    
@@ -1659,6 +1658,7 @@ socket_server_channel_new(int sockfd){
   temp_ch->ops = (struct IPC_OPS *)&socket_ops;
   temp_ch->msgpad = sizeof(struct SOCKET_MSG_HEAD);
   temp_ch->bytes_remaining = 0;
+  temp_ch->is_send_blocking = TRUE;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
    
