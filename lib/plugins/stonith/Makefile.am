@@ -109,7 +109,8 @@ plugindir	   = $(stonith_plugindir)/stonith2
 plugin_LTLIBRARIES =	apcsmart.la		\
 			baytech.la		\
 			null.la			\
-			ssh.la
+			ssh.la			\
+			ibmhmc.la
 
 #apcmaster_la_SOURCES	= apcmaster.c $(INCFILES)
 #apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version
@@ -136,9 +137,9 @@ baytech_la_LIBADD	= $(GLIBLIB)
 #external_la_LDFLAGS	= -export-dynamic -module -avoid-version
 #external_la_LIBADD	= $(top_builddir)/replace/libreplace.la
 
-#ibmhmc_la_SOURCES	= ibmhmc.c	$(INCFILES)
-#ibmhmc_la_LDFLAGS	= -export-dynamic -module -avoid-version
-#ibmhmc_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
+ibmhmc_la_SOURCES	= ibmhmc.c	$(INCFILES)
+ibmhmc_la_LDFLAGS	= -export-dynamic -module -avoid-version
+ibmhmc_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
 #ipmilan_la_SOURCES	= ipmilan.c ipmilan.h ipmilan_command.c	$(INCFILES)
 #ipmilan_la_LDFLAGS	= -export-dynamic -module -avoid-version
