@@ -276,9 +276,9 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 		int		priority = logmsg->priority;
 		
 		cl_direct_log(priority, logmsg->message, 
-			      logmsg->use_pri_str);
+			      logmsg->use_pri_str, logmsg->entity);
 		
-		logd_log("msg: %s\n", logmsg->message);
+		/*logd_log("%s: %s\n", logmsg->entity,logmsg->message);*/
 		
 		if (ipcmsg->msg_done){
 			ipcmsg->msg_done(ipcmsg);
