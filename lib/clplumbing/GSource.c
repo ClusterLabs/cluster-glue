@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.26 2005/02/17 18:02:32 alan Exp $ */
+/* $Id: GSource.c,v 1.27 2005/02/17 19:52:16 andrew Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -724,7 +724,7 @@ static GSourceFuncs G_SIG_SourceFuncs = {
 	G_SIG_destroy,
 };
 
-static GHashTable *G_main_signal_list = NULL;
+static GSIGSource *G_main_signal_list[_NSIG];
 
 void
 set_SignalHandler_dnotify(GSIGSource* sig_src, GDestroyNotify notify)
@@ -742,6 +742,7 @@ G_main_add_SignalHandler(int priority, int signal,
 {
 	GSIGSource* sig_src;
 	GSource * source = g_source_new(&G_SIG_SourceFuncs, sizeof(GSIGSource));
+	gboolean failed = FALSE;
 	
 	sig_src = (GSIGSource*)source;
 	
@@ -755,20 +756,33 @@ G_main_add_SignalHandler(int priority, int signal,
 
 	g_source_set_priority(source, priority);
 	g_source_set_can_recurse(source, FALSE);
-	sig_src->gsourceid = g_source_attach(source, NULL);
 
-	if(G_main_signal_list == NULL) {
-		G_main_signal_list = g_hash_table_new(g_int_hash, g_int_equal);
+	if(G_main_signal_list[signal] != NULL) {
+		cl_log(LOG_ERR,
+		       "G_main_add_SignalHandler: Handler already present for signal %d",
+		       signal);
+		failed = TRUE;
+	}
+	if(!failed) {
+		sig_src->gsourceid = g_source_attach(source, NULL);
+		if (sig_src->gsourceid < 1) {
+			cl_log(LOG_ERR, "G_main_add_SignalHandler: Could not attach source for signal %d (%d)",
+			       signal, sig_src->gsourceid);
+			failed = TRUE;
+		}
 	}
 	
-	g_hash_table_replace(
-		G_main_signal_list, &signal, sig_src);
-	
-	if (sig_src->gsourceid == 0) {
+	if(failed) {
+		cl_log(LOG_ERR, "G_main_add_SignalHandler: Signal handler for signal %d NOT added",
+			signal);
+		g_source_remove(sig_src->gsourceid);
 		g_source_unref(source);
 		source = NULL;
 		sig_src = NULL;
 	} else {
+		cl_log(LOG_INFO, "G_main_add_SignalHandler: Added signal handler for signal %d",
+			signal);
+		G_main_signal_list[signal] = sig_src;
 		CL_SIGNAL(signal, G_main_signal_handler);
 	}
 	
@@ -786,27 +800,26 @@ G_main_del_SignalHandler(GSIGSource* sig_src)
 		cl_log(LOG_CRIT, "Bad gsource in G_main_del_IPC_channel");
 		return FALSE;
 	}
+	g_assert(_NSIG > sig_src->signal);
 
 	CL_SIGNAL(sig_src->signal, NULL);
 
-	g_source_remove(sig_src->gsourceid);
 	sig_src->gsourceid = 0;
+	sig_src->signal_triggered = FALSE;
+	g_source_remove(sig_src->gsourceid);
 
-	g_hash_table_remove(
-		G_main_signal_list, GUINT_TO_POINTER(sig_src->signal));
+	G_main_signal_list[sig_src->signal] = NULL;
 
 	return TRUE;
 }
 
 static gboolean
-G_SIG_prepare(GSource* source,
-	     gint* timeout)
+G_SIG_prepare(GSource* source, gint* timeout)
 {
 	GSIGSource* sig_src = (GSIGSource*)source;
 	
 	g_assert(IS_SIGSOURCE(sig_src));
 	
-
 	return sig_src->signal_triggered;
 }
 
@@ -872,10 +885,14 @@ G_main_signal_handler(int nsig)
 {
 	GSIGSource* sig_src = NULL;
 
-	sig_src = (GSIGSource*)g_hash_table_lookup(G_main_signal_list, &nsig);
+	g_assert(G_main_signal_list != NULL);
+	g_assert(_NSIG > nsig);
+	
+	sig_src = G_main_signal_list[nsig];
 
-	g_assert(sig_src != NULL);
+/* 	g_assert(sig_src != NULL); */
 	if(sig_src == NULL) {
+		cl_log(LOG_CRIT, "No handler for signal -%d", nsig);
 		return;
 	}
 	
