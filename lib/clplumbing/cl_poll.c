@@ -556,13 +556,13 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 	int				eventcount = 0;
 	unsigned int			j;
 	int				savederrno = errno;
+	int				stw_errno;
 	int				rc;
-#ifdef TIME_CALLS
 	longclock_t			starttime;
-	int				maxsleep = timeoutms;
+	longclock_t			endtime;
 	const int			msfudge
 	=				2* 1000/hz_longclock();
-#endif
+	int				mselapsed = 0;
 
 	/* Do we have any old news to report? */
 	if ((nready=cl_init_poll_sig(fds, nfds)) != 0) {
@@ -581,17 +581,14 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 	 * cl_init_poll() prepared a set of file signals to watch...
 	 */
 
+recalcandwaitagain:
 	if (timeoutms >= 0) {
 		ts.tv_sec = timeoutms / 1000;
 		ts.tv_nsec = (((unsigned long)timeoutms) % 1000UL)*1000000UL;
 	}else{
 		ts.tv_sec = G_MAXLONG;
 		ts.tv_nsec = 99999999UL;
-#ifdef TIME_CALLS
-		maxsleep = G_MAXINT;
-#endif
 	}
-
 
 	/*
 	 * Perform a timed wait for any of our signals...
@@ -601,19 +598,12 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 	 * sleeping.
 	 */
 
-	if (debug && itertime->tv_sec != 0 && itertime->tv_nsec != 0) {
-		cl_log(LOG_DEBUG, "sigtimedwait() for (%ld, %ld) time"
-		,	(long)itertime->tv_sec, itertime->tv_nsec);
-	}
-
-#ifdef TIME_CALLS
 	starttime = time_longclock();
-#endif
 	/*
 	 * Wait up to the prescribed time for a signal.
-	 * If we get a signal, then loop grabbing any other
-	 * pending signals, but subsequent iterations will
-	 * use &zerotime for the maximum wait time...
+	 * If we get a signal, then loop grabbing all other
+	 * pending signals. Note that subsequent iterations will
+	 * use &zerotime to get the minimum wait time.
 	 */
 	if (debug) {
 		check_fd_info(fds, nfds);
@@ -621,35 +611,29 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 	}
 waitagain:
 	while (sigtimedwait(&SignalSet, &info, itertime) >= 0) {
-		int	nsig;
-#ifdef TIME_CALLS
-		int		mselapsed;
-		longclock_t	endtime = time_longclock();
-
-
-		mselapsed = longclockto_ms(sub_longclock(endtime, starttime));
-
-		if (maxsleep != G_MAXINT && mselapsed > maxsleep + msfudge) {
-			/* We slept too long... */
-			cl_log(LOG_WARNING
-			,	"sigtimedwait() for %d ms took %d ms"
-			,	maxsleep, mselapsed);
-		}
-#endif
-
-		itertime = &zerotime;
-		nsig = info.si_signo;
+		int		nsig = info.si_signo;
 
 		/* Call signal handler to simulate signal reception */
+
 		cl_poll_sigaction(nsig, &info, NULL);
-#ifdef TIME_CALLS
-		maxsleep = 0;
-		starttime = time_longclock();
-#endif
+		itertime = &zerotime;
 	}
+	stw_errno=errno; /* Save errno for later use */
+	endtime = time_longclock();
+	mselapsed = longclockto_ms(sub_longclock(endtime, starttime));
+
+#ifdef TIME_CALLS
+	if (timeoutms >= 0 && mselapsed > timeoutms + msfudge) {
+		/* We slept too long... */
+		cl_log(LOG_WARNING
+		,	"sigtimedwait() sequence for %d ms took %d ms"
+		,	timeoutms, mselapsed);
+	}
+#endif
+
 	if (SigQOverflow) {
 		/* OOPS!  Better recover from this! */
-		/* This will use poll(2) to get (correct) current status */
+		/* This will use poll(2) to correct our current status */
 		cl_poll_sigpoll_overflow();
 	}
 
@@ -673,10 +657,22 @@ waitagain:
 			}
 		}
 	}
-	if (eventcount == 0 && timeoutms < 0 && errno == EAGAIN) {
-		goto waitagain;
+	if (eventcount == 0 && stw_errno == EAGAIN && timeoutms != 0) {
+		/* We probably saw an event the user didn't ask to see. */
+		/* Consquently, we may have more waiting to do */
+		if (timeoutms < 0) {
+			/* Restore our infinite wait time */
+			itertime = &ts;
+			goto waitagain;
+		}else if (timeoutms > 0) {
+			if (mselapsed < timeoutms) {
+				timeoutms -= mselapsed;
+				goto recalcandwaitagain;
+			}
+				
+		}
 	}
-	rc = (eventcount > 0 ? eventcount : (errno == EAGAIN ? 0 : -1));
+	rc = (eventcount > 0 ? eventcount : (stw_errno == EAGAIN ? 0 : -1));
 
 	if (rc >= 0) {
 		errno = savederrno;
