@@ -421,7 +421,7 @@ logd_stop(void){
 	}
 	
 	if (kill((pid_t)running_logd_pid, SIGTERM) >= 0) {
-		/* Wait for the running heartbeat to die */
+		/* Wait for the running logd to die */
 		alarm(0);
 		do {
 			sleep(1);
@@ -657,14 +657,15 @@ main(int argc, char** argv)
 	
 	if (ask_status){
 		long pid;
+
 		if( (pid = get_running_logd_pid()) > 0 ){
-			fprintf(stderr, "logging daemon is running [pid = %ld].\n", pid);
-			exit(LSB_EXIT_OK);
+			printf("logging daemon is running [pid = %ld].\n", pid);
+			exit(LSB_EXIT_OK);			
 		}else{
-			fprintf(stderr, "logging daemon is stopped.\n");
+			printf("logging daemon is stopped.\n");
 			exit(LSB_EXIT_GENERIC);
 		}
-
+		
 	}
 	if (stop_logd){
 		logd_stop();
