@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.32 2004/11/18 00:34:37 gshi Exp $ */
+/* $Id: ipc.h,v 1.33 2004/12/01 02:31:51 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -109,6 +109,8 @@ typedef struct IPC_AUTH			IPC_Auth;
 
 typedef struct IPC_OPS			IPC_Ops;
 typedef struct IPC_WAIT_OPS		IPC_WaitOps;
+
+
 
 /* wait connection structure. */
 struct IPC_WAIT_CONNECTION{
@@ -575,6 +577,43 @@ extern IPC_Auth * ipc_set_auth(uid_t * a_uid, gid_t * a_gid
 extern void ipc_destroy_auth(IPC_Auth * auth);
 
 extern void ipc_set_pollfunc(int (*)(struct pollfd*, unsigned int, int));
+
+struct SOCKET_MSG_HEAD{
+  int msg_len;
+};
+
+#define	MAXDATASIZE	65535
+
+#define POOL_SIZE (4*1024)
+struct ipc_bufpool{
+	
+	int refcount;
+	char* currpos;
+	char* consumepos;
+	char* startpos;
+	char* endpos;
+};
+
+struct ipc_bufpool* ipc_bufpool_new(void);
+
+void	ipc_bufpool_del(struct ipc_bufpool* pool);
+
+int	ipc_bufpool_spaceleft(struct ipc_bufpool* pool);
+
+int	ipc_bufpool_update(struct ipc_bufpool* pool,
+			   struct IPC_CHANNEL * ch,
+			   int msg_len,
+			   IPC_Queue* rqueue);
+
+gboolean	ipc_bufpool_full(struct ipc_bufpool* pool,
+				 struct IPC_CHANNEL* ch);
+int		ipc_bufpool_partial_copy(struct ipc_bufpool* dstpool,
+					 struct ipc_bufpool* srcpool);
+
+void	ipc_bufpool_ref(struct ipc_bufpool* pool);
+
+void	ipc_bufpool_unref(struct ipc_bufpool* pool);
+
 
 #define	IPC_PATH_ATTR		"path"		/* pathname attribute */
 #define	IPC_DOMAIN_SOCKET	"uds"		/* Unix domain socket */

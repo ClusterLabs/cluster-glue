@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.18 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: ocf_ipc.c,v 1.19 2004/12/01 02:31:51 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -27,6 +27,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/poll.h>
+#include <clplumbing/cl_log.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 
 struct IPC_WAIT_CONNECTION * socket_wait_conn_new(GHashTable* ch_attrs);
 struct IPC_CHANNEL * socket_client_channel_new(GHashTable* ch_attrs);
@@ -105,4 +109,274 @@ ipc_destroy_auth(struct IPC_AUTH *auth)
 		}
 		free((void *)auth);
 	}
+}
+
+	
+struct ipc_bufpool*
+ipc_bufpool_new(void)
+{
+	struct ipc_bufpool* pool;
+	
+	pool = (struct ipc_bufpool*)g_malloc(POOL_SIZE);
+	memset(pool, 0, POOL_SIZE);
+	pool->refcount = 1;
+	pool->startpos = pool->currpos = pool->consumepos =
+		((char*)pool) + sizeof(struct ipc_bufpool); 
+	
+	pool->endpos = ((char*)pool)  + POOL_SIZE;
+	
+	return pool;
+}
+
+void
+ipc_bufpool_del(struct ipc_bufpool* pool)
+{
+	
+	if (pool == NULL){
+		return;
+	}
+	
+	if (pool->refcount > 0){
+		cl_log(LOG_ERR," ipc_bufpool_del:"
+		       " IPC buffer pool reference count"
+		       " > 0");
+		return;
+	}
+	
+	memset(pool, 0, POOL_SIZE);
+	g_free(pool);	
+	return;
+}
+
+int
+ipc_bufpool_spaceleft(struct ipc_bufpool* pool)
+{
+
+	if( pool == NULL){
+		cl_log(LOG_ERR, "ipc_bufpool_spacelft:"
+		       "invalid input argument");
+		return 0;		
+	}
+	
+	return pool->endpos - pool->currpos;
+}
+
+
+
+
+/* brief free the memory space allocated to msg and destroy msg. */
+
+static void
+ipc_bufpool_msg_done(struct IPC_MESSAGE * msg) {
+	
+	struct ipc_bufpool* pool;
+	
+	if (msg == NULL){
+		cl_log(LOG_ERR, "ipc_bufpool_msg_done:"
+		       "invalid input");
+		return;
+	}
+	
+	pool = (struct ipc_bufpool*)msg->msg_private;
+	
+	ipc_bufpool_unref(pool);
+	g_free(msg);
+	
+}
+
+static struct IPC_MESSAGE*
+ipc_bufpool_msg_new(void)
+{
+	struct IPC_MESSAGE * temp_msg;
+	
+	temp_msg = g_malloc(sizeof(struct IPC_MESSAGE));
+	if (temp_msg == NULL){
+		cl_log(LOG_ERR, "ipc_bufpool_msg_new:"
+		       "allocating new msg failed");
+		return NULL;
+	}
+	
+	memset(temp_msg, 0, sizeof(struct IPC_MESSAGE));
+
+	return temp_msg;
+}
+
+
+/* after a recv call, we have new data
+ * in the pool buf, we need to update our
+ * pool struct to consume it
+ *
+ */
+
+int
+ipc_bufpool_update(struct ipc_bufpool* pool,
+		   struct IPC_CHANNEL * ch,
+		   int msg_len,
+		   IPC_Queue* rqueue)
+{
+	IPC_Message*			ipcmsg;
+	struct SOCKET_MSG_HEAD*		head;
+	int				nmsgs = 0 ;
+	
+	if (rqueue == NULL){
+		cl_log(LOG_ERR, "ipc_update_bufpool:"
+		       "invalid input");
+		return 0;
+	}
+	
+	pool->currpos += msg_len;
+	
+	while(TRUE){
+		/*not enough data for head*/
+		if (pool->currpos - pool->consumepos < ch->msgpad){
+			break;
+		}
+		
+		head = (struct SOCKET_MSG_HEAD*)pool->consumepos;
+		
+		if ( head->msg_len > MAXDATASIZE){
+			cl_log(LOG_ERR, "ipc_update_bufpool:"
+			       "msg length is corruptted(%d)",
+			       head->msg_len);
+			break;
+		}
+		
+		if (pool->consumepos + ch->msgpad + head->msg_len
+		    > pool->endpos){
+			break;
+			
+		}
+		
+		ipcmsg = ipc_bufpool_msg_new();
+		if (ipcmsg == NULL){
+			cl_log(LOG_ERR, "ipc_update_bufpool:"
+			       "allocating memory for new ipcmsg failed");
+			break;
+			
+		}
+		
+		ipcmsg->msg_buf = pool->consumepos;
+		ipcmsg->msg_body = pool->consumepos + ch->msgpad;
+		ipcmsg->msg_len = head->msg_len;
+		ipcmsg->msg_private = pool;
+		ipcmsg->msg_done = ipc_bufpool_msg_done;
+		
+		rqueue->queue = g_list_append(rqueue->queue, ipcmsg);
+		rqueue->current_qlen ++;
+		nmsgs++;
+		
+		pool->consumepos += ch->msgpad + head->msg_len;
+		ipc_bufpool_ref(pool);
+	}
+	
+	return nmsgs;
+}
+
+
+
+
+
+
+gboolean
+ipc_bufpool_full(struct ipc_bufpool* pool, struct IPC_CHANNEL* ch)
+{
+
+	struct SOCKET_MSG_HEAD* head;
+	/* not enough space for head */
+	if (pool->endpos - pool->consumepos < ch->msgpad){
+		return TRUE;
+	}
+	
+	/*enough space for head*/
+	if (pool->currpos - pool->consumepos >= ch->msgpad){
+		head = (struct SOCKET_MSG_HEAD*) pool->consumepos;
+		
+		/* not enough space for data*/
+		if ( pool->consumepos + ch->msgpad + head->msg_len >= pool->endpos){
+			return TRUE;
+		}
+	}
+	
+	
+	/* Either we are sure we have enough space 
+	 * or we cannot tell because we have not received
+	 * head yet. But we are sure we have enough space
+	 * for head
+	 */
+	return FALSE;
+
+
+	
+}
+
+
+int 
+ipc_bufpool_partial_copy(struct ipc_bufpool* dstpool,
+			      struct ipc_bufpool* srcpool)
+{
+	struct SOCKET_MSG_HEAD * head;
+	int space_needed;
+	int nbytes;
+	
+	if (dstpool == NULL
+	    || srcpool == NULL){
+		cl_log(LOG_ERR, "ipc_bufpool_partial_ipcmsg_cp:"
+		       "invalid input");		
+		return IPC_FAIL;
+	}
+	
+	if (srcpool->currpos - srcpool->consumepos >=
+	    sizeof(struct SOCKET_MSG_HEAD)){
+		
+		head = (struct SOCKET_MSG_HEAD*)srcpool->consumepos;
+		space_needed = head->msg_len + sizeof(*head);
+		
+		if (space_needed >  ipc_bufpool_spaceleft(dstpool)){
+			cl_log(LOG_ERR, "ipc_bufpool_partial_ipcmsg_cp:"
+			       " not enough space left in dst pool,spaced needed=%d",
+			       space_needed);
+			return IPC_FAIL;	
+		}	
+	}
+	
+	nbytes = srcpool->currpos - srcpool->consumepos;
+	memcpy(dstpool->consumepos, srcpool->consumepos,nbytes);
+	
+	
+	srcpool->currpos = srcpool->consumepos;
+	dstpool->currpos = dstpool->consumepos + nbytes;
+	
+	return IPC_OK;
+}
+
+
+void
+ipc_bufpool_ref(struct ipc_bufpool* pool)
+{
+	if (pool == NULL){
+		cl_log(LOG_ERR, "ref_pool:"
+		       " invalid input");
+		return;		
+	}
+	
+	pool->refcount ++;
+	
+}
+
+void
+ipc_bufpool_unref(struct ipc_bufpool* pool){
+	
+	if (pool == NULL){
+		cl_log(LOG_ERR, "unref_pool:"
+		       " invalid input");
+		return;		
+	}
+	
+	pool->refcount --;
+
+	if (pool->refcount <= 0){
+		ipc_bufpool_del(pool);
+	}
+	
+	return;
 }
