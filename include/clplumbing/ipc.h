@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.38 2005/02/09 01:45:05 gshi Exp $ */
+/* $Id: ipc.h,v 1.39 2005/03/08 20:54:51 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -544,6 +544,15 @@ struct IPC_OPS{
 				      int len, void* private);
 	
 	
+/*
+ * IPC_OPS::nget_chan_status
+ * ch	(IN) : the pointer to the channel
+ *
+ * Return value:
+ *	channel status.
+ *
+ */
+	int	(*get_chan_status)(IPC_Channel* ch);
 };
 
 
