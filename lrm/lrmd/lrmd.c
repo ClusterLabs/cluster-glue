@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.43 2004/10/08 21:54:27 alan Exp $ */
+/* $Id: lrmd.c,v 1.44 2004/10/09 01:48:41 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -450,8 +450,7 @@ init_start ()
 
 	if ((pid = get_running_pid(PID_FILE, NULL)) > 0) {
 		lrmd_log(LOG_ERR, "already running: [pid %ld].", pid);
-		lrmd_log(LOG_INFO, "lrmd: failed (already running)");
-		
+		lrmd_log(LOG_ERR, "Startup aborted (already running).  Shutting down."); 
 		exit(100);
 	}
 
@@ -466,7 +465,7 @@ init_start ()
 	dir = opendir(RA_PLUGIN_DIR);
 	if (NULL == dir) {
 		lrmd_log(LOG_ERR, "main: can not open RA plugin dir "RA_PLUGIN_DIR);
-		lrmd_log(LOG_INFO, "lrmd: failed (no RA plugin)");
+		lrmd_log(LOG_ERR, "Startup aborted (no RA plugin).  Shutting down.");
 		exit(100);
 	}
 
@@ -514,7 +513,8 @@ init_start ()
 	if (NULL == conn_cmd) {
 		lrmd_log(LOG_ERR,
 			"main: can not create wait connection for command.");
-		lrmd_log(LOG_INFO, "lrmd: failed (can't create comm channel)");
+		lrmd_log(LOG_ERR, "Startup aborted (can't create comm channel).  Shutting down.");
+
 		exit(100);
 	}
 
@@ -533,7 +533,7 @@ init_start ()
 	if (NULL == conn_cbk) {
 		lrmd_log(LOG_ERR,
 			"main: can not create wait connection for callback.");
-		lrmd_log(LOG_INFO, "lrmd: failed (can't create comm channel)");
+		lrmd_log(LOG_ERR, "Startup aborted (can't create comm channel).  Shutting down.");
 		exit(100);
 	}
 
@@ -546,7 +546,7 @@ init_start ()
 	if (G_main_add_input(G_PRIORITY_HIGH, FALSE, 
 			     &polled_input_SourceFuncs) ==NULL){
 		cl_log(LOG_ERR, "main: G_main_add_input failed");
-		lrmd_log(LOG_INFO, "lrmd: failed (G_main_add_input failed)");
+		lrmd_log(LOG_ERR, "Startup aborted (G_main_add_input failed).  Shutting down.");
 	}
 	
 	set_child_signal();
@@ -554,7 +554,7 @@ init_start ()
 	/*Create the mainloop and run it*/
 	mainloop = g_main_new(FALSE);
 	lrmd_log(LOG_DEBUG, "main: run the loop...");
-	lrmd_log(LOG_INFO, "lrmd: started.");
+	lrmd_log(LOG_INFO, "Started.");
 	g_main_run(mainloop);
 
 	conn_cmd->ops->destroy(conn_cmd);
@@ -2036,6 +2036,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.44  2004/10/09 01:48:41  zhenh
+ * change the failure logs from LOG_INFO to LOG_ERR
+ *
  * Revision 1.43  2004/10/08 21:54:27  alan
  * BEAM FIX:  Got rid of an freeing-null-pointer-error.
  *
