@@ -1,4 +1,4 @@
-/* $Id: cl_log.h,v 1.12 2005/03/29 21:02:19 andrew Exp $ */
+/* $Id: cl_log.h,v 1.13 2005/04/04 21:08:18 gshi Exp $ */
 #ifndef _CLPLUMBING_CL_LOG_H
 #	define _CLPLUMBING_CL_LOG_H
 #	include <glib.h>
@@ -8,7 +8,7 @@
 #define	HA_FAIL		0
 #define	HA_OK		1
 #define MAXMSG		40000
-void		cl_direct_log(int priority, char* buf, gboolean, const char*, int, TIME_T);
+void		cl_direct_log(int priority, const char* buf, gboolean, const char*, int, TIME_T);
 void            cl_log(int priority, const char * fmt, ...) G_GNUC_PRINTF(2,3);
 void            cl_perror(const char * fmt, ...) G_GNUC_PRINTF(1,2);
 void		cl_log_enable_stderr(int truefalse);
