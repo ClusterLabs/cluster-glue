@@ -56,6 +56,11 @@
 #endif
 #define MAX_LISTEN_NUM 10
 
+#ifdef MSG_NOSIGNAL
+#define HA_MSG_DONTWAIT_NOSIGNAL      (MSG_DONTWAIT|MSG_NOSIGNAL)
+#else
+#define HA_MSG_DONTWAIT_NOSIGNAL      (MSG_DONTWAIT)
+#endif
 
 /* wait connection private data. */
 struct SOCKET_WAIT_CONN_PRIVATE{
@@ -465,7 +470,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 
       len=send(conn_info->s, (char *)&head
       ,			sizeof(struct SOCKET_MSG_HEAD)
-      ,			MSG_DONTWAIT|MSG_NOSIGNAL);
+      ,			HA_MSG_DONTWAIT_NOSIGNAL);
 
       if (len < 0){
 	if(errno == EAGAIN) {
@@ -484,7 +489,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
       }
 
       len=send(conn_info->s, msg->msg_body, msg->msg_len
-      ,			MSG_DONTWAIT|MSG_NOSIGNAL);
+      ,			HA_MSG_DONTWAIT_NOSIGNAL);
       if (len < 0){
 	if (errno == EAGAIN) {
 	  break;
