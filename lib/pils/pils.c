@@ -883,7 +883,8 @@ ifmgr_register_interface(PILInterface* intf
 
 	if (DEBUGPLUGIN) {
 		PILLog(PIL_DEBUG
-		, 	"Registering Interface manager for type '%s'"
+		, 	"Registering Implementation manager for"
+	       " Interface type '%s'"
 		,	intf->interfacename);
 	}
 	*imports = &IFManagerImports;
