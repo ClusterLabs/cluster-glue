@@ -364,11 +364,11 @@ G_CH_destroy(gpointer user_data)
 	if (!chp->fd_fdx) {
 		g_main_remove_poll(&chp->outfd);
 	}
-	chp->ch->ops->destroy(chp->ch);
 	if (chp->dnotify) {
 		chp->dnotify(chp->udata);
 	}
 	g_source_remove(chp->gsourceid);
+	chp->ch->ops->destroy(chp->ch);
 	memset(chp, 0, sizeof(*chp));
 	g_free(chp);
 }
