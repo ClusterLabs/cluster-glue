@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.15 2004/07/15 09:17:38 zhenh Exp $ */
+/* $Id: cl_msg.c,v 1.16 2004/08/03 06:01:19 zhenh Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -604,7 +604,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 				": string2msg_ll failed");
 				return(HA_FAIL);
 			}
-
+			ha_free(value);
 			cp_value = (void*) tmpmsg;
 			cp_vallen = sizeof(struct ha_msg);
 
@@ -1863,6 +1863,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.16  2004/08/03 06:01:19  zhenh
+ * fix a memory leak
+ *
  * Revision 1.15  2004/07/15 09:17:38  zhenh
  * increase the size of ha_msg autmatically
  *
