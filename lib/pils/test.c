@@ -98,7 +98,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, PILPluginImports* imports, void *user_ptr)
 	,	&OurIfOps	/* Exported interface operations */
 	,	IfClose		/* Interface Close function */
 	,	&OurIf
-	,	(void**)&OurIfImports
+	,	(void*)&OurIfImports
 	,	NULL);
 	imports->log(PIL_INFO, "test init function: returning %d"
 		,	ret);

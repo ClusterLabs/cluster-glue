@@ -111,7 +111,7 @@ stonith_new(const char * type)
 	/* Look and see if we already have it loaded... */
 
 	if (g_hash_table_lookup_extended(Splugins, type
-	,	(gpointer*)&key, (gpointer*)&ops)) {
+	,	(gpointer)&key, (gpointer)&ops)) {
 		PILIncrIFRefCount(PIsys, STONITH_TYPE_S, type, 1);
 
 	}else{		/* Try and load it... */
@@ -123,7 +123,7 @@ stonith_new(const char * type)
 
 		/* Look the plugin up in the Splugins table */
 		if (!g_hash_table_lookup_extended(Splugins, type
-		,		(void**)&key, (void**)&ops)) {
+		,		(void*)&key, (void*)&ops)) {
 			/* OOPS! didn't find it(!?!)... */
 			PILIncrIFRefCount(PIsys, STONITH_TYPE_S, type, -1);
 			FREE(s);
