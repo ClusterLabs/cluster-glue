@@ -107,7 +107,7 @@ Gmain_timeout_prepare(gpointer src, GTimeVal* t, gint* timeout
 	remain = sub_longclock(source->nexttime, lnow);
 	/* This is also safe - we started out in 'ms' */
 	*timeout = longclock_to_ms(remain);
-	return *timeout != 0;
+	return ((*timeout) == 0);
 }
 
 /* g_main_loop-style check function */
