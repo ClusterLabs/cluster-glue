@@ -39,6 +39,7 @@
 #ifndef __STONITH_H
 #	define __STONITH_H
 
+#include "signal.h"
 /*
  *	Return codes from "Stonith" member functions.
  */
