@@ -1,4 +1,4 @@
-/* $Id: ssh.c,v 1.19 2005/03/17 07:30:52 sunjd Exp $ */
+/* $Id: ssh.c,v 1.20 2005/03/22 08:06:15 zhenh Exp $ */
 /*
  * Stonith module for SSH Stonith device
  *
@@ -92,7 +92,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  * in which the child process always stay in 'system' call. Please FIX this.
  * Additonally, this issue seems related to both of 2.6 kernel and stonithd.
  */
-#define SSH_COMMAND "ssh -f -q -x -n -l root"
+#define SSH_COMMAND "ssh -q -x -n -l root"
 
 /* We need to do a real hard reboot without syncing anything to simulate a
  * power cut. 
@@ -101,7 +101,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  */
 #define REBOOT_COMMAND "nohup sh -c '(sleep 2; nohup /sbin/reboot -nf) </dev/null >/dev/null 2>&1' &"
 #undef REBOOT_COMMAND
-#define REBOOT_COMMAND	"echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now"
+#define REBOOT_COMMAND	"echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
 
 /*
  *    SSH STONITH device
