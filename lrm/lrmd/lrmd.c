@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.36 2004/09/14 15:07:30 gshi Exp $ */
+/* $Id: lrmd.c,v 1.37 2004/09/16 09:14:14 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -511,6 +511,7 @@ init_start ()
 	conn_cmd_attrs = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(conn_cmd_attrs, path, cmd_path);
 	conn_cmd = ipc_wait_conn_constructor(IPC_ANYTYPE, conn_cmd_attrs);
+	g_hash_table_destroy(conn_cmd_attrs);
 	if (NULL == conn_cmd) {
 		lrmd_log(LOG_ERR,
 			"main: can not create wait connection for command.");
@@ -527,6 +528,8 @@ init_start ()
 	conn_cbk_attrs = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(conn_cbk_attrs, path, cbk_path);
 	conn_cbk = ipc_wait_conn_constructor( IPC_ANYTYPE, conn_cbk_attrs);
+	g_hash_table_destroy(conn_cbk_attrs);
+
 	if (NULL == conn_cbk) {
 		lrmd_log(LOG_ERR,
 			"main: can not create wait connection for callback.");
@@ -620,6 +623,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 	type = ha_msg_value(msg, F_LRM_TYPE);
 	if (0 != strncmp(type, REGISTER, strlen(REGISTER))) {
 		lrmd_log(LOG_ERR, "on_connect_cbk: msg is not register");
+		ha_msg_del(msg);
 		send_rc_msg(ch, HA_FAIL);
 		return TRUE;
 	}
@@ -627,6 +631,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 	/*get the pid of client */
 	if (HA_OK != ha_msg_value_int(msg, F_LRM_PID, &pid)) {
 		lrmd_log(LOG_ERR, "on_connect_cbk: can not get pid");
+		ha_msg_del(msg);
 		send_rc_msg(ch, HA_FAIL);
 		return TRUE;
 	}
@@ -732,11 +737,13 @@ on_timeout_op_done(gpointer data)
 
 	lrmd_log(LOG_INFO, "on_timeout_op_done: start.");
 	op = (lrmd_op_t*)data;
-	if (HA_FAIL==ha_msg_add_int(op->msg, F_LRM_OPSTATUS, LRM_OP_TIMEOUT)) {
+	if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_TIMEOUT)) {
 		lrmd_log(LOG_ERR,
 			"on_timeout_op_done: can not add opstatus to msg");
 	}
-	kill(op->exec_pid, 9);
+	if (-1 != op->exec_pid ) {
+		kill(op->exec_pid, 9);
+	}
 
 	rsc = op->rsc;
 	on_op_done(op);
@@ -762,7 +769,11 @@ on_repeat_op_done(gpointer data)
 
 	op->rsc->op_list = g_list_append(op->rsc->op_list, op);
 	
-	ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout);
+	if (HA_OK != ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)) {
+		lrmd_log(LOG_ERR,
+			"on_repeat_op_done: can not get timeout value");
+		return FALSE;
+	}
 	if (0 < timeout ) {
 		op->timeout_tag = g_timeout_add(timeout,
 			on_timeout_op_done, op);
@@ -839,7 +850,7 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 	/* remove from client_list */
 	client_list = g_list_remove(client_list, client);
 	
-	/* remove all monitors and pending ops */
+	/* remove all ops */
 	for(rsc_node = g_list_first(rsc_list);
 		NULL != rsc_node; rsc_node = g_list_next(rsc_node)){
 		rsc = (lrmd_rsc_t*)rsc_node->data;
@@ -1020,7 +1031,11 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 	else {
 		char* meta = RAExec->get_resource_meta(rtype,provider);
 		if (NULL != meta) {
-			ha_msg_addbin(ret,F_LRM_METADATA,meta, strlen(meta));
+			if (HA_OK != ha_msg_addbin(ret,F_LRM_METADATA,
+						   meta, strlen(meta))) {
+				lrmd_log(LOG_ERR,
+				"on_msg_get_metadata: can not add metadata.");
+			}
 			g_free(meta);
 		}
 	}
@@ -1053,7 +1068,10 @@ on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg)
 	for(node=g_list_first(rsc_list); NULL!=node; node=g_list_next(node)) {
 		lrmd_rsc_t* rsc = (lrmd_rsc_t*)node->data;
 		snprintf(key,MAX_NAME_LEN,"%s%d",F_LRM_RID,i);
-		ha_msg_add(ret,key,rsc->id);
+		if (HA_OK != ha_msg_add(ret,key,rsc->id)) {
+			lrmd_log(LOG_ERR,
+				"on_msg_get_all: can not add resource id.");
+		}	
 		i++;
 	}
 
@@ -1089,25 +1107,30 @@ on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 				"on_msg_get_rsc: can not create msg.");
 			return HA_FAIL;
 		}
-		if (HA_FAIL == ha_msg_add(ret, F_LRM_RID, rsc->id)) {
-			return HA_FAIL;
-		}
-
-		if (HA_FAIL == ha_msg_add(ret, F_LRM_RTYPE, rsc->type)) {
-			return HA_FAIL;
-		}
-
-		if (HA_FAIL == ha_msg_add(ret, F_LRM_RCLASS, rsc->class)) {
+		if (HA_OK != ha_msg_add(ret, F_LRM_RID, rsc->id)
+		||  HA_OK != ha_msg_add(ret, F_LRM_RTYPE, rsc->type)
+		||  HA_OK != ha_msg_add(ret, F_LRM_RCLASS, rsc->class)) {
+			ha_msg_del(ret);
+			lrmd_log(LOG_ERR,
+				"on_msg_get_rsc: can not add field to msg.");
 			return HA_FAIL;
 		}
 		if( rsc->provider ) {
-			if (HA_FAIL == ha_msg_add(ret, F_LRM_RPROVIDER,
+			if (HA_OK != ha_msg_add(ret, F_LRM_RPROVIDER,
 							rsc->provider)) {
+				ha_msg_del(ret);
+				lrmd_log(LOG_ERR,
+				"on_msg_get_rsc: can not add provider to msg.");
 				return HA_FAIL;
 			}
 		}
 		
-		ha_msg_add_str_table(ret, F_LRM_PARAM, rsc->params);
+		if (rsc->params && HA_OK!=ha_msg_add_str_table(ret,F_LRM_PARAM,rsc->params)){
+			ha_msg_del(ret);
+			lrmd_log(LOG_ERR,
+				"on_msg_get_rsc: can not add field to msg.");
+			return HA_FAIL;
+		}
 
 	}
 	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
@@ -1287,10 +1310,11 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		
 	}
 	else {
-		if (HA_FAIL == ha_msg_add_int(msg, F_LRM_CALLID, call_id)) {
-			lrmd_log(LOG_ERR, "on_msg_perform_op: can not add callid.");
+		if (HA_OK != ha_msg_add_int(msg, F_LRM_CALLID, call_id)) {
+			lrmd_log(LOG_ERR,
+				"on_msg_perform_op: can not add callid.");
 		}
-		if (HA_FAIL==ha_msg_add(msg, F_LRM_APP, client->app_name)) {
+		if (HA_OK !=ha_msg_add(msg, F_LRM_APP, client->app_name)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_perform_op: can not add app_name.");
 		}
@@ -1303,12 +1327,19 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		op->rsc = rsc;
 		op->msg = ha_msg_copy(msg);
 
-		ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout);
-		if (0 < timeout ) {
+		if (HA_OK!=ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)) {
+			lrmd_log(LOG_ERR,
+				"on_msg_perform_op: can not get timeout.");
+		} else if (0 < timeout ) {
 			op->timeout_tag = g_timeout_add(timeout,
 						on_timeout_op_done, op);
 		}
-		ha_msg_value_int(op->msg, F_LRM_INTERVAL, &op->interval);
+		
+		if (HA_OK!=ha_msg_value_int(op->msg, F_LRM_INTERVAL,
+						 &op->interval)) {
+			lrmd_log(LOG_ERR,
+				"on_msg_perform_op: can not get interval.");
+		}
 
 		rsc->op_list = g_list_append(rsc->op_list, op);
 
@@ -1338,15 +1369,13 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	if ( NULL == rsc->op_list )
 	{
-		ret = NULL;
 		if (NULL != rsc->last_op) {
 			ret = op_to_msg(rsc->last_op);
-		}
-		if (NULL == ret) {
+		} else {
 			ret = ha_msg_new(5);
 		}
 
-		if (HA_FAIL == ha_msg_add_int(ret, F_LRM_STATE, LRM_RSC_IDLE)) {
+		if (HA_OK != ha_msg_add_int(ret, F_LRM_STATE, LRM_RSC_IDLE)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_get_state: can not add state to msg.");
 			ha_msg_del(ret);
@@ -1361,14 +1390,14 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	else {
 		ret = ha_msg_new(5);
 
-		if (HA_FAIL == ha_msg_add_int(ret, F_LRM_STATE, LRM_RSC_BUSY)) {
+		if (HA_OK != ha_msg_add_int(ret, F_LRM_STATE, LRM_RSC_BUSY)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_get_state: can not add state to msg.");
 			ha_msg_del(ret);
 			return HA_FAIL;
 		}
 		op_count = g_list_length(rsc->op_list);
-		if (HA_FAIL == ha_msg_add_int(ret, F_LRM_OPCNT, op_count)) {
+		if (HA_OK != ha_msg_add_int(ret, F_LRM_OPCNT, op_count)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_get_state: can not add state count.");
 			ha_msg_del(ret);
@@ -1434,11 +1463,11 @@ on_op_done(lrmd_op_t* op)
 
 	}
 	
-	if (HA_FAIL == ha_msg_value_int(op->msg,F_LRM_TARGETRC,&target_rc)){
+	if (HA_OK != ha_msg_value_int(op->msg,F_LRM_TARGETRC,&target_rc)){
 		lrmd_log(LOG_ERR,"on_op_done: can not get tgt status from msg");
 		return HA_FAIL;
 	}
-	if (HA_FAIL ==
+	if (HA_OK !=
 		ha_msg_value_int(op->msg, F_LRM_OPSTATUS, (int*)&op_status)) {
 		lrmd_log(LOG_ERR,
 			"on_op_done: can not get op status from msg.");
@@ -1449,7 +1478,7 @@ on_op_done(lrmd_op_t* op)
 		need_notify = 1;
 	}
 	else
-	if (HA_FAIL == ha_msg_value_int(op->msg,F_LRM_RC,&op_rc)){
+	if (HA_OK != ha_msg_value_int(op->msg,F_LRM_RC,&op_rc)){
 		need_notify = 1;
 	}
 	else
@@ -1458,7 +1487,7 @@ on_op_done(lrmd_op_t* op)
 	}
 	else
 	if (CHANGED == target_rc) {
-		if (HA_FAIL == ha_msg_value_int(op->msg,F_LRM_LASTRC,
+		if (HA_OK != ha_msg_value_int(op->msg,F_LRM_LASTRC,
 						&last_rc)){
 			need_notify = 0;
 		}
@@ -1467,7 +1496,7 @@ on_op_done(lrmd_op_t* op)
 				need_notify = 1;
 			}
 		}
-		if (HA_FAIL == ha_msg_mod_int(op->msg,F_LRM_LASTRC,
+		if (HA_OK != ha_msg_mod_int(op->msg,F_LRM_LASTRC,
 						op_rc)){
 			lrmd_log(LOG_ERR,"on_op_done: can not save status ");
 			return HA_FAIL;
@@ -1539,12 +1568,12 @@ int
 flush_op(lrmd_op_t* op)
 {
 	lrmd_log(LOG_INFO, "flush_op: start.");
-	if (HA_FAIL == ha_msg_add_int(op->msg, F_LRM_RC, HA_FAIL)) {
+	if (HA_OK != ha_msg_add_int(op->msg, F_LRM_RC, HA_FAIL)) {
 		lrmd_log(LOG_ERR,"flush_op: can not add rc ");
 		return HA_FAIL;
 	}
 
-	if (HA_FAIL==ha_msg_add_int(op->msg,F_LRM_OPSTATUS,LRM_OP_CANCELLED)) {
+	if (HA_OK != ha_msg_add_int(op->msg,F_LRM_OPSTATUS,LRM_OP_CANCELLED)){
 		lrmd_log(LOG_ERR,"flush_op: can not add op status");
 		return HA_FAIL;
 	}
@@ -1583,9 +1612,9 @@ perform_op(lrmd_rsc_t* rsc)
 			lrmd_log(LOG_INFO, "perform_op: current op is performing");
 			break;
 		}
-		if ( HA_FAIL == perform_ra_op(op)) {
+		if ( HA_OK != perform_ra_op(op)) {
 			lrmd_log(LOG_ERR,	"perform_op: perform_ra_op failed");
-			if (HA_FAIL == ha_msg_add_int(op->msg, F_LRM_OPSTATUS,
+			if (HA_OK != ha_msg_add_int(op->msg, F_LRM_OPSTATUS,
 						LRM_OP_ERROR)) {
 				lrmd_log(LOG_ERR, "perform_op: can not add opstatus to msg");
 			}
@@ -1615,7 +1644,7 @@ op_to_msg(lrmd_op_t* op)
 		lrmd_log(LOG_ERR,"op_to_msg: can not copy the msg");
 		return NULL;
 	}
-	if (HA_FAIL == ha_msg_add_int(msg, F_LRM_CALLID, op->call_id)) {
+	if (HA_OK != ha_msg_add_int(msg, F_LRM_CALLID, op->call_id)) {
 		ha_msg_del(msg);
 		lrmd_log(LOG_ERR,"op_to_msg: can not add call_id");
 		return NULL;
@@ -1764,18 +1793,23 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
 	rc = RAExec->map_ra_retvalue(exitcode, op_type);
 	if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
-		if (HA_FAIL == ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_ERROR)) {
-			lrmd_log(LOG_ERR,	"on_ra_proc_finished: can not add opstatus to msg");
+		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS,
+							LRM_OP_ERROR)) {
+			lrmd_log(LOG_ERR,
+			"on_ra_proc_finished: can not add opstatus to msg");
 			return ;
 		}
 	}
 	else {
-		if (HA_FAIL == ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_DONE)) {
-			lrmd_log(LOG_ERR,	"on_ra_proc_finished: can not add opstatus to msg");
+		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS,
+								LRM_OP_DONE)) {
+			lrmd_log(LOG_ERR,
+			"on_ra_proc_finished: can not add opstatus to msg");
 			return ;
 		}
-		if (HA_FAIL == ha_msg_mod_int(op->msg, F_LRM_RC, rc)) {
-			lrmd_log(LOG_ERR,"on_ra_proc_finished: can not add rc to msg");
+		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_RC, rc)) {
+			lrmd_log(LOG_ERR,
+				"on_ra_proc_finished: can not add rc to msg");
 			return ;
 		}
 	}
@@ -1784,8 +1818,8 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	read_pipe(op->output_fd, &data);
 	if (NULL != data) {
 		ret = cl_msg_modbin(op->msg, F_LRM_DATA,data,strlen(data));
-		if (HA_FAIL == ret) {
-			lrmd_log(LOG_ERR,	"on_ra_proc_finished: can not add data to msg");
+		if (HA_OK != ret) {
+			lrmd_log(LOG_ERR,"on_ra_proc_finished: can not add data to msg");
 		}
 		g_free(data);
 	}
@@ -2000,6 +2034,11 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.37  2004/09/16 09:14:14  zhenh
+ * fix some memory leaks
+ * add more return value checking
+ * change HA_FAIL == ... TO HA_OK != ...
+ *
  * Revision 1.36  2004/09/14 15:07:30  gshi
  * change glib API to glib2 API
  *
