@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.20 2004/10/10 09:27:53 zhenh Exp $ */
+/* $Id: lrmadmin.c,v 1.21 2004/10/11 02:11:07 zhenh Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -171,7 +171,7 @@ int main(int argc, char **argv)
         cl_log_set_entity(lrmadmin_name);
 	cl_log_enable_stderr(FALSE);
 	cl_log_set_facility(LOG_USER);
-//	set_debug_level(LOG_INFO);
+
 	memset(rscid_arg_tmp, '\0', RID_LEN);
 	memset(raclass, '\0', 20);
 	do {
@@ -879,6 +879,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.21  2004/10/11 02:11:07  zhenh
+ * remove comment line with //
+ *
  * Revision 1.20  2004/10/10 09:27:53  zhenh
  * change some output information to make it more clear
  *
