@@ -1902,6 +1902,7 @@ PILPluginTypeListPlugins(PILPluginType* pitype
 		if (dircount <= 0) {
 			if (files != NULL) {
 				FREE_DIRLIST(files, dircount);
+				files = NULL;
 			}
 			continue;
 		}
@@ -1926,6 +1927,7 @@ PILPluginTypeListPlugins(PILPluginType* pitype
 			result[initoff+j] = s;
 		}
 		FREE_DIRLIST(files, dircount);
+		files = NULL;
 	}
 
 	if (picount != NULL) {
