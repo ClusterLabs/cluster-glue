@@ -3,4 +3,5 @@
 int	setmsrepeattimer(long ms);
 int	setmsalarm(long ms);
 int	cancelmstimer(void);
+long	mssleep(long ms);
 #endif
