@@ -36,8 +36,10 @@
 #include <errno.h>
 #include <fcntl.h>
 
+#ifndef UNIX_PATH_MAX
+#define UNIX_PATH_MAX 108
+#endif
 #define MAX_LISTEN_NUM 10
-#define MAX_PATH_LEN 255
 #define PATH_ATTR "path_name"
 #define SOCKET_ATTR "socket"
 
@@ -46,7 +48,7 @@
 struct SOCKET_CH_PRIVATE{
   /* the path name wich the connection will be built on. */
   /*! the path name wich the connection will be built on. */
-  char path_name[MAX_PATH_LEN];
+  char path_name[UNIX_PATH_MAX];
   /* the domain socket. */
   /*! the domain socket. */
   int s;
@@ -252,7 +254,7 @@ socket_disconnect(struct OCF_IPC_CHANNEL* ch)
   conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
   close(conn_info->s);
   ch->ch_status = CH_DISCONNECT;
-  /*FIXME! return value??? */
+  /*FIXME! return value??? -- done*/
   return CH_SUCCESS;
 }
 
@@ -269,7 +271,11 @@ socket_initiate_connection(struct OCF_IPC_CHANNEL * ch)
   //prepare the socket
   bzero(&peer_addr, sizeof(peer_addr));
   peer_addr.sun_family = AF_LOCAL;    // host byte order 
-  /* FIXME!  string truncation! */
+  /* FIXME!  string truncation! --done*/
+  if(strlen(conn_info->path_name) >= UNIX_PATH_MAX){
+    fprintf(stderr,"the max path length is %d\n",UNIX_PATH_MAX-1);
+    return CH_FAIL;
+  }
   strncpy(peer_addr.sun_path, conn_info->path_name, sizeof(peer_addr.sun_path)-1);
   //send connection request
   if (connect(conn_info->s, (struct sockaddr *)&peer_addr
@@ -380,15 +386,13 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
     return AUTH_FAIL;
   }
   
-	/* FIXME! I don't think we need check_uid or check_gid */
+	/* FIXME! I don't think we need check_uid or check_gid -- done*/
   /* verify the credential information. */
-  if (	auth_info->check_uid == TRUE
-  &&	auth_info->uid
+  if (	auth_info->uid
   &&	g_hash_table_lookup(auth_info->uid, &(cred->uid)) == NULL) {
 		ret = AUTH_FAIL;
   }
-  if (	auth_info->check_gid == TRUE
-  &&	auth_info->gid
+  if (	auth_info->gid
   &&	g_hash_table_lookup(auth_info->gid, &(cred->gid)) == NULL) {
 		ret = AUTH_FAIL;
   }
@@ -594,7 +598,12 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   unlink(path_name);
   bzero(&my_addr, sizeof(my_addr));
   my_addr.sun_family = AF_LOCAL;         // host byte order
-  /* FIXME!  string truncation! */
+  /* FIXME!  string truncation! --done*/
+  if(strlen(path_name) >= UNIX_PATH_MAX){
+    fprintf(stderr,"the max path length is %d\n",UNIX_PATH_MAX-1);
+    return NULL;
+  }
+    
   strncpy(my_addr.sun_path, path_name, sizeof(my_addr.sun_path)-1);
     
   if (bind(s, (struct sockaddr *)&my_addr, sizeof(my_addr)) == -1) {
@@ -610,8 +619,8 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   
   wait_private = (struct SOCKET_CH_PRIVATE* ) malloc(sizeof(struct SOCKET_CH_PRIVATE));
   wait_private->s = s;
-  /* FIXME!!  Don't use strcpy! */
-  strcpy(wait_private->path_name, path_name);
+  /* FIXME!!  Don't use strcpy! --done*/
+  strncpy(wait_private->path_name, path_name,strlen(path_name));
   temp_ch = g_new(struct OCF_IPC_WAIT_CONNECTION, 1);
   temp_ch->ch_private = (void *) wait_private;
   temp_ch->ch_status = CH_WAIT;
@@ -632,6 +641,10 @@ socket_channel_new(GHashTable *ch_attrs) {
 
 
   if ((path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR)) != NULL) { //client side connection
+    if(strlen(path_name) >= UNIX_PATH_MAX){
+       fprintf(stderr,"the max path length is %d\n",UNIX_PATH_MAX-1);
+       return NULL;
+    }
     //prepare the socket
     if ((sockfd = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
       perror("socket");
@@ -650,8 +663,8 @@ socket_channel_new(GHashTable *ch_attrs) {
 
   conn_info->s = sockfd;
   if (path_name) {
-    /* FIXME!!  Don't use strcpy! */
-    strcpy(conn_info->path_name, path_name);
+    /* FIXME!!  Don't use strcpy! --done*/
+    strncpy(conn_info->path_name, path_name,strlen(path_name));
   }
   temp_ch->ch_status = CH_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
