@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.105 2004/11/22 20:06:42 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.106 2004/12/01 02:31:51 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -125,9 +125,6 @@ struct SOCKET_CH_PRIVATE{
   struct IPC_MESSAGE *buf_msg;
 };
 
-struct SOCKET_MSG_HEAD{
-  int msg_len;
-};
 
 struct IPC_Stats {
 	long	nsent;
@@ -208,7 +205,7 @@ static int socket_waitin(struct IPC_CHANNEL * ch);
 
 static int socket_waitout(struct IPC_CHANNEL * ch);
 
-static int socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started, gboolean read1anyway);
+static int socket_resume_io_read(struct IPC_CHANNEL *ch, int*, gboolean read1anyway);
 
 /* socket object of the function table */
 static struct IPC_OPS socket_ops = {
@@ -231,7 +228,6 @@ static struct IPC_OPS socket_ops = {
 
 
 
-#define	MAXDATASIZE	65535
 
 void dump_ipc_info(const IPC_Channel* chan);
 
@@ -725,16 +721,17 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 {
 	GList *element;
 
-	gboolean	started;
+	int		nbytes;
 	int		result;
-
-	(void)socket_resume_io(ch);
-	result = socket_resume_io_read(ch, &started, TRUE);
+	
+	socket_resume_io(ch);
+	result = socket_resume_io_read(ch, &nbytes, TRUE);
 
 	*message = NULL;
 
 	if (ch->recv_queue->current_qlen == 0) {
 		return result != IPC_OK ? result : IPC_FAIL;
+		/*return IPC_OK;*/
 	}
 	element = g_list_first(ch->recv_queue->queue);
 
@@ -909,8 +906,9 @@ socket_assert_auth(struct IPC_CHANNEL *ch, GHashTable *auth)
 
 
 
+
 static int
-socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started, gboolean read1anyway)
+socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 {
 	struct SOCKET_CH_PRIVATE*	conn_info;
 	int				retcode = IPC_OK;
@@ -918,162 +916,107 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started, gboolean read1a
 	int				debug_loopcount = 0;
 	int				debug_bytecount = 0;
 	int				maxqlen = ch->recv_queue->max_qlen;
-
+	static struct ipc_bufpool*	pool = NULL;
+	int				nmsgs = 0;
+	
+	*nbytes = 0;
+	
 	CHANAUDIT(ch);
 	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
-	*started = FALSE;
-
- 
+	
+	if (pool == NULL){
+		pool = ipc_bufpool_new();
+		if (pool == NULL){			
+			cl_log(LOG_ERR, "socket_resume_io_read: "
+			       "memory allocation for ipc pool failed");
+			return IPC_FAIL;
+		}
+	}
+	
+	if (ipc_bufpool_full(pool, ch)){
+		
+		struct ipc_bufpool*	newpool;
+		
+		newpool = ipc_bufpool_new();
+		if (newpool == NULL){			
+			cl_log(LOG_ERR, "socket_resume_io_read: "
+			       "memory allocation for a new ipc pool failed");
+			return IPC_FAIL;
+		}
+		
+		ipc_bufpool_partial_copy(newpool, pool);
+		ipc_bufpool_unref(pool);
+		pool = newpool;
+	}
+	
+	
 	if (maxqlen <= 0 && read1anyway) {
 		maxqlen = 1;
 	}
-  	while (ch->recv_queue->current_qlen < maxqlen && retcode == IPC_OK) {
-
-		gboolean			new_msg;
+  	if (ch->recv_queue->current_qlen < maxqlen && retcode == IPC_OK) {
+		
 		void *				msg_begin;
 		int				msg_len;
-		struct SOCKET_MSG_HEAD		head;
 		int				len;
 
 
 		CHANAUDIT(ch);
 		++debug_loopcount;
-		new_msg = (conn_info->remaining_data == 0);
 
-		if (new_msg) {
-			len = sizeof(struct SOCKET_MSG_HEAD);
-			msg_begin = &head;
-		}else{
-			struct IPC_MESSAGE * msg = conn_info->buf_msg;
-			len = conn_info->remaining_data;
-			msg_begin = ((char*)msg->msg_body)
-			+	(msg->msg_len - len);
-		}
-
-		if (len <= 0 || len > MAXDATASIZE) {
-			cl_log(LOG_ERR
-			,	"socket_resume_io_read()"
-			": bad packet length [%d]", len);
-			ch->ch_status = IPC_DISCONNECT;
-			retcode = IPC_BROKEN;
-			break;
-		}
+		len = ipc_bufpool_spaceleft(pool);
+		msg_begin = pool->currpos;
+		
 		CHANAUDIT(ch);
-
+		
 		/* Now try to receive some data */
 
 		msg_len = recv(conn_info->s, msg_begin, len, MSG_DONTWAIT);
 		SocketIPCStats.last_recv_rc = msg_len;
 		SocketIPCStats.last_recv_errno = errno;
 		++SocketIPCStats.recv_count;
-#ifdef DEBUG
-		cl_perror("recv() => %d, errno = %d loopcount = %d, %s"
-		,	msg_len, errno, debug_loopcount
-		,	(new_msg ? "msg head": "msg body"));
-#endif
-
-		CHANAUDIT(ch);
-
+		
 		/* Did we get an error? */
 		if (msg_len < 0) {
-			/* What kind of error did we get? */
 			switch (errno) {
-				case EAGAIN:
-					if (ch->ch_status==IPC_DISC_PENDING){
-						ch->ch_status =IPC_DISCONNECT;
-						retcode = IPC_BROKEN;
-					}
-					break;
+			case EAGAIN:
+				if (ch->ch_status==IPC_DISC_PENDING){
+					ch->ch_status =IPC_DISCONNECT;
+					retcode = IPC_BROKEN;
+				}
+				break;
 						
-				case ECONNREFUSED:
-				case ECONNRESET:
-					retcode
-					= socket_check_disc_pending(ch);
-					break;
-
-				default:
-					cl_perror("socket_resume_io_read"
-					": unknown recv error");
-					ch->ch_status = IPC_DISCONNECT;
-					retcode = IPC_FAIL;
-					break;
-			}
-			break; /* out of loop */
-    		}
-		if (msg_len == 0) {
-			if (ch->ch_status == IPC_DISC_PENDING
-			&&	ch->recv_queue->current_qlen <= 0) {
-				ch->ch_status = IPC_DISCONNECT;
-				retcode = IPC_FAIL;
-			}
-			break;
-		}
-		/* How about that!  We read something! */
-		/* Note that all previous cases break out of the loop */
-		debug_bytecount += msg_len;
-		*started=TRUE;
-
-#if 0
-		cl_log(LOG_DEBUG, "Got %d byte message", msg_len);
-		cl_log(LOG_DEBUG, "Contents: %s", (char*)msg_begin);
-#endif
-		/* Is this data for the start of a new message? */
-		if (new_msg){
-			/* We assume we read 'len' bytes */
-			if (head.msg_len <= 0
-			||	head.msg_len > MAXDATASIZE) {
-				cl_log(LOG_CRIT
-				,	"socket_resume_io_read()"
-				": Invalid msg len [%d]"
-				,	head.msg_len);
+			case ECONNREFUSED:
+			case ECONNRESET:
+				retcode= socket_check_disc_pending(ch);
+				break;
+				
+			default:
+				cl_perror("socket_resume_io_read"
+					  ": unknown recv error");
 				ch->ch_status = IPC_DISCONNECT;
 				retcode = IPC_FAIL;
 				break;
 			}
-			conn_info->buf_msg
-			= socket_message_new(ch, head.msg_len);
-			conn_info->remaining_data = head.msg_len;
-			/* Next time we'll read the message body */
-			continue;
-		}
-
-
-		/* No, not the start of a new message. Therefore we */
-		/* must have received (more) data from an old message */
-
-		conn_info->remaining_data = conn_info->remaining_data
-		-	msg_len;
-
-		if (conn_info->remaining_data < 0){
-			cl_log(LOG_CRIT
-			,	"received more data than expected");
-			conn_info->remaining_data = 0;
-			retcode = IPC_FAIL;
-
-		}else if (conn_info->remaining_data == 0){
-#if 0
-			cl_log(LOG_DEBUG, "channel: 0x%lx"
-			,	(unsigned long)ch);
-			cl_log(LOG_DEBUG, "New recv_queue = 0x%lx"
-			,	(unsigned long)ch->recv_queue);
-			cl_log(LOG_DEBUG, "buf_msg: len = %ld, body =  0x%lx"
-			,	(unsigned long)conn_info->buf_msg->msg_len
-			,	(unsigned long)conn_info->buf_msg->msg_body);
-			cl_log(LOG_DEBUG, "buf_msg: contents: %s"
-			,	(char *)conn_info->buf_msg->msg_body);
-#endif
-			/* Got the last of the message! */
-
-			/* Append gotten message to receive queue */
-			CHECKFOO(2,ch, conn_info->buf_msg, SavedReceivedBody
-			,	"received message");
-			ch->recv_queue->queue =	g_list_append
-			(	ch->recv_queue->queue, conn_info->buf_msg);
-			ch->recv_queue->current_qlen++;
-			SocketIPCStats.ninqueued++;
-			conn_info->buf_msg = NULL;
+			
+		}else if (msg_len == 0) {
+			if (ch->ch_status == IPC_DISC_PENDING
+			    &&	ch->recv_queue->current_qlen <= 0) {
+				ch->ch_status = IPC_DISCONNECT;
+				retcode = IPC_FAIL;
+			}
+		}else {
+			/* We read something! */
+			/* Note that all previous cases break out of the loop */
+			debug_bytecount += msg_len;
+			*nbytes = msg_len;
+			
+			nmsgs = ipc_bufpool_update(pool, ch, msg_len, ch->recv_queue) ;
+			
+			SocketIPCStats.ninqueued += nmsgs;
+			
 		}
 	}
+
 
 	/* Check for errors uncaught by recv() */
 	/* NOTE: It doesn't seem right we have to do this every time */
@@ -1093,6 +1036,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started, gboolean read1a
 
 	return IPC_ISRCONN(ch) ? IPC_OK : IPC_BROKEN;
 }
+
 
 static int
 socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
@@ -1133,7 +1077,6 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 		if (msg->msg_buf ){
 			diff = (char*)msg->msg_body - (char*)msg->msg_buf;				
 		}
-		/*cl_log(LOG_INFO, "diff=%d", diff);*/
 		if ( diff < sizeof(struct SOCKET_MSG_HEAD) ){
 			/* either we don't have msg->msg_buf set
 			 * or we don't have enough bytes for socket head
@@ -1245,18 +1188,18 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 {
 	int		rc1 = IPC_OK;
 	int		rc2 = IPC_OK;
-	gboolean	rstarted;
 	int		nwmsg = 1;
+	int		nbytes_r = 1;
 	gboolean	OKonce = FALSE;
 
 	CHANAUDIT(ch);
 	if (!IPC_ISRCONN(ch)) {
 		return IPC_BROKEN;
 	}
-
+	
 	do {
-		if (rc1 == IPC_OK){
-			rc1 = socket_resume_io_read(ch, &rstarted, FALSE);
+		if (nbytes_r > 0){
+			rc1 = socket_resume_io_read(ch, &nbytes_r, FALSE);
 		}
 		
 		if (nwmsg > 0){
@@ -1268,7 +1211,10 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 			OKonce = TRUE;
 		}
 		
-	} while ((rstarted || nwmsg > 0) && IPC_ISRCONN(ch));
+	} while ((nbytes_r > 0  || nwmsg > 0) && IPC_ISRCONN(ch));
+	
+
+
 
 	if (IPC_ISRCONN(ch)) {
 		if (rc1 != IPC_OK) {
@@ -1695,8 +1641,13 @@ socket_message_new(struct IPC_CHANNEL *ch, int msg_len)
 
   temp_msg = g_new(struct IPC_MESSAGE, 1);
   memset(temp_msg, 0, sizeof(struct IPC_MESSAGE));
-  temp_msg->msg_buf = g_malloc(msg_len + ch->msgpad);
-  temp_msg->msg_body = (char*)temp_msg->msg_buf + ch->msgpad;
+  if (msg_len != 0){
+	  temp_msg->msg_buf = g_malloc(msg_len + ch->msgpad);
+	  temp_msg->msg_body = (char*)temp_msg->msg_buf + ch->msgpad;
+  }else{
+	  temp_msg->msg_buf = temp_msg->msg_body = NULL;
+  }
+  
   temp_msg->msg_len = msg_len;
   temp_msg->msg_private = NULL;
   temp_msg->msg_ch = ch;
@@ -1726,7 +1677,6 @@ socket_free_message(struct IPC_MESSAGE * msg) {
 #endif
 	g_free((void *)msg);
 }
-
 
 
 /***********************************************************************
