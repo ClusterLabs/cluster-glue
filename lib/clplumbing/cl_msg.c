@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.37 2005/01/18 20:33:04 andrew Exp $ */
+/* $Id: cl_msg.c,v 1.38 2005/01/26 13:57:07 andrew Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -544,7 +544,7 @@ ha_msg_adduuid(struct ha_msg* msg, const char *name, uuid_t u)
 
 /*Add a null-terminated name and struct value to a message*/
 int
-ha_msg_addstruct(struct ha_msg * msg, const char * name, void * value)
+ha_msg_addstruct(struct ha_msg * msg, const char * name, const void * value)
 {
 	
 	return ha_msg_addraw(msg, name, strlen(name), value, 
@@ -1988,6 +1988,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.38  2005/01/26 13:57:07  andrew
+ * Make value a const argument for consistency
+ *
  * Revision 1.37  2005/01/18 20:33:04  andrew
  * Appologies for the top-level commit, one change necessitated another which
  *   exposed some bugs... etc etc
