@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.18 2004/09/27 08:33:55 zhenh Exp $ */
+/* $Id: lrm_msg.c,v 1.19 2004/12/03 02:24:08 zhenh Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -41,24 +41,27 @@ static void merge_pair(gpointer key, gpointer value, gpointer user_data);
 int
 ha_msg_add_int(struct ha_msg * msg, const char * name, int value)
 {
-	return ha_msg_addbin(msg, name, &value, sizeof(int));
+	char buf[MAX_INT_LEN];
+	snprintf(buf, MAX_INT_LEN, "%d", value);
+	return (ha_msg_add(msg, name, buf));	
 }
 
 int
 ha_msg_mod_int(struct ha_msg * msg, const char * name, int value)
 {
-	return cl_msg_modbin(msg, name, &value, sizeof(int));
+	char buf[MAX_INT_LEN];
+	snprintf(buf, MAX_INT_LEN, "%d", value);
+	return (cl_msg_modstring(msg, name, buf));	
 }
 
 int
 ha_msg_value_int(struct ha_msg * msg, const char * name, int* value)
 {
-	size_t size;
-	const void* data = cl_get_binary(msg, name, &size);
-	if (NULL == data || NULL == value || sizeof(int) != size) {
+	const char* svalue = ha_msg_value(msg, name);
+	if(NULL == svalue) {
 		return HA_FAIL;
 	}
-	*value = *(const int *)data;
+	*value = atoi(svalue);
 	return HA_OK;
 }
 #ifdef LRM_MSG_UUID_SUPPORT
@@ -414,6 +417,9 @@ create_lrm_ret(int rc, int fields)
 
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.19  2004/12/03 02:24:08  zhenh
+ * make the ha_msg_value_int() endian-independence
+ *
  * Revision 1.18  2004/09/27 08:33:55  zhenh
  * apply the new cl_msg_list_xxx() funcions in lrm
  *
