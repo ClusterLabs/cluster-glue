@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.15 2004/09/07 20:53:45 gshi Exp $ */
+/* $Id: GSource.c,v 1.16 2004/09/07 21:42:59 gshi Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -442,9 +442,9 @@ G_main_add_IPC_WaitConnection(int priority
 	,	ret, ret, NULL);
 
 	if (ret->gsourceid == 0) {
-		g_free(ret);
 		g_main_remove_poll(&ret->gpfd);
 		memset(ret, 0, sizeof(*ret));
+		g_free(ret);
 		ret = NULL;
 	}
 	return ret;
