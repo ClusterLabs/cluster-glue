@@ -1,4 +1,4 @@
-/* $Id: drac3_hash.c,v 1.3 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: drac3_hash.c,v 1.4 2004/08/28 14:16:42 alan Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -35,12 +35,12 @@
 
 /* Hash functions for DRAC3 authentication */
 
-u_int16_t 
+guint16 
 drac3Crc16(const char *str, 
 	const int l) {
 
     int i,j;
-    u_int16_t crc = 0;
+    guint16 crc = 0;
     
     for (i=0; i<l; i++) {
         crc = crc ^ (str[i] << 8);
@@ -63,7 +63,7 @@ drac3AuthHash(const char * chall,
     char passMD5[MD5LEN];
     char xorBytes[MD5LEN];
     char xorBytesMD5[MD5LEN];
-    u_int16_t crc;
+    guint16 crc;
     char response[MD5LEN+2];
     char responseb64[SBUFLEN];
     int i;
