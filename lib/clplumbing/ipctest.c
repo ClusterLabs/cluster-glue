@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.28 2004/11/18 00:34:37 gshi Exp $ */
+/* $Id: ipctest.c,v 1.29 2004/11/22 20:06:42 gshi Exp $ */
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -262,8 +262,9 @@ echoserver(IPC_Channel* wchan, int repcount)
 	int	errcount = 0;
 	IPC_Message	wmsg;
 	IPC_Message*	rmsg;
-
-
+	
+	
+	memset(&wmsg, 0, sizeof(wmsg));
 	wmsg.msg_private = NULL;
 	wmsg.msg_done = NULL;
 	wmsg.msg_body = str;
@@ -438,6 +439,9 @@ newmessage(IPC_Channel* chan, int niter)
 		       " allocating memory for msg failed");
 		return NULL;
 	}
+	
+	memset(msg, 0, sizeof(*msg));
+	
 	msg->msg_private = NULL;
 	msg->msg_done = msg_free;
 	msg->msg_ch = chan;

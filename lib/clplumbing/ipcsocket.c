@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.104 2004/11/18 00:34:37 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.105 2004/11/22 20:06:42 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1694,6 +1694,7 @@ socket_message_new(struct IPC_CHANNEL *ch, int msg_len)
   struct IPC_MESSAGE * temp_msg;
 
   temp_msg = g_new(struct IPC_MESSAGE, 1);
+  memset(temp_msg, 0, sizeof(struct IPC_MESSAGE));
   temp_msg->msg_buf = g_malloc(msg_len + ch->msgpad);
   temp_msg->msg_body = (char*)temp_msg->msg_buf + ch->msgpad;
   temp_msg->msg_len = msg_len;
