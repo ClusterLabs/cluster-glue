@@ -25,6 +25,7 @@
  * interfaces will be registered in a hash table.  If we manage
  * authentication modules, they'll have their (separate) hash table that
  * their exported interfaces are registered in.
+ * 
  */
 #include <pils/interface.h>
 
@@ -56,6 +57,7 @@ typedef int (*GenericPILCallback)
 typedef struct {
 	const char *	   iftype;	/* What type of interface is this? */
 	GHashTable**	   ifmap;	/* Table with implementation info */
+	void*		   importfuns;	/* Functions for interface to import */
 	GenericPILCallback callback;	/* Function2call when events occur */
 	void*		   userptr;	/* Passed to Callback function */
 }PILGenericIfMgmtRqst;
@@ -66,9 +68,10 @@ typedef struct {
  * GHashTable*	commmodules = NULL;
  * PILGenericIfMgmtRqst RegisterRequests[] =
  * {
- * 	{"auth",	&authmodules,	NULL,	NULL},
- * 	{"comm",	&commmodules,	NULL,	NULL},
- * 	{NULL,		NULL,		NULL,	NULL}	// Must be here
+ * 	{"auth",	&authmodules,	&authimports,	NULL,	NULL},
+ * 	{"comm",	&commmodules,	&commimports,	NULL,	NULL},
+ * 	{NULL,		NULL,		NULL,		NULL,	NULL}
+	// NULL entry must be here
  * };
  *
  * PILPlugin*	PluginUniverse;
