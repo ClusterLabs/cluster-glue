@@ -252,7 +252,6 @@ static int gbl_debug = DEBUG;
 #	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
 #endif
 
-#define DIMOF(a)	(sizeof(a)/sizeof(a[0]))
 #define WHITESPACE	" \t\n\r\f"
 
 #define	REPLSTR(s,v)	{					\
@@ -407,7 +406,8 @@ RPSSendCommand (struct WTI_RPS10 *ctx, char outlet, char command, int timeout)
 	}
 
 	/* send the command */
-	if (write(ctx->fd, writebuf, strlen(writebuf)) != strlen(writebuf)) {
+	if (write(ctx->fd, writebuf, strlen(writebuf)) != 
+			(int)strlen(writebuf)) {
 		syslog (LOG_ERR, "%s: Error writing to  %s : %s",
 			WTIid, ctx->device, strerror(errno));
 		return S_OOPS;

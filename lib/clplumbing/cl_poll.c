@@ -416,7 +416,7 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 	const struct timespec*		itertime = &ts;
 	siginfo_t			info;
 	int				eventcount = 0;
-	int				j;
+	unsigned int			j;
 #ifdef TIME_CALLS
 	longclock_t			starttime;
 	int				maxsleep = timeoutms;

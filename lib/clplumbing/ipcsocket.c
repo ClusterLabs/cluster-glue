@@ -583,7 +583,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
       }
     
       if (len > 0 ) {
-	if (len < msg->msg_len){
+	if ((size_t)len < msg->msg_len){
 	  /* 
 	   * FIXME! for stream domain socket, if the message is too big, it 
 	   * may cause part of the message cut instead of being sent out.

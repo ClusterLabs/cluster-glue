@@ -37,8 +37,6 @@
 
 #include <stonith/stonith.h>
 
-#include "stonith_signal.h"
-
 /*
  * APCSmart (tested with 2 old 900XLI)
  *
@@ -119,6 +117,8 @@ static const char *NOTapcID = "destroyed (APCSmart)";
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
+
+#include "stonith_signal.h"
 
 /*
  * apcsmartclose is called as part of unloading the apcsmart STONITH plugin.

@@ -174,9 +174,6 @@ static const char * NOTsshID = "SSH device has been destroyed";
 #	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
 #endif
 
-#define DIMOF(a)	(sizeof(a)/sizeof(a[0]))
-
-
 #define N_(text)	(text)
 #define _(text)		dgettext(ST_TEXTDOMAIN, text)
 

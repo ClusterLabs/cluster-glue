@@ -175,7 +175,6 @@ static const char * NOTbtid = "Hey, dummy this has been destroyed (BayTech)";
 #	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t))))
 #endif
 
-#define DIMOF(a)	(sizeof(a)/sizeof(a[0]))
 #define WHITESPACE	" \t\n\r\f"
 
 #define	REPLSTR(s,v)	{					\
