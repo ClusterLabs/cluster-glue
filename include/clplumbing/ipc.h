@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.40 2005/03/15 18:40:06 gshi Exp $ */
+/* $Id: ipc.h,v 1.41 2005/03/31 20:10:57 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -39,6 +39,12 @@
 
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
+#endif
+
+#ifdef IPC_TIME_DEBUG
+#include <clplumbing/longclock.h>
+#define MAXIPCTIME 3000
+
 #endif
 
 /* constants */
@@ -180,6 +186,8 @@ struct IPC_AUTH {
 	GHashTable * gid;	/* hash table for group id */
 };
 
+
+
 /* Message structure. */
 struct IPC_MESSAGE{
 	size_t	msg_len;
@@ -201,6 +209,7 @@ struct IPC_MESSAGE{
 				/* May be used by callback function. */
 	IPC_Channel * msg_ch;	/* Channel the */
 				/* message is from/in */
+
 };
 
 struct IPC_WAIT_OPS{
@@ -642,9 +651,30 @@ extern void ipc_destroy_auth(IPC_Auth * auth);
 
 extern void ipc_set_pollfunc(int (*)(struct pollfd*, unsigned int, int));
 
+
+#ifdef IPC_TIME_DEBUG
+
+#define GET_ENQUEUE_TIME(x)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->enqueue_time
+#define GET_SEND_TIME(x)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->send_time
+#define GET_RECV_TIME(x)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->recv_time
+#define GET_DEQUEUE_TIME(x)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->dequeue_time
+#define SET_ENQUEUE_TIME(x,t)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->enqueue_time = t
+#define SET_SEND_TIME(x,t)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->send_time = t
+#define SET_RECV_TIME(x,t)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->recv_time = t
+#define SET_DEQUEUE_TIME(x,t)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->dequeue_time =t 
+#endif
+
+
 struct SOCKET_MSG_HEAD{
 	int msg_len;
 	int magic;
+#ifdef IPC_TIME_DEBUG
+	longclock_t enqueue_time;
+	longclock_t send_time;
+	longclock_t recv_time;
+	longclock_t dequeue_time;
+#endif
+
 };
 
 #define	MAXDATASIZE	65535
