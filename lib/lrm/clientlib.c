@@ -588,8 +588,9 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype,
 
 	/* get the metadata from message */
 	tmp = cl_get_binary(ret, F_LRM_METADATA, &len);
-
-	metadata = strndup(tmp, len);
+	if (NULL!=tmp) {
+		metadata = strndup(tmp, len);
+	}
 	ha_msg_del(ret);
 
 	client_log(LOG_INFO, "lrm_get_rsc_type_supported: end.");
