@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.91 2004/04/18 07:53:36 alan Exp $ */
+/* $Id: ipcsocket.c,v 1.92 2004/04/18 19:22:13 alan Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1849,7 +1849,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
     }
 
   /* Avoid alignment issues - just copy it! */
-  memcpy(cred, CMSG_DATA(cmsg), sizeof(cred));
+  memcpy(&cred, CMSG_DATA(cmsg), sizeof(cred));
 
 
   if (	auth_info->uid
