@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.136 2005/04/04 07:30:44 andrew Exp $ */
+/* $Id: ipcsocket.c,v 1.137 2005/04/04 15:59:51 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -293,7 +293,7 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 				struct ha_msg* hamsg;
 				cl_log(LOG_WARNING, 
 				       " message delayed from enqueue to %s %d ms "
-				       "(enqueue-time=%ld, peer pid=%d) ",
+				       "(enqueue-time=%lu, peer pid=%d) ",
 				       positions[whichpos],
 				       msdiff,
 				       longclockto_ms(GET_ENQUEUE_TIME(ipcmsg)),
