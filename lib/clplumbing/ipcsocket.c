@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.115 2005/01/20 19:17:50 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.116 2005/02/03 20:39:51 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -568,7 +568,9 @@ static void
 socket_destroy_channel(struct IPC_CHANNEL * ch)
 {
 	while ( ch->send_queue->current_qlen > 0){
-		socket_resume_io(ch);
+		if (socket_resume_io(ch) != IPC_OK){
+			break;
+		}
 	}
 	socket_disconnect(ch);
 	socket_destroy_queue(ch->send_queue);
