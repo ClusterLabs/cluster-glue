@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.7 2005/02/07 02:09:21 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.8 2005/02/07 03:07:23 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -618,6 +618,50 @@ cl_dump_item(struct cl_bucket*b)
 		,	cp[0], cp[1], cp[2], cp[3]);
 	}
 }
+
+/* The only reason these functions exist is because glib uses non-standard
+ * types (gsize)in place of size_t.  Since size_t is 64-bits on some
+ * machines where gsize (unsigned int) is 32-bits, this is annoying.
+ */
+
+static gpointer
+cl_malloc_glib(gsize n_bytes)
+{
+	return (gpointer)cl_malloc((size_t)n_bytes);
+}
+
+static void
+cl_free_glib(gpointer mem)
+{
+	cl_free((void*)mem);
+}
+
+static void *
+cl_realloc_glib(gpointer mem, gsize n_bytes)
+{
+	return cl_realloc((void*)mem, (size_t)n_bytes);
+}
+
+
+/* Call before using any glib functions(!) */
+/* See also: g_mem_set_vtable() */
+void
+cl_malloc_forced_for_glib(void)
+{
+	static GMemVTable vt = {
+		cl_malloc_glib,
+		cl_realloc_glib,
+		cl_free_glib,
+		NULL,
+		NULL,
+		NULL,
+	};
+	if (!cl_malloc_inityet) {
+		cl_malloc_init();
+	}
+	g_mem_set_vtable(&vt);
+}
+
 #ifdef MARK_PRISTINE
 static int
 cl_check_is_pristine(const void* v, unsigned size)
