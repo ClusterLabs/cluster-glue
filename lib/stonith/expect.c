@@ -44,11 +44,11 @@
 #	include <sched.h>
 #endif
 
-#include <stonith/expect.h>
-
 #ifndef EOS
 #	define	EOS '\0'
 #endif
+
+#include <stonith/stonith.h>
 
 
 /*
@@ -56,7 +56,7 @@
  *	Return the token type for the given token or -1 on error.
  */
 
-int
+static int
 ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
 ,	int maxline)
 {
@@ -202,7 +202,7 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
  * Start a process with its stdin and stdout redirected to pipes
  * so the parent process can talk to it.
  */
-int
+static int
 StartProcess(const char * cmd, int * readfd, int * writefd)
 {
 	pid_t	pid;
@@ -275,3 +275,8 @@ StartProcess(const char * cmd, int * readfd, int * writefd)
 	/*NOTREACHED*/
 	return(-1);
 }
+
+StonithImports		stonithimports = {
+	ExpectToken,
+	StartProcess,
+};

@@ -46,7 +46,7 @@
 PILPluginUniv*		PIsys = NULL;
 static GHashTable*	Splugins = NULL;
 static int		init_pluginsys(void);
-StonithImports		stonithimports;
+extern StonithImports	stonithimports;
 
 static PILGenericIfMgmtRqst	Reqs[] =
 {
@@ -54,6 +54,7 @@ static PILGenericIfMgmtRqst	Reqs[] =
 	{NULL, NULL, NULL, NULL, NULL}
 };
 
+void PILpisysSetDebugLevel(int);
 /* Initialize the plugin system... */
 static int
 init_pluginsys(void) {
@@ -62,13 +63,20 @@ init_pluginsys(void) {
 		return TRUE;
 	}
 
+	//PILpisysSetDebugLevel(10);
+
 	PIsys = NewPILPluginUniv(STONITH_MODULES);
 	
 	if (PIsys) {
-		if (PILLoadPlugin(PIsys, PI_IFMANAGER, "generic", &Reqs) != PIL_OK){
+		if (PILLoadPlugin(PIsys, PI_IFMANAGER, "generic", Reqs)
+		!=	PIL_OK){
+			fprintf(stderr, "generic plugin load failed\n");
 			DelPILPluginUniv(PIsys);
 			PIsys = NULL;
 		}
+		//PILSetDebugLevel(PIsys, PI_IFMANAGER, "generic", 10);
+	}else{
+		fprintf(stderr, "pi univ creation failed\n");
 	}
 	return PIsys != NULL;
 }
@@ -103,14 +111,15 @@ stonith_new(const char * type)
 		PILIncrIFRefCount(PIsys, STONITH_TYPE_S, type, 1);
 
 	}else{		/* Try and load it... */
-		if (PILLoadPlugin(PIsys, STONITH_TYPE_S, type, NULL) != PIL_OK) {
+		if (PILLoadPlugin(PIsys, STONITH_TYPE_S, type, NULL)
+		!=	PIL_OK) {
 			FREE(s);
 			return NULL;
 		}
 
 		/* Look the plugin up in the Splugins table */
-		if (g_hash_table_lookup_extended(Splugins, type
-		,		(gpointer*)&key, (gpointer*)&ops)) {
+		if (!g_hash_table_lookup_extended(Splugins, type
+		,		(void**)&key, (void**)&ops)) {
 			/* OOPS! didn't find it(!?!)... */
 			PILIncrIFRefCount(PIsys, STONITH_TYPE_S, type, -1);
 			FREE(s);
