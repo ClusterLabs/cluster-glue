@@ -2,6 +2,8 @@
 #include <heartbeat.h>
 #include <syslog.h>
 #include <string.h>
+#include <stdlib.h>
+#include <assert.h>
 /*
  *
  * Base64 conversion functions.
@@ -44,6 +46,7 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
 	(void)_ha_msg_h_Id;
 	(void)_heartbeat_h_Id;
 
+	assert(strlen(b64chars) == 64);
 	if (outlen < requiredlen) {
 		ha_log(LOG_ERR, "binary_to_base64: output area too small.");
 		return -1;
@@ -65,17 +68,24 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
 		|	((*(inptr+1)) << 8)
 		|	(*(inptr+2))) & MASK24;
 
-		sixbits = chunk >> 18;
+		sixbits = (chunk >> 18) & MASK6;
 		*outptr = b64chars[sixbits]; ++outptr;
+
+//fprintf(stderr, "Adding char [%c] [%d]\n", b64chars[sixbits], sixbits);
 
 		sixbits = (chunk >> 12) & MASK6;
 		*outptr = b64chars[sixbits]; ++outptr;
 
+//fprintf(stderr, "Adding char [%c] [%d]\n", b64chars[sixbits], sixbits);
+
 		sixbits = (chunk >> 6) & MASK6;
 		*outptr = b64chars[sixbits]; ++outptr;
 
+//fprintf(stderr, "Adding char [%c] [%d]\n", b64chars[sixbits], sixbits);
+
 		sixbits = (chunk & MASK6);
 		*outptr = b64chars[sixbits]; ++outptr;
+//fprintf(stderr, "Adding char [%c] [%d]\n", b64chars[sixbits], sixbits);
 	}
 
 	/* Do we have anything left over? */
@@ -87,7 +97,7 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
 		unsigned long	chunk;
 		unsigned int	sixbits;
 
-		g_assert(bytesleft == 1 || bytesleft == 2);
+		assert(bytesleft == 1 || bytesleft == 2);
 
 		/* Grab first byte */
 		chunk =	(*inptr) << 16;
@@ -99,9 +109,9 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
 		chunk &= MASK24;
 
 		/* OK, now we have our chunk... */
-		sixbits = chunk >> 18;
+		sixbits = (chunk >> 18) & MASK6;
 		*outptr = b64chars[sixbits]; ++outptr;
-		sixbits = chunk >> 12;
+		sixbits = (chunk >> 12) & MASK6;
 		*outptr = b64chars[sixbits]; ++outptr;
 
 		if (bytesleft == 2) {
@@ -116,7 +126,7 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
 	}
 	*outptr = EOS;	/* Don't increment */
 	return (outptr - output);
-} 
+}
 
 
 /* This macro usable only in base64_to_binary() */
@@ -126,7 +136,11 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
 	ptmp = memchr(b64chars, (in), sizeof(b64chars)-1);	\
 	if (ptmp == NULL) {					\
 		ha_log(LOG_ERR					\
-		,	"base64_to_binary: invalid input.");	\
+		,	"base64_to_binary: invalid input. %d [%c]!"	\
+					,	in, in);	\
+		fprintf(stderr, "Line #: %d :", __LINE__);	\
+		ha_log(LOG_ERR					\
+		,	"string input. [%s] %d", input, inlen);\
 		return -1;					\
 	}							\
 	out = ((ptmp-b64chars) & MASK6);			\
@@ -134,10 +148,11 @@ binary_to_base64(void * data, int nbytes, char * output, int outlen)
 	
 
 int
-base64_to_binary(char * input, int inlen, void * output, int outlen)
+base64_to_binary(char * in, int inlen, void * output, int outlen)
 {
 	int maxbinlen = B64_maxbytelen(inlen); /* Worst case size */
-	const char * lastinput = input + inlen - B64outunit;
+	char *		input = in;
+	char *		lastinput = in + inlen - B64outunit;
 	int		equalcount = 0;
 	unsigned char *	startout;
 	unsigned char *	out;
@@ -147,6 +162,7 @@ base64_to_binary(char * input, int inlen, void * output, int outlen)
 	unsigned	sixbits4;
 	unsigned long	chunk;
 
+//fprintf(stderr, "Processing [%s]\n", input);
 	/* Make sure we have enough room */
 	if (outlen < maxbinlen) {
 		int	residue = maxbinlen - outlen;
@@ -165,12 +181,16 @@ base64_to_binary(char * input, int inlen, void * output, int outlen)
 		return -1;
 	}
 
+	if (inlen == 0) {
+		return 0;
+	}
+
 	/* We have enough space.  We are happy :-)  */
 
 	startout = out = (char *)output;
 
 
-	for (;input < lastinput; input += B64outunit) {
+	while (input < lastinput) {
 		unsigned long	chunk;
 
 
@@ -180,7 +200,7 @@ base64_to_binary(char * input, int inlen, void * output, int outlen)
 		Char2SixBits(*input, sixbits4); ++input;
 
 		chunk = (sixbits1 << 18)
-		|	(sixbits2 < 12) | (sixbits3 < 6) | sixbits4;
+		|	(sixbits2 << 12) | (sixbits3 << 6) | sixbits4;
 
 
 		*out = ((chunk >> 16) & 0xff);	++out;
@@ -190,9 +210,14 @@ base64_to_binary(char * input, int inlen, void * output, int outlen)
 
 	/* Process last 4 chars of input (1 to 3 bytes of output) */
 
+//fprintf(stderr, "Whole string: [%s], remaining [%s] lastinput[%s]\n", in, input, lastinput);
+
+
 	/* The first two input chars must be normal chars */
 	Char2SixBits(*input, sixbits1); ++input;
+//fprintf(stderr, "Got six bits as: %d\n", sixbits1);
 	Char2SixBits(*input, sixbits2); ++input;
+//fprintf(stderr, "Got six bits as: %d\n", sixbits2);
 
 	/* We should find one of: (char,char) (char,=) or (=,=) */
 	/* We then output:         (3 bytes)  (2 bytes)  (1 byte) */
@@ -206,6 +231,7 @@ base64_to_binary(char * input, int inlen, void * output, int outlen)
 	}else{
 		/* We have either the (char,char) or (char,=) case */
 		Char2SixBits(*input, sixbits3); ++input;
+//fprintf(stderr, "Got six bits as: %d\n", sixbits3);
 		if (*input == EQUALS) {
 			/* The (char, =): 2 bytes case */
 			equalcount=1;
@@ -213,12 +239,18 @@ base64_to_binary(char * input, int inlen, void * output, int outlen)
 		}else{
 			/* The (char, char): 3 bytes case */
 			Char2SixBits(*input, sixbits4); ++input;
+//fprintf(stderr, "Got six bits as: %d\n", sixbits4);
 			equalcount=0;
 		}
 	}
 
 	chunk = (sixbits1 << 18)
-	|	(sixbits2 < 12) | (sixbits3 < 6) | sixbits4;
+	|	(sixbits2 << 12) | (sixbits3 << 6) | sixbits4;
+// fprintf(stderr, "Got chunk of: 0x%06lx %ld\n", chunk, chunk);
+// fprintf(stderr, "Sixbits1 : 0x%06o\n", sixbits1);
+// fprintf(stderr, "Sixbits2 : 0x%06o\n", sixbits2);
+// fprintf(stderr, "Sixbits3 : 0x%06o\n", sixbits3);
+// fprintf(stderr, "Sixbits4 : 0x%06o\n", sixbits4);
 
 	/* We always have one more char to output... */
 	*out = ((chunk >> 16) & 0xff); ++out;
@@ -235,3 +267,151 @@ base64_to_binary(char * input, int inlen, void * output, int outlen)
 
 	return out - startout;
 }
+
+#if 0
+#define RAND(upb)	(rand()%(upb))
+
+void dumpbin(void * Bin, int length);
+void randbin(void * Bin, int length);
+
+void
+dumpbin(void * Bin, int length)
+{
+	unsigned char *	bin = Bin;
+
+	int	j;
+
+	for (j=0; j < length; ++j) {
+		fprintf(stderr, "%02x ", bin[j]);
+		if ((j % 32) == 31) {
+			fprintf(stderr, "\n");
+		}
+	}
+	fprintf(stderr, "\n");
+}
+
+void
+randbin(void * Bin, int length)
+{
+	unsigned char *	bin = Bin;
+	int	j;
+
+	for (j=0; j < length; ++j) {
+		bin[j] = (unsigned char)RAND(256);
+	}
+	
+}
+
+#define MAXLEN	320
+#define	MAXSTRING B64_stringlen(MAXLEN)+1
+#define	MAXITER	3000000
+int
+main(int argc, char ** argv)
+{
+	int	errcount = 0;
+	char	origbin[MAXLEN+1];
+	char	sourcebin[MAXLEN+1];
+	char	destbin[MAXLEN+1];
+	char	deststr[MAXSTRING];
+	int	maxiter = MAXITER;
+	int	j;
+	
+	for (j=0; j < maxiter; ++j) {
+		int	iterlen = RAND(MAXLEN+1);
+		int	slen;
+		int	blen;
+
+fprintf(stderr, "+");
+
+		memset(origbin, 0, MAXLEN+1);
+		memset(sourcebin, 0, MAXLEN+1);
+		memset(destbin, 0, MAXLEN+1);
+		randbin(origbin, iterlen);
+		origbin[iterlen] = 0x1;
+		memcpy(sourcebin, origbin, iterlen);
+		sourcebin[iterlen] = 0x2;
+		slen = binary_to_base64(sourcebin, iterlen, deststr, MAXSTRING);
+		if (slen < 0) {
+			fprintf(stderr
+			,	"binary_to_base64 failure: length %d\n"
+			,	iterlen);
+			++errcount;
+			continue;
+		}
+		if (strlen(deststr) != slen) {
+			fprintf(stderr
+			,	"binary_to_base64 failure: length was %d (strlen) vs %d (ret value)\n"
+			,	strlen(deststr), slen);
+			fprintf(stderr, "binlen: %d, deststr: [%s]\n"
+			,	iterlen, deststr);
+			continue;
+			++errcount;
+		}
+		destbin[iterlen] = 0x3;
+		blen = base64_to_binary(deststr, slen, destbin, iterlen);
+
+		if (blen != iterlen) {
+			fprintf(stderr
+			,	"base64_to_binary failure: length was %d vs %d\n"
+			,	blen, iterlen);
+			dumpbin(origbin, iterlen);
+			fprintf(stderr
+			,	"Base64 intermediate: [%s]\n", deststr);
+			++errcount;
+			continue;
+		}
+		if (memcmp(destbin, origbin, iterlen) != 0) {
+			fprintf(stderr
+			,	"base64_to_binary mismatch. Orig:\n");
+			dumpbin(origbin, iterlen);
+			fprintf(stderr, "Dest:\n");
+			dumpbin(destbin, iterlen);
+			fprintf(stderr
+			,	"Base64 intermediate: [%s]\n", deststr);
+			++errcount;
+		}
+		if (destbin[iterlen] != 0x3) {
+			fprintf(stderr
+			,	"base64_to_binary corruption. dest byte: 0x%02x\n"
+			,	destbin[iterlen]);
+			++errcount;
+		}
+
+		if (sourcebin[iterlen] != 0x2) {
+			fprintf(stderr
+			,	"base64_to_binary corruption. source byte: 0x%02x\n"
+			,	sourcebin[iterlen]);
+			++errcount;
+		}
+		sourcebin[iterlen] = 0x0;
+		origbin[iterlen] = 0x0;
+		if (memcmp(sourcebin, origbin, MAXLEN+1) != 0) {
+			fprintf(stderr
+			,	"base64_to_binary corruption. origbin:\n");
+			dumpbin(origbin, MAXLEN+1);
+			fprintf(stderr, "sourcebin:\n");
+			dumpbin(sourcebin, MAXLEN+1);
+			++errcount;
+		}
+
+	}
+
+	fprintf(stderr, "%d errors.\n", errcount);
+
+	return errcount;
+}
+/* HA-logging function */
+void
+ha_log(int priority, const char * fmt, ...)
+{
+	va_list		ap;
+	char		buf[MAXLINE];
+
+	va_start(ap, fmt);
+	vsnprintf(buf, MAXLINE, fmt, ap);
+	va_end(ap);
+
+	fprintf(stderr, "%s\n",  buf);
+
+}
+#endif
