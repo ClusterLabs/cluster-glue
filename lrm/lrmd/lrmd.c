@@ -976,7 +976,7 @@ on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 			return HA_FAIL;
 		}
 
-		if (HA_FAIL == ha_msg_add(ret, F_LRM_RCLASS, rsc->class))	{
+		if (HA_FAIL == ha_msg_add(ret, F_LRM_RCLASS, rsc->class)) {
 			return HA_FAIL;
 		}
 		ha_msg_add_hash_table(ret, F_LRM_PARAM, rsc->params);
@@ -1024,6 +1024,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 			free_op(op);
 		}
 		//free the memeroy of rsc
+		g_free(rsc->id);
 		g_free(rsc->type);
 		g_free(rsc->class);
 		if (NULL != rsc->params) {
@@ -1076,7 +1077,7 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 				"on_msg_add_rsc: ra type does not exist.");
 		return HA_FAIL;
 	}
-	rsc->params = NULL;
+
 	rsc->op_list = NULL;
 	rsc->repeat_op_list = NULL;
 	rsc->last_op = NULL;
