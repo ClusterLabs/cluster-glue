@@ -500,7 +500,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
   struct SOCKET_CH_PRIVATE* conn_info;
   GList *element;
   struct SOCKET_MSG_HEAD head;
-  char *msg_begin;
+  char *msg_begin = NULL;
   gboolean new_msg = FALSE;
 
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
@@ -519,6 +519,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	msg = conn_info->buf_msg;
 	msg_begin = (char *) msg->msg_body + (msg->msg_len - len); 
       }else{
+	msg_begin = (char *)&head;
 	new_msg = TRUE;
       }
     }else{
