@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.16 2004/09/10 10:25:50 sunjd Exp $ */
+/* $Id: lrmadmin.c,v 1.17 2004/09/14 09:17:35 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -456,7 +456,7 @@ int main(int argc, char **argv)
 					 cur_state==LRM_RSC_IDLE?
 					 "LRM_RSC_IDLE":"LRM_RSC_BUSY");
 								
-				if (!ops_queue) {
+				if (ops_queue) {
 					g_list_foreach(ops_queue, g_print_ops, 
 							NULL);
 					g_list_free(ops_queue);
@@ -824,9 +824,8 @@ print_rsc_inf(lrm_rsc_t * lrm_rsc)
 	if (lrm_rsc->params) {
 		tmp = params_hashtable_to_str(lrm_rsc->class, 
 				lrm_rsc->params);
+		printf("Resource agency parameters:%s\n", tmp);
 	}
-
-	printf("Resource agency parameters:%s\n", tmp);
 	g_free(tmp);
 }
 
@@ -879,6 +878,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.17  2004/09/14 09:17:35  sunjd
+ * fix two pointer bugs found by BEAM
+ *
  * Revision 1.16  2004/09/10 10:25:50  sunjd
  * Minor polish to message format
  *
