@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.46 2005/02/09 01:45:05 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.47 2005/02/09 18:57:12 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -2053,11 +2053,12 @@ msg2wirefmt(const struct ha_msg*m, size_t* len)
 		char	*tmp;
 
 		tmp = msg2string(m);
-		/*
-		*len = m->stringlen;
-		cl_log(LOG_INFO, "m->stringlen =%d,strlen(tmp)=%d",
-		m->stringlen, strlen(tmp));
-		*/
+		
+		if(tmp == NULL){
+			*len = 0;
+			return NULL;
+		}
+		
 		*len = strlen(tmp) + 1;
 		return(tmp);
 	}
@@ -2140,6 +2141,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.47  2005/02/09 18:57:12  gshi
+ * In case of one field printing to string failure, we should discard the entire message
+ *
  * Revision 1.46  2005/02/09 01:45:05  gshi
  * 1.add a magic number in strut SOCKET_MSG_HEAD. On IPC receive side, it checks that magic
  * number and abort if not correct

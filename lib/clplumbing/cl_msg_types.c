@@ -979,7 +979,7 @@ str2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	if ( strlen(s) != len){
 		cl_log(LOG_ERR, "str2string:"
 		       "the input len != string length");
-		return 0;
+		return -1;
 	}
 	
 	strcat(buf, s);
@@ -1002,7 +1002,7 @@ binary2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	
 	if ( buf + baselen >= maxp){
 		cl_log(LOG_ERR, "binary2string: out of bounary");
-		return 0;
+		return -1;
 	}
 	
 	truelen = binary_to_base64(value, len, buf, baselen);
@@ -1026,7 +1026,7 @@ struct2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	if ( buf + baselen > maxp){
 		cl_log(LOG_ERR, "struct2string: not enough buffer"
 		       "for the struct to generate a string");
-		return 0;
+		return -1;
 	}
 
 	if (msg2string_buf(msg, buf ,baselen,depth + 1, NEEDHEAD)
@@ -1035,13 +1035,13 @@ struct2string(char* buf, char* maxp, void* value, size_t len, int depth)
 		cl_log(LOG_ERR
 		       , "struct2string(): msg2string_buf for"
 		       " child message failed");		
-		return 0;
+		return -1;
 		
 	}
 	
 	if (convert(buf, baselen, depth, NL_TO_SYM) != HA_OK){		
 		cl_log(LOG_ERR , "struct2string(): convert failed");		
-		return 0;		
+		return -1;		
 	}
 	
 	return strlen(buf);
@@ -1065,7 +1065,7 @@ list2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	if (listlen == 0){
 		cl_log(LOG_ERR, "list2string():"
 		       "string_list_pack() failed");
-		return 0;
+		return -1;
 	}
 	
 	return listlen;	
