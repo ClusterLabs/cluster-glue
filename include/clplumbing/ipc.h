@@ -480,6 +480,16 @@ extern IPC_Channel  * ipc_channel_constructor(const char * ch_type
 ,	GHashTable* ch_attrs);
 
 /*
+ * ipc_channel_pair:
+ *   Construct a pair of connected IPC channels in a fashion analagous
+ *	to pipe(2) or socketpair(2).
+ *
+ * Parameters:
+ *   channels: an array of two IPC_Channel pointers for return result
+ */
+int ipc_channel_pair(IPC_Channel* channels[2]);
+
+/*
  * ipc_set_auth:
  *   A helper function used to convert array of uid and gid into
  *	an authentication structure (IPC_Auth)
