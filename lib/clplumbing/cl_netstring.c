@@ -147,8 +147,7 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 		
 		llen = (size_t)m->nlens[i];
 		
-		if(m->types[i] < sizeof(fieldtypefuncs) 
-		   / sizeof(fieldtypefuncs[0])){					
+		if(m->types[i] < DIMOF(fieldtypefuncs)){
 			int (*tonetstring)(char*, char*, void*, size_t, size_t*);			
 			tonetstring = fieldtypefuncs[m->types[i]].tonetstring;
 			if (!tonetstring || tonetstring(sp, smax, m->values[i], m->vlens[i], &comlen) != HA_OK){
@@ -362,8 +361,7 @@ netstring2msg(const char *s, size_t length, int need_auth)
 		
 		fieldtype = atoi(type);		
 		
-		if (fieldtype < sizeof(fieldtypefuncs) 
-		    / sizeof(fieldtypefuncs[0])){					
+		if (fieldtype < DIMOF(fieldtypefuncs)){
 			netstringtofield = fieldtypefuncs[fieldtype].netstringtofield;
 			memfree = fieldtypefuncs[fieldtype].memfree;
 			if (!netstringtofield || netstringtofield(value, vlen,
