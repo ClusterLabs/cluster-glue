@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.21 2004/12/09 20:28:15 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.22 2005/02/08 04:26:02 alan Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -107,7 +107,7 @@ ipc_destroy_auth(struct IPC_AUTH *auth)
 		if (auth->gid) {
 			g_hash_table_destroy(auth->gid);
 		}
-		free((void *)auth);
+		g_free((void *)auth);
 	}
 }
 
