@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.126 2005/03/02 22:54:29 alan Exp $ */
+/* $Id: ipcsocket.c,v 1.127 2005/03/08 20:54:51 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -218,6 +218,8 @@ static IPC_Message* socket_new_ipcmsg(IPC_Channel* ch,
 				      void* private);
 
 
+static int	socket_get_chan_status(IPC_Channel* ch);
+
 /* socket object of the function table */
 static struct IPC_OPS socket_ops = {
   socket_destroy_channel,
@@ -238,6 +240,7 @@ static struct IPC_OPS socket_ops = {
   socket_set_high_flow_callback,
   socket_set_low_flow_callback,
   socket_new_ipcmsg,
+  socket_get_chan_status,
 };
 
 
@@ -1433,6 +1436,12 @@ socket_new_ipcmsg(IPC_Channel* ch, const void* data, int len, void* private)
 	return hdr;
 }
 
+static int
+socket_get_chan_status(IPC_Channel* ch)
+{
+	socket_resume_io(ch);
+	return ch->ch_status;
+}
 
 /* socket object of the function table */
 static struct IPC_WAIT_OPS socket_wait_ops = {
