@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.42 2005/04/01 22:56:14 gshi Exp $ */
+/* $Id: ipc.h,v 1.43 2005/04/04 21:06:43 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -562,6 +562,17 @@ struct IPC_OPS{
  *
  */
 	int	(*get_chan_status)(IPC_Channel* ch);
+
+	
+/*
+ * These two functions returns true if the corresponding queue 
+ * is full, otherwise it returns false
+ */
+	
+	gboolean (*is_sendq_full)(struct IPC_CHANNEL * ch);
+	gboolean (*is_recvq_full)(struct IPC_CHANNEL * ch);
+
+
 };
 
 
