@@ -302,6 +302,7 @@ netstring2msg(const char *s, size_t length, int need_auth)
 		/* This can happen if the sender gets killed */
 		/* at just the wrong time... */
 		cl_log(LOG_WARNING, "netstring2msg: no MSG_START");
+                ha_msg_del(ret);
 		return(NULL);
 	}else{
 		sp += startlen;
