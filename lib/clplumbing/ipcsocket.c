@@ -358,144 +358,7 @@ socket_assert_auth(struct IPC_CHANNEL *ch, GHashTable *auth)
   return IPC_FAIL;
 }
 
-/* verify the authentication information. */
-#ifdef SO_PEERCRED
-static int 
-socket_verify_auth(struct IPC_CHANNEL* ch)
-{
-  struct SOCKET_CH_PRIVATE *conn_info;
-  struct IPC_AUTH *auth_info;
-  ssize_t n;
-  int ret = IPC_OK;
-  struct ucred *cred;
-  
-  
-  auth_info = (struct IPC_AUTH *) ch->auth_info;
 
-  if (auth_info == NULL) { /* no restriction for authentication */
-    return IPC_OK;
-  }
-  
-  if (auth_info->uid == NULL && auth_info->gid == NULL) {
-    return IPC_OK;    /* no restriction for authentication */
-  }
-
-  /* get the credential information for peer */
-  n = sizeof(struct ucred);
-  conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
-  cred = g_new(struct ucred, 1); 
-  if (getsockopt(conn_info->s, SOL_SOCKET, SO_PEERCRED, cred, &n) != 0) {
-    free(cred);
-    return IPC_FAIL;
-  }
-  
-  /* verify the credential information. */
-  if (	auth_info->uid
-  &&	g_hash_table_lookup(auth_info->uid, &(cred->uid)) == NULL) {
-		ret = IPC_FAIL;
-  }
-  if (	auth_info->gid
-  &&	g_hash_table_lookup(auth_info->gid, &(cred->gid)) == NULL) {
-		ret = IPC_FAIL;
-  }
-  free(cred);
-  return ret;
-}
-
-#else
-
-/* FIXME!  Need to implement SCM_CREDS mechanism for BSD-based systems
- * This isn't an emergency, but should be done in the future...
- * Hint: * Postgresql does both types of authentication...
- * see src/backend/libpq/auth.c
- * Not clear its SO_PEERCRED implementation works though ;-) 
- */
-
-/* Done.... Haven't tested yet. */
-static int 
-socket_verify_auth(struct IPC_CHANNEL* ch)
-{
-  struct msghdr msg;
-  /* Credentials structure */
-#ifdef HAVE_STRUCT_CMSGCRED
-  typedef struct cmsgcred Cred;
-#define cruid cmcred_uid
-
-#elif HAVE_STRUCT_FCRED
-  typedef struct fcred Cred;
-#define cruid fc_uid
-
-#elif HAVE_STRUCT_SOCKCRED
-  typedef struct sockcred Cred;
-#define cruid sc_uid
-
-#elif _HAVE_CRED_H
-  typedef struct cred Cred;
-#define cruid c_uid
-#else
- typedef struct ucred Cred;
-#define cruid c_uid
-#endif
-  Cred	   *cred;
-  struct SOCKET_CH_PRIVATE *conn_info;
-  struct IPC_AUTH *auth_info;
-  int ret = IPC_OK;
-  char         buf;
-  
-  /* Compute size without padding */
-  char		cmsgmem[ALIGN(sizeof(struct cmsghdr)) + ALIGN(sizeof(Cred))];	/* for NetBSD */
-
-  /* Point to start of first structure */
-  struct cmsghdr *cmsg = (struct cmsghdr *) cmsgmem;
-  
-  auth_info = (struct IPC_AUTH *) ch->auth_info;
-
-  if (auth_info == NULL) { /* no restriction for authentication */
-    return IPC_OK;
-  }
-  
-  if (auth_info->uid == FALSE && auth_info->gid == FALSE) {
-    return IPC_OK;    /* no restriction for authentication */
-  }
-  conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
-
-  memset(&msg, 0, sizeof(msg));
-  msg.msg_iov = (struct iovec *) malloc(sizeof(struct iovec));
-  msg.msg_iovlen = 1;
-  msg.msg_control = (char *) cmsg;
-  msg.msg_controllen = sizeof(cmsgmem);
-  memset(cmsg, 0, sizeof(cmsgmem));
-
-  /*
-   * The one character which is received here is not meaningful; its
-   * purposes is only to make sure that recvmsg() blocks long enough for
-   * the other side to send its credentials.
-   */
-  msg.msg_iov->iov_base = &buf;
-  msg.msg_iov->iov_len = 1;
-  
-  if (recvmsg(conn_info->s, &msg, 0) < 0 
-      || cmsg->cmsg_len < sizeof(cmsgmem) 
-      || cmsg->cmsg_type != SCM_CREDS)
-    {
-      fprintf(stderr,"can't get credential information from peer\n");
-      return IPC_FAIL;
-    }
-
-  cred = (Cred *) CMSG_DATA(cmsg);
-  if (	auth_info->uid
-  &&	g_hash_table_lookup(auth_info->uid, &(cred->cr_uid)) == NULL) {
-		ret = IPC_FAIL;
-  }
-  if (	auth_info->gid
-  &&	g_hash_table_lookup(auth_info->gid, &(cred->cr_groups)) == NULL) {
-		ret = IPC_FAIL;
-  }
-
-  return ret;
-}
-
-#endif
 
 static int
 socket_resume_io(struct IPC_CHANNEL *ch)
@@ -948,8 +811,76 @@ socket_free_message(struct IPC_MESSAGE * msg) {
   free((void *)msg);
 }
 
-/* get farside pid through*/
+
+
+/***********************************************************************
+ *
+ * IPC authentication schemes...  More machine dependent than
+ * we'd like, but don't know any better way...
+ *
+ ***********************************************************************/
+
+
 #ifdef SO_PEERCRED
+#	define	USE_SO_PEERCRED
+#elif defined(SCM_CREDS)
+#	define	USE_SCM_CREDS
+#else
+#	define	USE_DUMMY_CREDS
+	/* This will make it compile, but attempts to authenticate
+	 * will fail.  This is a stopgap measure ;-)
+	 */
+#endif
+
+/***********************************************************************
+ * SO_PEERCRED VERSION... (Linux)
+ ***********************************************************************/
+
+#ifdef USE_SO_PEERCRED
+/* verify the authentication information. */
+static int 
+socket_verify_auth(struct IPC_CHANNEL* ch)
+{
+  struct SOCKET_CH_PRIVATE *conn_info;
+  struct IPC_AUTH *auth_info;
+  ssize_t n;
+  int ret = IPC_OK;
+  struct ucred *cred;
+  
+  
+  auth_info = (struct IPC_AUTH *) ch->auth_info;
+
+  if (auth_info == NULL) { /* no restriction for authentication */
+    return IPC_OK;
+  }
+  
+  if (auth_info->uid == NULL && auth_info->gid == NULL) {
+    return IPC_OK;    /* no restriction for authentication */
+  }
+
+  /* get the credential information for peer */
+  n = sizeof(struct ucred);
+  conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
+  cred = g_new(struct ucred, 1); 
+  if (getsockopt(conn_info->s, SOL_SOCKET, SO_PEERCRED, cred, &n) != 0) {
+    free(cred);
+    return IPC_FAIL;
+  }
+  
+  /* verify the credential information. */
+  if (	auth_info->uid
+  &&	g_hash_table_lookup(auth_info->uid, &(cred->uid)) == NULL) {
+		ret = IPC_FAIL;
+  }
+  if (	auth_info->gid
+  &&	g_hash_table_lookup(auth_info->gid, &(cred->gid)) == NULL) {
+		ret = IPC_FAIL;
+  }
+  free(cred);
+  return ret;
+}
+/* get farside pid through*/
+
 pid_t
 socket_get_farside_pid(int sockfd )
 {
@@ -958,7 +889,7 @@ socket_get_farside_pid(int sockfd )
   struct ucred *cred;
   pid_t f_pid;
   
-  /* get the credential information for peer */
+  /* Get the credential information from peer */
   n = sizeof(struct ucred);
   cred = g_new(struct ucred, 1); 
   if (getsockopt(sockfd, SOL_SOCKET, SO_PEERCRED, cred, &n) != 0) {
@@ -970,17 +901,136 @@ socket_get_farside_pid(int sockfd )
   free(cred);
   return f_pid;
 }
+#endif /* SO_PEERCRED version */
 
-#elif defined(SCM_CREDS) || defined(HAVE_STRUCT_CMSGCRED) || defined(HAVE_STRUCT_FCRED) || (defined(HAVE_STRUCT_SOCKCRED) && defined(LOCAL_CREDS))
+
+
+/***********************************************************************
+ * SCM_CREDS VERSION... (*BSD systems)
+ ***********************************************************************/
+#ifdef	USE_SCM_CREDS
+/* FIXME!  Need to implement SCM_CREDS mechanism for BSD-based systems
+ * This isn't an emergency, but should be done in the future...
+ * Hint: * Postgresql does both types of authentication...
+ * see src/backend/libpq/auth.c
+ * Not clear its SO_PEERCRED implementation works though ;-) 
+ */
+
+/* Done.... Haven't tested yet. */
+static int 
+socket_verify_auth(struct IPC_CHANNEL* ch)
+{
+  struct msghdr msg;
+  /* Credentials structure */
+#ifdef HAVE_STRUCT_CMSGCRED
+  typedef struct cmsgcred Cred;
+#define cruid cmcred_uid
+
+#elif HAVE_STRUCT_FCRED
+  typedef struct fcred Cred;
+#define cruid fc_uid
+
+#elif HAVE_STRUCT_SOCKCRED
+  typedef struct sockcred Cred;
+#define cruid sc_uid
+
+#elif _HAVE_CRED_H
+  typedef struct cred Cred;
+#define cruid c_uid
+#else
+ typedef struct ucred Cred;
+#define cruid c_uid
+#endif
+  Cred	   *cred;
+  struct SOCKET_CH_PRIVATE *conn_info;
+  struct IPC_AUTH *auth_info;
+  int ret = IPC_OK;
+  char         buf;
   
+  /* Compute size without padding */
+  char		cmsgmem[ALIGN(sizeof(struct cmsghdr)) + ALIGN(sizeof(Cred))];	/* for NetBSD */
+
+  /* Point to start of first structure */
+  struct cmsghdr *cmsg = (struct cmsghdr *) cmsgmem;
+  
+  auth_info = (struct IPC_AUTH *) ch->auth_info;
+
+  if (auth_info == NULL) { /* no restriction for authentication */
+    return IPC_OK;
+  }
+  
+  if (auth_info->uid == FALSE && auth_info->gid == FALSE) {
+    return IPC_OK;    /* no restriction for authentication */
+  }
+  conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
+
+  memset(&msg, 0, sizeof(msg));
+  msg.msg_iov = (struct iovec *) malloc(sizeof(struct iovec));
+  msg.msg_iovlen = 1;
+  msg.msg_control = (char *) cmsg;
+  msg.msg_controllen = sizeof(cmsgmem);
+  memset(cmsg, 0, sizeof(cmsgmem));
+
+  /*
+   * The one character which is received here is not meaningful; its
+   * purpose is only to make sure that recvmsg() blocks long enough for
+   * the other side to send its credentials.
+   */
+  msg.msg_iov->iov_base = &buf;
+  msg.msg_iov->iov_len = 1;
+  
+  if (recvmsg(conn_info->s, &msg, 0) < 0 
+      || cmsg->cmsg_len < sizeof(cmsgmem) 
+      || cmsg->cmsg_type != SCM_CREDS) {
+      fprintf(stderr,"can't get credential information from peer\n");
+      return IPC_FAIL;
+    }
+
+  cred = (Cred *) CMSG_DATA(cmsg);
+
+  /* This is weird... Shouldn't cr_uid be cruid instead? FIXME??*/
+  /* Either that, or we shouldn't be defining it above... */
+  /* Also, what about the group id field name? */
+
+  if (	auth_info->uid
+  &&	g_hash_table_lookup(auth_info->uid, &(cred->cr_uid)) == NULL) {
+		ret = IPC_FAIL;
+  }
+  if (	auth_info->gid
+  &&	g_hash_table_lookup(auth_info->gid, &(cred->cr_groups)) == NULL) {
+		ret = IPC_FAIL;
+  }
+
+  return ret;
+}
+
 /* FIXME!  Need to implement SCM_CREDS mechanism for BSD-based systems
  * this is similar to the SCM_CREDS mechanism for verify_auth() function.
  * here we just want to get the pid of the other side from the credential 
  * information.
  */
 
-pid_t socket_get_farside_pid(int sock){
-  return -1;
+pid_t
+socket_get_farside_pid(int sock){
+	/* FIXME! */
+	return -1;
+}
+#endif /* SCM_CREDS version */
+
+
+/***********************************************************************
+ * DUMMY VERSION... (other systems...)
+ ***********************************************************************/
+
+#ifdef USE_DUMMY_CREDS
+static int 
+socket_verify_auth(struct IPC_CHANNEL* ch)
+{
+	return IPC_FAIL;
 }
 
-#endif
+pid_t
+socket_get_farside_pid(int sock){
+	return -1;
+}
+#endif /* Dummy version */
