@@ -73,7 +73,7 @@
  *	function pointers in these tables as member functions.
  *
  *  On the server side, everything starts up with a call to
- *	ipc_channel_constructor(), which returns an IPC_WaitConnection.
+ *	ipc_wait_conn_constructor(), which returns an IPC_WaitConnection.
  *
  *	Once the server has the IPC_WaitConnection object in hand,
  *	it can give the result of the get_select_fd() member function
@@ -87,7 +87,7 @@
  *	go ;-)
  *
  *  On the client side, everything starts up with a call to
- *	ipc_wait_conn_constructor() which we use to talk to the server.
+ *	ipc_channel_constructor() which we use to talk to the server.
  *	The client is much easier ;-)
  */
 
