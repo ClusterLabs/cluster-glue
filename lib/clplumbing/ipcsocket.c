@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.98 2004/10/07 05:53:59 andrew Exp $ */
+/* $Id: ipcsocket.c,v 1.99 2004/10/07 15:17:18 andrew Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -62,6 +62,10 @@
 #	define UNIX_PATH_MAX 108
 #endif
 #define MAX_LISTEN_NUM 10
+
+#ifndef SUN_LEN
+#    define SUN_LEN(ptr) ((size_t) (offsetof (sockaddr_un, sun_path) + strlen ((ptr)->sun_path))
+#endif
 
 #ifndef MSG_NOSIGNAL
 #define		MSG_NOSIGNAL	0
@@ -1516,7 +1520,6 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   conn_info->peer_addr = NULL;
   
 #ifdef USE_BINDSTAT_CREDS
-  int len = 0;
   char rand_id[16];
   char uuid_str_tmp[40];
   struct sockaddr_un sock_addr;
@@ -1532,11 +1535,8 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   snprintf(sock_addr.sun_path, sizeof(sock_addr.sun_path),
 	   "%s/%s/%s", HA_VARLIBDIR, PACKAGE, uuid_str_tmp);
   
-  len = sizeof(sock_addr);
-  sock_addr.sun_len = len;
-  
   unlink(sock_addr.sun_path);
-  if(bind(sockfd, (struct sockaddr*)&sock_addr, len) < 0) {
+  if(bind(sockfd, (struct sockaddr*)&sock_addr, SUN_LEN(&sock_addr)) < 0) {
 	  perror("Client bind() failure");
 	  return NULL;
   }
@@ -1973,7 +1973,6 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 	int ret = IPC_OK;
 	struct stat stat_buf;
 	struct sockaddr_un *peer_addr = NULL;
-	struct sockaddr_un dummy;
 	struct SOCKET_CH_PRIVATE *ch_private = NULL;	
 
 	if(ch != NULL) {
@@ -2000,8 +1999,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 		return IPC_FAIL;
 	}
 	
-	len = peer_addr->sun_len;
-	len -= sizeof(dummy.sun_len) - sizeof(dummy.sun_family);
+	len = SUN_LEN(peer_addr);
 
 	if(len < 1) {
 		cl_log(LOG_ERR, "No peer information available");
