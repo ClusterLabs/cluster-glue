@@ -249,7 +249,7 @@ LogToLoggingDaemon(int priority, const char * buf, int bufstrlen)
 	}
 	if (logging_channel == NULL) {
 		GHashTable*	attrs;
-		char		path[] = PATH_ATTR;
+		char		path[] = IPC_PATH_ATTR;
 		char		sockpath[] = LOGDAEMON_IPC;
 	
 		attrs = g_hash_table_new(g_str_hash, g_str_equal);

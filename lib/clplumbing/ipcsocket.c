@@ -739,7 +739,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   int s;
   struct SOCKET_WAIT_CONN_PRIVATE *wait_private;
   
-  path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR);
+  path_name = (char *) g_hash_table_lookup(ch_attrs, IPC_PATH_ATTR);
   if (path_name == NULL) {
     return NULL;
   }
@@ -832,7 +832,8 @@ socket_client_channel_new(GHashTable *ch_attrs) {
    * create a socket channel.
    */
 
-  if ((path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR)) != NULL) { 
+  path_name = (char *) g_hash_table_lookup(ch_attrs, IPC_PATH_ATTR);
+  if (path_name != NULL) { 
     if (strlen(path_name) >= sizeof(conn_info->path_name)) {
       	return NULL;
     }

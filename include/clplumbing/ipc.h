@@ -532,7 +532,7 @@ extern IPC_Auth * ipc_set_auth(uid_t * a_uid, gid_t * a_gid
 extern void ipc_destroy_auth(IPC_Auth * auth);
 
 
-#define	PATH_ATTR		"path"		/* pathname attribute */
+#define	IPC_PATH_ATTR		"path"		/* pathname attribute */
 #define	IPC_DOMAIN_SOCKET	"uds"		/* Unix domain socket */
 
 #ifdef IPC_DOMAIN_SOCKET
