@@ -48,7 +48,8 @@ lib_LTLIBRARIES		= libstonith.la
 
 libstonith_la_SOURCES	= expect.c stonith.c
 libstonith_la_LDFLAGS	= -version-info 0:0:0
-libstonith_la_LIBADD	=$(top_builddir)/lib/pils/libpils.la	$(GLIBLIB)
+libstonith_la_LIBADD	= -L$(top_builddir)/lib/pils/ \
+			-L$(top_builddir)/lib/pils/.libs/ -lpils $(GLIBLIB)
 
 ## Man pages
 
