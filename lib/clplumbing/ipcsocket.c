@@ -305,16 +305,21 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
       if (element != NULL) {
 	*message = (struct IPC_MESSAGE *) (element->data);
 	      
-	ch->recv_queue->queue = g_list_remove_link(ch->recv_queue->queue, element);
+	ch->recv_queue->queue = g_list_remove_link(ch->recv_queue->queue
+	,	element);
 	ch->recv_queue->current_qlen--;
       
 	return IPC_OK;
       }
   }
+
+  if (ch->ch_status == IPC_DISCONNECT) {
+	return IPC_BROKEN;
+  }
   result = IPC_FAIL;
   *message = NULL;
 
-  if((sockpoll.fd = socket_get_recv_fd(ch)) != -1) {
+  if ((sockpoll.fd = socket_get_recv_fd(ch)) != -1) {
     	/* check if the server still exists */
   	sockpoll.events = POLLHUP;
 	if ((poll(&sockpoll, 1, 0)) && sockpoll.revents) {
@@ -337,6 +342,9 @@ socket_is_message_pending(struct IPC_CHANNEL * ch)
   if((sockpoll.fd = socket_get_recv_fd(ch)) != -1) {
   	sockpoll.events = POLLIN|POLLHUP;
 	if ((poll(&sockpoll, 1, 0)) && sockpoll.revents) {
+		if (sockpoll.revents & POLLHUP) {
+ 			ch->ch_status = IPC_DISCONNECT;
+		}
 		return TRUE;
 	 }
   }

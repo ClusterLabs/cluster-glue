@@ -295,9 +295,9 @@ struct IPC_OPS{
  *		message available.
  *
  * Return values:
- *   IPC_OK : reveive operation is finished successfully.
- *   IPC_FAIL    : operation fails.
- *   IPC_BROKEN  : the channel is broken.
+ *   IPC_OK	: receive operation is completed successfully.
+ *   IPC_FAIL	: operation failed.
+ *   IPC_BROKEN	: the channel is broken (disconnected)
  *
  * Note: 
  *   return value IPC_OK doesn't mean the message is already 
@@ -308,21 +308,22 @@ struct IPC_OPS{
  *   message is no longer needed.
  *
  *   is_sending_blocked() is another way to check if there is a message 
- *   pending in the send_queue. 
+ *   pending in the send_queue.
+ *
  */
 	int (* recv) (IPC_Channel * ch, IPC_Message** msg);
 
 /*
  * IPC_OPS::is_message_pending
- *   check to see if there is any messages ready to read.
+ *   check to see if there is any messages ready to read, or hangup has
+ *   occurred.
  *
  * Parameters:
  *   ch (IN) : the pointer to the channel.
  *
  * Return values:
- *   TRUE : there are messages ready to read.
+ *   TRUE : there are messages ready to read, or hangup.
  *   FALSE: there are no messages ready to be read.
- *
  */
 	gboolean (* is_message_pending) (IPC_Channel  * ch);
 
