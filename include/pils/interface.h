@@ -43,14 +43,14 @@
 
 struct PILInterface_s {
 	unsigned long		MagicNum;	
-	PILInterfaceType*	interfacetype;	/* Parent pointer */
+	PILInterfaceType*	interfacetype;	/* Parent pointer	*/
 	char *			interfacename;	/* malloced interface name */
-	PILInterface*		ifmanager;	/* plugin managing us */
+	PILInterface*		ifmanager;	/* plugin managing us	*/
 	void*			exports;	/* Exported Functions	*/
 						/* for this interface	*/
-	PILInterfaceFun		if_close;	/* Interface close operation */
+	PILInterfaceFun		if_close;	/* Interface close operation*/
 	void*			ud_interface;	/* per-interface user data */
-	int			refcnt;		/* Reference count for plugin*/
+	int			refcnt;		/* Ref count for plugin	*/
 	PILPlugin*		loadingpi;	/* Plugin that loaded us */
 };
 /*
@@ -62,8 +62,9 @@ struct PILInterfaceType_s {
 	char*			typename;	/* Our interface type name */
 	GHashTable*		interfaces;	/* The set of interfaces
 						 * of our type.  The
-						 * "values" are all PILInterface*
-						 * objects */
+						 * "values" are all
+						 * PILInterface * objects
+						 */
 	void*			ud_if_type;	/* per-interface-type user
 						   data*/
 	PILInterfaceUniv*	universe;	/* Pointer to parent (up) */
@@ -91,10 +92,9 @@ struct PILInterfaceUniv_s{
 
 #ifdef ENABLE_PLUGIN_MANAGER_PRIVATE
 /*
- *
  * From here to the end is specific to interface managers.
- * This data is only needed by interface managers, and the interface management
- * system itself.
+ * This data is only needed by interface managers, and the interface
+ * management system itself.
  *
  */
 typedef struct PILInterfaceOps_s		PILInterfaceOps;

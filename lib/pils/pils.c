@@ -209,11 +209,11 @@ static PIL_rc	ifmgr_register_interface(PILInterface* newif
 static PIL_rc	ifmgr_unregister_interface(PILInterface* interface);
 
 /*
- *	For consistency, the master interface manager is a interface in the system
- *	Below is our set of exported Interface functions.
+ *	For consistency, the master interface manager is a interface in the
+ *	system.   Below is our set of exported Interface functions.
  *
- *	Food for thought:  This is the interface manager whose name is interface.
- *	This makes it the Interface Interface interface ;-)
+ *	Food for thought:  This is the interface manager whose name is
+ *	interface.  This makes it the Interface Interface interface ;-)
  *		(or the Interface/Interface interface if you prefer)
  */
 
@@ -283,22 +283,25 @@ NewPILPlugin(	PILPluginType* pitype
 static void
 DelPILPlugin(PILPlugin*pi)
 {
-	DELETE(pi->plugin_name);
-	STATFREE(plugin);
-
-	pi->plugintype = NULL;
 
 	if (pi->refcnt > 0) {
 		PILLog(PIL_INFO, "DelPILPlugin: Non-zero refcnt");
 	}
 
-	if (DEBUGPLUGIN) {
-		PILLog(PIL_DEBUG, "Closing dlhandle for (%s/%s)"
+	if (pi->dlhandle) {
+		if (DEBUGPLUGIN) {
+			PILLog(PIL_DEBUG, "Closing dlhandle for (%s/%s)"
+			, pi->plugintype->plugintype,  pi->plugin_name);
+		}
+		lt_dlclose(pi->dlhandle);
+	}else if (DEBUGPLUGIN) {
+		PILLog(PIL_DEBUG, "NO dlhandle for (%s/%s)!"
 		, pi->plugintype->plugintype,  pi->plugin_name);
 	}
-	lt_dlclose(pi->dlhandle);
+	DELETE(pi->plugin_name);
 	ZAP(pi);
 	DELETE(pi);
+	STATFREE(plugin);
 }
 
 
@@ -890,6 +893,7 @@ ifmgr_register_interface(PILInterface* intf
 {
 	PILInterfaceType*	ift = intf->interfacetype;
 	PILInterfaceUniv*	ifuniv = ift->universe;
+	PILInterfaceOps* ifops;	/* Ops vector for InterfaceManager */
 
 	if (DEBUGPLUGIN) {
 		PILLog(PIL_DEBUG
@@ -897,9 +901,19 @@ ifmgr_register_interface(PILInterface* intf
 	       " Interface type '%s'"
 		,	intf->interfacename);
 	}
+
+	ifops = intf->exports;
+	if (ifops->RegisterInterface == NULL
+	||	ifops->UnRegisterInterface == NULL)  {
+		PILLog(PIL_DEBUG, "ifmgr_register_interface(%s)"
+		": NULL exported function pointer"
+		,	intf->interfacename);
+		return PIL_INVAL;
+	}
+
 	*imports = &IFManagerImports;
 
-	if(g_hash_table_lookup(ifuniv->iftypes, intf->interfacename) == NULL) {
+	if(g_hash_table_lookup(ifuniv->iftypes, intf->interfacename) == NULL){
 		/* It registers itself into ifuniv automatically */
 		NewPILInterfaceType(ifuniv,intf->interfacename, &IfExports
 		,	NULL);
@@ -983,7 +997,6 @@ PluginIncrRefCount(PILPlugin*pi, int plusminus)
 	pi->refcnt += plusminus;
 	if (pi->refcnt <= 0) {
 		pi->refcnt = 0;
-		/* FIXME! UNLOAD this plugin */
 		RemoveAPILPlugin(pi);
 	}
 	return pi->refcnt;
@@ -1322,7 +1335,7 @@ PILLoadPlugin(PILPluginUniv* universe, const char * plugintype
 #define REPORTERR(msg)	PILLog(PIL_CRIT, "%s", msg)
 
 /*
- *	Register a interface.
+ *	Register an interface.
  *
  *	This function is exported to plugins for their use.
  */
@@ -1412,11 +1425,16 @@ PILRegisterInterface(PILPlugin* piinfo
 	/* Call the registration function for our interface type */
 	rc = ifops->RegisterInterface(ifinfo, Imports);
 
+
 	/* Increment reference count of interface manager */
 	IfIncrRefCount(ifmgrinfo, 1);
 
-	/* Increment the reference count of the plugin that loaded us */
+	/* Increment the ref count of the plugin that loaded us */
 	PluginIncrRefCount(piinfo, 1);
+
+	if (rc != PIL_OK) {
+		PILunregister_interface(ifinfo);
+	}
 	return rc;
 }
 
