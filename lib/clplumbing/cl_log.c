@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.44 2005/04/04 18:15:07 gshi Exp $ */
+/* $Id: cl_log.c,v 1.45 2005/04/04 21:08:18 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -188,7 +188,7 @@ cl_log_set_debugfile(const char * path)
 
 /* Cluster logging function */
 void
-cl_direct_log(int priority, char* buf, gboolean use_priority_str,
+cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 	      const char* entity, int entity_pid, TIME_T ts)
 {
 	FILE *		fp = NULL;
@@ -508,6 +508,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 	}
 
 	if (chan == NULL){
+		cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);
 		return HA_FAIL;
 	}
 	
@@ -521,7 +522,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 		chan->ops->destroy(chan);
 		
 		if (drop_msg_num > 0){
-			cl_log(LOG_ERR, "%d message are dropped ", drop_msg_num);
+			cl_log(LOG_ERR, "%d message were dropped ", drop_msg_num);
 			drop_msg_num = 0;
 		}
 		
@@ -529,15 +530,17 @@ LogToLoggingDaemon(int priority, const char * buf,
 		return HA_FAIL;
 	}
 	/* Logging_channel is all set up */
+
+	if (chan->ops->is_sending_blocked(chan)) {
+		chan->ops->resume_io(chan);
+	}
+	if (drop_msg_num > 0 && chan->ops->is_sendq_full(chan)) {
+		cl_log(LOG_ERR, "cl_log: %d message were dropped ", drop_msg_num);
+		drop_msg_num = 0;
+	}	
 	
 	sendrc =  chan->ops->send(chan, msg);
 	if (sendrc == IPC_OK) {		
-		
-		if (drop_msg_num > 0){
-			cl_log(LOG_ERR, "%d message are dropped ", drop_msg_num);
-			drop_msg_num = 0;
-		}
-		
 		return HA_OK;
 		
 	}else{
@@ -548,7 +551,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 			logging_daemon_chan = NULL;
 			
 			if (drop_msg_num > 0){
-				cl_log(LOG_ERR, "channel destroyed: %d message are dropped ", drop_msg_num);
+				cl_log(LOG_ERR, "channel destroyed: %d message were dropped ", drop_msg_num);
 			}
 			
 			drop_msg_num=0;
