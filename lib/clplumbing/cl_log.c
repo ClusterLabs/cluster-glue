@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.25 2005/01/26 13:58:14 andrew Exp $ */
+/* $Id: cl_log.c,v 1.26 2005/02/01 22:37:09 andrew Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -158,9 +158,9 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str)
 	
 	if (syslog_enabled) {
 		if (pristr){
-			syslog(priority, "%s: %s", pristr,  buf);
+			syslog(priority, "%s: %s%c", pristr,  buf, 0);
 		}else {
-			syslog(priority, "%s", buf);			
+			syslog(priority, "%s%c", buf, 0);
 		}
 		
 	}
