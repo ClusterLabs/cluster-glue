@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.13 2004/09/03 01:07:08 zhenh Exp $ */
+/* $Id: lrm_msg.c,v 1.14 2004/09/10 02:07:16 zhenh Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -41,31 +41,27 @@ static void merge_pair(gpointer key, gpointer value, gpointer user_data);
 int
 ha_msg_add_int(struct ha_msg * msg, const char * name, int value)
 {
-	char buf[MAX_INT_LEN];
-	snprintf(buf, MAX_INT_LEN, "%d", value);
-	return (ha_msg_nadd(msg, name, strlen(name), buf, strlen(buf)));
+	return ha_msg_addbin(msg, name, &value, sizeof(int));
 }
 
 int
 ha_msg_mod_int(struct ha_msg * msg, const char * name, int value)
 {
-	char buf[MAX_INT_LEN];
-	snprintf(buf, MAX_INT_LEN, "%d", value);
-	return (cl_msg_modstring(msg, name, buf));
+	return cl_msg_modbin(msg, name, &value, sizeof(int));
 }
 
 int
 ha_msg_value_int(struct ha_msg * msg, const char * name, int* value)
 {
-	const char* svalue = ha_msg_value(msg, name);
-	if(NULL == svalue) {
+	int size;
+	const void* data = cl_get_binary(msg, name, &size);
+	if (NULL == data || NULL == value || sizeof(int) != size) {
 		return HA_FAIL;
 	}
-	*value = atoi(svalue);
-
+	*value = *(const int *)data;
 	return HA_OK;
 }
-/*
+#ifdef LRM_MSG_UUID_SUPPORT
 int
 ha_msg_add_uuid(struct ha_msg * msg, const char * name, const uuid_t id)
 {
@@ -90,10 +86,20 @@ ha_msg_value_uuid(struct ha_msg * msg, const char * name, uuid_t id)
 
 	return HA_OK;
 }
-*/
+#endif
+
+/*
+ * ha_msg_value_str_list()/ha_msg_add_str_list():
+ * transform a string list suitable for putting into an ha_msg is by a convention
+ * of naming the fields into the following format:
+ *	listname1=foo
+ *	listname2=bar
+ *	listname3=stuff
+ *	etc.
+ */
 
 GList* 
-ha_msg_value_list(struct ha_msg * msg, const char * name)
+ha_msg_value_str_list(struct ha_msg * msg, const char * name)
 {
 	
 	int i = 1;
@@ -102,17 +108,11 @@ ha_msg_value_list(struct ha_msg * msg, const char * name)
 	char* element;
 	GList* list = NULL;
 	
-	if (NULL == msg) {
+	if( NULL==msg||NULL==name||strnlen(name, MAX_NAME_LEN)>=MAX_NAME_LEN ){
 		return NULL;
-	}
-	if (NULL == name) {
-		return NULL;
-	}
-	if (strlen(name) > MAX_NAME_LEN) {
-		return NULL;
-	}
-	while (TRUE) {
-		
+	}	
+
+	for(;;) {
 		snprintf(paramname, MAX_NAME_LEN+MAX_INT_LEN, "%s%d", name, i);
 		value = ha_msg_value(msg,paramname);
 		if (NULL == value) {
@@ -126,17 +126,11 @@ ha_msg_value_list(struct ha_msg * msg, const char * name)
 }
 
 int
-ha_msg_add_list(struct ha_msg * msg, const char * name, GList* list)
+ha_msg_add_str_list(struct ha_msg * msg, const char * name, GList* list)
 {
 	int i = 1;
 	char paramname[MAX_NAME_LEN+MAX_INT_LEN];
-	if (NULL == msg) {
-		return HA_FAIL;
-	}
-	if (NULL == name) {
-		return HA_FAIL;
-	}
-	if (strlen(name) > MAX_NAME_LEN) {
+	if( NULL==msg||NULL==name||strnlen(name, MAX_NAME_LEN)>=MAX_NAME_LEN ){
 		return HA_FAIL;
 	}
 	
@@ -144,23 +138,32 @@ ha_msg_add_list(struct ha_msg * msg, const char * name, GList* list)
 		GList* element = g_list_first(list);
 		while (NULL != element) {
 			char* value = (char*)element->data;
-			snprintf(paramname, MAX_NAME_LEN+MAX_INT_LEN, "%s%d", name, i);
-			ha_msg_add(msg,paramname, value);
+			snprintf(paramname, MAX_NAME_LEN+MAX_INT_LEN, "%s%d",
+				 name, i);
+			if( HA_OK != ha_msg_add(msg,paramname, value)) {
+				cl_log(LOG_ERR,
+				"ha_msg_add in ha_msg_add_str_list failed");
+				
+				return HA_FAIL;
+			}
 			element = g_list_next(element);
 			i++;
 		}
 	}
 	return HA_OK;
 }
-void
+
+static void
 pair_to_msg(gpointer key, gpointer value, gpointer user_data)
 {
 	struct ha_msg* msg = (struct ha_msg*)user_data;
-	ha_msg_add(msg, key, value);
+	if( HA_OK != ha_msg_add(msg, key, value)) {
+		cl_log(LOG_ERR, "ha_msg_add in pair_to_msg failed");
+	}
 }
 
 GHashTable*
-ha_msg_value_hash_table(struct ha_msg * msg, const char * name)
+ha_msg_value_str_table(struct ha_msg * msg, const char * name)
 {
 	struct ha_msg* hash_msg;
 	GHashTable * hash_table = NULL;
@@ -171,28 +174,34 @@ ha_msg_value_hash_table(struct ha_msg * msg, const char * name)
 
 	hash_msg = cl_get_struct(msg, name);
 	if (NULL == hash_msg) {
+		cl_log(LOG_ERR, "cl_get_struct in ha_msg_value_str_table failed");
 		return NULL;
 	}
-	hash_table = msg_to_hash_table(hash_msg);
+	hash_table = msg_to_str_table(hash_msg);
 	return hash_table;
 }
 
 int
-ha_msg_add_hash_table(struct ha_msg * msg, const char * name,
-							GHashTable* hash_table)
+ha_msg_add_str_table(struct ha_msg * msg, const char * name,
+			GHashTable* hash_table)
 {
 	struct ha_msg* hash_msg;
 	if (NULL == msg || NULL == name || NULL == hash_table) {
 		return HA_FAIL;
 	}
 
-	hash_msg = hash_table_to_msg(hash_table);
-	ha_msg_addstruct(msg, name, hash_msg);
+	hash_msg = str_table_to_msg(hash_table);
+	if( HA_OK != ha_msg_addstruct(msg, name, hash_msg)) {
+		ha_msg_del(hash_msg);
+		cl_log(LOG_ERR, "ha_msg_add in ha_msg_add_str_table failed");
+		return HA_FAIL;
+	}
 	ha_msg_del(hash_msg);
 	return HA_OK;
 }
+
 GHashTable*
-msg_to_hash_table(struct ha_msg * msg)
+msg_to_str_table(struct ha_msg * msg)
 {
 	int i;
 	GHashTable* hash_table;
@@ -204,12 +213,18 @@ msg_to_hash_table(struct ha_msg * msg)
 	hash_table = g_hash_table_new(g_str_hash, g_str_equal);
 
 	for (i = 0; i < msg->nfields; i++) {
-		g_hash_table_insert(hash_table, strdup(msg->names[i]),strdup(msg->values[i]));
+		if( FT_STRING != msg->types[i] ) {
+			continue;
+		}
+		g_hash_table_insert(hash_table,
+				    strndup(msg->names[i],msg->nlens[i]),
+				    strndup(msg->values[i],msg->vlens[i]));
 	}
 	return hash_table;
 }
+
 struct ha_msg*
-hash_table_to_msg(GHashTable* hash_table)
+str_table_to_msg(GHashTable* hash_table)
 {
 	struct ha_msg* hash_msg;
 
@@ -221,7 +236,9 @@ hash_table_to_msg(GHashTable* hash_table)
 	g_hash_table_foreach(hash_table, pair_to_msg, hash_msg);
 	return hash_msg;
 }
-void
+
+
+static void
 copy_pair(gpointer key, gpointer value, gpointer user_data)
 {
 	GHashTable* taget_table = (GHashTable*)user_data;
@@ -229,7 +246,7 @@ copy_pair(gpointer key, gpointer value, gpointer user_data)
 }
 
 GHashTable*
-copy_hash_table(GHashTable* src_table)
+copy_str_table(GHashTable* src_table)
 {
 	GHashTable* target_table = NULL;
 
@@ -241,33 +258,36 @@ copy_hash_table(GHashTable* src_table)
 	return target_table;
 }
 
-void
+static void
 merge_pair(gpointer key, gpointer value, gpointer user_data)
 {
+	gpointer oldvalue;
+	gpointer oldkey;
 	GHashTable* ret = (GHashTable*)user_data;
-	char* oldvalue = g_hash_table_lookup(ret, key);
-	if (NULL != oldvalue) {
+	
+	if (g_hash_table_lookup_extended(ret, key, &oldkey, &oldvalue)){
 		g_free(oldvalue);
+		g_free(oldkey);
 	}
 	g_hash_table_insert(ret, g_strdup(key), g_strdup(value));
 }
 
 GHashTable*
-merge_hash_tables(GHashTable* old, GHashTable* new)
+merge_str_tables(GHashTable* old, GHashTable* new)
 {
 	GHashTable* ret = NULL;
 	if ( NULL == old ) {
-		return copy_hash_table(new);
+		return copy_str_table(new);
 	}
 	if ( NULL == new ) {
-		return copy_hash_table(old);
+		return copy_str_table(old);
 	}
-	ret = copy_hash_table(old);
+	ret = copy_str_table(old);
 	g_hash_table_foreach(new, merge_pair, ret);
 	return ret;
 }
 
-gboolean
+static gboolean
 free_pair(gpointer key, gpointer value, gpointer user_data)
 {
 	g_free(key);
@@ -276,11 +296,12 @@ free_pair(gpointer key, gpointer value, gpointer user_data)
 }
 
 void
-free_hash_table(GHashTable* hash_table)
+free_str_table(GHashTable* hash_table)
 {
 	g_hash_table_foreach_remove(hash_table, free_pair, NULL);
 	g_hash_table_destroy(hash_table);
-}	
+}
+
 
 struct ha_msg*
 create_lrm_msg (const char* msg)
@@ -291,7 +312,9 @@ create_lrm_msg (const char* msg)
 	}
 
 	ret = ha_msg_new(1);
-	if (HA_FAIL == ha_msg_add(ret, F_LRM_TYPE, msg)) {
+	if (HA_OK != ha_msg_add(ret, F_LRM_TYPE, msg)) {
+		ha_msg_del(ret);
+		cl_log(LOG_ERR, "ha_msg_add in create_lrm_msg failed");
 		return NULL;
 	}
 
@@ -308,23 +331,13 @@ create_lrm_reg_msg(const char* app_name)
 
 	ret = ha_msg_new(5);
 
-	if (HA_FAIL == ha_msg_add(ret, F_LRM_TYPE, REGISTER)) {
-		return NULL;
-	}
-	
-	if (HA_FAIL == ha_msg_add(ret, F_LRM_APP, app_name)) {
-		return NULL;
-	}
-
-	if (HA_FAIL == ha_msg_add_int(ret, F_LRM_PID, getpid())) {
-		return NULL;
-	}
-
-	if (HA_FAIL == ha_msg_add_int(ret, F_LRM_GID, getgid())) {
-		return NULL;
-	}
-
-	if (HA_FAIL == ha_msg_add_int(ret, F_LRM_UID, getuid())) {
+	if(HA_OK != ha_msg_add(ret, F_LRM_TYPE, REGISTER)
+	|| HA_OK != ha_msg_add(ret, F_LRM_APP, app_name)
+	|| HA_OK != ha_msg_add_int(ret, F_LRM_PID, getpid())
+	|| HA_OK != ha_msg_add_int(ret, F_LRM_GID, getegid())
+	|| HA_OK != ha_msg_add_int(ret, F_LRM_UID, getuid())) {
+		ha_msg_del(ret);
+		cl_log(LOG_ERR, "ha_msg_add in create_lrm_reg_msg failed");
 		return NULL;
 	}
 	
@@ -335,33 +348,38 @@ struct ha_msg*
 create_lrm_addrsc_msg(const char* rid, const char* class, const char* type,
 			const char* provider, GHashTable* params)
 {
-	struct ha_msg* msg = ha_msg_new(5);
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_TYPE, ADDRSC)) {
+	struct ha_msg* msg;
+	if (NULL==rid||NULL==class||NULL==type) {
 		return NULL;
 	}
-
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_RID, rid)) {
+	
+	msg = ha_msg_new(5);
+	if(HA_OK != ha_msg_add(msg, F_LRM_TYPE, ADDRSC)
+	|| HA_OK != ha_msg_add(msg, F_LRM_RID, rid)
+	|| HA_OK != ha_msg_add(msg, F_LRM_RCLASS, class)
+	|| HA_OK != ha_msg_add(msg, F_LRM_RTYPE, type)) {
+		ha_msg_del(msg);
+		cl_log(LOG_ERR, "ha_msg_add in create_lrm_addrsc_msg failed");
 		return NULL;
 	}
-
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_RCLASS, class))	{
-		return NULL;
-	}
-
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_RTYPE, type)) {
-		return NULL;
-	}
-
+		
 	if( provider ) {
-		if (HA_FAIL == ha_msg_add(msg, F_LRM_RPROVIDER, provider)) {
+		if (HA_OK != ha_msg_add(msg, F_LRM_RPROVIDER, provider)) {
+			ha_msg_del(msg);
+			cl_log(LOG_ERR,
+			"ha_msg_add in create_lrm_addrsc_msg failed");
 			return NULL;
 		}
 	}
 	
-	if (NULL != params) {
-		ha_msg_add_hash_table(msg,F_LRM_PARAM,params);
+	if ( params ) {
+		if (HA_OK != ha_msg_add_str_table(msg,F_LRM_PARAM,params)) {
+			ha_msg_del(msg);
+			cl_log(LOG_ERR,
+			"ha_msg_add_str_table in create_lrm_addrsc_msg failed");
+			return NULL;
+		}
 	}
-
 	return msg;
 }
 
@@ -370,16 +388,15 @@ struct ha_msg*
 create_lrm_rsc_msg(const char* rid, const char* msg)
 {
 	struct ha_msg* ret;
-	if ((NULL == msg) || (0 == strlen(msg))) {
+	if ((NULL == rid) ||(NULL == msg) || (0 == strlen(msg))) {
 		return NULL;
 	}
 
-	ret = ha_msg_new(1);
-	if (HA_FAIL == ha_msg_add(ret, F_LRM_TYPE, msg)) {
-		return NULL;
-	}
-
-	if (HA_FAIL == ha_msg_add(ret, F_LRM_RID, rid)) {
+	ret = ha_msg_new(2);
+	if(HA_OK != ha_msg_add(ret, F_LRM_TYPE, msg)
+	|| HA_OK != ha_msg_add(ret, F_LRM_RID, rid)) {
+		ha_msg_del(ret);
+		cl_log(LOG_ERR, "ha_msg_add in create_lrm_rsc_msg failed");
 		return NULL;
 	}
 	return ret;
@@ -391,31 +408,20 @@ struct ha_msg*
 create_lrm_ret(int rc, int fields)
 {
 	struct ha_msg* ret = ha_msg_new(fields);
-	if (HA_FAIL == ha_msg_add(ret, F_LRM_TYPE, RETURN)) {
-		return NULL;
-	}
-
-	if (HA_FAIL == ha_msg_add_int(ret, F_LRM_RC, rc)) {
+	if(HA_OK != ha_msg_add(ret, F_LRM_TYPE, RETURN)
+	|| HA_OK != ha_msg_add_int(ret, F_LRM_RC, rc)) {
+		ha_msg_del(ret);
+		cl_log(LOG_ERR, "ha_msg_add in create_lrm_ret failed");
 		return NULL;
 	}
 	return ret;
 }
 
-void
-ha_msg_print(struct ha_msg * msg)
-{
-	int i;
-	printf("print msg:%p\n",msg);
-	printf("\tnfields:%d\n",msg->nfields);
-	for (i = 0; i < msg->nfields; i++){
-		printf("\tname:%s\tvalue:%s\n",(char*)msg->names[i],(char*)msg->values[i]);
-	}
-	printf("print end\n");
-
-}
-
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.14  2004/09/10 02:07:16  zhenh
+ * make names of functions more clear,fix some bug and  make it more robust
+ *
  * Revision 1.13  2004/09/03 01:07:08  zhenh
  * add provider for resource
  *
