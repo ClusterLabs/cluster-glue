@@ -54,7 +54,7 @@ typedef struct {
 
 #define CL_KILL(_pid, _sig) kill((_pid), (_sig))
 
-#define CL_PID_EXISTS(_pid) ( !CL_KILL((_pid), 0) || errno != ESRCH )
+#define CL_PID_EXISTS(_pid) ( CL_KILL((_pid), 0) >= 0 || errno != ESRCH )
 
 int
 cl_signal_set_handler(int sig, void (*handler)(int), sigset_t *mask
