@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.19 2005/02/17 09:20:18 sunjd Exp $ */
+/* $Id: apcmaster.c,v 1.20 2005/03/16 18:31:11 blaschke Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -51,9 +51,11 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.19 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.20 $"; 
 
 #define	DEVICE	"APC MasterSwitch"
+
+#define DOESNT_USE_STONITHKILLCOMM	1
 
 #include "stonith_plugin_common.h"
 
@@ -204,7 +206,6 @@ MSLogin(struct pluginDevice * ms)
 			return(S_ACCESS);
 
 		default:
-			Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
 			return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	} 
 
@@ -220,12 +221,7 @@ MSRobustLogin(struct pluginDevice * ms)
 	int j = 0;
 
 	for ( ; ; ) {
-	  if (ms->pid > 0) {
-		Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
-	  }
-	  if (MS_connect_device(ms) != S_OK) {	
-		Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
-	  } else {
+	  if (MS_connect_device(ms) == S_OK) {	
 		rc = MSLogin(ms);
 		if( rc == S_OK ) {
 			break;
@@ -266,7 +262,10 @@ int MSLogout(struct pluginDevice* ms)
 	/* "4" is logout */
 	SEND(ms->wrfd, "4\r");
 
-	Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
+	close(ms->wrfd);
+	close(ms->rdfd);
+	ms->wrfd = ms->rdfd = -1;
+
 	return(rc >= 0 ? S_OK : (errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS));
 }
 /* Reset (power-cycle) the given outlets */
@@ -609,15 +608,13 @@ apcmaster_hostlist(StonithPlugin  *s)
 static int
 MS_connect_device(struct pluginDevice * ms)
 {
-	char	TelnetCommand[256];
+	int fd = OurImports->OpenStreamSocket(ms->device
+	,	TELNET_PORT, TELNET_SERVICE);
 
-	snprintf(TelnetCommand, sizeof(TelnetCommand)
-	,	"exec telnet %s 2>/dev/null", ms->device);
-
-	ms->pid=STARTPROC(TelnetCommand, &ms->rdfd, &ms->wrfd);
-	if (ms->pid <= 0) {
+	if (fd < 0) {
 		return(S_OOPS);
 	}
+	ms->rdfd = ms->wrfd = fd;
 	return(S_OK);
 }
 
@@ -644,7 +641,6 @@ apcmaster_reset_req(StonithPlugin * s, int request, const char * host)
 		if (noutlet < 1) {
 			LOG(PIL_WARN, "%s %s %s [%s]"
 			, ms->idinfo ,ms->unitid, _("doesn't control host"), host);
-			Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
 			return(S_BADHOST);
 		}
 		switch(request) {
@@ -761,7 +757,14 @@ apcmaster_destroy(StonithPlugin *s)
 	ms = (struct pluginDevice *)s;
 
 	ms->pluginid = NOTpluginID;
-	Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
+	if (ms->rdfd >= 0) {
+		close(ms->rdfd);
+		ms->rdfd = -1;
+	}
+	if (ms->wrfd >= 0) {
+		close(ms->wrfd);
+		ms->wrfd = -1;
+	}
 	if (ms->device != NULL) {
 		FREE(ms->device);
 		ms->device = NULL;

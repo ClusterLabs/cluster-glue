@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.21 2005/02/18 07:32:09 zhaokai Exp $ */
+/* $Id: wti_nps.c,v 1.22 2005/03/16 18:31:11 blaschke Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -50,6 +50,9 @@
  */
 
 #define	DEVICE	"WTI Network Power Switch"
+
+#define DOESNT_USE_STONITHKILLCOMM	1
+
 #include "stonith_plugin_common.h"
 
 #define PIL_PLUGIN              wti_nps
@@ -182,13 +185,7 @@ NPSRobustLogin(struct pluginDevice * nps)
 	}
 
 	for ( ; ; ) {
-		if (nps->pid > 0) {
-			Stonithkillcomm(&nps->rdfd, &nps->wrfd, &nps->pid);
-		}
-		if (NPS_connect_device(nps) != S_OK) {	
-			Stonithkillcomm(&nps->rdfd, &nps->wrfd, &nps->pid);
-		}
-		else {
+		if (NPS_connect_device(nps) == S_OK) {	
 			rc = NPSLogin(nps);
 			if (rc == S_OK) { 
 				break;
@@ -225,7 +222,6 @@ NPSLogin(struct pluginDevice * nps)
 	if (EXPECT_TOK(nps->rdfd, password, 2, IDinfo
 	,	sizeof(IDinfo), Debug) < 0) {
 		LOG(PIL_CRIT, "%s", _("No initial response from " DEVICE "."));
-		Stonithkillcomm(&nps->rdfd, &nps->wrfd, &nps->pid);
  		return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	}
 	idptr += strspn(idptr, WHITESPACE);
@@ -249,7 +245,6 @@ NPSLogin(struct pluginDevice * nps)
 			return(S_ACCESS);
 
 		default:
-			Stonithkillcomm(&nps->rdfd, &nps->wrfd, &nps->pid);
 			return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	}
 	return(S_OK);
@@ -276,7 +271,10 @@ NPSLogout(struct pluginDevice* nps)
 	/* "/x" is Logout, "/x,y" auto-confirms */
 	SEND(nps->wrfd, "/x,y\r");
 
-	Stonithkillcomm(&nps->rdfd, &nps->wrfd, &nps->pid);
+	close(nps->wrfd);
+	close(nps->rdfd);
+	nps->wrfd = nps->rdfd = -1;
+
 	return(rc >= 0 ? S_OK : (errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS));
 }
 
@@ -596,15 +594,13 @@ NPS_parse_config_info(struct pluginDevice* nps, const char * info)
 static int
 NPS_connect_device(struct pluginDevice * nps)
 {
-	char	TelnetCommand[256];
-	
-	snprintf(TelnetCommand, sizeof(TelnetCommand)
-	,	"exec telnet %s 2>/dev/null", nps->device);
-	
-	nps->pid=STARTPROC(TelnetCommand, &nps->rdfd, &nps->wrfd);
-	if (nps->pid <= 0) {	
+	int fd = OurImports->OpenStreamSocket(nps->device
+	,	TELNET_PORT, TELNET_SERVICE);
+
+	if (fd < 0) {
 		return(S_OOPS);
 	}
+	nps->rdfd = nps->wrfd = fd;
 	return(S_OK);
 }
 
@@ -645,7 +641,6 @@ wti_nps_reset_req(StonithPlugin * s, int request, const char * host)
 			LOG(PIL_WARN, "%s %s %s[%s]"
 			,	nps->idinfo,	nps->unitid
 			,	_("doesn't control host [%s]."),	host);
-			Stonithkillcomm(&nps->rdfd, &nps->wrfd, &nps->pid);
 			return(S_BADHOST);
 		}
 		switch(request) {
@@ -790,7 +785,14 @@ wti_nps_destroy(StonithPlugin *s)
 	nps = (struct pluginDevice *)s;
 
 	nps->pluginid = NOTnpsid;
-	Stonithkillcomm(&nps->rdfd, &nps->wrfd, &nps->pid);
+	if (nps->rdfd >= 0) {
+		close(nps->rdfd);
+		nps->rdfd = -1;
+	}
+	if (nps->wrfd >= 0) {
+		close(nps->wrfd);
+		nps->wrfd = -1;
+	}
 	if (nps->device != NULL) {
 		FREE(nps->device);
 		nps->device = NULL;
