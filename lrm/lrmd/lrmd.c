@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.64 2005/02/22 01:30:40 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.65 2005/02/23 05:31:25 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1080,8 +1080,7 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 	else {
 		char* meta = RAExec->get_resource_meta(rtype,provider);
 		if (NULL != meta) {
-			if (HA_OK != ha_msg_addbin(ret,F_LRM_METADATA,
-						   meta, strlen(meta))) {
+			if (HA_OK != ha_msg_add(ret,F_LRM_METADATA, meta)) {
 				lrmd_log(LOG_ERR,
 				"on_msg_get_metadata: can not add metadata.");
 			}
@@ -1888,7 +1887,10 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	data = NULL;
 	read_pipe(op->output_fd, &data);
 	if (NULL != data) {
-		ret = cl_msg_modbin(op->msg, F_LRM_DATA,data,strlen(data));
+		if (NULL != cl_get_string(op->msg, F_LRM_DATA)) {
+			cl_msg_remove(op->msg, F_LRM_DATA);
+		}
+		ret = ha_msg_add(op->msg, F_LRM_DATA, data);
 		if (HA_OK != ret) {
 			lrmd_log(LOG_ERR,"on_ra_proc_finished: can not add data to msg");
 		}
@@ -2112,6 +2114,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.65  2005/02/23 05:31:25  zhenh
+ * replace the code of storing binary data in ha_msg. (BEAM bug)
+ *
  * Revision 1.64  2005/02/22 01:30:40  sunjd
  * Degrade running privilege to 'nobody' as more as possible;
  * Add authority verification data to the IPC channel which is used to communicate with clients.
