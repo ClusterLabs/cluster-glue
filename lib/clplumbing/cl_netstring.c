@@ -194,8 +194,15 @@ msg2netstring(const struct ha_msg *m, size_t * slen)
 
 	int	len;
 	void	*s;
-
+	
 	len= get_netstringlen(m) + 1;
+	
+	if (len >= MAXMSG){
+		cl_log(LOG_ERR, "msg2netstring: msg is too large"
+		       "len =%d,MAX msg allowed=%d", len, MAXMSG);
+		return NULL;
+	}
+
 	s = ha_calloc(1, len);
 	if (!s){
 		cl_log(LOG_ERR, "msg2netstring: no memory for netstring");

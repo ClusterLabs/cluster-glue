@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.50 2005/02/16 06:54:51 zhenh Exp $ */
+/* $Id: cl_msg.c,v 1.51 2005/02/16 19:14:35 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -302,18 +302,15 @@ ha_msg_audit(const struct ha_msg* msg)
 		,	(unsigned) msg, msg->nalloc);
 		doabort = TRUE;
 	}
-	if (get_stringlen(msg) < 0) {
-		cl_log(LOG_CRIT
-		,	"Message @ 0x%x has negative stringlen (%d)"
-		       ,	(unsigned) msg, get_stringlen(msg));
+	if (msg->stringlen <=0 
+	    || msg->netstringlen <= 0) {
+		cl_log(LOG_CRIT,
+		       "Message @ 0x%x has non-negative net/stringlen field"
+		       "stringlen=(%d), netstringlen=(%d)",
+		       (unsigned) msg, msg->stringlen, msg->netstringlen);
 		doabort = TRUE;
 	}
-	if (get_stringlen(msg) < 4 * msg->nfields) {
-		cl_log(LOG_CRIT
-		,	"Message @ 0x%x has too small stringlen (%d)"
-		       ,	(unsigned) msg, get_stringlen(msg));
-		doabort = TRUE;
-	}
+
 	if (!ha_is_allocated(msg->names)) {
 		cl_log(LOG_CRIT
 		,	"Message names @ 0x%x is not allocated"
@@ -1974,9 +1971,15 @@ msg2string(const struct ha_msg *m)
 		cl_log(LOG_ERR, "msg2string: Message with zero fields");
 		return(NULL);
 	}
-
+	
 	len = get_stringlen(m);
-
+	
+	if (len >= MAXMSG){
+		cl_log(LOG_ERR, "msg2string: msg is too large"
+		       "len =%d,MAX msg allowed=%d", len, MAXMSG);
+		return NULL;
+	}
+	
 	buf = ha_malloc(len);
 
 
@@ -2146,6 +2149,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.51  2005/02/16 19:14:35  gshi
+ * Don't check a message's stringlen/netstringlen until it is time to encode the message to string or netstring
+ *
  * Revision 1.50  2005/02/16 06:54:51  zhenh
  * add cl_malloc_forced_for_glib() to lrmd.
  *

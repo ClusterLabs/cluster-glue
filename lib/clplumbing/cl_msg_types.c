@@ -818,10 +818,6 @@ add_struct_field(struct ha_msg* msg, char* name, size_t namelen,
 {	
 	int next;
 	struct ha_msg* childmsg;
-	int stringlen_add;
-	int netstringlen_add;
-	int new_stringlen;
-	int new_netstringlen;
 
 	if ( !msg || !name || !value
 	     || depth < 0){
@@ -829,40 +825,14 @@ add_struct_field(struct ha_msg* msg, char* name, size_t namelen,
 		       " invalid input argument");
 		return HA_FAIL;
 	}
-
-
-
 	
 	childmsg = (struct ha_msg*)value; 
-	
-	stringlen_add = struct_stringlen(namelen, vallen, value);	
-	netstringlen_add =  struct_netstringlen(namelen, vallen, value);
-	
-	new_stringlen = get_stringlen(msg) + stringlen_add ;
-	new_netstringlen =  get_netstringlen(msg) + netstringlen_add;
-	
-	if (new_stringlen >= MAXMSG || 
-	    new_netstringlen >= MAXMSG){
-		cl_log(LOG_ERR, "add_struct_field"
-		       "msg too large: max length allowed=%d"
-		       "requested stringlen=%d"
-		       "requested netstringlen =%d",
-		       MAXMSG,
-		       new_stringlen,
-		       new_netstringlen);		       
-		return HA_FAIL;
-	}
-	
 	
 	next = msg->nfields;
 	msg->names[next] = name;
 	msg->nlens[next] = namelen;
 	msg->values[next] = value;
-	msg->vlens[next] = vallen;
-	
-/* 	msg->stringlen += stringlen_add; */
-/* 	msg->netstringlen +=  netstringlen_add; */
-		
+	msg->vlens[next] = vallen;			
 	msg->types[next] = FT_STRUCT;
 	
 	msg->nfields++;	
@@ -910,14 +880,6 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 		netstringlen_add = list_netstringlen(namelen, 
 						     listlen, 
 						     value);
-		
-		if (get_stringlen(msg) + stringlen_add >= MAXMSG || 
-		    get_netstringlen(msg) + netstringlen_add >= MAXMSG){
-			cl_log(LOG_ERR, "add_list_field"
-			       "msg too large");
-			return HA_FAIL;
-		}		
-		
 		next = msg->nfields;
 		msg->names[next] = name;
 		msg->nlens[next] = namelen;
@@ -949,14 +911,6 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 		stringlen_add = newlistlen - oldlistlen;
 		netstringlen_add = intlen(newlistlen) + newlistlen
 			- intlen(oldlistlen) - oldlistlen;		
-		
-		if (get_stringlen(msg)+ stringlen_add >= MAXMSG 
-		    || get_netstringlen(msg) + netstringlen_add >= MAXMSG){
-			cl_log(LOG_ERR, "ha_msg too big");
-			list = g_list_remove(list, value);
-			msg->values[j]=list;
-			return HA_FAIL;
-		} 
 		
 		
 		msg->values[j] = list;
@@ -1467,28 +1421,6 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 		cl_log(LOG_ERR, "add_string_field():"
 		       " wrong type %lu", (unsigned long)internal_type);
 		return HA_FAIL;
-	}
-	
-	
-	if (get_stringlen(msg) + stringlen_add >= MAXMSG ||
-	    get_netstringlen(msg) + netstringlen_add >= MAXMSG) {
-		
-		cl_log(LOG_ERR, "add_string_field()"
-		       ": cannot add name/value to ha_msg (value too big: %ld bytes)"
-		       ,	(long)MAX(get_stringlen(msg) + stringlen_add
-					  ,	get_netstringlen(msg) + netstringlen_add));
-
-		if (cp_value) {   
-			if(internal_type  < sizeof(fieldtypefuncs) 
-			   / sizeof(fieldtypefuncs[0])){			
-				fieldtypefuncs[internal_type].memfree(cp_value);
-			}
-			cp_value = NULL;   
-		}   
-		if (cp_name) {   
-			cl_free(cp_name);       cp_name = NULL;   
-		} 		
-		return(HA_FAIL);
 	}
 	
 	
