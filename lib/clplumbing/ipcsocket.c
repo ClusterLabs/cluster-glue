@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.93 2004/04/20 21:21:20 andrew Exp $ */
+/* $Id: ipcsocket.c,v 1.94 2004/05/14 21:13:39 andrew Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1597,7 +1597,6 @@ socket_free_message(struct IPC_MESSAGE * msg) {
  *
  ***********************************************************************/
 
-
 #ifdef SO_PEERCRED
 #	define	USE_SO_PEERCRED
 #elif HAVE_GETPEEREID
@@ -1799,7 +1798,9 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
  // reuse this define for the moment
 #  if HAVE_STRUCT_UCRED_DARWIN
 #	define crEuid	cr_uid
-#	define crEgid	cr_groups[0]
+#	define crEgid	cr_groups[0]		/* Best guess */
+#	define crgrps	cr_groups
+#	define crngrp	cr_ngroups
 #  else
 #	define crEuid	c_uid
 #	define crEgid	c_gid
