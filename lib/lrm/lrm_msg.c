@@ -214,7 +214,7 @@ void
 copy_pair(gpointer key, gpointer value, gpointer user_data)
 {
 	GHashTable* taget_table = (GHashTable*)user_data;
-	g_hash_table_insert(taget_table, key, value);
+	g_hash_table_insert(taget_table, g_strdup(key), g_strdup(value));
 }
 
 GHashTable*
