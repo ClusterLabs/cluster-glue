@@ -22,10 +22,10 @@
 
 #ifndef _PROCTRACK_H
 #	define _PROCTRACK_H
+#include <portability.h>
 #include <sys/types.h>
 #include <sys/times.h>
 #include <clplumbing/longclock.h>
-#include <portability.h>
 
 /*
  * We track processes, mainly so we can do something appropriate
