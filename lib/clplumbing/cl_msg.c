@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.38 2005/01/26 13:57:07 andrew Exp $ */
+/* $Id: cl_msg.c,v 1.39 2005/01/28 09:09:51 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -412,6 +412,68 @@ ha_msg_expand(struct ha_msg* msg )
 }
 
 
+int
+cl_msg_remove(struct ha_msg* msg, const char* name)
+{
+	int j;
+	int i;
+	int tmplen;
+	
+	if (msg == NULL || name == NULL){
+		cl_log(LOG_ERR, "cl_msg_remove: invalid argument");
+		return HA_FAIL;
+	}
+	
+	for (j = 0; j < msg->nfields; ++j){
+		if (strcmp(name, msg->names[j]) == 0){
+			break;			
+		}
+	}
+	
+	if (j == msg->nfields){		
+		cl_log(LOG_ERR, "cl_msg_remove: field %s not found",
+		       name);
+		return HA_FAIL;
+	}
+	
+	tmplen = msg->stringlen;
+	msg->stringlen -=  fieldtypefuncs[msg->types[j]].stringlen(msg->nlens[j],
+								   msg->vlens[j],
+								   msg->values[j]);
+	if (msg->stringlen <=0){
+		cl_log(LOG_ERR, "cl_msg_remove: stringlen <= 0 after removing"
+		       "field %s. Return failure", name);
+		msg->stringlen =tmplen;
+		return HA_FAIL;
+	}
+
+	tmplen = msg->netstringlen;
+	msg->netstringlen -=  fieldtypefuncs[msg->types[j]].netstringlen(msg->nlens[j],
+									 msg->vlens[j],       
+									 msg->values[j]);	
+	if (msg->netstringlen <=0){
+		cl_log(LOG_ERR, "cl_msg_remove: netstringlen <= 0 after removing"
+		       "field %s. return failure", name);
+		msg->netstringlen =tmplen;
+		return HA_FAIL;
+	}
+	
+	ha_free(msg->names[j]);
+	fieldtypefuncs[msg->types[j]].memfree(msg->values[j]);
+	
+	for (i= j + 1; i < msg->nfields ; i++){
+		msg->names[i -1] = msg->names[i];
+		msg->nlens[i -1] = msg->nlens[i];
+		msg->values[i -1] = msg->values[i];
+		msg->vlens[i-1] = msg->vlens[i];
+		msg->types[i-1] = msg->types[i];
+	}
+	msg->nfields--;
+
+	
+	return HA_OK;
+}
+	
 
 
 /* low level implementation for ha_msg_add
@@ -1988,6 +2050,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.39  2005/01/28 09:09:51  gshi
+ * add function to remove a field
+ *
  * Revision 1.38  2005/01/26 13:57:07  andrew
  * Make value a const argument for consistency
  *
