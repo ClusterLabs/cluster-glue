@@ -1,7 +1,8 @@
 /*
  * ipc.h IPC abstraction data structures.
  *
- * author  Xiaoxiang Liu <xiliu@ncsa.uiuc.edu>, Alan Robertson <alanr@unix.sh>
+ * author  Xiaoxiang Liu <xiliu@ncsa.uiuc.edu>,
+ *	Alan Robertson <alanr@unix.sh>
  *
  *
  * Copyright (c) 2002 International Business Machines
@@ -53,286 +54,403 @@
 #define IPC_FAIL 1
 #define IPC_BROKEN 2
 
+/*
+ *	IPC:  Sockets-like Interprocess Communication Abstraction
+ *
+ *	We have two fundmental abstractions which we maintain.
+ *	Everything else is in support of these two abstractions.
+ *
+ *	These two main abstractions are:
+ *
+ *	IPC_WaitConnection:
+ *	A server-side abstraction for waiting for someone to connect.
+ *
+ *	IPC_Channel:
+ *	An abstraction for an active communications channel.
+ *
+ *	All the operations on these two abstractions are carried out
+ *	via function tables (channel->ops).  Below we refer to the
+ *	function pointers in these tables as member functions.
+ *
+ *  On the server side, everything starts up with a call to
+ *	ipc_channel_constructor(), which returns an IPC_WaitConnection.
+ *
+ *	Once the server has the IPC_WaitConnection object in hand,
+ *	it can give the result of the get_select_fd() member function
+ *	to poll or select to inform you when someone tries to connect.
+ *
+ *	Once select tells you someone is trying to connect, you then
+ *	use the accept_connection() member function to accept
+ *	the connection.  accept_connection() returns an IPC_Channel.
+ *
+ *	With that, the server can talk to the client, and away they
+ *	go ;-)
+ *
+ *  On the client side, everything starts up with a call to
+ *	ipc_wait_conn_constructor() which we use to talk to the server.
+ *	The client is much easier ;-)
+ */
+
+
+typedef struct IPC_WAIT_CONNECTION	IPC_WaitConnection;
+typedef struct IPC_CHANNEL		IPC_Channel;
+
+typedef struct IPC_MESSAGE		IPC_Message;
+typedef struct IPC_QUEUE		IPC_Queue;
+typedef struct IPC_AUTH			IPC_Auth;
+
+typedef struct IPC_OPS			IPC_Ops;
+typedef struct IPC_WAIT_OPS		IPC_WaitOps;
+
 /* wait connection structure. */
 struct IPC_WAIT_CONNECTION{
-  /* wait connection status.*/
-  int ch_status;
-  /* wait connection private data. */
-  void * ch_private;
-  /* wait connection function table .*/
-  struct IPC_WAIT_OPS *ops;
+	int		ch_status;	/* wait conn. status.*/
+	void *		ch_private;	/* wait conn. private data. */
+	IPC_WaitOps	*ops;		/* wait conn. function table .*/
 };
 
 /* channel structure.*/
 struct IPC_CHANNEL{
-  /* identify the status of channel.*/
-  int ch_status;
-  /* far side pid */
-  pid_t farside_pid;
-  /* the channel private data. May contain the connection information*/
-  void* ch_private;
-  /*
-   *  There two queues in channel. One is for sending and the other
-   *  is for receiving. 
-   *  Those two queues are channel's internal queues. They should not be 
-   *  accessed by user directly.
-   *
-   */
-  struct IPC_QUEUE* send_queue; 
-  /* the queue used to contain receving messages.*/
-  struct IPC_QUEUE* recv_queue; 
-  /* the standard function table.*/
-  struct IPC_OPS *ops;
+	int		ch_status;	/* identify the status of channel.*/
+	pid_t		farside_pid;	/* far side pid */
+	void*		ch_private;	/* channel private data. */
+					/* (may contain conn. info.) */
+	IPC_Ops*	ops;		/* IPC_Channel function table.*/
+/*
+ *  There two queues in channel. One is for sending and the other
+ *  is for receiving. 
+ *  Those two queues are channel's internal queues. They should not be 
+ *  accessed directly.
+ */
+/* private: */
+	IPC_Queue*	send_queue; 
+	IPC_Queue*	recv_queue; 
+
 };
 
 struct IPC_QUEUE{
-  int current_qlen;
-  int max_qlen;
-  GList* queue;
+	int		current_qlen;	/* Current qlen */
+	int		max_qlen;	/* Max allowed qlen */
+	GList*	queue;		/* List of messages */
 };
-/* authentication information : set of gid and uid. */
+
+/* authentication information : set of gids and uids */
 struct IPC_AUTH {
-  /* hash table for user id */
-  GHashTable * uid;
-  /* hash table for group id */
-  GHashTable * gid;
+	GHashTable * uid;	/* hash table for user id */
+	GHashTable * gid;	/* hash table for group id */
 };
 
 /* Message structure. */
 struct IPC_MESSAGE{
-  unsigned long msg_len;
-  void* msg_body;
-  /* 
-   * IPC_MESSAGE::msg_done 
-   *   the callback function pointer which can be called after this 
-   *   message is sent, received or processed.
-   * Parameter:
-   *   msg: the back pointer to the message which contains this function pointer.
-   * 
-  */
-  void (* msg_done)(struct IPC_MESSAGE * msg);
-  /* the message private data. Sometimes can also be used by above callback function. */
-  void* msg_private;
-  /* this will point back to the channel which contain the message. */
-  struct IPC_CHANNEL * msg_ch;
+	unsigned long		msg_len;
+	void*			msg_body;
+/* 
+ * IPC_MESSAGE::msg_done 
+ *   the callback function pointer which can be called after this 
+ *   message is sent, received or otherwise processed.
+ *
+ * Parameter:
+ * msg: the back pointer to the message which contains this
+ *	function pointer.
+ * 
+ */
+	void (* msg_done)(IPC_Message * msg);
+	void* msg_private;	/* the message private data.	*/
+				/* Belongs to message creator	*/
+				/* May be used by callback function. */
+	IPC_Channel * msg_ch;	/* Channel the */
+				/* the message is from/in */
 };
 
 struct IPC_WAIT_OPS{
-  /*
-   * IPC_WAIT_OPS::destroy
-   *   detroy the wait connection and free the memory space used by this wait connection.
-   * 
-   * parameters:
-   *   wait_conn (IN):  the pointer to the wait connection.
-   *
-  */ 
-  void (* destroy)(struct IPC_WAIT_CONNECTION *wait_conn);
-  /*
-   * IPC_WAIT_OPS::get_select_fd
-   *   provide a fd which user can listen on for a new coming connection.
-   * parameters: 
-   *   wait_conn (IN) : the pointer to the wait connection which contains the select id.
-   * return values:
-   *   integer >= 0 :  the select_fd.
-   *       -1       :  can't get the select fd.
-   *
-  */
-  int (* get_select_fd)(struct IPC_WAIT_CONNECTION *wait_conn);
-  /*
-   * IPC_WAIT_OPS::accept_connection
-   *   accept and create a new connection and verify the authentication.
-   * parameters:
-   *   wait_conn (IN) : the waiting connection which will accept create the new connection.
-   *   auth_info (IN) : the authentication information which will be assigned to the new connection.
-   * return values:
-   *   the pointer to the new IPC channel; NULL if the creation or authentication fail.
-   *
-  */
-  struct IPC_CHANNEL* (* accept_connection)(struct IPC_WAIT_CONNECTION * wait_conn, struct IPC_AUTH *auth_info);
+/*
+ * IPC_WAIT_OPS::destroy
+ *   detroy the wait connection and free the memory space used by
+ *	this wait connection.
+ * 
+ * Parameters:
+ *   wait_conn (IN):  the pointer to the wait connection.
+ *
+ */ 
+	void (* destroy)(IPC_WaitConnection *wait_conn);
+/*
+ * IPC_WAIT_OPS::get_select_fd
+ *   provide a fd which user can listen on for a new coming connection.
+ *
+ * Parameters: 
+ *   wait_conn (IN) : the pointer to the wait connection which
+ *	we're supposed to return the file descriptor for
+ *	(the file descriptor can be used with poll too ;-))
+ *
+ * Return values:
+ *   integer >= 0 :  the select_fd.
+ *       -1       :  can't get the select fd.
+ *
+ */
+	int (* get_select_fd)(IPC_WaitConnection *wait_conn);
+/*
+ * IPC_WAIT_OPS::accept_connection
+ *   accept and create a new connection and verify the authentication.
+ *
+ * Parameters:
+ *   wait_conn (IN) : the waiting connection which will accept
+ *	create the new connection.
+ *   auth_info (IN) : the authentication information which will be
+ *	verified for the new connection.
+ *
+ * Return values:
+ *   the pointer to the new IPC channel; NULL if the creation or
+ *	authentication fails.
+ *
+ */
+	IPC_Channel * (* accept_connection)
+		(IPC_WaitConnection * wait_conn, IPC_Auth *auth_info);
 };
 
-/* channel function table. */
+/* Standard IPC channel operations */
+
 struct IPC_OPS{
-  /*
-   * IPC_OPS::destroy
-   *   brief destory the channel object.
-   * parameters:
-   *   ch  (IN) : the pointer to the channel which will be destroied.
-   *
-  */
-  void  (*destroy) (struct IPC_CHANNEL* ch);
-  /*
-   * IPC_OPS::initiate_connection
-   *   used by service user side to set up a connection.
-   * parameters:
-   *   ch (IN) : the pointer to channel used to initiate the connection. 
-   * return values:
-   *   IPC_OK  : the channel set up the connection succesully.
-   *   IPC_FAIL     : the connection initiation fails.
-   *
-  */
-  int (* initiate_connection) (struct IPC_CHANNEL* ch);
-  /*
-   * IPC_OPS::verify_auth
-   *   used by service provider to verify the authentication of peer.
-   * parameters
-   *   ch (IN) : the pointer to the channel.
-   * return values:
-   *   IPC_OK   : the peer is trust.
-   *   IPC_FAIL : verifying authentication fails.
-   *
-  */
-  int (* verify_auth) (struct IPC_CHANNEL* ch, struct IPC_AUTH* info);
-  /*
-   * IPC_OPS::assert_auth
-   *   service user asserts to be certain qualified service user.
-   * parameters:
-   *   ch    (IN):  the active channel.
-   *   auth  (IN):  the hash table contain the asserting information.
-   * return values:
-   *   IPC_OK :  assert the authentication succefully.
-   *   IPC_FAIL    : assertion fails.
-  */
-  int (* assert_auth) (struct IPC_CHANNEL* ch, GHashTable * auth);
-  /*
-   * IPC_OPS::send
-   *   send the message through the sending connection.
-   * parameters:
-   *   ch  (IN) : the channel which contains the connection.
-   *   msg (IN) : pointer to the sending message. User should allocate the message space.
-   * return values:
-   *   IPC_OK : the message was either sent out successfully or appended in the send_queue.
-   *   IPC_FAIL    : the send operation fails.
-   *   IPC_BROKEN  : the channel is broken.
-   *
-  */    
-  int (* send) (struct IPC_CHANNEL* ch, struct IPC_MESSAGE* msg);
-  /*
-   * IPC_OPS::recv
-   *   receive the message through receving queue.
-   * parameters:
-   *   ch  (IN) : the channel which contains the connection.
-   *   msg (OUT): the IPC_MESSAGE** pointer which contains the pointer to the recevied message 
-   *              or NULL if there is no message available.
-   * return values:
-   *   IPC_OK : reveive operation is finished successfully.
-   *   IPC_FAIL    : operation fails.
-   *   IPC_BROKEN  : the channel is broken.
-   *
-   * note: 
-   *   return value IPC_OK doesn't mean the message is already 
-   *   sent out to the peer. It may be pending in the send_queue. In order to 
-   *   make sure the message it out, please specify the msg_done function in the
-   *   message structure and once this function is called, the message is out.
-   *
-   *   is_sending_blocked() is another way to check if there is message 
-   *   pending in the send_queue. 
-  */
-  int (* recv) (struct IPC_CHANNEL* ch, struct IPC_MESSAGE** msg);
-  /*
-   * IPC_OPS::is_message_pending
-   *   check the recv_queue to see if there is any messages available. 
-   * parameters:
-   *   ch (IN) : the pointer to the channel.
-   * return values:
-   *   TRUE : there are messages pending in the rece_queue.
-   *   FALSE: there is no message pending in the rece_queue.
-   *
-  */
-  gboolean (* is_message_pending) (struct IPC_CHANNEL * ch);
-  /*
-   * IPC_OPS::is_sending_blocked
-   *   check the send_queue to see if there is any messages blocked. 
-   * parameters:
-   *   ch (IN) : the pointer to the channel.
-   * return values:
-   *   TRUE : there are messages blocked in the send_queue.
-   *   FALSE: there is no message blocked in the send_queue.
-   *
-  */  
-  gboolean (* is_sending_blocked) (struct IPC_CHANNEL *ch);
-  /*
-   * IPC_OPS::resume_io
-   *   brief resume all possible IO operations through the inner connection . 
-   * parameters:
-   *   the pointer to the channel.
-   * return values:
-   *   IPC_OK : resume all the possible I/O operation succefully.
-   *   IPC_FAIL   : the operation fails.
-   *   IPC_BROKEN : the channel is broken.
-   *
-  */
-  int (* resume_io) (struct IPC_CHANNEL *ch);
-  /*
-   * IPC_OPS::get_send_select_fd 
-   *   return a file descriptor which can be given to select. this fd is
-   *   for sending.
-   * parameters:
-   *   ch (IN) : the pointer to the channel.
-   * return values:
-   *   interger >= 0 : the send fd for selection.
-   *      -1         : there is no send fd.
-   *
-  */
-  int   (* get_send_select_fd) (struct IPC_CHANNEL* ch);
-  /*
-   * IPC_OPS::get_recv_select_fd
-   *   return a file descriptor which can be given to select. This fd
-   *   is for receiving.
-   * parameters:
-   *   ch (IN) : the pointer to the channel.
-   * return values:
-   *   interger >= 0 : the recv fd for selection.
-   *       -1        : there is no recv fd.
-   *
-  */
-  int   (* get_recv_select_fd) (struct IPC_CHANNEL* ch);
-  /*
-   * IPC_OPS::set_send_qlen
-   *   allow user to set the maximum send_queue length.
-   * parameters
-   *   ch    (IN) : the pointer to the channel.
-   *   q_len (IN) : the max length for the send_queue.
-   * return values:
-   *   IPC_OK : set the send queue length successfully.
-   *   IPC_FAIL    : there is no send queue.we are not supposed to get this return value.
-   *                It means something bad happened.
-   *
-  */
-  int  (* set_send_qlen) (struct IPC_CHANNEL* ch, int q_len);
-  /*
-   * IPC_OPS::set_recv_qlen
-   *   allow user to set the maximum recv_queue length.
-   * parameters:
-   *   ch    (IN) : the pointer to the channel.
-   *   q_len (IN) : the max length for the recv_queue.
-   * return values:
-   *   IPC_OK : set the recv queue length successfully.
-   *   IPC_FAIL    : there is no recv queue.
-   *
-  */
-  int  (* set_recv_qlen) (struct IPC_CHANNEL* ch, int q_len);
+/*
+ * IPC_OPS::destroy
+ *   brief destory the channel object.
+ *
+ * Parameters:
+ *   ch  (IN) : the pointer to the channel which will be destroied.
+ *
+ */
+	void  (*destroy) (IPC_Channel * ch);
+/*
+ * IPC_OPS::initiate_connection
+ *   used by service user side to set up a connection.
+ *
+ * Parameters:
+ *   ch (IN) : the pointer to channel used to initiate the connection. 
+ *
+ * Return values:
+ *   IPC_OK  : the channel set up the connection succesully.
+ *   IPC_FAIL     : the connection initiation fails.
+ *
+ */
+	int (* initiate_connection) (IPC_Channel * ch);
+/*
+ * IPC_OPS::verify_auth
+ *   used by either side to verify the identity of peer on connection.
+ *
+ * Parameters
+ *   ch (IN) : the pointer to the channel.
+ *
+ * Return values:
+ *   IPC_OK   : the peer is trust.
+ *   IPC_FAIL : verifying authentication fails.
+ */
+	int (* verify_auth) (IPC_Channel * ch, IPC_Auth* info);
+/*
+ * IPC_OPS::assert_auth
+ *   service user asserts to be certain qualified service user.
+ *
+ * Parameters:
+ *   ch    (IN):  the active channel.
+ *   auth  (IN):  the hash table contain the asserting information.
+ *
+ * Return values:
+ *   IPC_OK :  assert the authentication successfully.
+ *   IPC_FAIL    : assertion fails.
+ *
+ * NOTE:  This operation is a bit obscure.  It isn't needed with
+ *	UNIX domain sockets at all.  The intent is that some kinds
+ *	of IPC (like FIFOs), do not have an intrinsic method to
+ *	authenticate themselves except through file permissions.
+ *	The idea is that you must tell it how to chown/grp your
+ *	FIFO so that the other side and see that if you can write
+ *	this, you can ONLY be the user/group they expect you to be.
+ *	But, I think the parameters may be wrong for this ;-)
+ */
+	int (* assert_auth) (IPC_Channel * ch, GHashTable * auth);
+/*
+ * IPC_OPS::send
+ *   send the message through the sending connection.
+ *
+ * Parameters:
+ *   ch  (IN) : the channel which contains the connection.
+ *   msg (IN) : pointer to the sending message. User must
+ *	allocate the message space.
+ *
+ * Return values:
+ *   IPC_OK : the message was either sent out successfully or
+ *	appended to the send_queue.
+ *   IPC_FAIL    : the send operation failed.
+ *   IPC_BROKEN  : the channel is broken.
+ *
+*/    
+	int (* send) (IPC_Channel * ch, IPC_Message* msg);
+
+/*
+ * IPC_OPS::recv
+ *   receive the message through receving queue.
+ *
+ * Parameters:
+ *   ch  (IN) : the channel which contains the connection.
+ *   msg (OUT): the IPC_MESSAGE** pointer which contains the pointer
+ *		to the recevied message or NULL if there is no
+ *		message available.
+ *
+ * Return values:
+ *   IPC_OK : reveive operation is finished successfully.
+ *   IPC_FAIL    : operation fails.
+ *   IPC_BROKEN  : the channel is broken.
+ *
+ * Note: 
+ *   return value IPC_OK doesn't mean the message is already 
+ *   sent out to (or received by) the peer. It may be pending
+ *   in the send_queue.  In order to make sure the message is no
+ *   longer needed, please specify the msg_done function in the
+ *   message structure and once this function is called, the
+ *   message is no longer needed.
+ *
+ *   is_sending_blocked() is another way to check if there is a message 
+ *   pending in the send_queue. 
+ */
+	int (* recv) (IPC_Channel * ch, IPC_Message** msg);
+
+/*
+ * IPC_OPS::is_message_pending
+ *   check to see if there is any messages ready to read.
+ *
+ * Parameters:
+ *   ch (IN) : the pointer to the channel.
+ *
+ * Return values:
+ *   TRUE : there are messages ready to read.
+ *   FALSE: there are no messages ready to be read.
+ *
+ */
+	gboolean (* is_message_pending) (IPC_Channel  * ch);
+
+/*
+ * IPC_OPS::is_sending_blocked
+ *   check the send_queue to see if there is any messages blocked. 
+ *
+ * Parameters:
+ *   ch (IN) : the pointer to the channel.
+ *
+ * Return values:
+ *   TRUE : there are messages blocked (waiting) in the send_queue.
+ *   FALSE: there is no message blocked (waiting) in the send_queue.
+ *
+ *  See also:
+ *	get_send_select_fd()
+ */  
+	gboolean (* is_sending_blocked) (IPC_Channel  *ch);
+
+/*
+ * IPC_OPS::resume_io
+ *   Resume all possible IO operations through the IPC transport
+ *
+ * Parameters:
+ *   the pointer to the channel.
+ *
+ * Return values:
+ *   IPC_OK : resume all the possible I/O operation successfully.
+ *   IPC_FAIL   : the operation fails.
+ *   IPC_BROKEN : the channel is broken.
+ *
+ */
+	int (* resume_io) (IPC_Channel  *ch);
+/*
+ * IPC_OPS::get_send_select_fd()
+ *   return a file descriptor which can be given to select/poll. This fd
+ *   is used by the IPC code for sending.  It is intended that this be
+ *   ONLY used with select, poll, or similar mechanisms, not for direct I/O.
+ *   Note that due to select(2) and poll(2) semantics, you must check
+ *   is_sending_blocked() to see whether you should include this FD in
+ *   your poll for writability, or you will loop very fast in your
+ *   select/poll loop ;-)
+ *
+ * Parameters:
+ *   ch (IN) : the pointer to the channel.
+ *
+ * Return values:
+ *   integer >= 0 : the send fd for selection.
+ *      -1         : there is no send fd.
+ *
+ *  See also:
+ *	is_sending_blocked()
+ */
+	int   (* get_send_select_fd) (IPC_Channel * ch);
+/*
+ * IPC_OPS::get_recv_select_fd
+ *   return a file descriptor which can be given to select. This fd
+ *   is for receiving.  It is intended that this be ONLY used with select,
+ *   poll, or similar mechanisms, NOT for direct I/O.
+ *
+ * Parameters:
+ *   ch (IN) : the pointer to the channel.
+ *
+ * Return values:
+ *   integer >= 0 : the recv fd for selection.
+ *       -1        : there is no recv fd.
+ *
+ *	NOTE:  This file descriptor is often the same as the send
+ *	file descriptor.
+ */
+	int   (* get_recv_select_fd) (IPC_Channel * ch);
+/*
+ * IPC_OPS::set_send_qlen
+ *   allow user to set the maximum send_queue length.
+ *
+ * Parameters
+ *   ch    (IN) : the pointer to the channel.
+ *   q_len (IN) : the max length for the send_queue.
+ *
+ * Return values:
+ *   IPC_OK : set the send queue length successfully.
+ *   IPC_FAIL    : there is no send queue. (This isn't supposed
+ *		 	to happen).
+ *                It means something bad happened.
+ *
+ */
+	int  (* set_send_qlen) (IPC_Channel * ch, int q_len);
+/*
+ * IPC_OPS::set_recv_qlen
+ *   allow user to set the maximum recv_queue length.
+ *
+ * Parameters:
+ *   ch    (IN) : the pointer to the channel.
+ *   q_len (IN) : the max length for the recv_queue.
+ *
+ * Return values:
+ *   IPC_OK : set the recv queue length successfully.
+ *   IPC_FAIL    : there is no recv queue.
+ *
+ */
+	int  (* set_recv_qlen) (IPC_Channel * ch, int q_len);
 };
 
-/* below functions are implemented in ocf_ipc.c */
 
 /*
  * ipc_wait_conn_constructor:
  *    the common constructor for ipc waiting connection. 
  *    Use ch_type to identify the connection type. Usually it's only
  *    needed by server side.
- * parameters:
- *    ch_type   (IN) : the type of the waiting connection you want to create.
- *    ch_attrs  (IN) : the hash table which contains the attributes needed by this waiting connection.
- *                     For example, the only attribute needed by doamin socket is path name.
- * return values:
- *    the pointer to a new waiting connection or NULL if the connection can't be created.
- * note:
- *    current implementation only support unix domain socket 
+ *
+ * Parameters:
+ *    ch_type   (IN) : the type of the waiting connection to create.
+ *    ch_attrs  (IN) : the hash table which contains the attributes
+ *			needed by this waiting connection in name/value
+ *			pair format.
+ *
+ *			For example, the only attribute needed by UNIX
+ *			domain sockets is path name.
+ *
+ * Return values:
+ *    the pointer to a new waiting connection or NULL if the connection
+ *			can't be created.
+ * Note:
+ *    current implementation only supports unix domain socket 
  *    whose type is IPC_DOMAIN_SOCKET 
  *
-*/
-extern struct IPC_WAIT_CONNECTION * ipc_wait_conn_constructor(const char * ch_type
+ */
+extern IPC_WaitConnection * ipc_wait_conn_constructor(const char * ch_type
 ,	GHashTable* ch_attrs);
 
 /*
@@ -340,36 +458,48 @@ extern struct IPC_WAIT_CONNECTION * ipc_wait_conn_constructor(const char * ch_ty
  *   brief the common constructor for ipc channel. 
  *   Use ch_type to identify the channel type.
  *   Usually this function is only called by client side.
- * parameters:
+ *
+ * Parameters:
  *   ch_type  (IN): the type of the channel you want to create.
- *   ch_attrs (IN): the hash table which contains the attributes needed by this channel.
- *                  For example, the only attribute needed by doamin socket is path name.
- * return values:
- *   the pointer to the new channel whose status is IPC_DISCONNECT or NULL if the channel can't be created.
- * note:
+ *   ch_attrs (IN): the hash table which contains the attributes needed
+ *		by this channel.
+ *                  For example, the only attribute needed by UNIX domain
+ *			socket is path name.
+ *
+ * Return values:
+ *   the pointer to the new channel whose status is IPC_DISCONNECT
+ *	or NULL if the channel can't be created.
+ *
+ * Note:
  *   current implementation only support unix domain socket 
  *   whose type is IPC_DOMAIN_SOCKET 
  *
-*/
-extern struct IPC_CHANNEL * ipc_channel_constructor(const char * ch_type
+ */
+extern IPC_Channel  * ipc_channel_constructor(const char * ch_type
 ,	GHashTable* ch_attrs);
 
 /*
  * ipc_set_auth:
- *   the wapper function used to convert array of uid and gid into a authetication structure.
- * parameters:
+ *   A helper function used to convert array of uid and gid into
+ *	an authentication structure (IPC_Auth)
+ *
+ * Parameters:
  *   a_uid    (IN): the array of a set of user ids.
  *   a_gid    (IN): the array of a set of group ids.
  *   num_uid  (IN): the number of user ids.
  *   num_gid  (IN): the number of group ids.
- * return values:
- *   the pointer to the authentication structure which contains the 
- *   set of uid and the set of gid. Or NULL if this sturcture can't be created.
  *
-*/
-extern struct IPC_AUTH * ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid);			   
+ * Return values:
+ *   the pointer to the authentication structure which contains the 
+ *   set of uid and the set of gid. Or NULL if this structure can't
+ *	be created.
+ *
+ */
+extern IPC_Auth * ipc_set_auth(uid_t * a_uid, gid_t * a_gid
+,	int num_uid, int num_gid);
 
-extern void ipc_destroy_auth(struct IPC_AUTH * auth);
+/* Destroys an object constructed by ipc_set_auth */
+extern void ipc_destroy_auth(IPC_Auth * auth);
 
 
 #define	PATH_ATTR		"path"		/* pathname attribute */
