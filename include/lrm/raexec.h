@@ -112,7 +112,7 @@ struct RAExecOps {
 	 *		  this class in the local machine.
 	 *
 	 * Return Value:
-	 *	0 : succeed
+	 *	>=0 : succeed. the RA type number of this RA class
 	 *	-1: failed due to invalid RA directory such as not existing.
 	 *	-2: failed due to other factors
 	 */

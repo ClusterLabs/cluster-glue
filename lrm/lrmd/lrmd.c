@@ -120,7 +120,7 @@ struct lrmd_rsc
 //glib loop call back functions
 static gboolean on_connect_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_connect_cbk(IPC_Channel* ch_cbk, gpointer user_data);
-static gboolean on_recieve_cmd(IPC_Channel* ch_cmd, gpointer user_data);
+static gboolean on_receive_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_timeout_monitor(gpointer data);
 static gboolean on_timeout_op_done(gpointer data);
 static void on_remove_client(gpointer user_data);
@@ -237,7 +237,6 @@ void register_pid(const char *pid_file, gboolean do_fork,
 int
 main(int argc, char ** argv)
 {
-	int req_stop = FALSE;
 	int argerr = 0;
 	int flag;
 
@@ -248,9 +247,6 @@ main(int argc, char ** argv)
 
 	while ((flag = getopt(argc, argv, OPTARGS)) != EOF) {
 		switch(flag) {
-			case 'k':		/* Stop (kill) */
-				req_stop = TRUE;
-				break;
 			case 'h':		/* Help message */
 				usage(lrm_system_name, LSB_EXIT_OK);
 				break;
@@ -268,43 +264,7 @@ main(int argc, char ** argv)
 		usage(lrm_system_name,LSB_EXIT_OK);
 	}
 
-	if (req_stop) {
-		return init_stop(PID_FILE);
-	}
 	return init_start();
-}
-
-int
-init_stop(const char *pid_file)
-{
-	long	pid;
-	int	rc = LSB_EXIT_OK;
-
-	polled_input_SourceFuncs.prepare = NULL;
-
-	if (pid_file == NULL) {
-		cl_log(LOG_ERR, "No pid file specified to kill process");
-		return LSB_EXIT_GENERIC;
-	}
-	pid =	get_running_pid(pid_file, NULL);
-
-	if (pid > 0) {
-		if (CL_KILL((pid_t)pid, SIGTERM) < 0) {
-			rc = (errno == EPERM
-			      ?	LSB_EXIT_EPERM : LSB_EXIT_GENERIC);
-			fprintf(stderr, "Cannot kill pid %ld\n", pid);
-		}else{
-			cl_log(LOG_INFO,
-			       "Signal sent to pid=%ld,"
-			       " waiting for process to exit",
-			       pid);
-
-			while (CL_PID_EXISTS(pid)) {
-				sleep(1);
-			}
-		}
-	}
- 	return rc;
 }
 
 long
@@ -337,7 +297,7 @@ usage(const char* cmd, int exit_status)
 
 	stream = exit_status ? stderr : stdout;
 
-	fprintf(stream, "usage: %s [-kh]\n", cmd);
+	fprintf(stream, "usage: %s [-h]\n", cmd);
 	fflush(stream);
 
 	exit(exit_status);
@@ -366,17 +326,7 @@ register_pid(const char *pid_file,gboolean do_fork,void (*shutdown)(int nsig))
 	long	pid;
 	FILE *	lockfd;
 
-	if (do_fork) {
-		pid = fork();
-
-		if (pid < 0) {
-			cl_log(LOG_CRIT, "cannot start daemon");
-			exit(LSB_EXIT_GENERIC);
-		}else if (pid > 0) {
-			exit(LSB_EXIT_OK);
-		}
-	}
-
+	pid = getpid();
 	lockfd = fopen(pid_file, "w");
 	if (lockfd == NULL) {
 		cl_log(LOG_CRIT, "cannot create pid file: %s", pid_file);
@@ -426,7 +376,7 @@ init_start ()
 	PILGenericIfMgmtRqst RegisterRqsts[]= {
 		{"RAExec", &RAExecFuncs, NULL, NULL, NULL},
 		{ NULL, NULL, NULL, NULL, NULL} };
-		
+
 
 	if ((pid = get_running_pid(PID_FILE, NULL)) > 0) {
 		cl_log(LOG_CRIT, "already running: [pid %ld].", pid);
@@ -478,7 +428,7 @@ init_start ()
 	 *one for register the client,
 	 *the other is for create the callback channel
 	 */
-	 
+
 	uidlist = g_hash_table_new(g_direct_hash, g_direct_equal);
 	g_hash_table_insert(uidlist, GUINT_TO_POINTER(id), &one);
 	auth.uid = uidlist;
@@ -561,7 +511,7 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 	client->app_name = NULL;
 	client->ch_cmd = ch;
 	client->g_src = G_main_add_IPC_Channel(G_PRIORITY_DEFAULT,
-				ch, FALSE, on_recieve_cmd, (gpointer)client,
+				ch, FALSE, on_receive_cmd, (gpointer)client,
 				on_remove_client);
 
 	cl_log(LOG_INFO, "on_connect_cmd: end.");
@@ -577,7 +527,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 	const char* type = NULL;
 	struct ha_msg* msg = NULL;
 	lrmd_client_t* client = NULL;
-	
+
 	cl_log(LOG_INFO, "on_connect_cbk: start.");
 	if (NULL == ch) {
 		cl_log(LOG_INFO, "on_connect_cbk: channel is null");
@@ -587,7 +537,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 	/*get the message */
 	msg = msgfromIPC_noauth(ch);
 	if (NULL == msg) {
-		cl_log(LOG_ERR, "on_connect_cbk: can not recieve msg");
+		cl_log(LOG_ERR, "on_connect_cbk: can not receive msg");
 		return TRUE;
 	}
 
@@ -623,24 +573,24 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 }
 
 gboolean
-on_recieve_cmd (IPC_Channel* ch, gpointer user_data)
+on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 {
 	int i;
 	lrmd_client_t* client = NULL;
 	struct ha_msg* msg = NULL;
 	const char* type = NULL;
-	
-	cl_log(LOG_INFO, "on_recieve_cmd: start.");
+
+	cl_log(LOG_INFO, "on_receive_cmd: start.");
 
 	client = (lrmd_client_t*)user_data;
 	if (IPC_DISCONNECT == ch->ch_status) {
 		cl_log(LOG_INFO,
-			"on_recieve_cmd: channel status is disconnect");
+			"on_receive_cmd: channel status is disconnect");
 		return FALSE;
 	}
 
 	if (!ch->ops->is_message_pending(ch)) {
-		cl_log(LOG_INFO, "on_recieve_cmd: no pending message");
+		cl_log(LOG_INFO, "on_receive_cmd: no pending message");
 		return TRUE;
 	}
 
@@ -648,7 +598,7 @@ on_recieve_cmd (IPC_Channel* ch, gpointer user_data)
 	/*get the message */
 	msg = msgfromIPC_noauth(ch);
 	if (NULL == msg) {
-		cl_log(LOG_ERR, "on_recieve_cmd: can not recieve msg");
+		cl_log(LOG_INFO, "on_receive_cmd: can not receive msg");
 		return TRUE;
 	}
 
@@ -670,13 +620,13 @@ on_recieve_cmd (IPC_Channel* ch, gpointer user_data)
 		}
 	}
 	if (i == DIMOF(msg_maps)) {
-		cl_log(LOG_INFO, "on_recieve_cmd: unknown msg");
+		cl_log(LOG_INFO, "on_receive_cmd: unknown msg");
 	}
 
 	/*delete the msg*/
 	ha_msg_del(msg);
 
-	cl_log(LOG_INFO, "on_recieve_cmd: end.");
+	cl_log(LOG_INFO, "on_receive_cmd: end.");
 
 	return TRUE;
 }
@@ -686,6 +636,9 @@ on_remove_client (gpointer user_data)
 {
 	cl_log(LOG_INFO, "on_remove_client: start.");
 	lrmd_client_t* client = (lrmd_client_t*) user_data;
+	if (NULL != lookup_client(client->pid)) {
+		on_msg_unregister(client,NULL);
+	}
 
 	g_free(client->app_name);
 	g_free(client);
@@ -706,7 +659,12 @@ on_timeout_op_done(gpointer data)
 			"on_timeout_op_done: can not add opstatus to msg");
 	}
 	kill(op->exec_pid, 9);
-	rsc = op->rsc;
+	rsc = op->rsc;	if (NULL != rsc->params ) {
+		cl_log(LOG_ERR, "rsc->params:%p\n",rsc->params);
+		cl_log(LOG_ERR, "rsc->params:%d\n",g_hash_table_size(rsc->params));
+		cl_log(LOG_ERR, "lookup:%s\n",(char*)g_hash_table_lookup(rsc->params,strdup("1")));
+	}
+
 	op_done(op);
 	perform_op(rsc);
 	cl_log(LOG_INFO, "on_timeout_op_done: end.");
@@ -870,7 +828,6 @@ on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg)
 	}
 
 	ha_msg_add_list(ret,F_LRM_RCLASS,ra_list);
-
 	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
 		cl_log(LOG_ERR,
 			"on_msg_get_rsc_classes: can not send the ret msg");
@@ -906,13 +863,13 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 		cl_log(LOG_INFO,"on_msg_get_rsc_types: can not find class");
 	}
 	else {
-		if (0 == RAExec->get_resource_list(&typeinfos)) {
+		if (0 <= RAExec->get_resource_list(&typeinfos)) {
 			for ( 	typeinfo = g_list_first(typeinfos);
 				NULL != typeinfo;
 				typeinfo = g_list_next(typeinfo)) {
-				
 				rsc_info_t* info = typeinfo->data;
 				types = g_list_append(types, info->rsc_type);
+cl_log(LOG_INFO,"TYPE:%s\n",info->rsc_type);			
 				
 			}
 		}
@@ -999,11 +956,6 @@ on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 
 		if (HA_FAIL == ha_msg_add(ret, F_LRM_RCLASS, rsc->class))	{
 			return HA_FAIL;
-		}
-		if (NULL != rsc->params ) {
-			cl_log(LOG_ERR, "rsc->params:%p\n",rsc->params);
-			cl_log(LOG_ERR, "rsc->params:%d\n",g_hash_table_size(rsc->params));
-			cl_log(LOG_ERR, "lookup:%s\n",(char*)g_hash_table_lookup(rsc->params,strdup("1")));
 		}
 		ha_msg_add_hash_table(ret, F_LRM_PARAM, rsc->params);
 		
@@ -1123,14 +1075,7 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	rsc->mon_list = NULL;
 	rsc->last_op = NULL;
 	rsc->params = ha_msg_value_hash_table(msg,F_LRM_PARAM);
-	if (NULL != rsc->params ) {
-		cl_log(LOG_ERR, "rsc->params:%p\n",rsc->params);
-		cl_log(LOG_ERR, "rsc->params:%d\n",g_hash_table_size(rsc->params));
-		cl_log(LOG_ERR, "lookup:%s\n",(char*)g_hash_table_lookup(rsc->params,strdup("1")));
-	}
-
 	rsc_list = g_list_append(rsc_list, rsc);
-
 
 	cl_log(LOG_INFO, "on_msg_add_rsc: end.");
 	return HA_OK;
@@ -1814,7 +1759,6 @@ lookup_client (pid_t pid)
 	GList* node;
 	lrmd_client_t* client;
 	cl_log(LOG_INFO, "lookup_client: start.");
-
 	for(node = g_list_first(client_list);
 		NULL != node; node = g_list_next(node)){
 		client = (lrmd_client_t*)node->data;
