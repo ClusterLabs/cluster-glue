@@ -26,13 +26,13 @@ COMMONLIBS			=	$(top_builddir)/lib/clplumbing/libplumb.la   \
 					$(top_builddir)/lib/hbclient/libhbclient.la  \
 					$(top_builddir)/lib/apphb/libapphb.la \
                         		$(GLIBLIB)
-
-noinst_PROGRAMS 		= 	apitest plugintest 
+LRM_DIR			=	lrm
+noinst_PROGRAMS 	= 	apitest plugintest 
 
 apitest_SOURCES  	= 	apitest.c
 apitest_LDFLAGS 	= 	$(COMMONLIBS)
-apitest_LDADD 		= 	$(top_builddir)/lib/@LRM_DIR@/liblrm.la
-apitest_DEPENDENCIES    = 	$(top_builddir)/lib/@LRM_DIR@/liblrm.la
+apitest_LDADD 		= 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
+apitest_DEPENDENCIES    = 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 
 plugintest_SOURCES 	= 	plugintest.c
 plugintest_LDADD 	= 	$(top_builddir)/lib/clplumbing/libplumb.la $(GLIBLIB)
