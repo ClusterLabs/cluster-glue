@@ -66,12 +66,6 @@
 #endif
 
 static int	debug = 0;
-static void dump_fd_info(struct pollfd *fds, unsigned int nfds, int timeoutms);
-static void check_fd_info(struct pollfd *fds, unsigned int nfds);
-static void cl_real_poll_fd(int fd);
-static void cl_poll_sigpoll_overflow_sigaction(int nsig, siginfo_t* , void*);
-static void cl_poll_sigpoll_overflow(void);
-static int cl_poll_get_sigqlimit(void);
 
 int	/* Slightly sleazy... */
 cl_glibpoll(GPollFD* ufds, guint nfsd, gint timeout)
@@ -104,6 +98,12 @@ cl_poll_ignore(int fd)
 }
 
 #else /* HAVE_FCNTL_F_SETSIG */
+static void dump_fd_info(struct pollfd *fds, unsigned int nfds, int timeoutms);
+static void check_fd_info(struct pollfd *fds, unsigned int nfds);
+static void cl_real_poll_fd(int fd);
+static void cl_poll_sigpoll_overflow_sigaction(int nsig, siginfo_t* , void*);
+static void cl_poll_sigpoll_overflow(void);
+static int cl_poll_get_sigqlimit(void);
 typedef	unsigned char poll_bool;
 
 /*
