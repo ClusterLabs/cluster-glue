@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.20 2005/01/20 19:17:50 gshi Exp $ */
+/* $Id: GSource.c,v 1.21 2005/01/25 23:08:49 gshi Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -507,7 +507,6 @@ G_CH_destroy(GSource* source)
 	GCHSource* chp = GET_CH_SOURCE(source);
 
 
-	cl_log(LOG_INFO, "channel destroy function gets called");
 	g_assert(IS_CHSOURCE(chp));
 	
 	if (chp->dnotify) {
