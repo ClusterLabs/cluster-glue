@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.102 2004/11/12 18:33:17 lars Exp $ */
+/* $Id: ipcsocket.c,v 1.103 2004/11/12 18:47:38 lars Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1388,7 +1388,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   char *path_name;
   char *mode_attr;
   struct sockaddr_un my_addr;
-  int s;
+  int s, flags;
   struct SOCKET_WAIT_CONN_PRIVATE *wait_private;
   mode_t s_mode;
   
@@ -1444,7 +1444,14 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     close(s);
     return NULL;
   }
-  if (fcntl(s, F_SETFL, O_NONBLOCK) < 0) {
+  flags = fcntl(s, F_GETFL, O_NONBLOCK);
+  if (flags == -1) {
+    cl_perror("socket_wait_conn_new: cannot read file descriptor flags");
+    close(s);
+    return NULL;
+  }
+  flags |= O_NONBLOCK;
+  if (fcntl(s, F_SETFL, flags) < 0) {
     cl_perror("socket_wait_conn_new: cannot set O_NONBLOCK");
     close(s);
     return NULL;
@@ -1477,7 +1484,12 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   struct IPC_CHANNEL * temp_ch;
   struct SOCKET_CH_PRIVATE* conn_info;
   char *path_name;
-  int sockfd;
+  int sockfd, flags;
+#ifdef USE_BINDSTAT_CREDS
+  char rand_id[16];
+  char uuid_str_tmp[40];
+  struct sockaddr_un sock_addr;
+#endif
 
   /*
    * I don't really understand why the client and the server use different
@@ -1520,10 +1532,6 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   conn_info->peer_addr = NULL;
   
 #ifdef USE_BINDSTAT_CREDS
-  char rand_id[16];
-  char uuid_str_tmp[40];
-  struct sockaddr_un sock_addr;
-
   /* Prepare the socket */
   memset(&sock_addr, 0, sizeof(sock_addr));
   sock_addr.sun_family = AF_UNIX;
@@ -1538,11 +1546,19 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   unlink(sock_addr.sun_path);
   if(bind(sockfd, (struct sockaddr*)&sock_addr, SUN_LEN(&sock_addr)) < 0) {
 	  perror("Client bind() failure");
+	  close(sockfd);
 	  return NULL;
   }
 #endif
-
-  if (fcntl(sockfd, F_SETFL, O_NONBLOCK) < 0) {
+  
+  flags = fcntl(sockfd, F_GETFL, O_NONBLOCK);
+  if (flags == -1) {
+    cl_perror("socket_client_channel_new: cannot read file descriptor flags");
+    close(sockfd);
+    return NULL;
+  }
+  flags |= O_NONBLOCK;
+  if (fcntl(sockfd, F_SETFL, flags) < 0) {
     cl_perror("socket_client_channel_new: cannot set O_NONBLOCK");
     close(sockfd);
     return NULL;
@@ -1570,12 +1586,19 @@ struct IPC_CHANNEL *
 socket_server_channel_new(int sockfd){
   struct IPC_CHANNEL * temp_ch;
   struct SOCKET_CH_PRIVATE* conn_info;
+  int flags;
   
   
   temp_ch = g_new(struct IPC_CHANNEL, 1);
   conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
 
-  if (fcntl(sockfd, F_SETFL, O_NONBLOCK) < 0) {
+  flags = fcntl(sockfd, F_GETFL, O_NONBLOCK);
+  if (flags == -1) {
+    cl_perror("socket_server_channel_new: cannot read file descriptor flags");
+    return NULL;
+  }
+  flags |= O_NONBLOCK;
+  if (fcntl(sockfd, F_SETFL, flags) < 0) {
     cl_perror("socket_server_channel_new: cannot set O_NONBLOCK");
     return NULL;
   }
