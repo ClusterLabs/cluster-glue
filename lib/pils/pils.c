@@ -1891,7 +1891,7 @@ PILPluginTypeListPlugins(PILPluginType* pitype
 		files = NULL;
 		errno = 0;
 		dircount = scandir(path->str, &files
-		,	SCANSEL_CAST so_select, alphasort);
+		,	SCANSEL_CAST so_select, NULL);
 		g_string_free(path, 1); path=NULL;
 
 		if (dircount <= 0) {
