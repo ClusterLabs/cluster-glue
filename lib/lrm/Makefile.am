@@ -30,6 +30,7 @@ COMMONLIBS			=	$(top_builddir)/lib/clplumbing/libplumb.la   \
                         		$(GLIBLIB)
 LRM_DIR 			=	lrm
 lrmdir				=	$(HA_VARLIBDIR)/$(HB_PKG)/$(LRM_DIR)
+apigid                          =       @HA_APIGID@
 
 
 lib_LTLIBRARIES = liblrm.la
