@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.53 2004/12/05 19:15:21 andrew Exp $ */
+/* $Id: lrmd.c,v 1.54 2004/12/07 06:35:00 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1999,7 +1999,7 @@ read_pipe(int fd, char ** data)
 		if ( readlen > 0 ) {
 			g_string_append(gstr_tmp, buffer);
 		}
-	} while (readlen == BUFFLEN - 1 || errno != EINTR);
+	} while (readlen == BUFFLEN - 1 || errno == EINTR);
 	close(fd);
 
 	if (readlen < 0) {
@@ -2040,6 +2040,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.54  2004/12/07 06:35:00  zhenh
+ * fix a bug, mistype
+ *
  * Revision 1.53  2004/12/05 19:15:21  andrew
  * "man" says these are equivalent.  The advantage is that this form compiles
  *  on BSD variants.
