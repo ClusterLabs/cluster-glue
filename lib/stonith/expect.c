@@ -260,7 +260,7 @@ StartProcess(const char * cmd, int * readfd, int * writefd)
 				sched_setscheduler(0, SCHED_OTHER, &sp);
 			}
 #endif
-				execlp("/bin/sh", "sh", "-c", cmd, NULL);
+				execlp("/bin/sh", "sh", "-c", cmd, (const char *)NULL);
 				perror("cannot exec shell!");
 				exit(1);
 
