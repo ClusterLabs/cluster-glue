@@ -58,19 +58,6 @@ cl_set_authentication_computation_method(int (*method)(int whichauth
 	authmethod = method;
 }
 
-/* This is not a good name for a global function - FIXME! */
-int
-intlen(int x)
-{
-	char	buf[MAXLINE];
-
-	/* This code looks a little silly! */
-	memset(buf, 0, MAXLINE);
-	sprintf(buf, "%d", x);
-
-	return(strlen(buf));
-
-}
 
 static int
 compose_netstring(char * s, const char * smax, size_t len,
@@ -159,7 +146,7 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 
 			llen =  get_netstringlen((struct ha_msg *)m->values[i]
 			,	0);
-			sp += sprintf(sp, "%ld:", (long int)llen);
+			sp += sprintf(sp, "%ld:", (long)llen);
 
 			if (msg2netstring_buf((struct ha_msg * )m->values[i]
 			,	sp, llen, &tmplen) != HA_OK){
@@ -301,8 +288,10 @@ netstring2msg(const char *s, size_t length, int need_auth)
 	if (strncmp(sp, MSG_START_NETSTRING, startlen) != 0) {
 		/* This can happen if the sender gets killed */
 		/* at just the wrong time... */
-		cl_log(LOG_WARNING, "netstring2msg: no MSG_START");
-                ha_msg_del(ret);
+		if (!cl_msg_quiet_fmterr) {
+			cl_log(LOG_WARNING, "netstring2msg: no MSG_START");
+			ha_msg_del(ret);
+		}
 		return(NULL);
 	}else{
 		sp += startlen;
@@ -334,11 +323,13 @@ netstring2msg(const char *s, size_t length, int need_auth)
 
 		if (strncmp(sp, MSG_END_NETSTRING, endlen) == 0) {
 			if (!is_auth_netstring(datap, tmp, name,nlen) ){
-				cl_log(LOG_ERR
-				,	"netstring authentication"
-				" failed, s=%s, autotoken=%s, sp=%s"
-				,	s, name, sp);
-				cl_log_message(ret);
+				if (!cl_msg_quiet_fmterr) {
+					cl_log(LOG_ERR
+					,	"netstring authentication"
+					" failed, s=%s, autotoken=%s, sp=%s"
+					,	s, name, sp);
+					cl_log_message(ret);
+				}
 				ha_msg_del(ret);
 				return(NULL);
 			}
@@ -386,7 +377,9 @@ netstring2msg(const char *s, size_t length, int need_auth)
 	if (!need_auth){
 		return(ret);
 	}else {
-		cl_log(LOG_ERR, "no authentication found in netstring");
+		if (!cl_msg_quiet_fmterr) {
+			cl_log(LOG_ERR, "no authentication found in netstring");
+		}
 		ha_msg_del(ret);
 		return(NULL);
 	}
@@ -411,7 +404,10 @@ is_auth_netstring(const char * datap, size_t datalen,
 	strncpy(authstr, authstring, MAXLINE);
 	authstr[authlen] = 0;
 	if (sscanf(authstr, "%d %s", &authwhich, authtoken) != 2) {
-		cl_log(LOG_WARNING, "Bad/invalid netstring auth string");
+		if (!cl_msg_quiet_fmterr) {
+			cl_log(LOG_WARNING
+			,	"Bad/invalid netstring auth string");
+		}
 		return(0);
 	}
 
@@ -419,9 +415,11 @@ is_auth_netstring(const char * datap, size_t datalen,
 	if (authmethod(authwhich, datap, datalen, authstr, authlen)
 	!=	authwhich) {
 
-		cl_log(LOG_WARNING
-		,	"Invalid authentication [%d] in message!"
-		,	authwhich);
+		if (!cl_msg_quiet_fmterr) {
+			cl_log(LOG_WARNING
+			,	"Invalid authentication [%d] in message!"
+			,	authwhich);
+		}
 		return(FALSE);
 	}
 
@@ -429,7 +427,10 @@ is_auth_netstring(const char * datap, size_t datalen,
 		return(TRUE);
 	}
 
-	cl_log(LOG_ERR,"authtoken does not match, authtoken=%s, authstr=%s"
-	,	authtoken, authstr);
+	if (!cl_msg_quiet_fmterr) {
+		cl_log(LOG_ERR
+		,	"authtoken does not match, authtoken=%s, authstr=%s"
+		,	authtoken, authstr);
+	}
 	return(FALSE);
 }
