@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.57 2005/01/27 01:39:37 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.58 2005/01/28 10:14:29 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -45,6 +45,7 @@
 #include <clplumbing/lsb_exitcodes.h>
 #include <clplumbing/cl_signal.h>
 #include <clplumbing/proctrack.h>
+#include <clplumbing/coredumps.h>
 
 #include <ha_msg.h>
 #include <lrm/lrm_api.h>
@@ -56,6 +57,7 @@
 
 #define OPTARGS		"skrhV"
 #define PID_FILE 	HA_VARRUNDIR"/lrmd.pid"
+#define LRMD_COREDUMP_ROOT_DIR "/tmp/lrm"
 
 typedef struct
 {
@@ -546,10 +548,27 @@ init_start ()
 	if (G_main_add_input(G_PRIORITY_HIGH, FALSE, 
 			     &polled_input_SourceFuncs) ==NULL){
 		cl_log(LOG_ERR, "main: G_main_add_input failed");
-		lrmd_log(LOG_ERR, "Startup aborted (G_main_add_input failed).  Shutting down.");
+		lrmd_log(LOG_ERR, "Startup aborted (G_main_add_input failed). "
+				  " Shutting down.");
 	}
 	
 	set_child_signal();
+
+	lrmd_log(LOG_DEBUG, "Enabling coredumps");
+	if (-1 == mkdir(LRMD_COREDUMP_ROOT_DIR, 
+			S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) ) {
+		/* I donnot want to check it more carefully. */
+		lrmd_log(LOG_INFO, "May fail to make corerootdir.");
+	}
+	if (cl_set_corerootdir(LRMD_COREDUMP_ROOT_DIR) < 0) {
+		lrmd_log(LOG_ERR, "cannot set corerootdir");
+	}
+	if (cl_enable_coredumps(1) != 0) {
+		lrmd_log(LOG_ERR, "Cannot enable coredumps");
+	}
+	if (cl_cdtocoredir() != 0) {
+		lrmd_log(LOG_ERR, "Cannot cd to coredump dir");
+    	}
 
 	/*Create the mainloop and run it*/
 	mainloop = g_main_new(FALSE);
@@ -2049,6 +2068,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.58  2005/01/28 10:14:29  sunjd
+ * turn on coredump on lrmd
+ *
  * Revision 1.57  2005/01/27 01:39:37  zhenh
  * make it pass gcc 3.4.3. Thanks gshi.
  *
