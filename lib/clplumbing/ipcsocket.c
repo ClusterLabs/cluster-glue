@@ -334,11 +334,11 @@ dump_msg(struct IPC_MESSAGE *msg, const char * label)
 {
 #ifdef CHEAT_CHECKS
 	cl_log(LOG_DEBUG, "%s packet (length %d) [%s] %ld pid %d"
-	,	label,	msg->msg_len, (char*)msg->msg_body
+	,	label,	(int)msg->msg_len, (char*)msg->msg_body
 	,	cheat_get_sequence(msg), (int)getpid());
 #else
 	cl_log(LOG_DEBUG, "%s length %d [%s] pid %d"
-	,	label,	msg->msg_len, (char*)msg->msg_body
+	,	label,	(int)msg->msg_len, (char*)msg->msg_body
 	,	(int)getpid());
 #endif
 }
