@@ -1,3 +1,4 @@
+/* $Id: lrmadmin.c,v 1.11 2004/08/29 04:42:03 msoffen Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -821,3 +822,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 	return lrm_rsc;
 }
 
+/*
+ * $Log: lrmadmin.c,v $
+ * Revision 1.11  2004/08/29 04:42:03  msoffen
+ * Added missing ID and Log
+ *
+ */
