@@ -69,8 +69,6 @@ struct IPC_CHANNEL{
   int ch_status;
   /* far side pid */
   pid_t farside_pid;
-  /* the information used for authentication */
-  struct IPC_AUTH* auth_info;
   /* the channel private data. May contain the connection information*/
   void* ch_private;
   /*
@@ -145,7 +143,7 @@ struct IPC_WAIT_OPS{
    *   accept and create a new connection and verify the authentication.
    * parameters:
    *   wait_conn (IN) : the waiting connection which will accept create the new connection.
-   *   auth_info (IN) : the authentication infromation which will be assigned to the new connection.
+   *   auth_info (IN) : the authentication information which will be assigned to the new connection.
    * return values:
    *   the pointer to the new IPC channel; NULL if the creation or authentication fail.
    *
@@ -184,7 +182,7 @@ struct IPC_OPS{
    *   IPC_FAIL : verifying authentication fails.
    *
   */
-  int (* verify_auth) (struct IPC_CHANNEL* ch);
+  int (* verify_auth) (struct IPC_CHANNEL* ch, struct IPC_AUTH* info);
   /*
    * IPC_OPS::assert_auth
    *   service user asserts to be certain qualified service user.
