@@ -152,6 +152,109 @@ struct IPC_CHANNEL* socket_server_channel_new(int sockfd);
 pid_t socket_get_farside_pid(int sockfd);
 
 static int (*ourpollfunc)(struct pollfd *, nfds_t, int) = poll;
+static int socket_waitin(struct IPC_CHANNEL * ch);
+
+static int socket_waitout(struct IPC_CHANNEL * ch);
+
+/* socket object of the function table */
+static struct IPC_OPS socket_ops = {
+  socket_destroy_channel,
+  socket_initiate_connection,
+  socket_verify_auth,
+  socket_assert_auth,
+  socket_send,
+  socket_recv,
+  socket_waitin,
+  socket_waitout,
+  socket_is_message_pending,
+  socket_is_sending_blocked,
+  socket_resume_io,
+  socket_get_send_fd,
+  socket_get_recv_fd,
+  socket_set_send_qlen,
+  socket_set_recv_qlen,
+};
+
+#define	MAXDATASIZE	65535
+
+#ifndef AUDIT_CHANNELS
+#	define	CHANAUDIT(ch)	/*NOTHING */
+#else
+#	define CHANAUDIT(ch)	socket_chan_audit(ch)
+#	define MAXPID	65535
+
+
+static void
+socket_chan_audit(const struct IPC_CHANNEL* ch)
+{
+	int	badch = FALSE;
+
+  	struct SOCKET_CH_PRIVATE *chp;
+	struct stat		b;
+	
+	if ((chp = ch->ch_private) == NULL) {
+		cl_log(LOG_CRIT, "Bad ch_private");
+		badch = TRUE;
+	}
+	if (ch->ops != &socket_ops) {
+		cl_log(LOG_CRIT, "Bad socket_ops");
+		badch = TRUE;
+	}
+	if (ch->ch_status == IPC_DISCONNECT) {
+		return;
+	}
+	if (ch->ch_status != IPC_CONNECT) {
+		cl_log(LOG_CRIT, "Bad ch_status");
+		badch = TRUE;
+	}
+	if (ch->farside_pid < 0 || ch->farside_pid > MAXPID) {
+		cl_log(LOG_CRIT, "Bad farside_pid");
+		badch = TRUE;
+	}
+	if (fstat(chp->s, &b) < 0) {
+		badch = TRUE;
+	}else if ((b.st_mode & S_IFMT) != S_IFSOCK) {
+		cl_log(LOG_CRIT, "channel @ 0x%lx: not a socket"
+		,	(unsigned long)ch);
+		badch = TRUE;
+	}
+	if (chp->remaining_data < 0) {
+		cl_log(LOG_CRIT, "Negative remaining_data");
+		badch = TRUE;
+	}
+	if (chp->remaining_data < 0 || chp->remaining_data > MAXDATASIZE) {
+		cl_log(LOG_CRIT, "Excessive remaining_data");
+		badch = TRUE;
+	}
+	if (chp->remaining_data && chp->buf_msg == NULL) {
+		cl_log(LOG_CRIT, "inconsistent remaining_data/buf_msg");
+		badch = TRUE;
+	}
+	if (chp->remaining_data == 0 && chp->buf_msg != NULL) {
+		cl_log(LOG_CRIT, "inconsistent remaining_data/buf_msg(2)");
+		badch = TRUE;
+	}
+	if (ch->send_queue == NULL || ch->recv_queue == NULL) {
+		cl_log(LOG_CRIT, "bad send/recv queue");
+		badch = TRUE;
+	}
+	if (ch->recv_queue->current_qlen < 0
+	||	ch->recv_queue->current_qlen > ch->recv_queue->max_qlen) {
+		cl_log(LOG_CRIT, "bad recv queue");
+		badch = TRUE;
+	}
+	if (ch->send_queue->current_qlen < 0
+	||	ch->send_queue->current_qlen > ch->send_queue->max_qlen) {
+		cl_log(LOG_CRIT, "bad send_queue");
+		badch = TRUE;
+	}
+	if (badch) {
+		cl_log(LOG_CRIT, "Bad channel @ 0x%lx", (unsigned long)ch);
+		abort();
+	}
+}
+
+#endif
 
 /* destroy socket wait channel */ 
 static void 
@@ -293,6 +396,10 @@ socket_initiate_connection(struct IPC_CHANNEL * ch)
 static int 
 socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 {
+
+	if (msg->msg_len < 0 || msg->msg_len > MAXDATASIZE) {
+		return IPC_FAIL;
+	}
   
 	if (ch->send_queue->current_qlen < ch->send_queue->max_qlen) {
 		/* add the meesage into the send queue */
@@ -364,6 +471,7 @@ socket_waitfor(struct IPC_CHANNEL * ch
 {
 	struct pollfd sockpoll;
 
+	CHANAUDIT(ch);
 	if (finished(ch)) {
 		return IPC_OK;
 	}
@@ -392,10 +500,12 @@ socket_waitfor(struct IPC_CHANNEL * ch
 
 		rc = socket_check_poll(ch, &sockpoll);
 		if (rc != IPC_OK) {
+			CHANAUDIT(ch);
 			return rc;
 		}
 	}
 
+	CHANAUDIT(ch);
 	return IPC_OK;
 }
 
@@ -414,6 +524,7 @@ static int
 socket_waitout(struct IPC_CHANNEL * ch)
 {
 	int	rc;
+	CHANAUDIT(ch);
 	rc = socket_waitfor(ch, socket_is_output_flushed);
 
 	if (rc != IPC_OK) {
@@ -422,6 +533,7 @@ socket_waitout(struct IPC_CHANNEL * ch)
 	}else if (ch->ops->is_sending_blocked(ch)) {
 		cl_log(LOG_ERR, "socket_waitout output still blocked");
 	}
+	CHANAUDIT(ch);
 	return rc;
 }
 
@@ -463,10 +575,14 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 {
 	struct SOCKET_CH_PRIVATE*	conn_info;
 	int				retcode = IPC_OK;
-	struct pollfd			sockpoll;	
+	struct pollfd			sockpoll;
+	int				debug_loopcount = 0;
+	int				debug_bytecount = 0;
 
+	CHANAUDIT(ch);
 	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 	*started = FALSE;
+
  
 	while (ch->recv_queue->current_qlen < ch->recv_queue->max_qlen
 	&&	retcode == IPC_OK) {
@@ -478,6 +594,8 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 		int				len;
 
 
+		CHANAUDIT(ch);
+		++debug_loopcount;
 		new_msg = (conn_info->remaining_data == 0);
 
 		if (new_msg) {
@@ -490,9 +608,18 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 			+	(msg->msg_len - len);
 		}
 
+		if (len <= 0 || len > MAXDATASIZE) {
+			ch->ch_status = IPC_DISCONNECT;
+			retcode = IPC_BROKEN;
+			break;
+		}
+		CHANAUDIT(ch);
+
 		/* Now try to receive some data */
 
 		msg_len = recv(conn_info->s, msg_begin, len, MSG_DONTWAIT);
+
+		CHANAUDIT(ch);
 
 		if (msg_len == 0) {
 			/* We don't think this should happen */
@@ -516,12 +643,22 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 			}
 			break; /* out of loop */
     		} else {
+			debug_bytecount += msg_len;
 
 #if 0
 		cl_log(LOG_DEBUG, "Got %d byte message", msg_len);
 		cl_log(LOG_DEBUG, "Contents: %s", (char*)msg_begin);
 #endif
 			if (new_msg){
+				if (head.msg_len <= 0
+				||	head.msg_len > MAXDATASIZE) {
+					cl_log(LOG_CRIT
+					,	"invalid msg len [%d]"
+					,	head.msg_len);
+					ch->ch_status = IPC_DISCONNECT;
+					retcode = IPC_FAIL;
+					break;
+				}
 				conn_info->buf_msg
 				= socket_message_new(ch, head.msg_len);
 				conn_info->remaining_data = head.msg_len;
@@ -537,7 +674,8 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 			-	msg_len;
 
 			if (conn_info->remaining_data < 0){
-				cl_log(LOG_CRIT, "received more data than expected");
+				cl_log(LOG_CRIT
+				,	"received more data than expected");
 				conn_info->remaining_data = 0;
 				retcode = IPC_FAIL;
 
@@ -553,7 +691,6 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 				cl_log(LOG_DEBUG, "buf_msg: contents: %s"
 				,	(char *)conn_info->buf_msg->msg_body);
 #endif
-
 				/* Got the last of the message! */
 
 				/* Append gotten message to receive queue */
@@ -574,6 +711,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 		retcode = socket_check_poll(ch,&sockpoll);
 	}
 	
+	CHANAUDIT(ch);
 	if (retcode != IPC_OK) {
 		return retcode;
 	}
@@ -588,6 +726,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 	struct SOCKET_CH_PRIVATE*	conn_info;
 
 
+	CHANAUDIT(ch);
 	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 	*started = FALSE;
   
@@ -601,6 +740,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 		struct SOCKET_MSG_HEAD		head;
 		int				sendrc = 0;
 
+		CHANAUDIT(ch);
 		element = g_list_first(ch->send_queue->queue);
 		if (element == NULL) {
 			/* OOPS!  - correct consistency problem */
@@ -645,6 +785,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 
 
 		do {
+			CHANAUDIT(ch);
 			sendrc=send(conn_info->s, msg->msg_body, msg->msg_len
 			,	(MSG_DONTWAIT|MSG_NOSIGNAL));
 
@@ -685,6 +826,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 			ch->send_queue->current_qlen--;
 		}
 	}
+	CHANAUDIT(ch);
 	if (retcode != IPC_OK) {
 		return retcode;
 	}
@@ -698,9 +840,12 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	gboolean	rstarted;
 	gboolean	wstarted;
 
+	CHANAUDIT(ch);
 	do {
 		rc1 = socket_resume_io_read(ch, &rstarted);
+		CHANAUDIT(ch);
 		rc2 = socket_resume_io_write(ch, &wstarted);
+		CHANAUDIT(ch);
 	}while (rc1 == IPC_OK && rc2 == IPC_OK && (rstarted||wstarted));
 
 	return (rc1 != IPC_OK ? rc1 : rc2);
@@ -750,26 +895,6 @@ static struct IPC_WAIT_OPS socket_wait_ops = {
   socket_destroy_wait_conn,
   socket_wait_selectfd,
   socket_accept_connection,
-};
-
-
-/* socket object of the function table */
-static struct IPC_OPS socket_ops = {
-  socket_destroy_channel,
-  socket_initiate_connection,
-  socket_verify_auth,
-  socket_assert_auth,
-  socket_send,
-  socket_recv,
-  socket_waitin,
-  socket_waitout,
-  socket_is_message_pending,
-  socket_is_sending_blocked,
-  socket_resume_io,
-  socket_get_send_fd,
-  socket_get_recv_fd,
-  socket_set_send_qlen,
-  socket_set_recv_qlen,
 };
 
 
@@ -1000,6 +1125,7 @@ socket_server_channel_new(int sockfd){
   conn_info->s = sockfd;
   conn_info->remaining_data = 0;
   conn_info->buf_msg = NULL;
+  strcpy(conn_info->path_name, "?");
 
   temp_ch->ch_status = IPC_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
@@ -1021,6 +1147,7 @@ ipc_channel_pair(IPC_Channel* channels[2])
 {
 	int	sockets[2];
 	int	rc;
+	int	j;
 
 	if ((rc = socketpair(AF_LOCAL, SOCK_STREAM, 0, sockets)) < 0) {
 		return IPC_FAIL;
@@ -1036,8 +1163,13 @@ ipc_channel_pair(IPC_Channel* channels[2])
 		close(sockets[1]);
 		return IPC_FAIL;
 	}
-	channels[0]->ch_status = IPC_CONNECT;
-	channels[1]->ch_status = IPC_CONNECT;
+	for (j=0; j < 2; ++j) {
+  		struct SOCKET_CH_PRIVATE* p = channels[j]->ch_private;
+		channels[j]->ch_status = IPC_CONNECT;
+		/* Valid, but not terribly meaningful */
+		channels[j]->farside_pid = getpid();
+  		strncpy(p->path_name, "[socketpair]", sizeof(p->path_name));
+	}
 
 	return IPC_OK;
 	
