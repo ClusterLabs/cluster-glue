@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.47 2005/02/09 18:57:12 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.48 2005/02/14 21:06:11 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -639,10 +639,10 @@ ha_msg_addbin(struct ha_msg * msg, const char * name,
 }
 
 int 
-ha_msg_adduuid(struct ha_msg* msg, const char *name, uuid_t u)
+ha_msg_adduuid(struct ha_msg* msg, const char *name, const uuid_t u)
 {
 	return(ha_msg_addraw(msg, name, strlen(name)
-	,	u, sizeof(u), FT_BINARY, 0));
+	,	u, sizeof(uuid_t), FT_BINARY, 0));
 }
 
 /*Add a null-terminated name and struct value to a message*/
@@ -1028,6 +1028,8 @@ cl_get_uuid(const struct ha_msg *msg, const char * name, uuid_t retval)
 {
 	const void *	vret;
 	size_t		vretsize;
+	
+	uuid_clear(retval);
 
 	if ((vret = cl_get_binary(msg, name, &vretsize)) == NULL) {
 		/*discouraged function*/ /* But perfectly portable in this case */
@@ -1035,6 +1037,9 @@ cl_get_uuid(const struct ha_msg *msg, const char * name, uuid_t retval)
 	}
 	if (vretsize != sizeof(uuid_t)) {
 		cl_log(LOG_WARNING, "Binary field %s is not a uuid.", name);
+		cl_log(LOG_INFO, "expecting %d bytes, got %d bytes",
+		       sizeof(uuid_t), vretsize);
+		cl_log_message(LOG_INFO, msg);
 		return HA_FAIL;
 	}
 	memcpy(retval, vret, sizeof(uuid_t));
@@ -1206,9 +1211,9 @@ cl_msg_modbin(struct ha_msg * msg, const char* name,
 }
 int
 cl_msg_moduuid(struct ha_msg * msg, const char* name, 
-	      uuid_t uuid)
+	       const uuid_t uuid)
 {
-	return cl_msg_mod(msg, name, uuid, sizeof(uuid), FT_BINARY);
+	return cl_msg_mod(msg, name, uuid, sizeof(uuid_t), FT_BINARY);
 }
 	
 
@@ -2141,6 +2146,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.48  2005/02/14 21:06:11  gshi
+ * BEAM fix:
+ *
+ * replacing the binary usage in core code with uuid function
+ *
  * Revision 1.47  2005/02/09 18:57:12  gshi
  * In case of one field printing to string failure, we should discard the entire message
  *
