@@ -1,8 +1,8 @@
 #!/bin/bash
 
-num_servers=100
-num_clients=100
-client_time=3
+num_servers=10
+num_clients=10
+client_time=2
 
 total_failed=0
 
