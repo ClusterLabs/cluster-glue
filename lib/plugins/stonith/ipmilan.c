@@ -233,7 +233,7 @@ get_config_string(struct ipmilanDevice * nd, int index)
 	struct ipmilanHostInfo * host;
 	int i;
 
-	char * buf, *p;
+	char * buf;
 
 	if (index >= nd->hostcount || index < 0) {
 		return (NULL);
