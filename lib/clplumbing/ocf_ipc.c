@@ -22,6 +22,7 @@
  *
  */
 #include <clplumbing/ipc.h>
+#include <string.h>
 
 struct OCF_IPC_WAIT_CONNECTION * socket_wait_conn_new(GHashTable* ch_attrs);
 struct OCF_IPC_CHANNEL * socket_channel_new(GHashTable* ch_attrs);
