@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.41 2005/03/31 20:10:57 gshi Exp $ */
+/* $Id: ipc.h,v 1.42 2005/04/01 22:56:14 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -654,6 +654,13 @@ extern void ipc_set_pollfunc(int (*)(struct pollfd*, unsigned int, int));
 
 #ifdef IPC_TIME_DEBUG
 
+enum MSGPOS_IN_IPC{
+	MSGPOS_ENQUEUE,
+	MSGPOS_SEND,
+	MSGPOS_RECV,
+	MSGPOS_DEQUEUE
+};
+
 #define GET_ENQUEUE_TIME(x)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->enqueue_time
 #define GET_SEND_TIME(x)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->send_time
 #define GET_RECV_TIME(x)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->recv_time
@@ -662,6 +669,7 @@ extern void ipc_set_pollfunc(int (*)(struct pollfd*, unsigned int, int));
 #define SET_SEND_TIME(x,t)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->send_time = t
 #define SET_RECV_TIME(x,t)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->recv_time = t
 #define SET_DEQUEUE_TIME(x,t)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->dequeue_time =t 
+
 #endif
 
 
@@ -676,6 +684,7 @@ struct SOCKET_MSG_HEAD{
 #endif
 
 };
+
 
 #define	MAXDATASIZE	65535
 #define HEADMAGIC	0xabcd

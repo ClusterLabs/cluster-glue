@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.26 2005/04/01 21:15:00 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.27 2005/04/01 22:55:40 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -36,6 +36,8 @@ extern struct ha_msg* wirefmt2msg(const char* s, size_t length);
 void cl_log_message (int log_level, const struct ha_msg *m);
 int  timediff(longclock_t t1, longclock_t t2);
 void   ha_msg_del(struct ha_msg* msg);
+void	ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos);
+
 #endif
 
 struct IPC_WAIT_CONNECTION * socket_wait_conn_new(GHashTable* ch_attrs);
@@ -298,28 +300,9 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 		ipcmsg->msg_len = head->msg_len;
 		ipcmsg->msg_private = pool;
 		ipcmsg->msg_done = ipc_bufpool_msg_done;
-
+		
 #ifdef IPC_TIME_DEBUG				
-		{
-			int msdiff = 0;
-			SET_RECV_TIME(ipcmsg, time_longclock());
-			msdiff = timediff(GET_RECV_TIME(ipcmsg), GET_ENQUEUE_TIME(ipcmsg));
-			if (msdiff > MAXIPCTIME){
-				struct ha_msg* hamsg;
-				cl_log(LOG_WARNING, "socket_resume_io_write:"
-				       " message delayed from enqueue to recv %d ms"
-				       "(enqueue-time=%ld, peer pid=%d) ", 
-				       msdiff, 
-				       longclockto_ms(GET_ENQUEUE_TIME(ipcmsg)),
-				       ch->farside_pid
-				       );
-				hamsg = wirefmt2msg(ipcmsg->msg_body, ipcmsg->msg_len);
-				if (hamsg != NULL){
-					cl_log_message(LOG_INFO, hamsg);
-					ha_msg_del(hamsg);
-				}
-			}	
-		}
+		ipc_time_debug(ch,ipcmsg, MSGPOS_RECV);
 #endif				
 
 
