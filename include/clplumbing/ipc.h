@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.36 2004/12/09 23:12:39 gshi Exp $ */
+/* $Id: ipc.h,v 1.37 2004/12/14 22:15:17 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -119,6 +119,9 @@ struct IPC_WAIT_CONNECTION{
 	IPC_WaitOps	*ops;		/* wait conn. function table .*/
 };
 
+
+typedef void(*flow_callback_t)(IPC_Channel*, void*);
+
 /* channel structure.*/
 struct IPC_CHANNEL{
 	int		ch_status;	/* identify the status of channel.*/
@@ -151,6 +154,15 @@ struct IPC_CHANNEL{
 	/* private: */
 	IPC_Queue*	send_queue; 
 	IPC_Queue*	recv_queue; 
+
+
+	/* the follwing is for send flow control*/
+	int		high_flow_mark;
+	int		low_flow_mark;
+	void*		high_flow_userdata;
+	void*		low_flow_userdata;
+	flow_callback_t	high_flow_callback;
+	flow_callback_t	low_flow_callback;
 	
 };
 
@@ -489,6 +501,29 @@ struct IPC_OPS{
  *
  */
 	int  (* set_recv_qlen) (IPC_Channel * ch, int q_len);
+
+
+/*
+ * IPC_OPS: set callback for high/low flow mark
+ * ch	(IN) : the pointer to the channel
+ * callback (IN) : the callback function
+ * user_data(IN) : a pointer to user_data
+ *		   callback will be called with channel and
+ *		   this user_data as parameters
+ *
+ * Return values:
+ *	void
+ *
+ */
+	
+	
+	void (* set_high_flow_callback) (IPC_Channel* ch , 	
+					 flow_callback_t callback,
+					 void* user_data);
+	
+	void (* set_low_flow_callback) (IPC_Channel* ch , 	
+					 flow_callback_t callback,
+					 void* user_data);
 	
 /*
  * IPC_OPS::new_ipcmsg

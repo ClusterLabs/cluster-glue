@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.31 2004/12/08 19:17:54 gshi Exp $ */
+/* $Id: ipctest.c,v 1.32 2004/12/14 22:15:17 gshi Exp $ */
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -470,7 +470,34 @@ checkinput(IPC_Channel* chan, const char * where, int* rdcount, int maxcount)
 	return errs;
 }
 
+static void
+async_high_flow_callback(IPC_Channel* ch, void* userdata)
+{
+	int* stopsending = userdata;
+	
+	if (userdata == NULL){
+		cl_log(LOG_ERR, "userdata is NULL");
+		return;
+	}
+	
+	*stopsending = 1;
+	
+}
 
+static void
+async_low_flow_callback(IPC_Channel* ch, void* userdata)
+{
+
+	int* stopsending = userdata;
+	
+	if (userdata == NULL){
+		cl_log(LOG_ERR, "userdata is NULL");
+		return;
+	}
+
+	*stopsending = 0;
+	
+}
 
 
 static int
@@ -481,52 +508,73 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 	int		errcount = 0;
 	int		blockedcount = 0;
 	IPC_Message*	wmsg;
-	int		lastcount = -1;
 	const char*	w = "asyn_echoserver";
-
-
+	int		stopsending = 0;
 
 	cl_log(LOG_INFO, "Asyn echo server: %d reps pid %d."
 	,	repcount, (int)getpid());
+	
+	(void)async_high_flow_callback;
+	(void)async_low_flow_callback;
+	
+	
+	wchan->ops->set_high_flow_callback(wchan, async_high_flow_callback, &stopsending);
+	wchan->ops->set_low_flow_callback(wchan, async_low_flow_callback, &stopsending);
+	  
+	wchan->low_flow_mark = 2;
+	wchan->high_flow_mark = 20;
+	
 	while (rdcount < repcount) {
 		int	rc;
-
-		do {
-			++wrcount;
-			if (wrcount > repcount) {
-				break;
-			}
-			wmsg = wchan->ops->new_ipcmsg(wchan, NULL, 32, NULL);
-			echomsgbody(wmsg->msg_body, wrcount, &wmsg->msg_len);
-			/*fprintf(stderr, "s"); */
-			if ((rc = wchan->ops->send(wchan, wmsg)) != IPC_OK) {
-				cl_log(LOG_ERR
-				,	"asyn_echoserver: send failed"
-				" %d rc iter %d"
-				,	rc, wrcount);
-				++errcount;
-				continue;
-			}
-			lastcount = wrcount;
+		
+		while (wrcount < repcount && blockedcount < 10
+		       && wchan->ch_status != IPC_DISCONNECT 
+		       ){
 			
-			if (wchan->ops->is_sending_blocked(wchan)) {
-				/* fprintf(stderr, "b"); */
-				++blockedcount;
-			}else{
-				blockedcount = 0;
+			if (!stopsending){
+				++wrcount;
+				if (wrcount > repcount) {
+					break;
+				}
+				wmsg = wchan->ops->new_ipcmsg(wchan, NULL, 32, NULL);
+				echomsgbody(wmsg->msg_body, wrcount, &wmsg->msg_len);
+				if ((rc = wchan->ops->send(wchan, wmsg)) != IPC_OK){
+					
+					cl_log(LOG_INFO, "channel sstatus in echo server is %d",
+					       wchan->ch_status);
+					if (wchan->ch_status != IPC_CONNECT) {
+						cl_log(LOG_ERR
+						       ,	"asyn_echoserver: send failed"
+						       " %d rc iter %d"
+						       ,	rc, wrcount);
+						++errcount;
+						continue;
+					}else {/*send failed because of channel busy
+						* roll back
+						*/
+						--wrcount;
+					}				
+				}
+				
+				if (wchan->ops->is_sending_blocked(wchan)) {
+					/* fprintf(stderr, "b"); */
+					++blockedcount;
+				}else{
+					blockedcount = 0;
+				}
 			}
+			
+			
 			errcount += checkinput(wchan, w, &rdcount, repcount);
 			if (wrcount < repcount
-			&&	wchan->ch_status == IPC_DISCONNECT) {
+			    &&	wchan->ch_status == IPC_DISCONNECT) {
 				++errcount;
 				break;
 			}
-		}while (wrcount < repcount && blockedcount < 10
-		&&	wchan->ch_status != IPC_DISCONNECT);
-
-		if (wrcount < repcount) {
-			/* fprintf(stderr, "B"); */
 		}
+		
+/*  		cl_log(LOG_INFO, "async_echoserver: wrcount =%d rdcount=%d B", wrcount, rdcount); */
+
 		wchan->ops->waitout(wchan);
 		errcount += checkinput(wchan, w, &rdcount, repcount);
 		if (wrcount >= repcount && rdcount < repcount) {
@@ -534,15 +582,15 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 			
 			if (rc != IPC_OK) {
 				cl_log(LOG_ERR
-				,	"asyn_echoserver: waitin()"
-				" failed %d rc rdcount %d errno=%d"
+				       ,	"asyn_echoserver: waitin()"
+				       " failed %d rc rdcount %d errno=%d"
 				,	rc, rdcount, errno);
 				cl_perror("waitin");
 				exit(1);
 			}
 		}
 		if (wchan->ch_status == IPC_DISCONNECT
-		&&	rdcount < repcount) {
+		    &&	rdcount < repcount) {
 			cl_log(LOG_ERR
 			,	"asyn_echoserver: EOF in iter %d"
 			,	rdcount);
@@ -551,11 +599,13 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 			break;
 		}
 
+		blockedcount = 0;
+
 	}
 
 	cl_log(LOG_INFO, "asyn_echoserver: %d errors", errcount);
 #if 0
-	cl_log(LOG_INFO, "destroying channel 0x%lx", (unsigned long)wchan);
+	cl_log(LOG_INFO, "%d destroying channel 0x%lx", getpid(), (unsigned long)wchan);
 #endif
 	wchan->ops->destroy(wchan); wchan = NULL;
 	return errcount;
@@ -624,26 +674,34 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 			}
 			/*fprintf(stderr, "c"); */
 			++rdcount;
-			if ((rc = chan->ops->send(chan, rmsg))
-			!=	IPC_OK) {
+
+			
+			do {
+				rc = chan->ops->send(chan, rmsg);
+				
+			}while (rc != IPC_OK && chan->ch_status == IPC_CONNECT);
+
+			if (chan->ch_status !=  IPC_CONNECT){
 				++errcount;
 				cl_perror("send");
 				cl_log(LOG_ERR
-				,	"Async echoclient: send failed"
-				" rc %d, iter %d", rc, rdcount);
+				       ,	"Async echoclient: send failed"
+				       " rc %d, iter %d", rc, rdcount);
 				cl_log(LOG_INFO, "Message being sent: %s"
-				,		(char*)rmsg->msg_body);
+				       ,		(char*)rmsg->msg_body);
 				if (!IPC_ISRCONN(chan)) {
 					cl_log(LOG_ERR
-					,	"Async echoclient: EOF(2)"
-					" iter %d", rdcount+1);
+					       ,	"Async echoclient: EOF(2)"
+					       " iter %d", rdcount+1);
 					EOFcheck(chan);
 					return errcount;
 				}
 				continue;
-			}else{
-				++wrcount;
+				
 			}
+
+			
+			++wrcount;
 			/*fprintf(stderr, "x"); */
 		}
 		if (rdcount >= repcount) {
@@ -721,11 +779,13 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 	}
 	cl_poll_ignore(rfd);
 	cl_poll_ignore(wfd);
-	cl_log(LOG_INFO, "Async echoclient: %d errors, %d reads, %d writes"
-	,	errcount, rdcount, wrcount);
+	cl_log(LOG_INFO, "Async echoclient: %d errors, %d reads, %d writes",
+	       errcount, rdcount, wrcount);
 #if 0
-	cl_log(LOG_INFO, "destroying channel 0x%lx", (unsigned long)chan);
+	cl_log(LOG_INFO, "%d destroying channel 0x%lx",getpid(), (unsigned long)chan);
 #endif
+
+
 	chan->ops->destroy(chan); chan = NULL;
 	return errcount;
 }
@@ -742,27 +802,23 @@ struct iterinfo {
 
 static GMainLoop*	loop = NULL;
 
+
+
+
 static gboolean
 s_send_msg(gpointer data)
 {
 	struct iterinfo*i = data;
 	IPC_Message*	wmsg;
-	int		rc;
+	int		rc;	
 	
-	/* Flow control? */
-	if (i->chan->send_queue->current_qlen
-	>=	i->chan->send_queue->max_qlen-2) {
-		i->sendingsuspended = TRUE;
-		return FALSE;
-	}
-	if (i->sendingsuspended) {
-		i->sendingsuspended = FALSE;
-	}
 	++i->wcount;
 	
 	wmsg = i->chan->ops->new_ipcmsg(i->chan, NULL, 32, NULL);
 	echomsgbody(wmsg->msg_body, i->wcount, &wmsg->msg_len);
-	/*fprintf(stderr, "s");*/
+	
+	/*cl_log(LOG_INFO, "s_send_msg: sending out %d", i->wcount);*/
+	
 	if ((rc = i->chan->ops->send(i->chan, wmsg)) != IPC_OK) {
 		cl_log(LOG_ERR
 		,	"s_send_msg: send failed"
@@ -782,7 +838,44 @@ s_send_msg(gpointer data)
 			return FALSE;
 		}
 	}
-	return i->wcount < i->max;
+	return !i->sendingsuspended?i->wcount < i->max: FALSE;
+}
+
+
+
+
+static void
+mainloop_low_flow_callback(IPC_Channel* ch, void* userdata)
+{
+	
+	struct iterinfo* i = (struct iterinfo*) userdata;
+	
+	if (userdata == NULL){
+		cl_log(LOG_ERR, "userdata is NULL");
+		return;
+	}
+	
+	if (i->sendingsuspended){
+		i->sendingsuspended = FALSE;
+		g_idle_add(s_send_msg, i);
+	}
+	
+	return;
+	
+}
+
+static void
+mainloop_high_flow_callback(IPC_Channel* ch, void* userdata)
+{
+	struct iterinfo* i = (struct iterinfo*) userdata;
+	
+	if (userdata == NULL){
+		cl_log(LOG_ERR, "userdata is NULL");
+		return;
+	}
+	
+	i->sendingsuspended = TRUE;
+	
 }
 
 
@@ -792,13 +885,7 @@ s_rcv_msg(IPC_Channel* chan, gpointer data)
 	struct iterinfo*i = data;
 
 	i->errcount += checkinput(chan, "s_rcv_msg", &i->rcount, i->max);
-
-	if (i->sendingsuspended
-	&&	!chan->ops->is_sending_blocked(chan)) {
-		i->sendingsuspended = FALSE;
-		g_idle_add(s_send_msg, data);
-	}
-
+	
 	if (chan->ch_status == IPC_DISCONNECT
 	||	i->rcount >= i->max || i->errcount > MAXERRORS) {
 		if (i->rcount < i->max) {
@@ -873,14 +960,7 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 		if (chan->ch_status == IPC_DISCONNECT) {
 			break;
 		}
-		if (i->chan->send_queue->current_qlen
-		>=	i->chan->send_queue->max_qlen-2) {
-			i->sendingsuspended = TRUE;
-			cl_log(LOG_INFO
-			,	"s_echo_msg: Sending suspended.");
-			goto retout;
-		}
-		i->sendingsuspended = FALSE;
+
 		if ((rc = chan->ops->recv(chan, &rmsg)) != IPC_OK) {
 			cl_log(LOG_ERR
 			,	"s_echo_msg: recv failed %d rc iter %d"
@@ -895,21 +975,32 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 			++i->errcount;
 		}
 
-		/*fprintf(stderr, "c");*/
-		if ((rc = chan->ops->send(chan, rmsg)) != IPC_OK) {
-			cl_log(LOG_ERR
-			,	"s_echo_msg: send failed %d rc iter %d qlen %d"
-			,	rc, i->rcount, chan->send_queue->current_qlen);
-			cl_perror("s_echo_msg:send");
-			++i->errcount;
-		}else{
-			i->wcount+=1;
+		
+		
+		/*cl_log(LOG_INFO, "s_echo_msg: rcount= %d, wcount =%d", i->rcount, i->wcount);*/
+		
+		
+		do {
+			rc = chan->ops->send(chan, rmsg);
+			
+		}while (rc != IPC_OK && chan->ch_status == IPC_CONNECT);
+		
+		if (chan->ch_status !=  IPC_CONNECT){
+			cl_log(LOG_ERR,
+			       "s_echo_msg: send failed %d rc iter %d qlen %d",
+			       rc, i->rcount, chan->send_queue->current_qlen);
+			cl_perror("send");
+			i->errcount ++;
+			
 		}
+		
+		i->wcount+=1;
+		/*cl_log(LOG_INFO, "s_echo_msg: end of this ite");*/
 	}
-retout:
+ retout:
 	/*fprintf(stderr, "%%");*/
 	if (i->rcount >= i->max || chan->ch_status == IPC_DISCONNECT
-	||	i->errcount > MAXERRORS) {
+	    ||	i->errcount > MAXERRORS) {
 		chan->ops->waitout(chan);
 		g_main_quit(loop);
 		return FALSE;
@@ -923,6 +1014,7 @@ init_iterinfo(struct iterinfo * i, IPC_Channel* chan, int max)
 	memset(i, 0, sizeof(*i));
 	i->chan = chan;
 	i->max = max;
+	i->sendingsuspended = FALSE;
 }
 
 static int
@@ -931,8 +1023,17 @@ mainloop_server(IPC_Channel* chan, int repcount)
 	struct iterinfo info;
 	GCHSource*	msgchan;
 	guint		sendmsgsrc;
+
+	
+
 	loop = g_main_new(FALSE);
 	init_iterinfo(&info, chan, repcount);
+
+	chan->ops->set_high_flow_callback(chan, mainloop_high_flow_callback, &info);
+	chan->ops->set_low_flow_callback(chan, mainloop_low_flow_callback, &info);
+	chan->high_flow_mark = 20;
+	chan->low_flow_mark = 2;
+
 	sendmsgsrc = g_idle_add(s_send_msg, &info);
 	msgchan = G_main_add_IPC_Channel(G_PRIORITY_DEFAULT, chan
 	,	FALSE, s_rcv_msg, &info, NULL);
@@ -952,7 +1053,7 @@ mainloop_client(IPC_Channel* chan, int repcount)
 	init_iterinfo(&info, chan, repcount);
 	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT, chan
 	,	FALSE, s_echo_msg, &info, NULL);
-	cl_log(LOG_INFO, "Mainloop echo client: %d reps pid %d.", repcount, (int)getpid());
+	cl_log(LOG_INFO, "Mainloop echo client: %d reps pid %d.", repcount, (int)getpid());	
 	g_main_run(loop);
 	g_main_destroy(loop);
 	loop = NULL;

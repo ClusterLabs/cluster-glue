@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.111 2004/12/09 23:12:39 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.112 2004/12/14 22:15:17 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -206,7 +206,16 @@ static int socket_waitin(struct IPC_CHANNEL * ch);
 static int socket_waitout(struct IPC_CHANNEL * ch);
 
 static int socket_resume_io_read(struct IPC_CHANNEL *ch, int*, gboolean read1anyway);
-static IPC_Message* socket_new_ipcmsg(IPC_Channel* ch, const void* data, int len, void* private);
+static void socket_set_high_flow_callback(IPC_Channel* ch,
+					  flow_callback_t callback,
+					  void* userdata);
+static void socket_set_low_flow_callback(IPC_Channel* ch,
+					 flow_callback_t callback,
+					 void* userdata);
+static IPC_Message* socket_new_ipcmsg(IPC_Channel* ch, 
+				      const void* data,
+				      int len,
+				      void* private);
 
 
 /* socket object of the function table */
@@ -226,6 +235,8 @@ static struct IPC_OPS socket_ops = {
   socket_get_recv_fd,
   socket_set_send_qlen,
   socket_set_recv_qlen,
+  socket_set_high_flow_callback,
+  socket_set_low_flow_callback,
   socket_new_ipcmsg,
 };
 
@@ -556,6 +567,9 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 static void
 socket_destroy_channel(struct IPC_CHANNEL * ch)
 {
+	while ( ch->send_queue->current_qlen > 0){
+		socket_resume_io(ch);
+	}
 	socket_disconnect(ch);
 	socket_destroy_queue(ch->send_queue);
 	socket_destroy_queue(ch->recv_queue);
@@ -633,7 +647,7 @@ socket_check_disc_pending(struct IPC_CHANNEL* ch)
 		if (sockpoll.revents & POLLIN) {
 			ch->ch_status = IPC_DISC_PENDING;
 		}else{
-#if 0
+#if 1
 			cl_log(LOG_INFO, "HUP without input");
 #endif
 			ch->ch_status = IPC_DISCONNECT;
@@ -678,11 +692,57 @@ socket_initiate_connection(struct IPC_CHANNEL * ch)
 	return IPC_OK;
 }
 
+static void
+socket_set_high_flow_callback(IPC_Channel* ch,
+			      flow_callback_t callback,
+			      void* userdata){
+	
+	ch->high_flow_callback = callback;
+	ch->high_flow_userdata = userdata;
+	
+}
+
+static void
+socket_set_low_flow_callback(IPC_Channel* ch,
+			     flow_callback_t callback,
+			     void* userdata){
+	
+	ch->low_flow_callback = callback;
+	ch->low_flow_userdata = userdata;
+	
+}
+
+static void
+socket_check_flow_control(struct IPC_CHANNEL* ch, 
+			  int orig_qlen, 
+			  int curr_qlen)
+{
+	if (!IPC_ISRCONN(ch)) {
+		return;
+	}
+
+	if (curr_qlen >= ch->high_flow_mark
+	    && ch->high_flow_callback){
+			ch->high_flow_callback(ch, ch->high_flow_userdata);
+	} 
+	
+	if (curr_qlen <= ch->low_flow_mark
+	    && orig_qlen > ch->low_flow_mark
+	    && ch->low_flow_callback){
+		ch->low_flow_callback(ch, ch->low_flow_userdata);	       
+	}			
+	
+	return;	
+}
+
+
 
 static int 
 socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 {
 
+	int orig_qlen;
+	
 	if (msg->msg_len < 0 || msg->msg_len > MAXDATASIZE) {
 		cl_log(LOG_ERR, "socket_send: "
 		       "invalid message");		       
@@ -693,11 +753,13 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 		return IPC_FAIL;
 	}
 	
-	
+	ch->ops->resume_io(ch);
+
 	if ( !ch->should_send_blocking &&
 	    ch->send_queue->current_qlen >= ch->send_queue->max_qlen) {
-		cl_log(LOG_ERR, "send queue maximum length(%d) exceeded",
-		       ch->send_queue->max_qlen );
+		/*cl_log(LOG_WARNING, "send queue maximum length(%d) exceeded",
+		  ch->send_queue->max_qlen );*/
+
 		return IPC_FAIL;
 	}
 	
@@ -711,7 +773,10 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 	SocketIPCStats.noutqueued++;
 	ch->send_queue->queue = g_list_append(ch->send_queue->queue,
 					      msg);
-	ch->send_queue->current_qlen++;
+	orig_qlen = ch->send_queue->current_qlen++;
+	
+	socket_check_flow_control(ch, orig_qlen, orig_qlen +1 );
+	
 	/* resume io */
 	ch->ops->resume_io(ch);
 	return IPC_OK;
@@ -770,7 +835,7 @@ socket_check_poll(struct IPC_CHANNEL * ch
 			ch->ch_status = IPC_DISC_PENDING;
 			return IPC_OK;
 		}
-#if 0
+#if 1
 		cl_log(LOG_INFO, "socket_check_poll(): HUP without input");
 #endif
 		ch->ch_status = IPC_DISCONNECT;
@@ -1157,6 +1222,8 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 			}
 			break;
 		}else{
+			int orig_qlen;
+
 			CHECKFOO(3,ch, msg, SavedSentBody, "sent message")
 
 			if (oldmsg){
@@ -1173,7 +1240,8 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 				msg->msg_done(msg);
 			}
 			SocketIPCStats.nsent++;
-			ch->send_queue->current_qlen--;
+			orig_qlen = ch->send_queue->current_qlen--;
+			socket_check_flow_control(ch, orig_qlen, orig_qlen -1 );
 			*nmsg ++;
 		}
 	}
@@ -1183,6 +1251,8 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 	}
 	return IPC_ISRCONN(ch) ? IPC_OK : IPC_BROKEN;
 }
+
+
 
 static int
 socket_resume_io(struct IPC_CHANNEL *ch)
@@ -1197,6 +1267,8 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	if (!IPC_ISRCONN(ch)) {
 		return IPC_BROKEN;
 	}
+	
+	
 	
 	do {
 		if (nbytes_r > 0){
@@ -1566,6 +1638,15 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   }
 
   temp_ch = g_new(struct IPC_CHANNEL, 1);
+  if (temp_ch == NULL){
+	  cl_log(LOG_ERR, "socket_server_channel_new:"
+		 " allocating memory for channel failed");
+	  return NULL;	  
+  }
+  memset(temp_ch, 0, sizeof(struct IPC_CHANNEL));
+  
+
+
   conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
   conn_info->peer_addr = NULL;
   
@@ -1615,10 +1696,12 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   temp_ch->ops = (struct IPC_OPS *)&socket_ops;
   temp_ch->msgpad = sizeof(struct SOCKET_MSG_HEAD);
   temp_ch->bytes_remaining = 0;
-  temp_ch->should_send_blocking = TRUE;
+  temp_ch->should_send_blocking = FALSE;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
-   
+  temp_ch->high_flow_mark = temp_ch->send_queue->max_qlen;
+  temp_ch->low_flow_mark = -1;
+  
   return temp_ch;
   
 }
@@ -1630,7 +1713,14 @@ socket_server_channel_new(int sockfd){
   int flags;
   
   
-  temp_ch = g_new(struct IPC_CHANNEL, 1);
+  temp_ch = g_new(struct IPC_CHANNEL, 1); 
+  if (temp_ch == NULL){
+	  cl_log(LOG_ERR, "socket_server_channel_new:"
+		 " allocating memory for channel failed");
+	  return NULL;	  
+  }
+  memset(temp_ch, 0, sizeof(struct IPC_CHANNEL));
+  
   conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
 
   flags = fcntl(sockfd, F_GETFL, O_NONBLOCK);
@@ -1658,10 +1748,12 @@ socket_server_channel_new(int sockfd){
   temp_ch->ops = (struct IPC_OPS *)&socket_ops;
   temp_ch->msgpad = sizeof(struct SOCKET_MSG_HEAD);
   temp_ch->bytes_remaining = 0;
-  temp_ch->should_send_blocking = TRUE;
+  temp_ch->should_send_blocking = FALSE;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
-   
+  temp_ch->high_flow_mark = temp_ch->send_queue->max_qlen;
+  temp_ch->low_flow_mark = -1;
+     
   return temp_ch;
   
 }
