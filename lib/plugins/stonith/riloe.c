@@ -3,6 +3,8 @@
  *
  * Copyright (c) 2004 Alain St-Denis <alain.st-denis@ec.gc.ca>
  *
+ * Mangled by Zhaokai <zhaokai@cn.ibm.com>, IBM, 2005
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -28,24 +30,24 @@
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
 
-static void *		riloe_new(void);
-static void		riloe_destroy(Stonith *);
-static int		riloe_set_config_file(Stonith *, const char * cfgname);
-static int		riloe_set_config_info(Stonith *, const char * info);
-static const char *	riloe_getinfo(Stonith * s, int InfoType);
-static int		riloe_status(Stonith * );
-static int		riloe_reset_req(Stonith * s, int request, const char * host);
-static char **		riloe_hostlist(Stonith  *);
+static StonithPlugin *	riloe_new(void);
+static void		riloe_destroy(StonithPlugin *);
+static int		riloe_set_config(StonithPlugin *, StonithNVpair *);
+static const char **	riloe_get_confignames(StonithPlugin * );
+static const char *	riloe_getinfo(StonithPlugin * s, int InfoType);
+static int		riloe_status(StonithPlugin * );
+static int		riloe_reset_req(StonithPlugin * s, int request, const char * host);
+static char **		riloe_hostlist(StonithPlugin  *);
 
 static struct stonith_ops riloeOps ={
-	riloe_new,		/* Create new STONITH object	*/
-	riloe_destroy,		/* Destroy STONITH object	*/
-	riloe_set_config_file,	/* set configuration from file	*/
-	riloe_set_config_info,	/* Get configuration from file	*/
-	riloe_getinfo,		/* Return STONITH info string	*/
-	riloe_status,		/* Return STONITH device status	*/
-	riloe_reset_req,		/* Request a reset */
-	riloe_hostlist,		/* Return list of supported hosts */
+	riloe_new,		/* Create new STONITH object		*/
+	riloe_destroy,		/* Destroy STONITH object		*/
+	riloe_getinfo,		/* Return STONITH info string		*/
+	riloe_get_confignames,	/* Return STONITH info string		*/
+	riloe_set_config,	/* Get configuration from NVpairs	*/
+	riloe_status,		/* Return STONITH device status		*/
+	riloe_reset_req,	/* Request a reset 			*/
+	riloe_hostlist,		/* Return list of supported hosts 	*/
 };
 
 PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
@@ -87,6 +89,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  */
 
 struct pluginDevice {
+	StonithPlugin	sp;
 	const char *	pluginid;
 	char **		hostlist;
 	int		hostcount;
@@ -96,8 +99,12 @@ static const char * pluginid = "pluginDevice-Stonith";
 static const char * NOTriloeID = "Hey, dummy this has been destroyed (RiloeDev)";
 
 static int
-riloe_status(Stonith  *s)
+riloe_status(StonithPlugin  *s)
 {
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
 	ERRIFWRONGDEV(s,S_OOPS);
 	return S_OK;
@@ -109,15 +116,19 @@ riloe_status(Stonith  *s)
  */
 
 static char **
-riloe_hostlist(Stonith  *s)
+riloe_hostlist(StonithPlugin  *s)
 {
 	int		numnames = 0;
 	char **		ret = NULL;
 	struct pluginDevice*	nd;
 	int		j;
 
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
+
 	ERRIFWRONGDEV(s,NULL);
-	nd = (struct pluginDevice*) s->pinfo;
+	nd = (struct pluginDevice*) s;
 	if (nd->hostcount < 0) {
 		LOG(PIL_CRIT
 		,	"unconfigured stonith object in RILOE_list_hosts");
@@ -176,6 +187,10 @@ RILOE_parse_config_info(struct pluginDevice* nd, const char * info)
 	const char *		s = info;
 	int			j;
 
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
+
 	if (nd->hostcount >= 0) {
 		return(S_OOPS);
 	}
@@ -216,14 +231,25 @@ RILOE_parse_config_info(struct pluginDevice* nd, const char * info)
  *	(we don't even error check the "request" type)
  */
 static int
-riloe_reset_req(Stonith * s, int request, const char * host)
+riloe_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	char cmd[4096];
 
-	ERRIFWRONGDEV(s,S_OOPS);
-	LOG(PIL_INFO, "Host %s riloe-reset.", host);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
+	ERRIFWRONGDEV(s,S_OOPS);
+	
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
+	
 	sprintf(cmd, "%s %s reset", RILOE_COMMAND, host);
+	
+	if (Debug) {
+		LOG(PIL_DEBUG, "command %s  will be execute", cmd);
+	}
 
 	if (system(cmd) == 0)
 		return S_OK;
@@ -234,77 +260,72 @@ riloe_reset_req(Stonith * s, int request, const char * host)
 }
 
 /*
- *	Parse the information in the given configuration file,
+ *	Parse the information in the given string,
  *	and stash it away...
  */
 static int
-riloe_set_config_file(Stonith* s, const char * configname)
+riloe_set_config(StonithPlugin* s, StonithNVpair *list)
 {
-	FILE *	cfgfile;
+	const char*	RILOEline;
 
-	char	RILOEline[256];
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
 	struct pluginDevice*	nd;
 
-	ERRIFWRONGDEV(s,S_OOPS);
-	nd = (struct pluginDevice*) s->pinfo;
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
-	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		LOG(PIL_CRIT, "Cannot open %s", configname);
-		return(S_BADCONFIG);
+	ERRIFWRONGDEV(s,S_OOPS);
+	nd = (struct pluginDevice*) s;
+	
+	if ((RILOEline = OurImports->GetValue(list, ST_HOSTLIST)) == NULL) {
+		return S_OOPS;
 	}
-	while (fgets(RILOEline, sizeof(RILOEline), cfgfile) != NULL){
-		if (*RILOEline == '#' || *RILOEline == '\n' || *RILOEline == EOS) {
-			continue;
-		}
-		return(RILOE_parse_config_info(nd, RILOEline));
-	}
-	return(S_BADCONFIG);
+	
+	return (RILOE_parse_config_info(nd , RILOEline));
 }
 
 /*
- *	Parse the config information in the given string, and stash it away...
+ *  Return the  Stonith plugin configuration parameter
  */
-static int
-riloe_set_config_info(Stonith* s, const char * info)
+static const char**
+riloe_get_confignames(StonithPlugin* p)
 {
-	struct pluginDevice* nd;
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
-	ERRIFWRONGDEV(s,S_OOPS);
-	nd = (struct pluginDevice *)s->pinfo;
-
-	return(RILOE_parse_config_info(nd, info));
+	static const char *	RiloeParams[] = {ST_HOSTLIST, NULL };
+	return RiloeParams;
 }
 
+/*
+ * Return STONITH info string
+ */
+
 static const char *
-riloe_getinfo(Stonith * s, int reqtype)
+riloe_getinfo(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* nd;
 	char *		ret;
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
 	ERRIFWRONGDEV(s,NULL);
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	nd = (struct pluginDevice *)s->pinfo;
+	nd = (struct pluginDevice *)s;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
 			ret = _("riloe STONITH device");
 			break;
-
-		case ST_CONF_INFO_SYNTAX:
-			ret = _("hostname ...\n"
-			"host names are white-space delimited.");
-			break;
-
-		case ST_CONF_FILE_SYNTAX:
-			ret = _("hostname ...\n"
-			"host names are white-space delimited.  "
-			"All host names must be on one line.  "
-			"Blank lines and lines beginning with # are ignored");
-			break;
-
 		case ST_DEVICEDESCR:
 			ret = _("Compaq RILOE STONITH device\n"
 			"Very early version!");
@@ -321,12 +342,16 @@ riloe_getinfo(Stonith * s, int reqtype)
  *	RILOE Stonith destructor...
  */
 static void
-riloe_destroy(Stonith *s)
+riloe_destroy(StonithPlugin *s)
 {
 	struct pluginDevice* nd;
 
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
+
 	VOIDERRIFWRONGDEV(s);
-	nd = (struct pluginDevice *)s->pinfo;
+	nd = (struct pluginDevice *)s;
 
 	nd->pluginid = NOTriloeID;
 	if (nd->hostlist) {
@@ -338,9 +363,13 @@ riloe_destroy(Stonith *s)
 }
 
 /* Create a new Riloe Stonith device.  Too bad this function can't be static */
-static void *
+static StonithPlugin *
 riloe_new(void)
 {
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
+
 	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
 
 	if (nd == NULL) {
@@ -351,5 +380,7 @@ riloe_new(void)
 	nd->pluginid = pluginid;
 	nd->hostlist = NULL;
 	nd->hostcount = -1;
-	return((void *)nd);
+	nd->sp.s_ops = &riloeOps;
+
+	return &(nd->sp);
 }

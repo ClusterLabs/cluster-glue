@@ -1,4 +1,4 @@
-/* $Id: nw_rpc100s.c,v 1.17 2004/10/24 13:00:14 lge Exp $ */
+/* $Id: nw_rpc100s.c,v 1.18 2005/01/31 10:06:33 sunjd Exp $ */
 /*
  *	Stonith module for Night/Ware RPC100S 
  *
@@ -8,6 +8,8 @@
  *      Modifications for NW RPC100S
  *	Copyright (c) 2000 Computer Generation Incorporated
  *               Eric Z. Ayers <eric.ayers@compgen.com>
+ *
+ *      Mangled by Zhaokai <zhaokai@cn.ibm.com>, IBM, 2005
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -32,26 +34,27 @@
 #define PIL_PLUGIN_S            "nw_rpc100s"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
+#define MAX_CFGLINE		256
 #include <pils/plugin.h>
 
-static void *		nw_rpc100s_new(void);
-static void		nw_rpc100s_destroy(Stonith *);
-static int		nw_rpc100s_set_config_file(Stonith *, const char * cfgname);
-static int		nw_rpc100s_set_config_info(Stonith *, const char * info);
-static const char *	nw_rpc100s_getinfo(Stonith * s, int InfoType);
-static int		nw_rpc100s_status(Stonith * );
-static int		nw_rpc100s_reset_req(Stonith * s, int request, const char * host);
-static char **		nw_rpc100s_hostlist(Stonith  *);
+static StonithPlugin *	nw_rpc100s_new(void);
+static void		nw_rpc100s_destroy(StonithPlugin *);
+static int		nw_rpc100s_set_config(StonithPlugin *, StonithNVpair *);
+static const char**	nw_rpc100s_get_confignames(StonithPlugin *);
+static const char *	nw_rpc100s_getinfo(StonithPlugin * s, int InfoType);
+static int		nw_rpc100s_status(StonithPlugin * );
+static int		nw_rpc100s_reset_req(StonithPlugin * s, int request, const char * host);
+static char **		nw_rpc100s_hostlist(StonithPlugin  *);
 
 static struct stonith_ops nw_rpc100sOps ={
-	nw_rpc100s_new,		/* Create new STONITH object	*/
-	nw_rpc100s_destroy,		/* Destroy STONITH object	*/
-	nw_rpc100s_set_config_file,	/* set configuration from file	*/
-	nw_rpc100s_set_config_info,	/* Get configuration from file	*/
-	nw_rpc100s_getinfo,		/* Return STONITH info string	*/
-	nw_rpc100s_status,		/* Return STONITH device status	*/
-	nw_rpc100s_reset_req,		/* Request a reset */
-	nw_rpc100s_hostlist,		/* Return list of supported hosts */
+	nw_rpc100s_new,			/* Create new STONITH object		*/
+	nw_rpc100s_destroy,		/* Destroy STONITH object		*/
+	nw_rpc100s_getinfo,		/* Return STONITH info string		*/
+	nw_rpc100s_get_confignames,	/* Return STONITH info string		*/
+	nw_rpc100s_set_config,		/* Get configuration from NVpairs	*/
+	nw_rpc100s_status,		/* Return STONITH device status		*/
+	nw_rpc100s_reset_req,		/* Request a reset 			*/
+	nw_rpc100s_hostlist,		/* Return list of supported hosts 	*/
 };
 
 PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
@@ -144,6 +147,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 
 
 struct pluginDevice {
+	StonithPlugin   sp;
 	const char *	pluginid;
 
 	char *	idinfo;  /* ??? What's this for Alan ??? */
@@ -354,7 +358,7 @@ RPCOff(struct pluginDevice* ctx, int unitnum, const char * host)
  *    S_OK   - if the stonith device is reachable and online.
  */
 static int
-nw_rpc100s_status(Stonith  *s)
+nw_rpc100s_status(StonithPlugin  *s)
 {
 	struct pluginDevice*	ctx;
 	
@@ -362,7 +366,7 @@ nw_rpc100s_status(Stonith  *s)
 	
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
-	ctx = (struct pluginDevice*) s->pinfo;
+	ctx = (struct pluginDevice*) s;
 	if (RPCConnect(ctx) != S_OK) {
 		return(S_OOPS);
 	}
@@ -388,7 +392,7 @@ nw_rpc100s_status(Stonith  *s)
  *         of null-terminated malloc'ed strings.
  */
 static char **
-nw_rpc100s_hostlist(Stonith  *s)
+nw_rpc100s_hostlist(StonithPlugin  *s)
 {
 	char **		ret = NULL;	/* list to return */
 	struct pluginDevice*	ctx;
@@ -397,7 +401,7 @@ nw_rpc100s_hostlist(Stonith  *s)
 	
 	ERRIFNOTCONFIGED(s,NULL);
 
-	ctx = (struct pluginDevice*) s->pinfo;
+	ctx = (struct pluginDevice*) s;
 
 	ret = (char **)MALLOC(2*sizeof(char*));
 	if (ret == NULL) {
@@ -631,7 +635,7 @@ RPCNametoOutlet ( struct pluginDevice * ctx, const char * host )
  *          on the stonith device.
  */
 static int
-nw_rpc100s_reset_req(Stonith * s, int request, const char * host)
+nw_rpc100s_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	int	rc = S_OK;
 	int	lorc = S_OK;
@@ -642,13 +646,14 @@ nw_rpc100s_reset_req(Stonith * s, int request, const char * host)
 	
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
-	ctx = (struct pluginDevice*) s->pinfo;
+	ctx = (struct pluginDevice*) s;
 
 	if ((rc = RPCConnect(ctx)) != S_OK) {
 		return(rc);
 	}
 
 	outletnum = RPCNametoOutlet(ctx, host);
+	LOG(PIL_DEBUG, "zk:outletname=%d", outletnum);
 
 	if (outletnum < 0) {
 		LOG(PIL_WARN, "%s %s %s[%s]",
@@ -683,58 +688,54 @@ nw_rpc100s_reset_req(Stonith * s, int request, const char * host)
 }
 
 /*
- *	Parse the information in the given configuration file,
+ *	Parse the information in the given string 
  *	and stash it away...
  */
 static int
-nw_rpc100s_set_config_file(Stonith* s, const char * configname)
+nw_rpc100s_set_config(StonithPlugin* s, StonithNVpair *list)
 {
-	FILE *	cfgfile;
-
-	char	cfgline[256];
+	char	cfgline[MAX_CFGLINE];
 
 	struct pluginDevice*	ctx;
+	StonithNamesToGet	namestoget [] =
+	{	{ST_TTYDEV,	NULL}
+	,	{ST_HOSTLIST,	NULL}
+	,	{NULL,		NULL}
+	};
+	int rc = 0;
+
 
 	ERRIFWRONGDEV(s,S_OOPS);
 
-	ctx = (struct pluginDevice*) s->pinfo;
-
-	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		LOG(PIL_CRIT, "%s %s", _("Cannot open"), configname);
-		return(S_BADCONFIG);
+	ctx = (struct pluginDevice*) s;
+	
+	if ((rc = OurImports->GetAllValues(namestoget , list)) != S_OK) {
+		return rc;
 	}
 
-	while (fgets(cfgline, sizeof(cfgline), cfgfile) != NULL){
-
-		RPC_parse_config_info(ctx, cfgline);
+	if ((snprintf(cfgline,MAX_CFGLINE , "%s %s" , namestoget[0].s_value , namestoget[1].s_value)) <= 0){
+		LOG(PIL_CRIT, "Can not copy parameter to cfgline");
 	}
-	return(S_BADCONFIG);
+	return (RPC_parse_config_info(ctx, cfgline));
 }
 
 /*
- *	nw_rpc100s_set_config_info - API entry point to process one line of config info 
- *       for this particular device.
- *
- *      Parse the config information in the given string, and stash it away...
- *
+ * Return STONITH config vars
  */
-static int
-nw_rpc100s_set_config_info(Stonith* s, const char * info)
+static const char **
+nw_rpc100s_get_confignames(StonithPlugin* p)
 {
-	struct pluginDevice* ctx;
-
-	ERRIFWRONGDEV(s,S_OOPS);
-
-	ctx = (struct pluginDevice *)s->pinfo;
-
-	return(RPC_parse_config_info(ctx, info));
+	static const char *	RpcParams[] = {ST_TTYDEV , ST_HOSTLIST, NULL };
+	return RpcParams;
 }
+
+
 
 /*
  * nw_rpc100s_getinfo - API entry point to retrieve something from the handle
  */
 static const char *
-nw_rpc100s_getinfo(Stonith * s, int reqtype)
+nw_rpc100s_getinfo(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* ctx;
 	const char *		ret;
@@ -744,32 +745,15 @@ nw_rpc100s_getinfo(Stonith * s, int reqtype)
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	ctx = (struct pluginDevice *)s->pinfo;
+	ctx = (struct pluginDevice *)s;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
 			ret = ctx->idinfo;
 			break;
-
-		case ST_CONF_INFO_SYNTAX:
-			ret = _("<serial_device> <node>\n"
-			"All tokens are white-space delimited.\n");
-			break;
-
-		case ST_CONF_FILE_SYNTAX:
-			ret = _("<serial_device> <node>\n"
-			"All tokens are white-space delimited.\n"
-			"Blank lines and lines beginning with # are ignored");
-			break;
-
 		case ST_DEVICEDESCR:
 			ret = _("Micro Energetics Night/Ware RPC100S");
 			break;
-
-		case ST_DEVICEURL:
-			ret = "http://microenergeticscorp.com/";
-			break;
-
 		default:
 			ret = NULL;
 			break;
@@ -781,13 +765,13 @@ nw_rpc100s_getinfo(Stonith * s, int reqtype)
  * nw_rpc100s_destroy - API entry point to destroy a NW_RPC100S Stonith object.
  */
 static void
-nw_rpc100s_destroy(Stonith *s)
+nw_rpc100s_destroy(StonithPlugin *s)
 {
 	struct pluginDevice* ctx;
 
 	VOIDERRIFWRONGDEV(s);
 
-	ctx = (struct pluginDevice *)s->pinfo;
+	ctx = (struct pluginDevice *)s;
 
 	ctx->pluginid = NOTrpcid;
 
@@ -812,7 +796,7 @@ nw_rpc100s_destroy(Stonith *s)
  * nw_rpc100s_new - API entry point called to create a new NW_RPC100S Stonith device
  *          object. 
  */
-static void *
+static StonithPlugin *
 nw_rpc100s_new(void)
 {
 	struct pluginDevice*	ctx = MALLOCT(struct pluginDevice);
@@ -831,6 +815,7 @@ nw_rpc100s_new(void)
 	ctx->unitid = NULL;
 	REPLSTR(ctx->idinfo, DEVICE);
 	REPLSTR(ctx->unitid, "unknown");
+	ctx->sp.s_ops = &nw_rpc100sOps;
 
-	return((void *)ctx);
+	return &(ctx->sp);
 }

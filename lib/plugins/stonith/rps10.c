@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.16 2004/10/24 13:00:14 lge Exp $ */
+/* $Id: rps10.c,v 1.17 2005/01/31 10:06:33 sunjd Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -8,6 +8,8 @@
  *      Modifications for WTI RPS10
  *	Copyright (c) 2000 Computer Generation Incorporated
  *               Eric Z. Ayers <eric.ayers@compgen.com>
+ *
+ * 	Mangled by Zhaokai <zhaokai@cn.ibm.com>, IBM, 2005
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -33,26 +35,28 @@
 #define PIL_PLUGIN_S            "rps10"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
+#define	ST_RPS10		"<serial_device> <node> <outlet> [ <node> <outlet> [...] ]"
+#define MAX_PRSID		256
 #include <pils/plugin.h>
 
-static void *		rps10_new(void);
-static void		rps10_destroy(Stonith *);
-static int		rps10_set_config_file(Stonith *, const char * cfgname);
-static int		rps10_set_config_info(Stonith *, const char * info);
-static const char *	rps10_getinfo(Stonith * s, int InfoType);
-static int		rps10_status(Stonith * );
-static int		rps10_reset_req(Stonith * s, int request, const char * host);
-static char **		rps10_hostlist(Stonith  *);
+static StonithPlugin *	rps10_new(void);
+static void		rps10_destroy(StonithPlugin *);
+static int		rps10_set_config(StonithPlugin *, StonithNVpair *);
+static const char**	rps10_get_confignames(StonithPlugin *);
+static const char *	rps10_getinfo(StonithPlugin * s, int InfoType);
+static int		rps10_status(StonithPlugin * );
+static int		rps10_reset_req(StonithPlugin * s, int request, const char * host);
+static char **		rps10_hostlist(StonithPlugin  *);
 
 static struct stonith_ops rps10Ops ={
-	rps10_new,		/* Create new STONITH object	*/
-	rps10_destroy,		/* Destroy STONITH object	*/
-	rps10_set_config_file,	/* set configuration from file	*/
-	rps10_set_config_info,	/* Get configuration from file	*/
-	rps10_getinfo,		/* Return STONITH info string	*/
-	rps10_status,		/* Return STONITH device status	*/
-	rps10_reset_req,		/* Request a reset */
-	rps10_hostlist,		/* Return list of supported hosts */
+	rps10_new,		/* Create new STONITH object		*/
+	rps10_destroy,		/* Destroy STONITH object		*/
+	rps10_getinfo,		/* Return STONITH info string		*/
+	rps10_get_confignames,	/* Return STONITH info string		*/
+	rps10_set_config,	/* Get configuration from NVpairs	*/
+	rps10_status,		/* Return STONITH device status		*/
+	rps10_reset_req,	/* Request a reset 			*/
+	rps10_hostlist,		/* Return list of supported hosts 	*/
 };
 
 PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
@@ -154,6 +158,7 @@ struct cntrlr_str {
 };
 
 struct pluginDevice {
+  StonithPlugin	sp;
   const char *	pluginid;
 
   char *	idinfo;  /* ??? What's this for Alan ??? */
@@ -251,6 +256,10 @@ RPSSendCommand (struct pluginDevice *ctx, char outlet, char command, int timeout
 	int		return_val;  /* system call result */
 	fd_set          rfds, wfds, xfds;
 				     /*  list of FDs for select() */
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
+
 	struct timeval 	tv;	     /*  */
 
 	FD_ZERO(&rfds);
@@ -302,6 +311,10 @@ static int
 RPSReset(struct pluginDevice* ctx, char unit_id, const char * rebootid)
 {
 
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
+
 	if (gbl_debug) printf ("Calling RPSReset (%s)\n", pluginid);
 	
 	if (ctx->fd < 0) {
@@ -345,6 +358,9 @@ RPSReset(struct pluginDevice* ctx, char unit_id, const char * rebootid)
 static int
 RPSOn(struct pluginDevice* ctx, char unit_id, const char * host)
 {
+	if (Debug) {
+		LOG(PIL_DEBUG , "%s:called.", __FUNCTION__);
+	}
 
 	if (ctx->fd < 0) {
 		LOG(PIL_CRIT, "%s: device %s is not open!", pluginid, 
@@ -380,6 +396,10 @@ static int
 RPSOff(struct pluginDevice* ctx, char unit_id, const char * host)
 {
 
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
+	
 	if (ctx->fd < 0) {
 		LOG(PIL_CRIT, "%s: device %s is not open!", pluginid, 
 		       ctx->device);
@@ -416,15 +436,19 @@ RPSOff(struct pluginDevice* ctx, char unit_id, const char * host)
  *    S_OK   - if the stonith device is reachable and online.
  */
 static int
-rps10_status(Stonith  *s)
+rps10_status(StonithPlugin  *s)
 {
 	struct pluginDevice*	ctx;
+	
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 	
 	if (gbl_debug) printf ("Calling rps10_status (%s)\n", pluginid);
 	
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
-	ctx = (struct pluginDevice*) s->pinfo;
+	ctx = (struct pluginDevice*) s;
 	if (RPSConnect(ctx) != S_OK) {
 		return(S_OOPS);
 	}
@@ -450,18 +474,22 @@ rps10_status(Stonith  *s)
  *         of null-terminated malloc'ed strings.
  */
 static char **
-rps10_hostlist(Stonith  *s)
+rps10_hostlist(StonithPlugin  *s)
 {
 	char **		ret = NULL;	/* list to return */
 	int 		i;
 	int 		j;
 	struct pluginDevice*	ctx;
 
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
+
 	if (gbl_debug) printf ("Calling rps10_hostlist (%s)\n", pluginid);
 	
 	ERRIFNOTCONFIGED(s,NULL);
 
-	ctx = (struct pluginDevice*) s->pinfo;
+	ctx = (struct pluginDevice*) s;
 
 	if (ctx->unit_count >= 1) {
 		ret = (char **)MALLOC((ctx->unit_count+1)*sizeof(char*));
@@ -527,6 +555,9 @@ RPS_parse_config_info(struct pluginDevice* ctx, const char * info)
 	char *token;
 	char *outlet, *node;
 
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
 	if (ctx->config) {
 		/* The module is already configured. */
@@ -619,22 +650,30 @@ token_error:
  *
  */
 static void dtrtoggle(int fd) {
-    struct termios tty, old;
-    int sec = 2;
+	struct termios tty, old;
+	int sec = 2;
     
-    if (gbl_debug) printf ("Calling dtrtoggle (%s)\n", pluginid);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
+	
+	if (gbl_debug) {
+		printf ("Calling dtrtoggle (%s)\n", pluginid);
+    	}
+
+	tcgetattr(fd, &tty);
+	tcgetattr(fd, &old);
+	cfsetospeed(&tty, B0);
+	cfsetispeed(&tty, B0);
+	tcsetattr(fd, TCSANOW, &tty);
+	if (sec>0) {
+		sleep(sec);
+		tcsetattr(fd, TCSANOW, &old);
+	}
     
-    tcgetattr(fd, &tty);
-    tcgetattr(fd, &old);
-    cfsetospeed(&tty, B0);
-    cfsetispeed(&tty, B0);
-    tcsetattr(fd, TCSANOW, &tty);
-    if (sec>0) {
-      sleep(sec);
-      tcsetattr(fd, TCSANOW, &old);
-    }
-    
-    if (gbl_debug) printf ("dtrtoggle Complete (%s)\n", pluginid);
+	if (gbl_debug) {
+		printf ("dtrtoggle Complete (%s)\n", pluginid);
+	}
 }
 
 /*
@@ -655,6 +694,9 @@ static void dtrtoggle(int fd) {
 static int
 RPSConnect(struct pluginDevice * ctx)
 {
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
   	  
 	/* Open the serial port if it isn't already open */
 	if (ctx->fd < 0) {
@@ -723,16 +765,20 @@ static int
 RPSDisconnect(struct pluginDevice * ctx)
 {
 
-  if (ctx->fd >= 0) {
-    /* Flush the serial port, we don't care what happens to the characters
-       and failing to do this can cause close to hang.
-    */
-    tcflush(ctx->fd, TCIOFLUSH);
-    close (ctx->fd);
-  }
-  ctx->fd = -1;
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
-  return S_OK;
+	if (ctx->fd >= 0) {
+	/* Flush the serial port, we don't care what happens to the characters
+	and failing to do this can cause close to hang.
+	*/
+	tcflush(ctx->fd, TCIOFLUSH);
+	close (ctx->fd);
+	}
+	ctx->fd = -1;
+
+	return S_OK;
 } 
 
 /*
@@ -748,6 +794,10 @@ RPSNametoOutlet ( struct pluginDevice * ctx, const char * host )
 {
 	int i=0;
 	char *shost;
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
 	if ( (shost = STRDUP(host)) == NULL) {
 		LOG(PIL_CRIT, "strdup failed in RPSNametoOutlet");
@@ -781,18 +831,24 @@ RPSNametoOutlet ( struct pluginDevice * ctx, const char * host )
  *          on the stonith device.
  */
 static int
-rps10_reset_req(Stonith * s, int request, const char * host)
+rps10_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	int	rc = S_OK;
 	int	lorc = S_OK;
 	signed char outlet_id = -1;
 	struct pluginDevice*	ctx;
 	
-	if (gbl_debug) printf ("Calling rps10_reset (%s)\n", pluginid);
-	
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
+
+	if (gbl_debug) {
+		printf ("Calling rps10_reset (%s)\n", pluginid);
+	}
+
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
-	ctx = (struct pluginDevice*) s->pinfo;
+	ctx = (struct pluginDevice*) s;
 
 	if ((rc = RPSConnect(ctx)) != S_OK) {
 		return(rc);
@@ -834,103 +890,87 @@ rps10_reset_req(Stonith * s, int request, const char * host)
 }
 
 /*
- *	Parse the information in the given configuration file,
+ *	Parse the information in the given string,
  *	and stash it away...
  */
 static int
-rps10_set_config_file(Stonith* s, const char * configname)
+rps10_set_config(StonithPlugin* s, StonithNVpair* list)
 {
-	FILE *	cfgfile;
+	char	RPSid[MAX_PRSID];
 
-	char	RPSid[256];
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
 	struct pluginDevice*	ctx;
+	StonithNamesToGet	namestoget [] =
+	{	{ST_RPS10,	NULL}
+	,	{NULL,		NULL}
+	};
+	int rc=0;
 
 	ERRIFWRONGDEV(s,S_OOPS);
 
-	ctx = (struct pluginDevice*) s->pinfo;
 
-	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		LOG(PIL_CRIT, "%s %s", _("Cannot open"), configname);
-		return(S_BADCONFIG);
+	ctx = (struct pluginDevice*) s;
+
+	if((rc = OurImports->GetAllValues(namestoget , list)) != S_OK){
+		LOG(PIL_DEBUG , "get all calues failed");	
+		return rc;
 	}
-
-	while (fgets(RPSid, sizeof(RPSid), cfgfile) != NULL){
-
-		switch (RPSid[0]){
-			case '\0': case '\n': case '\r': case '#':
-			continue;
-		}
-
-		/* We can really only handle one line. Wimpy. */
-		return RPS_parse_config_info(ctx, RPSid);
+	
+	if ((snprintf(RPSid, MAX_PRSID, "%s", 
+		namestoget[0].s_value)) <= 0) {
+		LOG(PIL_CRIT, "Can not copy parameter to PRSid");
 	}
-	return(S_BADCONFIG);
+	
+	return (RPS_parse_config_info(ctx,RPSid));	
+
 }
 
 /*
- *	rps10_set_config_info - API entry point to process one line of config info 
- *       for this particular device.
- *
- *      Parse the config information in the given string, and stash it away...
+ *  Return the Stonith plugin configuration parameter 
  *
  */
-static int
-rps10_set_config_info(Stonith* s, const char * info)
+static const char**
+rps10_get_confignames(StonithPlugin* p)
 {
-	struct pluginDevice* ctx;
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
-	ERRIFWRONGDEV(s,S_OOPS);
-
-	ctx = (struct pluginDevice *)s->pinfo;
-
-	return(RPS_parse_config_info(ctx, info));
+	static const char *	Rps10Params[] = {ST_RPS10 ,NULL };
+	return Rps10Params;
 }
 
 /*
  * rps10_getinfo - API entry point to retrieve something from the handle
  */
 static const char *
-rps10_getinfo(Stonith * s, int reqtype)
+rps10_getinfo(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* ctx;
 	const char *	ret;
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
 	ERRIFWRONGDEV(s,NULL);
 
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	ctx = (struct pluginDevice *)s->pinfo;
+	ctx = (struct pluginDevice *)s;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
 			ret = ctx->idinfo;
 			break;
-
-		case ST_CONF_INFO_SYNTAX:
-			ret = _("<serial_device> <node> <outlet> "
-			"[ <node> <outlet> [...] ]\n"
-			"All tokens are white-space delimited.\n");
-			break;
-
-		case ST_CONF_FILE_SYNTAX:
-			ret = _("<serial_device> <node> <outlet> "
-			"[ <node> <outlet> [...] ]\n"
-			"All tokens are white-space delimited.\n"
-			"Blank lines and lines beginning with # are ignored");
-			break;
-
 		case ST_DEVICEDESCR:
 			ret = _("Western Telematic Inc. (WTI) "
 			"Remote Power Switch - RPS-10M.\n");
 			break;
-
-
-		case ST_DEVICEURL:
-			ret = "http://www.wti.com/";
-			break;
-
 		default:
 			ret = NULL;
 			break;
@@ -942,13 +982,17 @@ rps10_getinfo(Stonith * s, int reqtype)
  * rps10_destroy - API entry point to destroy a WTI_RPS10 Stonith object.
  */
 static void
-rps10_destroy(Stonith *s)
+rps10_destroy(StonithPlugin *s)
 {
 	struct pluginDevice* ctx;
 
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
+
 	VOIDERRIFWRONGDEV(s);
 
-	ctx = (struct pluginDevice *)s->pinfo;
+	ctx = (struct pluginDevice *)s;
 
 	ctx->pluginid = NOTwtiid;
 
@@ -973,10 +1017,14 @@ rps10_destroy(Stonith *s)
  * rps10_new - API entry point called to create a new WTI_RPS10 Stonith device
  *          object. 
  */
-static void *
+static StonithPlugin * 
 rps10_new(void)
 {
 	struct pluginDevice*	ctx = MALLOCT(struct pluginDevice);
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
 	if (ctx == NULL) {
 		LOG(PIL_CRIT, "out of memory");
@@ -992,6 +1040,7 @@ rps10_new(void)
 	ctx->unitid = NULL;
 	REPLSTR(ctx->idinfo, DEVICE);
 	REPLSTR(ctx->unitid, "unknown");
+	ctx->sp.s_ops = &rps10Ops;
 
-	return((void *)ctx);
+	return &(ctx->sp);
 }

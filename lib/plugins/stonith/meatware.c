@@ -1,4 +1,4 @@
-/* $Id: meatware.c,v 1.15 2004/10/24 13:00:14 lge Exp $ */
+/* $Id: meatware.c,v 1.16 2005/01/31 10:06:33 sunjd Exp $ */
 /*
  * Stonith module for Human Operator Stonith device
  *
@@ -8,6 +8,8 @@
  *   by Alan Robertson <alanr@unix.sh>, using code by David C. Teigland
  *   <teigland@sistina.com> originally appeared in the GFS stomith
  *   meatware agent.
+ *
+ * Mangled by Zhaokai <zhaokai@cn.ibm.com>, IBM, 2005
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -34,24 +36,24 @@
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
 
-static void *		meatware_new(void);
-static void		meatware_destroy(Stonith *);
-static int		meatware_set_config_file(Stonith *, const char * cfgname);
-static int		meatware_set_config_info(Stonith *, const char * info);
-static const char *	meatware_getinfo(Stonith * s, int InfoType);
-static int		meatware_status(Stonith * );
-static int		meatware_reset_req(Stonith * s, int request, const char * host);
-static char **		meatware_hostlist(Stonith  *);
+static StonithPlugin *	meatware_new(void);
+static void		meatware_destroy(StonithPlugin *);
+static int		meatware_set_config(StonithPlugin *, StonithNVpair *);
+static const char**	meatware_get_confignames(StonithPlugin *);
+static const char *	meatware_getinfo(StonithPlugin * s, int InfoType);
+static int		meatware_status(StonithPlugin * );
+static int		meatware_reset_req(StonithPlugin * s, int request, const char * host);
+static char **		meatware_hostlist(StonithPlugin  *);
 
 static struct stonith_ops meatwareOps ={
-	meatware_new,		/* Create new STONITH object	*/
-	meatware_destroy,		/* Destroy STONITH object	*/
-	meatware_set_config_file,	/* set configuration from file	*/
-	meatware_set_config_info,	/* Get configuration from file	*/
-	meatware_getinfo,		/* Return STONITH info string	*/
-	meatware_status,		/* Return STONITH device status	*/
-	meatware_reset_req,		/* Request a reset */
-	meatware_hostlist,		/* Return list of supported hosts */
+	meatware_new,			/* Create new STONITH object		*/
+	meatware_destroy,		/* Destroy STONITH object		*/
+	meatware_getinfo,		/* Return STONITH info string		*/
+	meatware_get_confignames,	/* Return STONITH info string		*/
+	meatware_set_config,		/* Get configuration from NVpairs	*/
+	meatware_status,		/* Return STONITH device status		*/
+	meatware_reset_req,		/* Request a reset 			*/
+	meatware_hostlist,		/* Return list of supported hosts 	*/
 };
 static int WordCount(const char * s);
 
@@ -92,6 +94,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  */
 
 struct pluginDevice {
+	StonithPlugin   sp;
 	const char *	pluginid;
 	char **		hostlist;
 	int		hostcount;
@@ -101,7 +104,7 @@ static const char * pluginid = "MeatwareDevice-Stonith";
 static const char * NOTpluginID = "Hey, dummy this has been destroyed (MeatwareDev)";
 
 static int
-meatware_status(Stonith  *s)
+meatware_status(StonithPlugin  *s)
 {
 	ERRIFWRONGDEV(s,S_OOPS);
 	return S_OK;
@@ -113,7 +116,7 @@ meatware_status(Stonith  *s)
  */
 
 static char **
-meatware_hostlist(Stonith  *s)
+meatware_hostlist(StonithPlugin  *s)
 {
 	int		numnames = 0;
 	char **		ret = NULL;
@@ -121,7 +124,7 @@ meatware_hostlist(Stonith  *s)
 	int		j;
 
 	ERRIFWRONGDEV(s,NULL);
-	nd = (struct pluginDevice*) s->pinfo;
+	nd = (struct pluginDevice*) s;
 	if (nd->hostcount < 0) {
 		LOG(PIL_CRIT
 		,	"unconfigured stonith object in Meatware_list_hosts");
@@ -178,7 +181,7 @@ Meat_parse_config_info(struct pluginDevice* nd, const char * info)
 	int			numnames;
 	const char *		s = info;
 	int			j;
-
+	LOG(PIL_INFO , "parse config info info=%s",info);
 	if (nd->hostcount >= 0) {
 		return(S_OOPS);
 	}
@@ -219,7 +222,7 @@ Meat_parse_config_info(struct pluginDevice* nd, const char * info)
  *	Indicate that host must be power cycled manually.
  */
 static int
-meatware_reset_req(Stonith * s, int request, const char * host)
+meatware_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	int fd, rc;
 	const char *	meatpipe_pr = "/tmp/.meatware"; /* if you intend to
@@ -229,17 +232,19 @@ meatware_reset_req(Stonith * s, int request, const char * host)
 	char		line[256], meatpipe[256];
 	char		resp_addr[50], resp_mw[50], resp_result[50];
 	char *		shost;
+
 	
 	ERRIFWRONGDEV(s,S_OOPS);
+	
 	
 	if ((shost = STRDUP(host)) == NULL) {
 		LOG(PIL_CRIT, "strdup failed in %s", __FUNCTION__);
 		return(S_OOPS);
 	}
+	
 	g_strdown(shost);
 
 	snprintf(meatpipe, 256, "%s.%s", meatpipe_pr, shost);
-
 	umask(0);
 	unlink(meatpipe);
 
@@ -296,50 +301,41 @@ out:	free(shost);
 }
 
 /*
- *	Parse the information in the given configuration file,
+ *	Parse the information in the given string 
  *	and stash it away...
  */
 static int
-meatware_set_config_file(Stonith* s, const char * configname)
+meatware_set_config(StonithPlugin* s, StonithNVpair *list)
 {
-	FILE *	cfgfile;
 
-	char	Meatline[256];
+	const char*	hlist;
 
 	struct pluginDevice*	nd;
 
 	ERRIFWRONGDEV(s,S_OOPS);
-	nd = (struct pluginDevice*) s->pinfo;
-
-	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		LOG(PIL_CRIT, "cannot open %s", configname);
-		return(S_BADCONFIG);
+	nd = (struct pluginDevice*) s;
+	
+	if ((hlist = OurImports->GetValue(list, ST_HOSTLIST)) == NULL) {
+		return S_OOPS;
 	}
-	while (fgets(Meatline, sizeof(Meatline), cfgfile) != NULL){
-		if (*Meatline == '#' || *Meatline == '\n' || *Meatline == EOS) {
-			continue;
-		}
-		return(Meat_parse_config_info(nd, Meatline));
-	}
-	return(S_BADCONFIG);
+	return (Meat_parse_config_info(nd, hlist));
 }
 
 /*
- *	Parse the config information in the given string, and stash it away...
+ * Return STONITH config vars
  */
-static int
-meatware_set_config_info(Stonith* s, const char * info)
+static const char**
+meatware_get_confignames(StonithPlugin* p)
 {
-	struct pluginDevice* nd;
-
-	ERRIFWRONGDEV(s,S_OOPS);
-	nd = (struct pluginDevice *)s->pinfo;
-
-	return(Meat_parse_config_info(nd, info));
+	static const char *	MeatwareParams[] = {ST_HOSTLIST, NULL };
+	return MeatwareParams;
 }
 
+/*
+ * Return STONITH info string
+ */
 static const char *
-meatware_getinfo(Stonith * s, int reqtype)
+meatware_getinfo(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* nd;
 	char *		ret;
@@ -348,25 +344,12 @@ meatware_getinfo(Stonith * s, int reqtype)
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	nd = (struct pluginDevice *)s->pinfo;
+	nd = (struct pluginDevice *)s;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
 			ret = _("Meatware STONITH device");
 			break;
-
-		case ST_CONF_INFO_SYNTAX:
-			ret = _("hostname ...\n"
-			"host names are white-space delimited.");
-			break;
-
-		case ST_CONF_FILE_SYNTAX:
-			ret = _("hostname...\n"
-			"host names are white-space delimited.  "
-			"All host names must be on one line.  "
-			"Blank lines and lines beginning with # are ignored");
-			break;
-
 		case ST_DEVICEDESCR:
 			ret = _("Human (meatware) intervention STONITH device.\n"
 			"This STONITH agent prompts a human to reset a machine.\n"
@@ -384,12 +367,12 @@ meatware_getinfo(Stonith * s, int reqtype)
  *	Meat Stonith destructor...
  */
 static void
-meatware_destroy(Stonith *s)
+meatware_destroy(StonithPlugin *s)
 {
 	struct pluginDevice* nd;
 
 	VOIDERRIFWRONGDEV(s);
-	nd = (struct pluginDevice *)s->pinfo;
+	nd = (struct pluginDevice *)s;
 
 	nd->pluginid = NOTpluginID;
 	if (nd->hostlist) {
@@ -402,7 +385,7 @@ meatware_destroy(Stonith *s)
 
 /* Create a new Meatware Stonith device. */
 
-static void *
+static StonithPlugin *
 meatware_new(void)
 {
 	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
@@ -415,5 +398,7 @@ meatware_new(void)
 	nd->pluginid = pluginid;
 	nd->hostlist = NULL;
 	nd->hostcount = -1;
-	return((void *)nd);
+	nd->sp.s_ops = &meatwareOps;
+
+	return &(nd->sp);
 }
