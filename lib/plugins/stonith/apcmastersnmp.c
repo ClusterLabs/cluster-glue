@@ -19,6 +19,9 @@
  */
 
 #include <portability.h>
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <syslog.h>
@@ -28,12 +31,24 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <ucd-snmp/ucd-snmp-config.h>
-#include <ucd-snmp/asn1.h>
-#include <ucd-snmp/snmp_api.h>
-#include <ucd-snmp/snmp.h>
-#include <ucd-snmp/snmp_client.h>
-#include <ucd-snmp/mib.h>
+#ifdef HAVE_NET_SNMP_NET_SNMP_CONFIG_H
+#       include <net-snmp/net-snmp-config.h>
+#       include <net-snmp/net-snmp-includes.h>
+#       include <net-snmp/agent/net-snmp-agent-includes.h>
+#       define  INIT_AGENT()    init_master_agent()
+#else
+#       include <ucd-snmp/ucd-snmp-config.h>
+#       include <ucd-snmp/ucd-snmp-includes.h>
+#       include <ucd-snmp/ucd-snmp-agent-includes.h>
+#       ifndef NETSNMP_DS_APPLICATION_ID
+#               define NETSNMP_DS_APPLICATION_ID        DS_APPLICATION_ID
+#       endif
+#       ifndef NETSNMP_DS_AGENT_ROLE
+#               define NETSNMP_DS_AGENT_ROLE    DS_AGENT_ROLE
+#       endif
+#       define netsnmp_ds_set_boolean   ds_set_boolean
+#       define  INIT_AGENT()    init_master_agent(161, NULL, NULL)
+#endif
 
 #include <stonith/stonith.h>
 #define PIL_PLUGINTYPE          STONITH_TYPE
@@ -98,11 +113,8 @@ static PILInterface*		OurInterface;
 static StonithImports*		OurImports;
 static void*			interfprivate;
 
-#define LOG		PluginImports->log
-#define MALLOC		PluginImports->alloc
-#define FREE		PluginImports->mfree
-#define EXPECT_TOK	OurImports->ExpectToken
-#define STARTPROC	OurImports->StartProcess
+#define APC_MALLOC		PluginImports->alloc
+#define APC_FREE		PluginImports->mfree
 
 PIL_rc
 PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
@@ -182,16 +194,16 @@ static const char *NOTapcID = "destroyed (APCMasterswitch)";
 
 #define _(text) dgettext(ST_TEXTDOMAIN, text)
 
-#ifndef MALLOC
-#  define MALLOC malloc
+#ifndef APC_MALLOC
+#  define APC_MALLOC malloc
 #endif
 
-#ifndef FREE
-#  define FREE free
+#ifndef APC_FREE
+#  define APC_FREE free
 #endif
 
-#ifndef MALLOCT
-#  define MALLOCT(t) ((t *)(MALLOC(sizeof(t))))
+#ifndef APC_MALLOCT
+#  define APC_MALLOCT(t) ((t *)(APC_MALLOC(sizeof(t))))
 #endif
 
 /*
@@ -505,7 +517,7 @@ apcmastersnmp_hostlist(Stonith * s)
     ad = (struct APCDevice *) s->pinfo;
 
     // allocate memory for array of up to NUM_OUTLETS strings
-    if ((hl = (char **) MALLOC(ad->num_outlets * sizeof(char *))) == NULL) {
+    if ((hl = (char **) APC_MALLOC(ad->num_outlets * sizeof(char *))) == NULL) {
 	syslog(LOG_ERR, "%s: out of memory.", __FUNCTION__);
 	return (NULL);
     }
@@ -541,7 +553,7 @@ apcmastersnmp_hostlist(Stonith * s)
 #endif
 		
 		if ((hl[num_outlets] = 
-				MALLOC(strlen(outlet_name) + 1)) == NULL) {
+				APC_MALLOC(strlen(outlet_name) + 1)) == NULL) {
 		    syslog(LOG_ERR, "%s: out of memory.", __FUNCTION__);
 		    apcmastersnmp_free_hostlist(hl);
 		    hl = NULL;
@@ -580,13 +592,13 @@ apcmastersnmp_free_hostlist(char **hlist)
 
     // walk through the list and release the strings
     while (*hl) {
-	FREE(*hl);
+	APC_FREE(*hl);
 	*hl = NULL;
 	++hl;
     }
 
     // release the list itself
-    FREE(hlist);
+    APC_FREE(hlist);
     hlist = NULL;
 }
 
@@ -933,7 +945,7 @@ apcmastersnmp_destroy(Stonith * s)
     ad->community = NULL;
     ad->num_outlets = 0;
 
-    FREE(ad);
+    APC_FREE(ad);
     /* Our caller will release the STONITH object itself */
 
 }
@@ -946,7 +958,7 @@ apcmastersnmp_destroy(Stonith * s)
 void *
 apcmastersnmp_new(void)
 {
-    struct APCDevice *ad = MALLOCT(struct APCDevice);
+    struct APCDevice *ad = APC_MALLOCT(struct APCDevice);
 
 #ifdef APC_DEBUG
     syslog(LOG_DEBUG, "%s: called.", __FUNCTION__);

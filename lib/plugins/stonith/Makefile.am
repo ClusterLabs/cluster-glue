@@ -46,7 +46,7 @@ endif
 #       for the apcmastersnmp plugin to work
 #
 
-if USE_UCD_SNMP
+if USE_APC_SNMP
 apcmastersnmp_LIB = apcmastersnmp.la
 else
 apcmastersnmp_LIB =
