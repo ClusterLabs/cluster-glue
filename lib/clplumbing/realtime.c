@@ -29,8 +29,7 @@ static int
 cl_stack_hogger(char * inbuf, int kbytes)
 {
 #ifdef _POSIX_MEMLOCK
-	/* Needs to be volatile so it really can't be optimised away */
-	char	buf[1024];
+	unsigned char	buf[1024];
 	
 	if (inbuf == NULL) {
 		memset(buf, HOGRET, sizeof(buf));
@@ -107,6 +106,7 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 	 *	ourselves into memory...
 	 */
 		void*	mval = malloc(heapgrowK*1024);
+		int	ret;
 
 		if (mval != NULL) {
 			memset(mval, 0, heapgrowK*1024);
@@ -115,8 +115,9 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 			cl_log(LOG_INFO, "Could not preallocate (%d) bytes" 
 			,	heapgrowK);
 		}
-		if (cl_stack_hogger(NULL, stackgrowK) != HOGRET) {
-			cl_log(LOG_INFO, "Stack hogger failed");
+		if ((ret=cl_stack_hogger(NULL, stackgrowK)) != HOGRET) {
+			cl_log(LOG_INFO, "Stack hogger failed 0x%x"
+			,	ret);
 		}
 	}
 
