@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.55 2004/12/08 08:46:37 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.56 2005/01/03 19:35:00 msoffen Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1507,11 +1507,13 @@ on_op_done(lrmd_op_t* op)
 	}
 
 	if ( need_notify ) {
+		lrmd_client_t* client;
+
 		/* send the result to client */
 		lrmd_log(LOG_DEBUG, "on_op_done: a normal op done.");
 		/* we have to check whether the client still exists */
 		/* for the client may signoff during the op running. */
-		lrmd_client_t* client = lookup_client(op->client_id);
+		client = lookup_client(op->client_id);
 		if (NULL != client) {
 			/* the client still exists */
 			if (NULL == client->ch_cbk) {
@@ -2045,6 +2047,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.56  2005/01/03 19:35:00  msoffen
+ * Moved var declaration from assignment
+ *
  * Revision 1.55  2004/12/08 08:46:37  zhenh
  * let lrmd pass timeout to RA.
  *
