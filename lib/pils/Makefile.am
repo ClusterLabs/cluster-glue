@@ -25,6 +25,7 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 
 
 CFLAGS			= @CFLAGS@
+gliblib			= @GLIBLIB@
 
 ## include files
 #pkginclude_HEADERS	= $(top_srcdir)/include/pils/plugin.h \
@@ -37,7 +38,7 @@ sbin_PROGRAMS		= main
 main_SOURCES		= main.c
 
 main_LDADD		= libpils.la $(top_builddir)/libltdl/libltdlc.la \
-			$(top_builddir)/replace/libreplace.la 
+			$(top_builddir)/replace/libreplace.la $(gliblib)
 main_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self
 
 
