@@ -835,7 +835,7 @@ nw_rpc100s_set_config_file(Stonith* s, const char * configname)
 {
 	FILE *	cfgfile;
 
-	char	RPCid[256];
+	char	cfgline[256];
 
 	struct NW_RPC100S*	ctx;
 
@@ -850,9 +850,9 @@ nw_rpc100s_set_config_file(Stonith* s, const char * configname)
 		return(S_BADCONFIG);
 	}
 
-	while (fgets(RPCid, sizeof(RPCid), cfgfile) != NULL){
+	while (fgets(cfgline, sizeof(cfgline), cfgfile) != NULL){
 
-		RPC_parse_config_info(ctx, RPCid);
+		RPC_parse_config_info(ctx, cfgline);
 	}
 	return(S_BADCONFIG);
 }
