@@ -447,8 +447,6 @@ socket_resume_io(struct OCF_IPC_CHANNEL *ch)
 
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
   
-  /* QUESTION:  Is there a way to find the size of next msg? */
-  /* Done. Use ioctl and FIONREAD flag. */
   while (ch->recv_queue->current_qlen < ch->recv_queue->max_qlen) {
     /* check how much data queued. */
     if(ioctl(conn_info->s, FIONREAD,&len) < 0){
