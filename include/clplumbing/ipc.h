@@ -45,10 +45,11 @@
 #define MAX_MESSAGE_SIZE 4096
 
 /* channel and connection status */
-#define IPC_CONNECT		0
-#define IPC_WAIT		1
-#define IPC_DISCONNECT		2
-#define IPC_DISC_PENDING	3 /* Disconnected, but more data to read */
+#define IPC_CONNECT		1	/* Connected: can read, write */
+#define IPC_WAIT		2	/* Waiting for connection */
+#define IPC_DISCONNECT		3	/* Disconnected, can't read or write*/
+#define IPC_DISC_PENDING	4	/* Disconnected, can't write but    */
+					/* may be more data to read	    */
 
 #define IPC_ISRCONN(ch) ((ch)->ch_status == IPC_CONNECT		\
 	||	(ch)->ch_status == IPC_DISC_PENDING)
