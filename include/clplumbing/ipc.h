@@ -26,7 +26,7 @@
 
 #ifndef _IPC_H_
 #define _IPC_H_
-#include <portability.h>
+#include <linux-ha/portability.h>
 #include <glib.h>
 #undef MIN
 #undef MAX

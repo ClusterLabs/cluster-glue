@@ -19,7 +19,7 @@
  *
  */
 
-#include <portability.h>
+#include <linux-ha/portability.h>
 #include <string.h>
 #include <errno.h>
 

@@ -21,7 +21,8 @@ MAINTAINERCLEANFILES    = Makefile.in
 
 INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/linux-ha -I$(top_srcdir)/linux-ha \
-			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl @SYS_INCLUDES@
+			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl \
+			-I$(top_builddir) -I$(top_srcdir) @SYS_INCLUDES@
 
 
 AM_CFLAGS			= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \

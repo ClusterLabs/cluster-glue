@@ -18,7 +18,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#include <portability.h>
+#include <linux-ha/portability.h>
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #ifdef HAVE_LIBINTL_H
 #    include <libintl.h>
 #endif

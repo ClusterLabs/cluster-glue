@@ -22,7 +22,7 @@
 #ifndef _STONITH_SIGNAL_H
 #define _STONITH_SIGNAL_H
 
-#include <portability.h>
+#include <linux-ha/portability.h>
 #include <signal.h>
 #include <sys/signal.h>
 
