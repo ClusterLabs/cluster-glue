@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.65 2005/02/23 05:31:25 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.66 2005/02/23 09:04:25 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -108,7 +108,6 @@ static gboolean on_connect_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_connect_cbk(IPC_Channel* ch_cbk, gpointer user_data);
 static gboolean on_receive_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_timeout_op_done(gpointer data);
-static gboolean on_timeout_shutdown(gpointer data);
 static gboolean on_repeat_op_done(gpointer data);
 static void on_remove_client(gpointer user_data);
 
@@ -142,7 +141,8 @@ static int read_pipe(int fd, char ** data);
 static void lrmd_log(int priority, const char * fmt, ...)G_GNUC_PRINTF(2,3);
 static struct ha_msg* op_to_msg(lrmd_op_t* op);
 static void free_op(lrmd_op_t* op);
-
+static gboolean lrm_shutdown(gpointer data);
+static gboolean can_shutdown(void);
 
 /*
  * following functions are used to monitor the exit of ra proc
@@ -210,6 +210,7 @@ static int call_id 		= 1;
 const char* lrm_system_name 	= "lrmd";
 GHashTable * RAExecFuncs 	= NULL;
 GList* ra_class_list		= NULL;
+gboolean shutdown_in_progress	= FALSE;
 
 /*
  * Daemon functions
@@ -379,8 +380,9 @@ usage(const char* cmd, int exit_status)
 }
 
 static gboolean
-on_timeout_shutdown(gpointer data)
+lrm_shutdown(gpointer data)
 {
+	lrmd_log(LOG_INFO,"lrmd is shutting down");
 	if (mainloop != NULL && g_main_is_running(mainloop)) {
 		g_main_quit(mainloop);
 	}else {
@@ -388,12 +390,35 @@ on_timeout_shutdown(gpointer data)
 	}
 	return FALSE;
 }
-
+static gboolean
+can_shutdown() 
+{
+	lrmd_op_t* op = NULL;
+	lrmd_rsc_t* rsc = NULL;
+	GList* op_node = NULL;
+	
+	GList* rsc_node = g_list_first(rsc_list);
+	
+	for(; NULL!=rsc_node; rsc_node=g_list_next(rsc_node)){
+		rsc = (lrmd_rsc_t*)rsc_node->data;
+		op_node = g_list_first(rsc->op_list);
+		for(; NULL!=op_node; op_node = g_list_next(op_node)) {
+			op = (lrmd_op_t*)op_node->data;
+			if (0 == op->interval) {
+				return FALSE;
+			}
+		}
+	}
+	return TRUE;
+}
 void
 sigterm_action(int nsig)
 {
 	CL_SIGNAL(nsig, sigterm_action);
-	g_timeout_add(5000, on_timeout_shutdown, NULL);	
+	shutdown_in_progress = TRUE;		
+	if (can_shutdown()) {
+		 g_timeout_add(1, lrm_shutdown, NULL);
+	}
 }
 
 void
@@ -746,7 +771,16 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 		lrmd_log(LOG_DEBUG, "on_receive_cmd: can not receive msg");
 		return TRUE;
 	}
-
+	
+	if (TRUE == shutdown_in_progress ) {
+		send_rc_msg(ch,HA_FAIL);
+		ha_msg_del(msg);
+		lrmd_log(LOG_DEBUG, "on_receive_cmd: return HA_FAIL because"\
+			 " lrmd is in shutdown.");
+		lrmd_log(LOG_DEBUG, "on_receive_cmd: end.");
+		return TRUE;
+	}	
+	
 	/*dispatch the message*/
 	type = ha_msg_value(msg, F_LRM_TYPE);
 
@@ -1649,6 +1683,10 @@ perform_op(lrmd_rsc_t* rsc)
 	lrmd_op_t* op = NULL;
 
 	lrmd_log(LOG_DEBUG, "perform_op: start.");
+	if (TRUE == shutdown_in_progress && can_shutdown()) {
+		lrm_shutdown(NULL);
+		lrmd_log(LOG_DEBUG, "perform_op: end.");
+	}
 	if (NULL == g_list_find(rsc_list, rsc)) {
 		lrmd_log(LOG_DEBUG,
 			"perform_op: the resource of this op does not exists");
@@ -2114,6 +2152,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.66  2005/02/23 09:04:25  zhenh
+ * make lrmd exiting just after all non-monitor operations finished when it received SIGTERM
+ *
  * Revision 1.65  2005/02/23 05:31:25  zhenh
  * replace the code of storing binary data in ha_msg. (BEAM bug)
  *
