@@ -53,7 +53,7 @@ test_PROGRAMS = ipctest ipctransientclient ipctransientserver
 libplumb_la_LDFLAGS	= -version-info 0:0:0
 
 ipctest_SOURCES = ipctest.c
-ipctest_LDADD = libplumb.la $(GLIBLIB)
+ipctest_LDADD = $(top_builddir)/replace/libreplace.la libplumb.la $(GLIBLIB)
 
 #ipctransient_SOURCES = ipctransient.c
 #ipctransient_LDADD = libplumb.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
