@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.20 2005/03/16 21:59:25 blaschke Exp $ */
+/* $Id: rps10.c,v 1.21 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -39,7 +39,7 @@
 #define MAX_PRSID		256
 #include <pils/plugin.h>
 
-static StonithPlugin *	rps10_new(void);
+static StonithPlugin *	rps10_new(const char *);
 static void		rps10_destroy(StonithPlugin *);
 static int		rps10_set_config(StonithPlugin *, StonithNVpair *);
 static const char**	rps10_get_confignames(StonithPlugin *);
@@ -1040,7 +1040,7 @@ rps10_destroy(StonithPlugin *s)
  *          object. 
  */
 static StonithPlugin * 
-rps10_new(void)
+rps10_new(const char *subplugin)
 {
 	struct pluginDevice*	ctx = MALLOCT(struct pluginDevice);
 

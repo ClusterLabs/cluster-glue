@@ -1,4 +1,4 @@
-/* $Id: ssh.c,v 1.22 2005/03/28 02:04:27 sunjd Exp $ */
+/* $Id: ssh.c,v 1.23 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  * Stonith module for SSH Stonith device
  *
@@ -31,7 +31,7 @@
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
 
-static StonithPlugin *	ssh_new(void);
+static StonithPlugin *	ssh_new(const char *);
 static void		ssh_destroy(StonithPlugin *);
 static const char**	ssh_get_confignames(StonithPlugin *);
 static int		ssh_set_config(StonithPlugin *, StonithNVpair*);
@@ -275,7 +275,7 @@ ssh_destroy(StonithPlugin *s)
 
 /* Create a new ssh Stonith device */
 static StonithPlugin*
-ssh_new(void)
+ssh_new(const char *subplugin)
 {
 	struct pluginDevice*	sd = MALLOCT(struct pluginDevice);
 

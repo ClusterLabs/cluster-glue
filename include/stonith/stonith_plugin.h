@@ -1,4 +1,4 @@
-/* $Id: stonith_plugin.h,v 1.4 2005/01/10 08:35:43 alan Exp $ */
+/* $Id: stonith_plugin.h,v 1.5 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  *	S hoot
  *	T he
@@ -50,7 +50,7 @@ typedef struct stonith_plugin	StonithPlugin;
 #define NUM_STONITH_FNS 7
 
 struct stonith_ops {
-	StonithPlugin * (*new)	(void);			/* mini-Constructor */
+	StonithPlugin * (*new)	(const char*);		/* mini-Constructor */
 	void (*destroy)		(StonithPlugin*);	/*(full) Destructor */
 
 	const char* (*get_info)	(StonithPlugin*, int infotype);

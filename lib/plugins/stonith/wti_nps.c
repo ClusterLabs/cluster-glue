@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.23 2005/03/16 21:59:25 blaschke Exp $ */
+/* $Id: wti_nps.c,v 1.24 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -65,7 +65,7 @@
 
 #include "stonith_signal.h"
 
-static StonithPlugin *	wti_nps_new(void);
+static StonithPlugin *	wti_nps_new(const char *);
 static void		wti_nps_destroy(StonithPlugin *);
 static const char**	wti_nps_get_confignames(StonithPlugin *);
 static int		wti_nps_set_config(StonithPlugin * , StonithNVpair * );
@@ -815,7 +815,7 @@ wti_nps_destroy(StonithPlugin *s)
 /* Create a new BayTech Stonith device. */
 
 static StonithPlugin *
-wti_nps_new(void)
+wti_nps_new(const char *subplugin)
 {
 	struct pluginDevice*	nps = MALLOCT(struct pluginDevice);
 

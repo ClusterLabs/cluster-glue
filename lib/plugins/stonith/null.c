@@ -1,4 +1,4 @@
-/* $Id: null.c,v 1.17 2005/01/03 18:12:11 alan Exp $ */
+/* $Id: null.c,v 1.18 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  * Stonith module for NULL Stonith device
  *
@@ -36,7 +36,7 @@ struct pluginDevice {
 	int		hostcount;
 };
 
-static StonithPlugin*	null_new(void);
+static StonithPlugin*	null_new(const char *);
 static void		null_destroy(StonithPlugin *);
 static int		null_set_config(StonithPlugin*
 ,				StonithNVpair*);
@@ -222,7 +222,7 @@ null_destroy(StonithPlugin *s)
  * Too bad this function can't be static
  */
 static StonithPlugin *
-null_new(void)
+null_new(const char *subplugin)
 {
 	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
 

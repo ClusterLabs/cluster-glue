@@ -1,4 +1,4 @@
-/* $Id: baytech.c,v 1.24 2005/03/16 21:59:25 blaschke Exp $ */
+/* $Id: baytech.c,v 1.25 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  *	Stonith module for BayTech Remote Power Controllers (RPC-x devices)
  *
@@ -34,7 +34,7 @@
 
 #include "stonith_signal.h"
 
-static StonithPlugin *	baytech_new(void);
+static StonithPlugin *	baytech_new(const char *);
 static void		baytech_destroy(StonithPlugin *);
 static int		baytech_set_config(StonithPlugin *, StonithNVpair *);
 static const char **	baytech_get_confignames(StonithPlugin * s);
@@ -851,7 +851,7 @@ baytech_destroy(StonithPlugin *s)
 /* Create a new BayTech Stonith device. */
 
 static StonithPlugin *
-baytech_new(void)
+baytech_new(const char *subplugin)
 {
 	struct pluginDevice*	bt = MALLOCT(struct pluginDevice);
 

@@ -1,4 +1,4 @@
- /* $Id: cyclades.c,v 1.5 2005/03/29 17:58:26 blaschke Exp $ */
+ /* $Id: cyclades.c,v 1.6 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  * Stonith module for Cyclades AlterPath PM
  * Bases off the SSH plugin
@@ -41,7 +41,7 @@
 
 #include "stonith_signal.h"
 
-static StonithPlugin *	cyclades_new(void);
+static StonithPlugin *	cyclades_new(const char *);
 static void		cyclades_destroy(StonithPlugin *);
 static int		cyclades_set_config(StonithPlugin *, StonithNVpair *);
 static const char **	cyclades_get_confignames(StonithPlugin * s);
@@ -552,7 +552,7 @@ cyclades_destroy(StonithPlugin *s)
 
 /* Create a new cyclades Stonith device */
 static StonithPlugin *
-cyclades_new(void)
+cyclades_new(const char *subplugin)
 {
 	struct pluginDevice*	sd = MALLOCT(struct pluginDevice);
 

@@ -1,4 +1,4 @@
-/* $Id: main.c,v 1.19 2005/03/15 11:25:06 alan Exp $ */
+/* $Id: main.c,v 1.20 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  * Stonith: simple test program for exercising the Stonith API code
  *
@@ -56,21 +56,34 @@ usage(const char * cmd, int exit_status)
 
 	stream = exit_status ? stderr : stdout;
 
-	fprintf(stream, "usage: %s [-sSlLvh] "
-	"[-t stonith-device-type] "
-	"[-p stonith-device-parameters] "
-	"[-F stonith-device-parameters-file] "
-	"nodename\n", cmd);
+	fprintf(stream, "usage:\n");
+	fprintf(stream, "\t %s [-svh] "
+	"-L\n"
+	, cmd);
+	fprintf(stream, "\t %s [-svh] "
+	"-t stonith-device-type "
+	"[-p stonith-device-parameters | "
+	"-F stonith-device-parameters-file] "
+	"-lS\n"
+	, cmd);
+	fprintf(stream, "\t %s [-svh] "
+	"-t stonith-device-type "
+	"[-p stonith-device-parameters | "
+	"-F stonith-device-parameters-file] "
+	"-T {reset|on|off} nodename\n"
+	, cmd);
 
+	fprintf(stream, "\nwhere:\n");
 	fprintf(stream, "\t-L\tlist supported stonith device types\n");
 	fprintf(stream, "\t-l\tlist hosts controlled by this stonith device\n");
 	fprintf(stream, "\t-S\treport stonith device status\n");
 	fprintf(stream, "\t-s\tsilent\n");
 	fprintf(stream, "\t-v\tverbose\n");
-	fprintf(stream, "\t-T\t(reset|on|off)\n");
-	fprintf(stream, "\t-h\tget this help message\n");
+	fprintf(stream, "\t-h\tdisplay detailed help message with stonith device desriptions\n");
 
-	confhelp(cmd, stream);
+	if (exit_status == 0) {
+		confhelp(cmd, stream);
+	}
 
 	exit(exit_status);
 }
@@ -162,6 +175,7 @@ main(int argc, char** argv)
 	int		rc;
 	Stonith *	s;
 	const char *	SwitchType = NULL;
+	const char *	tmp;
 	const char *	optfile = NULL;
 	const char *	parameters = NULL;
 	int		reset_type = ST_GENERIC_RESET;
@@ -258,6 +272,12 @@ main(int argc, char** argv)
 			" style arguments\n");
 			usage(cmdname, 1);
 		}
+		if (optfile)  {
+			fprintf(stderr
+			,	"Cannot include both -F and name=value "
+			" style arguments\n");
+			usage(cmdname, 1);
+		}
 		if (nvcount >= MAXNVARG) {
 			fprintf(stderr, "Too many n=v arguments\n");
 			exit(1);
@@ -265,6 +285,7 @@ main(int argc, char** argv)
 		nvargs[nvcount].s_name = argv[optind];
 		*eqpos = EOS;
 		nvargs[nvcount].s_value = eqpos+1;
+		nvcount++;
 	}
 	nvargs[nvcount].s_name = NULL;
 	nvargs[nvcount].s_value = NULL;
@@ -296,11 +317,15 @@ main(int argc, char** argv)
 		return(0);
 	}
 
-	if (optfile == NULL && parameters == NULL) {
-		optfile = "/etc/ha.d/rpc.cfg";
+	if (optfile == NULL && parameters == NULL && nvcount == 0) {
+		fprintf(stderr
+		,	"Must specify either -p option, -F option or "
+		" name=value style arguments\n");
+		usage(cmdname, 1);
 	}
 	if (SwitchType == NULL) {
-		SwitchType = "baytech";
+		fprintf(stderr,	"Must specify device type (-t option)\n");
+		usage(cmdname, 1);
 	}
 #ifndef LOG_PERROR
 #	define LOG_PERROR	0
@@ -337,6 +362,7 @@ main(int argc, char** argv)
 			fprintf(stderr
 			,	"Invalid STONITH -p parameter [%s]\n"
 			,	parameters);
+			stonith_delete(s); s=NULL;
 			exit(1);
 		}
 		if ((rc = stonith_set_config(s, pairs)) != S_OK) {
@@ -352,25 +378,29 @@ main(int argc, char** argv)
 			const char**	names;
 			int		j;
 			fprintf(stderr
-			,	"Invalid config info for %s device"
+			,	"Invalid config info for %s device\n"
 			,	SwitchType);
-			fprintf(stderr
-			,	"Valid config names are:\n");
-			
+
 			names = stonith_get_confignames(s);
 
-			for (j=0; names[j]; ++j) {
+			if (names != NULL) {
 				fprintf(stderr
-				,	"\t%s\n", names[j]);
+				,	"Valid config names are:\n");
+			
+				for (j=0; names[j]; ++j) {
+					fprintf(stderr
+					,	"\t%s\n", names[j]);
+				}
 			}
+			stonith_delete(s); s=NULL;
 			exit(rc);
 		}
 	}
 
 	rc = stonith_get_status(s);
 
-	if ((SwitchType = stonith_get_info(s, ST_DEVICEID)) == NULL) {
-		SwitchType = "BayTech";
+	if ((tmp = stonith_get_info(s, ST_DEVICEID)) == NULL) {
+		SwitchType = tmp;
 	}
 
 	if (status && !silent) {

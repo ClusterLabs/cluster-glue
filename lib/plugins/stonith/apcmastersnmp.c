@@ -1,4 +1,4 @@
-/* $Id: apcmastersnmp.c,v 1.19 2005/02/17 09:25:28 sunjd Exp $ */
+/* $Id: apcmastersnmp.c,v 1.20 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
@@ -56,7 +56,7 @@
     	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);	\
     }
 
-static StonithPlugin *	apcmastersnmp_new(void);
+static StonithPlugin *	apcmastersnmp_new(const char *);
 static void	apcmastersnmp_destroy(StonithPlugin *);
 static const char **	apcmastersnmp_get_confignames(StonithPlugin *);
 static int	apcmastersnmp_set_config(StonithPlugin *, StonithNVpair *);
@@ -787,7 +787,7 @@ apcmastersnmp_destroy(StonithPlugin * s)
  */
 
 static StonithPlugin *
-apcmastersnmp_new(void)
+apcmastersnmp_new(const char *subplugin)
 {
 	struct pluginDevice *ad = MALLOCT(struct pluginDevice);
 

@@ -1,4 +1,4 @@
-/* $Id: ipmilan.c,v 1.13 2005/01/31 09:45:31 sunjd Exp $ */
+/* $Id: ipmilan.c,v 1.14 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
@@ -45,7 +45,7 @@
 
 #include "ipmilan.h"
 
-static StonithPlugin *	ipmilan_new(void);
+static StonithPlugin *	ipmilan_new(const char *);
 static void		ipmilan_destroy(StonithPlugin *);
 static const char **	ipmilan_get_confignames(StonithPlugin *);
 static int		ipmilan_set_config(StonithPlugin *, StonithNVpair *);
@@ -431,7 +431,7 @@ ipmilan_destroy(StonithPlugin *s)
 
 /* Create a new ipmilan StonithPlugin device.  Too bad this function can't be static */
 static StonithPlugin *
-ipmilan_new(void)
+ipmilan_new(const char *subplugin)
 {
 	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
 

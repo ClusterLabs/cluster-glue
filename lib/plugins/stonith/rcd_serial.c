@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.24 2005/02/18 07:32:09 zhaokai Exp $ */
+/* $Id: rcd_serial.c,v 1.25 2005/04/06 18:58:42 blaschke Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -50,7 +50,7 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 
-static StonithPlugin*	rcd_serial_new(void);
+static StonithPlugin*	rcd_serial_new(const char *);
 static void		rcd_serial_destroy(StonithPlugin *);
 static int		rcd_serial_set_config(StonithPlugin *, StonithNVpair *);
 static const char **	rcd_serial_get_confignames(StonithPlugin *);
@@ -635,7 +635,7 @@ rcd_serial_destroy(StonithPlugin *s)
  * Too bad this function can't be static. (Hmm, weird, it _is_ static?)
  */
 static StonithPlugin *
-rcd_serial_new(void)
+rcd_serial_new(const char *subplugin)
 {
 	struct pluginDevice*	rcd = MALLOCT(struct pluginDevice);
 
