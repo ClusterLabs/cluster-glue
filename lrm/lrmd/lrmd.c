@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.67 2005/02/24 06:54:15 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.68 2005/02/24 10:34:49 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1237,7 +1237,6 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		return HA_FAIL;
 	}
 	else {
-		rsc_list = g_list_remove(rsc_list, rsc);
 		/* remove pending ops */
 		op_node = g_list_first(rsc->op_list);
 		while (NULL != op_node) {
@@ -1252,13 +1251,14 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 			op = (lrmd_op_t*)op_node->data;
 			op_node = g_list_next(op_node);
 			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
-			free_op(op);
+			flush_op(op);
 		}
 		/* free the last_op */
 		if ( NULL!=rsc->last_op) {
 			free_op(rsc->last_op);
 		}
 		
+		rsc_list = g_list_remove(rsc_list, rsc);
 		/* free the memeroy of rsc */
 		g_free(rsc->id);
 		g_free(rsc->type);
@@ -2153,6 +2153,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.68  2005/02/24 10:34:49  zhenh
+ * when lrm deletes a resource, notifies the clients who are monitoring the resource
+ *
  * Revision 1.67  2005/02/24 06:54:15  sunjd
  * return to nobody privilege after forking failed
  *
