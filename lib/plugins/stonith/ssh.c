@@ -1,4 +1,4 @@
-/* $Id: ssh.c,v 1.21 2005/03/25 10:02:44 sunjd Exp $ */
+/* $Id: ssh.c,v 1.22 2005/03/28 02:04:27 sunjd Exp $ */
 /*
  * Stonith module for SSH Stonith device
  *
@@ -101,7 +101,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  */
 #define REBOOT_COMMAND "nohup sh -c '(sleep 2; nohup /sbin/reboot -nf) </dev/null >/dev/null 2>&1' &"
 #undef REBOOT_COMMAND
-#define REBOOT_COMMAND	"echo 'sleep 2; /bin/ls -l / > /tmp/TEST' | SHELL=/bin/sh at now >/dev/null 2>&1"
+#define REBOOT_COMMAND "echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
 
 /*
  *    SSH STONITH device
