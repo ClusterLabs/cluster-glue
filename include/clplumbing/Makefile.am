@@ -22,4 +22,6 @@
 #
 MAINTAINERCLEANFILES    = Makefile.in
 
-SOURCES		        = proctrack.h
+SOURCES	= 		\
+	longclock.h	\
+	proctrack.h
