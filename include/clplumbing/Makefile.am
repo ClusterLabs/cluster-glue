@@ -28,6 +28,7 @@ include_HEADERS	= 		\
 	base64.h	\
 	cl_log.h	\
 	ipc.h		\
+	lsb_exitcodes.h	\
 	loggingdaemon.h	\
 	longclock.h	\
 	mkstemp_mode.h	\
