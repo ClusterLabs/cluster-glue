@@ -106,6 +106,8 @@ static void
 socket_destroy_wait_conn(struct OCF_IPC_WAIT_CONNECTION * wait_conn)
 {
   close(((struct SOCKET_CH_PRIVATE *) (wait_conn->ch_private))->s);
+  if(wait_conn->ch_private != NULL)
+    free((void*) (wait_conn->ch_private));
   free((void*) wait_conn);
 }
 
@@ -172,6 +174,10 @@ socket_destroy_channel(struct OCF_IPC_CHANNEL * ch)
   socket_disconnect(ch);
   socket_destroy_queue(ch->send_queue);
   socket_destroy_queue(ch->recv_queue);
+  if(ch->ch_private != NULL)
+    free((void*)(ch->ch_private));
+  ipc_destroy_auth(ch->auth_info);
+  
   free((void*) ch);
 }
 
@@ -309,7 +315,7 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
     return AUTH_OK;
   }
   
-  if (auth_info->check_uid == FALSE && auth_info->check_gid == FALSE) {
+  if (auth_info->uid == NULL && auth_info->gid == NULL) {
     return AUTH_OK;    /* no restriction for authentication */
   }
 
@@ -464,7 +470,7 @@ socket_resume_io(struct OCF_IPC_CHANNEL *ch)
     if (msg_len > 0) {
       /* Copying messages is slow... Sigh... :-( */
       /* removed memcpy. */
-      msg->message_done = socket_free_message;
+      msg->msg_done = socket_free_message;
       msg->ch = ch;
       msg->msg_len = msg_len;
       ch->recv_queue->queue = g_list_append(ch->recv_queue->queue, msg);
@@ -489,8 +495,8 @@ socket_resume_io(struct OCF_IPC_CHANNEL *ch)
     
       if (len > 0 ) {
 	ch->send_queue->queue = g_list_remove(ch->send_queue->queue, msg);
-	if (msg->message_done != NULL) {
-	  msg->message_done(msg);
+	if (msg->msg_done != NULL) {
+	  msg->msg_done(msg);
         }
 	ch->send_queue->current_qlen--;
       }else{
@@ -781,7 +787,7 @@ socket_message_new(struct OCF_IPC_CHANNEL *ch, int msg_len)
   temp_msg->msg_len = msg_len;
   temp_msg->msg_private = NULL;
   temp_msg->ch = ch;
-  temp_msg->message_done = socket_free_message;
+  temp_msg->msg_done = socket_free_message;
 
   return temp_msg;
 }
