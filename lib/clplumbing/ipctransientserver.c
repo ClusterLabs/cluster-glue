@@ -133,6 +133,7 @@ int
 main(int argc, char ** argv)
 {
     int	iteration = 0;
+    GMainLoop* mainloop = NULL;
     
     cl_log_set_entity("ipc_transient_server_test");
     cl_log_enable_stderr(TRUE);
@@ -142,7 +143,7 @@ main(int argc, char ** argv)
     /* wait for the reply by creating a mainloop and running it until
      * the callbacks are invoked...
      */
-    GMainLoop* mainloop = g_main_new(FALSE);
+    mainloop = g_main_new(FALSE);
     cl_log(LOG_INFO, "#--#--#--# Echo Server %d is active...", iteration);
     
     g_main_run(mainloop);
@@ -163,15 +164,16 @@ init_server_ipc_comms(const char *child,
      * listen to this source at a relatively lower priority.
      */
     
-    char    commpath[FIFO_LEN];
-    sprintf(commpath, WORKING_DIR "/%s.sock", child);
-
     IPC_WaitConnection *wait_ch;
+    char    commpath[FIFO_LEN];
 
     mode_t mask;
     char path[] = IPC_PATH_ATTR;
     
     GHashTable * attrs = g_hash_table_new(g_str_hash,g_str_equal);
+
+    sprintf(commpath, WORKING_DIR "/%s.sock", child);
+
     g_hash_table_insert(attrs, path, commpath);
     
     mask = umask(0);
@@ -215,6 +217,10 @@ echoserver_callback(IPC_Channel *client, gpointer user_data)
 {
     int lpc = 0;
     IPC_Message *msg = NULL;
+    char *buffer = NULL;
+    IPC_Message *reply = NULL;
+    int llpc = 0;
+
     cl_log(LOG_DEBUG, "channel: %p", client);
 
     cl_log(LOG_DEBUG, "Client status %d (disconnect=%d)", client->ch_status, IPC_DISCONNECT);
@@ -234,12 +240,11 @@ echoserver_callback(IPC_Channel *client, gpointer user_data)
 	}
 
 	lpc++;
-	char *buffer = (char*)msg->msg_body;
+	buffer = (char*)msg->msg_body;
 	cl_log(LOG_DEBUG, "[Server] Got xml [text=%s]", buffer);
 
-	IPC_Message *reply = create_simple_message(strdup(buffer), client);
+	reply = create_simple_message(strdup(buffer), client);
 
-	int llpc = 0;
 	while(llpc++ < MAX_IPC_FAIL && client->ops->send(client, reply) == IPC_FAIL)
 	{
 	    cl_log(LOG_WARNING, "[Server] ipc channel blocked");
@@ -304,15 +309,17 @@ echoserver_connect(IPC_Channel *client_channel, gpointer user_data)
 IPC_Message *
 create_simple_message(char *text, IPC_Channel *ch)
 {
-    if(text == NULL) return NULL;
-
     //    char	       str[256];
     IPC_Message        *ack_msg = NULL;
+    int text_len = 0;
+    char *copy_text = NULL;
+
+    if(text == NULL) return NULL;
 
     ack_msg = (IPC_Message *)malloc(sizeof(IPC_Message));
 
-    int text_len = strlen(text) + 1;
-    char *copy_text = (char *)malloc(sizeof(char)*text_len);
+    text_len = strlen(text) + 1;
+    copy_text = (char *)malloc(sizeof(char)*text_len);
     strcpy(copy_text, text);
     copy_text[text_len-1] = '\0';
     

@@ -133,16 +133,18 @@ int
 main(int argc, char ** argv)
 {
     int	lpc =0, iteration=0;
+    GMainLoop* client_main = NULL;
+    IPC_Channel *server_channel = NULL;
     
     cl_log_set_entity("ipc_transient_client_test");
     cl_log_enable_stderr(TRUE);
     
     // give the server a chance to start
     cl_log(LOG_INFO, "#--#--#--#--# Beginning test run %d against server %d...", lpc, iteration);
-    GMainLoop* client_main = g_main_new(FALSE);
+    client_main = g_main_new(FALSE);
     
     // connect, send messages
-    IPC_Channel *server_channel = init_client_ipc_comms("echo", echoclient_callback, client_main);
+    server_channel = init_client_ipc_comms("echo", echoclient_callback, client_main);
     
     if(server_channel == NULL)
     {
@@ -178,12 +180,14 @@ init_client_ipc_comms(const char *child,
 {
     IPC_Channel *ch;
     GHashTable * attrs;
+    static char 	path[] = IPC_PATH_ATTR;
+    char * commpath = NULL;
+
     int local_sock_len = 7; // 7 = '/' + ".fifo" + '\0'
     local_sock_len += strlen(child);
     local_sock_len += strlen(WORKING_DIR);
 
-    static char 	path[] = IPC_PATH_ATTR;
-    char    commpath[local_sock_len];
+    commpath = (char *)malloc(local_sock_len);
     sprintf(commpath, WORKING_DIR "/%s.sock", child);
     commpath[local_sock_len - 1] = '\0';
     
@@ -222,6 +226,7 @@ echoclient_callback(IPC_Channel* server, void* private_data)
     int lpc = 0;
     IPC_Message *msg = NULL;
     static int recieved_responses = 0;
+    char *buffer = NULL;
 
     GMainLoop *mainloop = (GMainLoop*)private_data;
 
@@ -241,7 +246,7 @@ echoclient_callback(IPC_Channel* server, void* private_data)
 	}
 
 	lpc++;
-	char *buffer = (char*)msg->msg_body;
+	buffer = (char*)msg->msg_body;
 	cl_log(LOG_DEBUG, "[Client] Got text [text=%s]", buffer);
 	recieved_responses++;
     }
@@ -271,6 +276,8 @@ client_send_message(const char *message_text,
 		    IPC_Channel *server_channel,
 		    int iteration)
 {
+    IPC_Message *a_message = NULL;
+
     if(server_channel->ch_status != IPC_OK)
     {
 	cl_log(LOG_ERR, "[Client %d] Channel is disconnected (status=%d)",
@@ -279,7 +286,7 @@ client_send_message(const char *message_text,
     }
     
     cl_log(LOG_DEBUG, "[Client %d] Sending %s", iteration, message_text);
-    IPC_Message *a_message = create_simple_message(strdup(message_text), server_channel);
+    a_message = create_simple_message(strdup(message_text), server_channel);
 
     while(server_channel->ops->send(server_channel, a_message) == IPC_FAIL)
     {
@@ -303,15 +310,17 @@ default_ipc_input_destroy(gpointer user_data)
 IPC_Message *
 create_simple_message(char *text, IPC_Channel *ch)
 {
-    if(text == NULL) return NULL;
-
     //    char	       str[256];
     IPC_Message        *ack_msg = NULL;
+    int text_len = 0;
+    char *copy_text = NULL;
+
+    if(text == NULL) return NULL;
 
     ack_msg = (IPC_Message *)malloc(sizeof(IPC_Message));
 
-    int text_len = strlen(text) + 1;
-    char *copy_text = (char *)malloc(sizeof(char)*text_len);
+    text_len = strlen(text) + 1;
+    copy_text = (char *)malloc(sizeof(char)*text_len);
     strcpy(copy_text, text);
     copy_text[text_len-1] = '\0';
     
