@@ -23,6 +23,7 @@
 
 #include <clplumbing/ipc.h>
 #include <clplumbing/cl_log.h>
+#include <clplumbing/realtime.h>
 
 
 #include <stdio.h>
@@ -290,20 +291,19 @@ socket_initiate_connection(struct IPC_CHANNEL * ch)
 }
 
 static int 
-socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* message)
+socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 {
   
+	if (ch->send_queue->current_qlen < ch->send_queue->max_qlen) {
+		/* add the meesage into the send queue */
+		ch->send_queue->queue = g_list_append(ch->send_queue->queue
+		,	msg);
+		ch->send_queue->current_qlen++;
+		/* resume io */
+		return ch->ops->resume_io(ch);
+	}
   
-  if (ch->send_queue->current_qlen < ch->send_queue->max_qlen) {
-    /* add the meesage into the send queue */
-    ch->send_queue->queue = g_list_append(ch->send_queue->queue, message);
-    ch->send_queue->current_qlen++;
-    /* resume io */
-    return ch->ops->resume_io(ch);
-        
-  }
-  
-  return IPC_FAIL;
+	return IPC_FAIL;
   
 }
 
@@ -627,7 +627,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 					cl_log(LOG_DEBUG,
 						"socket send returned EAGAIN");
 #endif
-					sched_yield();
+					cl_shortsleep();
 					continue;
 				case EPIPE:
 					ch->ch_status = IPC_DISCONNECT;
@@ -643,13 +643,19 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
     		}
 		*started=TRUE;
 
+
 		do {
 			sendrc=send(conn_info->s, msg->msg_body, msg->msg_len
 			,	(MSG_DONTWAIT|MSG_NOSIGNAL));
 
 			/* if send failed with EAGAIN, delay and try again */
-		} while(sendrc < 0 && 
-			(errno == EAGAIN ?sched_yield(),TRUE: FALSE));
+		} while(sendrc < 0
+		&&	(errno == EAGAIN ? (cl_shortsleep(), TRUE) : FALSE));
+
+		if (sendrc != msg->msg_len) {
+			cl_perror("Sent %d byte message body: rc = %d"
+			,	msg->msg_len, sendrc);
+		}
 
 #if 0
 		cl_log(LOG_DEBUG, "Sent %d byte message body"
