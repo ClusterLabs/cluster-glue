@@ -4,6 +4,6 @@
 ../admin/lrmadmin -T lsb
 ../admin/lrmadmin -T ocf
 ../admin/lrmadmin -T heartbeat
-../admin/lrmadmin -M lsb sshd
-../admin/lrmadmin -M heartbeat IPv6addr
- 
+../admin/lrmadmin -M lsb sshd NULL
+../admin/lrmadmin -M heartbeat IPv6addr NULL
+../admin/lrmadmin -P heartbeat IPv6addr 

@@ -60,7 +60,7 @@ int main (int argc, char* argv[])
 	param = g_hash_table_new(g_str_hash,g_str_equal);
 	g_hash_table_insert(param, strdup("1"), strdup("3ffe:ffff:0:f101::3"));
 	puts("add_rsc...");
-	lrm->lrm_ops->add_rsc(lrm, rid, "heartbeat", "IPv6addr", param);
+	lrm->lrm_ops->add_rsc(lrm, rid, "heartbeat", "IPv6addr", NULL, param);
 	puts("get_rsc...");
 	rsc = lrm->lrm_ops->get_rsc(lrm, rid);
 	printf_rsc(rsc);
