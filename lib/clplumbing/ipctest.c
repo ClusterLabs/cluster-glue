@@ -141,6 +141,7 @@ main(int argc, char ** argv)
 	cl_log_enable_stderr(TRUE);
 
 
+
 	rc += transport_tests(10000);
 
 	cl_log(LOG_INFO, "NOTE: Enabling poll(2) replacement code.");
@@ -460,7 +461,7 @@ checkinput(IPC_Channel* chan, const char * where, int* rdcount, int maxcount)
 			cl_log(LOG_ERR
 			,	"checkinput3[0x%lx %s]: EOF in iter %d"
 			,	(unsigned long)chan, where, *rdcount);
-				EOFcheck(chan);
+			EOFcheck(chan);
 		}
 
 	}
@@ -921,14 +922,17 @@ static int
 mainloop_server(IPC_Channel* chan, int repcount)
 {
 	struct iterinfo info;
+	GCHSource*	msgchan;
+	guint		sendmsgsrc;
 	loop = g_main_new(FALSE);
 	init_iterinfo(&info, chan, repcount);
-	g_idle_add(s_send_msg, &info);
-	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT, chan
+	sendmsgsrc = g_idle_add(s_send_msg, &info);
+	msgchan = G_main_add_IPC_Channel(G_PRIORITY_DEFAULT, chan
 	,	FALSE, s_rcv_msg, &info, NULL);
 	cl_log(LOG_INFO, "Mainloop echo server: %d reps pid %d.", repcount, (int)getpid());
 	g_main_run(loop);
 	g_main_destroy(loop);
+	g_source_remove(sendmsgsrc);
 	loop = NULL;
 	cl_log(LOG_INFO, "Mainloop echo server: %d errors", info.errcount);
 	return info.errcount;

@@ -668,7 +668,6 @@ waitagain:
 				timeoutms -= mselapsed;
 				goto recalcandwaitagain;
 			}
-				
 		}
 	}
 	rc = (eventcount > 0 ? eventcount : (stw_errno == EAGAIN ? 0 : -1));

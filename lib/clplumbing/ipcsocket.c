@@ -24,6 +24,7 @@
 #include <clplumbing/ipc.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/realtime.h>
+#include <clplumbing/cl_poll.h>
 
 
 #include <stdio.h>
@@ -429,6 +430,7 @@ socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn)
 
 	if (wc != NULL) {
 		close(wc->s);
+		cl_poll_ignore(wc->s);
 		unlink(wc->path_name);
 		g_free(wc);
 	}
@@ -537,6 +539,7 @@ socket_disconnect(struct IPC_CHANNEL* ch)
 	}
 #endif
 	close(conn_info->s);
+	cl_poll_ignore(conn_info->s);
 	conn_info->s = -1;
 	ch->ch_status = IPC_DISCONNECT;
 	return IPC_OK;
@@ -561,25 +564,28 @@ socket_check_disc_pending(struct IPC_CHANNEL* ch)
 	rc = ipc_pollfunc_ptr(&sockpoll, 1, 0);
 
  	if (rc < 0) {
-		cl_log(LOG_INFO, "socket_check_disc_pending() bad poll call");
+		cl_log(LOG_INFO
+		,	"socket_check_disc_pending() bad poll call");
 		ch->ch_status = IPC_DISCONNECT;
  		return IPC_BROKEN;
 	}
+
 	
+
 	if (sockpoll.revents & POLLHUP) {
 		if (sockpoll.revents & POLLIN) {
 			ch->ch_status = IPC_DISC_PENDING;
-		}
+		}else{
 #if 0
-		cl_log(LOG_INFO, "HUP without input");
+			cl_log(LOG_INFO, "HUP without input");
 #endif
-		ch->ch_status = IPC_DISCONNECT;
-		return IPC_BROKEN;
+			ch->ch_status = IPC_DISCONNECT;
+			return IPC_BROKEN;
+		}
 	}
-	
 	if (sockpoll.revents & POLLIN) {
-		int i;
-		socket_resume_io_read(ch,&i);
+		int dummy;
+		socket_resume_io_read(ch, &dummy);
 	}
 	return IPC_OK;
 
@@ -687,7 +693,7 @@ socket_check_poll(struct IPC_CHANNEL * ch
 			ch->ch_status = IPC_DISC_PENDING;
 			return IPC_OK;
 		}
-#if 1
+#if 0
 		cl_log(LOG_INFO, "socket_check_poll(): HUP without input");
 #endif
 		ch->ch_status = IPC_DISCONNECT;
@@ -707,7 +713,6 @@ socket_check_poll(struct IPC_CHANNEL * ch
 		errno = EINVAL;
 		return IPC_FAIL;
 	}
-	
 	return IPC_OK;
 }
 
@@ -732,9 +737,14 @@ socket_waitfor(struct IPC_CHANNEL * ch
 
 		sockpoll.events = POLLIN;
 		
-		/* Cannot call is_output_pending(), because it calls
-		 * resume_io!  This will possibly bring in more input
-		 * with everyone unaware...
+		/* Cannot call resume_io after the call to finished()
+		 * and before the call to poll because we might
+		 * change the state of the thing finished() is
+		 * waiting for.
+		 * This means that the poll call below would be
+		 * not only pointless, but might
+		 * make us hang forever waiting for this
+		 * event which has already happened
 		 */
 		if (ch->send_queue->current_qlen > 0) {
 			sockpoll.events |= POLLOUT;
@@ -747,6 +757,9 @@ socket_waitfor(struct IPC_CHANNEL * ch
 		}
 
 		rc = socket_check_poll(ch, &sockpoll);
+		if (sockpoll.revents & POLLIN) {
+			socket_resume_io(ch);
+		}
 		if (rc != IPC_OK) {
 			CHANAUDIT(ch);
 			return rc;
