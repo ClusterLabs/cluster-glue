@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.116 2005/02/03 20:39:51 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.117 2005/02/06 05:54:42 alan Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1665,6 +1665,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   if(bind(sockfd, (struct sockaddr*)&sock_addr, SUN_LEN(&sock_addr)) < 0) {
 	  perror("Client bind() failure");
 	  close(sockfd);
+	  free(conn_info); conn_info = NULL;
 	  return NULL;
   }
 #endif
@@ -1672,6 +1673,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   flags = fcntl(sockfd, F_GETFL, O_NONBLOCK);
   if (flags == -1) {
     cl_perror("socket_client_channel_new: cannot read file descriptor flags");
+    free(conn_info); conn_info = NULL;
     close(sockfd);
     return NULL;
   }
@@ -1725,11 +1727,13 @@ socket_server_channel_new(int sockfd){
   flags = fcntl(sockfd, F_GETFL, O_NONBLOCK);
   if (flags == -1) {
     cl_perror("socket_server_channel_new: cannot read file descriptor flags");
+    free(conn_info); conn_info = NULL;
     return NULL;
   }
   flags |= O_NONBLOCK;
   if (fcntl(sockfd, F_SETFL, flags) < 0) {
     cl_perror("socket_server_channel_new: cannot set O_NONBLOCK");
+    free(conn_info); conn_info = NULL;
     return NULL;
   }
 

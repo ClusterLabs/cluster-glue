@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.39 2005/01/28 09:09:51 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.40 2005/02/06 05:54:42 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1619,7 +1619,7 @@ wirefmt2ipcmsg(void* p, size_t len, IPC_Channel* ch)
 	IPC_Message*	ret = NULL;
 
 	if (p == NULL){
-	  return(NULL);
+		return(NULL);
 	}
 
 	ret = MALLOCT(IPC_Message);
@@ -1629,14 +1629,24 @@ wirefmt2ipcmsg(void* p, size_t len, IPC_Channel* ch)
 	
 	memset(ret, 0, sizeof(IPC_Message));
 	
-	ret->msg_buf = cl_malloc(len + ch->msgpad);
+	if (NULL == (ret->msg_buf = cl_malloc(len + ch->msgpad))) {
+		cl_free(ret);
+		return NULL;
+	}
 	ret->msg_body = (char*)ret->msg_buf + ch->msgpad;
 	memcpy(ret->msg_body, p, len);
+
+	/* FIXME: WHOA! What's this freeing of 'p' doing here?? */
+	/* APIs which free arguments implicitly are generally evil */
+	/* BEAM brought this to my attention (ALR) */
 	cl_free(p);
 
 	ret->msg_done = ipcmsg_done;
 	ret->msg_private = NULL;
 	ret->msg_ch = ch;
+	/* FIXME: Why are we setting msg_body to 'p'? */
+	/* we just set it above.  And, to top it all, p was freed. */
+	/* BEAM brought this to my attention (ALR) */
 	ret->msg_body = p;
 	ret->msg_len = len;
 
@@ -1663,7 +1673,11 @@ hamsg2ipcmsg(struct ha_msg* m, IPC_Channel* ch)
 	
 	memset(ret, 0, sizeof(IPC_Message));
 
-	ret->msg_buf = cl_malloc(len + ch->msgpad);
+	if (NULL == (ret->msg_buf = cl_malloc(len + ch->msgpad))) {
+		cl_free(s);
+		cl_free(ret);
+		return NULL;
+	}
 	ret->msg_body = (char*)ret->msg_buf + ch->msgpad;
 	memcpy(ret->msg_body, s, len);
 	cl_free(s);
@@ -2050,6 +2064,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.40  2005/02/06 05:54:42  alan
+ * Miscellaneous BEAM fixes.
+ * Memory leaks, use of NULL pointers, etc.
+ * Two errors are just pointed out and not fixed.  One is serious.
+ *
  * Revision 1.39  2005/01/28 09:09:51  gshi
  * add function to remove a field
  *
