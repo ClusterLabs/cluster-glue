@@ -386,7 +386,8 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
   
-  while (ch->recv_queue->current_qlen < ch->recv_queue->max_qlen) {
+  while (ch->ch_status == IPC_CONNECT
+  &&		ch->recv_queue->current_qlen < ch->recv_queue->max_qlen) {
     /* check how much data queued. */
     if(ioctl(conn_info->s, FIONREAD,&len) < 0){
       cl_perror("socket_resume_io: ioctl FIONREAD failed");
@@ -432,7 +433,8 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	msg = NULL;
       }else{
 	if(msg_len == conn_info->remaining_data){
-	  ch->recv_queue->queue = g_list_append(ch->recv_queue->queue, conn_info->buf_msg);
+	  ch->recv_queue->queue
+          =	g_list_append(ch->recv_queue->queue, conn_info->buf_msg);
 	  ch->recv_queue->current_qlen++;
 	  conn_info->buf_msg = NULL;
 	  conn_info->remaining_data = 0;
@@ -451,12 +453,17 @@ socket_resume_io(struct IPC_CHANNEL *ch)
   
  
   len = 0;
-  while (len >=0 && ch->send_queue->current_qlen >0) {
+  while (ch->ch_status == IPC_CONNECT
+  &&		len >=0 && ch->send_queue->current_qlen >0) {
+
     element = g_list_first(ch->send_queue->queue);
     if (element != NULL) {
       msg = (struct IPC_MESSAGE *) (element->data);
       head.msg_len = msg->msg_len;
-      len=send(conn_info->s, (char *)&head, sizeof(struct SOCKET_MSG_HEAD), MSG_DONTWAIT);
+
+      len=send(conn_info->s, (char *)&head
+      ,			sizeof(struct SOCKET_MSG_HEAD), MSG_DONTWAIT);
+
       if (len < 0){
 	if(errno == EAGAIN) {
 	  break;
@@ -468,6 +475,11 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	  return IPC_FAIL;	  
 	}
       }
+
+      if (ch->ch_status != IPC_CONNECT) {
+		break;
+      }
+
       len=send(conn_info->s, msg->msg_body, msg->msg_len, MSG_DONTWAIT);
       if (len < 0){
 	if(errno == EAGAIN) {
@@ -486,7 +498,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	  /* 
 	   * FIXME! for stream domain socket, if the message is too big, it 
 	   * may cause part of the message cut instead of being sent out.
-	   * We may need to implement the fragmentaion for sending. 
+	   * We may need to implement the fragmentation for sending. 
 	   * 
 	   */
 	  cl_log(LOG_ERR, "can't send all data out %d",len);
@@ -503,7 +515,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
     }
   }
 
-  return IPC_OK;
+  return ch->ch_status == IPC_CONNECT ? IPC_OK : IPC_BROKEN;
 }
 
 
