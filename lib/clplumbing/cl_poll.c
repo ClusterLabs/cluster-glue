@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <malloc.h>
+#include <string.h>
 #include <glib.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/cl_poll.h>
