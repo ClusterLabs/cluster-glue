@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.17 2004/09/14 15:07:29 gshi Exp $ */
+/* $Id: GSource.c,v 1.18 2004/12/09 20:56:48 gshi Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -268,6 +268,13 @@ static GSourceFuncs G_CH_SourceFuncs = {
 
 
 #define GET_CH_SOURCE(src)	(GCHSource*)(src +1)
+
+void
+set_IPC_Channel_dnotify(GCHSource* chp,
+			GDestroyNotify notify){
+	chp->dnotify = notify;	
+}
+
 /*
  *	Add an IPC_channel to the gmainloop world...
  */
