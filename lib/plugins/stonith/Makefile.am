@@ -28,7 +28,7 @@ AM_CFLAGS			= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 			-DSTONITH_MODULES='"$(stonithlibdir)"' \
 			-DLOCALEDIR='"@LOCALE@"' 
 
-EXTRA_DIST = README.meatware README.rcd_serial README.vacm
+EXTRA_DIST = README.meatware README.rcd_serial README.vacm README.drac3
 
 #
 #       We need "vacmclient_api.h" and -lvacmclient to make the VACM
@@ -123,6 +123,6 @@ rcd_serial_la_SOURCES	= rcd_serial.c
 rcd_serial_la_LDFLAGS	= -export-dynamic -module -avoid-version
 
 
-drac3_la_SOURCES	= drac3.c drac3_command.c drac3_command.h drac3_hash.c drac_hash.h
+drac3_la_SOURCES	= drac3.c drac3_command.c drac3_command.h drac3_hash.c drac3_hash.h
 drac3_la_LDFLAGS	= -export-dynamic -module -avoid-version -lxml2 -lssl
 drac3_la_LIBADD		= /usr/lib/libcurl.la
