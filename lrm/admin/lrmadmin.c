@@ -21,6 +21,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <portability.h>
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -35,8 +37,6 @@
 #endif
 #include <errno.h>
 #include <getopt.h>
-#include <uuid/uuid.h>
-#include <uuid/uuid.h>
 #include <clplumbing/cl_log.h>
 #include <lrm/lrm_api.h>
 /*
@@ -152,6 +152,9 @@ int main(int argc, char **argv)
 	int option_char;
 	rsc_id_t rscid_arg_tmp;
 	int ret_value = 0; 
+        ll_lrm_t* lrmd;
+	lrm_rsc_t * lrm_rsc;
+	GList *ratype, *rscid_list;
 
 	/* Prevent getopt_long to print error message on stderr isself */
 	/*opterr = 0; */  
@@ -288,8 +291,6 @@ int main(int argc, char **argv)
                }
 	} while (!QUIT_GETOPT);
 
-        ll_lrm_t* lrmd;
-
         lrmd = ll_lrm_new("lrm");
 
         if (NULL == lrmd) {
@@ -313,8 +314,6 @@ int main(int argc, char **argv)
 		return 0;
 	}
 	
-	lrm_rsc_t * lrm_rsc;
-	GList *ratype, *rscid_list;
 	switch (lrmadmin_cmd) {
 		case EXECUTE_RA:
 			call_id = resource_operation(lrmd, argc, optind, argv);
@@ -555,6 +554,7 @@ int main(int argc, char **argv)
 static void
 lrm_op_done_callback(lrm_op_t* op)
 {
+	char * tmp = NULL;
 	if (!op) {
 		cl_log(LOG_ERR, "In callback function, op is NULL pointer.");
 		return;
@@ -562,7 +562,7 @@ lrm_op_done_callback(lrm_op_t* op)
 
 	printf("Operation result: %s\n", status_msg[op->status-LRM_OP_DONE]);
 	printf("Operation type: %s\n", op->op_type);
-	char * tmp = params_hashtable_to_str(op->rsc->ra_type, op->params);
+	tmp = params_hashtable_to_str(op->rsc->ra_type, op->params);
 	printf("Opration parameters: %s\n", tmp);
 	g_free(tmp);
 
@@ -603,15 +603,16 @@ post_query_call_result(gpointer data)
 static int 
 resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 {
-	if ((argc - optind) < 3) {
-		cl_log(LOG_ERR,"No enough parameters.");
-		return -2;
-	}
-	
 	rsc_id_t rsc_id;
 	GHashTable * params_ht = NULL;
 	lrm_op_t op;
 	lrm_rsc_t * lrm_rsc;
+	int call_id;
+	
+	if ((argc - optind) < 3) {
+		cl_log(LOG_ERR,"No enough parameters.");
+		return -2;
+	}
 	
 	uuid_parse(argv[optind], rsc_id);
 	lrm_rsc = lrmd->lrm_ops->get_rsc(lrmd, rsc_id);	
@@ -630,7 +631,6 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	}
 	op.params = params_ht;
 
-	int call_id;
 	call_id = lrm_rsc->ops->perform_op(lrm_rsc, &op);
 	/* g_free(lrm_rsc);   don't need to free it ? */
 	if (params_ht) {
@@ -643,17 +643,21 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 static int 
 add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 {
+	int tmp_ret = 0;
+	rsc_id_t rsc_id;
+	const char * ra_type = NULL;
+	const char * ra_name = NULL;
+	GHashTable * params_ht = NULL;
+
 	if ((argc - optind) < 3) {
 		cl_log(LOG_ERR,"No enough parameters.");
 		return -2;
 	}
 
-	rsc_id_t rsc_id;
-	const char * ra_type = argv[optind+1];
-	const char * ra_name = argv[optind+2];
+	ra_type = argv[optind+1];
+	ra_name = argv[optind+2];
 	uuid_parse(argv[optind], rsc_id);
 
-	GHashTable * params_ht = NULL;
 	/* delete Hashtable */
 	if ((argc - optind) > 3) {
 		if ( 0 > transfer_cmd_params(argc, optind+3, argv, ra_type,
@@ -662,7 +666,7 @@ add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 		}
 	}
 
-	int tmp_ret = lrmd->lrm_ops->add_rsc(lrmd, rsc_id, ra_type, 
+	tmp_ret = lrmd->lrm_ops->add_rsc(lrmd, rsc_id, ra_type, 
 						ra_name, params_ht);
 
 	/*delete params_ht*/
@@ -678,13 +682,16 @@ static int
 transfer_cmd_params(int amount, int start, char * argv[], const char * ra_type, 
 GHashTable ** params_ht)
 {
+	int i;
+	int len_tmp;
+	char buffer[21];
+	char * delimit, * key, * value;
+
 	if (amount < start) {
 		return -1;
 	}
 
 	if (strncmp("ocf", ra_type, 4)==0) {
-		int i;
-		char * delimit, * key, * value;
 		*params_ht = g_hash_table_new(g_str_hash, g_str_equal);
 
 		for (i=start; i<amount; i++) {
@@ -695,7 +702,6 @@ GHashTable ** params_ht)
 				goto error_return; /* Have to */
 			}
 
-			int len_tmp;
 			/* lack error handling for g_new. Exception ? */
 			len_tmp = strnlen(delimit+1, 80) + 1;
 			value = g_new(gchar, len_tmp);
@@ -713,8 +719,6 @@ GHashTable ** params_ht)
 		/* Pay attention: for parameter ordring issue */
 		*params_ht = g_hash_table_new(g_str_hash, g_str_equal);
 
-		int i;
-		char buffer[21];
 		buffer[20] = '\0';
 		for (i=start; i<amount; i++) {
 			snprintf(buffer, 20, "%d", i-start+1);
@@ -740,12 +744,13 @@ error_return:
 static char * 
 params_hashtable_to_str(const char * ra_type, GHashTable * ht)
 {
+	gchar * params_str = NULL;
+	GString * gstr_tmp;
+
 	if (!ht) {
 		 return NULL;
 	}
 
-	gchar * params_str = NULL;
-	GString * gstr_tmp;
 	if (strncmp("ocf", ra_type, 4)==0) {
 		gstr_tmp = g_string_new("");
 		g_hash_table_foreach(ht, ocf_params_hash_to_str, &gstr_tmp);
@@ -790,13 +795,15 @@ g_print_ops(gpointer data, gpointer user_data)
 static void
 g_get_rsc_description(gpointer data, gpointer user_data)
 {
+	ll_lrm_t* lrmd = NULL;
+	lrm_rsc_t * lrm_rsc;
+	rsc_id_t rsc_id_tmp;
+
 	if (!(user_data)) {
 		return;
 	}
 
-	ll_lrm_t* lrmd = (ll_lrm_t *)user_data;
-	lrm_rsc_t * lrm_rsc;
-	rsc_id_t rsc_id_tmp;
+	lrmd = (ll_lrm_t *)user_data;
 	
 	memset(rsc_id_tmp, '\0', sizeof(rsc_id_t));
 	strncpy(rsc_id_tmp, data, sizeof(rsc_id_t));
@@ -815,17 +822,17 @@ g_get_rsc_description(gpointer data, gpointer user_data)
 static void
 print_rsc_inf(lrm_rsc_t * lrm_rsc)
 {
+	char * tmp = NULL;
+	char rscid_str_tmp[40];
+
 	if (!lrm_rsc) {
 		return;
 	}
-
-	char rscid_str_tmp[40];
 
 	uuid_unparse(lrm_rsc->id, rscid_str_tmp);
 	printf("Resource ID:                %s\n", rscid_str_tmp);
 	printf("Resource agency name:       %s\n", lrm_rsc->name);
 	printf("Resource agency type:       %s\n", lrm_rsc->ra_type);
-	char * tmp = NULL;
 	if (lrm_rsc->params) {
 		tmp = params_hashtable_to_str(lrm_rsc->ra_type, 
 				lrm_rsc->params);
@@ -879,6 +886,8 @@ get_lrm_rsc(ll_lrm_t * lrmd, rsc_id_t rscid)
 static void
 g_print_monitor(gpointer data, gpointer user_data)
 {
+	char * tmp;
+
 	/* Don't need to free it */
 	lrm_mon_t * lrm_mon = (lrm_mon_t *) data;
 	if (lrm_mon) {
@@ -888,7 +897,6 @@ g_print_monitor(gpointer data, gpointer user_data)
 		printf("Target: %d\n", lrm_mon->target);
 		printf("Operation type: %s\n", lrm_mon->op_type);
 		printf("Timeout: %d\n", lrm_mon->timeout);
-		char * tmp;
 		tmp = params_hashtable_to_str(lrm_mon->rsc->ra_type, 
 						lrm_mon->params);
 		printf("Parameters: %s\n", tmp);
@@ -897,18 +905,19 @@ g_print_monitor(gpointer data, gpointer user_data)
 	}
 }
 
-static int 
+int 
 set_monitor(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 {
-	if ((argc - optind) < 4) {
-		cl_log(LOG_ERR,"No enough parameters.");
-		return -2;
-	}
-	
 	rsc_id_t rsc_id;
 	GHashTable * params_ht = NULL;
 	lrm_mon_t mon;
 	lrm_rsc_t * lrm_rsc;
+	int call_id;
+	
+	if ((argc - optind) < 4) {
+		cl_log(LOG_ERR,"No enough parameters.");
+		return -2;
+	}
 	
 	uuid_parse(argv[optind], rsc_id);
 	lrm_rsc = lrmd->lrm_ops->get_rsc(lrmd, rsc_id);	
@@ -929,7 +938,6 @@ set_monitor(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	}
 	mon.params = params_ht;
 
-	int call_id;
 	call_id = lrm_rsc->ops->set_monitor(lrm_rsc, &mon);
 	/* g_free(lrm_rsc);  Don't need to free it? */
 	if (params_ht) {

@@ -151,11 +151,12 @@ pair_to_msg(gpointer key, gpointer value, gpointer user_data)
 GHashTable*
 ha_msg_value_hash_table(struct ha_msg * msg, const char * name)
 {
+	GHashTable* hash_table = NULL;
 	struct ha_msg* hash_msg = cl_get_struct(msg, name);
 	if (NULL == hash_msg) {
 		return NULL;
 	}
-	GHashTable* hash_table = msg_to_hash_table(hash_msg);
+	hash_table = msg_to_hash_table(hash_msg);
 	return hash_table;
 }
 
@@ -163,10 +164,11 @@ int
 ha_msg_add_hash_table(struct ha_msg * msg, const char * name,
 							GHashTable* hash_table)
 {
+	struct ha_msg* hash_msg = NULL;
 	if (NULL == msg || NULL == name || NULL == hash_table) {
 		return HA_FAIL;
 	}
-	struct ha_msg* hash_msg = hash_table_to_msg(hash_table);
+	hash_msg = hash_table_to_msg(hash_table);
 	ha_msg_addstruct(msg, name, hash_msg);
 	return HA_OK;
 }
@@ -201,10 +203,11 @@ pair_to_string(gpointer key, gpointer value, gpointer user_data)
 char*
 hash_table_to_string(GHashTable* hash_table)
 {
+	char* ret = NULL;
 	char* param = g_new(char, MAX_PARAM_LEN);
 	param[0]=EOS;
 	g_hash_table_foreach(hash_table, pair_to_string, param);
-	char* ret = g_strdup(param);
+	ret = g_strdup(param);
 	g_free(param);
 	return ret;
 }
@@ -253,11 +256,12 @@ free_hash_table(GHashTable* hash_table)
 struct ha_msg*
 create_lrm_msg (const char* msg)
 {
+	struct ha_msg* ret = NULL;
 	if ((NULL == msg) || (0 == strlen(msg))) {
 		return NULL;
 	}
 
-	struct ha_msg* ret = ha_msg_new(1);
+	ret = ha_msg_new(1);
 	if (HA_FAIL == ha_msg_add(ret, F_LRM_TYPE, msg)) {
 		return NULL;
 	}
@@ -268,11 +272,12 @@ create_lrm_msg (const char* msg)
 struct ha_msg*
 create_lrm_reg_msg(const char* app_name)
 {
+	struct ha_msg* ret = NULL;
 	if ((NULL == app_name) || (0 == strlen(app_name))) {
 		return NULL;
 	}
 
-	struct ha_msg* ret = ha_msg_new(5);
+	ret = ha_msg_new(5);
 
 	if (HA_FAIL == ha_msg_add(ret, F_LRM_TYPE, REGISTER)) {
 		return NULL;
@@ -332,11 +337,12 @@ create_lrm_addrsc_msg(rsc_id_t rid, const char* rname,
 struct ha_msg*
 create_lrm_rsc_msg(rsc_id_t rid, const char* msg)
 {
+	struct ha_msg* ret = NULL;
 	if ((NULL == msg) || (0 == strlen(msg))) {
 		return NULL;
 	}
 
-	struct ha_msg* ret = ha_msg_new(1);
+	ret = ha_msg_new(1);
 	if (HA_FAIL == ha_msg_add(ret, F_LRM_TYPE, msg)) {
 		return NULL;
 	}

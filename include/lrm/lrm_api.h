@@ -57,6 +57,14 @@
 
 #include <portability.h>
 
+#ifdef HAVE_UUID_H
+#  include <uuid.h>
+#endif /* HAVE_UUID_H */
+ 
+#ifdef HAVE_UUID_UUID_H
+#  include <uuid/uuid.h>
+#endif /* HAVE_UUID_UUID_H */
+
 #include <glib.h>
 
 #define	LRM_PROTOCOL_VERSION	0.1
