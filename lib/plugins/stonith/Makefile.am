@@ -19,7 +19,6 @@
 #
 MAINTAINERCLEANFILES    = Makefile.in
 
-SUBDIRS			= external
 
 INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/linux-ha -I$(top_srcdir)/linux-ha  \
