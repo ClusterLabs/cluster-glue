@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.133 2005/04/01 21:15:00 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.134 2005/04/01 22:55:40 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -250,6 +250,7 @@ extern struct ha_msg* wirefmt2msg(const char* s, size_t length);
 void cl_log_message (int log_level, const struct ha_msg *m);
 int timediff(longclock_t t1, longclock_t t2);
 void   ha_msg_del(struct ha_msg* msg);
+void	ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos);
 int 
 timediff(longclock_t t1, longclock_t t2)
 {
@@ -259,6 +260,59 @@ timediff(longclock_t t1, longclock_t t2)
 	
 	return longclockto_ms(remain);
 }
+
+
+void
+ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
+{
+	int msdiff = 0;
+	longclock_t lnow =  time_longclock();
+	char positions[4][16]={
+		"enqueue",
+		"send",
+		"recv",
+		"dequeue"};
+	
+	switch(whichpos){
+		case MSGPOS_ENQUEUE:			
+			SET_ENQUEUE_TIME(ipcmsg, lnow);	
+			break;
+		case MSGPOS_SEND:		
+			SET_SEND_TIME(ipcmsg, lnow);
+			goto checktime;
+		case MSGPOS_RECV:
+			SET_RECV_TIME(ipcmsg, lnow);
+			goto checktime;
+		case MSGPOS_DEQUEUE:
+			SET_DEQUEUE_TIME(ipcmsg, lnow);
+			
+	checktime:			
+			msdiff = timediff(lnow, GET_ENQUEUE_TIME(ipcmsg));
+			if (msdiff > MAXIPCTIME){
+				struct ha_msg* hamsg;
+				cl_log(LOG_WARNING, 
+				       " message delayed from enqueue to %s %d ms "
+				       "(enqueue-time=%ld, peer pid=%d) ",
+				       positions[whichpos],
+				       msdiff,
+				       longclockto_ms(GET_ENQUEUE_TIME(ipcmsg)),
+				       ch->farside_pid);			
+				hamsg = wirefmt2msg(ipcmsg->msg_body, ipcmsg->msg_len);
+				if (hamsg != NULL){
+					cl_log_message(LOG_INFO, hamsg);
+					ha_msg_del(hamsg);
+				}			
+			}	
+		default:
+			cl_log(LOG_ERR, "wrong position value in IPC:%d", whichpos);
+			return;
+	}
+	
+	return;
+}
+
+
+
 
 #endif 
 
@@ -834,7 +888,7 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 	
 
 #ifdef IPC_TIME_DEBUG
-	SET_ENQUEUE_TIME(msg, time_longclock());
+	ipc_time_debug(ch,msg, MSGPOS_ENQUEUE);
 #endif
 	ch->send_queue->queue = g_list_append(ch->send_queue->queue,
 					      msg);
@@ -880,26 +934,8 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 	ipcmsg = *message = (struct IPC_MESSAGE *) (element->data);
 	
 	
-#ifdef IPC_TIME_DEBUG				
-	{
-		int msdiff = 0;
-		SET_DEQUEUE_TIME(ipcmsg, time_longclock());
-		msdiff = timediff(GET_DEQUEUE_TIME(ipcmsg), GET_ENQUEUE_TIME(ipcmsg));
-		if (msdiff > MAXIPCTIME){
-			struct ha_msg* hamsg;
-			cl_log(LOG_WARNING, "socket_recv:"
-			       " message delayed from enqueue to dequeue %d ms "
-			       "(enqueue-time=%ld, peer pid=%d) ",
-			       msdiff,
-			       longclockto_ms(GET_ENQUEUE_TIME(ipcmsg)),
-			       ch->farside_pid);			
-			hamsg = wirefmt2msg(ipcmsg->msg_body, ipcmsg->msg_len);
-			if (hamsg != NULL){
-				cl_log_message(LOG_INFO, hamsg);
-				ha_msg_del(hamsg);
-			}			
-		}	
-	}
+#ifdef IPC_TIME_DEBUG		
+	ipc_time_debug(ch, ipcmsg, MSGPOS_DEQUEUE);	
 #endif	
 
 	CHECKFOO(1,ch, *message, SavedReadBody, "read message");
@@ -1266,27 +1302,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 		if (ch->bytes_remaining == 0){
 			/*we start to send a new message*/
 #ifdef IPC_TIME_DEBUG				
-			{
-				int msdiff = 0;
-				struct IPC_MESSAGE* ipcmsg = msg;
-				SET_SEND_TIME(ipcmsg, time_longclock());
-				msdiff = timediff(GET_SEND_TIME(ipcmsg), GET_ENQUEUE_TIME(ipcmsg));
-				if (msdiff > MAXIPCTIME){
-					struct ha_msg* hamsg;
-					cl_log(LOG_WARNING, "socket_resume_io_write:"
-					       " message delayed from enqueue to send %d ms "
-					       "(enqueue-time=%ld, peer pid=%d) ", 
-					       msdiff,
-					       longclockto_ms(GET_ENQUEUE_TIME(ipcmsg)),
-					       ch->farside_pid
-					       );			
-					hamsg = wirefmt2msg(ipcmsg->msg_body, ipcmsg->msg_len);
-					if (hamsg != NULL){
-						cl_log_message(LOG_INFO, hamsg);
-						ha_msg_del(hamsg);
-					}
-				}	
-			}
+			ipc_time_debug(ch, msg, MSGPOS_SEND);	
 #endif				
 
 
