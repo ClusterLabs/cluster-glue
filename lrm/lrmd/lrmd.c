@@ -31,7 +31,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <wait.h>
+#include <sys/wait.h>
 #include <dirent.h>
 
 #include <glib.h>
