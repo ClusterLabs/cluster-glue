@@ -778,6 +778,34 @@ socket_server_channel_new(int sockfd){
   
 }
 
+/*
+ * Create a new pair of pre-connected IPC channels similar to
+ * the result of pipe(2), or socketpair(2).
+ */
+
+int
+ipc_channel_pair(IPC_Channel* channels[2])
+{
+	int	sockets[2];
+	int	rc;
+
+	if ((rc = socketpair(AF_LOCAL, SOCK_STREAM, 0, sockets)) < 0) {
+		return IPC_FAIL;
+	}
+	if ((channels[0] = socket_server_channel_new(sockets[0])) == NULL) {
+		return IPC_FAIL;
+	}
+	if ((channels[1] = socket_server_channel_new(sockets[1])) == NULL) {
+		channels[0]->ops->destroy(channels[0]);
+		return IPC_FAIL;
+	}
+	channels[0]->ch_status = IPC_CONNECT;
+	channels[1]->ch_status = IPC_CONNECT;
+
+	return IPC_OK;
+	
+}
+
 /* 
  * create a new ipc message whose msg_body's length is msg_len. 
  * 
