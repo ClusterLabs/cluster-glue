@@ -24,8 +24,8 @@
 #include <sys/wait.h>
 #include <heartbeat.h>
 #include <clplumbing/proctrack.h>
+#include <clplumbing/cl_log.h>
 
-#define	PT	"clplumbing/proctrack"
 #define	DEBUGPROCTRACK	debugproctrack
 
 
@@ -90,7 +90,7 @@ ReportProcHasDied(int pid, int status)
 #endif
 	if ((p = GetProcInfo(pid)) == NULL) {
 		if (DEBUGPROCTRACK) {
-			g_log(PT, G_LOG_LEVEL_DEBUG
+			cl_log(LOG_DEBUG
 			,	"Process %d died (%d) but is not tracked."
 			,	pid, status);
 		}
@@ -136,9 +136,7 @@ ReportProcHasDied(int pid, int status)
 
 	if (doreport) {
 		if (deathbyexit) {
-			g_log(PT
-			,	(exitcode == 0 ? G_LOG_LEVEL_INFO
-			:		G_LOG_LEVEL_WARNING)
+			cl_log((exitcode == 0 ? LOG_INFO : LOG_WARNING)
 			,	"Exiting %s process %d returned rc %d."
 			,	type, pid, exitcode);
 		}else if (deathbysig) {
@@ -146,14 +144,11 @@ ReportProcHasDied(int pid, int status)
 			 * Processes being killed isn't an error if
 			 * we're only logging because of debugging.
 			 */
-			g_log(PT
-			,	(debugreporting ? G_LOG_LEVEL_DEBUG
-			:	G_LOG_LEVEL_CRITICAL)
+			cl_log((debugreporting ? LOG_DEBUG : LOG_ERR)
 			,	"Exiting %s process %d killed by signal %d."
 			,	type, pid, signo);
 		}else{
-			g_log(PT, G_LOG_LEVEL_CRITICAL
-			,	"Exiting %s process %d went away"
+			cl_log(LOG_ERR, "Exiting %s process %d went away"
 			" strangely (!)"
 			,	type, pid);
 		}
@@ -161,8 +156,7 @@ ReportProcHasDied(int pid, int status)
 #ifdef WCOREDUMP
 	if (didcoredump) {
 		/* We report ALL core dumps without exception */
-		g_log(PT, G_LOG_LEVEL_CRITICAL
-		,	"Exiting %s process %d dumped core"
+		cl_log(LOG_ERR, "Exiting %s process %d dumped core"
 		,	type, pid);
 	}
 #endif
@@ -171,8 +165,7 @@ ReportProcHasDied(int pid, int status)
 		p->ops->procdied(p, status, exitcode, signo, doreport);
 		if (p->privatedata) {
 			/* They may have forgotten to free something... */
-			g_log(PT, G_LOG_LEVEL_CRITICAL
-			,	"Exiting %s process %d did not"
+			cl_log(LOG_ERR, "Exiting %s process %d did not"
 			" clean up private data!"
 			,	type, pid);
 		}
