@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.63 2005/02/18 05:43:09 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.64 2005/02/22 01:30:40 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -47,6 +47,7 @@
 #include <clplumbing/cl_signal.h>
 #include <clplumbing/proctrack.h>
 #include <clplumbing/coredumps.h>
+#include <clplumbing/uids.h>
 
 #include <ha_msg.h>
 #include <lrm/lrm_api.h>
@@ -266,10 +267,12 @@ main(int argc, char ** argv)
 		usage(lrm_system_name, LSB_EXIT_GENERIC);
 	}
 
+	cl_malloc_forced_for_glib();
 	cl_log_set_entity(lrm_system_name);
 	cl_log_enable_stderr(debug_level?TRUE:FALSE);
 	cl_log_set_facility(LOG_DAEMON);
-	cl_malloc_forced_for_glib();
+	/* waiting for it becomes stable */
+	cl_log_send_to_logging_daemon(FALSE); 
 	if (req_status){
 		return init_status(PID_FILE, lrm_system_name);
 	}
@@ -434,8 +437,7 @@ init_start ()
 	char* dot = NULL;
 	char* ra_name = NULL;
         int len;
-	IPC_Auth	auth;
-	guint		id = 100;
+	IPC_Auth	* auth = NULL;
 	int		one = 1;
 	GHashTable*	uidlist;
 	IPC_WaitConnection* conn_cmd = NULL;
@@ -459,7 +461,6 @@ init_start ()
 	}
 
 	register_pid(PID_FILE, FALSE, sigterm_action);
-
 
 	/* load RA plugins   */
 	PluginLoadingSystem = NewPILPluginUniv (PLUGIN_DIR);
@@ -502,10 +503,23 @@ init_start ()
 	 */
 
 	uidlist = g_hash_table_new(g_direct_hash, g_direct_equal);
-	g_hash_table_insert(uidlist, GUINT_TO_POINTER(id), &one);
-	auth.uid = uidlist;
-	auth.gid = NULL;
+	/* Add root;s uid */
+	g_hash_table_insert(uidlist, GUINT_TO_POINTER(0), &one); 
 
+	pw_entry = getpwnam(HA_CCMUSER);
+	if (pw_entry == NULL) {
+		lrmd_log(LOG_ERR, "Cannot get the uid of HACCMUSER");
+	} else {
+		g_hash_table_insert(uidlist, GUINT_TO_POINTER(pw_entry->pw_uid)
+				    , &one); 
+	}
+
+	if ( NULL == (auth = MALLOCT(struct IPC_AUTH)) ) {
+		lrmd_log(LOG_ERR, "init_start: MALLOCT failed.");
+	} else {
+		auth->uid = uidlist;
+		auth->gid = NULL;
+	}
 
 	lrmd_log(LOG_DEBUG, "main: start.");
 
@@ -523,7 +537,7 @@ init_start ()
 	}
 
 	/*Create a source to handle new connect rquests for command*/
-	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cmd, NULL, FALSE,
+	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cmd, auth, FALSE,
 				   on_connect_cmd, conn_cmd, NULL);
 
 	/*
@@ -542,11 +556,9 @@ init_start ()
 	}
 
 	/*Create a source to handle new connect rquests for callback*/
-	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cbk, NULL, FALSE,
+	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cbk, auth, FALSE,
 	                               on_connect_cbk, conn_cbk, NULL);
 
-
-	
 	if (G_main_add_input(G_PRIORITY_HIGH, FALSE, 
 			     &polled_input_SourceFuncs) ==NULL){
 		cl_log(LOG_ERR, "main: G_main_add_input failed");
@@ -557,6 +569,15 @@ init_start ()
 	set_child_signal();
 
 	lrmd_log(LOG_DEBUG, "Enabling coredumps");
+	/* Althugh lrmd can count on the parent to enable coredump, still
+	 * set it here for test, when start manually.
+	 * Moreover, we use simple code here, since coredump file can not be
+	 * overwritten after appending the pid. The old code remain for a
+	 * while, will remove later.
+	 */
+ 	cl_cdtocoredir();
+	cl_enable_coredumps(TRUE);	
+#if 0
 	pw_entry = getpwuid(geteuid());
 	if (pw_entry == NULL) {
 		lrmd_log(LOG_ERR, "Cannot get the user name of uid [%d]"
@@ -583,19 +604,26 @@ init_start ()
 	if (cl_cdtocoredir() != 0) {
 		lrmd_log(LOG_ERR, "Cannot cd to coredump dir");
     	}
+#endif
 
+	drop_privs(0, 0); /* become "nobody" */
 	/*Create the mainloop and run it*/
 	mainloop = g_main_new(FALSE);
 	lrmd_log(LOG_DEBUG, "main: run the loop...");
 	lrmd_log(LOG_INFO, "Started.");
 	g_main_run(mainloop);
 
+	return_to_orig_privs();
 	conn_cmd->ops->destroy(conn_cmd);
 	conn_cmd = NULL;
 
 	conn_cbk->ops->destroy(conn_cbk);
 	conn_cbk = NULL;
 
+	g_hash_table_destroy(uidlist);
+	if ( NULL != auth ) {
+		cl_free(auth);
+	}
 	if (unlink(PID_FILE) == 0) {
 		lrmd_log(LOG_DEBUG, "[%s] stopped", lrm_system_name);
 	}
@@ -1704,6 +1732,7 @@ perform_ra_op(lrmd_op_t* op)
 	free_str_table(op->rsc->params);
 	op->rsc->params = params;
 
+	return_to_orig_privs();
 	switch(pid=fork()) {
 		case -1:
 			lrmd_log(LOG_ERR,"start_a_child_client: Cannot fork.");
@@ -1716,6 +1745,7 @@ perform_ra_op(lrmd_op_t* op)
 			op->exec_pid = pid;
 
 			lrmd_log(LOG_DEBUG, "perform_ra_op: end(parent).");
+			return_to_dropped_privs();
 			return HA_OK;
 
 		case 0:		/* Child */
@@ -2007,7 +2037,9 @@ void
 free_op(lrmd_op_t* op)
 {
 	if (-1 != op->exec_pid ) {
+		return_to_orig_privs();	
 		kill(op->exec_pid, 9);
+		return_to_dropped_privs();
 		return;
 	}
 
@@ -2080,6 +2112,10 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.64  2005/02/22 01:30:40  sunjd
+ * Degrade running privilege to 'nobody' as more as possible;
+ * Add authority verification data to the IPC channel which is used to communicate with clients.
+ *
  * Revision 1.63  2005/02/18 05:43:09  sunjd
  * Fix the bugs BEAM found
  *
