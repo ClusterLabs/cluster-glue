@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.13 2004/03/18 12:07:39 lars Exp $ */
+/* $Id: cl_log.c,v 1.14 2004/04/16 19:30:00 alan Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -237,9 +237,12 @@ ha_timestamp(void)
 	static char ts[64];
 	struct tm*	ttm;
 	TIME_T		now;
+	time_t		nowtt;
 
+	/* Work around various weridnesses in different OSes and time_t definitions */
 	now = time(NULL);
-	ttm = localtime((time_t *)&now);
+	nowtt = (time_t)now;
+	ttm = localtime(&nowtt);
 
 	snprintf(ts, sizeof(ts), "%04d/%02d/%02d_%02d:%02d:%02d"
 	,	ttm->tm_year+1900, ttm->tm_mon+1, ttm->tm_mday
