@@ -43,6 +43,7 @@
 #include <sys/ioctl.h>
 #include <fcntl.h>
 #include <sys/time.h>
+#include <sys/termios.h>
 
 #include <stonith/stonith.h>
 
@@ -289,6 +290,7 @@ rcd_serial_status(Stonith  *s)
 {
 	struct RCD_SerialDevice*	rcd;
 	int fd;
+	const char * err;
 
 	if (!ISRCD_SERIALDEV(s)) {
 		syslog(LOG_ERR, "invalid argument to RCD_SERIAL_status");
@@ -303,14 +305,24 @@ rcd_serial_status(Stonith  *s)
 	*/
 
 	if ((fd = RCD_open_serial_port(rcd->device)) == -1) {
+#ifdef HAVE_STRERROR
+                err = strerror(errno);
+#else
+		err = sys_errlist[errno];
+#endif
 		syslog(LOG_ERR, "%s: open of %s failed - %s",
-			__FUNCTION__, rcd->device, sys_errlist[errno]);
+			__FUNCTION__, rcd->device, err);
 		return(S_OOPS);
 	}
 
 	if (RCD_close_serial_port(fd) != 0) {
+#ifdef HAVE_STRERROR
+                err = strerror(errno);
+#else
+		err = sys_errlist[errno];
+#endif
 		syslog(LOG_ERR, "%s: close of %s failed - %s",
-			__FUNCTION__, rcd->device, sys_errlist[errno]);
+			__FUNCTION__, rcd->device, err);
 		return(S_OOPS);
 	}
 
@@ -514,6 +526,7 @@ rcd_serial_reset_req(Stonith * s, int request, const char * host)
 	int fd;
 	int sigbit;
 	struct itimerval timer;
+	const char * err;
 
 	if (!ISRCD_SERIALDEV(s)) {
 		syslog(LOG_ERR, "invalid argument to %s", __FUNCTION__);
@@ -540,8 +553,13 @@ rcd_serial_reset_req(Stonith * s, int request, const char * host)
 
 	/* Open the device */
 	if ((fd = RCD_open_serial_port(rcd->device)) == -1) {
+#ifdef HAVE_STRERROR
+                err = strerror(errno);
+#else
+		err = sys_errlist[errno];
+#endif
 		syslog(LOG_ERR, "%s: open of %s failed - %s",
-			__FUNCTION__, rcd->device, sys_errlist[errno]);
+			__FUNCTION__, rcd->device, err);
 		return(S_OOPS);
 	}
 
@@ -567,8 +585,13 @@ rcd_serial_reset_req(Stonith * s, int request, const char * host)
 
         /* Close the port */
 	if (RCD_close_serial_port(fd) != 0) {
+#ifdef HAVE_STRERROR
+                err = strerror(errno);
+#else
+		err = sys_errlist[errno];
+#endif
 		syslog(LOG_ERR, "%s: close of %s failed - %s",
-			__FUNCTION__, rcd->device, sys_errlist[errno]);
+			__FUNCTION__, rcd->device, err);
 		return(S_OOPS);
 	}
 
