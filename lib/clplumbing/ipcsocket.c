@@ -107,9 +107,13 @@ struct OCF_IPC_CHANNEL* socket_channel_new(GHashTable *attrs);
 static void 
 socket_destroy_wait_conn(struct OCF_IPC_WAIT_CONNECTION * wait_conn)
 {
-  close(((struct SOCKET_CH_PRIVATE *) (wait_conn->ch_private))->s);
-  if(wait_conn->ch_private != NULL)
-    free((void*) (wait_conn->ch_private));
+  struct SOCKET_CH_PRIVATE * wc = wait_conn->ch_private;
+
+  if (wc != NULL) {
+    close(wc->s);
+    unlink(wc->path_name);
+    free(wc);
+  }
   free((void*) wait_conn);
 }
 
@@ -665,11 +669,13 @@ socket_wait_conn_new(GHashTable *ch_attrs)
 
   /* prepare the unix domain socket */
   if ((s = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
-    perror("socket");
+    perror("socket_wait_conn_new: socket");
     return NULL;
   }
   
-  unlink(path_name);
+  if (unlink(path_name) < 0 && errno != ENOENT) {
+    perror("socket_wait_conn_new: unlink");
+  }
   memset(&my_addr, 0, sizeof(my_addr));
   my_addr.sun_family = AF_LOCAL;         /* host byte order */
 
