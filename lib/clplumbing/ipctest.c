@@ -37,12 +37,17 @@ channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
 			break;
 
 		case 0:		/* Child */
-			rc =clientfunc(channels[0], count);
+			rc = clientfunc(channels[0], count);
+			channels[0]->ops->waitout(channels[0]);
+			channels[0]->ops->destroy(channels[0]);
 			exit (rc > 127 ? 127 : rc);
 			break;
 
 		default:	 /* Server */
-			return serverfunc(channels[1], count);
+			rc = serverfunc(channels[1], count);
+			channels[1]->ops->waitout(channels[1]);
+			channels[1]->ops->destroy(channels[1]);
+			return rc;
 	}
 	return -1; /* This can't happen ;-) */
 }
@@ -136,6 +141,10 @@ echoserver(IPC_Channel* wchan, int repcount)
 		checkifblocked(wchan);
 		//fprintf(stderr, "S");
 
+		/* Try and induce a failure... */
+		if (j == repcount) {
+			sleep(1);
+		}
 		if ((rc = wchan->ops->waitin(wchan)) != IPC_OK) {
 			fprintf(stderr
 			,	"echotest server: waitin failed %d rc iter %d"
