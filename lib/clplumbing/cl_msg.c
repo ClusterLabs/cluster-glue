@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.54 2005/02/17 18:14:22 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.55 2005/02/17 21:45:35 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -202,8 +202,7 @@ ha_msg_del(struct ha_msg *msg)
 					continue;
 				}
 				
-				if(msg->types[j] < sizeof(fieldtypefuncs) 
-				   / sizeof(fieldtypefuncs[0])){					
+				if(msg->types[j] < DIMOF(fieldtypefuncs)){					
 					fieldtypefuncs[msg->types[j]].memfree(msg->values[j]);
 				}
 			}
@@ -257,8 +256,7 @@ ha_msg_copy(const struct ha_msg *msg)
 		memcpy(ret->names[j], msg->names[j], msg->nlens[j]+1);
 		
 		
-		if(msg->types[j] < sizeof(fieldtypefuncs) 
-		   / sizeof(fieldtypefuncs[0])){					
+		if(msg->types[j] < DIMOF(fieldtypefuncs)){					
 			ret->values[j] = fieldtypefuncs[msg->types[j]].dup(msg->values[j],
 									   msg->vlens[j]);
 			if (!ret->values[j]){
@@ -570,7 +568,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 	
 	internal_type = type;
 	
-	HA_MSG_ASSERT(type < sizeof(fieldtypefuncs)/sizeof(fieldtypefuncs[0]));
+	HA_MSG_ASSERT(type < DIMOF(fieldtypefuncs));
 	
 	addfield =  fieldtypefuncs[type].addfield;
 	if (!addfield || 
@@ -602,7 +600,7 @@ ha_msg_addraw(struct ha_msg * msg, const char * name, size_t namelen,
 	strncpy(cpname, name, namelen);
 	cpname[namelen] = EOS;
 	
-	HA_MSG_ASSERT(type < sizeof(fieldtypefuncs)/sizeof(fieldtypefuncs[0]));
+	HA_MSG_ASSERT(type < DIMOF(fieldtypefuncs));
 	
 	if (fieldtypefuncs[type].dup){
 		cpvalue = fieldtypefuncs[type].dup(value, vallen);	
@@ -1149,10 +1147,8 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 		cl_log(LOG_ERR, "cl_msg_mod: NULL input.");
 		return HA_FAIL;
 	}
-
 	
-	if(type >= sizeof(fieldtypefuncs) 
-	   / sizeof(fieldtypefuncs[0])){
+	if(type >= DIMOF(fieldtypefuncs)){
 		cl_log(LOG_ERR, "cl_msg_mod:"
 		       "invalid type(%d)", type);
 		return HA_FAIL;
@@ -1463,9 +1459,8 @@ msgfromstream_netstring(FILE * f)
 		fieldtype = atoi(type);
 
 
-				
-		if (fieldtype < sizeof(fieldtypefuncs) 
-		    / sizeof(fieldtypefuncs[0])){					
+		
+		if (fieldtype < DIMOF(fieldtypefuncs)){					
 			netstringtofield = fieldtypefuncs[fieldtype].netstringtofield;
 			memfree = fieldtypefuncs[fieldtype].memfree;
 			if (!netstringtofield || netstringtofield(data, datalen,
@@ -1925,8 +1920,7 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 		strcat(bp, "=");
 		bp++;
 		
-		if(m->types[j] < sizeof(fieldtypefuncs) 
-		   / sizeof(fieldtypefuncs[0])){
+		if(m->types[j] < DIMOF(fieldtypefuncs)){
 			tostring = fieldtypefuncs[m->types[j]].tostring;
 		} else {
 			cl_log(LOG_ERR, "type(%d) unrecognized", m->types[j]);
@@ -2126,8 +2120,7 @@ cl_log_message (int log_level, const struct ha_msg *m)
 	
 	for (j=0; j < m->nfields; ++j) {
 		
-		if(m->types[j] < sizeof(fieldtypefuncs) 
-		   / sizeof(fieldtypefuncs[0])){					
+		if(m->types[j] < DIMOF(fieldtypefuncs)){					
 			fieldtypefuncs[m->types[j]].display(log_level, j, 
 							    m->names[j],
 							    m->values[j]);
@@ -2158,6 +2151,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.55  2005/02/17 21:45:35  gshi
+ *  use DIMOF to calculate dimention of an array
+ *
  * Revision 1.54  2005/02/17 18:14:22  gshi
  * BEAM fix:
  * add surrounding {} for some if statements
