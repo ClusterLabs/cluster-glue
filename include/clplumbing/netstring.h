@@ -24,6 +24,7 @@
 #define NET_STRING_H
 #include <stdlib.h>
 #include <stdio.h>
+#include <ha_msg.h>
 
 /* Calculate the length of this integer */
 int			intlen(int x);
@@ -37,4 +38,11 @@ struct ha_msg *		netstring2msg(const char*, size_t, int);
 /* Is this netstring authentic? */
 int			is_auth_netstring(const char* datap, size_t datalen, 
 					  const char* authstring, size_t authlen);
+
+void cl_set_authentication_computation_method(int (*method)(int authmethod
+,	const void * data
+,	size_t datalen
+,	char * authstr
+,	size_t authlen));
+
 #endif

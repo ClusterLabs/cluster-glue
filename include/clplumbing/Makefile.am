@@ -30,6 +30,7 @@ include_HEADERS	= 		\
 	apphb_cs.h	\
 	base64.h	\
 	cl_log.h	\
+	cl_malloc.h	\
 	cl_poll.h	\
 	cl_signal.h     \
 	cpulimits.h     \
@@ -43,4 +44,5 @@ include_HEADERS	= 		\
 	realtime.h	\
 	recoverymgr_cs.h \
 	timers.h	\
+	ttylock.h	\
 	uids.h
