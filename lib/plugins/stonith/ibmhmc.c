@@ -39,19 +39,6 @@
  *
  * Current deficiencies:
  *
- *	- The user has to provide a list of partitions and/or system names
- *		on the command line, when we should grab this information
- *		from the HMC ourselves...
- *
- *	- The user has to tell us whether the system is partitioned or not
- *
- *	- All systems either have to be partitioned or none can be
- *
- *	- We don't have a "status" command that will verify that we're
- *		configured correctly.
- *
- *	- I don't think the on/off/reset commands are done quite right yet...
- *
  *	- We don't capture the firmware version of the HMC itself.
  *		We'll probably eventually need that...
  *
