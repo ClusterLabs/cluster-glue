@@ -1,4 +1,4 @@
-/* $Id: ipctransientserver.c,v 1.6 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: ipctransientserver.c,v 1.7 2004/03/01 22:19:44 lars Exp $ */
 /* 
  * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
  * 
@@ -157,7 +157,9 @@ transient_server_callback(IPC_Channel *client, gpointer user_data)
 		
 		if(msg != NULL){
 			lpc++;
-			buffer = (char*)msg->msg_body;
+			buffer = (char*)g_malloc(msg->msg_len+1);
+			memcpy(buffer,msg->msg_body, msg->msg_len);
+			buffer[msg->msg_len+1] = '\0';
 			cl_log(LOG_DEBUG, "[Server] Got xml [text=%s]", buffer);
 			
 			reply = create_simple_message(strdup(buffer), client);
