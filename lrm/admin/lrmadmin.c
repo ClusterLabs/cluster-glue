@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.23 2004/11/23 20:58:18 andrew Exp $ */
+/* $Id: lrmadmin.c,v 1.24 2004/12/05 13:18:32 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -664,7 +664,7 @@ GHashTable ** params_ht)
 		return -1;
 	}
 
-	if (strncmp("ocf", class, 4)==0) {
+	if (strncmp("ocf", class, 4)==0 || strncmp("stonith", class, 4)==0) {
 		*params_ht = g_hash_table_new(g_str_hash, g_str_equal);
 
 		for (i=start; i<amount; i++) {
@@ -882,6 +882,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.24  2004/12/05 13:18:32  sunjd
+ * add the support to stonith RAs
+ *
  * Revision 1.23  2004/11/23 20:58:18  andrew
  * Commit zhenh's patch for preserving user data across connections
  * Only supports flat objects (ie. char* or structs without pointers in them)
