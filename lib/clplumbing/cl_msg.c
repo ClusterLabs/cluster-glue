@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.9 2004/04/29 01:22:30 alan Exp $ */
+/* $Id: cl_msg.c,v 1.10 2004/06/18 03:04:33 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -828,11 +828,12 @@ cl_get_type(const struct ha_msg *msg, const char *name)
 
 	ret =  cl_get_value( msg, name, NULL, &type);
 
-	if (ret == NULL ||( type != FT_STRING &&
-			   type != FT_BINARY && type != FT_STRUCT)) {
-
-		cl_log(LOG_WARNING, "field %s not found or "
-		       "it is not any valid type", name);
+	if (ret == NULL) {
+		return -1;
+	}
+	if (type != FT_STRING && type != FT_BINARY && type != FT_STRUCT) {
+		cl_log(LOG_WARNING, "field %s not a valid type"
+		,	name);
 		return(-1);
 	}
 
@@ -843,7 +844,6 @@ cl_get_type(const struct ha_msg *msg, const char *name)
 struct ha_msg *
 cl_get_struct(const struct ha_msg *msg, const char* name)
 {
-
 	struct ha_msg	*ret;
 	int		type;
 	size_t		vallen;
@@ -851,11 +851,8 @@ cl_get_struct(const struct ha_msg *msg, const char* name)
 	ret = (struct ha_msg *)cl_get_value(msg, name, &vallen, &type);
 
 	if (ret == NULL || type != FT_STRUCT){
-		cl_log(LOG_ERR, "filed %s not found or"
-	       " it is not a struct", name);
 		return(NULL);
 	}
-
 	return(ret);
 }
 
@@ -1784,6 +1781,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.10  2004/06/18 03:04:33  alan
+ * Changed a few checks for non-existent fields to return NULL
+ * silently.  This is the right behavior (really!).
+ *
  * Revision 1.9  2004/04/29 01:22:30  alan
  * Undid a broken fix to the %zd format string problem.
  * It was replaced with %xd which prints in hex instead of decimal, and also
