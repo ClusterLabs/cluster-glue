@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.54 2004/12/07 06:35:00 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.55 2004/12/08 08:46:37 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1658,6 +1658,7 @@ perform_ra_op(lrmd_op_t* op)
 {
 	int fd[2];
 	pid_t pid;
+	int timeout;
 	struct RAExecOps * RAExec = NULL;
 	const char* op_type = NULL;
         GHashTable* params = NULL;
@@ -1707,8 +1708,11 @@ perform_ra_op(lrmd_op_t* op)
 				return HA_FAIL;
 			}
 			op_type = ha_msg_value(op->msg, F_LRM_OP);
+			if(HA_OK != ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)){
+				timeout = 0;
+				lrmd_log(LOG_ERR,"perform_ra_op: can not find timeout");
+			}
 
-			
 			/* Name of the resource and some others also
 			 * need to be passed in. Maybe pass through the
 			 * entire lrm_op_t too? */
@@ -1716,6 +1720,7 @@ perform_ra_op(lrmd_op_t* op)
 					op->rsc->type,
 					op->rsc->provider,
 					op_type,
+					timeout,
 					params);
 
 			/* execra should never return. */
@@ -2040,6 +2045,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.55  2004/12/08 08:46:37  zhenh
+ * let lrmd pass timeout to RA.
+ *
  * Revision 1.54  2004/12/07 06:35:00  zhenh
  * fix a bug, mistype
  *

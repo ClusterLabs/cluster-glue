@@ -84,6 +84,7 @@ struct RAExecOps {
 		const char * rsc_type,
 		const char * provider,
 		const char * op_type,
+		const int    timeout,
 		GHashTable * params);
 
 	/*
