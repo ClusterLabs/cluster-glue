@@ -35,6 +35,7 @@
 static gboolean free_pair(gpointer key, gpointer value, gpointer user_data);
 static void pair_to_msg(gpointer key, gpointer value, gpointer user_data);
 static void copy_pair(gpointer key, gpointer value, gpointer user_data);
+static void merge_pair(gpointer key, gpointer value, gpointer user_data);
 
 int
 ha_msg_add_int(struct ha_msg * msg, const char * name, int value)
@@ -228,6 +229,31 @@ copy_hash_table(GHashTable* src_table)
 	target_table = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_foreach(src_table, copy_pair, target_table);
 	return target_table;
+}
+
+void
+merge_pair(gpointer key, gpointer value, gpointer user_data)
+{
+	GHashTable* ret = (GHashTable*)user_data;
+	char* oldvalue = g_hash_table_lookup(ret, key);
+	if (NULL != oldvalue) {
+		g_free(oldvalue);
+	}
+	g_hash_table_insert(ret, g_strdup(key), g_strdup(value));
+}
+
+GHashTable*
+merge_hash_tables(GHashTable* old, GHashTable* new)
+{
+	if ( NULL == old ) {
+		return copy_hash_table(new);
+	}
+	if ( NULL == new ) {
+		return copy_hash_table(old);
+	}
+	GHashTable* ret = copy_hash_table(old);
+	g_hash_table_foreach(new, merge_pair, ret);
+	return ret;
 }
 
 gboolean
