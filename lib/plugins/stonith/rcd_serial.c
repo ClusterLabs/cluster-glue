@@ -231,12 +231,12 @@ RCD_alarm_handler(int sig) {
 	sa.sa_mask = sigmask;
 	sa.sa_flags = 0;
 	sigaction(SIGALRM, &sa, NULL);
+#endif
 
 #ifdef RCD_NOPAUSE
 	RCD_alarmcaught = 1;
 #endif
 	return;
-#endif
 }
 
 static int
