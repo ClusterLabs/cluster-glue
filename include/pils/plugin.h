@@ -443,8 +443,14 @@ PIL_rc		PILLoadPlugin(PILPluginUniv* piuniv
 ,		const char *	pluginname
 ,		void *		pi_private);
 
-void		PILSetDebugLevel(int level);
-int		PILGetDebugLevel(void);
+/* Either or both of pitype and piname may be NULL */
+void		PILSetDebugLevel(PILPluginUniv*u, char * pitype
+,		char * piname
+,		int level);
+
+/* Neither pitype nor piname may be NULL */
+int		PILGetDebugLevel(PILPluginUniv* u, const char * pitype
+,		const char * piname);
 
 PIL_rc		PILIncrIFRefCount(PILPluginUniv* piuniv
 ,		const char *	interfacetype
