@@ -1,4 +1,4 @@
-#include <portability.h>
+#include <linux-ha/portability.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -250,7 +250,7 @@ LogToLoggingDaemon(int priority, const char * buf, int bufstrlen)
 	if (logging_channel == NULL) {
 		GHashTable*	attrs;
 		char		path[] = IPC_PATH_ATTR;
-		char		sockpath[] = LOGDAEMON_IPC;
+		char		sockpath[] = HA_LOGDAEMON_IPC;
 	
 		attrs = g_hash_table_new(g_str_hash, g_str_equal);
 		g_hash_table_insert(attrs, path, sockpath);

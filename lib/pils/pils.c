@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#include <portability.h>
+#include <linux-ha/portability.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
