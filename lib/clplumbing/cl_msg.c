@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.56 2005/02/24 20:46:29 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.57 2005/02/24 21:17:58 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1135,6 +1135,24 @@ cl_msg_list_nth_data(struct ha_msg* msg, const char* name, int n)
 	
 }
 
+int
+cl_msg_add_list(struct ha_msg* msg, const char* name, GList* list)
+{
+	int		ret;
+	
+	if(msg == NULL|| name ==NULL || list == NULL){
+		cl_log(LOG_ERR, "cl_msg_add_list:"
+		       "invalid arguments");
+		return HA_FAIL;
+	}
+	
+	ret = ha_msg_addraw(msg, name, strlen(name), list, 
+			    string_list_pack_length(list),
+			    FT_LIST, 0);
+	
+	return ret;
+}
+
 GList*
 cl_msg_get_list(struct ha_msg* msg, const char* name)
 {
@@ -2267,6 +2285,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.57  2005/02/24 21:17:58  gshi
+ * add two APIs for list support
+ *
  * Revision 1.56  2005/02/24 20:46:29  gshi
  * BEAM FIX:
  *
