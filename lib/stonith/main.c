@@ -62,7 +62,7 @@ confhelp(const char * cmd, FILE* stream)
 	Stonith *       s;
 
 	fprintf(stream
-	,	"\nSTONITH device types [-t devicetypes] and"
+	,	"\nSTONITH -t device types and"
 		" associated configuration details:");
 
 	typelist = stonith_types();
