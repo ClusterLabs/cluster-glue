@@ -20,25 +20,27 @@
  */
 
 #include <clplumbing/ipc.h>
+#include <clplumbing/cl_log.h>
 
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/uio.h>
 #ifdef HAVE_SYS_FILIO_H
-#include <sys/filio.h>
+#	include <sys/filio.h>
 #endif
 #ifdef HAVE_SYS_SYSLIMITS_H
-#include <sys/syslimits.h>
+#	include <sys/syslimits.h>
 #endif
 #ifdef HAVE_SYS_CRED_H
-#include <sys/cred.h>
+#	include <sys/cred.h>
 #endif
 #ifdef HAVE_SYS_UCRED_H
-#include <sys/ucred.h>
+#	include <sys/ucred.h>
 #endif
 #include <sys/socket.h>
 #include <sys/poll.h>
@@ -118,13 +120,14 @@ static int socket_set_recv_qlen (struct IPC_CHANNEL* ch, int q_len);
 
 /* helper functions. */
 
-int socket_disconnect(struct IPC_CHANNEL* ch);
+static int socket_disconnect(struct IPC_CHANNEL* ch);
 
-struct IPC_QUEUE* socket_queue_new(void);
+static struct IPC_QUEUE* socket_queue_new(void);
 
-void socket_destroy_queue(struct IPC_QUEUE * q);
+static void socket_destroy_queue(struct IPC_QUEUE * q);
 
-struct IPC_MESSAGE* socket_message_new(struct IPC_CHANNEL *ch, int msg_len);
+static struct IPC_MESSAGE* socket_message_new(struct IPC_CHANNEL*ch
+,	int msg_len);
 
 void socket_free_message(struct IPC_MESSAGE * msg);
 
@@ -174,24 +177,25 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
   
   /* get select fd */
   s = wait_conn->ops->get_select_fd(wait_conn); 
-  if (s == -1) {
-    printf("get_select_fd: invalid fd\n");
+  if (s < 0) {
+    cl_log(LOG_ERR, "get_select_fd: invalid fd");
     return NULL;
   }
 
   /* get client connection. */
   sin_size = sizeof(struct sockaddr_un);
   if ((new_sock = accept(s, (struct sockaddr *)&peer_addr, &sin_size)) == -1) {
-    perror("accept");
+    cl_perror("socket_accept_connection: accept");
     return NULL;
   }else{
     if ((ch = socket_server_channel_new(new_sock)) == NULL) {
-      printf("socket_accept_connection: Can't create new channel\n");
+      cl_log(LOG_ERR, "socket_accept_connection: Can't create new channel");
       return NULL;
     }else{
       conn_private = (struct SOCKET_WAIT_CONN_PRIVATE *)(wait_conn->ch_private);
       ch_private = (struct SOCKET_CH_PRIVATE *)(ch->ch_private);
-      strncpy(ch_private->path_name,conn_private->path_name,sizeof(conn_private->path_name));
+      strncpy(ch_private->path_name,conn_private->path_name
+      ,		sizeof(conn_private->path_name));
     }
   }
   /* verify the client authentication information. */
@@ -230,7 +234,7 @@ socket_destroy_channel(struct IPC_CHANNEL * ch)
  *      IPC_FAIL     operation fails.
 */
 
-int
+static int
 socket_disconnect(struct IPC_CHANNEL* ch)
 {
   struct SOCKET_CH_PRIVATE* conn_info;
@@ -255,15 +259,13 @@ socket_initiate_connection(struct IPC_CHANNEL * ch)
   peer_addr.sun_family = AF_UNIX;    /* host byte order */ 
 
   if (strlen(conn_info->path_name) >= sizeof(peer_addr.sun_path)) {
-    fprintf(stderr,"the max path length is %lu\n"
-    ,	(unsigned long) sizeof(peer_addr.sun_path));
     return IPC_FAIL;
   }
   strncpy(peer_addr.sun_path, conn_info->path_name, sizeof(peer_addr.sun_path));
   /* send connection request */
   if (connect(conn_info->s, (struct sockaddr *)&peer_addr
   , 	sizeof(struct sockaddr_un)) == -1) {
-    perror("connect");
+    cl_perror("initiate_connection: connect failure");
     return IPC_FAIL;
   }
   
@@ -364,7 +366,8 @@ socket_is_sending_blocked(struct IPC_CHANNEL * ch)
 static int 
 socket_assert_auth(struct IPC_CHANNEL *ch, GHashTable *auth)
 {
-  printf("the assert_auth function for domain socket is not implemented\n");
+  cl_log(LOG_ERR
+  , "the assert_auth function for domain socket is not implemented");
   return IPC_FAIL;
 }
 
@@ -386,7 +389,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
   while (ch->recv_queue->current_qlen < ch->recv_queue->max_qlen) {
     /* check how much data queued. */
     if(ioctl(conn_info->s, FIONREAD,&len) < 0){
-      perror("ioctl");
+      cl_perror("socket_resume_io: ioctl FIONREAD failed");
       return IPC_FAIL;
     }
 
@@ -437,7 +440,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	  conn_info->remaining_data = conn_info->remaining_data - msg_len;
 	}else{
 	  /* Wrong! */
-	  printf(" received more data than expected\n");
+	  cl_log(LOG_INFO, " received more data than expected");
 	  return IPC_FAIL;
 	}
       }
@@ -486,7 +489,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	   * We may need to implement the fragmentaion for sending. 
 	   * 
 	   */
-	  printf("can't send all data out %d\n",len);
+	  cl_log(LOG_ERR, "can't send all data out %d",len);
 	}
 	ch->send_queue->queue = g_list_remove(ch->send_queue->queue, msg);
 	if (msg->msg_done != NULL) {
@@ -494,7 +497,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
         }
 	ch->send_queue->current_qlen--;
       }else{
-	perror("send");
+	cl_perror("socket_resume_io: send");
 	break;
       }
     }
@@ -573,7 +576,7 @@ static struct IPC_OPS socket_ops = {
  * return the pointer to a new ipc queue or NULL is the queue can't be created.
  */
 
-struct IPC_QUEUE*
+static struct IPC_QUEUE*
 socket_queue_new(void)
 {
   struct IPC_QUEUE *temp_queue;
@@ -636,18 +639,17 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   
   path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR);
   if (path_name == NULL) {
-    printf("GHash look up : Can't get the path_name from the hash table\n");
     return NULL;
   }
 
   /* prepare the unix domain socket */
   if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-    perror("socket_wait_conn_new: socket");
+    cl_perror("socket_wait_conn_new: socket() failure");
     return NULL;
   }
 
   if (unlink(path_name) < 0 && errno != ENOENT) {
-    perror("socket_wait_conn_new: unlink");
+    cl_perror("socket_wait_conn_new: unlink failure");
   }
   memset(&my_addr, 0, sizeof(my_addr));
   my_addr.sun_family = AF_UNIX;         /* host byte order */
@@ -659,13 +661,13 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   strncpy(my_addr.sun_path, path_name, sizeof(my_addr.sun_path));
     
   if (bind(s, (struct sockaddr *)&my_addr, sizeof(my_addr)) == -1) {
-    perror("bind");
+    cl_perror("socket_wait_conn_new: bind");
     return NULL;
   }
 
   /* listen to the socket */
   if (listen(s, MAX_LISTEN_NUM) == -1) {
-    perror("listen");
+    cl_perror("socket_wait_conn_new: listen(MAX_LISTEN_NUM)");
     return NULL;
   }
   
@@ -715,23 +717,21 @@ socket_client_channel_new(GHashTable *ch_attrs) {
    * ipc_channel_constructor() call socket_channel_new(GHashTable*)to
    * create a new socket channel.
    * <server side>
-   * wait_conn->accept_connection() will call another function to create a new channel.
-   * this function will take socketfd as the parameter to create a socket channel.
+   * wait_conn->accept_connection() will call another function to create a
+   * new channel.  This function will take socketfd as the parameter to
+   * create a socket channel.
    */
 
   if ((path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR)) != NULL) { 
     if (strlen(path_name) >= sizeof(conn_info->path_name)) {
-      fprintf(stderr,"the max path length is %lu\n"
-      ,	(unsigned long) sizeof(conn_info->path_name));
       	return NULL;
     }
     /* prepare the socket */
     if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-      perror("socket");
+      cl_perror("socket_client_channel_new: socket");
       return NULL;
     }
   }else{
-    printf("socket_client_channel_new: Can't get required information from hash table\n");
     return NULL;
   }
 
@@ -789,7 +789,7 @@ socket_server_channel_new(int sockfd){
  */
 
 
-struct IPC_MESSAGE*
+static struct IPC_MESSAGE*
 socket_message_new(struct IPC_CHANNEL *ch, int msg_len)
 {
   struct IPC_MESSAGE * temp_msg;
@@ -975,7 +975,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
   if (recvmsg(conn_info->s, &msg, 0) < 0 
       || cmsg->cmsg_len < sizeof(cmsgmem) 
       || cmsg->cmsg_type != SCM_CREDS) {
-      fprintf(stderr,"can't get credential information from peer\n");
+      cl_perror("can't get credential information from peer");
       return IPC_FAIL;
     }
 
@@ -984,6 +984,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
   /* This is weird... Shouldn't cr_uid be cruid instead? FIXME??*/
   /* Either that, or we shouldn't be defining it above... */
   /* Also, what about the group id field name? */
+  /* FIXME! */
 
   if (	auth_info->uid
   &&	g_hash_table_lookup(auth_info->uid, &(cred->cr_uid)) == NULL) {

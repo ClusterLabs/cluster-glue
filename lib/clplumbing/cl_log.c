@@ -135,9 +135,8 @@ cl_log(int priority, const char * fmt, ...)
 	}
 
 	if (stderr_enabled) {
-		fprintf(stderr, "%s: %s %s: %s\n"
+		fprintf(stderr, "%s: %s: %s\n"
 		,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
-		,	ha_timestamp()
 		,	pristr,  buf);
 	}
 
