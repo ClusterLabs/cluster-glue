@@ -295,7 +295,7 @@ static void PILValidateInterfaceUniv(gpointer key, gpointer puniv, gpointer);
  *
  ****************************************************************************/
 
-PILPlugin*
+static PILPlugin*
 NewPILPlugin(	PILPluginType* pitype
 	,	const char *	plugin_name
 	,	lt_dlhandle	dlhand
