@@ -1160,7 +1160,7 @@ msg_to_op(struct ha_msg* msg)
 		/* op->output */
 		output = cl_get_binary(msg, F_LRM_DATA,&output_len);
 		if (NULL != output){
-			op->output = output;
+			op->output = strndup(output, output_len);
 		}
 		else {
 			op->output = NULL;
