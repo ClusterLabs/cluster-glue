@@ -224,7 +224,6 @@ cl_init_poll_sig(struct pollfd *fds, unsigned int nfds)
 
 
 	if (cl_nsig == 0) {
-		cl_poll_setsig(SIGIO);
 		cl_nsig = ((SIGRTMIN+SIGRTMAX)/2);
 		if (cl_poll_setsig(cl_nsig) < 0) {
 			return -1;

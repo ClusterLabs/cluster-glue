@@ -146,6 +146,7 @@ main(int argc, char ** argv)
 	cl_log(LOG_INFO, "NOTE: Enabling poll(2) replacement code.");
 	PollFunc = cl_poll;
 	g_main_set_poll_func(cl_glibpoll);
+	ipc_set_pollfunc(cl_poll);
 
 	rc += transport_tests(50000);
 	
