@@ -1,4 +1,4 @@
-/* $Id: Gmain_timeout.c,v 1.7 2004/09/14 15:07:29 gshi Exp $ */
+/* $Id: Gmain_timeout.c,v 1.8 2005/02/23 00:53:49 gshi Exp $ */
 /*
  * Glib mainloop timeout handling code.
  *
@@ -33,9 +33,6 @@
 #include <clplumbing/Gmain_timeout.h>
 #include <string.h>
 
-#define GETAPPEND(src)	(struct GTimeoutAppend*)(src +1)
-
-
 
 static gboolean
 Gmain_timeout_prepare(GSource* src,  gint* timeout);
@@ -54,6 +51,7 @@ static GSourceFuncs Gmain_timeout_funcs = {
 
 
 struct GTimeoutAppend {
+	GSource		Source;
 	longclock_t	nexttime;
 	guint		interval;
 };
@@ -78,12 +76,10 @@ Gmain_timeout_add_full(gint priority
 	struct GTimeoutAppend* append;
 	
 	GSource* source = g_source_new( &Gmain_timeout_funcs, 
-					sizeof(GSource)
-					+ sizeof(struct GTimeoutAppend));
+					sizeof(struct GTimeoutAppend));
 	
-	append = GETAPPEND(source); 
+	append = (struct GTimeoutAppend*)source;
 	
-	memset(append, 0, sizeof(struct GTimeoutAppend));
 	append->nexttime = add_longclock(time_longclock()
 					 ,msto_longclock(interval));
   	append->interval = interval; 
@@ -115,7 +111,7 @@ static gboolean
 Gmain_timeout_prepare(GSource* src,  gint* timeout)
 {
 	
-	struct GTimeoutAppend* append = GETAPPEND(src);
+	struct GTimeoutAppend* append = (struct GTimeoutAppend*)src;
 	longclock_t	lnow = time_longclock();
 	longclock_t	remain;
 	
@@ -134,7 +130,7 @@ Gmain_timeout_prepare(GSource* src,  gint* timeout)
 static gboolean
 Gmain_timeout_check    (GSource* src)
 {
-	struct GTimeoutAppend* append = GETAPPEND(src);
+	struct GTimeoutAppend* append = (struct GTimeoutAppend*)src;
 	longclock_t	lnow = time_longclock();
 	
 	if (cmp_longclock(lnow, append->nexttime) >= 0) {
@@ -147,7 +143,7 @@ Gmain_timeout_check    (GSource* src)
 static gboolean
 Gmain_timeout_dispatch(GSource* src, GSourceFunc func, gpointer user_data)
 {
-	struct GTimeoutAppend* append = GETAPPEND(src);
+	struct GTimeoutAppend* append = (struct GTimeoutAppend*)src;
 
 	/* Schedule our next dispatch */
 	append->nexttime = add_longclock(time_longclock()
