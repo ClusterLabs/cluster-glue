@@ -820,6 +820,8 @@ add_struct_field(struct ha_msg* msg, char* name, size_t namelen,
 	struct ha_msg* childmsg;
 	int stringlen_add;
 	int netstringlen_add;
+	int new_stringlen;
+	int new_netstringlen;
 
 	if ( !msg || !name || !value
 	     || depth < 0){
@@ -836,10 +838,18 @@ add_struct_field(struct ha_msg* msg, char* name, size_t namelen,
 	stringlen_add = struct_stringlen(namelen, vallen, value);	
 	netstringlen_add =  struct_netstringlen(namelen, vallen, value);
 	
-	if (get_stringlen(msg) + stringlen_add >= MAXMSG || 
-	    get_netstringlen(msg) + netstringlen_add >= MAXMSG){
+	new_stringlen = get_stringlen(msg) + stringlen_add ;
+	new_netstringlen =  get_netstringlen(msg) + netstringlen_add;
+	
+	if (new_stringlen >= MAXMSG || 
+	    new_netstringlen >= MAXMSG){
 		cl_log(LOG_ERR, "add_struct_field"
-		       "msg too largge");
+		       "msg too largge: max length allowed=%d"
+		       "requested stringlen=%d"
+		       "requested netstringlen =%d",
+		       MAXMSG,
+		       new_stringlen,
+		       new_netstringlen);		       
 		return HA_FAIL;
 	}
 	
