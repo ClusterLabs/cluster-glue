@@ -1300,7 +1300,8 @@ ha_msg_print(struct ha_msg * msg)
 	printf("print msg:%p\n",msg);
 	printf("\tnfields:%d\n",msg->nfields);
 	for (i = 0; i < msg->nfields; i++){
-		printf("\tname:%s\tvalue:%s\n",msg->names[i],msg->values[i]);
+		printf("\tname:%s\tvalue:%s\n",msg->names[i],
+				(char *)msg->values[i]);
 	}
 	printf("print end\n");
 
