@@ -388,11 +388,11 @@ init_start ()
 
 	register_pid(PID_FILE, TRUE, FALSE);
 
+	cl_log_send_to_logging_daemon(TRUE);
 	cl_log_set_logfile(DAEMON_LOG);
 	cl_log_set_debugfile(DAEMON_DEBUG);
 
-	//load RA plugins
-
+	/* load RA plugins   */
 
 	PluginLoadingSystem = NewPILPluginUniv (PLUGIN_DIR);
 	PILLoadPlugin(PluginLoadingSystem, "InterfaceMgr", "generic",
