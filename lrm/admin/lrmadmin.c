@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.24 2004/12/05 13:18:32 sunjd Exp $ */
+/* $Id: lrmadmin.c,v 1.25 2004/12/09 07:16:58 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -273,7 +273,7 @@ int main(int argc, char **argv)
 				return -1;
 
 			default:
-				cl_log(LOG_ERR,"Error:getopt returned character"\
+				cl_log(LOG_ERR,"Error:getopt returned character"
 					 " code %c.", option_char);
 				return -1;
                }
@@ -309,17 +309,17 @@ int main(int argc, char **argv)
 			call_id = resource_operation(lrmd, argc, optind, argv);
 			if (call_id < 0) {
 				if ( call_id == -2 ) {
-					cl_log(LOG_ERR, "Failed to operate "\
+					cl_log(LOG_ERR, "Failed to operate "
 					   "resource %s due to parameter error."
 					  , argv[optind]);
 					ret_value = -3;
 				}
 				if ( call_id == -1 ) {
-					cl_log(LOG_ERR, "Failed! no this "\
+					cl_log(LOG_ERR, "Failed! no this "
 					   "resource %s.", argv[optind]);
 					ret_value = -2;
 				}
-				cl_log(LOG_ERR, "Failed to operate "\
+				cl_log(LOG_ERR, "Failed to operate "
 				   "resource %s due to unknown error."
 				  , argv[optind]);
 				ret_value = -3;
@@ -327,7 +327,7 @@ int main(int argc, char **argv)
 			} else { 
 				/* Return value: HA_OK = 1 Or  HA_FAIL = 0 */
 				if ( call_id == 0 ) {
-					cl_log(LOG_ERR, "Resource operation "\
+					cl_log(LOG_ERR, "Resource operation "
 					"Failed." );
 					ret_value = -3;
 					ASYN_OPS = FALSE;
@@ -425,7 +425,7 @@ int main(int argc, char **argv)
 						, lrmd);
 				g_list_free(rscid_list);
 			} else
-				printf("Currently no resource is managed by "\
+				printf("Currently no resource is managed by "
 					 "LRM.\n");
 
 			ASYN_OPS = FALSE;
@@ -574,7 +574,7 @@ ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 		return -2;
 	}
 
-	if (0==strncmp(provider,"NULL",4)) {
+	if (0 == strncmp(provider,"NULL",strlen("NULL"))) {
 		provider=NULL;
 	}
 
@@ -628,7 +628,7 @@ add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	rsc_id[RID_LEN-1]='\0';
 	strncpy(rsc_id, argv[optind], RID_LEN-1);
 
-	if (0==strncmp(provider,"NULL",4)) {
+	if (0 == strncmp(provider, "NULL", strlen("NULL"))) {
 		provider=NULL;
 	}
 	
@@ -664,18 +664,18 @@ GHashTable ** params_ht)
 		return -1;
 	}
 
-	if (strncmp("ocf", class, 4)==0 || strncmp("stonith", class, 4)==0) {
+	if ( strncmp("ocf", class, strlen("ocf"))==0
+	    || strncmp("stonith", class, strlen("stonith"))==0) {
 		*params_ht = g_hash_table_new(g_str_hash, g_str_equal);
 
 		for (i=start; i<amount; i++) {
 			delimit = strchr(argv[i], '=');
 			if (!delimit) {
-				cl_log(LOG_ERR, "parameter %s is invalid for " \
+				cl_log(LOG_ERR, "parameter %s is invalid for "
 					"OCF standard.", argv[i]);
 				goto error_return; /* Have to */
 			}
 
-			/* lack error handling for g_new. Exception ? */
 			len_tmp = strnlen(delimit+1, 80) + 1;
 			value = g_new(gchar, len_tmp);
 			strncpy(value, delimit+1, len_tmp);
@@ -687,8 +687,8 @@ GHashTable ** params_ht)
 			
 			g_hash_table_insert(*params_ht, key, value);
 		}
-	} else if ( strncmp("lsb", class, 4) == 0 || 
-		    strncmp("heartbeat", class, 10) == 0 ) {
+	} else if ( strncmp("lsb", class, strlen("lsb")) == 0
+		   || strncmp("heartbeat", class, strlen("heartbeat")) == 0 ) {
 
 		/* Pay attention: for parameter ordring issue */
 		*params_ht = g_hash_table_new(g_str_hash, g_str_equal);
@@ -728,14 +728,15 @@ params_hashtable_to_str(const char * class, GHashTable * ht)
 		 return NULL;
 	}
 
-	if (strncmp("ocf", class, 4)==0) {
+	if (   strncmp("ocf", class, strlen("ocf")) == 0 
+	    || strncmp("stonith", class, strlen("stonith")) == 0) {
 		gstr_tmp = g_string_new("");
 		g_hash_table_foreach(ht, ocf_params_hash_to_str, &gstr_tmp);
 		params_str = g_new(gchar, gstr_tmp->len+1);		
 		strncpy(params_str, gstr_tmp->str, gstr_tmp->len+1);
 		g_string_free(gstr_tmp, TRUE);
-	} else if ( strncmp("lsb", class, 4) == 0 || 
-		    strncmp("heartbeat", class, 10) == 0 ) {
+	} else if (   strncmp("lsb", class, strlen("lsb")) == 0
+		   || strncmp("heartbeat", class, strlen("heartbeat")) == 0 ) {
 		ht_size = g_hash_table_size(ht);
 		tmp_str = g_new(gchar, ht_size*ARGVI_MAX_LEN); 	
 		memset(tmp_str, ' ', ht_size*ARGVI_MAX_LEN);
@@ -882,6 +883,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.25  2004/12/09 07:16:58  sunjd
+ * add the support to stonith RA; some minor polish
+ *
  * Revision 1.24  2004/12/05 13:18:32  sunjd
  * add the support to stonith RAs
  *
