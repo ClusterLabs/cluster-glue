@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.19 2004/12/01 02:31:51 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.20 2004/12/01 19:48:12 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -215,9 +215,11 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 		   IPC_Queue* rqueue)
 {
 	IPC_Message*			ipcmsg;
-	struct SOCKET_MSG_HEAD*		head;
+	struct SOCKET_MSG_HEAD		localhead;
+	struct SOCKET_MSG_HEAD*		head = &localhead;
 	int				nmsgs = 0 ;
 	
+
 	if (rqueue == NULL){
 		cl_log(LOG_ERR, "ipc_update_bufpool:"
 		       "invalid input");
@@ -232,7 +234,7 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 			break;
 		}
 		
-		head = (struct SOCKET_MSG_HEAD*)pool->consumepos;
+		memcpy(head, pool->consumepos, sizeof(struct SOCKET_MSG_HEAD));
 		
 		if ( head->msg_len > MAXDATASIZE){
 			cl_log(LOG_ERR, "ipc_update_bufpool:"
@@ -280,8 +282,9 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 gboolean
 ipc_bufpool_full(struct ipc_bufpool* pool, struct IPC_CHANNEL* ch)
 {
-
-	struct SOCKET_MSG_HEAD* head;
+	
+	struct SOCKET_MSG_HEAD  localhead;
+	struct SOCKET_MSG_HEAD* head = &localhead;
 	/* not enough space for head */
 	if (pool->endpos - pool->consumepos < ch->msgpad){
 		return TRUE;
@@ -289,7 +292,7 @@ ipc_bufpool_full(struct ipc_bufpool* pool, struct IPC_CHANNEL* ch)
 	
 	/*enough space for head*/
 	if (pool->currpos - pool->consumepos >= ch->msgpad){
-		head = (struct SOCKET_MSG_HEAD*) pool->consumepos;
+		memcpy(head, pool->consumepos, sizeof(struct SOCKET_MSG_HEAD));
 		
 		/* not enough space for data*/
 		if ( pool->consumepos + ch->msgpad + head->msg_len >= pool->endpos){
@@ -314,7 +317,8 @@ int
 ipc_bufpool_partial_copy(struct ipc_bufpool* dstpool,
 			      struct ipc_bufpool* srcpool)
 {
-	struct SOCKET_MSG_HEAD * head;
+	struct SOCKET_MSG_HEAD	localhead;
+	struct SOCKET_MSG_HEAD *head = &localhead;
 	int space_needed;
 	int nbytes;
 	
@@ -328,7 +332,7 @@ ipc_bufpool_partial_copy(struct ipc_bufpool* dstpool,
 	if (srcpool->currpos - srcpool->consumepos >=
 	    sizeof(struct SOCKET_MSG_HEAD)){
 		
-		head = (struct SOCKET_MSG_HEAD*)srcpool->consumepos;
+		memcpy(head, srcpool->consumepos, sizeof(struct SOCKET_MSG_HEAD));
 		space_needed = head->msg_len + sizeof(*head);
 		
 		if (space_needed >  ipc_bufpool_spaceleft(dstpool)){
