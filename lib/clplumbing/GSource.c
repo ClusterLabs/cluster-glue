@@ -340,8 +340,9 @@ G_CH_dispatch(gpointer source_data
 	if ((chp->infd.revents|chp->outfd.revents) & G_IO_HUP) {
 		/* CHEAT!! */
 		chp->ch->ch_status = IPC_DISCONNECT;
+	}else{
+		chp->ch->ops->resume_io(chp->ch);
 	}
-	chp->ch->ops->resume_io(chp->ch);
 	if(chp->dispatch) {
 		return chp->dispatch(chp->ch, chp->udata);
 	}

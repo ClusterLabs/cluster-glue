@@ -198,6 +198,8 @@ cl_enable_realtime(void)
 	cl_realtimepermitted = TRUE;
 }
 
+/* Give up the CPU for a little bit */
+/* This is similar to sched_yield() but allows lower prio processes to run */
 int
 cl_shortsleep(void)
 {
