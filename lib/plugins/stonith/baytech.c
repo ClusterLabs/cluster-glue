@@ -579,13 +579,13 @@ RPC_onoff(struct BayTech* bt, int unitnum, const char * unitid, int req)
 
 	/* Expect "RPC->x "... or "(Y/N)" (if confirmation turned on) */
 
-	if (RPCLookFor(bt, RPC, 5) == 1) {
+	if (RPCLookFor(bt, RPC, 10) == 1) {
 		/* They've turned on that annoying command confirmation :-( */
 		SEND("Y\r");
-		EXPECT(RPC, 5);
+		EXPECT(RPC, 10);
 	}
 
-	EXPECT(GTSign, 5);
+	EXPECT(GTSign, 10);
 
 	/* All Right!  Command done. Life is Good! */
 	syslog(LOG_NOTICE, _("Power to host %s turned %s."), unitid, onoff);
