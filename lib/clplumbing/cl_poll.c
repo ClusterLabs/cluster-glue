@@ -663,8 +663,13 @@ waitagain:
 		if (fds[j].revents) {
 			++eventcount;
 			moni->pendevents &= ~(fds[j].revents);
+			/* Make POLLHUP persistent */
 			if (fds[j].revents & POLLHUP) {
 				moni->pendevents |= POLLHUP;
+				/* Don't lose input events at EOF */
+				if (fds[j].events & POLLIN) {
+					cl_real_poll_fd(fds[j].fd);
+				}
 			}
 		}
 	}
