@@ -23,21 +23,13 @@ INCLUDES 			=	-I$(top_builddir)/include -I$(top_srcdir)/include \
 					-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 
 halibdir			=	$(libdir)/@HB_PKG@
-havarlibdir			=	$(localstatedir)/lib/@HB_PKG@
 COMMONLIBS			=	$(top_builddir)/lib/clplumbing/libplumb.la   \
 					$(top_builddir)/lib/hbclient/libhbclient.la  \
 					$(top_builddir)/lib/apphb/libapphb.la \
                         		$(GLIBLIB)
 
-lrmdir				=	 $(HA_VARLIBDIR)/$(HB_PKG)/@LRM_DIR@
-
-bin_PROGRAMS 		= 	lrmadmin
+halib_PROGRAMS 		= 	lrmadmin
 lrmadmin_SOURCES  	= 	lrmadmin.c
 lrmadmin_LDFLAGS 	= 	$(COMMONLIBS)
 lrmadmin_LDADD = $(top_builddir)/lib/@LRM_DIR@/liblrm.la
 lrmadmin_DEPENDENCIES = $(top_builddir)/lib/@LRM_DIR@/liblrm.la
-
-install-exec-local:
-	$(mkinstalldirs) $(DESTDIR)$(lrmdir)
-	-chgrp $(apigid) $(DESTDIR)/$(lrmdir)
-	chmod 770 $(DESTDIR)/$(lrmdir)
