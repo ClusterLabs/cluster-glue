@@ -59,7 +59,6 @@ static int lrm_delete_rsc (ll_lrm_t*, const char* id);
 static int lrm_inputfd (ll_lrm_t*);
 static int lrm_msgready (ll_lrm_t*);
 static int lrm_rcvmsg (ll_lrm_t*, int blocking);
-
 static struct lrm_ops lrm_ops_instance =
 {
 	lrm_signon,
@@ -95,18 +94,10 @@ static struct rsc_ops rsc_ops_instance =
 
 
 /* define the internal data used by the client library*/
-typedef struct {
-	char*		rsc_id;
-	int 		call_id;
-	int		interval;
-	gpointer	user_data;
-}op_save_t;
-
 static int is_signed_on					= FALSE;
 static IPC_Channel* ch_cmd				= NULL;
 static IPC_Channel* ch_cbk 				= NULL;
 static lrm_op_done_callback_t	op_done_callback 	= NULL;
-static GList* op_save_list				= NULL;
 
 /* define some utility functions*/
 static int get_rc_from_ch(IPC_Channel* ch);
@@ -114,7 +105,7 @@ static int get_rc_from_msg(struct ha_msg* msg);
 static void client_log (int priority, const char* fmt);
 static struct ha_msg* op_to_msg (lrm_op_t* op);
 static lrm_op_t* msg_to_op(struct ha_msg* msg);
-static op_save_t* lookup_op_save(int call_id);
+static void free_op (lrm_op_t* op);
 
 /* define of the api functions*/
 ll_lrm_t*
@@ -867,8 +858,8 @@ lrm_rcvmsg (ll_lrm_t* lrm, int blocking)
 		msg_count++;
 
 		op = msg_to_op(msg);
-		op->rsc = lrm_get_rsc( NULL, op->rsc_id );
 		if (NULL!=op && NULL!=op_done_callback) {
+			op->rsc = lrm_get_rsc( NULL, op->rsc_id );
 			(*op_done_callback)(op);
 		}
 		ha_msg_del(msg);
@@ -916,14 +907,6 @@ rsc_perform_op (lrm_rsc_t* rsc, lrm_op_t* op)
 
 	/* check return code, the return code is the call_id of the op */
 	rc = get_rc_from_ch(ch_cmd);
-	if (rc > 0) {
-		op_save_t* op_save = g_new(op_save_t, 1);
-		op_save->call_id = rc;
-		op_save->user_data = op->user_data;
-		op_save->interval = op->interval;
-		op_save->rsc_id = g_strdup(rsc->id);
-		op_save_list = g_list_append(op_save_list, op_save);
-	}
 	op->rsc_id = NULL;
 	client_log(LOG_INFO, "rsc_perform_op: end.");
 	return rc;
@@ -1021,6 +1004,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 	struct ha_msg* ret = NULL;
 	struct ha_msg* op_msg = NULL;
 	lrm_op_t* op       = NULL;
+	GList* node = NULL;
 	int state;
 	int op_count, i;
 
@@ -1071,6 +1055,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 		/* if the state is idle, the last finsihed op returned. */
 		/* the op is stored in the same msg, just get it out */
 		op = msg_to_op(ret);
+		op->rsc = lrm_get_rsc( NULL, op->rsc_id );
 		if (NULL != op) {
 			pending_op_list = g_list_append(pending_op_list, op);
 		}
@@ -1105,6 +1090,11 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 			}
 			ha_msg_del(op_msg);
 		}
+		for (node = g_list_first(pending_op_list);
+			NULL!=node; node = g_list_next(node)) {
+			lrm_op_t* op = (lrm_op_t*) node->data;
+			op->rsc = lrm_get_rsc( NULL, op->rsc_id );
+		}
 		client_log(LOG_INFO, "rsc_get_cur_state: end.");
 		return pending_op_list;
 	}
@@ -1122,7 +1112,10 @@ msg_to_op(struct ha_msg* msg)
 	lrm_op_t* op;
 	const char* op_type;
 	const char* app_name;
+	const char* rsc_id;
 	const char* output;
+	const void* user_data;
+	size_t userdata_len=0;
 	size_t output_len = 0;
 
 	client_log(LOG_INFO, "msg_to_op: start.");
@@ -1136,7 +1129,7 @@ msg_to_op(struct ha_msg* msg)
 	||  HA_OK != ha_msg_value_int(msg,F_LRM_TARGETRC, &op->target_rc)
 	||  HA_OK != ha_msg_value_int(msg,F_LRM_CALLID, &op->call_id)) {
 		client_log(LOG_ERR, "msg_to_op: can not get fields.");
-		g_free(op);
+		free_op(op);
 		return NULL;
 	}
 
@@ -1152,7 +1145,7 @@ msg_to_op(struct ha_msg* msg)
 	if (LRM_OP_DONE == op->op_status ) {
 		/* op->rc */
 		if (HA_OK != ha_msg_value_int(msg, F_LRM_RC, &op->rc)) {
-			g_free(op);
+			free_op(op);
 			client_log(LOG_ERR,
 				"on_op_done: can not get op rc from msg.");
 			return NULL;
@@ -1160,7 +1153,16 @@ msg_to_op(struct ha_msg* msg)
 		/* op->output */
 		output = cl_get_binary(msg, F_LRM_DATA,&output_len);
 		if (NULL != output){
-			op->output = strndup(output, output_len);
+			int len = strnlen(output, output_len);
+			if (len != output_len) {
+				free_op(op);
+				client_log(LOG_ERR,
+				"on_op_done: can not get data from msg.");
+				return NULL;
+			}
+			op->output = ha_malloc(len+1);
+			memcpy(op->output, output,len);
+			op->output[len]=0;
 		}
 		else {
 			op->output = NULL;
@@ -1173,38 +1175,43 @@ msg_to_op(struct ha_msg* msg)
 	app_name = ha_msg_value(msg, F_LRM_APP);
 	if (NULL == app_name) {
 		client_log(LOG_ERR, "msg_to_op: can not get app_name.");
-		g_free(op);
+		free_op(op);
 		return NULL;
 	}
-	op->app_name = app_name;
+	op->app_name = g_strdup(app_name);
 	
 	
 	/* op->op_type */
 	op_type = ha_msg_value(msg, F_LRM_OP);
 	if (NULL == op_type) {
 		client_log(LOG_ERR, "msg_to_op: can not get op_type.");
-		g_free(op);
+		free_op(op);
 		return NULL;
 	}
-	op->op_type = op_type;
+	op->op_type = g_strdup(op_type);
+
+	/* op->rsc_id */
+	rsc_id = ha_msg_value(msg, F_LRM_RID);
+	if (NULL == rsc_id) {
+		client_log(LOG_ERR, "msg_to_op: can not get rsc_id.");
+		free_op(op);
+		return NULL;
+	}
+	op->rsc_id = g_strdup(rsc_id);
+
+	/* op->user_data */
+	
+	user_data = cl_get_binary(msg, F_LRM_USERDATA,&userdata_len);
+	
+	if (NULL != user_data && sizeof(gpointer)==userdata_len ) {
+		memcpy(&op->user_data,user_data,sizeof(gpointer));
+	}
+	
+	op->rsc_id = g_strdup(rsc_id);
 
 	/* op->params */
 	op->params = ha_msg_value_str_table(msg, F_LRM_PARAM);
 
-	if (0<op->call_id) {
-		op_save_t* op_save = lookup_op_save(op->call_id);
-		if (NULL!=op_save) {
-			op->user_data = op_save->user_data;
-			op->rsc_id = g_strdup(op_save->rsc_id);
-			if (0==op_save->interval) {
-				op_save_list = g_list_remove(op_save_list,
-							op_save);
-				g_free(op_save->rsc_id);
-				g_free(op_save);
-			}
-
-		}
-	}
 	client_log(LOG_INFO, "msg_to_op: end.");
 
 	return op;
@@ -1229,6 +1236,13 @@ op_to_msg (lrm_op_t* op)
 		client_log(LOG_ERR, "op_to_msg: can not add field.");
 		return NULL;
 	}
+	if (NULL != op->user_data) {
+		if (HA_OK != ha_msg_addbin(msg,F_LRM_USERDATA,&op->user_data,sizeof(gpointer))){
+			ha_msg_del(msg);
+			client_log(LOG_ERR, "op_to_msg: can not add field.");
+			return NULL;
+		}
+	}
 	if (NULL != op->params) {
 		if (HA_OK != ha_msg_add_str_table(msg,F_LRM_PARAM,op->params)){
 			ha_msg_del(msg);
@@ -1236,30 +1250,10 @@ op_to_msg (lrm_op_t* op)
 			return NULL;
 		}	
 	}
+		
 
 
 	return msg;
-}
-
-static op_save_t*
-lookup_op_save(int call_id)
-{
-	GList* node;
-	op_save_t* save;
-	client_log(LOG_INFO, "lookup_op: start.");
-
-	for(node=g_list_first(op_save_list); NULL!=node; node=g_list_next(node)) {
-
-		save = (op_save_t*)node->data;
-		if (call_id == save->call_id) {
-			client_log(LOG_INFO, "lookup_op: end.");
-			return save;
-		}
-
-	}
-
-	client_log(LOG_INFO, "lookup_op: end.");
-	return NULL;
 }
 
 static int
@@ -1304,7 +1298,29 @@ get_rc_from_msg(struct ha_msg* msg)
 	client_log(LOG_INFO, "get_rc_from_msg: end.");
 	return rc;
 }
-
+static void
+free_op (lrm_op_t* op)
+{
+	if (NULL == op) {
+		return;
+	}
+	if (NULL != op->op_type) {
+		g_free(op->op_type);
+	}
+	if (NULL != op->output) {
+		g_free(op->output);
+	}
+	if (NULL != op->rsc_id) {
+		g_free(op->rsc_id);
+	}
+	if (NULL != op->app_name) {
+		g_free(op->app_name);
+	}
+	if (NULL != op->params) {
+		free_str_table(op->params);
+	}
+}
+			
 static int debug_level = 0;
 
 void set_debug_level(int level)
