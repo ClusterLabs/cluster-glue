@@ -12,6 +12,19 @@
 #ifndef MAXLINE
 #	define MAXLINE	512
 #endif
+/*
+ * <syslog.h> might not contain LOG_PRI...
+ * So, we define it ourselves, or error out if we can't...
+ */
+
+#ifndef LOG_PRI
+#  ifdef LOG_PRIMASK
+ 	/* David Lee <T.D.Lee@durham.ac.uk> reports this works on Solaris */
+#	define	LOG_PRI(p)      ((p) & LOG_PRIMASK)
+#  else
+#	error	"Syslog.h does not define either LOG_PRI or LOG_PRIMASK."
+#  endif 
+#endif
 
 #define	cl_malloc	malloc
 #define	cl_free		free
