@@ -26,16 +26,16 @@ static gboolean	cl_realtimepermitted = TRUE;
  * as per suggestion from mlockall(2)
  */
 static int
-cl_stack_hogger(volatile char * outbuf, int kbytes)
+cl_stack_hogger(char * inbuf, int kbytes)
 {
 #ifdef _POSIX_MEMLOCK
 	/* Needs to be volatile so it really can't be optimised away */
-	volatile char	buf[1024];
+	char	buf[1024];
 	
-	if (outbuf == NULL) {
-		memset(&buf, HOGRET, sizeof(buf));
+	if (inbuf == NULL) {
+		memset(buf, HOGRET, sizeof(buf));
 	}else{
-		memcpy(&buf, &outbuf, sizeof(buf));
+		memcpy(buf, inbuf, sizeof(buf));
 	}
 
 	if (kbytes > 0) {
@@ -44,15 +44,15 @@ cl_stack_hogger(volatile char * outbuf, int kbytes)
 		return buf[sizeof(buf)-1];
 	}
 #else
-	return HOGRET
+	return HOGRET;
 #endif
 }
 
 /*
  *	Make us behave like a soft real-time process.
  *	We need scheduling priority and being locked in memory.
- *	If you ask us nicely, we'll even grow the heap for you
- *	before locking you into memory ;-).
+ *	If you ask us nicely, we'll even grow the stack and heap
+ *	for you before locking you into memory ;-).
  */
 void
 cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
