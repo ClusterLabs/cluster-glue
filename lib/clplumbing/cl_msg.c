@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.26 2004/09/30 06:02:23 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.27 2004/10/03 07:25:44 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -230,26 +230,14 @@ ha_msg_copy(const struct ha_msg *msg)
 
 	
 	AUDITMSG(msg);
-	if (msg == NULL || (ret = MALLOCT(struct ha_msg)) == NULL) {   
+	if (msg == NULL || (ret = ha_msg_new(msg->nalloc)) == NULL) {   
 		return NULL;   
 	} 
 
 	ret->nfields	= msg->nfields;
-	ret->nalloc	= msg->nalloc;
 	ret->stringlen	= msg->stringlen;
 	ret->netstringlen = msg->netstringlen;
 
-	ret->names  = (char **)	ha_calloc(sizeof(char *), msg->nalloc);
-	ret->nlens  = (int *)	ha_calloc(sizeof(int), msg->nalloc);
-	ret->values = (void **)	ha_calloc(sizeof(void *), msg->nalloc);
-	ret->vlens  = (size_t *)	ha_calloc(sizeof(size_t), msg->nalloc);
-	ret->types  = (int *) ha_calloc(sizeof(int), msg->nalloc);
-	if (ret->names == NULL || ret->values == NULL
-	||	ret->nlens == NULL || ret->vlens == NULL || ret->types == NULL) {
-		cl_log(LOG_ERR
-		,	"ha_msg_new: out of memory for ha_msg_copy");
-		goto freeandleave;
-	}
 	memcpy(ret->nlens, msg->nlens, sizeof(msg->nlens[0])*msg->nfields);
 	memcpy(ret->vlens, msg->vlens, sizeof(msg->nlens[0])*msg->nfields);
 	memcpy(ret->types, msg->types, sizeof(msg->types[0])*msg->nfields);
@@ -268,8 +256,7 @@ ha_msg_copy(const struct ha_msg *msg)
 									   msg->vlens[j]);
 			if (!ret->values[j]){
 				cl_log(LOG_ERR,"duplicating the message field failed");
-				ha_msg_del(ret);
-				return NULL;
+				goto freeandleave;
 			}
 		}
 	}
@@ -1730,6 +1717,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.27  2004/10/03 07:25:44  gshi
+ * BEAM fix:
+ * fixed some memory leak problems
+ *
  * Revision 1.26  2004/09/30 06:02:23  gshi
  * modulize the message for types
  * all type-related functions are moved the new file cl_msg_types.c
