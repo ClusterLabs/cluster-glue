@@ -27,9 +27,9 @@ COMMONLIBS			=	$(top_builddir)/lib/clplumbing/libplumb.la   \
 					$(top_builddir)/lib/hbclient/libhbclient.la  \
 					$(top_builddir)/lib/apphb/libapphb.la \
                         		$(GLIBLIB)
-
+LRM_DIR			= 	lrm
 halib_PROGRAMS 		= 	lrmadmin
 lrmadmin_SOURCES  	= 	lrmadmin.c
 lrmadmin_LDFLAGS 	= 	$(COMMONLIBS)
-lrmadmin_LDADD = $(top_builddir)/lib/@LRM_DIR@/liblrm.la
-lrmadmin_DEPENDENCIES = $(top_builddir)/lib/@LRM_DIR@/liblrm.la
+lrmadmin_LDADD = $(top_builddir)/lib/$(LRM_DIR)/liblrm.la
+lrmadmin_DEPENDENCIES = $(top_builddir)/lib/$(LRM_DIR)/liblrm.la
