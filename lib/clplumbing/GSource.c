@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.25 2005/02/17 17:46:32 alan Exp $ */
+/* $Id: GSource.c,v 1.26 2005/02/17 18:02:32 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -64,7 +64,6 @@ struct GSIGSource_s {
 	gboolean 	(*dispatch)(int signal, gpointer user_data);
 	GDestroyNotify	dnotify;
 	guint		gsourceid;
-	gboolean	pausenow;
 };
 
 #define	DEF_EVENTS	(G_IO_IN|G_IO_PRI|G_IO_HUP|G_IO_ERR|G_IO_NVAL)
@@ -746,12 +745,11 @@ G_main_add_SignalHandler(int priority, int signal,
 	
 	sig_src = (GSIGSource*)source;
 	
-	sig_src->magno	= MAG_GSIGSOURCE;
-	sig_src->signal	= signal;
+	sig_src->magno		= MAG_GSIGSOURCE;
+	sig_src->signal		= signal;
 	sig_src->dispatch	= dispatch;
-	sig_src->udata	= userdata;
+	sig_src->udata		= userdata;
 	sig_src->dnotify	= notify;
-	sig_src->pausenow	= FALSE;
 
 	sig_src->signal_triggered = FALSE;
 
@@ -808,9 +806,6 @@ G_SIG_prepare(GSource* source,
 	
 	g_assert(IS_SIGSOURCE(sig_src));
 	
-	if (sig_src->pausenow){
-		return FALSE;
-	}
 
 	return sig_src->signal_triggered;
 }
@@ -826,10 +821,6 @@ G_SIG_check(GSource* source)
 	GSIGSource* sig_src = (GSIGSource*)source;
 
 	g_assert(IS_SIGSOURCE(sig_src));
-	
-	if (sig_src->pausenow){
-		return FALSE;
-	}
 	
 	return sig_src->signal_triggered;
 }
@@ -881,9 +872,6 @@ G_main_signal_handler(int nsig)
 {
 	GSIGSource* sig_src = NULL;
 
-	if(sig_src->pausenow) {
-		return;
-	}
 	sig_src = (GSIGSource*)g_hash_table_lookup(G_main_signal_list, &nsig);
 
 	g_assert(sig_src != NULL);
