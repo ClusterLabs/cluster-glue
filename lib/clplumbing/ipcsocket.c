@@ -32,6 +32,7 @@
 #include <netinet/in.h>
 #include <sys/un.h>
 #include <sys/param.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -44,7 +45,6 @@
 #define SOCKET_ATTR "socket"
 
 /* channel and wait connection private data. */
-/*! channel and wait connection private data. */
 struct SOCKET_CH_PRIVATE{
   /* the path name wich the connection will be built on. */
   /*! the path name wich the connection will be built on. */
@@ -213,8 +213,8 @@ socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
     return NULL;
   }else{
     //set the socket as non-blocking socket
-    val = fcntl(new_sock, F_GETFL, 0);
-    fcntl(new_sock, F_SETFL, val | O_NONBLOCK);
+    //    val = fcntl(new_sock, F_GETFL, 0);
+    //  fcntl(new_sock, F_SETFL, val | O_NONBLOCK);
     
     //get new hash table containing the socket attribute
     attrs = g_hash_table_new(g_str_hash, g_str_equal);
@@ -284,8 +284,8 @@ socket_initiate_connection(struct OCF_IPC_CHANNEL * ch)
   }
   
   //set the socket as non-blocking socket
-  val = fcntl(conn_info->s, F_GETFL, 0);
-  fcntl(conn_info->s, F_SETFL, val | O_NONBLOCK);
+  //val = fcntl(conn_info->s, F_GETFL, 0);
+  //fcntl(conn_info->s, F_SETFL, val | O_NONBLOCK);
   ch->ch_status = CH_CONNECT;
 
   return CH_SUCCESS;
@@ -398,7 +398,7 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
   return ret;
 }
 
-#elif defined(SCM_CREDS)
+#elif defined(HAVE_STRUCT_CMSGCRED) || defined(HAVE_STRUCT_FCRED) || (defined(HAVE_STRUCT_SOCKCRED) && defined(LOCAL_CREDS))
 
 /* FIXME!  Need to implement SCM_CREDS mechanism for BSD-based systems
  * This isn't an emergency, but should be done in the future...
@@ -407,11 +407,85 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
  * Not clear its SO_PEERCRED implementation works though ;-) 
  */
 
-
+/* Done.... Haven't tested yet. */
 static int 
 socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
 {
-    return AUTH_FAIL;
+  struct msghdr msg;
+  /* Credentials structure */
+#ifdef HAVE_STRUCT_CMSGCRED
+  typedef struct cmsgcred Cred;
+#define cruid cmcred_uid
+  
+#elif HAVE_STRUCT_FCRED
+  typedef struct fcred Cred;
+
+#define cruid fc_uid
+#elif HAVE_STRUCT_SOCKCRED
+  typedef struct sockcred Cred;
+
+#define cruid sc_uid
+#endif
+  Cred	   *cred;
+  struct SOCKET_CH_PRIVATE *conn_info;
+  struct OCF_IPC_AUTH *auth_info;
+  int tet = AUTH_OK;
+  
+  /* Compute size without padding */
+  char		cmsgmem[ALIGN(sizeof(struct cmsghdr)) + ALIGN(sizeof(Cred))];	/* for NetBSD */
+
+  auth_info = (struct OCF_IPC_AUTH *) ch->auth_info;
+
+  if (auth_info == NULL) { //no restriction for authentication
+    return AUTH_OK;
+  }
+  
+  if (auth_info->check_uid == FALSE && auth_info->check_gid == FALSE) {
+    return AUTH_OK;    //no restriction for authentication
+  }
+  conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
+
+  /* Point to start of first structure */
+  struct cmsghdr *cmsg = (struct cmsghdr *) cmsgmem;
+  
+  struct iovec iov;
+  char	 buf;
+  struct passwd *pw;
+  
+  memset(&msg, 0, sizeof(msg));
+  msg.msg_iov = &iov;
+  msg.msg_iovlen = 1;
+  msg.msg_control = (char *) cmsg;
+  msg.msg_controllen = sizeof(cmsgmem);
+  memset(cmsg, 0, sizeof(cmsgmem));
+
+  /*
+   * The one character which is received here is not meaningful; its
+   * purposes is only to make sure that recvmsg() blocks long enough for
+   * the other side to send its credentials.
+   */
+  iov.iov_base = &buf;
+  iov.iov_len = 1;
+  
+  if (recvmsg(conn_info->s, &msg, 0) < 0 
+      || cmsg->cmsg_len < sizeof(cmsgmem) 
+      || cmsg->cmsg_type != SCM_CREDS)
+    {
+      fprintf(stderr,"can't get credentical information from peer\n");
+      return AUTH_FAIL;
+    }
+
+  cred = (Cred *) CMSG_DATA(cmsg);
+  if (	auth_info->uid
+  &&	g_hash_table_lookup(auth_info->uid, &(cred->uid)) == NULL) {
+		ret = AUTH_FAIL;
+  }
+  if (	auth_info->gid
+  &&	g_hash_table_lookup(auth_info->gid, &(cred->gid)) == NULL) {
+		ret = AUTH_FAIL;
+  }
+
+  return ret;
 }
 
 #else
@@ -423,36 +497,45 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
 static int
 socket_resume_io(struct OCF_IPC_CHANNEL *ch)
 {
-  int len;
+  int len,msg_len;
   struct OCF_IPC_MESSAGE *msg;
-  char *buf;
   struct SOCKET_CH_PRIVATE* conn_info;
   GList *element;
 
-  buf = (char *) malloc(MAX_MESSAGE_SIZE);
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
   
-  
-  len = 1;
-
   /* QUESTION:  Is there a way to find the size of next msg? */
-
+  /* Done. Use ioctl and FIONREAD flag. */
   while (ch->recv_queue->current_qlen < ch->recv_queue->max_qlen) {
-    len=recv(conn_info->s, buf, MAX_MESSAGE_SIZE, MSG_DONTWAIT);
-    if (len < 0 && errno == EAGAIN) {
-	break;
+    /* check how much data queued. */
+    if(ioctl(conn_info->s, FIONREAD,&len) < 0){
+      perror("ioctl");
+      return CH_FAIL;
     }
-    
-    if (len > 0) {
+    if(len > 0){
       msg = socket_message_new(ch, len + 1);
+    }else{
+      break;
+    }
+
+    msg_len = recv(conn_info->s, msg->msg_body, len , MSG_DONTWAIT);  
+    if (msg_len < 0 && errno == EAGAIN) {
+      socket_free_message(msg);
+      break;
+    }
+
+    if (msg_len > 0) {
       /* Copying messages is slow... Sigh... :-( */
-      memcpy(msg->msg_body, (void *) buf, len);
+      /* removed memcpy. */
       msg->message_done = socket_free_message;
       msg->ch = ch;
+      msg->msg_len = msg_len;
       ch->recv_queue->queue = g_list_append(ch->recv_queue->queue, msg);
       ch->recv_queue->current_qlen++;
+      msg = NULL;
     }else{
-	break;
+      socket_free_message(msg);
+      break;
     }
   }
   
@@ -479,7 +562,7 @@ socket_resume_io(struct OCF_IPC_CHANNEL *ch)
       }
     }
   }
-  free(buf);
+
   return CH_SUCCESS;
 }
 
@@ -501,7 +584,7 @@ socket_get_send_fd(struct OCF_IPC_CHANNEL *ch)
 static int
 socket_set_send_qlen (struct OCF_IPC_CHANNEL* ch, int q_len)
 {
-	/* This seems more like an assertion failure than a normal error */
+  /* This seems more like an assertion failure than a normal error */
   if (ch->send_queue == NULL) {
     return CH_FAIL;
   }
@@ -513,7 +596,7 @@ socket_set_send_qlen (struct OCF_IPC_CHANNEL* ch, int q_len)
 static int
 socket_set_recv_qlen (struct OCF_IPC_CHANNEL* ch, int q_len)
 {
-	/* This seems more like an assertion failure than a normal error */
+  /* This seems more like an assertion failure than a normal error */
   if (ch->recv_queue == NULL) {
     return CH_FAIL;
   }
@@ -644,6 +727,17 @@ socket_channel_new(GHashTable *ch_attrs) {
    * in the same table.
    *
    * Maybe we need an internal function with a different set of parameters?
+   */
+ 
+  /*
+   * if we want to seperate them. I suggest
+   * <client side>
+   * user call ipc_channel_constructor(ch_type,attrs) to create a new channel.
+   * ipc_channel_constructor() call socket_channel_new(GHashTable*)to
+   * create a new socket channel.
+   * <server side>
+   * wait_conn->accept_connection() will call another function to create a new channel.
+   * this function will take socketfd as the parameter to create a socket channel.
    */
 
   if ((path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR)) != NULL) { //client side connection
