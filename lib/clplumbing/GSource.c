@@ -166,7 +166,11 @@ G_fd_dispatch(gpointer source_data
 		fdp->gpfd.events &= ~OUTPUT_EVENTS;
 	}
 
-	return fdp->dispatch(fdp->gpfd.fd, fdp->udata);
+	if(fdp->dispatch) {
+		return fdp->dispatch(fdp->gpfd.fd, fdp->udata);
+	}
+
+	return TRUE;
 }
 
 /*
@@ -262,7 +266,8 @@ GCHSource* G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 /*
  *	Delete an IPC_channel from the gmainloop world...
  */
-gboolean G_main_del_IPC_Channel(GCHSource* fdp)
+gboolean 
+G_main_del_IPC_Channel(GCHSource* fdp)
 {
 	return g_source_remove(fdp->gsourceid);
 }
@@ -337,7 +342,11 @@ G_CH_dispatch(gpointer source_data
 		chp->ch->ch_status = IPC_DISCONNECT;
 	}
 	chp->ch->ops->resume_io(chp->ch);
-	return chp->dispatch(chp->ch, chp->udata);
+	if(chp->dispatch) {
+		return chp->dispatch(chp->ch, chp->udata);
+	}
+
+	return TRUE;
 }
 
 /*
@@ -482,13 +491,22 @@ G_WC_dispatch(gpointer source_data
 
 	g_assert(IS_WCSOURCE(wcp));
        
-        do {
+        while(1) {
 		ch = wcp->wch->ops->accept_connection(wcp->wch, wcp->auth_info);
 		if (ch == NULL) {
 			break;
 	  	}
 		++count;
-	}while ((rc = wcp->dispatch(ch, wcp->udata)));
+
+		if(!wcp->dispatch) {
+			continue;
+		}
+
+		rc = wcp->dispatch(ch, wcp->udata);
+		if(!rc) {
+			break;
+		}
+	}
 	return rc;
 }
 

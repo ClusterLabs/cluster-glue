@@ -350,6 +350,10 @@ socket_waitin(struct IPC_CHANNEL * ch)
 {
 	struct pollfd sockpoll[2];
 
+	if(ch->recv_queue->current_qlen) {
+		return IPC_OK;
+	}
+
  	if (ch->ch_status == IPC_DISCONNECT) {
  		return IPC_BROKEN;
 	}
