@@ -44,7 +44,7 @@ main_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self
 
 lib_LTLIBRARIES		= libpils.la
 
-plugindir		= $(pkglibdir)/modules/InterfaceMgr
+plugindir		= $(pkglibdir)/plugins/test
 plugin_LTLIBRARIES	= test.la 
 
 libpils_la_SOURCES	= pils.c

@@ -1,8 +1,8 @@
 /*
  *	Sample Interface manager.
  */
-#define	PIL_PLUGINTYPE		InterfaceMgr
-#define	PIL_PLUGINTYPENAME	"InterfaceMgr"
+#define	PIL_PLUGINTYPE		test
+#define	PIL_PLUGINTYPENAME	"test"
 #define	PIL_PLUGIN		test
 #define	PIL_PLUGINNAME		"test"
 
@@ -21,9 +21,9 @@ Ourclose	(PILPlugin* us)
 /*
  *	Places to store information gotten during registration.
  */
-static const PILPluginImports*	OurPIImports;	/* Imported plugin fcns */
+static const PILPluginImports*	OurPIImports;	/* Imported plugin funs */
 static PILPlugin*		OurPlugin;	/* Our plugin info */
-static PILInterfaceImports*	OurIfImports;	/* Interface imported fcns */
+static PILInterfaceImports*	OurIfImports;	/* Interface imported funs */
 static PILInterface*		OurIf;		/* Pointer to interface info */
 
 /*
@@ -82,4 +82,3 @@ PIL_PLUGIN_INIT(PILPlugin*us, PILPluginImports* imports, void *user_ptr)
 
 	return ret;
 }
-
