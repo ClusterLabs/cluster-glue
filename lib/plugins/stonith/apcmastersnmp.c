@@ -1,4 +1,4 @@
-/* $Id: apcmastersnmp.c,v 1.18 2005/01/31 09:45:31 sunjd Exp $ */
+/* $Id: apcmastersnmp.c,v 1.19 2005/02/17 09:25:28 sunjd Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
@@ -346,8 +346,12 @@ apcmastersnmp_status(StonithPlugin * s)
     }
 
     /* issue a warning if ident mismatches */
-    for(i=DIMOF(APC_tested_ident) -1; i >=0 ; i--)
-      if (strcmp(ident, APC_tested_ident[i]) == 0) break;
+    for(i=DIMOF(APC_tested_ident) -1; i >=0 ; i--) {
+      if (strcmp(ident, APC_tested_ident[i]) == 0) {
+	 break;
+      }
+    }
+
     if (i<0) {
 	LOG(PIL_WARN,
 	       "%s: module not tested with this hardware '%s'",
