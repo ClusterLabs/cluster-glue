@@ -1,9 +1,12 @@
-/* $Id: ipmilan.c,v 1.12 2004/10/09 01:49:42 lge Exp $ */
+/* $Id: ipmilan.c,v 1.13 2005/01/31 09:45:31 sunjd Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
  * Copyright (c) 2003 Intel Corp. 
  *	Yixiong Zou <yixiong.zou@intel.com>
+ *
+ * Mangled by Sun Jiang Dong <sunjd@cn.ibm.com>, IBM, 2005.
+ * And passed the compiling with OpenIPMI-1.4.8.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -42,24 +45,24 @@
 
 #include "ipmilan.h"
 
-static void *		ipmilan_new(void);
-static void		ipmilan_destroy(Stonith *);
-static int		ipmilan_set_config_file(Stonith *, const char * cfgname);
-static int		ipmilan_set_config_info(Stonith *, const char * info);
-static const char *	ipmilan_getinfo(Stonith * s, int InfoType);
-static int		ipmilan_status(Stonith * );
-static int		ipmilan_reset_req(Stonith * s, int request, const char * host);
-static char **		ipmilan_hostlist(Stonith  *);
+static StonithPlugin *	ipmilan_new(void);
+static void		ipmilan_destroy(StonithPlugin *);
+static const char **	ipmilan_get_confignames(StonithPlugin *);
+static int		ipmilan_set_config(StonithPlugin *, StonithNVpair *);
+static const char *	ipmilan_getinfo(StonithPlugin * s, int InfoType);
+static int		ipmilan_status(StonithPlugin * );
+static int		ipmilan_reset_req(StonithPlugin * s, int request, const char * host);
+static char **		ipmilan_hostlist(StonithPlugin  *);
 
 static struct stonith_ops ipmilanOps ={
 	ipmilan_new,		/* Create new STONITH object	*/
-	ipmilan_destroy,		/* Destroy STONITH object	*/
-	ipmilan_set_config_file,	/* set configuration from file	*/
-	ipmilan_set_config_info,	/* Get configuration from file	*/
-	ipmilan_getinfo,		/* Return STONITH info string	*/
+	ipmilan_destroy,	/* Destroy STONITH object	*/
+	ipmilan_getinfo,	/* Return STONITH info string	*/
+	ipmilan_get_confignames,/* Get configuration parameter names */
+	ipmilan_set_config,	/* Set configuration */
 	ipmilan_status,		/* Return STONITH device status	*/
-	ipmilan_reset_req,		/* Request a reset */
-	ipmilan_hostlist,		/* Return list of supported hosts */
+	ipmilan_reset_req,	/* Request a reset */
+	ipmilan_hostlist,	/* Return list of supported hosts */
 };
 
 PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
@@ -103,6 +106,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  */
 
 struct pluginDevice {
+	StonithPlugin   sp;
 	const char *	pluginid;
 	int		hostcount;
 	struct ipmilanHostInfo * 	hostlist;
@@ -110,6 +114,11 @@ struct pluginDevice {
 
 static const char * pluginid = "pluginDevice-Stonith";
 static const char * NOTpluginid = "Hey, dummy this has been destroyed (ipmilanDev)";
+
+#define ST_HOSTNAME	"hostname"
+#define ST_PORT		"port"
+#define ST_AUTH		"auth"
+#define ST_PRIV		"priv"
 
 /*
  * Check the status of the IPMI Lan STONITH device. 
@@ -127,7 +136,7 @@ static const char * NOTpluginid = "Hey, dummy this has been destroyed (ipmilanDe
  */
 
 static int
-ipmilan_status(Stonith  *s)
+ipmilan_status(StonithPlugin  *s)
 {
 	struct pluginDevice * nd;
 	struct ipmilanHostInfo * node;
@@ -137,7 +146,7 @@ ipmilan_status(Stonith  *s)
 
 	ret = S_OK;
 
-	nd = (struct pluginDevice *)s->pinfo;
+	nd = (struct pluginDevice *)s;
 	node = nd->hostlist;
 #if 0
 	do {
@@ -195,7 +204,7 @@ get_config_string(struct pluginDevice * nd, int index)
  */
 
 static char **
-ipmilan_hostlist(Stonith  *s)
+ipmilan_hostlist(StonithPlugin  *s)
 {
 	int		numnames = 0;
 	char **		ret = NULL;
@@ -204,7 +213,7 @@ ipmilan_hostlist(Stonith  *s)
 
 	ERRIFWRONGDEV(s,NULL);
 	
-	nd = (struct pluginDevice*) s->pinfo;
+	nd = (struct pluginDevice*) s;
 	if (nd->hostcount < 0) {
 		LOG(PIL_CRIT
 		,	"unconfigured stonith object in ipmi_hostlist");
@@ -243,130 +252,11 @@ ipmilan_hostlist(Stonith  *s)
 
 #define MAX_IPMI_STRING_LEN 64
 
-static int
-ipmilan_parse_config_info(struct pluginDevice* nd, const char * info)
-{
-	static int port;
-
-	static char name[MAX_IPMI_STRING_LEN];
-	static char ip[MAX_IPMI_STRING_LEN]; 
-
-	static char auth[MAX_IPMI_STRING_LEN];
-	static char priv[MAX_IPMI_STRING_LEN];
-
-	static char user[MAX_IPMI_STRING_LEN];
-	static char pass[MAX_IPMI_STRING_LEN];
-
-	struct ipmilanHostInfo * hostinfo, * head, * tail;
-
-	port = 0;
-	hostinfo = NULL;
-	memset(name, 0, MAX_IPMI_STRING_LEN);
-	memset(ip, 0, MAX_IPMI_STRING_LEN);
-	memset(auth, 0, MAX_IPMI_STRING_LEN);
-	memset(priv, 0, MAX_IPMI_STRING_LEN);
-	memset(user, 0, MAX_IPMI_STRING_LEN);
-	memset(pass, 0, MAX_IPMI_STRING_LEN);
-
-	do {
-		if (sscanf(info, "%s %s %i %s %s %s %[^\r\n\t]", 
-			name, ip, &port, auth, priv, user, pass) == 7 && 
-			strlen(user) > 1 && strlen(pass) > 1) {
-
-			if ((hostinfo = (struct ipmilanHostInfo *) MALLOC(sizeof(struct ipmilanHostInfo))) == NULL) {
-				LOG(PIL_CRIT, "out of memory");
-				return (S_OOPS);
-			}
-
-			hostinfo->portnumber = port;
-
-			if (strncmp(auth, "none", strlen(auth)) == 0) {
-				hostinfo->authtype = IPMI_AUTHTYPE_NONE;
-			} 
-			else if (strncmp(auth, "md2", strlen(auth)) == 0) {
-				hostinfo->authtype = IPMI_AUTHTYPE_MD2;
-			}
-			else if (strncmp(auth, "md5", strlen(auth)) == 0) {
-				hostinfo->authtype = IPMI_AUTHTYPE_MD5;
-			}
-			else if (strncmp(auth, "straight", strlen(auth)) == 0) {
-				hostinfo->authtype = IPMI_AUTHTYPE_STRAIGHT;
-			}
-			else {
-				break;
-			}
-
-			if (strncmp(priv, "admin", strlen(priv)) == 0) {
-				hostinfo->privilege = IPMI_PRIVILEGE_ADMIN;
-			}
-			else if (strncmp(priv, "operator", strlen(priv)) == 0) {
-				hostinfo->privilege = IPMI_PRIVILEGE_OPERATOR;
-			}
-			else {
-				break;
-			}
-
-			if ((hostinfo->hostname = STRDUP(name)) == NULL) {
-				break;
-			}
-			g_strdown(hostinfo->hostname);
-
-			if ((hostinfo->ipaddr = STRDUP(ip)) == NULL) {
-				FREE(hostinfo->hostname);
-				break;
-			}
-
-			if (strncmp(user, "\"\"", 2)==0) {
-				memset(hostinfo->username, 0, sizeof(hostinfo->username));
-			} else {
-				strncpy(hostinfo->username, user, strlen(user)+1);
-			}
-
-			if (strncmp(pass, "\"\"", 2)==0) {
-				memset(hostinfo->password, 0, sizeof(hostinfo->password));
-			} else {
-				strncpy(hostinfo->password, pass, strlen(pass)+1);
-			}
-
-			hostinfo->next = NULL;
-
-			head = nd->hostlist;
-			/* find the last one in the list */
-			if (head) {
-				tail = head->prev;
-				tail->next = hostinfo;
-
-				hostinfo->prev = tail;
-				head->prev = hostinfo;
-
-			} else {
-				nd->hostlist = hostinfo;
-				hostinfo->prev = hostinfo;
-			}
-
-			/* increment the host counter */
-			nd->hostcount++;
-
-			return (S_OK);
-		} 
-		else {
-			break;
-		}
-
-	} while (0); /* using this do loop here so we can have 'break' statement. */
-
-	if (hostinfo) {
-		FREE(hostinfo);
-		hostinfo = NULL;
-	}
-	return (S_BADCONFIG);
-}
-
 /*
- *	Reset the given host on this Stonith device.
+ *	Reset the given host on this StonithPlugin device.
  */
 static int
-ipmilan_reset_req(Stonith * s, int request, const char * host)
+ipmilan_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	int rc = 0;
 	char *shost;
@@ -380,7 +270,7 @@ ipmilan_reset_req(Stonith * s, int request, const char * host)
 	}
 	g_strdown(shost);
 
-	nd = (struct pluginDevice *)s->pinfo;
+	nd = (struct pluginDevice *)s;
 	node = nd->hostlist;
 	do {
 		if (strcmp(node->hostname, host) == 0) {
@@ -407,56 +297,76 @@ ipmilan_reset_req(Stonith * s, int request, const char * host)
 }
 
 /*
- *	Parse the information in the given configuration file,
- *	and stash it away...
+ *	Get configuration parameter names
  */
-static int
-ipmilan_set_config_file(Stonith* s, const char * configname)
+static const char **
+ipmilan_get_confignames(StonithPlugin * s)
 {
-	FILE *	cfgfile;
-
-	char	ipmiline[256];
-
-	struct pluginDevice*	nd;
-
-	int rc = S_BADCONFIG;
-
-	ERRIFWRONGDEV(s,S_OOPS);
-	nd = (struct pluginDevice*) s->pinfo;
-
-	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		LOG(PIL_CRIT, "Cannot open %s", configname);
-		return(S_BADCONFIG);
-	}
-	while (fgets(ipmiline, sizeof(ipmiline), cfgfile) != NULL){
-		if (*ipmiline == '#' || *ipmiline == '\n' || *ipmiline == EOS) {
-			continue;
-		}
-		if ((rc = ipmilan_parse_config_info(nd, ipmiline)) != S_OK) {
-			break;
-		};
-	}
-
-	fclose(cfgfile);
-	return(rc);
+	static const char * ret[] = 
+		{ ST_HOSTNAME, ST_IPADDR, ST_PORT, ST_AUTH,
+		  ST_PRIV, ST_LOGIN, ST_PASSWD, NULL};
+	return ret;
 }
 
 /*
- *	Parse the config information in the given string, and stash it away...
+ *	Set the configuration parameters
  */
 static int
-ipmilan_set_config_info(Stonith* s, const char * info)
+ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 {
 	struct pluginDevice* nd;
+	int		rc;
+	struct ipmilanHostInfo *  tmp;
 
 	ERRIFWRONGDEV(s,S_OOPS);
-	nd = (struct pluginDevice *)s->pinfo;
+	nd = (struct pluginDevice *)s;
 
-	return(ipmilan_parse_config_info(nd, info));
+	StonithNamesToGet	namestoget [] =
+	{	{ST_HOSTNAME,	NULL}
+	,	{ST_IPADDR,	NULL}
+	,	{ST_PORT,	NULL}
+	,	{ST_AUTH,	NULL}
+	,	{ST_PRIV,	NULL}
+	,	{ST_LOGIN,	NULL}
+	,	{ST_PASSWD,	NULL}
+	,	{NULL,		NULL}
+	};
+
+	ERRIFWRONGDEV(s, S_OOPS);
+	if (nd->sp.isconfigured) {
+		return S_OOPS;
+	}
+
+	if ((rc=OurImports->GetAllValues(namestoget, list)) != S_OK) {
+		return rc;
+	}
+
+	tmp = MALLOCT(struct ipmilanHostInfo);
+	tmp->hostname = namestoget[0].s_value;
+	tmp->ipaddr   = namestoget[1].s_value;
+	tmp->portnumber = atoi(namestoget[2].s_value);
+	tmp->authtype = atoi(namestoget[3].s_value);
+	tmp->privilege = atoi(namestoget[4].s_value);
+	tmp->username = namestoget[5].s_value;
+	tmp->password = namestoget[6].s_value;
+	
+	if (nd->hostlist == NULL ) {
+		nd->hostlist = tmp;
+		nd->hostlist->prev = tmp;
+		nd->hostlist->next = tmp;
+	} else {
+		tmp->prev = nd->hostlist->prev;
+		tmp->next = nd->hostlist;
+		nd->hostlist->prev->next = tmp;
+		nd->hostlist->prev = tmp;
+	}
+	nd->hostcount++;
+
+	return(S_OK);
 }
 
 static const char *
-ipmilan_getinfo(Stonith * s, int reqtype)
+ipmilan_getinfo(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* nd;
 	char *		ret;
@@ -465,22 +375,11 @@ ipmilan_getinfo(Stonith * s, int reqtype)
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	nd = (struct pluginDevice *)s->pinfo;
+	nd = (struct pluginDevice *)s;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
 			ret = _("ipmilan STONITH device");
-			break;
-
-		case ST_CONF_INFO_SYNTAX:
-			ret = _("hostname ipaddr port auth priv user pass \n"
-			"all fields are white-space delimited.");
-			break;
-
-		case ST_CONF_FILE_SYNTAX:
-			ret = _("hostname ipaddr port auth priv user pass \n"
-			"All fields are white-space delimited.  "
-			"Blank lines and lines beginning with # are ignored");
 			break;
 
 		case ST_DEVICEDESCR:
@@ -495,12 +394,12 @@ ipmilan_getinfo(Stonith * s, int reqtype)
 }
 
 /*
- *	ipmilan Stonith destructor...
+ *	ipmilan StonithPlugin destructor...
  *
  * 	The hostlist is a link list.  So have to iterate through.
  */
 static void
-ipmilan_destroy(Stonith *s)
+ipmilan_destroy(StonithPlugin *s)
 {
 	struct pluginDevice* nd;
 	struct ipmilanHostInfo * host;
@@ -508,7 +407,7 @@ ipmilan_destroy(Stonith *s)
 
 	VOIDERRIFWRONGDEV(s);
 
-	nd = (struct pluginDevice *)s->pinfo;
+	nd = (struct pluginDevice *)s;
 
 	nd->pluginid = NOTpluginid;
 
@@ -518,6 +417,8 @@ ipmilan_destroy(Stonith *s)
 
 			FREE(host->hostname);
 			FREE(host->ipaddr);
+			FREE(host->username);
+			FREE(host->password);
 
 			FREE(host);
 			host = host->prev;
@@ -528,8 +429,8 @@ ipmilan_destroy(Stonith *s)
 	FREE(nd);
 }
 
-/* Create a new ipmilan Stonith device.  Too bad this function can't be static */
-static void *
+/* Create a new ipmilan StonithPlugin device.  Too bad this function can't be static */
+static StonithPlugin *
 ipmilan_new(void)
 {
 	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
@@ -542,7 +443,6 @@ ipmilan_new(void)
 	nd->pluginid = pluginid;
 	nd->hostlist = NULL;
 	nd->hostcount = 0; 
-	return((void *)nd);
+	nd->sp.s_ops = &ipmilanOps;
+	return(&(nd->sp));
 }
-
-

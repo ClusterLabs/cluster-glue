@@ -1,4 +1,4 @@
-/* $Id: ipmilan.h,v 1.2 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: ipmilan.h,v 1.3 2005/01/31 09:45:31 sunjd Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
@@ -30,8 +30,8 @@ struct ipmilanHostInfo {
 	int 		portnumber;
 	int 		authtype;
 	int		privilege;
-	char 		username[17];
-	char 		password[17];
+	char * 		username;
+	char *		password;
 
 	struct ipmilanHostInfo *  prev;
 	struct ipmilanHostInfo *  next;

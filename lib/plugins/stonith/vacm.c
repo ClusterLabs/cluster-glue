@@ -1,11 +1,12 @@
-#error "This looks like it hasn't been compiled nor working for a while. Please review before using."
 
-/* $Id: vacm.c,v 1.9 2004/10/06 10:55:18 lars Exp $ */
+/* $Id: vacm.c,v 1.10 2005/01/31 09:45:31 sunjd Exp $ */
 /******************************************************************************
 *
 *    Copyright 2000 Sistina Software, Inc.
 *    Tiny bits Copyright 2000 Alan Robertson <alanr@unix.sh>
 *    Tiny bits Copyright 2000 Zac Sprackett, VA Linux Systems
+*    Tiny bits Copyright 2005 International Business Machines
+*    Significantly Mangled by Sun Jiang Dong <sunjd@cn.ibm.com>, IBM, 2005	
 *
 *    This is free software released under the GNU General Public License.
 *    There is no warranty for this software.  See the file COPYING for
@@ -16,8 +17,9 @@
 *    This file is maintained by:
 *      Michael C Tilstra <conrad@sistina.com>
 *
-*    You'll need to uncomment a line from the Makefile to get this
-*    to compile and install with the normal stonith distribution.
+*    Becasue I have no device to test, now I just make it pass the compiling
+*    with vacm-2.0.5a. Please review before using.
+*		Sun Jiang Dong <sunjd@cn.ibm.com>, IBM, 2005
 *
 *    This module provides a driver for the VA Linux Cluster Manager.
 *    For more information on VACM, see http://vacm.sourceforge.net/
@@ -38,21 +40,21 @@
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
 
-static void *		vacm_new(void);
-static void		vacm_destroy(Stonith *);
-static int		vacm_set_config_file(Stonith *, const char * cfgname);
-static int		vacm_set_config_info(Stonith *, const char * info);
-static const char *	vacm_getinfo(Stonith * s, int InfoType);
-static int		vacm_status(Stonith * );
-static int		vacm_reset_req(Stonith * s, int request, const char * host);
-static char **		vacm_hostlist(Stonith  *);
+static StonithPlugin *	vacm_new(void);
+static void		vacm_destroy(StonithPlugin *);
+static const char **	vacm_get_confignames(StonithPlugin *);
+static int		vacm_set_config(StonithPlugin *, StonithNVpair *);
+static const char *	vacm_getinfo(StonithPlugin * s, int InfoType);
+static int		vacm_status(StonithPlugin * );
+static int		vacm_reset_req(StonithPlugin * s, int request, const char * host);
+static char **		vacm_hostlist(StonithPlugin  *);
 
 static struct stonith_ops vacmOps ={
 	vacm_new,		/* Create new STONITH object	*/
 	vacm_destroy,		/* Destroy STONITH object	*/
-	vacm_set_config_file,	/* set configuration from file	*/
-	vacm_set_config_info,	/* Get configuration from file	*/
 	vacm_getinfo,		/* Return STONITH info string	*/
+	vacm_get_confignames,	/* Return configuration parameters */
+	vacm_set_config,	/* Set configuration		*/
 	vacm_status,		/* Return STONITH device status	*/
 	vacm_reset_req,		/* Request a reset */
 	vacm_hostlist,		/* Return list of supported hosts */
@@ -91,88 +93,92 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 }
 
 /*structs*/
-struct vac {
-   unsigned int magic;
-   void *h; /* a handle to the nexxus. */
+struct pluginDevice {
+	StonithPlugin sp; 
+	const char * pluginid;
+	void *h; /* a handle to the nexxus. */
+	char *	nexxus;
+	char *	user;
+	char *	passwd;
 };
-#define VACMID_MAGIC 0x7661636d
 
-#define IS_VACM(i) (((i)!=NULL) && ((i)->pinfo!=NULL) \
-      && (((struct vac *)(i)->pinfo)->magic == VACMID_MAGIC))
+#define ST_NEXXUS   "nexxus"
 
-#define log_err(fmt, arg...) fprintf(stderr, fmt, ## arg)
-
+static const char * pluginid = "VACMDevice-Stonith";
+static const char * NOTpluginid = "VACM device has been destroyed";
 
 /*funcs*/
 int
-vacm_status(Stonith *s)
+vacm_status(StonithPlugin *s)
 {
-   struct vac *vc;
-   char snd[] = "NEXXUS:VERSION";
-   char *rcv, *tk;
-   int rcvlen;
+	struct pluginDevice *sd;
+	char snd[] = "NEXXUS:VERSION";
+	char *rcv, *tk;
+	int rcvlen;
 
-   if(!IS_VACM(s)) return (S_OOPS);
-   vc = (struct vac*)s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+	sd = (struct pluginDevice*)s;
 
-   /* If grabbing the nexxus version works, then the stauts must be ok.
-    * right?
-    */
+	/* If grabbing the nexxus version works, then the stauts must be ok.
+	 * right?
+	 */
 
-   api_nexxus_send_ipc(vc->h, snd, strlen(snd)+1);
-   while(1) {
-      if(api_nexxus_wait_for_data(vc->h, &rcv, &rcvlen, 20)<0)
-         break;
-      if(!(tk = strtok(rcv,":"))) { /*NEXXUS*/
-         break;
-      }else if(!(tk=strtok(NULL,":"))) { /* Job ID */
-         break;
-      }else if(!(tk=strtok(NULL,":"))) { /* one of the below */
-         break;
-      } else if( !strcmp(tk, "JOB_COMPLETED")) {
-         free(rcv);
-         return S_OK; /* YEAH!! */
-      }else if(!strcmp(tk, "JOB_STARTED")) {
-         free(rcv);
-         continue;
-      }else if(!strcmp(tk, "JOB_ERROR")) {
-         free(rcv);
-         break;
-      }else if(!strcmp(tk, "VERSION")) {
-         free(rcv);
-         continue;
-      } else {
-         log_err("Unexpected token \"%s\" in line \"%s\"\n",tk,rcv);
-         break;
-      }
-   }
+	api_nexxus_send_ipc(sd->h, snd, strlen(snd)+1);
+	while(1) {
+		if (api_nexxus_wait_for_data(sd->h, &rcv, &rcvlen, 20)<0) {
+			break;
+		}
+		if (!(tk = strtok(rcv,":"))) { /*NEXXUS*/
+			break;
+		}else if (!(tk=strtok(NULL,":"))) { /* Job ID */
+			break;
+		}else if (!(tk=strtok(NULL,":"))) { /* one of the below */
+			break;
+		} else if ( !strcmp(tk, "JOB_COMPLETED")) {
+			free(rcv);
+			return S_OK; /* YEAH!! */
+		}else if(!strcmp(tk, "JOB_STARTED")) {
+			free(rcv);
+			continue;
+		}else if(!strcmp(tk, "JOB_ERROR")) {
+			free(rcv);
+			break;
+		}else if(!strcmp(tk, "VERSION")) {
+			free(rcv);
+			continue;
+		} else {
+			LOG(PIL_CRIT, "Unexpected token \"%s\" in line \"%s\"\n"
+			    , tk, rcv);
+			break;
+		}
+	}
 
-   return S_OOPS;
+	return S_OOPS;
 }
 
 /* Better make sure the current group is correct. 
  * Can't think of a good way to do this.
  */
 char **
-vacm_hostlist(Stonith *s)
+vacm_hostlist(StonithPlugin *s)
 {
-   struct vac *vc;
+   struct pluginDevice *sd;
    char snd[] = "NEXXUS:NODE_LIST";
    char *rcv,*tk;
    int rcvlen;
    char ** hlst=NULL;
    int hacnt=0, hrcnt=0;
 #define MSTEP 20
-
-   if(!IS_VACM(s)) return NULL;
-   vc = (struct vac*)s->pinfo;
+   
+   ERRIFWRONGDEV(s, NULL);
+   sd = (struct pluginDevice*)s;
 
    hlst = (char **)malloc(MSTEP * sizeof(char*));
    hacnt=MSTEP;
 
-   api_nexxus_send_ipc(vc->h, snd, strlen(snd)+1);
+   api_nexxus_send_ipc(sd->h, snd, strlen(snd)+1);
    while(1) {
-      if(api_nexxus_wait_for_data(vc->h, &rcv, &rcvlen, 20)<0) {
+      if(api_nexxus_wait_for_data(sd->h, &rcv, &rcvlen, 20)<0) {
          goto HL_cleanup;
       }
       if(!(tk=strtok(rcv, ":"))) { /* NEXXUS */
@@ -204,7 +210,7 @@ vacm_hostlist(Stonith *s)
          }
       }else {
          /* WTF?! */
-         log_err("Unexpected token \"%s\" in line \"%s\"\n",tk,rcv);
+         LOG(PIL_CRIT, "Unexpected token \"%s\" in line \"%s\"\n",tk,rcv);
          break;
       }
    }
@@ -216,134 +222,99 @@ HL_cleanup:
 
 #define SND_SIZE 256
 int
-vacm_reset(Stonith *s, int request, const char *host)
+vacm_reset_req(StonithPlugin *s, int request, const char *host)
 {
-   struct vac *vc;
-   char snd[SND_SIZE]; /* god forbid its bigger than this */
-   char *rcv, *tk;
-   int rcvlen;
+	struct pluginDevice *sd;
+	char snd[SND_SIZE]; /* god forbid its bigger than this */
+	char *rcv, *tk;
+	int rcvlen;
 
-   if(!IS_VACM(s)) return (S_OOPS);
-   vc = (struct vac*)s->pinfo;
+	ERRIFWRONGDEV(s,S_OOPS);
+	sd = (struct pluginDevice*)s;
 
-   switch(request) {
+	switch(request) {
 #ifdef ST_POWERON
-      case ST_POWERON:
-         snprintf(snd, SND_SIZE, "EMP:POWER_ON:%s", host);
-         break;
+	case ST_POWERON:
+		snprintf(snd, SND_SIZE, "EMP:POWER_ON:%s", host);
+		break;
 #endif /*ST_POWERON*/
 #ifdef ST_POWEROFF
-      case ST_POWEROFF:
-         snprintf(snd, SND_SIZE, "EMP:POWER_OFF:%s", host);
-         break;
+	case ST_POWEROFF:
+		snprintf(snd, SND_SIZE, "EMP:POWER_OFF:%s", host);
+		break;
 #endif /*ST_POWEROFF*/
-      case ST_GENERIC_RESET:
-         snprintf(snd, SND_SIZE, "EMP:POWER_CYCLE:%s", host);
-         break;
-      default:
-         return S_INVAL;
-   }
-   api_nexxus_send_ipc(vc->h, snd, strlen(snd)+1);
-   while(1) {
-      if(api_nexxus_wait_for_data(vc->h, &rcv, &rcvlen, 20)<0)
-         return S_RESETFAIL;
-      if(!(tk = strtok(rcv,":"))) { /*EMP*/
-         break;
-      }else if(!(tk=strtok(NULL,":"))) { /* Job ID */
-         break;
-      }else if(!(tk=strtok(NULL,":"))) { /* one of teh below */
-         break;
-      } else if( !strcmp(tk, "JOB_COMPLETED")) {
-         free(rcv);
-         return S_OK;
-      }else if(!strcmp(tk, "JOB_STARTED")) {
-         free(rcv);
-         continue;
-      }else if(!strcmp(tk, "JOB_ERROR")) {
-         free(rcv);
-         return S_RESETFAIL;
-      } else {
-         /* WTF?! */
-         log_err("Unexpected token \"%s\" in line \"%s\"\n",tk,rcv);
-         break;
-      }
-   }
+	case ST_GENERIC_RESET:
+		snprintf(snd, SND_SIZE, "EMP:POWER_CYCLE:%s", host);
+		break;
+	default:
+		return S_INVAL;
+	}
 
-   return S_RESETFAIL;
+	api_nexxus_send_ipc(sd->h, snd, strlen(snd)+1);
+	while(1) {
+		if (api_nexxus_wait_for_data(sd->h, &rcv, &rcvlen, 20)<0) {
+			return S_RESETFAIL;
+		}
+		if (!(tk = strtok(rcv,":"))) { /*EMP*/
+			break;
+		}else if (!(tk=strtok(NULL,":"))) { /* Job ID */
+			break;
+		}else if (!(tk=strtok(NULL,":"))) { /* one of teh below */
+			break;
+		} else if ( !strcmp(tk, "JOB_COMPLETED")) {
+			free(rcv);
+			return S_OK;
+		} else if(!strcmp(tk, "JOB_STARTED")) {
+			free(rcv);
+			continue;
+		} else if(!strcmp(tk, "JOB_ERROR")) {
+			free(rcv);
+			return S_RESETFAIL;
+		} else {
+			/* WTF?! */
+			LOG(PIL_CRIT, "Unexpected token \"%s\" in line \"%s\"\n"
+			    , tk, rcv);
+			break;
+		}
+	}
+
+	return S_RESETFAIL;
 }
 
-int parse_conf_line(struct vac *vc, char *line)
+/* list => "nexxus:username:password" */
+static const char **
+vacm_get_confignames(StonithPlugin * s)
 {
-   char *n=NULL, *u=NULL, *p=NULL;
-   char *rcv;
-   int rcvlen;
-
-   n = line;
-   u = strstr(n, ":");
-   if(!u) return S_BADCONFIG;
-   *u++ = '\0';
-   p = strstr(u, ":");
-   if(!p) return S_BADCONFIG;
-   *p++ = '\0';
-
-   if(api_nexxus_connect(n, u, p, &(vc->h))<0)
-      return S_INVAL;
-   if(api_nexxus_wait_for_data(vc->h, &rcv, &rcvlen, 20)<0)
-      return S_INVAL;
-
-   if(strcmp(rcv, "NEXXUS_READY"))
-      return S_BADCONFIG;
-
-   free(rcv);
-   return S_OK;
+	static const char * ret[] = {ST_NEXXUS, ST_LOGIN, ST_PASSWD, NULL};
+	return ret;
 }
 
-int
-vacm_set_config_file(Stonith *s, const char *cfn)
+static int
+vacm_set_config(StonithPlugin *s, StonithNVpair * list)
 {
-   struct vac *vc;
-   int err=S_BADCONFIG;
-   char line[512], *tk;
-   FILE *fl;
+	struct pluginDevice* sd = (struct pluginDevice *)s;
+	int		rc;
+	StonithNamesToGet	namestoget [] =
+	{	{ST_NEXXUS,	NULL}
+	,	{ST_LOGIN,	NULL}
+	,	{ST_PASSWD,	NULL}
+	,	{NULL,		NULL}
+	};
 
-   if(!IS_VACM(s)) return (S_OOPS);
-   vc = (struct vac*)s->pinfo;
+	ERRIFWRONGDEV(s, S_OOPS);
+	if (sd->sp.isconfigured) {
+		return S_OOPS;
+	}
 
-   if( (fl = fopen(cfn, "r")) == NULL) return S_BADCONFIG;
+	if ((rc=OurImports->GetAllValues(namestoget, list)) != S_OK) {
+		return rc;
+	}
+	sd->nexxus = namestoget[0].s_value;
+	sd->user   = namestoget[1].s_value;
+	sd->passwd = namestoget[2].s_value;
+	/* When to initialize the sd->h */
 
-   while(fgets(line,512,fl) != NULL ) {
-      switch(line[0]) {
-         case '\0': case '\n': case '\r': case '#':
-            continue;
-      }
-      if( !(tk = strtok(line, ":"))) break;
-      if( !strcmp(tk, "vacmconf")) {
-         if( !(tk = strtok(NULL, " \t\n\r"))) break;
-         err = parse_conf_line(vc, tk);
-         break;
-      }
-
-   }
-
-   fclose(fl);
-   return err;
-}
-
-/* info => "nexxus:username:password" */
-int
-vacm_set_config_info(Stonith *s, const char *info)
-{
-   struct vac *vc;
-   int err = S_BADCONFIG;
-   char *tmp = strdup(info);
-
-   if(!IS_VACM(s)) return (S_OOPS);
-   vc = (struct vac*)s->pinfo;
-
-   err = parse_conf_line(vc, tmp);
-
-   free(tmp);
-   return err;
+	return(S_OK);
 }
 
 /*
@@ -355,42 +326,82 @@ vacm_set_config_info(Stonith *s, const char *info)
  * I don't think any other stonith modules do this currently.
  */
 const char *
-vacm_getinfo(Stonith *s, int reqtype)
+vacm_getinfo(StonithPlugin *s, int reqtype)
 {
-   if(!IS_VACM(s)) return NULL;
+	const char *		ret;
 
-   switch(reqtype){
-      case ST_DEVICEID:
-         return dgettext(ST_TEXTDOMAIN, "VACM");
-      case ST_CONF_INFO_SYNTAX:
-         return dgettext(ST_TEXTDOMAIN, "nexxus:username:password");
-      case ST_CONF_FILE_SYNTAX:
-         return dgettext(ST_TEXTDOMAIN, "vacmconf:nexxus:username:password");
-      default:
-         return NULL;
-   }
+   	ERRIFWRONGDEV(s, NULL);
+	switch (reqtype) {
+
+		case ST_DEVICEID:		/* What type of device? */
+			ret = dgettext(ST_TEXTDOMAIN, "VACM");
+			break;
+
+		case ST_DEVICENAME:		/* Which particular device? */
+			ret = dgettext(ST_TEXTDOMAIN, "VACM");
+			break;
+
+		case ST_DEVICEDESCR:		/* Description of dev type */
+			ret = "A driver for the VA Linux Cluster Manager.";
+			break;
+
+		case ST_DEVICEURL:		/* VACM's web site */
+			ret = "http://vacm.sourceforge.net/";
+			break;
+
+		default:
+			ret = NULL;
+			break;
+	}
+
+	return ret;
 }
 
 void
-vacm_destroy(Stonith *s)
+vacm_destroy(StonithPlugin *s)
 {
-   struct vac *vc;
+	struct pluginDevice *sd;
 
-   if(!IS_VACM(s)) return;
-   vc = (struct vac*)s->pinfo;
+	VOIDERRIFWRONGDEV(s);
+	sd = (struct pluginDevice*)s;
 
-   if( vc->h )
-      api_nexxus_disconnect(vc->h);
-   free(vc); vc = NULL;
+	if( sd->h ) {
+		api_nexxus_disconnect(sd->h);
+	}
 
+	sd->pluginid = NOTpluginid;
+	if (sd->nexxus != NULL) {
+		FREE(sd->nexxus);
+		sd->nexxus = NULL;
+	}
+	if (sd->user != NULL) {
+		FREE(sd->user);
+		sd->user = NULL;
+	}
+	if (sd->passwd != NULL) {
+		FREE(sd->passwd);
+		sd->passwd = NULL;
+	}
+
+	free(sd); sd = NULL;
 }
 
-void *
+static StonithPlugin *
 vacm_new(void)
 {
-   struct vac *vc;
-   vc = malloc(sizeof(struct vac));
-   vc->magic = VACMID_MAGIC;
-   vc->h = NULL;
-   return (void*)vc;
+	struct pluginDevice *sd;
+
+	sd = malloc(sizeof(struct pluginDevice));
+	if (sd == NULL) {
+		LOG(PIL_CRIT,	"%s", "out of memory");
+		return(NULL);
+	}
+	memset(sd, 0, sizeof(*sd));
+	sd->h = NULL;
+	sd->pluginid = pluginid;
+	sd->nexxus = NULL;
+	sd->user = NULL;
+	sd->passwd = NULL;
+	sd->sp.s_ops = &vacmOps;
+	return &(sd->sp);	/* same as "sd" */
 }
