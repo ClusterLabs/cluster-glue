@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.60 2005/03/07 20:01:28 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.61 2005/03/15 00:01:23 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -245,7 +245,7 @@ ha_msg_copy(const struct ha_msg *msg)
 	ret->netstringlen = msg->netstringlen;
 
 	memcpy(ret->nlens, msg->nlens, sizeof(msg->nlens[0])*msg->nfields);
-	memcpy(ret->vlens, msg->vlens, sizeof(msg->nlens[0])*msg->nfields);
+	memcpy(ret->vlens, msg->vlens, sizeof(msg->vlens[0])*msg->nfields);
 	memcpy(ret->types, msg->types, sizeof(msg->types[0])*msg->nfields);
 
 	for (j=0; j < msg->nfields; ++j) {
@@ -2261,6 +2261,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.61  2005/03/15 00:01:23  gshi
+ * size of msg->vlens[0] and msg->nlens[0] are diffent in ia64, don't mix them
+ *
  * Revision 1.60  2005/03/07 20:01:28  gshi
  * remove function ha_msg_add_str_list() (it is replaced by cl_msg_add_list() )
  *
