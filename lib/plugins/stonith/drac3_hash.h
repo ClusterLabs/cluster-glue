@@ -1,4 +1,4 @@
-/* $Id: drac3_hash.h,v 1.3 2004/08/28 14:16:42 alan Exp $ */
+/* $Id: drac3_hash.h,v 1.4 2004/08/29 23:24:21 alan Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -22,6 +22,7 @@
  */
 
 #include <sys/types.h>
+#include <glib.h>
 
 guint16 drac3Crc16(const char *str, const int l);
 void drac3AuthHash(const char *chall, const char *pass, char *token, int len);
