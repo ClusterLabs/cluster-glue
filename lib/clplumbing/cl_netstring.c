@@ -323,7 +323,7 @@ netstring2msg(const char *s, size_t length, int need_auth)
 					,	"netstring authentication"
 					" failed, s=%s, autotoken=%s, sp=%s"
 					,	s, name, sp);
-					cl_log_message(ret);
+					cl_log_message(LOG_ERR, ret);
 				}
 				ha_msg_del(ret);
 				return(NULL);

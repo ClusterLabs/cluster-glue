@@ -393,34 +393,34 @@ list_dup( const void* value, size_t len)
 }
 
 static void
-string_display(int seq, char* name, void* value)
+string_display(int log_level, int seq, char* name, void* value)
 {
 	HA_MSG_ASSERT(name);
 	HA_MSG_ASSERT(value);
-	cl_log(LOG_INFO, "MSG[%d] : [%s=%s]",
+	cl_log(log_level, "MSG[%d] : [%s=%s]",
 	       seq, name, (const char*)value);
 	return;
 }
 
 static void
-binary_display(int seq, char* name, void* value)
+binary_display(int log_level, int seq, char* name, void* value)
 {
 	HA_MSG_ASSERT(value);	
 	HA_MSG_ASSERT(name);
-	cl_log(LOG_INFO, "MSG[%d] : [(%s)%s=%p]",
+	cl_log(log_level, "MSG[%d] : [(%s)%s=%p]",
 	       seq,	FT_strings[FT_BINARY],
 	       name,	value);
 }
 
 static void
-struct_display(int seq, char* name, void* value)
+struct_display(int log_level, int seq, char* name, void* value)
 {
 	HA_MSG_ASSERT(name);
 	HA_MSG_ASSERT(value);	
-	cl_log(LOG_INFO, "MSG[%d] : [(%s)%s=%p]",
+	cl_log(log_level, "MSG[%d] : [(%s)%s=%p]",
 	       seq,	FT_strings[FT_STRUCT],
 	       name,	value);
-	cl_log_message((struct ha_msg*) value);
+	cl_log_message(log_level, (struct ha_msg*) value);
 	
 }
 
@@ -457,7 +457,7 @@ liststring(GList* list, char* buf, int maxlen)
 }
 
 static void
-list_display(int seq, char* name, void* value)
+list_display(int log_level, int seq, char* name, void* value)
 {
 	GList* list;
 	char buf[MAXLENGTH];
@@ -471,7 +471,7 @@ list_display(int seq, char* name, void* value)
 		cl_log(LOG_ERR, "liststring error");
 		return;
 	}
-	cl_log(LOG_INFO, "MSG[%d] :[(%s)%s=%s]",
+	cl_log(log_level, "MSG[%d] :[(%s)%s=%s]",
 	       seq, FT_strings[FT_LIST],
 	       name, buf);			
 	

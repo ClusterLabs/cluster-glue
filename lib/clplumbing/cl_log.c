@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.23 2004/11/22 19:03:01 gshi Exp $ */
+/* $Id: cl_log.c,v 1.24 2005/01/18 20:33:04 andrew Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -13,6 +13,9 @@
 #include <clplumbing/uids.h>
 #include <glib.h>
 #include <netinet/in.h>
+
+#include <sys/types.h>
+#include <unistd.h>
 
 #ifndef MAXLINE
 #	define MAXLINE	512
@@ -53,6 +56,7 @@ static int		syslog_enabled = 0;
 static int		stderr_enabled = 0;
 static const char*	logfile_name = NULL;
 static const char*	debugfile_name = NULL;
+int process_pid = -1;
 
 void
 cl_log_enable_stderr(int truefalse)
@@ -154,16 +158,22 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str)
 		}
 		
 	}
-	
+
+	if(process_pid < 0) {
+		process_pid = (int)getpid();
+	}
+
 	if (stderr_enabled) {
 		if (pristr){
-			fprintf(stderr, "%s: %s %s: %s\n"
+			fprintf(stderr, "%s[%d]: %s %s: %s\n"
 				,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+				,       process_pid
 				,	ha_timestamp()
 				,	pristr,  buf);
 		}else {
-			fprintf(stderr, "%s: %s %s\n"
+			fprintf(stderr, "%s[%d]: %s %s\n"
 				,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+				,       process_pid
 				,	ha_timestamp()
 				,	buf);
 			
@@ -175,13 +185,15 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str)
 		fp = fopen(debugfile_name, "a");
 		if (fp != NULL) {
 			if (pristr){
-				fprintf(fp, "%s: %s %s: %s\n"
+				fprintf(fp, "%s[%d]: %s %s: %s\n"
 					,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+					,       process_pid
 					,	ha_timestamp()
 					,	pristr,  buf);
 			}else{
-				fprintf(fp, "%s: %s %s\n"
+				fprintf(fp, "%s[%d]: %s %s\n"
 					,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+					,       process_pid
 					,	ha_timestamp()
 					,	buf);
 				
@@ -195,13 +207,15 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str)
 		fp = fopen(logfile_name, "a");
 		if (fp != NULL) {
 			if (pristr){
-				fprintf(fp, "%s: %s %s: %s\n"
+				fprintf(fp, "%s[%d]: %s %s: %s\n"
 				,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+				,       process_pid
 				,	ha_timestamp()
 				,	pristr,  buf);
 			}else {
-				fprintf(fp, "%s: %s %s\n"
+				fprintf(fp, "%s[%d]: %s %s\n"
 					,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+					,       process_pid
 					,	ha_timestamp()
 					,	buf);	
 			}
