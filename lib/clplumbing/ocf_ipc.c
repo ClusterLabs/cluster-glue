@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.25 2005/03/31 18:33:26 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.26 2005/04/01 21:15:00 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -34,7 +34,8 @@
 #ifdef IPC_TIME_DEBUG
 extern struct ha_msg* wirefmt2msg(const char* s, size_t length);
 void cl_log_message (int log_level, const struct ha_msg *m);
-int timediff(longclock_t t1, longclock_t t2);
+int  timediff(longclock_t t1, longclock_t t2);
+void   ha_msg_del(struct ha_msg* msg);
 #endif
 
 struct IPC_WAIT_CONNECTION * socket_wait_conn_new(GHashTable* ch_attrs);
@@ -315,6 +316,7 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 				hamsg = wirefmt2msg(ipcmsg->msg_body, ipcmsg->msg_len);
 				if (hamsg != NULL){
 					cl_log_message(LOG_INFO, hamsg);
+					ha_msg_del(hamsg);
 				}
 			}	
 		}
