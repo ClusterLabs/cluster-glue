@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.23 2005/01/31 10:06:33 sunjd Exp $ */
+/* $Id: rcd_serial.c,v 1.24 2005/02/18 07:32:09 zhaokai Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -169,7 +169,7 @@ RCD_alarm_handler(int sig) {
 #if !defined(HAVE_POSIX_SIGNALS)
         if (sig)
 		signal(sig, SIG_DFL);
-	else    signal(sig, RCD_alarm_handler);
+	else    { signal(sig, RCD_alarm_handler); }
 #else
 	struct sigaction sa;
 	sigset_t sigmask;
@@ -621,8 +621,12 @@ rcd_serial_destroy(StonithPlugin *s)
 		rcd->hostlist = NULL;
 	}
 	rcd->hostcount = -1;
-	if (rcd->device) FREE(rcd->device);
-	if (rcd->signal) FREE(rcd->signal);
+	if (rcd->device) {
+		FREE(rcd->device);
+	}
+	if (rcd->signal) {
+		FREE(rcd->signal);
+	}
 	FREE(rcd);
 }
 

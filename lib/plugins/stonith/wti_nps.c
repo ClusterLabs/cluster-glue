@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.20 2005/02/03 20:08:21 msoffen Exp $ */
+/* $Id: wti_nps.c,v 1.21 2005/02/18 07:32:09 zhaokai Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -182,17 +182,24 @@ NPSRobustLogin(struct pluginDevice * nps)
 	}
 
 	for ( ; ; ) {
-	  if (nps->pid > 0)
-	    Stonithkillcomm(&nps->rdfd, &nps->wrfd, &nps->pid);
-	  if (NPS_connect_device(nps) != S_OK) {	
-	      Stonithkillcomm(&nps->rdfd, &nps->wrfd, &nps->pid);
-	  }
-	  else {
-	    rc = NPSLogin(nps);
-	    if (rc == S_OK) break;
-	  }
-	  if ((++j) == 20) break;
-	  else sleep(1);
+		if (nps->pid > 0) {
+			Stonithkillcomm(&nps->rdfd, &nps->wrfd, &nps->pid);
+		}
+		if (NPS_connect_device(nps) != S_OK) {	
+			Stonithkillcomm(&nps->rdfd, &nps->wrfd, &nps->pid);
+		}
+		else {
+			rc = NPSLogin(nps);
+			if (rc == S_OK) { 
+				break;
+			}
+		}
+		if ((++j) == 20) { 
+			break;
+		}
+		else {
+			sleep(1);
+		}
 	}
 
 	return rc;
