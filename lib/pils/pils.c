@@ -1,4 +1,4 @@
-/* $Id: pils.c,v 1.40 2004/10/05 14:26:16 lars Exp $ */
+/* $Id: pils.c,v 1.41 2004/10/05 20:39:45 alan Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -1528,7 +1528,6 @@ PILRegisterInterface(PILPlugin* piinfo
 	||	(piuniv = pitype->piuniv)	== NULL
 	||	(ifuniv = piuniv->ifuniv)	== NULL
 	||	ifuniv->iftypes			== NULL
-	||	close_func			== NULL
 	) {
 		REPORTERR("bad parameters to PILRegisterInterface");
 		return PIL_INVAL;
@@ -1643,7 +1642,7 @@ PILunregister_interface(PILInterface* id)
 	/* Call the close function supplied by the interface */
 
 	if ((id->if_close != NULL) 
-	    && ((rc=id->if_close(id, id->ud_interface)) != PIL_OK)) {
+	&&	((rc=id->if_close(id, id->ud_interface)) != PIL_OK)) {
 		PILLog(PIL_WARN, "InterfaceClose on %s/%s returned %s"
 		,	t->typename, id->interfacename
 		,	PIL_strerror(rc));
