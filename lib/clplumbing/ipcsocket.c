@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.92 2004/04/18 19:22:13 alan Exp $ */
+/* $Id: ipcsocket.c,v 1.93 2004/04/20 21:21:20 andrew Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1795,9 +1795,15 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 
 #elif HAVE_STRUCT_UCRED
  typedef struct ucred Cred;
+
+ // reuse this define for the moment
+#  if HAVE_STRUCT_UCRED_DARWIN
+#	define crEuid	cr_uid
+#	define crEgid	cr_groups[0]
+#  else
 #	define crEuid	c_uid
 #	define crEgid	c_gid
-
+#  endif
 #else
 #	error "No credential type found!"
 #endif
