@@ -32,7 +32,9 @@ lib_LTLIBRARIES		= libplumb.la
 
 libplumb_la_SOURCES	= 		\
 			Gmain_timeout.c	\
+			ipcsocket.c	\
 			longclock.c	\
+			ocf_ipc.c	\
 			proctrack.c
 
 libplumb_la_LDFLAGS	= -version-info 0:0:0
