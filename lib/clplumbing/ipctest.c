@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.23 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: ipctest.c,v 1.24 2004/08/29 03:01:13 msoffen Exp $ */
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -278,10 +278,10 @@ echoserver(IPC_Channel* wchan, int repcount)
 			continue;
 		}
 
-		//fprintf(stderr, "+");
+		/*fprintf(stderr, "+"); */
 		wchan->ops->waitout(wchan);
 		checkifblocked(wchan);
-		//fprintf(stderr, "S");
+		/*fprintf(stderr, "S"); */
 
 		/* Try and induce a failure... */
 		if (j == repcount) {
@@ -299,7 +299,7 @@ echoserver(IPC_Channel* wchan, int repcount)
 			exit(1);
 		}
 
-		//fprintf(stderr, "-");
+		/*fprintf(stderr, "-"); */
 		if ((rc = wchan->ops->recv(wchan, &rmsg)) != IPC_OK) {
 			cl_log(LOG_ERR
 			,	"echotest server: recv failed %d rc iter %d"
@@ -310,7 +310,7 @@ echoserver(IPC_Channel* wchan, int repcount)
 			rmsg=NULL;
 			continue;
 		}
-		//fprintf(stderr, "s");
+		/*fprintf(stderr, "s"); */
 		if (rmsg->msg_len != wmsg.msg_len) {
 			cl_log(LOG_ERR
 			,	"echotest: length mismatch [%lu,%lu] iter %d"
@@ -362,7 +362,7 @@ echoclient(IPC_Channel* rchan, int repcount)
 			cl_perror("waitin");
 			exit(1);
 		}
-		//fprintf(stderr, "/");
+		/*fprintf(stderr, "/"); */
 
 		if ((rc = rchan->ops->recv(rchan, &rmsg)) != IPC_OK) {
 			cl_log(LOG_ERR
@@ -375,7 +375,7 @@ echoclient(IPC_Channel* rchan, int repcount)
 			rmsg=NULL;
 			continue;
 		}
-		//fprintf(stderr, "c");
+		/*fprintf(stderr, "c"); */
 		if ((rc = rchan->ops->send(rchan, rmsg)) != IPC_OK) {
 			cl_log(LOG_ERR
 			,	"echoclient: send failed %d rc iter %d"
@@ -385,10 +385,10 @@ echoclient(IPC_Channel* rchan, int repcount)
 			++errcount;
 			continue;
 		}
-		//fprintf(stderr, "%%");
+		/*fprintf(stderr, "%%"); */
 		rchan->ops->waitout(rchan);
 		checkifblocked(rchan);
-		//fprintf(stderr, "C");
+		/*fprintf(stderr, "C"); */
 	}
 	cl_log(LOG_INFO, "echoclient: %d errors", errcount);
 #if 0
@@ -520,7 +520,7 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 			}
 			wmsg = newmessage(wchan, wrcount);
 
-			//fprintf(stderr, "s");
+			/*fprintf(stderr, "s"); */
 			if ((rc = wchan->ops->send(wchan, wmsg)) != IPC_OK) {
 				cl_log(LOG_ERR
 				,	"asyn_echoserver: send failed"
@@ -532,7 +532,7 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 			lastcount = wrcount;
 			
 			if (wchan->ops->is_sending_blocked(wchan)) {
-				// fprintf(stderr, "b");
+				/* fprintf(stderr, "b"); */
 				++blockedcount;
 			}else{
 				blockedcount = 0;
@@ -547,7 +547,7 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 		&&	wchan->ch_status != IPC_DISCONNECT);
 
 		if (wrcount < repcount) {
-			// fprintf(stderr, "B");
+			/* fprintf(stderr, "B"); */
 		}
 		wchan->ops->waitout(wchan);
 		errcount += checkinput(wchan, w, &rdcount, repcount);
@@ -620,10 +620,10 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 		}
 
 		/* Have input? */
-		// fprintf(stderr, "i");
+		/* fprintf(stderr, "i"); */
 		while (chan->ops->is_message_pending(chan)
 		&&	rdcount < repcount) {
-			//fprintf(stderr, "r");
+			/*fprintf(stderr, "r"); */
 
 			if ((rc = chan->ops->recv(chan, &rmsg)) != IPC_OK) {
 				if (!IPC_ISRCONN(chan)) {
@@ -644,7 +644,7 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 				sleep(1);
 				continue;
 			}
-			//fprintf(stderr, "c");
+			/*fprintf(stderr, "c"); */
 			++rdcount;
 			if ((rc = chan->ops->send(chan, rmsg))
 			!=	IPC_OK) {
@@ -666,7 +666,7 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 			}else{
 				++wrcount;
 			}
-			//fprintf(stderr, "x");
+			/*fprintf(stderr, "x"); */
 		}
 		if (rdcount >= repcount) {
 			break;
@@ -679,13 +679,16 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 		 * is_message_pending() both perform a resume_io().
 		 * This might be confusing, but -- oh well...
 		 */
-		//fprintf(stderr, "P");
-		//cl_log(LOG_INFO, "poll[%d, 0x%x]"
-		//,	pf[0].fd, pf[0].events);
-		//cl_log(LOG_DEBUG, "poll[%d, 0x%x]..."
-		//,	pf[0].fd, pf[0].events);
-		//fprintf(stderr, "%%");
-		//cl_log(LOG_DEBUG, "CallingPollFunc()");
+
+		/*
+		  fprintf(stderr, "P");
+		  cl_log(LOG_INFO, "poll[%d, 0x%x]"
+		  ,	pf[0].fd, pf[0].events);
+		  cl_log(LOG_DEBUG, "poll[%d, 0x%x]..."
+		  ,	pf[0].fd, pf[0].events);
+		  fprintf(stderr, "%%");
+		  cl_log(LOG_DEBUG, "CallingPollFunc()");
+		*/
 		rc = PollFunc(pf, nfd, -1);
 
 		/* Bad poll? */
@@ -728,7 +731,7 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 
 		/* Output unblocked (only) ? */
 		if (pf[nfd-1].revents & POLLOUT) {
-			//fprintf(stderr, "R");
+			/*fprintf(stderr, "R");*/
 			chan->ops->resume_io(chan);
 		}else if ((pf[0].revents & POLLIN) == 0) {
 			/* Neither I nor O available... */
@@ -780,7 +783,7 @@ s_send_msg(gpointer data)
 	++i->wcount;
 	
 	wmsg = newmessage(i->chan, i->wcount);
-	//fprintf(stderr, "s");
+	/*fprintf(stderr, "s");*/
 	if ((rc = i->chan->ops->send(i->chan, wmsg)) != IPC_OK) {
 		cl_log(LOG_ERR
 		,	"s_send_msg: send failed"
@@ -912,7 +915,7 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 			++i->errcount;
 		}
 
-		//fprintf(stderr, "c");
+		/*fprintf(stderr, "c");*/
 		if ((rc = chan->ops->send(chan, rmsg)) != IPC_OK) {
 			cl_log(LOG_ERR
 			,	"s_echo_msg: send failed %d rc iter %d qlen %d"
@@ -924,7 +927,7 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 		}
 	}
 retout:
-	//fprintf(stderr, "%%");
+	/*fprintf(stderr, "%%");*/
 	if (i->rcount >= i->max || chan->ch_status == IPC_DISCONNECT
 	||	i->errcount > MAXERRORS) {
 		chan->ops->waitout(chan);

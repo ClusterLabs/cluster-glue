@@ -1,4 +1,4 @@
-/* $Id: ipctransientserver.c,v 1.7 2004/03/01 22:19:44 lars Exp $ */
+/* $Id: ipctransientserver.c,v 1.8 2004/08/29 03:01:13 msoffen Exp $ */
 /* 
  * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
  * 
@@ -82,7 +82,7 @@ init_server_ipc_comms(const char *child,
      * This source delivers the clients connection events.
      * listen to this source at a relatively lower priority.
      */
-    int local_sock_len = 2; // 2 = '/' + '\0'
+    int local_sock_len = 2; /* 2 = '/' + '\0' */
     char    *commpath = NULL;
     char path[] = IPC_PATH_ATTR;
     mode_t mask;
@@ -112,7 +112,7 @@ init_server_ipc_comms(const char *child,
 								  NULL,
 								  FALSE,
 								  channel_client_connect,
-								  wait_ch, // user data passed to ??
+								  wait_ch, /* user data passed to ?? */
 								  channel_input_destroy);
 
     cl_log(LOG_INFO, "[Server] Listening on: %s", commpath);
