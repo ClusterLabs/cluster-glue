@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.32 2004/09/09 03:30:24 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.33 2004/09/10 02:15:40 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -887,7 +887,7 @@ on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg)
 		return HA_FAIL;
 	}
 
-	ha_msg_add_list(ret,F_LRM_RCLASS,ra_class_list);
+	ha_msg_add_str_list(ret,F_LRM_RCLASS,ra_class_list);
 	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
 		lrmd_log(LOG_ERR,
 			"on_msg_get_rsc_classes: can not send the ret msg");
@@ -924,10 +924,11 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 			return HA_FAIL;
 		}
 		if (0 <= RAExec->get_resource_list(&types)) {
-			ha_msg_add_list(ret, F_LRM_RTYPES, types);
+			ha_msg_add_str_list(ret, F_LRM_RTYPES, types);
 			while (NULL != (type = g_list_first(types))) {
-				types = g_list_remove(types, type->data);
+				types = g_list_remove_link(types, type);
 				g_free(type->data);
+				g_list_free_1(type);
 			}
 			g_list_free(types);
 		}
@@ -967,10 +968,11 @@ on_msg_get_rsc_providers(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	else {
 		if (0 <= RAExec->get_provider_list(rtype, &providers)) {
-			ha_msg_add_list(ret, F_LRM_RPROVIDERS, providers);
+			ha_msg_add_str_list(ret, F_LRM_RPROVIDERS, providers);
 			while (NULL != (provider = g_list_first(providers))) {
-				providers = g_list_remove(providers, provider->data);
+				providers = g_list_remove_link(providers, provider);
 				g_free(provider->data);
+				g_list_free_1(provider);
 			}
 			g_list_free(providers);
 		}
@@ -1103,7 +1105,7 @@ on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 			}
 		}
 		
-		ha_msg_add_hash_table(ret, F_LRM_PARAM, rsc->params);
+		ha_msg_add_str_table(ret, F_LRM_PARAM, rsc->params);
 
 	}
 	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
@@ -1159,7 +1161,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		g_free(rsc->class);
 		g_free(rsc->provider);
 		if (NULL != rsc->params) {
-			free_hash_table(rsc->params);
+			free_str_table(rsc->params);
 		}
 		g_free(rsc);
 	}
@@ -1217,7 +1219,7 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	rsc->op_list = NULL;
 	rsc->repeat_op_list = NULL;
 	rsc->last_op = NULL;
-	rsc->params = ha_msg_value_hash_table(msg,F_LRM_PARAM);
+	rsc->params = ha_msg_value_str_table(msg,F_LRM_PARAM);
 	rsc_list = g_list_append(rsc_list, rsc);
 
 	lrmd_log(LOG_INFO, "on_msg_add_rsc: end.");
@@ -1666,8 +1668,8 @@ perform_ra_op(lrmd_op_t* op)
 			}
 			op_type = ha_msg_value(op->msg, F_LRM_OP);
 
-			op_params = ha_msg_value_hash_table(op->msg, F_LRM_PARAM);
-			params = merge_hash_tables(op->rsc->params,op_params);
+			op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
+			params = merge_str_tables(op->rsc->params,op_params);
 		
 			/* Name of the resource and some others also
 			 * need to be passed in. Maybe pass through the
@@ -1677,8 +1679,8 @@ perform_ra_op(lrmd_op_t* op)
 					op_type,
 					params);
 
-			free_hash_table(op_params);
-			free_hash_table(params);
+			free_str_table(op_params);
+			free_str_table(params);
 			/* execra should never return. */
 			exit(EXECRA_EXEC_UNKNOWN_ERROR);
 
@@ -1995,6 +1997,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.33  2004/09/10 02:15:40  zhenh
+ * make names of functions more clear,fix some bug
+ *
  * Revision 1.32  2004/09/09 03:30:24  zhenh
  * remove the unused struct
  *
