@@ -55,7 +55,7 @@ static struct stonith_ops externalOps ={
 	external_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;

@@ -1,4 +1,4 @@
-/* $Id: baytech.c,v 1.19 2004/10/06 10:55:18 lars Exp $ */
+/* $Id: baytech.c,v 1.20 2004/10/24 13:00:14 lge Exp $ */
 /*
  *	Stonith module for BayTech Remote Power Controllers (RPC-x devices)
  *
@@ -52,7 +52,7 @@ static struct stonith_ops baytechOps ={
 	baytech_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;

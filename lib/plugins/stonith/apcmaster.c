@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.16 2004/10/06 10:55:18 lars Exp $ */
+/* $Id: apcmaster.c,v 1.17 2004/10/24 13:00:13 lge Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -50,7 +50,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.16 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.17 $"; 
 
 #define	DEVICE	"APC MasterSwitch"
 
@@ -84,7 +84,7 @@ static struct stonith_ops apcmasterOps ={
 	apcmaster_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
 
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;

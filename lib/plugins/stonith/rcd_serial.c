@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.20 2004/10/09 01:49:42 lge Exp $ */
+/* $Id: rcd_serial.c,v 1.21 2004/10/24 13:00:14 lge Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -62,7 +62,7 @@ static struct stonith_ops rcd_serialOps ={
 	rcd_serial_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;

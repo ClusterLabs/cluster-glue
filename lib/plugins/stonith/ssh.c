@@ -1,4 +1,4 @@
-/* $Id: ssh.c,v 1.15 2004/10/07 23:53:49 alan Exp $ */
+/* $Id: ssh.c,v 1.16 2004/10/24 13:00:14 lge Exp $ */
 /*
  * Stonith module for SSH Stonith device
  *
@@ -51,7 +51,7 @@ static struct stonith_ops sshOps ={
 	ssh_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;

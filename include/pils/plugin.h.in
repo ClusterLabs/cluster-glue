@@ -334,7 +334,7 @@ typedef enum {
 	PIL_BADTYPE=2,	/* Bad plugin/interface type */
 	PIL_EXIST=3,	/* Duplicate Plugin/Interface name */
 	PIL_OOPS=4,	/* Internal Error */
-	PIL_NOPLUGIN=5,	/* No such plugin or Interface */
+	PIL_NOPLUGIN=5	/* No such plugin or Interface */
 }PIL_rc;			/* Return code from Plugin fns*/
 
 const char * PIL_strerror(PIL_rc rc);
@@ -396,7 +396,7 @@ typedef enum {
 	PIL_CRIT	= 2,	/* Critical -- serious error */
 	PIL_WARN	= 3,	/* Warning */
 	PIL_INFO	= 4,	/* Informative message */
-	PIL_DEBUG= 5,	/* Debug message */
+	PIL_DEBUG= 5	/* Debug message */
 }PILLogLevel;
 typedef void (*PILLogFun)(PILLogLevel priority, const char * fmt, ...);
 

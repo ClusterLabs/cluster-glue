@@ -81,7 +81,7 @@ typedef enum {
 	LRM_OP_CANCELLED,
 	LRM_OP_TIMEOUT,
 	LRM_OP_NOTSUPPORTED,
-	LRM_OP_ERROR,
+	LRM_OP_ERROR
 }op_status_t;
 
 /*for all timeouts: in milliseconds. 0 for no timeout*/
@@ -127,7 +127,7 @@ typedef struct{
 /*this enum is used in get_cur_state*/
 typedef enum {
 	LRM_RSC_IDLE,
-	LRM_RSC_BUSY,
+	LRM_RSC_BUSY
 }state_flag_t;
 
 struct rsc_ops

@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.17 2004/10/06 10:55:18 lars Exp $ */
+/* $Id: wti_nps.c,v 1.18 2004/10/24 13:00:14 lge Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -79,7 +79,7 @@ static struct stonith_ops wti_npsOps ={
 	wti_nps_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
