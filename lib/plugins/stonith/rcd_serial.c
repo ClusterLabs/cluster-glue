@@ -213,6 +213,11 @@ static int RCD_close_serial_port(int fd);
 
 static void
 RCD_alarm_handler(int sig) {
+#if !defined(HAVE_POSIX_SIGNALS)
+        if (sig)
+		signal(sig, SIG_DFL);
+	else    signal(sig, RCD_alarm_handler);
+#else
 	struct sigaction sa;
 	sigset_t sigmask;
 
@@ -231,6 +236,7 @@ RCD_alarm_handler(int sig) {
 	RCD_alarmcaught = 1;
 #endif
 	return;
+#endif
 }
 
 static int
