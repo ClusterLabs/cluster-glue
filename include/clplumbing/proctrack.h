@@ -58,16 +58,29 @@ struct _ProcTrack {
  * The set of operations to perform on our tracked processes.
  */
 struct _ProcTrack_ops {
-	void (*procdied)(ProcTrack* p, int status
-	,	int signo, int exitcode, int waslogged);
-	const char * (*proctype)(ProcTrack* p);
+
+	/* Called when a process dies */
+	void 	(*procdied)		
+		(ProcTrack* p, int status, int signo, int exitcode
+		,	int waslogged);
+
+	/* Called when a process registers */
+	void	(*procregistered)
+		(ProcTrack*p);
+
+	/* Returns a "name" for a process (for messages) */
+	/* (must be copied, because it may be a static value) */
+	const char *
+		(*proctype)
+		(ProcTrack* p);
 };
 
 /* A function for calling by the process table iterator */
 typedef void (*ProcTrackFun) (ProcTrack* p, void * data);
 
 /* Call this function to activate the procdied member function */
-int ReportProcHasDied(int pid, int status);/* returns TRUE if 'pid' was registered */
+/* Returns TRUE if 'pid' was registered */
+int ReportProcHasDied(int pid, int status);
 
 /* Create/Log a new tracked process */
 void NewTrackedProc(pid_t pid, int isapgrp, ProcTrackLogType loglevel
@@ -79,7 +92,7 @@ ProcTrack* GetProcInfo(pid_t pid);
 /*
  * Iterate over the set of tracked processes.
  * If proctype is NULL, then walk through them all, otherwise only those
- * of the given type.
+ * of the given type ("f")
  */
 void	ForEachProc(ProcTrack_ops* proctype, ProcTrackFun f, void * data);
 

@@ -66,6 +66,11 @@ NewTrackedProc(pid_t pid, int isapgrp, ProcTrackLogType loglevel
 		ha_log(LOG_DEBUG, "Creating tracked %s process %d"
 		,	ops->proctype(p), pid);
 	}
+
+	/* Tell them that someone registered a process */
+	if (p->ops->procregistered) {
+		p->ops->procregistered(p);
+	}
 }
 
 /* returns TRUE if 'pid' was registered */
