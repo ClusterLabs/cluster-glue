@@ -274,7 +274,7 @@ echoclient(IPC_Channel* rchan, int repcount)
 }
 
 static void
-echomsgbody(void * body, int niter, int * len)
+echomsgbody(void * body, int niter, size_t * len)
 {
 	char *	str = body;
 	sprintf(str, "String-%d", niter);
@@ -307,7 +307,7 @@ checkinput(IPC_Channel* chan, int* rdcount, int maxcount)
 	IPC_Message*	rmsg = NULL;
 	int		errs = 0;
 	char		str[256];
-	int		rdlen;
+	size_t		rdlen;
 	int		rc;
 
 	while (chan->ops->is_message_pending(chan)

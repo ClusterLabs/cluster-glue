@@ -457,7 +457,7 @@ cl_poll_sigaction(int nsig, siginfo_t* info, void* v)
 		,	"cl_poll_sigaction(nsig=%d fd=%d"
 		", si_code=%d si_band=0x%lx)"
 		,	nsig, fd, info->si_code
-		,	info->si_band);
+		,	(unsigned long)info->si_band);
 	}
 
 	if (fd <= 0) {
