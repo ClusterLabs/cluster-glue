@@ -262,18 +262,20 @@ socket_chan_audit(const struct IPC_CHANNEL* ch)
 
 #endif
 
+void dump_ipc_info(IPC_Channel* chan);
+
 #ifdef CHEAT_CHECKS
 
 static long
 cheat_get_sequence(IPC_Message* msg)
 {
-	const char header [] = "String-";;
+	const char header [] = "String-";
 	size_t header_len = sizeof(header)-1;
 	char *	body;
 
 	if (msg == NULL || msg->msg_len < sizeof(header)
 	||	msg->msg_len > sizeof(header) + 10
-	||	strncmp(msg->msg_body, header, sizeof(header)) != 0) {
+	||	strncmp(msg->msg_body, header, header_len) != 0) {
 		return -1L;
 	}
 	body = msg->msg_body;
@@ -296,18 +298,20 @@ save_body(struct IPC_MESSAGE *msg, char * savearea, size_t length)
 	savearea[mlen] = EOS;
 }
 
-static void 
+void saveandcheck(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg, char * savearea
+,	size_t savesize, long* lastseq, const char * text)
+void 
 saveandcheck(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg, char * savearea
 ,	size_t savesize, long* lastseq, const char * text)
 {
 	long	cheatseq = cheat_get_sequence(msg);
 
 	save_body(msg, savearea, savesize);
-	if (*lastseq != -1L) {
-		if (cheatseq != *lastseq +1) {
+	if (*lastseq != -1L ) {
+		if (cheatseq != *lastseq +1 && *cheatseq != 1) {
 			cl_log(LOG_ERR
-			,	"%s packets out of sequence! %ld versus %ld"
-			,	text, cheatseq, *lastseq);
+			,	"%s packets out of sequence! %ld versus %ld [pid %d]"
+			,	text, cheatseq, *lastseq, (int)getpid());
 			dump_ipc_info(ch);
 		}
 	}
@@ -345,7 +349,6 @@ dump_msgq_msg(gpointer data, gpointer user_data)
 
 
 
-void dump_ipc_info(IPC_Channel* chan);
 void
 dump_ipc_info(IPC_Channel* chan)
 {
