@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.37 2004/12/14 22:15:17 gshi Exp $ */
+/* $Id: ipc.h,v 1.38 2005/02/09 01:45:05 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -155,6 +155,8 @@ struct IPC_CHANNEL{
 	IPC_Queue*	send_queue; 
 	IPC_Queue*	recv_queue; 
 
+	/* buffer pool for receive in this channel*/
+	struct ipc_bufpool* pool;
 
 	/* the follwing is for send flow control*/
 	int		high_flow_mark;
@@ -632,11 +634,12 @@ extern void ipc_destroy_auth(IPC_Auth * auth);
 extern void ipc_set_pollfunc(int (*)(struct pollfd*, unsigned int, int));
 
 struct SOCKET_MSG_HEAD{
-  int msg_len;
+	int msg_len;
+	int magic;
 };
 
 #define	MAXDATASIZE	65535
-
+#define HEADMAGIC	0xabcd
 #define POOL_SIZE (4*1024)
 struct ipc_bufpool{
 	

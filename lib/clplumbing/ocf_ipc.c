@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.22 2005/02/08 04:26:02 alan Exp $ */
+/* $Id: ocf_ipc.c,v 1.23 2005/02/09 01:45:05 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -140,7 +140,7 @@ ipc_bufpool_new(int size)
 		return NULL;
 	}
 	
-	pool = (struct ipc_bufpool*)g_malloc(totalsize);
+	pool = (struct ipc_bufpool*)g_malloc(totalsize+1);
 	memset(pool, 0, totalsize);
 	pool->refcount = 1;
 	pool->startpos = pool->currpos = pool->consumepos =
@@ -260,6 +260,14 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 		
 		memcpy(head, pool->consumepos, sizeof(struct SOCKET_MSG_HEAD));
 		
+		if (head->magic != HEADMAGIC){
+			cl_log(LOG_ERR, "ipc_bufpool_update: "
+			       "magic number in head does not match."
+			       "Something very bad happened, abort now, farside pid =%d",
+			       ch->farside_pid);
+			abort();
+		}
+
 		if ( head->msg_len > MAXDATASIZE){
 			cl_log(LOG_ERR, "ipc_update_bufpool:"
 			       "msg length is corruptted(%d)",
@@ -268,9 +276,8 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 		}
 		
 		if (pool->consumepos + ch->msgpad + head->msg_len
-		    > pool->endpos){
-			break;
-			
+		    > pool->currpos){
+			break;			
 		}
 		
 		ipcmsg = ipc_bufpool_msg_new();
@@ -280,7 +287,6 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 			break;
 			
 		}
-		
 		ipcmsg->msg_buf = pool->consumepos;
 		ipcmsg->msg_body = pool->consumepos + ch->msgpad;
 		ipcmsg->msg_len = head->msg_len;
