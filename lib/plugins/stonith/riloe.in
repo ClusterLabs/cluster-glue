@@ -39,15 +39,15 @@ except IndexError:
         sys.exit(1)
 
 try:
-        password = os.environ['RIPASSWORD']
-        os.environ['RIPASSWORD'] = "********"
+        password = os.environ['RI_PASSWORD']
+        os.environ['RI_PASSWORD'] = "********"
         anypass=1
 except KeyError:
         password = ""
         anypass=0
 
 try:
-        host = os.environ['RIHOST']
+        host = os.environ['RI_HOST']
         rihost = host.split('.')[0]+'-rm'
 except KeyError:
         rihost = ""
@@ -56,7 +56,7 @@ except KeyError:
 #	Some old RILOE devices don't support the reset command
 #	This variable is 1 if it does.
 try:
-        reset_ok = os.environ["reset_supported"]
+        reset_ok = os.environ["RI_CAN_RESET"]
         if reset_ok == '':
                 reset_ok = None
 except KeyError:
@@ -102,7 +102,7 @@ except KeyError:
         None
 
 if cmd == 'getconfignames':
-        for arg in ['host', 'password']:
+        for arg in ['RI_HOST', 'RI_PASSWORD']:
             print arg
         sys.exit(0)
 
@@ -111,10 +111,10 @@ if cmd == 'getconfignames':
 #
 
 if host == '<unconfigured>':
-        print "Missing 'RIHOST' environment variable"
+        print "Missing 'RI_HOST' environment variable"
         sys.exit(1)
 if not anypass:
-        print "Missing 'RIPASSWORD' environment variable"
+        print "Missing 'RI_PASSWORD' environment variable"
 
 acmds=[]
 
