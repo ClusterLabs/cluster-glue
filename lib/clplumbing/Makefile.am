@@ -28,7 +28,7 @@ AM_CFLAGS			= @CFLAGS@  -DALIGNFUNC=@ALIGN@ -DMSGHDR_TYPE=@MSGHDR_TYPE@
 
 ## libraries
 
-lib_LTLIBRARIES		= libplumb.la
+lib_LTLIBRARIES		= libplumb.la $(top_builddir)/replace/libreplace.la
 
 libplumb_la_SOURCES	= 		\
 			Gmain_timeout.c	\
@@ -57,17 +57,17 @@ test_PROGRAMS = ipctest ipctransientclient ipctransientserver
 libplumb_la_LDFLAGS	= -version-info 0:0:0
 
 ipctest_SOURCES = ipctest.c
-ipctest_LDADD = $(top_builddir)/replace/libreplace.la libplumb.la $(GLIBLIB)
+ipctest_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
 #ipctransient_SOURCES = ipctransient.c
-#ipctransient_LDADD = libplumb.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
+#ipctransient_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
 
 ipctransientclient_SOURCES = ipctransientclient.c
-ipctransientclient_LDADD = libplumb.la $(GLIBLIB)
+ipctransientclient_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
 ipctransientserver_SOURCES = ipctransientserver.c
-ipctransientserver_LDADD = libplumb.la $(GLIBLIB)
+ipctransientserver_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
 #netstring_test_SOURCES	= netstring_test.c
-#netstring_test_LDADD	= libplumb.la	\
-			libhbclient.la $(gliblib)
+#netstring_test_LDADD	= libplumb.la $(top_builddir)/replace/libreplace.la libhbclient.la $(gliblib)
+
