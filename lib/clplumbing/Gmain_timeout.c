@@ -1,4 +1,4 @@
-/* $Id: Gmain_timeout.c,v 1.6 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: Gmain_timeout.c,v 1.7 2004/09/14 15:07:29 gshi Exp $ */
 /*
  * Glib mainloop timeout handling code.
  *
@@ -31,42 +31,32 @@
 #include <glib.h>
 #include <clplumbing/longclock.h>
 #include <clplumbing/Gmain_timeout.h>
+#include <string.h>
 
-static struct GTimeoutSource*
-Gmain_TimeoutSource_new(guint interval, GSourceFunc f);
+#define GETAPPEND(src)	(struct GTimeoutAppend*)(src +1)
 
-static gboolean Gmain_timeout_prepare(gpointer     source
-,	GTimeVal*	current_time, gint* timeout, gpointer udata);
-static gboolean Gmain_timeout_check(gpointer     source
-,	GTimeVal*current_time, gpointer user_data);
-static gboolean Gmain_timeout_dispatch(gpointer source
-,	GTimeVal* currtime, gpointer user_data);
-static void Gmain_timeout_destroy(gpointer source);
+
+
+static gboolean
+Gmain_timeout_prepare(GSource* src,  gint* timeout);
+
+static gboolean
+Gmain_timeout_check(GSource* src);
+
+static gboolean
+Gmain_timeout_dispatch(GSource* src, GSourceFunc func, gpointer user_data);
 
 static GSourceFuncs Gmain_timeout_funcs = {
-	Gmain_timeout_prepare,
-	Gmain_timeout_check,
-	Gmain_timeout_dispatch,
-	Gmain_timeout_destroy,
+	prepare: Gmain_timeout_prepare,
+	check: Gmain_timeout_check,
+	dispatch: Gmain_timeout_dispatch,
 };
 
-struct GTimeoutSource {
+
+struct GTimeoutAppend {
 	longclock_t	nexttime;
 	guint		interval;
-	GSourceFunc	f;
 };
-
-static struct GTimeoutSource*
-Gmain_TimeoutSource_new(guint interval, GSourceFunc f)
-{
-	struct GTimeoutSource*	gh;
-	gh = g_new0(struct GTimeoutSource, 1);
-	gh->nexttime = add_longclock(time_longclock()
-	,	msto_longclock(interval));
-	gh->interval = interval;
-	gh->f = f;
-	return gh;
-}
 
 guint
 Gmain_timeout_add(guint interval
@@ -84,34 +74,57 @@ Gmain_timeout_add_full(gint priority
 ,	gpointer	data
 ,	GDestroyNotify	notify)
 {
-	struct GTimeoutSource*	h = Gmain_TimeoutSource_new(interval, function);
+	
+	struct GTimeoutAppend* append;
+	
+	GSource* source = g_source_new( &Gmain_timeout_funcs, 
+					sizeof(GSource)
+					+ sizeof(struct GTimeoutAppend));
+	
+	append = GETAPPEND(source); 
+	
+	memset(append, 0, sizeof(struct GTimeoutAppend));
+	append->nexttime = add_longclock(time_longclock()
+					 ,msto_longclock(interval));
+  	append->interval = interval; 
+	
+	g_source_set_priority(source, priority);
+	
+	g_source_set_can_recurse(source, FALSE);
+	
+	g_source_set_callback(source, function, data, notify); 
+	
+	return g_source_attach(source, NULL);
 
-	return g_source_add(priority, FALSE
-	,	&Gmain_timeout_funcs, h, data, notify);
 }
 
 void
 Gmain_timeout_remove(guint tag)
 {
-	g_source_remove(tag);
+	GSource* source = g_main_context_find_source_by_id(NULL,tag);
+	
+	if (source != NULL){
+		g_source_destroy(source);		
+	}
+							   
+	
 }
 
 /* g_main_loop-style prepare function */
 static gboolean
-Gmain_timeout_prepare(gpointer src, GTimeVal* t, gint* timeout
-,	gpointer user_data)
+Gmain_timeout_prepare(GSource* src,  gint* timeout)
 {
 	
-	struct GTimeoutSource* source = src;
+	struct GTimeoutAppend* append = GETAPPEND(src);
 	longclock_t	lnow = time_longclock();
 	longclock_t	remain;
-
-	if (cmp_longclock(lnow, source->nexttime) >= 0) {
+	
+	if (cmp_longclock(lnow, append->nexttime) >= 0) {
 		*timeout = 0L;
 		return TRUE;
 	}
 	/* This is safe - we will always have a positive result */
-	remain = sub_longclock(source->nexttime, lnow);
+	remain = sub_longclock(append->nexttime, lnow);
 	/* This is also safe - we started out in 'ms' */
 	*timeout = longclockto_ms(remain);
 	return ((*timeout) == 0);
@@ -119,12 +132,12 @@ Gmain_timeout_prepare(gpointer src, GTimeVal* t, gint* timeout
 
 /* g_main_loop-style check function */
 static gboolean
-Gmain_timeout_check    (gpointer src, GTimeVal*t, gpointer udata)
+Gmain_timeout_check    (GSource* src)
 {
-	struct GTimeoutSource* source = src;
+	struct GTimeoutAppend* append = GETAPPEND(src);
 	longclock_t	lnow = time_longclock();
-
-	if (cmp_longclock(lnow, source->nexttime) >= 0) {
+	
+	if (cmp_longclock(lnow, append->nexttime) >= 0) {
 		return TRUE;
 	}
 	return FALSE;
@@ -132,21 +145,14 @@ Gmain_timeout_check    (gpointer src, GTimeVal*t, gpointer udata)
 
 /* g_main_loop-style dispatch function */
 static gboolean
-Gmain_timeout_dispatch(gpointer src, GTimeVal*t, gpointer user_data)
+Gmain_timeout_dispatch(GSource* src, GSourceFunc func, gpointer user_data)
 {
-	struct GTimeoutSource* source = src;
+	struct GTimeoutAppend* append = GETAPPEND(src);
 
 	/* Schedule our next dispatch */
-	source->nexttime = add_longclock(time_longclock()
-	,	msto_longclock(source->interval));
+	append->nexttime = add_longclock(time_longclock()
+					  , msto_longclock(append->interval));
 
 	/* Then call the user function */
-	return source->f(user_data);
-}
-
-/* g_main_loop-style source destruction function */
-static void
-Gmain_timeout_destroy(gpointer source)
-{
-	g_free(source);
+	return func(user_data);
 }

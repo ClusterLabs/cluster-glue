@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.35 2004/09/13 15:01:18 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.36 2004/09/14 15:07:30 gshi Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -148,15 +148,12 @@ static void free_op(lrmd_op_t* op);
 static void set_child_signal(void);
 static void child_signal_handler(int sig);
 
-static gboolean	on_polled_input_prepare(gpointer source_data
-,			GTimeVal* current_time
-,			gint* timeout, gpointer user_data);
-static gboolean	on_polled_input_check(gpointer source_data
-,			GTimeVal* current_time
-,			gpointer user_data);
-static gboolean	on_polled_input_dispatch(gpointer source_data
-,			GTimeVal* current_time
-,			gpointer user_data);
+static gboolean	on_polled_input_prepare(GSource* source,
+					gint* timeout);
+static gboolean	on_polled_input_check(GSource* source);
+static gboolean	on_polled_input_dispatch(GSource* source,
+					 GSourceFunc callback,
+					 gpointer user_data);
 
 static GSourceFuncs polled_input_SourceFuncs = {
 	on_polled_input_prepare,
@@ -540,8 +537,13 @@ init_start ()
 	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cbk, NULL, FALSE,
 	                               on_connect_cbk, conn_cbk, NULL);
 
-	g_source_add(G_PRIORITY_HIGH, FALSE, &polled_input_SourceFuncs, NULL, NULL, NULL);
 
+	
+	if (G_main_add_input(G_PRIORITY_HIGH, FALSE, 
+			     &polled_input_SourceFuncs) ==NULL){
+		cl_log(LOG_ERR, "cl_respawn: G_main_add_input failed");
+	}
+	
 	set_child_signal();
 
 	/*Create the mainloop and run it*/
@@ -1691,23 +1693,23 @@ perform_ra_op(lrmd_op_t* op)
 }
 /*g_source_add */
 static gboolean
-on_polled_input_prepare(gpointer source_data, GTimeVal* current_time
-,	gint* timeout, gpointer user_data)
+on_polled_input_prepare(GSource* source,
+			gint* timeout)
 {
 	return signal_pending != 0;
 }
 
 
 static gboolean
-on_polled_input_check(gpointer source_data, GTimeVal* current_time
-,	gpointer	user_data)
+on_polled_input_check(GSource* source)
 {
 	return signal_pending != 0;
 }
 
 static gboolean
-on_polled_input_dispatch(gpointer source_data, GTimeVal* current_time
-,	gpointer	user_data)
+on_polled_input_dispatch(GSource* source, 
+			 GSourceFunc callback,
+			 gpointer	user_data)
 {
 	unsigned long	handlers;
 	int status;
@@ -1998,6 +2000,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.36  2004/09/14 15:07:30  gshi
+ * change glib API to glib2 API
+ *
  * Revision 1.35  2004/09/13 15:01:18  sunjd
  * correct a silly careless error
  *
