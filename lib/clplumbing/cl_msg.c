@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.13 2004/06/24 20:54:35 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.14 2004/07/07 19:07:15 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -781,10 +781,15 @@ cl_get_binary(const struct ha_msg *msg,
 	int		type;
 
 	ret = cl_get_value( msg, name, vallen, &type);
-
-	if (ret == NULL || type != FT_BINARY){
-		cl_log(LOG_WARNING, "field %s not found or "
-		       "it is not binary", name);
+	
+	if (ret == NULL){
+		//cl_log(LOG_WARNING, "field %s not found", name);
+		//cl_log_message(msg);
+		return(NULL);
+	}
+	if ( type != FT_BINARY){
+		cl_log(LOG_WARNING, "field %s is not binary", name);
+		cl_log_message(msg);
 		return(NULL);
 	}
 
@@ -864,7 +869,8 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 			int	sizediff = 0;
 			
 			if (type != msg->types[j]){
-				cl_log(LOG_ERR, "cl_msg_mod: type mismatch");
+				cl_log(LOG_ERR, "cl_msg_mod: "
+				       "type mismatch for field %s", name);
 				return(HA_FAIL);
 			}
 			
@@ -1816,6 +1822,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.14  2004/07/07 19:07:15  gshi
+ * implemented uuid as nodeid
+ *
  * Revision 1.13  2004/06/24 20:54:35  gshi
  * add version 1.11 log that I overwritten in the last commit
  *
