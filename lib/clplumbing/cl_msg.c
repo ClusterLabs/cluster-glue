@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.31 2004/11/04 23:53:30 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.32 2004/11/17 22:03:43 lars Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -846,7 +846,7 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 			if (!newv){
 				cl_log(LOG_ERR, "dupliationg message fields failed"
 				       "value=%p, vlen=%d, msg->names[j]=%s", 
-				       value, vlen, msg->names[j]);
+				       value, (int)vlen, msg->names[j]);
 				return HA_FAIL;
 			}
 			
@@ -1756,6 +1756,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.32  2004/11/17 22:03:43  lars
+ * Fix another type error.
+ *
  * Revision 1.31  2004/11/04 23:53:30  gshi
  * when adding a binary field, even it's length is zero,
  * I still allocate 1-byte length memory for it and store '\0' in it
