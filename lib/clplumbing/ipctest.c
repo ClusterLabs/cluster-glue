@@ -11,6 +11,8 @@
 #include <clplumbing/GSource.h>
 #include <clplumbing/ipc.h>
 
+#define	MAXERRORS	1000
+
 typedef int (*TestFunc_t)(IPC_Channel*chan, int count);
 
 static int channelpair(TestFunc_t client, TestFunc_t server, int count);
@@ -766,7 +768,10 @@ s_send_msg(gpointer data)
 			cl_log(LOG_ERR,	"s_send_msg: Exiting.");
 			return FALSE;
 		}
-			
+		if (i->errcount >= MAXERRORS) {
+			g_main_quit(loop);
+			return FALSE;
+		}
 	}
 	return i->wcount < i->max;
 }
@@ -785,7 +790,7 @@ s_rcv_msg(IPC_Channel* chan, gpointer data)
 	}
 
 	if (chan->ch_status == IPC_DISCONNECT
-	||	i->rcount >= i->max) {
+	||	i->rcount >= i->max || i->errcount > MAXERRORS) {
 		if (i->rcount < i->max) {
 			++i->errcount;
 			cl_log(LOG_INFO, "Early exit from s_rcv_msg");
@@ -893,7 +898,8 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 	}
 retout:
 	//fprintf(stderr, "%%");
-	if (i->rcount >= i->max || chan->ch_status == IPC_DISCONNECT) {
+	if (i->rcount >= i->max || chan->ch_status == IPC_DISCONNECT
+	||	i->errcount > MAXERRORS) {
 		chan->ops->waitout(chan);
 		g_main_quit(loop);
 		return FALSE;
