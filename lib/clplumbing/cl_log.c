@@ -1,7 +1,9 @@
 #include <portability.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
-#include <sys/syslog.h>
+#include <syslog.h>
 #include <clplumbing/ipc.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/loggingdaemon.h>
