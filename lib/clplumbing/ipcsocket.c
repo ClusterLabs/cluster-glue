@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.103 2004/11/12 18:47:38 lars Exp $ */
+/* $Id: ipcsocket.c,v 1.104 2004/11/18 00:34:37 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -685,23 +685,38 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 {
 
 	if (msg->msg_len < 0 || msg->msg_len > MAXDATASIZE) {
+		cl_log(LOG_ERR, "socket_send: "
+		       "invalid message");		       
 		return IPC_FAIL;
 	}
-  
-	if (ch->ch_status == IPC_CONNECT
-	&&	ch->send_queue->current_qlen < ch->send_queue->max_qlen) {
-		/* add the message into the send queue */
-		CHECKFOO(0,ch, msg, SavedQueuedBody, "queued message");
-		SocketIPCStats.noutqueued++;
-		ch->send_queue->queue = g_list_append(ch->send_queue->queue
-		,	msg);
-		ch->send_queue->current_qlen++;
-		/* resume io */
-		ch->ops->resume_io(ch);
-		return IPC_OK;
+	
+	if (ch->ch_status != IPC_CONNECT){
+		return IPC_FAIL;
 	}
-  
-	return IPC_FAIL;
+	
+	
+	if ( !ch->is_send_blocking &&
+	    ch->send_queue->current_qlen >= ch->send_queue->max_qlen) {
+		cl_log(LOG_ERR, "send queue maximum length(%d) exceeded",
+		       ch->send_queue->max_qlen );
+		return IPC_FAIL;
+	}
+	
+	do{
+		ch->ops->resume_io(ch);
+	}
+	while (ch->send_queue->current_qlen >= ch->send_queue->max_qlen);
+	
+	/* add the message into the send queue */
+	CHECKFOO(0,ch, msg, SavedQueuedBody, "queued message");
+	SocketIPCStats.noutqueued++;
+	ch->send_queue->queue = g_list_append(ch->send_queue->queue,
+					      msg);
+	ch->send_queue->current_qlen++;
+	/* resume io */
+	ch->ops->resume_io(ch);
+	return IPC_OK;
+
   
 }
 
@@ -1080,15 +1095,15 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started, gboolean read1a
 }
 
 static int
-socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
+socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 {
 	int				retcode = IPC_OK;
 	struct SOCKET_CH_PRIVATE*	conn_info;
-
-
+	
+	
 	CHANAUDIT(ch);
+	*nmsg = 0;
 	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
-	*started = FALSE;
   
  
 	while (ch->ch_status == IPC_CONNECT
@@ -1097,9 +1112,14 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 
 		GList *				element;
 		struct IPC_MESSAGE *		msg;
-		struct SOCKET_MSG_HEAD		head;
+		struct SOCKET_MSG_HEAD*		head;
+                struct IPC_MESSAGE* 		oldmsg = NULL;
 		int				sendrc = 0;
-
+                struct IPC_MESSAGE* 		newmsg;
+		char*				p;
+		unsigned int			bytes_remaining;
+		int				diff;
+ 
 		CHANAUDIT(ch);
 		element = g_list_first(ch->send_queue->queue);
 		if (element == NULL) {
@@ -1108,107 +1128,109 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 			break;
 		}
 		msg = (struct IPC_MESSAGE *) (element->data);
-		head.msg_len = msg->msg_len;
 
-		/* Send message header */
-		sendrc = send(conn_info->s, (char *)&head
-		,	sizeof(struct SOCKET_MSG_HEAD)
-		,	(MSG_DONTWAIT|MSG_NOSIGNAL));
-		SocketIPCStats.last_send_rc = sendrc;
-		SocketIPCStats.last_send_errno = errno;
-		++SocketIPCStats.send_count;
-#ifdef DEBUG
-		cl_log(LOG_DEBUG, "Sent %d byte message header"
-		,	sizeof(struct SOCKET_MSG_HEAD));
-#endif
-
-
-		if (sendrc < 0) {
-			switch (errno) {
-				case EAGAIN:
-#ifdef DEBUG
-					cl_log(LOG_DEBUG,
-						"socket send returned EAGAIN");
-#endif
-					/* FIXME! KLUDGE! */
-					/* We could fix this if we kept better
-					 * state info so we could retry this
-					 * operation later and not be confused.
-					 * This is the right thing to do!
-					 */
-					cl_shortsleep();
-					continue;
-				case EPIPE:
-					socket_check_disc_pending(ch);
-					retcode = IPC_BROKEN;
-					break;
-				default:
-					cl_perror("socket_resume_io_write: send1 bad errno");
-					ch->ch_status = IPC_DISCONNECT;
-					retcode = IPC_FAIL;
-					break;
-			}
-			break;
-    		}
-		*started=TRUE;
-
-
-		do {
-			CHANAUDIT(ch);
-			sendrc = send(conn_info->s, msg->msg_body
-			,	msg->msg_len, (MSG_DONTWAIT|MSG_NOSIGNAL));
-			SocketIPCStats.last_send_rc = sendrc;
-			SocketIPCStats.last_send_errno = errno;
-			++SocketIPCStats.send_count;
-#ifdef DEBUG
-			cl_log(LOG_DEBUG, "send(%d bytes)  => %d errno=%d"
-			,	msg->msg_len, sendrc, errno);
-#endif
-
-			/* if send failed with EAGAIN, delay and try again */
-			/* FIXME! KLUDGE! */
-			/* We could fix this if we kept better
-			 * state info so we could retry this
-			 * operation later and not be confused.
-			 * This is the right thing to do!
+		diff = 0;
+		if (msg->msg_buf ){
+			diff = (char*)msg->msg_body - (char*)msg->msg_buf;				
+		}
+		/*cl_log(LOG_INFO, "diff=%d", diff);*/
+		if ( diff < sizeof(struct SOCKET_MSG_HEAD) ){
+			/* either we don't have msg->msg_buf set
+			 * or we don't have enough bytes for socket head
+			 * we delete this message and creates 
+			 * a new one and delete the old one
 			 */
-		} while(sendrc < 0
-		&&	(errno == EAGAIN ? (cl_shortsleep(), TRUE) : FALSE));
+			
+			newmsg= socket_message_new(ch, msg->msg_len);
+			if (newmsg == NULL){
+				cl_log(LOG_ERR, "socket_resume_io_write: "
+					"allocating memory for new ipc msg failed");
+                		return IPC_FAIL;
+			}
 
-		if (sendrc > 0 && sendrc != (int)msg->msg_len) {
+                	memcpy(newmsg->msg_body, msg->msg_body, msg->msg_len);
+                	oldmsg = msg;
+			msg = newmsg;
+		}
+	
+		head = (struct SOCKET_MSG_HEAD*) msg->msg_buf;
+                head->msg_len = msg->msg_len;
+
+		if (ch->bytes_remaining == 0){
+			bytes_remaining = msg->msg_len + ch->msgpad;
+			p = msg->msg_buf;
+		}else {
+			bytes_remaining = ch->bytes_remaining;
+			p = ((char*)msg->msg_buf) + msg->msg_len + ch->msgpad
+				- bytes_remaining;
+			
+		}
+
+		sendrc = 0;
+
+                do {
+                        CHANAUDIT(ch);
+
+			
+                       sendrc = send(conn_info->s, p
+                       ,       bytes_remaining, (MSG_DONTWAIT|MSG_NOSIGNAL));
+                        SocketIPCStats.last_send_rc = sendrc;
+                        SocketIPCStats.last_send_errno = errno;
+                        ++SocketIPCStats.send_count;
+
+			if (sendrc <= 0){
+				if(errno == EAGAIN){
+					break;
+				}
+			}else {				
+				p = p + sendrc;
+				bytes_remaining -= sendrc;
+			}
+
+                } while(bytes_remaining > 0 );
+
+
+		if (sendrc > 0 && sendrc != (int)msg->msg_len + ch->msgpad) {
 			cl_perror("Sent %d byte message body: rc = %d"
 			,	(int)msg->msg_len, sendrc);
 		}
 
-#ifdef DEBUG
-		cl_log(LOG_DEBUG, "Sent %d byte message body"
-		,	msg->msg_len);
-		cl_log(LOG_DEBUG, "Contents sent: %s",(char*)msg->msg_body);
-#endif
-
 		if (sendrc < 0) {
 			switch (errno) {
-				case EPIPE:
-					socket_check_disc_pending(ch);
-					retcode = IPC_BROKEN;
-					break;
-				default:
-					cl_perror("socket_resume_io_write"
-					": send2 bad errno");
-					ch->ch_status = IPC_DISCONNECT;
-					retcode = IPC_FAIL;
-					break;
+			case EAGAIN:
+				retcode = IPC_OK;
+				break;
+			case EPIPE:
+				socket_check_disc_pending(ch);
+				retcode = IPC_BROKEN;
+				break;
+			default:
+				cl_perror("socket_resume_io_write"
+					  ": send2 bad errno");
+				ch->ch_status = IPC_DISCONNECT;
+				retcode = IPC_FAIL;
+				break;
 			}
 			break;
 		}else{
 			CHECKFOO(3,ch, msg, SavedSentBody, "sent message")
+
+			if (oldmsg){
+		                if (msg->msg_done != NULL) {
+                                	msg->msg_done(msg);
+                        	}
+				msg=oldmsg;
+			}
+	
 			ch->send_queue->queue = g_list_remove(
 					ch->send_queue->queue,	msg);
+
 			if (msg->msg_done != NULL) {
 				msg->msg_done(msg);
 			}
 			SocketIPCStats.nsent++;
 			ch->send_queue->current_qlen--;
+			*nmsg ++;
 		}
 	}
 	CHANAUDIT(ch);
@@ -1221,13 +1243,11 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 static int
 socket_resume_io(struct IPC_CHANNEL *ch)
 {
-	int		rc1, rc2;
+	int		rc1 = IPC_OK;
+	int		rc2 = IPC_OK;
 	gboolean	rstarted;
-	gboolean	wstarted;
+	int		nwmsg = 1;
 	gboolean	OKonce = FALSE;
-#ifdef DEBUG
-	int		count = 0;
-#endif
 
 	CHANAUDIT(ch);
 	if (!IPC_ISRCONN(ch)) {
@@ -1235,32 +1255,25 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	}
 
 	do {
-		rc1 = socket_resume_io_read(ch, &rstarted, FALSE);
-		CHANAUDIT(ch);
-		if (ch->ch_status == IPC_DISC_PENDING) {
-			rc2 = IPC_OK;
-			wstarted = FALSE;
-		}else{
-			rc2 = socket_resume_io_write(ch, &wstarted);
+		if (rc1 == IPC_OK){
+			rc1 = socket_resume_io_read(ch, &rstarted, FALSE);
 		}
-		CHANAUDIT(ch);
+		
+		if (nwmsg > 0){
+			nwmsg = 0;
+			rc2 = socket_resume_io_write(ch, &nwmsg);
+		}
+		
 		if (rc1 == IPC_OK || rc2 == IPC_OK) {
 			OKonce = TRUE;
 		}
-#ifdef DEBUG
-		++count;
-		if (rc1 == IPC_OK && rc2 == IPC_OK && (rstarted||wstarted)) {
-			cl_log(LOG_DEBUG
-			,	"continuing: rstarted = %d wstarted = %d count: %d"
-			,	rstarted, wstarted, count);
-		}
-#endif
-	} while ((rstarted||wstarted) && IPC_ISRCONN(ch));
+		
+	} while ((rstarted || nwmsg > 0) && IPC_ISRCONN(ch));
 
 	if (IPC_ISRCONN(ch)) {
 		if (rc1 != IPC_OK) {
 			cl_log(LOG_ERR
-			,	"socket_resume_io_read() failure");
+			       ,	"socket_resume_io_read() failure");
 		}
 		if (rc2 != IPC_OK) {
 			cl_log(LOG_ERR
@@ -1575,6 +1588,8 @@ socket_client_channel_new(GHashTable *ch_attrs) {
 #endif
   temp_ch->ch_private = (void*) conn_info;
   temp_ch->ops = (struct IPC_OPS *)&socket_ops;
+  temp_ch->msgpad = sizeof(struct SOCKET_MSG_HEAD);
+  temp_ch->bytes_remaining = 0;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
    
@@ -1615,6 +1630,8 @@ socket_server_channel_new(int sockfd){
   temp_ch->ch_status = IPC_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
   temp_ch->ops = (struct IPC_OPS *)&socket_ops;
+  temp_ch->msgpad = sizeof(struct SOCKET_MSG_HEAD);
+  temp_ch->bytes_remaining = 0;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
    
@@ -1677,7 +1694,8 @@ socket_message_new(struct IPC_CHANNEL *ch, int msg_len)
   struct IPC_MESSAGE * temp_msg;
 
   temp_msg = g_new(struct IPC_MESSAGE, 1);
-  temp_msg->msg_body = g_malloc(msg_len);
+  temp_msg->msg_buf = g_malloc(msg_len + ch->msgpad);
+  temp_msg->msg_body = (char*)temp_msg->msg_buf + ch->msgpad;
   temp_msg->msg_len = msg_len;
   temp_msg->msg_private = NULL;
   temp_msg->msg_ch = ch;
@@ -1695,7 +1713,13 @@ socket_free_message(struct IPC_MESSAGE * msg) {
 #if 0
 	memset(msg->msg_body, 0xff, msg->msg_len);
 #endif
-	g_free(msg->msg_body);
+
+       if (msg->msg_buf){
+               g_free(msg->msg_buf);
+       }else {
+               g_free(msg->msg_body);
+       }
+
 #if 0
 	memset(msg, 0xff, sizeof(*msg));
 #endif

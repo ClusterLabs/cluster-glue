@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.19 2004/11/08 23:16:40 gshi Exp $ */
+/* $Id: cl_log.c,v 1.20 2004/11/18 00:34:37 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,7 +39,7 @@ static IPC_Channel*	logging_daemon_chan = NULL;
 
 int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 IPC_Message* ChildLogIPCMessage(int priority, const char *buf, int bstrlen, 
-				gboolean use_priority_str );
+				gboolean use_priority_str, IPC_Channel* ch);
 void	FreeChildLogIPCMessage(IPC_Message* msg);
 static char *	ha_timestamp(void);
 
@@ -362,13 +362,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 	IPC_Message*		msg;
 	int			sendrc;
 	int			intval = conn_logd_intval;
-	/*	cl_log(LOG_INFO, "LogToLoggingDaemon is called");*/
 
-	msg = ChildLogIPCMessage(priority, buf, bufstrlen, use_pri_str);
-	
-	if (msg == NULL) {
-		return HA_FAIL;
-	}
 	if (chan == NULL) {
 		GHashTable*	attrs;
 		char		path[] = IPC_PATH_ATTR;
@@ -388,7 +382,6 @@ LogToLoggingDaemon(int priority, const char * buf,
 			g_hash_table_destroy(attrs);
 			
 			if (chan == NULL) {
-				FreeChildLogIPCMessage(msg);
 				return HA_FAIL;
 			}
 			
@@ -400,14 +393,19 @@ LogToLoggingDaemon(int priority, const char * buf,
 				       " to logging daemon failed."
 				       " Logging daemon may not be running");
 				
-				FreeChildLogIPCMessage(msg);
 				return HA_FAIL;
 			}
 			
 		}else {
-			FreeChildLogIPCMessage(msg);
 			return HA_FAIL;
 		}
+	}
+
+
+
+	msg = ChildLogIPCMessage(priority, buf, bufstrlen, use_pri_str, chan);	
+	if (msg == NULL) {
+		return HA_FAIL;
 	}
 	
 	/* Logging_channel is all set up */
@@ -425,11 +423,12 @@ LogToLoggingDaemon(int priority, const char * buf,
 
 IPC_Message*
 ChildLogIPCMessage(int priority, const char *buf, int bufstrlen, 
-		   gboolean use_prio_str)
+		   gboolean use_prio_str, IPC_Channel* ch)
 {
 	IPC_Message*	ret;
 	LogDaemonMsg*	logbuf;
 	int		msglen;
+	char*		bodybuf;
 
 	ret = (IPC_Message*)cl_malloc(sizeof(IPC_Message));
 
@@ -439,12 +438,13 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 
 	/* Compute msg len: including room for the EOS byte */
 	msglen = sizeof(LogDaemonMsg)+bufstrlen;
-	logbuf = (LogDaemonMsg*)cl_malloc(msglen);
-
-	if (logbuf == NULL) {
+	bodybuf = cl_malloc(msglen + ch->msgpad);
+	if (bodybuf == NULL) {
 		cl_free(ret);
 		return NULL;
 	}
+	
+	logbuf = (LogDaemonMsg*) (bodybuf + ch->msgpad);
 	
 	logbuf->msgtype = LD_LOGIT;
 	logbuf->facility = cl_log_facility;
@@ -455,8 +455,10 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	logbuf->message[bufstrlen] = EOS;
 
 	ret->msg_len = msglen;
-	ret->msg_body = logbuf;
+	ret->msg_buf = bodybuf;
+	ret->msg_body = bodybuf + ch->msgpad;
 	ret->msg_done = FreeChildLogIPCMessage;
+	ret->msg_ch = ch;
 	return ret;
 }
 

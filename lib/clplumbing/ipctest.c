@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.27 2004/10/01 21:19:34 gshi Exp $ */
+/* $Id: ipctest.c,v 1.28 2004/11/18 00:34:37 gshi Exp $ */
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -267,6 +267,7 @@ echoserver(IPC_Channel* wchan, int repcount)
 	wmsg.msg_private = NULL;
 	wmsg.msg_done = NULL;
 	wmsg.msg_body = str;
+	wmsg.msg_buf = NULL;
 	wmsg.msg_ch = wchan;
 
 	cl_log(LOG_INFO, "Echo server: %d reps pid %d.", repcount, getpid());
@@ -440,6 +441,7 @@ newmessage(IPC_Channel* chan, int niter)
 	msg->msg_private = NULL;
 	msg->msg_done = msg_free;
 	msg->msg_ch = chan;
+	msg->msg_buf = NULL;
 	msg->msg_body = malloc(32);
 	echomsgbody(msg->msg_body, niter, &msg->msg_len);
 	return msg;
