@@ -25,6 +25,7 @@
 #include <clplumbing/cl_log.h>
 #include <clplumbing/realtime.h>
 
+/* #define CHEAT_CHECKS */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -333,11 +334,11 @@ dump_msg(struct IPC_MESSAGE *msg, const char * label)
 {
 #ifdef CHEAT_CHECKS
 	cl_log(LOG_DEBUG, "%s length %d [%s] %ld"
-	,	label,	msg->msg_len, (char*)msg->msg_body
+	,	label,	(unsigned int)msg->msg_len, (char*)msg->msg_body
 	,	cheat_get_sequence(msg));
 #else
 	cl_log(LOG_DEBUG, "%s length %d [%s]"
-	,	label,	msg->msg_len, (char*)msg->msg_body);
+	,	label,	(unsigned int)msg->msg_len, (char*)msg->msg_body);
 #endif
 }
 
