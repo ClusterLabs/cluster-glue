@@ -87,7 +87,7 @@ ipmilantest_LDADD = $(top_builddir)/lib/pils/libpils.la \
 
 ## libraries
 
-plugindir	   = $(stonith_plugindir)/stonith
+plugindir	   = $(stonith_plugindir)/stonith2
 plugin_LTLIBRARIES =	apcmaster.la		\
 			$(apcmastersnmp_LIB)	\
 			apcsmart.la		\
@@ -180,6 +180,6 @@ riloe_la_SOURCES         = riloe.c $(INCFILES)
 riloe_la_LDFLAGS         = -export-dynamic -module -avoid-version
 riloe_la_LIBADD          = $(GLIBLIB)
 
-stonithscriptdir                =  $(stonith_plugindir)/stonith
+stonithscriptdir                =  $(stonith_plugindir)/stonith2
 
 stonithscript_SCRIPTS  		= ribcl.py 

@@ -1,4 +1,4 @@
-/* $Id: stonith_plugin.h,v 1.3 2005/01/08 06:01:16 alan Exp $ */
+/* $Id: stonith_plugin.h,v 1.4 2005/01/10 08:35:43 alan Exp $ */
 /*
  *	S hoot
  *	T he
@@ -76,8 +76,8 @@ struct stonith_plugin  {
 	gboolean		isconfigured;
 };
 
-#define STONITH_TYPE	stonith
-#define STONITH_TYPE_S	"stonith"
+#define STONITH_TYPE	stonith2
+#define STONITH_TYPE_S	"stonith2"
 typedef struct StonithImports_s StonithImports;
 
 struct Etoken {
