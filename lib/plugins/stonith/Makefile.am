@@ -95,7 +95,8 @@ plugin_LTLIBRARIES =	apcmaster.la		\
 			rps10.la		\
 			ssh.la			\
 			$(vacm_LIB)		\
-			wti_nps.la
+			wti_nps.la		\
+			riloe.la
 
 apcmaster_la_SOURCES	= apcmaster.c stonith_signal.h
 apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version
@@ -160,3 +161,12 @@ vacm_la_LIBADD		= $(top_builddir)/replace/libreplace.la
 wti_nps_la_SOURCES	= wti_nps.c stonith_signal.h
 wti_nps_la_LDFLAGS	= -export-dynamic -module -avoid-version
 wti_nps_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
+
+
+riloe_la_SOURCES         = riloe.c
+riloe_la_LDFLAGS         = -export-dynamic -module -avoid-version
+riloe_la_LIBADD          = $(GLIBLIB)
+
+halibdir                = "$(libdir)/@HB_PKG@"
+
+halib_SCRIPTS  		= ribcl.py 
