@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.57 2005/02/24 21:17:58 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.58 2005/02/25 11:16:55 lars Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1238,8 +1238,8 @@ cl_msg_get_list_int(struct ha_msg* msg, const char* name,
 	len = g_list_length(list);
 	if (len > *n){
 		cl_log(LOG_ERR, "cl_msg_get_list_int:"
-		       "buffer too small: *n=%d, required len=%d",
-		       *n, len);
+		       "buffer too small: *n=%ld, required len=%ld",
+		       (long)*n, (long)len);
 		*n = len;
 		return HA_FAIL;	
 	}
@@ -2285,6 +2285,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.58  2005/02/25 11:16:55  lars
+ * size_t != int
+ *
  * Revision 1.57  2005/02/24 21:17:58  gshi
  * add two APIs for list support
  *
