@@ -932,12 +932,9 @@ apcmastersnmp_destroy(Stonith * s)
     ad->community = NULL;
     ad->num_outlets = 0;
 
-    // release stonith-object itself
     FREE(ad);
+    /* Our caller will release the STONITH object itself */
 
-    s->pinfo = NULL;
-    FREE(s);
-    s = NULL;
 }
 
 /*

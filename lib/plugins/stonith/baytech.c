@@ -1038,7 +1038,8 @@ baytech_getinfo(Stonith * s, int reqtype)
 			break;
 
 		case ST_DEVICEURL:		/* Manufacturer's web site */
-			ret = "http://www.baytech.net";
+			ret = "http://www.baytech.net/";
+			break;
 
 		default:
 			ret = NULL;

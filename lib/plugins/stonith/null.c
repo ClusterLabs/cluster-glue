@@ -405,6 +405,7 @@ null_getinfo(Stonith * s, int reqtype)
 		case ST_DEVICEDESCR:
 			ret = _("Dummy (do-nothing) STONITH device\n"
 			"FOR TESTING ONLY!");
+			break;
 
 		default:
 			ret = NULL;
@@ -434,9 +435,6 @@ null_destroy(Stonith *s)
 	}
 	nd->hostcount = -1;
 	FREE(nd);
-	s->pinfo = NULL;
-	FREE(s);
-	s = NULL;
 }
 
 /* Create a new Null Stonith device.  Too bad this function can't be static */

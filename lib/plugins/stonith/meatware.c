@@ -451,7 +451,7 @@ meatware_getinfo(Stonith * s, int reqtype)
 			break;
 
 		case ST_CONF_FILE_SYNTAX:
-			ret = _("IP-address login password\n"
+			ret = _("hostname...\n"
 			"host names are white-space delimited.  "
 			"All host names must be on one line.  "
 			"Blank lines and lines beginning with # are ignored");
@@ -459,8 +459,9 @@ meatware_getinfo(Stonith * s, int reqtype)
 
 		case ST_DEVICEDESCR:
 			ret = _("Human (meatware) intervention STONITH device.\n"
-			"This STONITH agent prompts a human to reset a machine, \n"
-			"and notices when it is completed.");
+			"This STONITH agent prompts a human to reset a machine.\n"
+			"The human tells it when the reset was completed.");
+			break;
 
 		default:
 			ret = NULL;
@@ -490,9 +491,6 @@ meatware_destroy(Stonith *s)
 	}
 	nd->hostcount = -1;
 	FREE(nd);
-	s->pinfo = NULL;
-	FREE(s);
-	s = NULL;
 }
 
 /* Create a new Meatware Stonith device. */
