@@ -197,8 +197,6 @@ base64_to_binary(const char * in, int inlen, void * output, int outlen)
 	startout = out = (char *)output;
 
 	while (input < lastinput) {
-		unsigned long	chunk;
-
 		Char2SixBits(*input, sixbits1); ++input;
 		Char2SixBits(*input, sixbits2); ++input;
 		Char2SixBits(*input, sixbits3); ++input;
