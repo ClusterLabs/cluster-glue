@@ -1,4 +1,4 @@
-/* $Id: pils.c,v 1.35 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: pils.c,v 1.36 2004/04/16 05:23:10 alan Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -1327,7 +1327,7 @@ PluginExists(const char * PluginPath)
 	/* Make sure we can read and execute the plugin file */
 	/* This test is nice, because dlopen reasons aren't return codes */
 
-	if (access(PluginPath, R_OK|X_OK) != 0) {
+	if (access(PluginPath, R_OK) != 0) {
 		if (DEBUGPLUGIN) {
 			PILLog(PIL_DEBUG, "Plugin file %s does not exist"
 			,	PluginPath);
