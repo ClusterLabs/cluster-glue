@@ -62,6 +62,10 @@ NewTrackedProc(pid_t pid, int isapgrp, ProcTrackLogType loglevel
 	p->starttime = time(NULL);
 
 	g_hash_table_insert(ProcessTable, GINT_TO_POINTER(pid), p);
+	if (ANYDEBUG) {
+		ha_log(LOG_DEBUG, "Creating tracked %s process %d"
+		,	ops->proctype(p), pid);
+	}
 }
 
 /* returns TRUE if 'pid' was registered */
