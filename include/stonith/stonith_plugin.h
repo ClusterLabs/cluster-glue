@@ -1,4 +1,4 @@
-/* $Id: stonith_plugin.h,v 1.1 2005/01/03 18:12:10 alan Exp $ */
+/* $Id: stonith_plugin.h,v 1.2 2005/01/05 04:04:02 alan Exp $ */
 /*
  *	S hoot
  *	T he
@@ -119,5 +119,6 @@ struct StonithImports_s {
 #define	ST_LOGIN	"login"
 #define	ST_PASSWD	"password"
 #define	ST_COMMUNITY	"community"	/* SNMP community */
+#define	ST_TTYDEV	"ttydev"	/* TTY device name */
 
 #endif /*__STONITH__PLUGIN_H*/
