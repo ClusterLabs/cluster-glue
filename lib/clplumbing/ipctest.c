@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.33 2005/02/12 17:15:16 alan Exp $ */
+/* $Id: ipctest.c,v 1.34 2005/02/17 15:49:50 alan Exp $ */
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -263,7 +263,7 @@ echoserver(IPC_Channel* wchan, int repcount)
 	int	j;
 	int	errcount = 0;
 	IPC_Message	wmsg;
-	IPC_Message*	rmsg;
+	IPC_Message*	rmsg = NULL;
 	
 	
 	memset(&wmsg, 0, sizeof(wmsg));
