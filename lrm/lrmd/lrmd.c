@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.40 2004/10/08 04:56:14 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.41 2004/10/08 05:34:27 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -382,6 +382,7 @@ lrmd_shutdown(int nsig)
 	if (!shuttingdown) {
 		shuttingdown = 1;
 	}
+	
 	if (mainloop != NULL && g_main_is_running(mainloop)) {
 		g_main_quit(mainloop);
 	}else {
@@ -547,6 +548,7 @@ init_start ()
 	/*Create the mainloop and run it*/
 	mainloop = g_main_new(FALSE);
 	lrmd_log(LOG_INFO, "main: run the loop...");
+	lrmd_log(LOG_WARNING, "lrmd: started.");
 	g_main_run(mainloop);
 
 	conn_cmd->ops->destroy(conn_cmd);
@@ -2016,7 +2018,7 @@ lrmd_log(int priority, const char * fmt, ...)
 {
 	va_list		ap;
 	char		buf[MAXLINE];
-	if ( 0==debug_level && LOG_ERR != priority) {
+	if ( 0==debug_level && LOG_INFO == priority) {
 		return;
 	}
 	
@@ -2028,6 +2030,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.41  2004/10/08 05:34:27  zhenh
+ * add log entry to indicate the startup was successful
+ *
  * Revision 1.40  2004/10/08 04:56:14  zhenh
  * According to the Bugzilla Bug 74.
  * 1. change the logging setting of lrm.
