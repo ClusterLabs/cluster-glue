@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.43 2005/02/07 18:04:37 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.44 2005/02/07 21:32:38 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1647,6 +1647,10 @@ ipcmsg_done(IPC_Message* m)
 }
 
 
+/*
+ * create an ipcmsg and copy the data
+ */
+
 IPC_Message*
 wirefmt2ipcmsg(void* p, size_t len, IPC_Channel* ch)
 {
@@ -1669,9 +1673,7 @@ wirefmt2ipcmsg(void* p, size_t len, IPC_Channel* ch)
 	}
 	ret->msg_body = (char*)ret->msg_buf + ch->msgpad;
 	memcpy(ret->msg_body, p, len);
-
-	cl_free(p);
-
+	
 	ret->msg_done = ipcmsg_done;
 	ret->msg_private = NULL;
 	ret->msg_ch = ch;
@@ -2091,6 +2093,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.44  2005/02/07 21:32:38  gshi
+ * move the free from the calling function in wirefmt2ipcmsg() to the caller
+ *
  * Revision 1.43  2005/02/07 18:04:37  gshi
  * Serious bug fix.
  *
