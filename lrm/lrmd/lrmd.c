@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.66 2005/02/23 09:04:25 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.67 2005/02/24 06:54:15 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1773,6 +1773,7 @@ perform_ra_op(lrmd_op_t* op)
 	switch(pid=fork()) {
 		case -1:
 			lrmd_log(LOG_ERR,"start_a_child_client: Cannot fork.");
+			return_to_dropped_privs();
 			return HA_FAIL;
 
 		default:	/* Parent */
@@ -2152,6 +2153,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.67  2005/02/24 06:54:15  sunjd
+ * return to nobody privilege after forking failed
+ *
  * Revision 1.66  2005/02/23 09:04:25  zhenh
  * make lrmd exiting just after all non-monitor operations finished when it received SIGTERM
  *
