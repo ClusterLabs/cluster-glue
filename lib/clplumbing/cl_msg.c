@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.8 2004/04/28 17:27:13 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.9 2004/04/29 01:22:30 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1571,9 +1571,9 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 
 	if (bp > buf + len){
 
-		cl_log(LOG_ERR, "msg2string_buf: out of memory bound,"
-		       "bp=%p, buf + len=%p, len=%xd \n",
-		       bp, buf + len, len);
+		cl_log(LOG_ERR, "msg2string_buf: out of memory bound"
+		", bp=%p, buf + len=%p, len=%ld"
+		,	bp, buf + len, (long)len);
 
 		cl_log_message(m);
 
@@ -1784,6 +1784,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.9  2004/04/29 01:22:30  alan
+ * Undid a broken fix to the %zd format string problem.
+ * It was replaced with %xd which prints in hex instead of decimal, and also
+ * inserts a d in the output string.
+ *
  * Revision 1.8  2004/04/28 17:27:13  gshi
  * Fix potential (though probably unlikely) memory leak
  * similar to the one found in cl_netstring.c by kevin
