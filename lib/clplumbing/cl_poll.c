@@ -1,6 +1,48 @@
 #include <portability.h>
 #include <stdlib.h>
 #include <unistd.h>
+/*
+ * Substitute poll(2) function using POSIX real time signals.
+ *
+ * The poll(2) system call often has significant latencies and realtime
+ * impacts (probably because of its variable length argument list).
+ *
+ * These functions let us use real time signals and sigtimedwait(2) instead
+ * of poll - for those files which work with real time signals.
+ * In the 2.4 series of Linux kernels, this does *not* include FIFOs.
+ *
+ * NOTE:  We (have to) grab the SIGPOLL signal for our own purposes.
+ *		Hope that's OK with you...
+ *
+ * Special caution:  We can only incompletely simulate the difference between
+ * the level-triggered interface of poll(2) and the edge-triggered behavior
+ * of I/O signals.  As a result you *must* read all previously-indicated
+ * incoming data before calling cl_poll() again.  Otherwise you may miss
+ * some incoming data (and possibly hang).
+ *
+ *
+ * Copyright (C) 2003 IBM Corporation
+ *
+ * Author:	<alanr@unix.sh>
+ *
+ * This software licensed under the GNU LGPL.
+ *
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of version 2.1 of the GNU Lesser General Public
+ * License as published by the Free Software Foundation.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ **************************************************************************/
+
 
 #define	__USE_GNU	1
 #	include <fcntl.h>
@@ -12,13 +54,25 @@
 #include <clplumbing/cl_log.h>
 #include <clplumbing/cl_poll.h>
 #include <clplumbing/cl_signal.h>
+
+
+
+/* Turn on to log odd realtime behavior */
+
 #define	TIME_CALLS	1
 #ifdef	TIME_CALLS
 #	include <clplumbing/longclock.h>
 #	include <clplumbing/cl_log.h>
 #endif
+#	include <linux/sysctl.h>
 
 static int	debug = 0;
+static void dump_fd_info(struct pollfd *fds, unsigned int nfds, int timeoutms);
+static void check_fd_info(struct pollfd *fds, unsigned int nfds);
+static void cl_real_poll_fd(int fd);
+static void cl_poll_sigpoll_overflow_sigaction(int nsig, siginfo_t* , void*);
+static void cl_poll_sigpoll_overflow(void);
+static int cl_poll_get_sigqlimit(void);
 
 int	/* Slightly sleazy... */
 cl_glibpoll(GPollFD* ufds, guint nfsd, gint timeout)
@@ -33,6 +87,11 @@ cl_glibpoll(GPollFD* ufds, guint nfsd, gint timeout)
 
 #ifndef HAVE_FCNTL_F_SETSIG
 
+/*
+ * Dummy cl_poll() and cl_poll_ignore() functions for systems where
+ * we don't have all the support we need.
+ */
+
 int
 cl_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 {
@@ -44,7 +103,6 @@ cl_poll_ignore(int fd)
 {
 	return 0;
 }
-
 
 #else /* HAVE_FCNTL_F_SETSIG */
 typedef	unsigned char poll_bool;
@@ -59,10 +117,11 @@ typedef	unsigned char poll_bool;
  *	enable signals for that file descriptor, and post the events in
  *	our own cache.  The next time you include that signal in a call
  *	to cl_poll(), you will get the information delivered
- *	to you in your poll call.
+ *	to you in your cl_poll() call.
  *
  *	If you want to stop monitoring a particular file descriptor, use
- *	cl_poll_ignore() for that purpose.
+ *	cl_poll_ignore() for that purpose.  Doing this is a good idea, but
+ *	not fatal if omitted...
  */
 
 /* Information about a file descriptor we're monitoring */
@@ -76,11 +135,12 @@ static int		max_allocated = 0;
 static poll_bool*	is_monitored = NULL;	/* Sized by max_allocated */
 static poll_info_t*	monitorinfo = NULL;	/* Sized by max_allocated */
 static int		cl_nsig = 0;
+static gboolean		SigQOverflow = FALSE;
 
-static int cl_init_poll_sig(struct pollfd *fds, unsigned int nfds);
-static short cl_poll_assignsig(int fd);
-static void cl_poll_sigaction(int nsig, siginfo_t* info, void* v);
-static int cl_poll_prepsig(int nsig);
+static int	cl_init_poll_sig(struct pollfd *fds, unsigned int nfds);
+static short	cl_poll_assignsig(int fd);
+static void	cl_poll_sigaction(int nsig, siginfo_t* info, void* v);
+static int	cl_poll_prepsig(int nsig);
 
 
 /*
@@ -92,7 +152,6 @@ static int cl_poll_prepsig(int nsig);
  */
 
 static sigset_t	SignalSet;
-static int	setinityet=FALSE;
 
 /* Select the signal you want us to use (must be a RT signal) */
 int
@@ -115,34 +174,39 @@ cl_poll_setsig(int nsig)
 static
 int cl_poll_prepsig(int nsig)
 {
-	sigset_t		singlemask;
+	static gboolean	setinityet=FALSE;
 	
+	if (!setinityet) {
+		CL_SIGEMPTYSET(&SignalSet);
+		cl_signal_set_simple_action(SIGPOLL
+		,	cl_poll_sigpoll_overflow_sigaction
+		,	NULL);
+		setinityet = TRUE;
+	}
 	if (CL_SIGINTERRUPT(nsig, FALSE) < 0) {
-		return -1;
-	}
-	if (CL_SIGEMPTYSET(&singlemask) < 0) {
-		return -1;
-	}
-	if (CL_SIGADDSET(&singlemask, nsig) < 0) {
+		cl_perror("sig_interrupt(%d, FALSE)", nsig);
 		return -1;
 	}
 	if (CL_SIGADDSET(&SignalSet, nsig) < 0) {
+		cl_perror("sig_addset(&SignalSet, %d)", nsig);
 		return -1;
 	}
-	if (CL_SIGPROCMASK(SIG_BLOCK, &singlemask, NULL) < 0) {
+	if (CL_SIGPROCMASK(SIG_BLOCK, &SignalSet, NULL) < 0) {
+		cl_perror("sig_sigprocmask(SIG_BLOCK, sig %d)", nsig);
 		return -1;
 	}
-
-	if (cl_signal_set_action(nsig, cl_poll_sigaction, &SignalSet,
-				SA_SIGINFO, NULL) < 0) {
-		return -1;
+	if (debug) {
+		cl_log(LOG_DEBUG
+		,	"Signal %d belongs to us...", nsig);
+		cl_log(LOG_DEBUG, "cl_poll_prepsig(%d) succeeded.\n", nsig);
 	}
+	
 	return 0;
 }
 
 #define	FD_CHUNKSIZE	64
 
-/* Set of events everyone must monitor */
+/* Set of events everyone must monitor whether they want to or not ;-) */
 #define	CONSTEVENTS	(POLLHUP|POLLERR|POLLNVAL)
 
 #define	RECORDFDEVENT(fd, flags) (monitorinfo[fd].pendevents |= (flags))
@@ -152,8 +216,6 @@ int cl_poll_prepsig(int nsig)
  * This means (among other things) registering any monitored
  * file descriptors.
  */
-
-
 static int
 cl_init_poll_sig(struct pollfd *fds, unsigned int nfds)
 {
@@ -162,6 +224,13 @@ cl_init_poll_sig(struct pollfd *fds, unsigned int nfds)
 	int		nmatch = 0;
 
 
+	if (cl_nsig == 0) {
+		cl_poll_setsig(SIGIO);
+		cl_nsig = ((SIGRTMIN+SIGRTMAX)/2);
+		if (cl_poll_setsig(cl_nsig) < 0) {
+			return -1;
+		}
+	}
 	for (j=0; j < nfds; ++j) {
 		const int fd = fds[j].fd;
 		
@@ -212,6 +281,11 @@ cl_init_poll_sig(struct pollfd *fds, unsigned int nfds)
 		max_allocated = newsize;
 	}
 
+	if (fds->events != 0 && debug) {
+		cl_log(LOG_DEBUG
+		,	"Current event mask for fd [0] {%d} 0x%x"
+		,	fds->fd, fds->events);
+	}
 	/*
 	 * Examine each fd for the following things:
 	 *	Is it already monitored?
@@ -221,7 +295,7 @@ cl_init_poll_sig(struct pollfd *fds, unsigned int nfds)
 	 */
 
 	for (j=0; j < nfds; ++j) {
-		const int fd = fds[j].fd;
+		const int	fd = fds[j].fd;
 		poll_info_t*	moni = monitorinfo+fd;
 		short		nsig;
 		int		badfd = FALSE;
@@ -234,18 +308,14 @@ cl_init_poll_sig(struct pollfd *fds, unsigned int nfds)
 				RECORDFDEVENT(fd, POLLERR);
 				badfd = TRUE;
 			}else{
-				struct pollfd	fdl[1];
+				/* Use real poll(2) to get initial
+				 * event status
+				 */
 				moni->nsig = nsig;
-				
-				/* Get "old news" from poll(2) */
-				fdl[0].fd = fd;
-				fdl[0].revents = 0;
-				fdl[0].events = ~0;
-				if (poll(fdl, 1,-1) > 0) {
-					RECORDFDEVENT(fd, fdl[0].revents);
-				}
+				cl_real_poll_fd(fd);
 			}
 		}else if (fcntl(fd, F_GETFD) < 0) {
+			cl_log(LOG_DEBUG, "bad fd(%d)", fd);
 			RECORDFDEVENT(fd, POLLERR);
 			badfd = TRUE;
 		}
@@ -258,14 +328,65 @@ cl_init_poll_sig(struct pollfd *fds, unsigned int nfds)
 		if (fds[j].revents) {
 			++nmatch;
 			moni->pendevents &= ~(fds[j].revents);
+			if (debug) {
+				cl_log(LOG_DEBUG
+				,	"revents for fd %d: 0x%x"
+				,	fds[j].fd, fds[j].revents);
+				cl_log(LOG_DEBUG
+				,	"events for fd %d: 0x%x"
+				,	fds[j].fd, fds[j].events);
+			}
+		}else if (fds[j].events && debug) {
+			cl_log(LOG_DEBUG
+			,	"pendevents for fd %d: 0x%x"
+			,	fds[j].fd, moni->pendevents);
 		}
 		if (badfd) {
 			cl_poll_ignore(fd);
 		}
 	}
+	if (nmatch != 0 && debug) {
+		cl_log(LOG_DEBUG, "Returning %d events from cl_init_poll_sig()"
+		,	nmatch);
+	}
 	return nmatch;
 }
 
+/*
+ * Initialize our current state of the world with info from the
+ * real poll(2) call.
+ *
+ * We call this when we first see a particular fd, and after a signal
+ * queue overflow.
+ */
+static void
+cl_real_poll_fd(int fd)
+{
+	struct pollfd	pfd[1];
+
+	if (fd >= max_allocated || !is_monitored[fd]) {
+		return;
+	}
+
+	if (debug) {
+		cl_log(LOG_DEBUG
+		,	"Calling poll(2) on fd %d", fd);
+	}
+	/* Get the current state of affaris from poll(2) */
+	pfd[0].fd = fd;
+	pfd[0].revents = 0;
+	pfd[0].events = ~0;
+	if (poll(pfd, 1, -1) > 0) {
+		RECORDFDEVENT(fd, pfd[0].revents);
+		if (debug) {
+			cl_log(LOG_DEBUG
+			,	"Old news from poll(2) for fd %d: 0x%x"
+			,	fd, pfd[0].revents);
+		}
+	}else{
+		RECORDFDEVENT(fd, POLLERR);
+	}
+}
 
 /*
  * Assign a signal for monitoring the given file descriptor
@@ -277,13 +398,9 @@ cl_poll_assignsig(int fd)
 	int		flags;
 
 
-	if (!setinityet) {
-		CL_SIGEMPTYSET(&SignalSet);
-		if (cl_nsig == 0) {
-			cl_nsig = ((SIGRTMIN+SIGRTMAX)/2);
-			cl_poll_prepsig(cl_nsig);
-		}
-		setinityet = TRUE;
+	if (debug) {
+		cl_log(LOG_DEBUG
+		,	"Signal %d monitors fd %d...", cl_nsig, fd);
 	}
 
 	/* Test to see if the file descriptor is good */
@@ -333,9 +450,16 @@ cl_poll_sigaction(int nsig, siginfo_t* info, void* v)
 {
 	int	fd;
 
-	/* I never could figure out what si_code I should get... */
+	/* What do you suppose all the various si_code values mean? */
 
 	fd = info->si_fd;
+	if (debug) {
+		cl_log(LOG_DEBUG
+		,	"cl_poll_sigaction(nsig=%d fd=%d"
+		", si_code=%d si_band=0x%lx)"
+		,	nsig, fd, info->si_code
+		,	info->si_band);
+	}
 
 	if (fd <= 0) {
 		return;
@@ -346,13 +470,11 @@ cl_poll_sigaction(int nsig, siginfo_t* info, void* v)
 		return;
 	}
 
-	/* We should not call logging functions within signal handlers */
-	/*
+	/* We should not call logging functions in (real) signal handlers */
 	if (nsig != monitorinfo[fd].nsig) {
 		cl_log(LOG_ERR, "cl_poll_sigaction called with signal %d/%d\n"
 		,	nsig, monitorinfo[fd].nsig);
 	}
-	*/
 
 	/* Record everything as a pending event. */
 	RECORDFDEVENT(fd, info->si_band);
@@ -370,6 +492,10 @@ cl_poll_ignore(int fd)
 	short	nsig;
 	int	flags;
 
+	if (debug) {
+		cl_log(LOG_DEBUG
+		,	"cl_poll_ignore(%d)", fd);
+	}
 	if (fd <  0 || fd >= max_allocated) {
 		errno = EINVAL;
 		return -1;
@@ -402,9 +528,12 @@ cl_poll_ignore(int fd)
  * because the first argument is an argument of arbitrary size, and
  * generally requires allocating memory.
  *
- * By contrast, we can monitor up to 1024 file descriptors with a
- * fixed-size structure of only 128 bytes. 
- * 
+ * The challenge is that poll is level-triggered, but the POSIX
+ * signals (and sigtimedwait(2)) are edge triggered.  This is
+ * one of the reasons why we have the cl_real_poll_fd() function
+ * - to get the current "level" before we start.
+ * Once we have this level we can compute something like the current
+ * level
  */
 
 int
@@ -427,6 +556,9 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 	/* Do we have any old news to report? */
 	if ((nready=cl_init_poll_sig(fds, nfds)) != 0) {
 		/* Return error or old news to report */
+		if (debug) {
+			cl_log(LOG_DEBUG, "cl_poll: early return(%d)", nready);
+		}
 		return nready;
 	}
 
@@ -453,12 +585,12 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 	/*
 	 * Perform a timed wait for any of our signals...
 	 *
-	 * We should wait only for the first call.
+	 * We shouldn't sleep for any call but (possibly) the first one.
 	 * Subsequent calls should just pick up other events without
-	 * waiting.
+	 * sleeping.
 	 */
 
-	if (debug) {
+	if (debug && itertime->tv_sec != 0 && itertime->tv_nsec != 0) {
 		cl_log(LOG_DEBUG, "sigtimedwait() for (%ld, %ld) time"
 		,	(long)itertime->tv_sec, itertime->tv_nsec);
 	}
@@ -466,6 +598,16 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 #ifdef TIME_CALLS
 	starttime = time_longclock();
 #endif
+	/*
+	 * Wait up to the prescribed time for a signal.
+	 * If we get a signal, then loop grabbing any other
+	 * pending signals, but subsequent iterations will
+	 * use &zerotime for the maximum wait time...
+	 */
+	if (debug) {
+		check_fd_info(fds, nfds);
+		dump_fd_info(fds, nfds, timeoutms);
+	}
 	while (sigtimedwait(&SignalSet, &info, itertime) >= 0) {
 		int	nsig;
 #ifdef TIME_CALLS
@@ -486,12 +628,17 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 		itertime = &zerotime;
 		nsig = info.si_signo;
 
-		/* Simulated signal reception */
+		/* Call signal handler to simulate signal reception */
 		cl_poll_sigaction(nsig, &info, NULL);
 #ifdef TIME_CALLS
 		maxsleep = 0;
 		starttime = time_longclock();
 #endif
+	}
+	if (SigQOverflow) {
+		/* OOPS!  Better recover from this! */
+		/* This will use poll(2) to get (correct) current status */
+		cl_poll_sigpoll_overflow();
 	}
 
 	/* Post observed events and count them... */
@@ -504,8 +651,142 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 		if (fds[j].revents) {
 			++eventcount;
 			moni->pendevents &= ~(fds[j].revents);
+			if (fds[j].revents & POLLHUP) {
+				moni->pendevents |= POLLHUP;
+			}
 		}
 	}
 	return (eventcount > 0 ? eventcount : -1);
+}
+/*
+ * Debugging routine for printing current poll arguments, etc.
+ */
+static void
+dump_fd_info(struct pollfd *fds, unsigned int nfds, int timeoutms)
+{
+	int	j;
+
+	cl_log(LOG_DEBUG, "timeout: %d milliseconds", timeoutms);
+	for (j=0; j < nfds; ++j) {
+		int	fd = fds[j].fd;
+		poll_info_t*	moni = monitorinfo+fd;
+
+		cl_log(LOG_DEBUG, "fd %d flags: 0%o, signal: %d, events: 0x%x"
+		", revents: 0x%x, pendevents: 0x%x"
+		,	fd, fcntl(fd, F_GETFL), moni->nsig
+		,	fds[j].events, fds[j].revents, moni->pendevents);
+	}
+	for (j=SIGRTMIN; j < SIGRTMAX; ++j) {
+		if (!sigismember(&SignalSet, j)) {
+			continue;
+		}
+		cl_log(LOG_DEBUG, "Currently monitoring RT signal %d", j);
+	}
+}
+
+/*
+ * Debugging routine for auditing our file descriptors, etc.
+ */
+static void
+check_fd_info(struct pollfd *fds, unsigned int nfds)
+{
+	int	j;
+
+	for (j=0; j < nfds; ++j) {
+		int	fd = fds[j].fd;
+		poll_info_t*	moni = monitorinfo+fd;
+
+		if (!sigismember(&SignalSet, moni->nsig)) {
+			cl_log(LOG_ERR, "SIGNAL %d not in monitored SignalSet"
+			,	moni->nsig);
+		}
+	}
+	for (j=0; j < 10; ++j) {
+		int	sig;
+		int	flags;
+		int	pid;
+		if ((flags = fcntl(j, F_GETFL)) < 0 || (flags & O_ASYNC) ==0){
+			continue;
+		}
+		sig = fcntl(j, F_GETSIG);
+		if (sig == 0) {
+			cl_log(LOG_ERR, "FD %d will get SIGIO", j);
+		}
+		if (!sigismember(&SignalSet, sig)) {
+			cl_log(LOG_ERR, "FD %d (signal %d) is not in SignalSet"
+			,	j, sig);
+		}
+		if (sig < SIGRTMIN || sig >= SIGRTMAX) {
+			cl_log(LOG_ERR, "FD %d (signal %d) is not RealTime"
+			,	j, sig);
+		}
+		pid = fcntl(j, F_GETOWN);
+		if (pid != getpid()) {
+			cl_log(LOG_ERR, "FD %d (signal %d) owner is pid %d"
+			,	j, sig, pid);
+		}
+	}
+}
+
+/* Note that the kernel signalled an event queue overflow */
+static void
+cl_poll_sigpoll_overflow_sigaction(int nsig, siginfo_t* info, void* v)
+{
+	SigQOverflow = TRUE;
+}
+
+#define	MAXQNAME	"rtsig-max"
+/*
+ * Called when signal queue overflow is suspected.
+ * We then use poll(2) to get the current data.  It's slow, but it
+ * should work quite nicely.
+ */
+static void
+cl_poll_sigpoll_overflow(void)
+{
+	int	fd;
+	int	limit;
+
+	if (!SigQOverflow) {
+		return;
+	}
+	cl_log(LOG_WARNING, "System signal queue overflow.");
+	limit = cl_poll_get_sigqlimit();
+	if (limit > 0) {
+		cl_log(LOG_WARNING, "Increase '%s'. Current limit is %d"
+		" (see sysctl(8)).", MAXQNAME, limit);
+	}
+
+	SigQOverflow = FALSE;
+
+	for (fd = 0; fd < max_allocated; ++fd) {
+		if (is_monitored[fd]) {
+			cl_real_poll_fd(fd);
+		}
+	}
+}
+
+#define	PSK	"/proc/sys/kernel/"
+
+/* Get current kernel signal queue limit */
+/* This only works on Linux - but that's not a big problem... */
+static int
+cl_poll_get_sigqlimit(void)
+{
+	int	limit = -1;
+	int	pfd;
+	char	result[32];
+
+	pfd = open(PSK MAXQNAME, O_RDONLY);
+	if (pfd >= 0 && read(pfd, result, sizeof(result)) > 1) {
+		limit = atoi(result);
+		if (limit < 1) {
+			limit = -1;
+		}
+	}
+	if (pfd >= 0) {
+		close(pfd);
+	}
+	return limit;
 }
 #endif /* HAVE_FCNTL_F_SETSIG */
