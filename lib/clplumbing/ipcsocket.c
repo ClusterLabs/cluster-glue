@@ -26,12 +26,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#ifdef BSD
-#include <sys/syslimits.h>
-#endif
 #include <sys/param.h>
 #include <sys/uio.h>
-#ifdef BSD
+#ifdef HAVE_SYS_FILIO_H
+#include <sys/filio.h>
+#endif
+#ifdef HAVE_SYS_SYSLIMITS_H
+#include <sys/syslimits.h>
+#endif
+#ifdef HAVE_SYS_CRED_H
+#include <sys/cred.h>
+#endif
+#ifdef HAVE_SYS_UCRED_H
 #include <sys/ucred.h>
 #endif
 #include <sys/socket.h>
@@ -247,7 +253,7 @@ socket_initiate_connection(struct IPC_CHANNEL * ch)
   
   /* prepare the socket */
   memset(&peer_addr, 0, sizeof(peer_addr));
-  peer_addr.sun_family = AF_LOCAL;    /* host byte order */ 
+  peer_addr.sun_family = AF_UNIX;    /* host byte order */ 
 
   if (strlen(conn_info->path_name) >= sizeof(peer_addr.sun_path)) {
     fprintf(stderr,"the max path length is %d\n", sizeof(peer_addr.sun_path));
@@ -396,7 +402,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch)
   return ret;
 }
 
-#elif defined(SCM_CREDS) || defined(HAVE_STRUCT_CMSGCRED) || defined(HAVE_STRUCT_FCRED) || (defined(HAVE_STRUCT_SOCKCRED) && defined(LOCAL_CREDS))
+#else
 
 /* FIXME!  Need to implement SCM_CREDS mechanism for BSD-based systems
  * This isn't an emergency, but should be done in the future...
@@ -423,8 +429,11 @@ socket_verify_auth(struct IPC_CHANNEL* ch)
   typedef struct sockcred Cred;
 #define cruid sc_uid
 
+#elif _HAVE_CRED_H
+  typedef struct cred Cred;
+#define cruid c_uid
 #else
-  typedef struct ucred Cred;
+ typedef struct ucred Cred;
 #define cruid c_uid
 #endif
   Cred	   *cred;
@@ -485,10 +494,6 @@ socket_verify_auth(struct IPC_CHANNEL* ch)
 
   return ret;
 }
-
-#else
-
-#error "Need either SO_PEERCRED or SCM_CREDS authentication mechanisms!"
 
 #endif
 
@@ -768,7 +773,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   }
 
   /* prepare the unix domain socket */
-  if ((s = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
+  if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
     perror("socket_wait_conn_new: socket");
     return NULL;
   }
@@ -777,7 +782,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     perror("socket_wait_conn_new: unlink");
   }
   memset(&my_addr, 0, sizeof(my_addr));
-  my_addr.sun_family = AF_LOCAL;         /* host byte order */
+  my_addr.sun_family = AF_UNIX;         /* host byte order */
 
   if (strlen(path_name) >= sizeof(my_addr.sun_path)) {
     return NULL;
@@ -853,7 +858,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
       	return NULL;
     }
     /* prepare the socket */
-    if ((sockfd = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
+    if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
       perror("socket");
       return NULL;
     }
