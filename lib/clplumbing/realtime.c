@@ -11,6 +11,7 @@
 #include <string.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/realtime.h>
+#include <time.h>
 
 static gboolean	cl_realtimepermitted = TRUE;
 
@@ -121,4 +122,12 @@ void
 cl_enable_realtime(void)
 {
 	cl_realtimepermitted = TRUE;
+}
+
+int
+cl_shortsleep(void)
+{
+	static const struct timespec	req = {0,0};
+
+	return nanosleep(&req, NULL);
 }
