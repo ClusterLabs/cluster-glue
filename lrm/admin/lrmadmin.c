@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.13 2004/09/03 01:29:44 zhenh Exp $ */
+/* $Id: lrmadmin.c,v 1.14 2004/09/09 03:32:50 zhenh Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -114,7 +114,7 @@ const char * simple_help_screen =
 "         {-C|--raclass_supported}\n"
 "         {-T|--ratype_supported} <raclss>\n"
 "         {-M|--metadata} <raclss> <ratype> <provider|NULL>\n"
-"         {-p|--provider} <raclss> <ratype>\n"
+"         {-P|--provider} <raclss> <ratype>\n"
 "         {-h|--help}\n";
 
 #define OPTION_OBSCURE_CHECK \
@@ -881,6 +881,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.14  2004/09/09 03:32:50  zhenh
+ * fix a mis type
+ *
  * Revision 1.13  2004/09/03 01:29:44  zhenh
  * add provider for resource
  *
