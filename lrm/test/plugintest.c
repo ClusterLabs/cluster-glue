@@ -20,6 +20,8 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#include <portability.h>
+
 #include <glib.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,6 +37,9 @@ int main(void)
 	GHashTable * RAExecFuncs = NULL;
 	struct RAExecOps * RAExec;
 	int key;
+	int result, ret;
+	char * meta_data;
+	GHashTable * cmd_params;
 
 	PILGenericIfMgmtRqst RegisterRqsts[]= { 
 		{"RAExec", &RAExecFuncs, NULL, NULL, NULL},
@@ -46,12 +51,8 @@ int main(void)
 
 	PILLoadPlugin(PluginLoadingSystem , "RAExec", "lsb", NULL);
 
-	int result, ret;
-	char * meta_data;
-
 	RAExec = g_hash_table_lookup(RAExecFuncs,"lsb");
 //	RAExec->execra("/root/linux-ha-checkout/linux-ha/lrm/test.sh",
-	GHashTable * cmd_params;
 	cmd_params = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(cmd_params, g_strdup("1"), g_strdup("par1"));
 	g_hash_table_insert(cmd_params, g_strdup("2"), g_strdup("par2"));

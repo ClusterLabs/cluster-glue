@@ -203,13 +203,13 @@ void register_pid(const char *pid_file, gboolean do_fork,
 int
 main(int argc, char ** argv)
 {
-	cl_log_set_entity(lrm_system_name);
-	cl_log_enable_stderr(TRUE);
-	cl_log_set_facility(LOG_USER);
-
 	int req_stop = FALSE;
 	int argerr = 0;
 	int flag;
+
+	cl_log_set_entity(lrm_system_name);
+	cl_log_enable_stderr(TRUE);
+	cl_log_set_facility(LOG_USER);
 
 	while ((flag = getopt(argc, argv, OPTARGS)) != EOF) {
 		switch(flag) {
@@ -242,14 +242,15 @@ main(int argc, char ** argv)
 int
 init_stop(const char *pid_file)
 {
+	long	pid;
+	int	rc = LSB_EXIT_OK;
+
 	if (pid_file == NULL) {
 		cl_log(LOG_ERR, "No pid file specified to kill process");
 		return LSB_EXIT_GENERIC;
 	}
-	long	pid;
-	int	rc = LSB_EXIT_OK;
-	pid =	get_running_pid(pid_file, NULL);
 
+	pid =	get_running_pid(pid_file, NULL);
 	if (pid > 0) {
 		if (CL_KILL((pid_t)pid, SIGTERM) < 0) {
 			rc = (errno == EPERM
@@ -365,6 +366,23 @@ int
 init_start ()
 {
 	long pid;
+	PILGenericIfMgmtRqst RegisterRqsts[]= {
+		{"RAExec", &RAExecFuncs, NULL, NULL, NULL},
+		{ NULL, NULL, NULL, NULL, NULL} };
+	DIR* dir = NULL;
+	PILPluginUniv * PluginLoadingSystem = NULL;
+	struct dirent* subdir;
+	char* dot = NULL;
+	char* ra_name = NULL;
+	GHashTable* conn_cmd_attrs;
+	GHashTable* conn_cbk_attrs;
+	IPC_WaitConnection* conn_cmd = NULL;
+	IPC_WaitConnection* conn_cbk = NULL;
+
+	char path[] = IPC_PATH_ATTR;
+	char cmd_path[] = LRM_CMDPATH;
+	char cbk_path[] = LRM_CALLBACKPATH;
+
 
 	if ((pid = get_running_pid(PID_FILE, NULL)) > 0) {
 		cl_log(LOG_CRIT, "already running: [pid %ld].", pid);
@@ -377,23 +395,17 @@ init_start ()
 	cl_log_set_debugfile(DAEMON_DEBUG);
 
 	//load RA plugins
-	PILPluginUniv * PluginLoadingSystem = NULL;
-
-	PILGenericIfMgmtRqst RegisterRqsts[]= {
-		{"RAExec", &RAExecFuncs, NULL, NULL, NULL},
-		{ NULL, NULL, NULL, NULL, NULL} };
 
 	PluginLoadingSystem = NewPILPluginUniv (PLUGIN_DIR);
 	PILLoadPlugin(PluginLoadingSystem , "InterfaceMgr", "generic" ,
 				  &RegisterRqsts);
 
-	DIR* dir = opendir(RA_PLUGIN_DIR);
+	dir = opendir(RA_PLUGIN_DIR);
 	if (NULL == dir) {
 		lrmd_log(LOG_ERR, -1, "main: can not open RA plugin dir.");
 		return 1;
 	}
 
-	struct dirent* subdir;
 	while ( NULL != (subdir = readdir(dir))) {
 		//skip . and ..
 		if ( '.' == subdir->d_name[0]) {
@@ -404,8 +416,7 @@ init_start ()
 			continue;
 		}
 		//remove the ".so"
-		char* dot = strchr(subdir->d_name,'.');
-		char* ra_name;
+		dot = strchr(subdir->d_name,'.');
 		if (NULL != dot) {
 			int len = (int)(dot - subdir->d_name);
 			ra_name = strndup(subdir->d_name,len);
@@ -424,15 +435,6 @@ init_start ()
 	 */
 
 	lrmd_log(LOG_INFO, 1, "main: start.");
-	IPC_WaitConnection* conn_cmd = NULL;
-	IPC_WaitConnection* conn_cbk = NULL;
-
-	GHashTable* conn_cmd_attrs;
-	GHashTable* conn_cbk_attrs;
-
-	char path[] = IPC_PATH_ATTR;
-	char cmd_path[] = LRM_CMDPATH;
-	char cbk_path[] = LRM_CALLBACKPATH;
 
 	/*Create a waiting connection to accept command connect from client*/
 	conn_cmd_attrs = g_hash_table_new(g_str_hash, g_str_equal);
@@ -492,6 +494,8 @@ init_start ()
 gboolean
 on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 {
+	lrmd_client_t* client = NULL;
+
 	lrmd_log(LOG_INFO, 1, "on_connect_cmd: start.");
 	//check paremeters
 	if (NULL == ch) {
@@ -500,7 +504,7 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 	}
 	//create new client
 	//the register will be finished in on_msg_register
-	lrmd_client_t* client = g_new(lrmd_client_t, 1);
+	client = g_new(lrmd_client_t, 1);
 	client->app_name = NULL;
 	client->ch_cmd = ch;
 	client->g_src = G_main_add_IPC_Channel(G_PRIORITY_DEFAULT,
@@ -517,6 +521,10 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 {
 	/*client connect for create the second channel for call back*/
 	pid_t pid;
+	const char* type = NULL;
+	struct ha_msg* msg = NULL;
+	lrmd_client_t* client = NULL;
+
 	lrmd_log(LOG_INFO, 1, "on_connect_cbk: start.");
 	if (NULL == ch) {
 		lrmd_log(LOG_INFO, -1, "on_connect_cbk: channel is null");
@@ -524,14 +532,14 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 	}
 
 	/*get the message */
-	struct ha_msg* msg = msgfromIPC_noauth(ch);
+	msg = msgfromIPC_noauth(ch);
 	if (NULL == msg) {
 		lrmd_log(LOG_ERR, -1, "on_connect_cbk: can not recieve msg");
 		return TRUE;
 	}
 
 	/*check if it is a register message*/
-	const char* type = ha_msg_value(msg, F_LRM_TYPE);
+	type = ha_msg_value(msg, F_LRM_TYPE);
 	if (0 != strncmp(type, REGISTER, strlen(REGISTER))) {
 		lrmd_log(LOG_ERR, -1, "on_connect_cbk: msg is not register");
 		send_rc_msg(ch, HA_FAIL);
@@ -546,7 +554,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 	}
 
 	/*get the client in the client list*/
-	lrmd_client_t* client = lookup_client(pid);
+	client = lookup_client(pid);
 	if (NULL == client) {
 		lrmd_log(LOG_ERR, -1,
 			"on_connect_cbk: can not find client in client list");
@@ -565,9 +573,13 @@ gboolean
 on_recieve_cmd (IPC_Channel* ch, gpointer user_data)
 {
 	int i;
+	lrmd_client_t* client = NULL;
+	struct ha_msg* msg = NULL;
+	const char* type = NULL;
+
 	lrmd_log(LOG_INFO, 1, "on_recieve_cmd: start.");
 
-	lrmd_client_t* client = (lrmd_client_t*)user_data;
+	client = (lrmd_client_t*)user_data;
 	if (IPC_DISCONNECT == ch->ch_status) {
 		lrmd_log(LOG_INFO, -1, 
 			"on_recieve_cmd: channel status is disconnect");
@@ -581,14 +593,14 @@ on_recieve_cmd (IPC_Channel* ch, gpointer user_data)
 
 
 	/*get the message */
-	struct ha_msg* msg = msgfromIPC_noauth(ch);
+	msg = msgfromIPC_noauth(ch);
 	if (NULL == msg) {
 		lrmd_log(LOG_ERR, -1, "on_recieve_cmd: can not recieve msg");
 		return TRUE;
 	}
 
 	/*dispatch the message*/
-	const char* type = ha_msg_value(msg, F_LRM_TYPE);
+	type = ha_msg_value(msg, F_LRM_TYPE);
 
 	for (i=0; i<DIMOF(msg_maps); i++) {
 		if (0 == strncmp(type, msg_maps[i].msg_type,
@@ -619,8 +631,9 @@ on_recieve_cmd (IPC_Channel* ch, gpointer user_data)
 void
 on_remove_client (gpointer user_data)
 {
+	lrmd_client_t* client = NULL;
 	lrmd_log(LOG_INFO, 1, "on_remove_client: start.");
-	lrmd_client_t* client = (lrmd_client_t*) user_data;
+	client = (lrmd_client_t*) user_data;
 
 	g_free(client->app_name);
 	g_free(client);
@@ -646,14 +659,18 @@ on_idle (gpointer data)
 gboolean
 on_timeout_op_done(gpointer data)
 {
+	lrmd_op_t* op = NULL;
+	lrmd_rsc_t* rsc = NULL;
+
 	lrmd_log(LOG_INFO, 1, "on_timeout_op_done: start.");
+
 	/*this operation is timeout*/
-	lrmd_op_t* op = (lrmd_op_t*)data;
+	op = (lrmd_op_t*)data;	
 	if (HA_FAIL==ha_msg_add_int(op->msg, F_LRM_OPSTATUS, LRM_OP_TIMEOUT)) {
 		lrmd_log(LOG_ERR,0,
 			"on_timeout_op_done: can not add opstatus to msg");
 	}
-	lrmd_rsc_t* rsc = op->rsc;
+	rsc = op->rsc;
 	op_done(op);
 	perform_op(rsc);
 	lrmd_log(LOG_INFO, -1, "on_timeout_op_done: end.");
@@ -663,11 +680,16 @@ on_timeout_op_done(gpointer data)
 gboolean
 on_timeout_monitor(gpointer data)
 {
+	lrmd_mon_t* mon = NULL;
+	lrmd_op_t* op = NULL;
+	int timeout = 0;
+
 	lrmd_log(LOG_INFO, 1, "on_timeout_monitor: start.");
-	lrmd_mon_t* mon = (lrmd_mon_t*)data;
+
+	mon = (lrmd_mon_t*)data;
 	mon->pending_op++;
 	//create a op
-	lrmd_op_t* op = g_new(lrmd_op_t, 1);
+	op = g_new(lrmd_op_t, 1);
 	op->call_id = mon->call_id;
 	op->callback_id = -1;
 	op->client = NULL;
@@ -682,7 +704,6 @@ on_timeout_monitor(gpointer data)
 		lrmd_log(LOG_ERR, 0,"on_msg_perform_op: can not add app_name.");
 	}
 	
-	int timeout = 0;
 	ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout);
 	if( 0 < timeout ) {
 		op->timeout_tag = g_timeout_add(timeout*1000, 
@@ -698,10 +719,12 @@ on_timeout_monitor(gpointer data)
 int
 on_msg_register(lrmd_client_t* client, struct ha_msg* msg)
 {
+	lrmd_client_t* exist = NULL;
+	const char* app_name = NULL;
+
 	lrmd_log(LOG_INFO, 1, "on_msg_register: start.");
 
-	lrmd_client_t* exist = NULL;
-	const char* app_name = ha_msg_value(msg, F_LRM_APP);
+	app_name = ha_msg_value(msg, F_LRM_APP);
 	if (NULL == app_name) {
 		lrmd_log(LOG_ERR, -1, "on_msg_register: app_name is null.");
 		return HA_FAIL;
@@ -743,6 +766,13 @@ on_msg_register(lrmd_client_t* client, struct ha_msg* msg)
 int
 on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 {
+	lrmd_rsc_t* rsc = NULL;
+	lrmd_mon_t* mon = NULL;
+	GList* rsc_node = NULL;
+	GList* mon_node = NULL;
+	GList* op_node = NULL;
+	lrmd_op_t* op = NULL;
+
 	lrmd_log(LOG_INFO, 1, "on_msg_unregister: start.");
 
 	if (NULL == client_list || NULL == lookup_client(client->pid)) {
@@ -753,14 +783,13 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 	//remove from client_list
 	client_list = g_list_remove(client_list, client);
 	//remove all monitors and pending ops
-	GList* rsc_node;
 	for(rsc_node = g_list_first(rsc_list);
 		NULL != rsc_node; rsc_node = g_list_next(rsc_node)){
-		lrmd_rsc_t* rsc = (lrmd_rsc_t*)rsc_node->data;
+		rsc = (lrmd_rsc_t*)rsc_node->data;
 		//remove monitors belong to this client
-		GList* mon_node = g_list_first(rsc->mon_list);
+		mon_node = g_list_first(rsc->mon_list);
 		while (NULL != mon_node) {
-			lrmd_mon_t* mon = (lrmd_mon_t*)mon_node->data;
+			mon = (lrmd_mon_t*)mon_node->data;
 			if (mon->client == client) {
 				mon_node = g_list_next(mon_node);
 				rsc->mon_list =
@@ -773,10 +802,10 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 
 		}
 		//remove pending ops belong to this client
-		GList* op_node = g_list_first(rsc->op_list);
+		op_node = g_list_first(rsc->op_list);
 		op_node = g_list_next(op_node);
 		while (NULL != op_node) {
-			lrmd_op_t* op = (lrmd_op_t*)op_node->data;
+			op = (lrmd_op_t*)op_node->data;
 			if (op->client == client) {
 				op_node = g_list_next(op_node);
 				rsc->op_list = g_list_remove(rsc->op_list, op);
@@ -796,8 +825,10 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 int
 on_msg_get_ra_types(lrmd_client_t* client, struct ha_msg* msg)
 {
+	struct ha_msg* ret = NULL;
 	lrmd_log(LOG_INFO, 1, "on_msg_get_rsc_types: start.");
-	struct ha_msg* ret = create_lrm_ret(HA_OK, 4);
+
+	ret = create_lrm_ret(HA_OK, 4);
 	if (NULL == ret) {
 		lrmd_log(LOG_ERR, -1, 
 			"on_msg_get_rsc_types: can not create msg.");
@@ -818,19 +849,22 @@ on_msg_get_ra_types(lrmd_client_t* client, struct ha_msg* msg)
 int
 on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg)
 {
-	lrmd_log(LOG_INFO, 1, "on_msg_get_all: start.");
+	GList* node;
 	int i = 1;
+	struct ha_msg* ret = NULL;
+	lrmd_rsc_t* rsc = NULL;
 	char value[UUID_SLEN];
 	char key[MAX_NAME_LEN];
-	struct ha_msg* ret = create_lrm_ret(HA_OK, g_list_length(rsc_list) + 1);
+
+	lrmd_log(LOG_INFO, 1, "on_msg_get_all: start.");
+	ret = create_lrm_ret(HA_OK, g_list_length(rsc_list) + 1);
 	if (NULL == ret) {
 		lrmd_log(LOG_ERR, -1, "on_msg_get_all: can not create msg.");
 		return HA_FAIL;
 	}
 
-	GList* node;
 	for(node=g_list_first(rsc_list); NULL!=node; node=g_list_next(node)) {
-		lrmd_rsc_t* rsc = (lrmd_rsc_t*)node->data;
+		rsc = (lrmd_rsc_t*)node->data;
 		uuid_unparse(rsc->id, value);
 		snprintf(key,MAX_NAME_LEN,"%s%d",F_LRM_RID,i);
 		ha_msg_add(ret,key,value);
@@ -904,6 +938,8 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 {
 	rsc_id_t id;
 	lrmd_rsc_t* rsc = NULL;
+	GList* mon_node = NULL;
+	GList* op_node = NULL;
 	lrmd_log(LOG_INFO, 1, "on_msg_del_rsc: start.");
 
 	ha_msg_value_uuid(msg,F_LRM_RID,id);
@@ -915,7 +951,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	else {
 		rsc_list = g_list_remove(rsc_list, rsc);
-		GList* mon_node = g_list_first(rsc->mon_list);
+		mon_node = g_list_first(rsc->mon_list);
 		while (NULL != mon_node) {
 			lrmd_mon_t* mon = (lrmd_mon_t*)mon_node->data;
 			if (mon->client == client) {
@@ -930,7 +966,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 
 		}
 		//remove pending ops
-		GList* op_node = g_list_first(rsc->op_list);
+		op_node = g_list_first(rsc->op_list);
 		if (NULL == op_node) {
 			//no ops, just remove the resource.
 			free_rsc(rsc);
@@ -964,8 +1000,14 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 int
 on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 {
-	lrmd_log(LOG_INFO, 1, "on_msg_add_rsc: start.");
+	GList* node;
+	gboolean ra_type_exist = FALSE;
+	char* type = NULL;
+	char* params = NULL;
+	lrmd_rsc_t* rsc = NULL;
 	rsc_id_t id;
+
+	lrmd_log(LOG_INFO, 1, "on_msg_add_rsc: start.");
 
 	ha_msg_value_uuid(msg,F_LRM_RID,id);
 	if (NULL != lookup_rsc(id)) {
@@ -974,15 +1016,13 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		return HA_FAIL;
 	}
 
-	lrmd_rsc_t* rsc = g_new(lrmd_rsc_t,1);
+	rsc = g_new(lrmd_rsc_t,1);
 	uuid_copy(rsc->id,id);
 	rsc->name = g_strdup(ha_msg_value(msg, F_LRM_RNAME));
 	rsc->type = g_strdup(ha_msg_value(msg, F_LRM_RTYPE));
 
-	gboolean ra_type_exist = FALSE;
-	GList* node;
 	for(node=g_list_first(ra_list); NULL!=node; node=g_list_next(node)){
-		char* type = (char*)node->data;
+		type = (char*)node->data;
 		if (0 == strcmp(type, rsc->type)) {
 			ra_type_exist = TRUE;
 			break;
@@ -998,7 +1038,7 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	rsc->op_list = NULL;
 	rsc->mon_list = NULL;
 	rsc->last_op = NULL;
-	char* params = g_strdup(ha_msg_value(msg, F_LRM_PARAM));
+	params = g_strdup(ha_msg_value(msg, F_LRM_PARAM));
 	if (NULL != params) {
 		rsc->params = string_to_hash_table(params);
 	}
@@ -1015,6 +1055,11 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 {
 	rsc_id_t id;
 	lrmd_rsc_t* rsc = NULL;
+	GList* node = NULL;
+	const char* type = NULL;
+	lrmd_op_t* op = NULL;
+	int timeout = 0;
+
 	lrmd_log(LOG_INFO, 1, "on_msg_perform_op: start.");
 
 	ha_msg_value_uuid(msg,F_LRM_RID,id);
@@ -1031,19 +1076,19 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		return HA_FAIL;
 	}
 
-	const char* type = ha_msg_value(msg, F_LRM_TYPE);
+	type = ha_msg_value(msg, F_LRM_TYPE);
 	//when a flush request arrived, flush all pending ops
 	if (0 == strncmp(type, FLUSHOPS, strlen(FLUSHOPS))) {
-		GList* node = g_list_first(rsc->op_list);
+		node = g_list_first(rsc->op_list);
 		while (NULL != node ) {
-			lrmd_op_t* op = (lrmd_op_t*)node->data;
+			op = (lrmd_op_t*)node->data;
 			node = g_list_next(node);
 			rsc->op_list = g_list_remove(rsc->op_list, op);
 			flush_op(op);
 		}
 	}
 	else {
-		lrmd_op_t* op = g_new(lrmd_op_t, 1);
+		op = g_new(lrmd_op_t, 1);
 		op->call_id = call_id;
 		op->callback_id = -1;
 		op->client = client;
@@ -1057,7 +1102,6 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			lrmd_log(LOG_ERR, 0, 
 				"on_msg_perform_op: can not add app_name.");
 		}
-		int timeout = 0;
 		ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout);
 		if (0 < timeout ) {
 			op->timeout_tag = g_timeout_add(timeout*1000, 
@@ -1074,6 +1118,8 @@ on_msg_set_monitor(lrmd_client_t* client, struct ha_msg* msg)
 {
 	rsc_id_t id;
 	lrmd_rsc_t* rsc = NULL;
+	mon_mode_t mode;
+
 	lrmd_log(LOG_INFO, 1, "on_msg_set_monitor: start.");
 
 	ha_msg_value_uuid(msg,F_LRM_RID,id);
@@ -1093,7 +1139,6 @@ on_msg_set_monitor(lrmd_client_t* client, struct ha_msg* msg)
 	}
 
 	//if the monitor mode is clear, remove all monitors on the resource.
-	mon_mode_t mode;
 	if (HA_FAIL == ha_msg_value_int(msg, F_LRM_MONMODE, (int*)&mode)) {
 		lrmd_log(LOG_ERR, -1, 
 			"on_msg_set_monitor: can not get monitor mode.");
@@ -1156,7 +1201,13 @@ int
 on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 {
 	rsc_id_t id;
+	int op_count = 0;
 	lrmd_rsc_t* rsc = NULL;
+	GList* node;
+	struct ha_msg* ret = NULL;
+	lrmd_op_t* op = NULL;
+	struct ha_msg* op_msg = NULL;
+
 	lrmd_log(LOG_INFO, 1, "on_msg_get_state: start.");
 
 	ha_msg_value_uuid(msg,F_LRM_RID,id);
@@ -1168,7 +1219,6 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	if ( NULL == rsc->op_list )
 	{
-		struct ha_msg* ret = NULL;
 		if (NULL != rsc->last_op) {
 			ret = op_to_msg(rsc->last_op);
 		}
@@ -1190,7 +1240,7 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 
 	}
 	else {
-		struct ha_msg* ret = ha_msg_new(5);
+		ret = ha_msg_new(5);
 
 		if (HA_FAIL == ha_msg_add_int(ret, F_LRM_STATE, LRM_RSC_BUSY)) {
 			lrmd_log(LOG_ERR, -1, 
@@ -1198,7 +1248,7 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 			ha_msg_del(ret);
 			return HA_FAIL;
 		}
-		int op_count = g_list_length(rsc->op_list);
+		op_count = g_list_length(rsc->op_list);
 		if (HA_FAIL == ha_msg_add_int(ret, F_LRM_OPCNT, op_count)) {
 			lrmd_log(LOG_ERR, -1, 
 				"on_msg_get_state: can not add state count.");
@@ -1213,11 +1263,10 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 		}
 		ha_msg_del(ret);
 
-		GList* node;
 		for(node = g_list_first(rsc->op_list);
 			NULL != node; node = g_list_next(node)){
-			lrmd_op_t* op = (lrmd_op_t*)node->data;
-			struct ha_msg* op_msg = op_to_msg(op);
+			op = (lrmd_op_t*)node->data;
+			op_msg = op_to_msg(op);
 			if ( NULL == op_msg  ) {
 				lrmd_log(LOG_ERR, 0, 
 					"on_msg_get_state: can not add op.");
@@ -1238,10 +1287,13 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 int
 check_op(lrmd_op_t* op)
 {
-	lrmd_log(LOG_INFO, 1, "check_op: start.");
 	int rc;
 	char* data=NULL;
 	struct RAExecOps * RAExec = NULL;
+	lrmd_rsc_t* rsc = NULL;
+	int ret = 0;
+
+	lrmd_log(LOG_INFO, 1, "check_op: start.");
 
 	RAExec = g_hash_table_lookup(RAExecFuncs,op->rsc->type);
 
@@ -1256,13 +1308,13 @@ check_op(lrmd_op_t* op)
 				"check_op: can not add opstatus to msg");
 			return HA_FAIL;
 		}
-		lrmd_rsc_t* rsc = op->rsc;
+		rsc = op->rsc;
 		op_done(op);
 		perform_op(rsc);
 		lrmd_log(LOG_INFO, -1, "check_op: end.");
 		return HA_OK;
 	}
-	int ret = check_ra_rc(RAExec,op->callback_id, &rc, &data);
+	ret = check_ra_rc(RAExec,op->callback_id, &rc, &data);
 	if ( 0 < ret ) {
 		if (HA_FAIL == ha_msg_add_int(op->msg, F_LRM_RC, rc)) {
 			lrmd_log(LOG_ERR,-1,"check_op: can not add rc to msg");
@@ -1283,7 +1335,7 @@ check_op(lrmd_op_t* op)
 				return HA_FAIL;
 			}
 		}
-		lrmd_rsc_t* rsc = op->rsc;
+		rsc = op->rsc;
 		op_done(op);
 		perform_op(rsc);
 	}
@@ -1293,6 +1345,9 @@ check_op(lrmd_op_t* op)
 int
 op_done(lrmd_op_t* op)
 {
+	gboolean need_send = FALSE;
+	lrmd_mon_t* mon = NULL;
+
 	lrmd_log(LOG_INFO, 1, "op_done: start.");
 	// we should check if the resource exists.
 	if (NULL == g_list_find(rsc_list, op->rsc)) {
@@ -1345,7 +1400,7 @@ op_done(lrmd_op_t* op)
 	//if the op is created by monitor
 		lrmd_log(LOG_INFO, 0, "op_done: a monitor op done.");
 
-		lrmd_mon_t* mon = op->mon;
+		mon = op->mon;
 		mon->pending_op--;
 		if (!mon->is_deleted) {
 			//check status
@@ -1354,7 +1409,6 @@ op_done(lrmd_op_t* op)
 			ha_msg_value_int(op->msg,F_LRM_OPSTATUS,(int*)&status);
 			ha_msg_value_int(op->msg, F_LRM_RC, &rc);
 
-			gboolean need_send = FALSE;
 			if (LRM_OP_TIMEOUT == status||LRM_OP_ERROR == status) {
 				need_send = TRUE;
 			}
@@ -1426,6 +1480,10 @@ flush_op(lrmd_op_t* op)
 int
 perform_op(lrmd_rsc_t* rsc)
 {
+	GList* first = NULL;
+	lrmd_op_t* op = NULL;
+	struct RAExecOps * RAExec = NULL;
+
 	lrmd_log(LOG_INFO, 1, "perform_op: start.");
 	if (NULL == g_list_find(rsc_list, rsc)) {
 
@@ -1438,13 +1496,13 @@ perform_op(lrmd_rsc_t* rsc)
 		lrmd_log(LOG_INFO,-1,"perform_op: no op to perform");
 		return HA_OK;
 	}
-	GList* first = g_list_first(rsc->op_list);
-	lrmd_op_t* op = first->data;
+
+	first = g_list_first(rsc->op_list);
+	op = first->data;
 	if (-1 != op->callback_id )	{
 		lrmd_log(LOG_INFO,-1,"perform_op: current op is performing");
 		return HA_OK;
 	}
-	struct RAExecOps * RAExec = NULL;
 	RAExec = g_hash_table_lookup(RAExecFuncs,op->rsc->type);
 	if (NULL == RAExec) {
 		lrmd_log(LOG_ERR,-1,"check_op: can not find RAExec");
@@ -1459,8 +1517,10 @@ perform_op(lrmd_rsc_t* rsc)
 struct ha_msg*
 op_to_msg(lrmd_op_t* op)
 {
+	struct ha_msg* msg = NULL;
+
 	lrmd_log(LOG_INFO, 1, "op_to_msg: start.");
-	struct ha_msg* msg = ha_msg_copy(op->msg);
+	msg = ha_msg_copy(op->msg);
 	if (NULL == msg) {
 		lrmd_log(LOG_ERR,-1,"op_to_msg: can not copy the msg");
 		return NULL;
@@ -1483,8 +1543,9 @@ op_to_msg(lrmd_op_t* op)
 int
 check_ra_rc(struct RAExecOps * RAExec ,int callback_id, int* rc, char** data)
 {
+	int ret = 0;
 	lrmd_log(LOG_INFO, 1, "check_ra_rc: start.");
-	int ret = RAExec->post_query_result(callback_id, rc, data);
+	ret = RAExec->post_query_result(callback_id, rc, data);
 	*rc = *rc / 256;
 
 	lrmd_log(LOG_INFO, -1, "check_ra_rc: end.");
@@ -1495,13 +1556,17 @@ int
 perform_ra_op(struct RAExecOps * RAExec, lrmd_op_t* op)
 {
 	int key, ret;
-	lrmd_log(LOG_INFO, 1, "perform_ra_op: start.");
+	char* params = NULL;
 	char* rsc_name = op->rsc->name;
-	const char* op_type = ha_msg_value(op->msg, F_LRM_OP);
+	const char* op_type = NULL;
 	GHashTable* params_table = NULL;
-	const char* temp_params = ha_msg_value(op->msg, F_LRM_PARAM);
+	const char* temp_params = NULL;
+
+	lrmd_log(LOG_INFO, 1, "perform_ra_op: start.");
+	op_type = ha_msg_value(op->msg, F_LRM_OP);
+	temp_params = ha_msg_value(op->msg, F_LRM_PARAM);
 	if (NULL != temp_params) {
-		char* params = g_strdup(temp_params);
+		params = g_strdup(temp_params);
 		params_table = string_to_hash_table(params);
 	}
 	ret=RAExec->execra(rsc_name, op_type, params_table, NULL, TRUE, &key);
@@ -1514,8 +1579,10 @@ perform_ra_op(struct RAExecOps * RAExec, lrmd_op_t* op)
 int
 send_rc_msg (IPC_Channel* ch, int rc)
 {
+	struct ha_msg* ret = NULL;
+
 	lrmd_log(LOG_INFO, 1, "send_rc_msg: start.");
-	struct ha_msg* ret = create_lrm_ret(rc, 1);
+	ret = create_lrm_ret(rc, 1);
 	if (NULL == ret) {
 		lrmd_log(LOG_ERR, -1, "send_rc_msg: can not create ret msg");
 		return HA_FAIL;
@@ -1532,12 +1599,14 @@ send_rc_msg (IPC_Channel* ch, int rc)
 lrmd_client_t*
 lookup_client (pid_t pid)
 {
+	GList* node;
+	lrmd_client_t* client = NULL;
+
 	lrmd_log(LOG_INFO, 1, "lookup_client: start.");
 
-	GList* node;
 	for(node = g_list_first(client_list);
 		NULL != node; node = g_list_next(node)){
-		lrmd_client_t* client = (lrmd_client_t*)node->data;
+		client = (lrmd_client_t*)node->data;
 		if (pid == client->pid) {
 			lrmd_log(LOG_INFO, -1, "lookup_client: end.");
 			return client;
@@ -1551,11 +1620,12 @@ lookup_client (pid_t pid)
 lrmd_rsc_t*
 lookup_rsc (rsc_id_t rid)
 {
+	GList* node;
+	lrmd_rsc_t* rsc = NULL;
 	lrmd_log(LOG_INFO, 1, "lookup_rsc: start.");
 
-	GList* node;
 	for(node=g_list_first(rsc_list); NULL!=node; node=g_list_next(node)){
-		lrmd_rsc_t* rsc = (lrmd_rsc_t*)node->data;
+		rsc = (lrmd_rsc_t*)node->data;
 		if (0 == uuid_compare(rid,rsc->id)) {
 			lrmd_log(LOG_INFO, -1, "lookup_rsc: end.");
 			return rsc;

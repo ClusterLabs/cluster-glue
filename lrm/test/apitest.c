@@ -19,6 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
+#include <portability.h>
 
 #include <unistd.h>
 #include <stdio.h>
@@ -38,7 +39,12 @@ void get_cur_state(lrm_rsc_t* rsc);
 
 int main (int argc, char* argv[])
 {
-	ll_lrm_t* lrm;
+	ll_lrm_t* lrm = NULL;
+	lrm_rsc_t* rsc = NULL;
+	rsc_id_t rid;
+	lrm_mon_t* mon = NULL;
+	lrm_op_t* op = NULL;
+
 	lrm = ll_lrm_new("lrm");	
 	if(NULL == lrm)
 	{
@@ -52,18 +58,17 @@ int main (int argc, char* argv[])
 	lrm->lrm_ops->set_lrm_callback(lrm, lrm_op_done_callback,
 					lrm_monitor_callback);
 	
-	rsc_id_t rid;
 	puts("add_rsc...");
 	uuid_generate(rid);
 	lrm->lrm_ops->add_rsc(lrm, rid, "lsb", "lsb_initscript_sim.sh", NULL);
 
 	puts("get_rsc...");
-	lrm_rsc_t*	rsc = lrm->lrm_ops->get_rsc(lrm, rid);
+	rsc = lrm->lrm_ops->get_rsc(lrm, rid);
 	printf_rsc(rsc);
 
 	
 	puts("set_monitor...");
-	lrm_mon_t* mon = g_new(lrm_mon_t, 1);
+	mon = g_new(lrm_mon_t, 1);
 	mon->op_type = "status";
 	mon->params = NULL;
 	mon->timeout = 0;
@@ -86,7 +91,7 @@ int main (int argc, char* argv[])
 	printf_mon(mon);
 
 	puts("perform_op...");
-	lrm_op_t* op = g_new(lrm_op_t, 1);
+	op = g_new(lrm_op_t, 1);
 	op->op_type = "start";
 	op->params = NULL;
 	op->timeout = 0;
@@ -129,13 +134,13 @@ void lrm_monitor_callback(lrm_mon_t* monitor)
 
 void printf_rsc(lrm_rsc_t* rsc)
 {
+	char buf[37];
 	printf("print resource\n");
 	if (NULL == rsc) {
 		printf("resource is null\n");
 		printf("print end\n");
 		return;
 	}
-	char buf[37];
 	uuid_unparse(rsc->id, buf);
 	printf("\tresource of id:%s\n", buf);
 	printf("\tname:%s\n", rsc->name);
@@ -235,12 +240,15 @@ printf_hash_table(GHashTable* hash_table)
 void
 get_all_rsc(ll_lrm_t* lrm)
 {
+	char buf[37];
+	rsc_id_t rid;
+	GList* rid_list = NULL;
+	GList* element = NULL;
+
 	puts("get_all_rscs...");
-	GList* rid_list = lrm->lrm_ops->get_all_rscs(lrm);
+	rid_list = lrm->lrm_ops->get_all_rscs(lrm);
 	if (NULL != rid_list) {
-		char buf[37];
-		rsc_id_t rid;
-		GList* element = g_list_first(rid_list);
+		element = g_list_first(rid_list);
 		while (NULL != element) {
 			uuid_copy(rid,element->data);
 			uuid_unparse(rid, buf);
@@ -254,12 +262,14 @@ get_all_rsc(ll_lrm_t* lrm)
 void
 get_cur_state(lrm_rsc_t* rsc)
 {
-	puts("get_cur_state...");
+	GList* node;
+	GList* op_list = NULL;
 	state_flag_t state;
-	GList* op_list = rsc->ops->get_cur_state(rsc, &state);
+
+	puts("get_cur_state...");
+	op_list = rsc->ops->get_cur_state(rsc, &state);
 	printf("\tcurrent state:%s\n",state==LRM_RSC_IDLE?"Idel":"Busy");
 
-	GList* node;
 	for(node = g_list_first(op_list); NULL != node; node = g_list_next(node)) {
 		lrm_op_t* op = (lrm_op_t*)node->data;
 		printf_op(op);
