@@ -1,6 +1,7 @@
 #ifndef CLPLUMBING_CL_POLL_H
 #	define CLPLUMBING_CL_POLL_H
 
+#include <portability.h>
 #include <glib.h>
 #include <sys/poll.h>
 

@@ -22,7 +22,7 @@
 #ifndef _STONITH_SIGNAL_H
 #define _STONITH_SIGNAL_H
 
-#define __USE_UNIX98
+#include <portability.h>
 #include <signal.h>
 #include <sys/signal.h>
 

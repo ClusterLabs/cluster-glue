@@ -21,9 +21,8 @@
 #ifndef _CL_SIGNAL_H
 #define _CL_SIGNAL_H
 
-
+#include <portability.h>
 #include <stdio.h>
-#define __USE_UNIX98
 #include <signal.h>
 #include <sys/signal.h>
 

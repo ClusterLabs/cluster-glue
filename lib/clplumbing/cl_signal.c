@@ -19,7 +19,7 @@
  *
  */
 
-
+#include <portability.h>
 #include <string.h>
 #include <errno.h>
 

@@ -20,12 +20,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
+#include <portability.h>
 #include <clplumbing/ipc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <portability.h>
 
 struct IPC_WAIT_CONNECTION * socket_wait_conn_new(GHashTable* ch_attrs);
 struct IPC_CHANNEL * socket_client_channel_new(GHashTable* ch_attrs);

@@ -1,5 +1,6 @@
 #ifndef CLPLUMBING_UIDS_H
 #	define CLPLUMBING_UIDS_H
+#include <portability.h>
 #include <sys/types.h>
 
 /* Tell us who you want to be - or zero for nobody */
