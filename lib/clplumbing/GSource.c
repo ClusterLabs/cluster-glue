@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.30 2005/04/04 07:27:10 andrew Exp $ */
+/* $Id: GSource.c,v 1.31 2005/04/04 09:05:39 andrew Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -509,7 +509,6 @@ G_CH_dispatch(GSource * source,
 #endif
 
 	if(chp->dispatch) {
-		cl_log(LOG_DEBUG, "Mainloop: Invoking mainloop dispatch");
 		if(!(chp->dispatch(chp->ch, chp->udata))){
 			g_source_remove_poll(source, &chp->infd);
 			if (!chp->fd_fdx) {
@@ -518,7 +517,6 @@ G_CH_dispatch(GSource * source,
 			g_source_unref(source);
 			return FALSE;
 		}
-		cl_log(LOG_DEBUG, "Mainloop: Returning to mainloop");
 	}
 	
 	return TRUE;
