@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.26 2004/10/01 12:04:12 lge Exp $ */
+/* $Id: ipctest.c,v 1.27 2004/10/01 21:19:34 gshi Exp $ */
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -432,6 +432,11 @@ newmessage(IPC_Channel* chan, int niter)
 	IPC_Message*	msg;
 
 	msg = malloc(sizeof(*msg));
+	if (msg == NULL){
+		cl_log(LOG_ERR, "newmessage:"
+		       " allocating memory for msg failed");
+		return NULL;
+	}
 	msg->msg_private = NULL;
 	msg->msg_done = msg_free;
 	msg->msg_ch = chan;
