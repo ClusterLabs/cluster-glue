@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.32 2005/02/10 21:10:56 gshi Exp $ */
+/* $Id: cl_log.c,v 1.33 2005/02/17 22:30:29 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -275,9 +275,7 @@ cl_log(int priority, const char * fmt, ...)
 		"debug"
 	};
 
-	if(cl_process_pid < 0) {
-		cl_process_pid = (int)getpid();
-	}
+	cl_process_pid = (int)getpid();
 
 	cl_log_depth++;
 
@@ -420,9 +418,6 @@ LogToLoggingDaemon(int priority, const char * buf,
 				return HA_FAIL;
 			}
 			
-			cl_log(LOG_DEBUG,"Initialize connection"
-			       "to logging daemon");
-			
 			if (chan->ops->initiate_connection(chan) != IPC_OK) {
 				cl_log(LOG_WARNING, "Initializing connection"
 				       " to logging daemon failed."
@@ -495,7 +490,7 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	logbuf.facility = cl_log_facility;
 	logbuf.priority = priority;
 	logbuf.use_pri_str = use_prio_str;
-	logbuf.entity_pid = cl_process_pid;
+	logbuf.entity_pid = getpid();
 	if (cl_log_entity){
 		strncpy(logbuf.entity,cl_log_entity,MAXENTITY);
 	}else {
