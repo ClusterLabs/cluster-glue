@@ -18,6 +18,7 @@
 void cl_make_realtime
 (	int spolicy,	/* SCHED_RR or SCHED_FIFO */
 	int priority,	/* typically 1-99 */
+	int stackgrowK,	/* Amount to grow stack by */
 	int heapgrowK	/* Amount to grow heap by */
 );
 
