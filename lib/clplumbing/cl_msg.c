@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.53 2005/02/17 15:49:50 alan Exp $ */
+/* $Id: cl_msg.c,v 1.54 2005/02/17 18:14:22 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -945,9 +945,13 @@ ha_msg_add_nv_depth(struct ha_msg* msg, const char * nvline,
 		return(HA_FAIL);
 	}
 	valp = nvline + namelen +1; /* Point just *past* the '=' */
-	if (valp >= bufmax)		return HA_FAIL;
+	if (valp >= bufmax){
+		return HA_FAIL;
+	}
 	vallen = strcspn(valp, CRNL);
-	if ((valp + vallen) >= bufmax)	return HA_FAIL;
+	if ((valp + vallen) >= bufmax){
+		return HA_FAIL;
+	}
 
 	if (vallen == 0){
 		valp = NULL;
@@ -1813,11 +1817,14 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 
 	while (*sp != EOS && strncmp(sp, MSG_END, endlen) != 0) {
 
-		if (sp >= smax)		return(NULL);
+		if (sp >= smax)	{
+			return(NULL);
+		}
 		/* Skip over initial CR/NL things */
 		sp += strspn(sp, CRNL);
-		if (sp >= smax)		return(NULL);
-
+		if (sp >= smax)	{
+			return(NULL);
+		}
 		/* End of message marker? */
 		if (strncmp(sp, MSG_END, endlen) == 0) {
 			break;
@@ -2151,6 +2158,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.54  2005/02/17 18:14:22  gshi
+ * BEAM fix:
+ * add surrounding {} for some if statements
+ *
  * Revision 1.53  2005/02/17 15:49:50  alan
  * Fixed a few BEAM complaints (but not all of them yet)
  *
