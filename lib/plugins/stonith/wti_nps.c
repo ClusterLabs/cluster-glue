@@ -51,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.4 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.5 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -221,10 +221,10 @@ static const char * NOTnpsid = "Hey, dummy this has been destroyed (WTINPS)";
  */
 
 #define WTINPSSTR	" Power Switch"
-
 static struct Etoken EscapeChar[] =	{ {"Escape character is '^]'.", 0, 0}
 					,	{NULL,0,0}};
-static struct Etoken password[] =	{ {"Password:", 0, 0} ,{NULL,0,0}};
+static struct Etoken password[] =	{ {"Password:", 0, 0},
+						{NULL,0,0}};
 static struct Etoken Prompt[] =	{ {"PS>", 0, 0} ,{NULL,0,0}};
 static struct Etoken LoginOK[] =	{ {WTINPSSTR, 0, 0}
                     , {"Invalid password", 1, 0} ,{NULL,0,0}};
@@ -289,7 +289,7 @@ NPSLookFor(struct WTINPS* nps, struct Etoken * tlist, int timeout)
 {
 	int	rc;
 	if ((rc = EXPECT_TOK(nps->rdfd, tlist, timeout, NULL, 0)) < 0) {
-		syslog(LOG_ERR, _("Did not find string: '%s' from" DEVICE ".")
+		syslog(LOG_ERR, _("Did not find string: '%s' from " DEVICE ".")
 		,	tlist[0].string);
 		NPSkillcomm(nps);
 	}
@@ -314,22 +314,23 @@ NPSScanLine(struct WTINPS* nps, int timeout, char * buf, int max)
 static int
 NPSRobustLogin(struct WTINPS * nps)
 {
-	int	rc=S_OOPS;
-	int	j;
+	int rc = S_OOPS;
+	int j = 0;
 
-	for (j=0; j < 20 && rc != S_OK; ++j) {
-
-	  if (nps->pid > 0) {
-			NPSkillcomm(nps);
-		}
-
+	for ( ; ; ) {
+	  if (nps->pid > 0)
+	    NPSkillcomm(nps);
 	  if (NPS_connect_device(nps) != S_OK) {	
 	      NPSkillcomm(nps);
-	      continue;
 	  }
-
-	  rc = NPSLogin(nps);
+	  else {
+	    rc = NPSLogin(nps);
+	    if (rc == S_OK) break;
+	  }
+	  if ((++j) == 20) break;
+	  else sleep(1);
 	}
+
 	return rc;
 }
 
@@ -340,7 +341,11 @@ NPSLogin(struct WTINPS * nps)
 	char		IDinfo[128];
 	char *		idptr = IDinfo;
 
-	EXPECT(EscapeChar, 10);
+	/*EXPECT(EscapeChar, 10);*/
+	if (NPSLookFor(nps, EscapeChar, 10) < 0) {
+		sleep(1);
+		return (errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
+	}
 	/* Look for the unit type info */
 	if (EXPECT_TOK(nps->rdfd, password, 2, IDinfo
 	,	sizeof(IDinfo)) < 0) {
@@ -361,6 +366,7 @@ NPSLogin(struct WTINPS * nps)
 	switch (NPSLookFor(nps, LoginOK, 5)) {
 
 		case 0:	/* Good! */
+			syslog(LOG_INFO, _("Successful login to " DEVICE "."));
 			break;
 
 		case 1:	/* Uh-oh - bad password */
@@ -380,7 +386,7 @@ static int
 NPSLogout(struct WTINPS* nps)
 {
 	int	rc;
-	
+
 	/* Send "/h" help command and expect back prompt */
 	//SEND("/h\r");
 	/* Expect "PS>" */
