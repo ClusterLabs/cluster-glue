@@ -73,7 +73,9 @@ endif
 
 noinst_PROGRAMS = $(ipmilan_TEST)
 ipmilantest_SOURCES = ipmilan_test.c 
-ipmilantest_LDADD = $(top_builddir)/lib/plugins/stonith/ipmilan.la $(OPENIPMI_LIB)
+ipmilantest_LDADD = $(top_builddir)/lib/pils/libpils.la \
+		    $(top_builddir)/lib/plugins/stonith/ipmilan.la \
+		    $(OPENIPMI_LIB)
 
 ## libraries
 
