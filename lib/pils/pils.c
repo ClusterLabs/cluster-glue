@@ -1438,7 +1438,6 @@ PILLoadPlugin(PILPluginUniv* universe, const char * plugintype
 		,	PluginPath
 		,	lt_dlerror());
 		DELETE(PluginPath);
-		DelPILPluginType(pitype);
 		return PIL_NOPLUGIN;
 	}
 	DELETE(PluginPath);
