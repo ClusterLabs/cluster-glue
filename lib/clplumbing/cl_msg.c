@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.22 2004/09/22 17:03:23 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.23 2004/09/22 22:41:10 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -36,6 +36,7 @@
 #include <clplumbing/ipc.h>
 #include <clplumbing/base64.h>
 #include <clplumbing/netstring.h>
+#include <glib.h>
 
 #define		MAXMSGLINE	MAXMSG
 #define		MINFIELDS	30
@@ -181,6 +182,58 @@ intlen(int x)
 }
 
 
+
+static GList* 
+list_copy(const GList* _list)
+{
+	int i;
+	GList* newlist = NULL;
+	GList* list;
+
+	memcpy(&list, &_list, sizeof(GList*));
+
+	for (i = 0; i < g_list_length(list); i++){
+		char* dup_element = NULL;
+		char* element = g_list_nth_data(list, i);
+		int len;
+		if (element == NULL){
+			cl_log(LOG_WARNING, "list_cleanup:"
+			       "element is NULL");
+			continue;
+		}
+
+		len = strlen(element);
+		dup_element= ha_malloc(len + 1);
+		if ( dup_element == NULL){
+			cl_log(LOG_ERR, "duplicate element failed");
+			continue;
+		}
+		memcpy(dup_element, element,len);
+		dup_element[len] = 0;
+		
+		newlist = g_list_append(newlist, dup_element);		
+	}
+	
+	return newlist;
+}
+void
+list_cleanup(GList* list)
+{
+	int i;
+	for (i = 0; i < g_list_length(list); i++){
+		char* element = g_list_nth_data(list, i);
+		if (element == NULL){
+			cl_log(LOG_WARNING, "list_cleanup:"
+			       "element is NULL");
+			continue;
+		}
+		ha_free(element);
+	}
+	g_list_free(list);
+}
+
+
+
 /* Create a new (empty) message */
 struct ha_msg *
 ha_msg_new(nfields)
@@ -247,17 +300,27 @@ ha_msg_del(struct ha_msg *msg)
 		}
 		if (msg->values) {
 			for (j=0; j < msg->nfields; ++j) {
-				
-				if (msg->values[j] == NULL) {              
-					continue;                                
-				}   
-				if (msg->types[j] != FT_STRUCT) {   
-					ha_free(msg->values[j]);                 
-					msg->values[j] = NULL; 
-				}else{                                
-					ha_msg_del((struct ha_msg*)msg->values[j]);  
-				}   
-				msg->values[j] = NULL; 				
+
+				if (msg->values[j] == NULL){
+					continue;
+				}
+				switch(msg->types[j]){
+				case FT_STRING:
+				case FT_BINARY:
+					ha_free(msg->values[j]);
+					msg->values[j] = NULL;
+					break;
+				case FT_STRUCT:
+					ha_msg_del((struct ha_msg*)msg->values[j]);
+					msg->values[j] = NULL;
+					break;
+				case FT_LIST:
+					list_cleanup((GList*)msg->values[j]);
+					break;
+				default:
+					break;
+					
+				}
 			}
 			ha_free(msg->values);
 			msg->values = NULL;
@@ -320,21 +383,32 @@ ha_msg_copy(const struct ha_msg *msg)
 		}
 		memcpy(ret->names[j], msg->names[j], msg->nlens[j]+1);
 
-		if (ret->types[j] == FT_STRUCT){
-			if ((ret->values[j]
-			=	(void*)ha_msg_copy((struct ha_msg*)msg->values[j]))
-			==	NULL){
-
-				cl_log(LOG_ERR
-				, "ha_msg_copy(): copy child message failed");
+		switch( ret->types[j]){
+		case FT_STRING:
+		case FT_BINARY:
+			if ((ret->values[j] = ha_malloc(msg->vlens[j]+1))==NULL){
 				goto freeandleave;
 			}
-		}else if ((ret->values[j] = ha_malloc(msg->vlens[j]+1))==NULL){
-			goto freeandleave;
-		}else{
+			
 			memcpy(ret->values[j], msg->values[j], msg->vlens[j]+1);
+			break;
+			
+		case FT_STRUCT:
+			if ((ret->values[j]
+			     =	(void*)ha_msg_copy((struct ha_msg*)msg->values[j]))
+			    ==	NULL){
+				cl_log(LOG_ERR, 
+				       "ha_msg_copy(): copy child message failed");
+				goto freeandleave;
+			}
+			break;
+		case FT_LIST:
+			ret->values[j]=list_copy( (GList*)msg->values[j]);			
+			break;
+		default:
+			break;
+			
 		}
-
 	}
 	return ret;
 
@@ -427,6 +501,154 @@ ha_msg_audit(const struct ha_msg* msg)
 }
 #endif
 
+
+/*
+  compute the total size of the resulted string
+  if the string list is to be converted
+  
+*/
+size_t
+string_list_pack_length(GList* list)
+{
+	int i;
+	size_t total_length = 0;
+	
+	if (list == NULL){
+		cl_log(LOG_WARNING, "string_list_pack_length():"
+		       "list is NULL");
+
+		return 0;
+	}
+	for (i = 0; i < g_list_length(list) ; i++){
+		
+		char * element = g_list_nth_data(list, i);
+		if (element == NULL){
+			cl_log(LOG_ERR, "string_list_pack_length: "
+			       "%dth element of the string list is NULL", i);
+			return 0;
+		}
+		total_length += intlen(strlen(element)) + strlen(element) + 2;
+		/* 2 is for ":" and "," */
+		}
+
+	return total_length ;
+}
+
+
+
+/*
+  convert a string list into a single string
+  the format to convert is similar to netstring:
+	<length> ":" <the actual string> ","
+
+  for example, a list containing two strings "abc" "defg"
+  will be converted into
+	3:abc,4:defg,
+  @list: the list to be converted
+  @buf:  the converted string should be put in the @buf
+  @maxlen: size of the buf
+*/
+
+
+int
+string_list_pack(GList* list, char* buf, char* maxp)
+{
+	int i;
+	char* p =  buf;
+
+	for (i = 0; i < g_list_length(list) ; i++){
+		
+		char * element = g_list_nth_data(list, i);
+		if (element == NULL){
+			cl_log(LOG_ERR, "string_list_pack: "
+			       "%dth element of the string list is NULL", i);
+			return 0;
+		}
+		p += sprintf(p, "%d:%s,",strlen(element),element);
+		
+		if (p >= maxp){
+			cl_log(LOG_ERR, "string_list_pack: "
+			       "buffer overflowed ");
+			return 0;
+		}		
+	}
+	
+	
+	return (p - buf);
+}
+
+
+
+/* 
+   this is reverse process of pack_string_list
+   @packed_str_list must be a string ending with '\0'
+*/
+GList* 
+string_list_unpack(const char* packed_str_list, size_t length)
+{
+	GList*		list = NULL;
+	const char*	psl = packed_str_list;
+	const char *	maxp= packed_str_list + length;
+	int		len = 0;
+	
+	
+	while(TRUE){
+		char* buf;
+
+		if (*psl == '\0' || psl >=  maxp){
+			break;
+		}
+		
+		if (sscanf( psl, "%d:", &len) <= 0 ){
+			break;
+		}
+		
+		if (len <=0){
+			cl_log(LOG_ERR, "unpack_string_list:"
+			       "reading len of string error");
+			if (list){
+				list_cleanup(list);
+			}
+			return NULL;
+		}
+		
+		while (*psl != ':' && *psl != '\0' ){
+			psl++;
+		}
+		
+		if (*psl == '\0'){
+			break;
+		}
+		
+		psl++;
+		
+		buf = ha_malloc(len + 1);
+		if (buf == NULL){
+			cl_log(LOG_ERR, "unpack_string_list:"
+			       "unable to allocate buf");
+			if(list){
+				list_cleanup(list);
+			}
+			return NULL;			
+			
+		}
+		memcpy(buf, psl, len);
+		buf[len] = '\0';
+		list = g_list_append(list, buf);
+		psl +=len;
+		
+		if (*psl != ','){
+			cl_log(LOG_ERR, "unpack_string_list:"
+			       "wrong format, s=%s",packed_str_list);	
+		}
+		psl++;
+	}
+	
+	return list;
+
+}
+
+
 /* low level implementation for ha_msg_add
 
    the caller is responsible to allocate/free memories
@@ -451,6 +673,8 @@ ha_msg_audit(const struct ha_msg* msg)
 	@type equals to FT_STRUCT implies it is called by a client
    to add a child message to this message because heartbeat itself does not
    add any child message.
+
+   4. FT_LIST
 
 */
 
@@ -537,6 +761,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		return(HA_FAIL);
 	}
 
+	internal_type = type;
 	switch(type){
 
 	case FT_BINARY:
@@ -549,6 +774,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		cp_value = value;
 		cp_vallen = vallen;
 		internal_type = type;
+
 		break;
 	case FT_STRUCT:
 
@@ -571,9 +797,92 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		return(HA_OK);
 
 
-	default: 	/*case FT_STRING: */
-		newstringlen =  msg->stringlen + (namelen+vallen+2);
+	case FT_LIST_ELEMENT:{
+		GList* list;
 
+		int j;
+		for (j=0; j < msg->nfields; ++j) {
+			if (strcmp(name, msg->names[j]) == 0) {
+				break;
+			}
+		}
+
+		if ( j >= msg->nfields){
+			list = g_list_append(NULL, value);
+			if (list == NULL){
+				cl_log(LOG_ERR, "ha_msg_addraw_ll:"
+				       " g_list_append() failed");
+				return HA_FAIL;
+			}
+			
+			next = msg->nfields;
+			msg->names[next] = name;
+			msg->nlens[next] = namelen;	
+			msg->values[next] = list;
+			msg->vlens[next] = string_list_pack_length(list);
+			msg->stringlen += namelen + 3 + string_list_pack_length(list) +2;
+			/*3 is for type, 2 is for "=" and "\n"*/
+			
+			msg->netstringlen += intlen(namelen) + (namelen)
+				+ intlen( string_list_pack_length(list)) 
+				+ string_list_pack_length(list) +4;
+			msg->netstringlen += 4; /* for type*/
+			msg->types[next] = FT_LIST;
+			msg->nfields++;
+			return HA_OK;
+			
+		}else if(  msg->types[j] == FT_LIST ){
+			GList* oldlist = (GList*) msg->values[j];
+			int oldlistlen = string_list_pack_length(oldlist);
+			int newlistlen;
+			list = g_list_append(oldlist, value);
+			if (list == NULL){
+				cl_log(LOG_ERR, "ha_msg_addraw_ll:"
+				       " g_list_append() failed");
+				return HA_FAIL;
+			}
+			
+			newlistlen = string_list_pack_length(list);
+						
+			msg->values[j] = list;
+			msg->vlens[j] =  string_list_pack_length(list);
+			msg->stringlen += newlistlen - oldlistlen;
+			msg->netstringlen += intlen(newlistlen) + newlistlen
+				-intlen(oldlistlen) - oldlistlen;
+			return HA_OK;
+			
+		}else { //type mismatch
+			cl_log(LOG_ERR, "ha_msg_addraw_ll: field already exists "
+			       "with differnt type=%d", type);
+			return (HA_FAIL);
+		}
+		
+		return(HA_OK);
+	}
+		
+	case FT_LIST: {
+		
+		next = msg->nfields;
+		msg->names[next] = name;
+		msg->nlens[next] = namelen;
+		msg->values[next] = value;
+		msg->vlens[next] =  string_list_pack_length(value);
+		msg->stringlen += namelen + 3 + string_list_pack_length(value) +2;
+		/*3 is for type, 2 is for "=" and "\n"*/
+		msg->netstringlen += intlen(namelen) + (namelen)
+			+ intlen(string_list_pack_length(value)) 
+			+ string_list_pack_length(value) +  4 ;
+		msg->netstringlen += 4; /* for type*/		
+		msg->types[next] = FT_LIST;
+		msg->nfields++;
+		return HA_OK;
+		
+		
+	}		
+	default: 	/*case FT_STRING: */
+
+		newstringlen =  msg->stringlen + (namelen+vallen+2);
+		
 		internal_type = FT_STRING;
 		if (name[0] == '('){
 			
@@ -633,7 +942,26 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 			ha_free(value);
 			cp_value = tmpmsg;
 			cp_vallen = sizeof(struct ha_msg);
+			
+		}else if (internal_type ==  FT_LIST ){	
+			int	nlo = 3; /*name length overhead */
+			GList*	list;
+			
+			cp_name = name;
+			cp_namelen = namelen - nlo ;
+			memmove(cp_name, name + nlo, namelen - nlo);
+			cp_name[namelen - nlo] = EOS;
 
+			list = string_list_unpack(value, vallen);
+			if (list == NULL){
+				cl_log(LOG_ERR, "ha_msg_addraw_ll():"
+				       "unpack_string_list failed: %s", (char*)value);
+				return(HA_FAIL);
+			}
+			ha_free(value);
+			cp_value = (void*)list;
+			cp_vallen = string_list_pack_length(list);
+			
 		}else{
 			cp_name = name;
 			cp_namelen = namelen;		
@@ -643,43 +971,44 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		}
 
 	}
-
+	
 	if (newstringlen >= MAXMSG) {
 		cl_log(LOG_ERR, "ha_msg_addraw_ll(): "
 		       "cannot add name/value to ha_msg (value too big)");
 		if (cp_value) {   
-			if (internal_type == FT_STRUCT) {   
+			switch(internal_type){
+			case FT_STRUCT:
 				ha_msg_del((struct ha_msg *)cp_value);   
-			}else{   
-				cl_free(cp_value);   
+				break;
+			case FT_LIST:
+				list_cleanup( (GList*) cp_value);
+				break;
+			case FT_BINARY:
+			case FT_STRING:
+			default:
+			  cl_free(cp_value);   
 			}   
 			cp_value = NULL;   
 		}   
 		if (cp_name) {   
 			cl_free(cp_name);       cp_name = NULL;   
-		} 
-		
+		} 		
 		return(HA_FAIL);
 	}
 
-
+	
 	next = msg->nfields;
 	msg->values[next] = cp_value;
 	msg->vlens[next] = cp_vallen;
 	msg->names[next] = cp_name;
 	msg->nlens[next] = cp_namelen;
 	msg->stringlen = newstringlen;
-
+	
 	msg->netstringlen += intlen(cp_namelen) + (cp_namelen)
 	+	intlen(cp_vallen) + cp_vallen + 4 ;
 	msg->netstringlen += 4; /* for type*/
 
-	if (type == FT_BINARY || internal_type == FT_BINARY){
-		msg->types[next] = FT_BINARY;
-	}else if (internal_type == FT_STRUCT){
-		msg->types[next] = FT_STRUCT;
-
-	}
+	msg->types[next] = internal_type;
 
 
 	msg->nfields++;
@@ -705,21 +1034,25 @@ ha_msg_addraw(struct ha_msg * msg, const char * name, size_t namelen,
 	}
 	strncpy(cpname, name, namelen);
 	cpname[namelen] = EOS;
-
-	if(type == FT_STRING || type == FT_BINARY){
+	
+	if (type == FT_STRING || type == FT_BINARY|| type == FT_LIST_ELEMENT){
 		if ((cpvalue = ha_malloc(vallen+1)) == NULL) {
 			cl_log(LOG_ERR, "ha_msg_addraw: no memory for string (value)");
 			return(HA_FAIL);
 		}
 		memcpy(cpvalue, value, vallen);
 		cpvalue[vallen] = EOS;	
-	}else{
+	}else if (type ==  FT_LIST){
+		cpvalue = (void*)list_copy(value);
+		
+	}else {
 		cpvalue = (char*)ha_msg_copy( (const struct ha_msg*) value);
-		if(cpvalue == NULL){
-			cl_log(LOG_ERR, "ha_msg_addraw: copying message failed");
-			ha_free(cpname);
-			return(HA_FAIL);
-		}
+	}
+	
+	if(cpvalue == NULL){
+		cl_log(LOG_ERR, "ha_msg_addraw: copying message failed");
+		ha_free(cpname);
+		return(HA_FAIL);
 	}
 	
 	ret = ha_msg_addraw_ll(msg, cpname, namelen, cpvalue, vallen
@@ -755,6 +1088,12 @@ ha_msg_addstruct(struct ha_msg * msg, const char * name, void * value)
 	return ha_msg_addraw(msg, name, strlen(name), value, 0, FT_STRUCT, 0);
 }
 
+int
+cl_msg_list_add_string(struct ha_msg* msg, const char* name, const char* value)
+{
+	return ha_msg_addraw(msg, name, strlen(name), value,strlen(value),
+			     FT_LIST_ELEMENT, 0);
+}
 
 /* Add a null-terminated name and value to a message */
 int
@@ -801,7 +1140,7 @@ ha_msg_add_nv_depth(struct ha_msg* msg, const char * nvline,
 	||	nvline[namelen] != '=') {
 		if (!cl_msg_quiet_fmterr) {
 			cl_log(LOG_WARNING
-			,	"ha_msg_add_nv: line doesn't contain '='");
+			,	"ha_msg_add_nv_depth: line doesn't contain '='");
 			cl_log(LOG_INFO, "%s", nvline);
 		}
 		return(HA_FAIL);
@@ -926,11 +1265,50 @@ cl_get_struct(const struct ha_msg *msg, const char* name)
 	size_t		vallen;
 
 	ret = (struct ha_msg *)cl_get_value(msg, name, &vallen, &type);
-
+	
 	if (ret == NULL || type != FT_STRUCT){
+		cl_log(LOG_WARNING, "field %s not found "
+		       " or type mismatch", name);
 		return(NULL);
 	}
 	return(ret);
+}
+
+int
+cl_msg_list_length(struct ha_msg* msg, const char* name)
+{
+	GList*   ret;
+	int		type;
+	
+	ret = cl_get_value( msg, name, NULL, &type);
+	
+	if ( ret == NULL || type != FT_LIST){
+		cl_log(LOG_WARNING, "field %s not found "
+		       " or type mismatch", name);
+		return -1;
+	}
+
+	return g_list_length(ret);
+	
+}
+
+
+void* 
+cl_msg_list_nth_data(struct ha_msg* msg, const char* name, int n)
+{
+	GList*   ret;
+	int		type;
+	
+	ret = cl_get_value( msg, name, NULL, &type);
+	
+	if ( ret == NULL || type != FT_LIST){
+		cl_log(LOG_WARNING, "field %s not found "
+		       " or type mismatch", name);
+		return NULL;
+	}
+	
+	return g_list_nth_data(ret, n);
+	
 }
 
 
@@ -1128,6 +1506,9 @@ msgfromstream_netstring(FILE * f)
 		int	typelen;
 		char *  type;
 		char *	typebuf;
+		struct ha_msg	*tmpmsg = NULL;
+		GList		*tmplist = NULL;
+		int		fieldtype;
 
 		if (fscanf(f, "%d:", &namelen) <= 0 || namelen <= 0){
 			if (!cl_msg_quiet_fmterr) {
@@ -1243,22 +1624,44 @@ msgfromstream_netstring(FILE * f)
 		sp += sprintf(sp, "%d:%s,", namelen, name);
 		sp += sprintf(sp, "%d:%s,", typelen, type);
 		sp += sprintf(sp, "%d:%s,", datalen, data);
-
-		if (atoi(type) == FT_STRUCT){
-			struct ha_msg	*tmpmsg;
-
+		
+				
+		fieldtype = atoi(type);
+		
+		if (fieldtype == FT_STRUCT){
+			
 			tmpmsg = netstring2msg(data, datalen, 1);
-			data = (char*)tmpmsg;
+			data = (char *)tmpmsg;
 			datalen = sizeof(struct ha_msg);
+			
+		} else if (fieldtype == FT_LIST){
+			tmplist = string_list_unpack(data, datalen);
+			if (tmplist == NULL){
+				cl_log(LOG_ERR, "unpacking string list failed");
+				return(NULL);
+			}
+			data = (char*) tmplist;
 		}
-
-		if (ha_msg_nadd_type(ret, name, namelen, data, datalen
-		,	atoi(type)) != HA_OK){
-			cl_log(LOG_WARNING
-			,  "msgfromstream_netstring(): ha_msg_nadd_type fails");
+		
+		if (ha_msg_nadd_type(ret, name, namelen, data, datalen, fieldtype)
+		    != HA_OK) {
+			cl_log(LOG_ERR, "ha_msg_nadd fails(netstring2msg)");
+			
+			if (fieldtype == FT_STRUCT && tmpmsg){
+				ha_msg_del(tmpmsg);
+			}else if (fieldtype == FT_LIST && tmplist){
+				list_cleanup(tmplist);
+			}
+			
 			ha_msg_del(ret);
 			return(NULL);
 		}
+		
+		if (fieldtype == FT_STRUCT && tmpmsg){
+			ha_msg_del(tmpmsg);
+		}else if (fieldtype == FT_LIST && tmplist){
+			list_cleanup(tmplist);
+		}			
 
 		ha_free(namebuf);
 		ha_free(databuf);
@@ -1566,6 +1969,7 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 			if (!cl_msg_quiet_fmterr) {
 				cl_log(LOG_ERR, "NV failure (string2msg_ll):");
 				cl_log(LOG_ERR, "Input string: [%s]", s);
+				cl_log(LOG_ERR, "sp=%s", sp);
 			}
 			ha_msg_del(ret);
 			return(NULL);
@@ -1618,7 +2022,9 @@ string2msg(const char * s, size_t length)
    3) if the field is a child message, then add "(FT_STRUCT)name=
    converted-string-for-child-message" followed by a new line
 
-
+   4) if the field is a list, then add "(FT_LIST)name=
+   converted-string-for-list" followed by a new line
+   
 */
 
 
@@ -1629,6 +2035,7 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 
 	char *	bp = NULL;
 	int	j;
+	char* maxp = buf + len;
 
 	buf[0]=0;
 	bp = buf;
@@ -1644,7 +2051,7 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 			continue;
 		}
 
-		if (m->types[j] == FT_BINARY || m->types[j] == FT_STRUCT){
+		if (m->types[j] != FT_STRING){
 			strcat(bp, "(");
 			bp++;
 			strcat(bp,FT_strings[m->types[j]]);
@@ -1671,6 +2078,19 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 			truelen = binary_to_base64(m->values[j]
 			,	m->vlens[j], bp, baselen);
 			bp += truelen;
+
+		} else if (m->types[j] == FT_LIST){
+
+			int listlen;
+			
+			listlen = string_list_pack((GList*)m->values[j], bp, maxp);			
+			if (listlen == 0){
+				cl_log(LOG_ERR, "msg2string_buf():"
+				       "string_list_pack() failed");
+				return(HA_FAIL);
+			}
+
+			bp += listlen;
 		} else{
 			int	baselen = get_stringlen(
 			(struct ha_msg*)	m->values[j], 0);
@@ -1871,6 +2291,35 @@ wirefmt2msg(const char* s, size_t length)
 }
 
 
+static int 
+liststring(GList* list, char* buf, int maxlen)
+{
+	char* p = buf;
+	char* maxp = buf + maxlen;
+	int i;
+	
+	for ( i = 0; i < g_list_length(list); i++){
+		char* element = g_list_nth_data(list, i);
+		if (element == NULL){
+			cl_log(LOG_ERR, "%dth element is NULL ", i);
+			return HA_FAIL;
+		} else{
+			if (i == 0){
+				p += sprintf(p,"%s",element);
+			}else{
+				p += sprintf(p," %s",element);
+			}
+			
+		}
+		if ( p >= maxp){
+			cl_log(LOG_ERR, "buffer overflow");
+			return HA_FAIL;
+		}
+		
+	}
+	
+	return HA_OK;
+}
 void
 cl_log_message (const struct ha_msg *m)
 {
@@ -1893,9 +2342,21 @@ cl_log_message (const struct ha_msg *m)
 			}
 
 			break;
-
-		
-		default: /* case(FT_STRING): */ 
+		case(FT_LIST): {
+			GList* list;
+			char buf[MAXLENGTH];
+			list = m->values[j];
+			if (liststring(list, buf, MAXLENGTH) != HA_OK){
+				cl_log(LOG_ERR, "liststring error");
+				continue;
+			}
+			cl_log(LOG_INFO, "MSG[%d] :[(%s)%s=%s]", j,
+			       FT_strings[m->types[j]],
+			       m->names[j] ? m->names[j] : "NULL",buf);			
+			break;
+		}
+			
+		default: /* case(FT_STRING): */
 			cl_log(LOG_INFO, "MSG[%d] : [%s=%s]", j
 		       ,	m->names[j] ? m->names[j] : "NULL"
 		       ,	(const char*)(m->values[j] ? m->values[j] : "NULL"));
@@ -1927,6 +2388,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.23  2004/09/22 22:41:10  gshi
+ * add list support for ha_msg
+ * it supports list of strings only
+ *
  * Revision 1.22  2004/09/22 17:03:23  gshi
  * brought STABLE change back to HEAD branch
  *
