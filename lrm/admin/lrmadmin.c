@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.25 2004/12/09 07:16:58 sunjd Exp $ */
+/* $Id: lrmadmin.c,v 1.26 2005/02/28 08:52:46 zhenh Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -315,14 +315,16 @@ int main(int argc, char **argv)
 					ret_value = -3;
 				}
 				if ( call_id == -1 ) {
-					cl_log(LOG_ERR, "Failed! no this "
+					cl_log(LOG_WARNING, "Failed! no this "
 					   "resource %s.", argv[optind]);
 					ret_value = -2;
 				}
-				cl_log(LOG_ERR, "Failed to operate "
-				   "resource %s due to unknown error."
-				  , argv[optind]);
-				ret_value = -3;
+				else {
+					cl_log(LOG_ERR, "Failed to operate "
+					"resource %s due to unknown error."
+					, argv[optind]);
+					ret_value = -3;
+				}
 				ASYN_OPS = FALSE;
 			} else { 
 				/* Return value: HA_OK = 1 Or  HA_FAIL = 0 */
@@ -883,6 +885,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.26  2005/02/28 08:52:46  zhenh
+ * no such resource should be a warning instead of error
+ *
  * Revision 1.25  2004/12/09 07:16:58  sunjd
  * add the support to stonith RA; some minor polish
  *
