@@ -69,8 +69,8 @@ int main (int argc, char* argv[])
 	printf_rsc(rsc);
 
 	puts("perform_op(start)...");
-	op = g_new(lrm_op_t, 1);
-	op->op_type = "start";
+	op = g_new0(lrm_op_t, 1);
+	op->op_type = g_strdup("start");
 	op->params = NULL;
 	op->timeout = 0;
 	op->user_data = strdup("It is a start op!");
@@ -80,8 +80,8 @@ int main (int argc, char* argv[])
 	printf_op(op);
 
 	puts("perform_op(status)...");
-	op = g_new(lrm_op_t, 1);
-	op->op_type = "status";
+	op = g_new0(lrm_op_t, 1);
+	op->op_type = g_strdup("status");
 	op->params = NULL;
 	op->timeout = 0;
 	op->user_data = strdup("It is a status op!");
@@ -91,8 +91,8 @@ int main (int argc, char* argv[])
 	printf_op(op);
 
 	puts("perform_op(stop)...");
-	op = g_new(lrm_op_t, 1);
-	op->op_type = "stop";
+	op = g_new0(lrm_op_t, 1);
+	op->op_type = g_strdup("stop");
 	op->params = NULL;
 	op->timeout = 0;
 	op->user_data = strdup("It is a stop op!");
