@@ -63,7 +63,7 @@ gboolean G_main_del_IPC_Channel(GCHSource* chp);
 GWCSource* G_main_add_IPC_WaitConnection(int priority, IPC_WaitConnection* ch
 ,	IPC_Auth* auth_info
 ,	gboolean can_recurse
-,	gboolean (*dispatch)(IPC_Channel* source_data /* Can be NULL! */
+,	gboolean (*dispatch)(IPC_Channel* source_data
 ,		gpointer user_data)
 ,	gpointer userdata
 ,	GDestroyNotify notify);
