@@ -1,4 +1,4 @@
-/* $Id: drac3_command.c,v 1.4 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: drac3_command.c,v 1.5 2004/09/20 18:42:41 msoffen Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -329,7 +329,7 @@ int
 drac3VerifyLogin (CURL *curl,
 		  const char *host)
 {	
-	//We try to do a GetSysInfo
+	/*We try to do a GetSysInfo */
 	return(drac3GetSysInfo (curl, host));
 }
 	

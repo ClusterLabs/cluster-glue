@@ -1,4 +1,4 @@
-/* $Id: drac3.c,v 1.6 2004/09/13 20:32:31 gshi Exp $ */
+/* $Id: drac3.c,v 1.7 2004/09/20 18:42:41 msoffen Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -363,7 +363,7 @@ drac3_reset_req(Stonith * s, int request, const char *host)
 #if defined(ST_POWERON) && defined(ST_POWEROFF)
 		case ST_POWERON:
 		case ST_POWEROFF:
-			// TODO...
+			/* TODO... */
 #endif
 		case ST_GENERIC_RESET:
 			if (drac3PowerCycle(drac3d->curl, drac3d->host))
