@@ -1,9 +1,6 @@
-/*!
- \file
- \brief unix domain socket implementation of IPC abstraction.
- \author Xiaoxiang Liu <xiliu@ncsa.uiuc.edu>
-*/
 /*
+ * ipcsocket unix domain socket implementation of IPC abstraction.
+ *
  * Copyright (c) 2002 Xiaoxiang Liu <xiliu@ncsa.uiuc.edu>
  *
  * This library is free software; you can redistribute it and/or
@@ -47,10 +44,8 @@
 /* channel and wait connection private data. */
 struct SOCKET_CH_PRIVATE{
   /* the path name wich the connection will be built on. */
-  /*! the path name wich the connection will be built on. */
   char path_name[UNIX_PATH_MAX];
   /* the domain socket. */
-  /*! the domain socket. */
   int s;
 };
 
@@ -80,14 +75,9 @@ static int socket_assert_auth(struct OCF_IPC_CHANNEL *ch, GHashTable *auth);
 static int socket_verify_auth(struct OCF_IPC_CHANNEL* ch);
 
 /* for domain socket, reve_fd = send_fd. */
-/*! 
-  \note for domain socket, reve_fd = send_fd. 
-*/
+
 static int socket_get_recv_fd(struct OCF_IPC_CHANNEL *ch);
 
-/*! 
-  \note for domain socket, reve_fd = send_fd. 
-*/
 static int socket_get_send_fd(struct OCF_IPC_CHANNEL *ch);
 
 static int socket_set_send_qlen (struct OCF_IPC_CHANNEL* ch, int q_len);
@@ -96,75 +86,19 @@ static int socket_set_recv_qlen (struct OCF_IPC_CHANNEL* ch, int q_len);
 
 
 /* helper functions. */
-/* will called by the socket_destory . */
-/*! 
-  \brief will called by the socket_destory. Disconnec the connection and set ch_status to CH_DISCONNECT. 
-  \param ch \b (IN) the pointer to the channel.
-  \retval CH_SUCCESS the connection is disconnected successfully.
-  \retval CH_FAIL operation fails.
-*/
+
 static int socket_disconnect(struct OCF_IPC_CHANNEL* ch);
 
-/* create a new ipc queue whose length = 0 and inner queue = NULL */
-/*! 
-  \brief create a new ipc queue whose length = 0 and inner queue = NULL.
-  \retval the pointer to a new ipc queue or NULL is the queue can't be created.
-*/
 static struct OCF_IPC_QUEUE* socket_queue_new(void);
 
-/* destory a ipc queue. */
-/*! 
-  \brief destory a ipc queue and clean all memory space assigned to this queue.
-  \param q \b (IN) the pointer to the queue which should be destroied.
-*/ 
 static void socket_destroy_queue(struct OCF_IPC_QUEUE * q);
 
-/* create a new ipc message whose msg_body's length is msg_len. */ 
-/*! 
-  \brief create a new ipc message whose msg_body's length is msg_len. 
-  \param msg_len \b (IN) the length of this message body in this message.
-  \retval the pointer to the new message or NULL if the message can't be created.
-*/
 static struct OCF_IPC_MESSAGE* socket_message_new(struct OCF_IPC_CHANNEL *ch, int msg_len);
 
-/* free the memory space allocated to msg and destroy msg. */
-/*! 
-  \brief free the memory space allocated to msg and destroy msg. 
-  \param msg \b (IN) the pointer to the message.
-*/
 static void socket_free_message(struct OCF_IPC_MESSAGE * msg);
 
-/* will be called by ipc_wait_conn_constructor to get a new socket waiting connection.  */
-/*! 
-  \brief will be called by ipc_wait_conn_constructor to get a new socket waiting connection.
-  \param ch_attrs \b (IN) the attributes used to create this connection.
-  \retval the pointer to the new waiting connection or NULL if the connection can't be created.
-  \note for domain socket implementation, the only attribute needed is path name. so the user should 
-  create the hash table like this: 
-  \note   GHashTable * attrs; 
-  \note   attrs = g_hash_table_new(g_str_hash, g_str_equal); 
-  \note   g_hash_table_insert(attrs, PATH_ATTR, path_name);   
-  \note   here PATH_ATTR is defined as "path_name" in ipc_socket.h 
-*/
 struct OCF_IPC_WAIT_CONNECTION *socket_wait_conn_new(GHashTable* ch_attrs);
 
-/* will be called by ipc_channel_constructor to create a new socket channel. */
-/*! 
-  \brief will be called by ipc_channel_constructor to create a new socket channel.
-  \param attrs \b (IN) the hash table of the attributes used to create this channel.
-  \retval the pointer to the new waiting channel or NULL if the channel can't be created.
-  \note for domain socket implementation, the only attribute needed by server is listening socket and the 
-  only attribute needed by clients is path name. so the user should create the hash table like this: 
-  \note \< server side \>
-  \note --   GHashTable * attrs; 
-  \note --   attrs = g_hash_table_new(g_str_hash, g_str_equal);
-  \note --   g_hash_table_insert(attrs, SOCKET_ATTR, &socket);  
-  \note \< client side \>
-  \note --   GHashTable * attrs; 
-  \note --   attrs = g_hash_table_new(g_str_hash, g_str_equal);
-  \note --   g_hash_table_insert(attrs, PATH_ATTR, path_name);  
-  \note here PATH_ATTR is defined as "path_name" and SOCKET_ATTR is defined as "socket" in ipc_socket.h 
-*/ 
 struct OCF_IPC_CHANNEL* socket_channel_new(GHashTable *attrs);
 
 
@@ -199,24 +133,21 @@ socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
   GHashTable* attrs;
   static char SockATTR []= SOCKET_ATTR;
 
-  //get select fd 
+  /* get select fd */
   s = wait_conn->ops->get_select_fd(wait_conn); 
   if (s == -1) {
     printf("get_select_fd: invalid fd\n");
     return NULL;
   }
 
-  //get client connection
+  /* get client connection. */
   sin_size = sizeof(struct sockaddr_un);
   if ((new_sock = accept(s, (struct sockaddr *)&peer_addr, &sin_size)) == -1) {
     perror("accept");
     return NULL;
   }else{
-    //set the socket as non-blocking socket
-    //    val = fcntl(new_sock, F_GETFL, 0);
-    //  fcntl(new_sock, F_SETFL, val | O_NONBLOCK);
-    
-    //get new hash table containing the socket attribute
+   
+    /* get new hash table containing the socket attribute. */
     attrs = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(attrs, SockATTR, &new_sock);
     if ((ch = socket_channel_new(attrs)) == NULL) {
@@ -225,7 +156,7 @@ socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
       return NULL;
     }
   }
-  //verify the client authentication information
+  /* verify the client authentication information. */
   ch->auth_info = auth_info;
   if (ch->ops->verify_auth(ch) == AUTH_OK) {
     ch->ch_status = CH_CONNECT;
@@ -246,6 +177,18 @@ socket_destroy_channel(struct OCF_IPC_CHANNEL * ch)
   free((void*) ch);
 }
 
+/* 
+ * will called by the socket_destory. Disconnec the connection 
+ * and set ch_status to CH_DISCONNECT. 
+ *
+ * parameters :
+ *     ch (IN) the pointer to the channel.
+ *
+ * return values : 
+ *     CH_SUCCESS   the connection is disconnected successfully.
+ *      CH_FAIL     operation fails.
+*/
+
 static int
 socket_disconnect(struct OCF_IPC_CHANNEL* ch)
 {
@@ -263,29 +206,26 @@ socket_initiate_connection(struct OCF_IPC_CHANNEL * ch)
 {
   struct SOCKET_CH_PRIVATE* conn_info;  
   int val;
-  struct sockaddr_un peer_addr; // connector's address information 
+  struct sockaddr_un peer_addr; /* connector's address information */
   
   conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
   
-  //prepare the socket
+  /* prepare the socket */
   bzero(&peer_addr, sizeof(peer_addr));
-  peer_addr.sun_family = AF_LOCAL;    // host byte order 
+  peer_addr.sun_family = AF_LOCAL;    /* host byte order */ 
 
   if (strlen(conn_info->path_name) >= sizeof(peer_addr.sun_path)) {
     fprintf(stderr,"the max path length is %d\n", sizeof(peer_addr.sun_path));
     return CH_FAIL;
   }
   strncpy(peer_addr.sun_path, conn_info->path_name, sizeof(peer_addr.sun_path));
-  //send connection request
+  /* send connection request */
   if (connect(conn_info->s, (struct sockaddr *)&peer_addr
   , 	sizeof(struct sockaddr_un)) == -1) {
     perror("connect");
     return CH_FAIL;
   }
   
-  //set the socket as non-blocking socket
-  //val = fcntl(conn_info->s, F_GETFL, 0);
-  //fcntl(conn_info->s, F_SETFL, val | O_NONBLOCK);
   ch->ch_status = CH_CONNECT;
 
   return CH_SUCCESS;
@@ -297,10 +237,10 @@ socket_send(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE* message)
   
   
   if (ch->send_queue->current_qlen < ch->send_queue->max_qlen) {
-    //add the meesage into the send queue
+    /* add the meesage into the send queue */
     ch->send_queue->queue = g_list_append(ch->send_queue->queue, message);
     ch->send_queue->current_qlen++;
-    //resume io
+    /* resume io */
     return ch->ops->resume_io(ch);
         
   }
@@ -354,7 +294,7 @@ socket_assert_auth(struct OCF_IPC_CHANNEL *ch, GHashTable *auth)
   return CH_FAIL;
 }
 
-//verify the authentication information
+/* verify the authentication information. */
 #ifdef SO_PEERCRED
 static int 
 socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
@@ -368,15 +308,15 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
   
   auth_info = (struct OCF_IPC_AUTH *) ch->auth_info;
 
-  if (auth_info == NULL) { //no restriction for authentication
+  if (auth_info == NULL) { /* no restriction for authentication */
     return AUTH_OK;
   }
   
   if (auth_info->check_uid == FALSE && auth_info->check_gid == FALSE) {
-    return AUTH_OK;    //no restriction for authentication
+    return AUTH_OK;    /* no restriction for authentication */
   }
 
-  //get the credential information for peer
+  /* get the credential information for peer */
   n = sizeof(struct ucred);
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
   cred = g_new(struct ucred, 1); 
@@ -436,12 +376,12 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
 
   auth_info = (struct OCF_IPC_AUTH *) ch->auth_info;
 
-  if (auth_info == NULL) { //no restriction for authentication
+  if (auth_info == NULL) { /* no restriction for authentication */
     return AUTH_OK;
   }
   
   if (auth_info->check_uid == FALSE && auth_info->check_gid == FALSE) {
-    return AUTH_OK;    //no restriction for authentication
+    return AUTH_OK;    /* no restriction for authentication */
   }
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 
@@ -605,7 +545,7 @@ socket_set_recv_qlen (struct OCF_IPC_CHANNEL* ch, int q_len)
   return CH_SUCCESS;
 }
 
-//socket object of the function table
+/* socket object of the function table */
 static struct OCF_IPC_WAIT_OPS socket_wait_ops = {
   socket_destroy_wait_conn,
   socket_wait_selectfd,
@@ -613,7 +553,7 @@ static struct OCF_IPC_WAIT_OPS socket_wait_ops = {
 };
 
 
-//socket object of the function table
+/* socket object of the function table */
 static struct OCF_IPC_OPS socket_ops = {
   socket_destroy_channel,
   socket_initiate_connection,
@@ -630,18 +570,30 @@ static struct OCF_IPC_OPS socket_ops = {
 };
 
 
+/* 
+ * create a new ipc queue whose length = 0 and inner queue = NULL.
+ * return the pointer to a new ipc queue or NULL is the queue can't be created.
+ */
+
 static struct OCF_IPC_QUEUE*
 socket_queue_new(void)
 {
   struct OCF_IPC_QUEUE *temp_queue;
   
-  //temp queue with length = 0 and inner queue = NULL
+  /* temp queue with length = 0 and inner queue = NULL. */
   temp_queue = (struct OCF_IPC_QUEUE *) malloc(sizeof(struct OCF_IPC_QUEUE));
   temp_queue->current_qlen = 0;
   temp_queue->max_qlen = DEFAULT_MAX_QLEN;
   temp_queue->queue = NULL;
   return temp_queue;
 }
+
+
+/* 
+ * destory a ipc queue and clean all memory space assigned to this queue.
+ * parameters:
+ *      q  (IN) the pointer to the queue which should be destroied.
+ */ 
 
 static void
 socket_destroy_queue(struct OCF_IPC_QUEUE * q)
@@ -652,7 +604,25 @@ socket_destroy_queue(struct OCF_IPC_QUEUE * q)
 
 
 
-//socket function to get a new wait channel
+
+/* 
+ * will be called by ipc_wait_conn_constructor to get a new socket waiting connection.
+ * 
+ * papameters :
+ *     ch_attrs (IN) the attributes used to create this connection.
+ 
+ * return :
+ *     the pointer to the new waiting connection or NULL if the connection can't be created.
+ * 
+ * note :
+ *   for domain socket implementation, the only attribute needed is path name. so the user should 
+ *   create the hash table like this: 
+ *     GHashTable * attrs; 
+ *     attrs = g_hash_table_new(g_str_hash, g_str_equal); 
+ *     g_hash_table_insert(attrs, PATH_ATTR, path_name);   
+ *     here PATH_ATTR is defined as "path_name". 
+ */
+struct OCF_IPC_WAIT_CONNECTION *socket_wait_conn_new(GHashTable* ch_attrs);
 struct OCF_IPC_WAIT_CONNECTION *
 socket_wait_conn_new(GHashTable *ch_attrs)
 {
@@ -670,7 +640,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     return NULL;
   }
 
-  //prepare the unix domain socket
+  /* prepare the unix domain socket */
   if ((s = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
     perror("socket");
     return NULL;
@@ -678,7 +648,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   
   unlink(path_name);
   bzero(&my_addr, sizeof(my_addr));
-  my_addr.sun_family = AF_LOCAL;         // host byte order
+  my_addr.sun_family = AF_LOCAL;         /* host byte order */
 
   if (strlen(path_name) >= sizeof(my_addr.sun_path)) {
     fprintf(stderr,"the max path length is %d\n", sizeof(my_addr.sun_path));
@@ -692,7 +662,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     return NULL;
   }
 
-  //listen to the socket
+  /* listen to the socket */
   if (listen(s, MAX_LISTEN_NUM) == -1) {
     perror("listen");
     return NULL;
@@ -710,7 +680,16 @@ socket_wait_conn_new(GHashTable *ch_attrs)
 }
 
 
-//socket function to get a new channel
+
+/* 
+ * will be called by ipc_channel_constructor to create a new socket channel.
+ * parameters :
+ *      attrs (IN) the hash table of the attributes used to create this channel.
+ *
+ * return:
+ *      the pointer to the new waiting channel or NULL if the channel can't be created.
+*/
+
 struct OCF_IPC_CHANNEL * 
 socket_channel_new(GHashTable *ch_attrs) {
   struct OCF_IPC_CHANNEL * temp_ch;
@@ -740,18 +719,18 @@ socket_channel_new(GHashTable *ch_attrs) {
    * this function will take socketfd as the parameter to create a socket channel.
    */
 
-  if ((path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR)) != NULL) { //client side connection
+  if ((path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR)) != NULL) { /* client side connection */
     if (strlen(path_name) >= sizeof(conn_info->path_name)) {
       fprintf(stderr,"the max path length is %d\n"
       ,	sizeof(conn_info->path_name));
       	return NULL;
     }
-    //prepare the socket
+    /* prepare the socket */
     if ((sockfd = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
       perror("socket");
       return NULL;
     }
-  }else if ((sock = (int *) g_hash_table_lookup(ch_attrs, SOCKET_ATTR)) != NULL) { //server side connection
+  }else if ((sock = (int *) g_hash_table_lookup(ch_attrs, SOCKET_ATTR)) != NULL) { /* server side connection */
     sockfd = *sock;
   }else{
     printf("socket_channel_new: Can't get required information from hash table\n");
@@ -780,6 +759,17 @@ socket_channel_new(GHashTable *ch_attrs) {
   
 }
 
+/* 
+ * create a new ipc message whose msg_body's length is msg_len. 
+ * 
+ * parameters :
+ *       msg_len (IN) the length of this message body in this message.
+ *
+ * return :
+ *       the pointer to the new message or NULL if the message can't be created.
+ */
+
+
 static struct OCF_IPC_MESSAGE*
 socket_message_new(struct OCF_IPC_CHANNEL *ch, int msg_len)
 {
@@ -794,6 +784,9 @@ socket_message_new(struct OCF_IPC_CHANNEL *ch, int msg_len)
 
   return temp_msg;
 }
+
+
+/* brief free the memory space allocated to msg and destroy msg. */
 
 static void
 socket_free_message(struct OCF_IPC_MESSAGE * msg) {
