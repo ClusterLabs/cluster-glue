@@ -31,7 +31,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
 #include <ctype.h>
@@ -169,7 +168,7 @@ static int
 external_status(Stonith  *s)
 {
   if (!ISEXTERNALDEV(s)) {
-    syslog(LOG_ERR, "invalid argument to EXTERNAL_status");
+    PILCallLog(LOG, PIL_CRIT, "invalid argument to EXTERNAL_status");
     return(S_OOPS);
   }
 
@@ -190,12 +189,12 @@ external_hostlist(Stonith  *s)
   int		j;
 
   if (!ISEXTERNALDEV(s)) {
-    syslog(LOG_ERR, "invalid argument to EXTERNAL_list_hosts");
+    PILCallLog(LOG, PIL_CRIT, "invalid argument to EXTERNAL_list_hosts");
     return(NULL);
   }
   sd = (struct externalDevice*) s->pinfo;
   if (sd->hostcount < 0) {
-    syslog(LOG_ERR
+    PILCallLog(LOG, PIL_CRIT
 	   ,	"unconfigured stonith object in EXTERNAL_list_hosts");
     return(NULL);
   }
@@ -203,7 +202,7 @@ external_hostlist(Stonith  *s)
 
   ret = (char **)MALLOC(numnames*sizeof(char*));
   if (ret == NULL) {
-    syslog(LOG_ERR, "out of memory");
+    PILCallLog(LOG, PIL_CRIT, "out of memory");
     return ret;
   }
 
@@ -269,7 +268,7 @@ external_parse_config_info(struct externalDevice* sd, const char * info)
 		;
 
 	if ((command = STRDUP(info + i)) == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(LOG, PIL_CRIT, "out of memory");
 		return(S_OOPS);
 		}
 	if (command[end] != '\0' && !isspace(command[end]))
@@ -291,10 +290,10 @@ external_reset_req(Stonith * s, int request, const char * host)
 	struct externalDevice *sd = NULL;
 
 	if (!ISEXTERNALDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to %s", __FUNCTION__);
+		PILCallLog(LOG, PIL_CRIT, "invalid argument to %s", __FUNCTION__);
 		return(S_OOPS);
 		}
-	syslog(LOG_INFO, _("Host %s external-reset initiating"), host);
+	PILCallLog(LOG, PIL_INFO, _("Host %s external-reset initiating"), host);
 
 	sd = (struct externalDevice*) s->pinfo;
 	if (sd->command == NULL) {
@@ -304,7 +303,7 @@ external_reset_req(Stonith * s, int request, const char * host)
 	if (system(sd->command) == 0) 
 		return S_OK;
 	else {
-		syslog(LOG_ERR, "command '%s' failed", sd->command);
+		PILCallLog(LOG, PIL_CRIT, "command '%s' failed", sd->command);
 		return(S_RESETFAIL);
 		}
 }
@@ -321,13 +320,13 @@ external_set_config_file(Stonith* s, const char * configname)
   struct externalDevice*	sd;
 
   if (!ISEXTERNALDEV(s)) {
-    syslog(LOG_ERR, "invalid argument to EXTERNAL_set_configfile");
+    PILCallLog(LOG, PIL_CRIT, "invalid argument to EXTERNAL_set_configfile");
     return(S_OOPS);
   }
   sd = (struct externalDevice*) s->pinfo;
 
   if ((cfgfile = fopen(configname, "r")) == NULL)  {
-    syslog(LOG_ERR, "Cannot open %s", configname);
+    PILCallLog(LOG, PIL_CRIT, "Cannot open %s", configname);
     return(S_BADCONFIG);
   }
   while (fgets(line, sizeof(line), cfgfile) != NULL){
@@ -348,7 +347,7 @@ external_set_config_info(Stonith* s, const char * info)
   struct externalDevice* sd;
 
   if (!ISEXTERNALDEV(s)) {
-    syslog(LOG_ERR, "%s: invalid argument", __FUNCTION__);
+    PILCallLog(LOG, PIL_CRIT, "%s: invalid argument", __FUNCTION__);
     return(S_OOPS);
   }
   sd = (struct externalDevice *)s->pinfo;
@@ -363,7 +362,7 @@ external_getinfo(Stonith * s, int reqtype)
   char *		ret;
 
   if (!ISEXTERNALDEV(s)) {
-    syslog(LOG_ERR, "EXTERNAL_idinfo: invalid argument");
+    PILCallLog(LOG, PIL_CRIT, "EXTERNAL_idinfo: invalid argument");
     return NULL;
   }
   /*
@@ -410,7 +409,7 @@ external_destroy(Stonith *s)
   struct externalDevice* sd;
 
   if (!ISEXTERNALDEV(s)) {
-    syslog(LOG_ERR, "%s: invalid argument", __FUNCTION__);
+    PILCallLog(LOG, PIL_CRIT, "%s: invalid argument", __FUNCTION__);
     return;
   }
   sd = (struct externalDevice *)s->pinfo;
@@ -435,7 +434,7 @@ external_new(void)
   struct externalDevice*	sd = MALLOCT(struct externalDevice);
 
   if (sd == NULL) {
-    syslog(LOG_ERR, "out of memory");
+    PILCallLog(LOG, PIL_CRIT, "out of memory");
     return(NULL);
   }
   memset(sd, 0, sizeof(*sd));
