@@ -623,8 +623,10 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 		if (sendrc < 0) {
 			switch (errno) {
 				case EAGAIN:
+#if 0
 					cl_log(LOG_DEBUG,
 						"socket send returned EAGAIN");
+#endif
 					sched_yield();
 					continue;
 				case EPIPE:

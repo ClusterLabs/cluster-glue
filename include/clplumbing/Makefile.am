@@ -39,5 +39,6 @@ include_HEADERS	= 		\
 	mkstemp_mode.h	\
 	proctrack.h	\
 	realtime.h	\
+	recoverymgr_cs.h \
 	timers.h	\
 	uids.h

@@ -33,6 +33,7 @@
 
 typedef struct _ProcTrack	ProcTrack;
 typedef struct _ProcTrack_ops	ProcTrack_ops;
+typedef struct _ProcTrackKillInfo	ProcTrackKillInfo;
 typedef enum _ProcTrackLogType	ProcTrackLogType;
 
 /*
@@ -53,6 +54,9 @@ struct _ProcTrack {
 
 	longclock_t		startticks;
 	TIME_T			starttime;
+	unsigned		timerid;
+	int			timeoutseq;
+	ProcTrackKillInfo*	killinfo;
 };
 
 /*
@@ -70,10 +74,15 @@ struct _ProcTrack_ops {
 		(ProcTrack*p);
 
 	/* Returns a "name" for a process (for messages) */
-	/* (must be copied, because it may be a static value) */
+	/* (may have to be copied, because it may be a static value) */
 	const char *
 		(*proctype)
 		(ProcTrack* p);
+};
+
+struct _ProcTrackKillInfo {
+	long	mstimeout;	/* Timeout in milliseconds */
+	int	signalno;	/* Signal number to issue @ timeout */
 };
 
 /* A function for calling by the process table iterator */
@@ -86,6 +95,9 @@ int ReportProcHasDied(int pid, int status);
 /* Create/Log a new tracked process */
 void NewTrackedProc(pid_t pid, int isapgrp, ProcTrackLogType loglevel
 ,	void * privatedata , ProcTrack_ops* ops);
+
+/* "info" is 0-terminated (terminated by a 0 signal) */
+int SetTrackedProcTimeouts(pid_t pid, ProcTrackKillInfo* info);
 
 /* Return information associated with the given PID (or NULL) */
 ProcTrack* GetProcInfo(pid_t pid);

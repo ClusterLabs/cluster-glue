@@ -21,10 +21,12 @@
  */
 
 #include <portability.h>
+#include <errno.h>
 #include <sys/wait.h>
 #include <heartbeat.h>
 #include <clplumbing/proctrack.h>
 #include <clplumbing/cl_log.h>
+#include <clplumbing/Gmain_timeout.h>
 
 #define	DEBUGPROCTRACK	debugproctrack
 
@@ -35,6 +37,7 @@ static GHashTable*	ProcessTable = NULL;
 static void		InitProcTable(void);
 static void		ForEachProcHelper(gpointer key, gpointer value
 ,				void * helper);
+static gboolean TrackedProcTimeoutFunction(gpointer p);
 
 static void
 InitProcTable()
@@ -57,12 +60,15 @@ NewTrackedProc(pid_t pid, int isapgrp, ProcTrackLogType loglevel
 
 	InitProcTable();
 	p->pid = pid;
-	p->isapgrp = pid;
+	p->isapgrp = isapgrp;
 	p->loglevel = loglevel;
 	p->privatedata = privatedata;
 	p->ops = ops;
 	p->startticks = time_longclock();
 	p->starttime = time(NULL);
+	p->timerid = 0;
+	p->timeoutseq = -1;
+	p->killinfo = NULL;
 
 	g_hash_table_insert(ProcessTable, GINT_TO_POINTER(pid), p);
 
@@ -162,6 +168,10 @@ ReportProcHasDied(int pid, int status)
 #endif
 
 	if (p) {
+		if (p->timerid > 0) {
+			g_source_remove(p->timerid);
+			p->timerid = 0;
+		}
 		p->ops->procdied(p, status, exitcode, signo, doreport);
 		if (p->privatedata) {
 			/* They may have forgotten to free something... */
@@ -185,6 +195,67 @@ GetProcInfo(pid_t pid)
 	:	NULL);
 }
 
+/* "info" is 0-terminated (terminated by a 0 signal) */
+int
+SetTrackedProcTimeouts(pid_t pid, ProcTrackKillInfo* info)
+{
+	long		mstimeout;
+	ProcTrack*	pinfo;
+	pinfo = GetProcInfo(pid);
+	
+	if (pinfo == NULL) {
+		return 0;
+	}
+
+	pinfo->timeoutseq = 0;
+	pinfo->killinfo = info;
+	mstimeout = pinfo->killinfo[0].mstimeout;
+	pinfo->timerid = Gmain_timeout_add(mstimeout
+	,	TrackedProcTimeoutFunction
+	,	GINT_TO_POINTER(pid));
+	return pinfo->timerid;
+}
+
+static gboolean
+TrackedProcTimeoutFunction(gpointer p)
+{
+	pid_t		pid = GPOINTER_TO_INT(p);
+	ProcTrack*	pinfo;
+	int		nsig;
+	long		mstimeout;
+
+	pinfo = GetProcInfo(pid);
+	
+	if (pinfo == NULL || pinfo->timeoutseq < 0
+	||	pinfo->killinfo == NULL) {
+		return FALSE;
+	}
+
+	pinfo->timerid = 0;
+	nsig = pinfo->killinfo[pinfo->timeoutseq].signalno;
+	mstimeout = pinfo->killinfo[pinfo->timeoutseq].mstimeout;
+
+	if (nsig == 0) {
+		return FALSE;
+	}
+	cl_log(LOG_WARNING, "%s process (PID %d) timed out"
+	".  Killing with signal %d."
+	,	pinfo->ops->proctype(pinfo), (int)pid, nsig);
+
+	if (kill(pid, nsig) < 0) {
+		if (errno == EEXIST) {
+			/* No point in trying this again ;-) */
+			return FALSE;
+		}else{
+			cl_perror("kill(%d,%d) failed"
+			,	pid, nsig);
+		}
+	}
+	pinfo->timerid = Gmain_timeout_add(mstimeout
+	,	TrackedProcTimeoutFunction
+	,	GINT_TO_POINTER(pid));
+	return FALSE;
+}
 
 /* Helper struct to allow us to stuff 3 args into one ;-) */
 struct prochelper {
