@@ -25,9 +25,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/poll.h>
 
 struct IPC_WAIT_CONNECTION * socket_wait_conn_new(GHashTable* ch_attrs);
 struct IPC_CHANNEL * socket_client_channel_new(GHashTable* ch_attrs);
+
+int (*ipc_pollfunc_ptr)(struct pollfd*, unsigned int, int)
+=	(int (*)(struct pollfd*, unsigned int, int)) poll;
+
+/* Set the IPC poll function to the given function */
+void
+ipc_set_pollfunc(int (*pf)(struct pollfd*, unsigned int, int))
+{
+	ipc_pollfunc_ptr = pf;
+}
 
 struct IPC_WAIT_CONNECTION * 
 ipc_wait_conn_constructor(const char * ch_type, GHashTable* ch_attrs)
