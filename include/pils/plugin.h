@@ -416,7 +416,6 @@ struct PILPluginImports_s {
 	,	void*	plugin_private);
 
 	void	(*log)	(PILLogLevel priority, const char * fmt, ...);
-					/* Logging function		*/
 };
 
 /*
