@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.109 2004/12/04 00:47:45 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.110 2004/12/09 20:28:15 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -921,14 +921,14 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 	int				maxqlen = ch->recv_queue->max_qlen;
 	static struct ipc_bufpool*	pool = NULL;
 	int				nmsgs = 0;
-	
+	int				spaceneeded;
 	*nbytes = 0;
 	
 	CHANAUDIT(ch);
 	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 	
 	if (pool == NULL){
-		pool = ipc_bufpool_new();
+		pool = ipc_bufpool_new(0);
 		if (pool == NULL){			
 			cl_log(LOG_ERR, "socket_resume_io_read: "
 			       "memory allocation for ipc pool failed");
@@ -936,11 +936,11 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 		}
 	}
 	
-	if (ipc_bufpool_full(pool, ch)){
+	if (ipc_bufpool_full(pool, ch, &spaceneeded)){
 		
 		struct ipc_bufpool*	newpool;
 		
-		newpool = ipc_bufpool_new();
+		newpool = ipc_bufpool_new(spaceneeded);
 		if (newpool == NULL){			
 			cl_log(LOG_ERR, "socket_resume_io_read: "
 			       "memory allocation for a new ipc pool failed");
