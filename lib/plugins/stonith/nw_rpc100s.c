@@ -189,7 +189,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 
 
 struct NW_RPC100S {
-	const char *	WTIid;
+	const char *	RPCid;
 
 	char *	idinfo;  /* ??? What's this for Alan ??? */
 	char *	unitid;  /* ??? What's this for Alan ??? */
@@ -209,11 +209,8 @@ struct NW_RPC100S {
 };
 
 /* This string is used to identify this type of object in the config file */
-static const char * WTIid = "NW_RPC100S";
-static const char * NOTwtiid = "OBJECT DESTROYED: (NW RPC100S)";
-
-/* WTIpassword - The fixed string ^B^X^X^B^X^X */
-static const char WTIpassword[7] = {2,24,24,2,24,24,0}; 
+static const char * RPCid = "NW_RPC100S";
+static const char * NOTrpcid = "OBJECT DESTROYED: (NW RPC100S)";
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -221,7 +218,7 @@ static const char WTIpassword[7] = {2,24,24,2,24,24,0};
 static int gbl_debug = DEBUG;
 
 #define	ISNWRPC100S(i)	(((i)!= NULL && (i)->pinfo != NULL)	\
-	&& ((struct NW_RPC100S *)(i->pinfo))->WTIid == WTIid)
+	&& ((struct NW_RPC100S *)(i->pinfo))->RPCid == RPCid)
 
 #define	ISCONFIGED(i)	(ISNWRPC100S(i) && ((struct NW_RPC100S *)(i->pinfo))->config)
 
@@ -235,7 +232,6 @@ static int gbl_debug = DEBUG;
 #	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
 #endif
 
-#define DIMOF(a)	(sizeof(a)/sizeof(a[0]))
 #define WHITESPACE	" \t\n\r\f"
 
 #define	REPLSTR(s,v)	{					\
@@ -358,19 +354,20 @@ RPCSendCommand (struct NW_RPC100S *ctx, const char *command, int timeout)
 	if (return_val == 0) {
 		/* timeout waiting on serial port */
 		syslog (LOG_ERR, "%s: Timeout writing to %s",
-			WTIid, ctx->device);
+			RPCid, ctx->device);
 		return S_TIMEOUT;
 	} else if ((return_val == -1) || FD_ISSET(ctx->fd, &xfds)) {
 		/* an error occured */
 		syslog (LOG_ERR, "%s: Error before writing to %s: %s",
-			WTIid, ctx->device, strerror(errno));		
+			RPCid, ctx->device, strerror(errno));		
 		return S_OOPS;
 	}
 
 	/* send the command */
-	if (write(ctx->fd, writebuf, strlen(writebuf)) != strlen(writebuf)) {
+	if (write(ctx->fd, writebuf, strlen(writebuf)) != 
+			(int)strlen(writebuf)) {
 		syslog (LOG_ERR, "%s: Error writing to  %s : %s",
-			WTIid, ctx->device, strerror(errno));
+			RPCid, ctx->device, strerror(errno));
 		return S_OOPS;
 	}
 
@@ -389,10 +386,10 @@ static int
 RPCReset(struct NW_RPC100S* ctx, int unitnum, const char * rebootid)
 {
 
-	if (gbl_debug) printf ("Calling RPCReset (%s)\n", WTIid);
+	if (gbl_debug) printf ("Calling RPCReset (%s)\n", RPCid);
 	
 	if (ctx->fd < 0) {
-		syslog(LOG_ERR, "%s: device %s is not open!", WTIid, 
+		syslog(LOG_ERR, "%s: device %s is not open!", RPCid, 
 		       ctx->device);
 		return S_OOPS;
 	}
@@ -420,7 +417,7 @@ RPCOn(struct NW_RPC100S* ctx, int unitnum, const char * host)
 {
 
 	if (ctx->fd < 0) {
-		syslog(LOG_ERR, "%s: device %s is not open!", WTIid, 
+		syslog(LOG_ERR, "%s: device %s is not open!", RPCid, 
 		       ctx->device);
 		return S_OOPS;
 	}
@@ -447,7 +444,7 @@ RPCOff(struct NW_RPC100S* ctx, int unitnum, const char * host)
 {
 
 	if (ctx->fd < 0) {
-		syslog(LOG_ERR, "%s: device %s is not open!", WTIid, 
+		syslog(LOG_ERR, "%s: device %s is not open!", RPCid, 
 		       ctx->device);
 		return S_OOPS;
 	}
@@ -479,7 +476,7 @@ nw_rpc100s_status(Stonith  *s)
 {
 	struct NW_RPC100S*	ctx;
 	
-	if (gbl_debug) printf ("Calling nw_rpc100s_status (%s)\n", WTIid);
+	if (gbl_debug) printf ("Calling nw_rpc100s_status (%s)\n", RPCid);
 	
 	if (!ISNWRPC100S(s)) {
 		syslog(LOG_ERR, "invalid argument to RPC_status");
@@ -521,7 +518,7 @@ nw_rpc100s_hostlist(Stonith  *s)
 	char **		ret = NULL;	/* list to return */
 	struct NW_RPC100S*	ctx;
 
-	if (gbl_debug) printf ("Calling nw_rpc100s_hostlist (%s)\n", WTIid);
+	if (gbl_debug) printf ("Calling nw_rpc100s_hostlist (%s)\n", RPCid);
 	
 	if (!ISNWRPC100S(s)) {
 		syslog(LOG_ERR, "invalid argument to RPC_list_hosts");
@@ -616,7 +613,7 @@ RPC_parse_config_info(struct NW_RPC100S* ctx, const char * info)
 	token = strtok (copy, " \t");
 	if (!token) {
 		syslog(LOG_ERR, "%s: Can't find serial device on config line '%s'",
-		       WTIid, info);
+		       RPCid, info);
 		goto token_error;		
 	}
 
@@ -631,7 +628,7 @@ RPC_parse_config_info(struct NW_RPC100S* ctx, const char * info)
 	token = strtok (NULL, " \t");
 	if (!token) {
 		syslog(LOG_ERR, "%s: Can't find node name on config line '%s'",
-		       WTIid, info);
+		       RPCid, info);
 		goto token_error;		
 	}
 
@@ -680,7 +677,7 @@ RPCConnect(struct NW_RPC100S * ctx)
 		ctx->fd = open (ctx->device, O_RDWR);
 		if (ctx->fd <0) {
 			syslog (LOG_ERR, "%s: Can't open %s : %s",
-				WTIid, ctx->device, strerror(errno));
+				RPCid, ctx->device, strerror(errno));
 			return S_OOPS;
 		}
 
@@ -700,7 +697,7 @@ RPCConnect(struct NW_RPC100S * ctx)
 
 		if (tcsetattr (ctx->fd, TCSANOW, &tio) < 0) {
 			syslog (LOG_ERR, "%s: Can't set attributes %s : %s",
-				WTIid, ctx->device, strerror(errno));
+				RPCid, ctx->device, strerror(errno));
 			close (ctx->fd);
 			ctx->fd=-1;
 			return S_OOPS;
@@ -708,7 +705,7 @@ RPCConnect(struct NW_RPC100S * ctx)
 		/* flush all data to and fro the serial port before we start */
 		if (tcflush (ctx->fd, TCIOFLUSH) < 0) {
 			syslog (LOG_ERR, "%s: Can't flush %s : %s",
-				WTIid, ctx->device, strerror(errno));
+				RPCid, ctx->device, strerror(errno));
 			close (ctx->fd);
 			ctx->fd=-1;
 			return S_OOPS;		
@@ -778,7 +775,7 @@ nw_rpc100s_reset_req(Stonith * s, int request, const char * host)
 	int outletnum = -1;
 	struct NW_RPC100S*	ctx;
 	
-	if (gbl_debug) printf ("Calling nw_rpc100s_reset (%s)\n", WTIid);
+	if (gbl_debug) printf ("Calling nw_rpc100s_reset (%s)\n", RPCid);
 	
 	if (!ISNWRPC100S(s)) {
 		syslog(LOG_ERR, "invalid argument to RPC_reset_host");
@@ -945,7 +942,7 @@ nw_rpc100s_destroy(Stonith *s)
 	}
 	ctx = (struct NW_RPC100S *)s->pinfo;
 
-	ctx->WTIid = NOTwtiid;
+	ctx->RPCid = NOTrpcid;
 
 	/*  close the fd if open and set ctx->fd to invalid */
 	RPCDisconnect(ctx);
@@ -978,7 +975,7 @@ nw_rpc100s_new(void)
 		return(NULL);
 	}
 	memset(ctx, 0, sizeof(*ctx));
-	ctx->WTIid = WTIid;
+	ctx->RPCid = RPCid;
 	ctx->fd = -1;
 	ctx->config = 0;
 	ctx->device = NULL;

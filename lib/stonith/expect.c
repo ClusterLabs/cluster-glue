@@ -42,10 +42,6 @@
 #	include <sched.h>
 #endif
 
-#ifndef EOS
-#	define	EOS '\0'
-#endif
-
 #include <stonith/stonith.h>
 
 

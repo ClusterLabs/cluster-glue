@@ -49,7 +49,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.6 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.7 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -197,7 +197,6 @@ static const char * NOTmsid = "Hey dummy, this has been destroyed (APCMS)";
 #	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
 #endif
 
-#define DIMOF(a)	(sizeof(a)/sizeof(a[0]))
 #define WHITESPACE	" \t\n\r\f"
 
 #define	REPLSTR(s,v)	{					\

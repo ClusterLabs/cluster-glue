@@ -63,7 +63,7 @@ struct apphb_signupmsg {
 /* App heartbeat setinterval / setwarn message */
 struct apphb_msmsg {
 	char	msgtype [APPHB_TLEN];
-	int	ms;
+	unsigned long	ms;
 };
 
 /* App heartbeat server return code (errno) */

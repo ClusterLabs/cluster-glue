@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <sys/times.h>
 #include <clplumbing/longclock.h>
+#include <portability.h>
 
 /*
  * We track processes, mainly so we can do something appropriate
@@ -52,7 +53,7 @@ struct _ProcTrack {
 	ProcTrack_ops*		ops;
 
 	longclock_t		startticks;
-	time_t			starttime;
+	TIME_T			starttime;
 };
 
 /*

@@ -142,8 +142,8 @@ struct IPC_AUTH {
 
 /* Message structure. */
 struct IPC_MESSAGE{
-	unsigned long		msg_len;
-	void*			msg_body;
+	size_t	msg_len;
+	void*	msg_body;
 /* 
  * IPC_MESSAGE::msg_done 
  *   the callback function pointer which can be called after this 

@@ -34,7 +34,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <signal.h>
 #include <string.h>
 #include <errno.h>
 #include <syslog.h>
@@ -49,6 +48,7 @@
 #include <sys/termios.h>
 
 #include <stonith/stonith.h>
+#include "stonith_signal.h"
 
 #define PIL_PLUGINTYPE          STONITH_TYPE
 #define PIL_PLUGINTYPE_S        STONITH_TYPE_S
@@ -280,9 +280,6 @@ static const char * NOTrcd_serialID = "Hey, dummy this has been destroyed (RCD_S
 #ifndef MALLOCT
 #	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
 #endif
-
-#define DIMOF(a)	(sizeof(a)/sizeof(a[0]))
-
 
 #define N_(text)	(text)
 #define _(text)		dgettext(ST_TEXTDOMAIN, text)
