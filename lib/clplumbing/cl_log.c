@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.36 2005/02/28 22:51:10 gshi Exp $ */
+/* $Id: cl_log.c,v 1.37 2005/03/02 22:54:29 alan Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -259,7 +259,7 @@ cl_log(int priority, const char * fmt, ...)
 	va_list		ap;
 	char		buf[MAXLINE];
 	int		logpri = LOG_PRI(priority);
-	int		nbytes;
+	ssize_t		nbytes;
 	const char *	pristr;
 	int	needprivs = !cl_have_full_privs();
 	static int	cl_log_depth = 0;
@@ -284,7 +284,7 @@ cl_log(int priority, const char * fmt, ...)
 	nbytes=vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 	
-	if (nbytes >= sizeof(buf)){
+	if (nbytes >= (ssize_t)sizeof(buf)){
 		nbytes =  sizeof(buf) -1 ;
 	}
 	

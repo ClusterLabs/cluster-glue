@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.23 2005/02/09 01:45:05 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.24 2005/03/02 22:54:29 alan Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -254,7 +254,7 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 	
 	while(TRUE){
 		/*not enough data for head*/
-		if (pool->currpos - pool->consumepos < ch->msgpad){
+		if ((int)(pool->currpos - pool->consumepos) < (int)ch->msgpad){
 			break;
 		}
 		
@@ -320,12 +320,12 @@ ipc_bufpool_full(struct ipc_bufpool* pool,
 
 	*dataspaceneeded = 0;
 	/* not enough space for head */
-	if (pool->endpos - pool->consumepos < ch->msgpad){
+	if ((int)(pool->endpos - pool->consumepos) < (int)ch->msgpad){
 		return TRUE;
 	}
 	
 	/*enough space for head*/
-	if (pool->currpos - pool->consumepos >= ch->msgpad){
+	if ((int)(pool->currpos - pool->consumepos) >= (int)ch->msgpad){
 		memcpy(head, pool->consumepos, sizeof(struct SOCKET_MSG_HEAD));
 		
 		/* not enough space for data*/
@@ -365,7 +365,7 @@ ipc_bufpool_partial_copy(struct ipc_bufpool* dstpool,
 	}
 	
 	if (srcpool->currpos - srcpool->consumepos >=
-	    sizeof(struct SOCKET_MSG_HEAD)){
+	    (ssize_t)sizeof(struct SOCKET_MSG_HEAD)){
 		
 		memcpy(head, srcpool->consumepos, sizeof(struct SOCKET_MSG_HEAD));
 		space_needed = head->msg_len + sizeof(*head);

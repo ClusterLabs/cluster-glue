@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.125 2005/02/23 18:12:10 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.126 2005/03/02 22:54:29 alan Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1158,7 +1158,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 		if (msg->msg_buf ){
 			diff = (char*)msg->msg_body - (char*)msg->msg_buf;				
 		}
-		if ( diff < sizeof(struct SOCKET_MSG_HEAD) ){
+		if ( diff < (int)sizeof(struct SOCKET_MSG_HEAD) ){
 			/* either we don't have msg->msg_buf set
 			 * or we don't have enough bytes for socket head
 			 * we delete this message and creates 
