@@ -1,4 +1,4 @@
-/* $Id: apphb_cs.h,v 1.8 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: apphb_cs.h,v 1.9 2004/11/08 09:07:51 sunjd Exp $ */
 /*
  * Copyright (C) 2002 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -56,6 +56,7 @@ struct apphb_signupmsg {
 	char msgtype [APPHB_TLEN];
 	char appname [APPHB_OLEN];
 	char appinstance [APPHB_OLEN];
+	char curdir [APPHB_OLEN];
 	pid_t	pid;
 	uid_t	uid;
 	gid_t	gid;
