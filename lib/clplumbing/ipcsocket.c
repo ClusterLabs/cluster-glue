@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.129 2005/03/18 20:48:14 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.130 2005/03/23 00:22:38 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -580,6 +580,11 @@ socket_destroy_channel(struct IPC_CHANNEL * ch)
 	socket_disconnect(ch);
 	socket_destroy_queue(ch->send_queue);
 	socket_destroy_queue(ch->recv_queue);
+
+	if (ch->pool){
+		ipc_bufpool_unref(ch->pool);
+	}
+
 	if (ch->ch_private != NULL) {
 		struct SOCKET_CH_PRIVATE *priv = (struct SOCKET_CH_PRIVATE *)
 			ch->ch_private;
