@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.117 2005/02/06 05:54:42 alan Exp $ */
+/* $Id: ipcsocket.c,v 1.118 2005/02/07 19:10:48 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1624,8 +1624,8 @@ socket_client_channel_new(GHashTable *ch_attrs) {
 
   path_name = (char *) g_hash_table_lookup(ch_attrs, IPC_PATH_ATTR);
   if (path_name != NULL) { 
-    if (strlen(path_name) >= sizeof(conn_info->path_name)) {
-      	return NULL;
+	  if (strlen(path_name) >= sizeof(conn_info->path_name)) {
+	    return NULL;
     }
     /* prepare the socket */
     if ((sockfd = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
@@ -1635,7 +1635,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   }else{
     return NULL;
   }
-
+  
   temp_ch = g_new(struct IPC_CHANNEL, 1);
   if (temp_ch == NULL){
 	  cl_log(LOG_ERR, "socket_server_channel_new:"
@@ -1644,8 +1644,8 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   }
   memset(temp_ch, 0, sizeof(struct IPC_CHANNEL));
   
-
-
+  
+  
   conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
   conn_info->peer_addr = NULL;
   
@@ -1665,22 +1665,26 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   if(bind(sockfd, (struct sockaddr*)&sock_addr, SUN_LEN(&sock_addr)) < 0) {
 	  perror("Client bind() failure");
 	  close(sockfd);
-	  free(conn_info); conn_info = NULL;
+	  g_free(conn_info); conn_info = NULL;
+	  g_free(temp_ch);
 	  return NULL;
   }
 #endif
   
   flags = fcntl(sockfd, F_GETFL, O_NONBLOCK);
   if (flags == -1) {
-    cl_perror("socket_client_channel_new: cannot read file descriptor flags");
-    free(conn_info); conn_info = NULL;
-    close(sockfd);
+	  cl_perror("socket_client_channel_new: cannot read file descriptor flags");
+	  g_free(conn_info); conn_info = NULL;
+	  g_free(temp_ch);
+	  close(sockfd);
     return NULL;
   }
   flags |= O_NONBLOCK;
   if (fcntl(sockfd, F_SETFL, flags) < 0) {
     cl_perror("socket_client_channel_new: cannot set O_NONBLOCK");
     close(sockfd);
+    g_free(conn_info);
+    g_free(temp_ch);
     return NULL;
   }
 
@@ -1723,17 +1727,19 @@ socket_server_channel_new(int sockfd){
   memset(temp_ch, 0, sizeof(struct IPC_CHANNEL));
   
   conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
-
+  
   flags = fcntl(sockfd, F_GETFL, O_NONBLOCK);
   if (flags == -1) {
-    cl_perror("socket_server_channel_new: cannot read file descriptor flags");
-    free(conn_info); conn_info = NULL;
-    return NULL;
+	  cl_perror("socket_server_channel_new: cannot read file descriptor flags");
+	  g_free(conn_info); conn_info = NULL;
+	  g_free(temp_ch);
+	  return NULL;
   }
   flags |= O_NONBLOCK;
   if (fcntl(sockfd, F_SETFL, flags) < 0) {
-    cl_perror("socket_server_channel_new: cannot set O_NONBLOCK");
-    free(conn_info); conn_info = NULL;
+	  cl_perror("socket_server_channel_new: cannot set O_NONBLOCK");
+	  g_free(conn_info); conn_info = NULL;
+	  g_free(temp_ch);
     return NULL;
   }
 
