@@ -1,4 +1,4 @@
-/* $Id: pils.c,v 1.45 2005/01/08 06:01:17 alan Exp $ */
+/* $Id: pils.c,v 1.46 2005/01/10 17:18:05 lars Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -493,8 +493,8 @@ NewPILPluginUniv(const char * basepluginpath)
 /* Change memory allocation functions immediately  after creating universe */
 void
 PilPluginUnivSetMemalloc(PILPluginUniv* u
-,	void*	(*allocfun)(size_t size)
-,	void*	(*reallocfun)(void * ptr, size_t size)
+,	void*	(*allocfun)(unsigned long size)
+,	void*	(*reallocfun)(void * ptr, unsigned long size)
 ,	void	(*freefun)(void* space)
 ,	char*	(*strdupfun)(const char *s))
 {
