@@ -1,0 +1,63 @@
+.TH STONITH 8 "7 April 2001"
+.SH NAME
+stonith \- extensible interface for remotely powering down a node in the cluster
+.SH SYNOPSIS
+.br
+\fBstonith\fP [ -sv ] [ -t type ] [ -p param ] [ -F file ] -S nodename
+.br
+\fBstonith\fP [ -sv ] [ -t type ] [ -p param ] [ -F file ] -l
+.br
+\fBstonith\fP [ -sv ] -L
+.br
+\fBstonith\fP -h
+.SH DESCRIPTION
+The STONITH module (a.k.a. STOMITH) provides an extensible interface for
+remotely powering down a node in the cluster.  The idea is quite simple:
+When the software running on one machine wants to make sure another machine
+in the cluster is not using a resource, pull the plug on the other machine.
+It's simple and reliable, albiet admittedly brutal.
+.SH OPTIONS
+.TP
+.B \-F options-file:
+Path to file specifying option s for a device. To determine the syntax of
+the options-file for a given device run:
+.nf
+\fBstonith\fP -t <devicetype> <dummy-nodename>
+e.g.
+\fBstonith\fP -t rps10 test
+.fi
+.TP
+.B \-h:
+Display command line options and exit.
+.TP
+.B \-L:
+List the valid devicetypes, suitable for passing as an argument to the
+-t option.
+.TP
+.B \-l:
+List the configured nodes.
+.TP
+.B \-t devicetype:
+The type of device to be used to effect STONITH.
+A list of supported devices for an instalation of stonith may be obtained
+using the -L option.
+.TP
+.B \-p stonith-parameters:
+Parameters to pass directly to stonith device. These are the same format as
+a line in the options-file for a divice. See notes on determining the
+syntax for the options-file for a divice above.
+.TP
+.B \-S:
+Show the status of the node.
+.TP
+.B \-s:
+Silent operation. Suppress logging of error messages to standard error.
+.TP
+.B \-v:
+Ignored.
+.SH AUTHORS
+.nf
+stonith - Alan Robertson <alanr@unix.sh> et al.
+man page - Horms <horms@vergenet.net>
+.fi
+
