@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.48 2004/11/23 20:58:18 andrew Exp $ */
+/* $Id: lrmd.c,v 1.49 2004/11/25 03:27:31 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -76,7 +76,7 @@ typedef struct lrmd_op	lrmd_op_t;
 struct lrmd_op
 {
 	lrmd_rsc_t*	rsc;
-	lrmd_client_t*	client;
+	pid_t		client_id;
 	int		call_id;
 	int		exec_pid;
 	int		output_fd;
@@ -185,7 +185,7 @@ struct msg_map msg_maps[] = {
 	{REGISTER,	TRUE,	on_msg_register},
 	{GETRSCCLASSES,	FALSE,	on_msg_get_rsc_classes},
 	{GETRSCTYPES,	FALSE,	on_msg_get_rsc_types},
-	{GETPROVIDERS,	FALSE,  on_msg_get_rsc_providers},
+	{GETPROVIDERS,	FALSE,	on_msg_get_rsc_providers},
 	{ADDRSC,	TRUE,	on_msg_add_rsc},
 	{GETRSC,	FALSE,	on_msg_get_rsc},
 	{GETALLRCSES,	FALSE,	on_msg_get_all},
@@ -855,25 +855,12 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 	for(rsc_node = g_list_first(rsc_list);
 		NULL != rsc_node; rsc_node = g_list_next(rsc_node)){
 		rsc = (lrmd_rsc_t*)rsc_node->data;
-		/* remove pending ops belong to this client */
-		op_node = g_list_first(rsc->op_list);
-		while (NULL != op_node) {
-			op = (lrmd_op_t*)op_node->data;
-			if (op->client == client) {
-				op_node = g_list_next(op_node);
-				rsc->op_list = g_list_remove(rsc->op_list, op);
-				free_op(op);				
-			}
-			else {
-				op_node = g_list_next(op_node);
-			}
 
-		}
 		/* remove repeat ops belong to this client */
 		op_node = g_list_first(rsc->repeat_op_list);
 		while (NULL != op_node) {
 			op = (lrmd_op_t*)op_node->data;
-			if (op->client == client) {
+			if (op->client_id == client->pid) {
 				op_node = g_list_next(op_node);
 				rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
 				free_op(op);
@@ -1288,7 +1275,8 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			flush_op(op);
 		}
 	}
-	else if (0 == strncmp(type, CANCELOP, strlen(CANCELOP))) {
+	else
+	if (0 == strncmp(type, CANCELOP, strlen(CANCELOP))) {
 		int cancel_op_id;
 		ha_msg_value_int(msg, F_LRM_CALLID, &cancel_op_id);
 		
@@ -1331,7 +1319,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		op = g_new(lrmd_op_t, 1);
 		op->call_id = call_id;
 		op->exec_pid = -1;
-		op->client = client;
+		op->client_id = client->pid;
 		op->timeout_tag = -1;
 		op->rsc = rsc;
 		op->msg = ha_msg_copy(msg);
@@ -1521,14 +1509,15 @@ on_op_done(lrmd_op_t* op)
 		lrmd_log(LOG_DEBUG, "on_op_done: a normal op done.");
 		/* we have to check whether the client still exists */
 		/* for the client may signoff during the op running. */
-		if (NULL != g_list_find(client_list, op->client)) {
+		lrmd_client_t* client = lookup_client(op->client_id);
+		if (NULL != client) {
 			/* the client still exists */
-			if (NULL == op->client->ch_cbk) {
+			if (NULL == client->ch_cbk) {
 				lrmd_log(LOG_ERR,
 					"on_op_done: client->ch_cbk is null");
 			}
 			else
-			if (HA_OK != msg2ipcchan(op->msg, op->client->ch_cbk)) {
+			if (HA_OK != msg2ipcchan(op->msg, client->ch_cbk)) {
 				lrmd_log(LOG_ERR,
 					"on_op_done: can not send the ret msg");
 			}
@@ -1544,7 +1533,7 @@ on_op_done(lrmd_op_t* op)
 
 	op->rsc->last_op = g_new(lrmd_op_t, 1);
 	op->rsc->last_op->rsc = op->rsc;
-	op->rsc->last_op->client = op->client;
+	op->rsc->last_op->client_id = op->client_id;
 	op->rsc->last_op->call_id = op->call_id;
 	op->rsc->last_op->exec_pid = op->exec_pid;
 	op->rsc->last_op->output_fd = op->output_fd;
@@ -1556,7 +1545,7 @@ on_op_done(lrmd_op_t* op)
 	if( op->timeout_tag > 0 ) {
 		g_source_remove(op->timeout_tag);
 	}
-	if ( 0!=op->interval && NULL != g_list_find(client_list, op->client)
+	if ( 0!=op->interval && NULL != lookup_client(op->client_id)
 	&&   LRM_OP_CANCELLED != op_status) {
 		op->repeat_timeout_tag = g_timeout_add(op->interval,
 					on_repeat_op_done, op);
@@ -1635,6 +1624,8 @@ perform_op(lrmd_rsc_t* rsc)
 		}
 	}
 
+
+
 	lrmd_log(LOG_DEBUG, "perform_op: end.");
 	return HA_OK;
 }
@@ -1675,6 +1666,11 @@ perform_ra_op(lrmd_op_t* op)
 	if ( pipe(fd) < 0 ) {
 		lrmd_log(LOG_ERR,"pipe create error.");
 	}
+	op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
+	params = merge_str_tables(op->rsc->params,op_params);
+	free_str_table(op_params);
+	free_str_table(op->rsc->params);
+	op->rsc->params = params;
 
 	switch(pid=fork()) {
 		case -1:
@@ -1705,9 +1701,7 @@ perform_ra_op(lrmd_op_t* op)
 			}
 			op_type = ha_msg_value(op->msg, F_LRM_OP);
 
-			op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
-			params = merge_str_tables(op->rsc->params,op_params);
-
+			
 			/* Name of the resource and some others also
 			 * need to be passed in. Maybe pass through the
 			 * entire lrm_op_t too? */
@@ -1717,8 +1711,6 @@ perform_ra_op(lrmd_op_t* op)
 					op_type,
 					params);
 
-			free_str_table(op_params);
-			free_str_table(params);
 			/* execra should never return. */
 			exit(EXECRA_EXEC_UNKNOWN_ERROR);
 
@@ -2040,9 +2032,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
- * Revision 1.48  2004/11/23 20:58:18  andrew
- * Commit zhenh's patch for preserving user data across connections
- * Only supports flat objects (ie. char* or structs without pointers in them)
+ * Revision 1.49  2004/11/25 03:27:31  zhenh
+ * 1. Let the resource save the param of last operation.
+ * 2. Let LRM execute  the pending operations from disconnected client.
  *
  * Revision 1.47  2004/10/22 02:47:16  zhenh
  * rename the stop_op() to cancel_op()
