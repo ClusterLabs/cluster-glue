@@ -52,7 +52,7 @@ else
 apcmastersnmp_LIB =
 endif
 if USE_OPENIPMI
-OPENIPMI_LIB = -lOpenIPMI
+OPENIPMI_LIB = -lOpenIPMI -lOpenIPMIposix -lOpenIPMIutils
 ipmilan_LIB = ipmilan.la
 ipmilan_TEST = ipmilantest
 else
