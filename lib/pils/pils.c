@@ -1,4 +1,4 @@
-/* $Id: pils.c,v 1.46 2005/01/10 17:18:05 lars Exp $ */
+/* $Id: pils.c,v 1.47 2005/02/17 05:49:24 alan Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -716,8 +716,9 @@ PILSetDebugLevel(PILPluginUniv* u, const char * pitype, const char * piname
 {
 	struct set_debug_helper helper = {pitype, piname, level};
 
-	if (u == NULL)
+	if (u == NULL) {
 		return;
+	}
 
 	if (pitype == NULL) {
 		g_hash_table_foreach(u->PluginTypes
