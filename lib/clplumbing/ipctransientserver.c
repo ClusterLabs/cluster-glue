@@ -1,4 +1,4 @@
-/* $Id: ipctransientserver.c,v 1.9 2004/09/10 06:39:25 alan Exp $ */
+/* $Id: ipctransientserver.c,v 1.10 2004/09/20 18:32:52 msoffen Exp $ */
 /* 
  * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
  * 
@@ -16,6 +16,7 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#define _GNU_SOURCE
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>

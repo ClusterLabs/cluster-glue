@@ -1,7 +1,10 @@
-/* $Id: ipctest.c,v 1.24 2004/08/29 03:01:13 msoffen Exp $ */
+/* $Id: ipctest.c,v 1.25 2004/09/20 18:32:52 msoffen Exp $ */
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <errno.h>
-#include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -20,6 +23,7 @@ static int channelpair(TestFunc_t client, TestFunc_t server, int count);
 #if 0
 static void clientserverpair(IPC_Channel* channels[2]);
 #endif
+
 static int echoserver(IPC_Channel*, int repcount);
 static int echoclient(IPC_Channel*, int repcount);
 static int asyn_echoserver(IPC_Channel*, int repcount);
