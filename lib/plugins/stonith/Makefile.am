@@ -83,6 +83,7 @@ plugin_LTLIBRARIES =	apcmaster.la		\
 			apcsmart.la		\
 			baytech.la		\
 			$(drac3_LIB)		\
+			external.la		\
 			ibmhmc.la		\
 			$(ipmilan_LIB)		\
 			meatware.la		\
@@ -111,6 +112,22 @@ baytech_la_SOURCES	= baytech.c stonith_signal.h
 baytech_la_LDFLAGS	= -export-dynamic -module -avoid-version
 baytech_la_LIBADD	= $(GLIBLIB)
 
+drac3_la_SOURCES	= drac3.c drac3_command.c drac3_command.h drac3_hash.c drac3_hash.h
+drac3_la_LDFLAGS	= -export-dynamic -module -avoid-version -lcurl -lxml2 -lssl $(GLIBLIB)
+#drac3_la_LIBADD		= /usr/lib/libcurl.la
+
+external_la_SOURCES	= external.c
+external_la_LDFLAGS	= -export-dynamic -module -avoid-version
+external_la_LIBADD	= $(top_builddir)/replace/libreplace.la
+
+ibmhmc_la_SOURCES	= ibmhmc.c
+ibmhmc_la_LDFLAGS	= -export-dynamic -module -avoid-version
+ibmhmc_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
+
+ipmilan_la_SOURCES	= ipmilan.c ipmilan.h ipmilan_command.c 
+ipmilan_la_LDFLAGS	= -export-dynamic -module -avoid-version
+ipmilan_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(OPENIPMI_LIB) $(GLIBLIB)
+
 meatware_la_SOURCES	= meatware.c
 meatware_la_LDFLAGS	= -export-dynamic -module -avoid-version
 meatware_la_LIBADD	= $(GLIBLIB)
@@ -123,20 +140,16 @@ nw_rpc100s_la_SOURCES	= nw_rpc100s.c
 nw_rpc100s_la_LDFLAGS	= -export-dynamic -module -avoid-version
 nw_rpc100s_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
+rcd_serial_la_SOURCES	= rcd_serial.c
+rcd_serial_la_LDFLAGS	= -export-dynamic -module -avoid-version
+rcd_serial_la_LIBADD	= $(GLIBLIB)
+
 rps10_la_SOURCES	= rps10.c
 rps10_la_LDFLAGS	= -export-dynamic -module -avoid-version
 rps10_la_LIBADD		= $(GLIBLIB)
 
 ssh_la_SOURCES		= ssh.c
 ssh_la_LDFLAGS		= -export-dynamic -module -avoid-version
-
-ibmhmc_la_SOURCES		= ibmhmc.c
-ibmhmc_la_LDFLAGS		= -export-dynamic -module -avoid-version
-ibmhmc_la_LIBADD		= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
-
-ipmilan_la_SOURCES		= ipmilan.c ipmilan.h ipmilan_command.c 
-ipmilan_la_LDFLAGS		= -export-dynamic -module -avoid-version
-ipmilan_la_LIBADD		= $(top_builddir)/replace/libreplace.la $(OPENIPMI_LIB) $(GLIBLIB)
 
 vacm_la_SOURCES		= vacm.c
 vacm_la_LDFLAGS		= -export-dynamic -module -avoid-version
@@ -145,11 +158,3 @@ vacm_la_LIBADD		= $(top_builddir)/replace/libreplace.la
 wti_nps_la_SOURCES	= wti_nps.c stonith_signal.h
 wti_nps_la_LDFLAGS	= -export-dynamic -module -avoid-version
 wti_nps_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
-
-rcd_serial_la_SOURCES	= rcd_serial.c
-rcd_serial_la_LDFLAGS	= -export-dynamic -module -avoid-version
-rcd_serial_la_LIBADD	= $(GLIBLIB)
-
-drac3_la_SOURCES	= drac3.c drac3_command.c drac3_command.h drac3_hash.c drac3_hash.h
-drac3_la_LDFLAGS	= -export-dynamic -module -avoid-version -lcurl -lxml2 -lssl $(GLIBLIB)
-#drac3_la_LIBADD		= /usr/lib/libcurl.la

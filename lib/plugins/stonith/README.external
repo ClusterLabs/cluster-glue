@@ -1,0 +1,18 @@
+EXTERNAL module for Linux-HA STONITH
+
+
+This stonith plug in runs an external command written in your favorite
+language to shutdown the given host.  The external command should return
+a zero exit status after a successful shutdown, or non-zero exit status
+for a shutdown failure.  Failures notifications will be sent to syslog.
+
+To configure the plug in, add this line to /etc/ha.d/rpc.cfg
+
+stonith external
+
+/etc/ha.d/rpc.cfg should contain lines like the following:
+
+hostname.domain.org /path/to/command [argument]...
+otherhost.domain.org /path/to/command [argument]...
+
+Where /path/to/command gives the location of your shutdown script.
