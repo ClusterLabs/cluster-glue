@@ -6,3 +6,5 @@ Makefile
 *.lo
 *.la
 ipctest
+ipctransientclient
+ipctransientserver
