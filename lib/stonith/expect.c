@@ -1,4 +1,4 @@
-/* $Id: expect.c,v 1.13 2005/01/03 18:12:11 alan Exp $ */
+/* $Id: expect.c,v 1.14 2005/01/04 07:38:07 alan Exp $ */
 /*
  * Simple expect module for the STONITH library
  *
@@ -21,6 +21,7 @@
  */
 
 #include <portability.h>
+#include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -40,6 +41,7 @@
 #include <sys/times.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/socket.h>
 #include <netdb.h>
 #ifdef _POSIX_PRIORITY_SCHEDULING
 #	include <sched.h>
