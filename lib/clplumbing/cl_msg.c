@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.59 2005/03/02 22:54:29 alan Exp $ */
+/* $Id: cl_msg.c,v 1.60 2005/03/07 20:01:28 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -740,30 +740,6 @@ ha_msg_value_str_list(struct ha_msg * msg, const char * name)
 		list = g_list_append(list, element);
 	}
 	return list;
-}
-
-int
-ha_msg_add_str_list(struct ha_msg * msg, const char * name, GList* list)
-{
-	int i = 1;
-	if( NULL==msg||NULL==name||strnlen(name, MAX_NAME_LEN)>=MAX_NAME_LEN ){
-		return HA_FAIL;
-	}
-	
-	if (NULL != list) {
-		GList* element = g_list_first(list);
-		while (NULL != element) {
-			char* value = (char*)element->data;
-			if( HA_OK != cl_msg_list_add_string(msg,name,value)) {
-				cl_log(LOG_ERR,
-				"cl_msg_list_add_string failed");
-				return HA_FAIL;
-			}
-			element = g_list_next(element);
-			i++;
-		}
-	}
-	return HA_OK;
 }
 
 
@@ -2285,6 +2261,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.60  2005/03/07 20:01:28  gshi
+ * remove function ha_msg_add_str_list() (it is replaced by cl_msg_add_list() )
+ *
  * Revision 1.59  2005/03/02 22:54:29  alan
  * Fixed a number of signed/unsigned comparisions
  *
