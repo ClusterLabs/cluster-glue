@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.112 2004/12/14 22:15:17 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.113 2005/01/03 19:34:22 msoffen Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1242,7 +1242,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 			SocketIPCStats.nsent++;
 			orig_qlen = ch->send_queue->current_qlen--;
 			socket_check_flow_control(ch, orig_qlen, orig_qlen -1 );
-			*nmsg ++;
+			(*nmsg)++;
 		}
 	}
 	CHANAUDIT(ch);
