@@ -1,4 +1,4 @@
-/* $Id: ipctransientclient.c,v 1.7 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: ipctransientclient.c,v 1.8 2004/05/14 21:12:49 andrew Exp $ */
 /* 
  * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
  * 
@@ -100,9 +100,9 @@ main(int argc, char ** argv)
 
 IPC_Channel *
 init_client_ipc_comms(const char *child,
-					  gboolean (*dispatch)(IPC_Channel* source_data
-										   ,gpointer    user_data),
-					  void *user_data)
+		      gboolean (*dispatch)(IPC_Channel* source_data
+					   ,gpointer    user_data),
+		      void *user_data)
 {
     IPC_Channel *ch;
     GHashTable * attrs;
