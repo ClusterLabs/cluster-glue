@@ -173,6 +173,8 @@ static int socket_waitin(struct IPC_CHANNEL * ch);
 
 static int socket_waitout(struct IPC_CHANNEL * ch);
 
+static int socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started);
+
 /* socket object of the function table */
 static struct IPC_OPS socket_ops = {
   socket_destroy_channel,
@@ -564,23 +566,20 @@ socket_check_disc_pending(struct IPC_CHANNEL* ch)
  		return IPC_BROKEN;
 	}
 	
-	rc = ipc_pollfunc_ptr(&sockpoll, 1, 0);
-
-	if (rc < 0) {
-		cl_perror("check_disc_pending() bad poll");
-		return (errno == EINTR ? IPC_INTR : IPC_FAIL);
-	}
-
 	if (sockpoll.revents & POLLHUP) {
 		if (sockpoll.revents & POLLIN) {
 			ch->ch_status = IPC_DISC_PENDING;
-			return IPC_OK;
 		}
 #if 0
 		cl_log(LOG_INFO, "HUP without input");
 #endif
 		ch->ch_status = IPC_DISCONNECT;
 		return IPC_BROKEN;
+	}
+	
+	if (sockpoll.revents & POLLIN) {
+		int i;
+		socket_resume_io_read(ch,&i);
 	}
 	return IPC_OK;
 
@@ -742,7 +741,7 @@ socket_waitfor(struct IPC_CHANNEL * ch
 		}
 		
 		rc = ipc_pollfunc_ptr(&sockpoll, 1, -1);
-
+		
 		if (rc < 0) {
 			return (errno == EINTR ? IPC_INTR : IPC_FAIL);
 		}
