@@ -51,7 +51,7 @@ riloeclosepi(PILPlugin*pi)
 {
 }
 
-
+ 
 /*
  * riloecloseintf called as part of shutting down the riloe STONITH
  * interface.  If there was any global data allocated, or file descriptors
@@ -126,7 +126,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 
 #define	DEVICE	"RILOE STONITH device"
 #define WHITESPACE	" \t\n\r\f"
-#define RILOE_COMMAND   "/usr/lib/heartbeat/ribcl.py"
+#define RILOE_COMMAND   HALIB "/ribcl.py"
 
 /*
  *	Riloe STONITH device.  We are very agreeable, but don't do much :-)
@@ -164,7 +164,7 @@ riloe_status(Stonith  *s)
 {
 
 	if (!ISRILOEDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to RILOE_status");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RILOE_status");
 		return(S_OOPS);
 	}
 	return S_OK;
@@ -184,12 +184,12 @@ riloe_hostlist(Stonith  *s)
 	int		j;
 
 	if (!ISRILOEDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to RILOE_list_hosts");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RILOE_list_hosts");
 		return(NULL);
 	}
 	nd = (struct RiloeDevice*) s->pinfo;
 	if (nd->hostcount < 0) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in RILOE_list_hosts");
 		return(NULL);
 	}
@@ -197,7 +197,7 @@ riloe_hostlist(Stonith  *s)
 
 	ret = (char **)MALLOC(numnames*sizeof(char*));
 	if (ret == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return ret;
 	}
 
@@ -272,7 +272,7 @@ RILOE_parse_config_info(struct RiloeDevice* nd, const char * info)
 
 	ret = (char **)MALLOC(numnames*sizeof(char*));
 	if (ret == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return S_OOPS;
 	}
 
@@ -308,17 +308,17 @@ riloe_reset_req(Stonith * s, int request, const char * host)
 	char cmd[4096];
 
 	if (!ISRILOEDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to %s", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to %s", __FUNCTION__);
 		return(S_OOPS);
 	}
-	syslog(LOG_INFO, "%s '%s'", _("riloe-reset host"), host);
+	PILCallLog(PluginImports->log,PIL_INFO, "%s '%s'", _("riloe-reset host"), host);
 
 	sprintf(cmd, "%s %s reset", RILOE_COMMAND, host);
 
 	if (system(cmd) == 0)
 		return S_OK;
 	else {
-		syslog(LOG_ERR, "command %s failed", cmd);
+		PILCallLog(PluginImports->log,PIL_CRIT, "command %s failed", cmd);
 		return(S_RESETFAIL);
 	}
 }
@@ -337,13 +337,13 @@ riloe_set_config_file(Stonith* s, const char * configname)
 	struct RiloeDevice*	nd;
 
 	if (!ISRILOEDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to RILOE_set_configfile");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RILOE_set_configfile");
 		return(S_OOPS);
 	}
 	nd = (struct RiloeDevice*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		syslog(LOG_ERR, "Cannot open %s", configname);
+		PILCallLog(PluginImports->log,PIL_CRIT, "Cannot open %s", configname);
 		return(S_BADCONFIG);
 	}
 	while (fgets(RILOEline, sizeof(RILOEline), cfgfile) != NULL){
@@ -364,7 +364,7 @@ riloe_set_config_info(Stonith* s, const char * info)
 	struct RiloeDevice* nd;
 
 	if (!ISRILOEDEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
 		return(S_OOPS);
 	}
 	nd = (struct RiloeDevice *)s->pinfo;
@@ -379,7 +379,7 @@ riloe_getinfo(Stonith * s, int reqtype)
 	char *		ret;
 
 	if (!ISRILOEDEV(s)) {
-		syslog(LOG_ERR, "RILOE_idinfo: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "RILOE_idinfo: invalid argument");
 		return NULL;
 	}
 	/*
@@ -425,7 +425,7 @@ riloe_destroy(Stonith *s)
 	struct RiloeDevice* nd;
 
 	if (!ISRILOEDEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
 		return;
 	}
 	nd = (struct RiloeDevice *)s->pinfo;
@@ -446,7 +446,7 @@ riloe_new(void)
 	struct RiloeDevice*	nd = MALLOCT(struct RiloeDevice);
 
 	if (nd == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(nd, 0, sizeof(*nd));

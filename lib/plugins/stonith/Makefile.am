@@ -26,7 +26,9 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 
 AM_CFLAGS			= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 			-DSTONITH_MODULES='"$(stonithlibdir)"' \
-			-DLOCALEDIR='"@LOCALE@"' 
+			-DLOCALEDIR='"@LOCALE@"' 		\
+			-DHALIB='$(halibdir)'
+
 
 EXTRA_DIST = README.meatware README.rcd_serial README.vacm README.drac3 README.ipmilan
 
