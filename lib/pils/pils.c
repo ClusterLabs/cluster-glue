@@ -1925,6 +1925,20 @@ PILPluginTypeListPlugins(PILPluginType* pitype
 
 	return result;
 }
+/* Return (sorted) list of available plugin names */
+char**
+PILListPlugins(PILPluginUniv* u, const char * pitype
+,	int *		picount	/* Can be NULL ... */)
+{
+	PILPluginType*	t;
+	if ((t = g_hash_table_lookup(u->PluginTypes, pitype)) == NULL) {
+		if (picount) {
+			*picount = 0;
+		}
+		return NULL;
+	}
+	return PILPluginTypeListPlugins(t, picount);
+}
 
 void
 PILFreePluginList(char ** pluginlist)
