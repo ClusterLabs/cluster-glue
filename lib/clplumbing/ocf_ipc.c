@@ -60,22 +60,23 @@ ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid)
   temp_auth->gid = g_hash_table_new(g_int_hash, g_int_equal);
 
   if (num_uid > 0) {
-    temp_auth->check_uid = TRUE;
     for (i=0; i<num_uid; i++) {
       g_hash_table_insert(temp_auth->uid, &a_uid[i], &v);
     }
-  }else{
-    temp_auth->uid = FALSE;
   }
 
   if (num_gid > 0) {
-    temp_auth->check_gid = TRUE;
     for (i=0; i<num_gid; i++) {
       g_hash_table_insert(temp_auth->gid, &a_gid[i], &v);
     }
-  }else{
-    temp_auth->gid = FALSE;
   }
 
   return temp_auth;
+}
+
+void
+ipc_destroy_auth(struct OCF_IPC_AUTH *auth)
+{
+  if(auth != NULL)
+    free((void *)auth);
 }
