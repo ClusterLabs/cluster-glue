@@ -1,4 +1,4 @@
-#!/usr/bin/python2.2
+#!@PYTHON@
 import sys
 import socket
 from httplib import *
