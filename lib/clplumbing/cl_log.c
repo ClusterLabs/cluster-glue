@@ -4,6 +4,7 @@
 #include <string.h>
 #include <errno.h>
 #include <syslog.h>
+#include <time.h>
 #include <clplumbing/ipc.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/loggingdaemon.h>
