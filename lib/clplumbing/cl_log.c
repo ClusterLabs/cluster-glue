@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.27 2005/02/02 08:13:21 gshi Exp $ */
+/* $Id: cl_log.c,v 1.28 2005/02/03 01:15:35 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -297,7 +297,7 @@ cl_log(int priority, const char * fmt, ...)
 	
 	if ( use_logging_daemon && 
 	     cl_log_depth <= 1 &&
-	     LogToLoggingDaemon(priority, buf, nbytes, TRUE) == HA_OK){
+	     LogToLoggingDaemon(priority, buf, nbytes + 1, TRUE) == HA_OK){
 		goto LogDone;
 	}else {
 		cl_direct_log(priority, buf, TRUE, NULL);
