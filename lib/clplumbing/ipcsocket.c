@@ -269,7 +269,7 @@ socket_initiate_connection(struct IPC_CHANNEL * ch)
   
   /* prepare the socket */
   memset(&peer_addr, 0, sizeof(peer_addr));
-  peer_addr.sun_family = AF_UNIX;    /* host byte order */ 
+  peer_addr.sun_family = AF_LOCAL;    /* host byte order */ 
 
   if (strlen(conn_info->path_name) >= sizeof(peer_addr.sun_path)) {
     return IPC_FAIL;
@@ -670,7 +670,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   }
 
   /* prepare the unix domain socket */
-  if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+  if ((s = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
     cl_perror("socket_wait_conn_new: socket() failure");
     return NULL;
   }
@@ -679,7 +679,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     cl_perror("socket_wait_conn_new: unlink failure");
   }
   memset(&my_addr, 0, sizeof(my_addr));
-  my_addr.sun_family = AF_UNIX;         /* host byte order */
+  my_addr.sun_family = AF_LOCAL;         /* host byte order */
 
   if (strlen(path_name) >= sizeof(my_addr.sun_path)) {
     close(s);
@@ -689,7 +689,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   strncpy(my_addr.sun_path, path_name, sizeof(my_addr.sun_path));
     
   if (bind(s, (struct sockaddr *)&my_addr, sizeof(my_addr)) == -1) {
-    cl_perror("socket_wait_conn_new: bind");
+    cl_perror("socket_wait_conn_new: trying to create in %s bind:", path_name);
     close(s);
     return NULL;
   }
@@ -762,7 +762,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
       	return NULL;
     }
     /* prepare the socket */
-    if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+    if ((sockfd = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
       cl_perror("socket_client_channel_new: socket");
       return NULL;
     }
