@@ -25,13 +25,13 @@ static char b64chars[]
 
 /* Convert from binary to a base64 string (~ according to RFC1341) */
 int
-binary_to_base64(void * data, int nbytes, char * output, int outlen)
+binary_to_base64(const void * data, int nbytes, char * output, int outlen)
 {
 	int	requiredlen = B64_stringlen(nbytes)+1; /* EOS */
 	char *		outptr;
-	unsigned char *	inmax;
-	unsigned char *	inlast;
-	unsigned char *	inptr;
+	const unsigned char *	inmax;
+	const unsigned char *	inlast;
+	const unsigned char *	inptr;
 	int	bytesleft;
 
 	(void)_ha_msg_h_Id;
@@ -149,11 +149,11 @@ init_b64_values(void)
 
 /* Convert from a base64 string (~ according to RFC1341) to binary */
 int
-base64_to_binary(char * in, int inlen, void * output, int outlen)
+base64_to_binary(const char * in, int inlen, void * output, int outlen)
 {
 	int maxbinlen = B64_maxbytelen(inlen); /* Worst case size */
-	char *		input = in;
-	char *		lastinput = in + inlen - B64outunit;
+	const char *		input = in;
+	const char *		lastinput = in + inlen - B64outunit;
 	int		equalcount = 0;
 	unsigned char *	startout;
 	unsigned char *	out;
