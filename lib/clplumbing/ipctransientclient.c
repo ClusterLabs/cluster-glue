@@ -155,6 +155,8 @@ main(int argc, char ** argv)
     client_send_message("hello world", server_channel, lpc);
     
     client_send_message("hello world again", server_channel, lpc);
+
+    server_channel->ops->waitout(server_channel);
     
     /* wait for the reply by creating a mainloop and running it until
      * the callbacks are invoked...
@@ -285,7 +287,7 @@ client_send_message(const char *message_text,
 	cl_shortsleep();
     }
     
-    if(server_channel->ch_status != IPC_OK)
+    if(server_channel->ch_status != IPC_CONNECT)
     {
 	cl_log(LOG_ERR, "[Client %d] Channel is disconnected (status=%d) after first message",
 	       iteration, server_channel->ch_status);
