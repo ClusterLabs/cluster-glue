@@ -311,11 +311,12 @@ static int
 socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 {
 	int result;
-	struct pollfd sockpoll;
 
 	result = ch->ops->resume_io(ch);
 
-	if ((result == IPC_OK) && (ch->recv_queue->current_qlen != 0)) {
+	*message = NULL;
+
+	if (ch->recv_queue->current_qlen != 0) {
 		GList *element = g_list_first(ch->recv_queue->queue);
 
 		if (element != NULL) {
@@ -325,34 +326,45 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 			=	g_list_remove(ch->recv_queue->queue
 			,	element->data);
 			ch->recv_queue->current_qlen--;
-	
 			return IPC_OK;
+		}else{
+			/* Internal accounting error, but correctable */
+			cl_log(LOG_ERR
+			, "recv failure: qlen (%d) > 0, but no message found."
+			,	ch->recv_queue->current_qlen);
+			ch->recv_queue->current_qlen = 0;
+			return result;
 		}
+	}else{
+		return result;	
 	}
+	
+	/* Not reached */
+}
 
-	if (ch->ch_status == IPC_DISCONNECT) {
+static int
+socket_check_poll(struct IPC_CHANNEL * ch
+,		struct pollfd * sockpoll)
+{
+	if (sockpoll->revents & POLLHUP) {
+		ch->ch_status = IPC_DISCONNECT;
 		return IPC_BROKEN;
+	}else if (sockpoll->revents & (POLLNVAL|POLLERR)) {
+		cl_log(LOG_ERR
+		,	"revents failure: fd %d, flags 0x%x"
+		,	sockpoll->fd, sockpoll->revents);
+		errno = EINVAL;
+		return IPC_FAIL;
 	}
-	result = IPC_FAIL;
-	*message = NULL;
-
-	if ((sockpoll.fd = socket_get_recv_fd(ch)) >= 0) {
-		/* Check if our peer still exists */
-		sockpoll.events = POLLHUP;
-		if ((ourpollfunc(&sockpoll, 1, 0)) && sockpoll.revents) {
-			ch->ch_status = IPC_DISCONNECT;
-			return IPC_BROKEN;
-		}
-	}
-	errno = EAGAIN;
-	return result;
+	
+	return IPC_OK;
 }
 
 static int
 socket_waitfor(struct IPC_CHANNEL * ch
 ,	gboolean (*finished)(struct IPC_CHANNEL * ch))
 {
-	struct pollfd sockpoll[2];
+	struct pollfd sockpoll;
 
 	if (finished(ch)) {
 		return IPC_OK;
@@ -361,56 +373,28 @@ socket_waitfor(struct IPC_CHANNEL * ch
  	if (ch->ch_status == IPC_DISCONNECT) {
  		return IPC_BROKEN;
 	}
-	sockpoll[0].fd = ch->ops->get_recv_select_fd(ch);
-	sockpoll[1].fd = ch->ops->get_send_select_fd(ch);
-	sockpoll[1].events = POLLHUP|POLLNVAL|POLLERR|POLLOUT;
-
-
+	sockpoll.fd = ch->ops->get_recv_select_fd(ch);
+	
 	while (!finished(ch)) {
 		int	rc;
-		int	nfd = 1;
 
-		sockpoll[0].events = POLLHUP|POLLNVAL|POLLERR|POLLIN;
-
-		/* CANNOT call is_sending_blocked() here! */
-		/* (it calls resume_io) */
+		sockpoll.events = POLLIN;
+		
+		/* Cannot call is_sending_blocked(), because it calls
+		 * resume_io! */
 		if (ch->send_queue->current_qlen > 0) {
-			if (sockpoll[0].fd == sockpoll[1].fd) {
-				sockpoll[0].events |= POLLOUT;
-			}else{
-				nfd=2;
-			}
+			sockpoll.events |= POLLOUT;
 		}
-
-
-		rc = ourpollfunc(sockpoll, nfd, -1);
+		
+		rc = ourpollfunc(&sockpoll, 1, -1);
 
 		if (rc < 0) {
 			return (errno == EINTR ? IPC_INTR : IPC_FAIL);
 		}
-		if (sockpoll[0].revents & POLLHUP) {
- 			ch->ch_status = IPC_DISCONNECT;
- 			return IPC_BROKEN;
-		}
-		if (sockpoll[0].revents & (POLLNVAL|POLLERR)) {
-			cl_log(LOG_ERR
-			,	"revents[0] failure: fd %d, flags 0x%x"
-			,	sockpoll[0].fd, sockpoll[0].revents);
-			errno = EINVAL;
- 			return IPC_FAIL;
-		}
-		if (nfd == 2) {
-			if (sockpoll[1].revents & POLLHUP) {
-				ch->ch_status = IPC_DISCONNECT;
-				return IPC_BROKEN;
-			}
-			if (sockpoll[1].revents & (POLLNVAL|POLLERR)) {
-				cl_log(LOG_ERR
-				,	"revents[1] failed: fd %d, flags 0x%x"
-				,	sockpoll[1].fd, sockpoll[1].revents);
-				errno = EINVAL;
-				return IPC_FAIL;
-			}
+
+		rc = socket_check_poll(ch, &sockpoll);
+		if (rc) {
+			return rc;
 		}
 	}
 
@@ -484,7 +468,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 {
 	struct SOCKET_CH_PRIVATE*	conn_info;
 	int				retcode = IPC_OK;
-	
+	struct pollfd			sockpoll;	
 
 	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 	*started = FALSE;
@@ -588,9 +572,19 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 		}
 	}
 
+	/* Check for errors uncaught by recv() */
+	if((retcode == IPC_OK) 
+	  && (sockpoll.fd = conn_info->s) != -1) {
+		/* Just check for errors, not for data */
+		sockpoll.events = 0;
+		ourpollfunc(&sockpoll, 1, 0);
+		retcode = socket_check_poll(ch,&sockpoll);
+	}
+	
 	if (retcode != IPC_OK) {
 		return retcode;
 	}
+
 	return ch->ch_status == IPC_CONNECT ? IPC_OK : IPC_BROKEN;
 }
 
@@ -677,7 +671,6 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 			}
 			break;
 		}
-		*started=TRUE;
     
 		ch->send_queue->queue = g_list_remove(ch->send_queue->queue
 		,	msg);

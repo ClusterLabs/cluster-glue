@@ -291,7 +291,7 @@ struct IPC_OPS{
  * Parameters:
  *   ch  (IN) : the channel which contains the connection.
  *   msg (OUT): the IPC_MESSAGE** pointer which contains the pointer
- *		to the recevied message or NULL if there is no
+ *		to the received message or NULL if there is no
  *		message available.
  *
  * Return values:
