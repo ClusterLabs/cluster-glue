@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.11 2005/02/17 15:49:50 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.12 2005/03/02 22:54:29 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -405,7 +405,7 @@ cl_realloc(void *ptr, size_t newsize)
 {
 	struct cl_bucket*	bhdr;
 	int			bucket;
-	int			bucksize;
+	size_t			bucksize;
 
 	if (!cl_malloc_inityet) {
 		cl_malloc_init();

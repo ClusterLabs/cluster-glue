@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.58 2005/02/25 11:16:55 lars Exp $ */
+/* $Id: cl_msg.c,v 1.59 2005/03/02 22:54:29 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -114,7 +114,7 @@ cl_set_msg_format(enum cl_msgfmt mfmt)
 void
 list_cleanup(GList* list)
 {
-	int i;
+	size_t i;
 	for (i = 0; i < g_list_length(list); i++){
 		char* element = g_list_nth_data(list, i);
 		if (element == NULL){
@@ -1177,7 +1177,7 @@ cl_msg_add_list_int(struct ha_msg* msg, const char* name,
 {
 	
 	GList*		list = NULL;
-	int		i;
+	size_t		i;
 	int		ret;
 	
 	if (n <= 0  || buf == NULL|| name ==NULL ||msg == NULL){
@@ -2285,6 +2285,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.59  2005/03/02 22:54:29  alan
+ * Fixed a number of signed/unsigned comparisions
+ *
  * Revision 1.58  2005/02/25 11:16:55  lars
  * size_t != int
  *
