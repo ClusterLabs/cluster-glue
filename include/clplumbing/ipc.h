@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef _OCF_IPC_H_
-#define _OCF_IPC_H_
+#ifndef _IPC_H_
+#define _IPC_H_
 #include <glib.h>
 #include <portability.h>
 #undef MIN
@@ -54,23 +54,23 @@
 #define IPC_BROKEN 2
 
 /* wait connection structure. */
-struct OCF_IPC_WAIT_CONNECTION{
+struct IPC_WAIT_CONNECTION{
   /* wait connection status.*/
   int ch_status;
   /* wait connection private data. */
   void * ch_private;
   /* wait connection function table .*/
-  struct OCF_IPC_WAIT_OPS *ops;
+  struct IPC_WAIT_OPS *ops;
 };
 
 /* channel structure.*/
-struct OCF_IPC_CHANNEL{
+struct IPC_CHANNEL{
   /* identify the status of channel.*/
   int ch_status;
   /* far side pid */
   pid_t farside_pid;
   /* the information used for authentication */
-  struct OCF_IPC_AUTH* auth_info;
+  struct IPC_AUTH* auth_info;
   /* the channel private data. May contain the connection information*/
   void* ch_private;
   /*
@@ -80,20 +80,20 @@ struct OCF_IPC_CHANNEL{
    *  accessed by user directly.
    *
    */
-  struct OCF_IPC_QUEUE* send_queue; 
+  struct IPC_QUEUE* send_queue; 
   /* the queue used to contain receving messages.*/
-  struct OCF_IPC_QUEUE* recv_queue; 
+  struct IPC_QUEUE* recv_queue; 
   /* the standard function table.*/
-  struct OCF_IPC_OPS *ops;
+  struct IPC_OPS *ops;
 };
 
-struct OCF_IPC_QUEUE{
+struct IPC_QUEUE{
   int current_qlen;
   int max_qlen;
   GList* queue;
 };
 /* authentication information : set of gid and uid. */
-struct OCF_IPC_AUTH {
+struct IPC_AUTH {
   /* hash table for user id */
   GHashTable * uid;
   /* hash table for group id */
@@ -101,36 +101,36 @@ struct OCF_IPC_AUTH {
 };
 
 /* Message structure. */
-struct OCF_IPC_MESSAGE{
+struct IPC_MESSAGE{
   unsigned long msg_len;
   void* msg_body;
   /* 
-   * OCF_IPC_MESSAGE::msg_done 
+   * IPC_MESSAGE::msg_done 
    *   the callback function pointer which can be called after this 
    *   message is sent, received or processed.
    * Parameter:
    *   msg: the back pointer to the message which contains this function pointer.
    * 
   */
-  void (* msg_done)(struct OCF_IPC_MESSAGE * msg);
+  void (* msg_done)(struct IPC_MESSAGE * msg);
   /* the message private data. Sometimes can also be used by above callback function. */
   void* msg_private;
   /* this will point back to the channel which contain the message. */
-  struct OCF_IPC_CHANNEL * ch;
+  struct IPC_CHANNEL * msg_ch;
 };
 
-struct OCF_IPC_WAIT_OPS{
+struct IPC_WAIT_OPS{
   /*
-   * OCF_IPC_WAIT_OPS::destroy
+   * IPC_WAIT_OPS::destroy
    *   detroy the wait connection and free the memory space used by this wait connection.
    * 
    * parameters:
    *   wait_conn (IN):  the pointer to the wait connection.
    *
   */ 
-  void (* destroy)(struct OCF_IPC_WAIT_CONNECTION *wait_conn);
+  void (* destroy)(struct IPC_WAIT_CONNECTION *wait_conn);
   /*
-   * OCF_IPC_WAIT_OPS::get_select_fd
+   * IPC_WAIT_OPS::get_select_fd
    *   provide a fd which user can listen on for a new coming connection.
    * parameters: 
    *   wait_conn (IN) : the pointer to the wait connection which contains the select id.
@@ -139,9 +139,9 @@ struct OCF_IPC_WAIT_OPS{
    *       -1       :  can't get the select fd.
    *
   */
-  int (* get_select_fd)(struct OCF_IPC_WAIT_CONNECTION *wait_conn);
+  int (* get_select_fd)(struct IPC_WAIT_CONNECTION *wait_conn);
   /*
-   * OCF_IPC_WAIT_OPS::accept_connection
+   * IPC_WAIT_OPS::accept_connection
    *   accept and create a new connection and verify the authentication.
    * parameters:
    *   wait_conn (IN) : the waiting connection which will accept create the new connection.
@@ -150,21 +150,21 @@ struct OCF_IPC_WAIT_OPS{
    *   the pointer to the new IPC channel; NULL if the creation or authentication fail.
    *
   */
-  struct OCF_IPC_CHANNEL* (* accept_connection)(struct OCF_IPC_WAIT_CONNECTION * wait_conn, struct OCF_IPC_AUTH *auth_info);
+  struct IPC_CHANNEL* (* accept_connection)(struct IPC_WAIT_CONNECTION * wait_conn, struct IPC_AUTH *auth_info);
 };
 
 /* channel function table. */
-struct OCF_IPC_OPS{
+struct IPC_OPS{
   /*
-   * OCF_IPC_OPS::destroy
+   * IPC_OPS::destroy
    *   brief destory the channel object.
    * parameters:
    *   ch  (IN) : the pointer to the channel which will be destroied.
    *
   */
-  void  (*destroy) (struct OCF_IPC_CHANNEL* ch);
+  void  (*destroy) (struct IPC_CHANNEL* ch);
   /*
-   * OCF_IPC_OPS::initiate_connection
+   * IPC_OPS::initiate_connection
    *   used by service user side to set up a connection.
    * parameters:
    *   ch (IN) : the pointer to channel used to initiate the connection. 
@@ -173,9 +173,9 @@ struct OCF_IPC_OPS{
    *   IPC_FAIL     : the connection initiation fails.
    *
   */
-  int (* initiate_connection) (struct OCF_IPC_CHANNEL* ch);
+  int (* initiate_connection) (struct IPC_CHANNEL* ch);
   /*
-   * OCF_IPC_OPS::verify_auth
+   * IPC_OPS::verify_auth
    *   used by service provider to verify the authentication of peer.
    * parameters
    *   ch (IN) : the pointer to the channel.
@@ -184,9 +184,9 @@ struct OCF_IPC_OPS{
    *   IPC_FAIL : verifying authentication fails.
    *
   */
-  int (* verify_auth) (struct OCF_IPC_CHANNEL* ch);
+  int (* verify_auth) (struct IPC_CHANNEL* ch);
   /*
-   * OCF_IPC_OPS::assert_auth
+   * IPC_OPS::assert_auth
    *   service user asserts to be certain qualified service user.
    * parameters:
    *   ch    (IN):  the active channel.
@@ -195,9 +195,9 @@ struct OCF_IPC_OPS{
    *   IPC_OK :  assert the authentication succefully.
    *   IPC_FAIL    : assertion fails.
   */
-  int (* assert_auth) (struct OCF_IPC_CHANNEL* ch, GHashTable * auth);
+  int (* assert_auth) (struct IPC_CHANNEL* ch, GHashTable * auth);
   /*
-   * OCF_IPC_OPS::send
+   * IPC_OPS::send
    *   send the message through the sending connection.
    * parameters:
    *   ch  (IN) : the channel which contains the connection.
@@ -208,13 +208,13 @@ struct OCF_IPC_OPS{
    *   IPC_BROKEN  : the channel is broken.
    *
   */    
-  int (* send) (struct OCF_IPC_CHANNEL* ch, struct OCF_IPC_MESSAGE* msg);
+  int (* send) (struct IPC_CHANNEL* ch, struct IPC_MESSAGE* msg);
   /*
-   * OCF_IPC_OPS::recv
+   * IPC_OPS::recv
    *   receive the message through receving queue.
    * parameters:
    *   ch  (IN) : the channel which contains the connection.
-   *   msg (OUT): the OCF_IPC_MESSAGE** pointer which contains the pointer to the recevied message 
+   *   msg (OUT): the IPC_MESSAGE** pointer which contains the pointer to the recevied message 
    *              or NULL if there is no message available.
    * return values:
    *   IPC_OK : reveive operation is finished successfully.
@@ -230,9 +230,9 @@ struct OCF_IPC_OPS{
    *   is_sending_blocked() is another way to check if there is message 
    *   pending in the send_queue. 
   */
-  int (* recv) (struct OCF_IPC_CHANNEL* ch, struct OCF_IPC_MESSAGE** msg);
+  int (* recv) (struct IPC_CHANNEL* ch, struct IPC_MESSAGE** msg);
   /*
-   * OCF_IPC_OPS::is_message_pending
+   * IPC_OPS::is_message_pending
    *   check the recv_queue to see if there is any messages available. 
    * parameters:
    *   ch (IN) : the pointer to the channel.
@@ -241,9 +241,9 @@ struct OCF_IPC_OPS{
    *   FALSE: there is no message pending in the rece_queue.
    *
   */
-  gboolean (* is_message_pending) (struct OCF_IPC_CHANNEL * ch);
+  gboolean (* is_message_pending) (struct IPC_CHANNEL * ch);
   /*
-   * OCF_IPC_OPS::is_sending_blocked
+   * IPC_OPS::is_sending_blocked
    *   check the send_queue to see if there is any messages blocked. 
    * parameters:
    *   ch (IN) : the pointer to the channel.
@@ -252,9 +252,9 @@ struct OCF_IPC_OPS{
    *   FALSE: there is no message blocked in the send_queue.
    *
   */  
-  gboolean (* is_sending_blocked) (struct OCF_IPC_CHANNEL *ch);
+  gboolean (* is_sending_blocked) (struct IPC_CHANNEL *ch);
   /*
-   * OCF_IPC_OPS::resume_io
+   * IPC_OPS::resume_io
    *   brief resume all possible IO operations through the inner connection . 
    * parameters:
    *   the pointer to the channel.
@@ -264,9 +264,9 @@ struct OCF_IPC_OPS{
    *   IPC_BROKEN : the channel is broken.
    *
   */
-  int (* resume_io) (struct OCF_IPC_CHANNEL *ch);
+  int (* resume_io) (struct IPC_CHANNEL *ch);
   /*
-   * OCF_IPC_OPS::get_send_select_fd 
+   * IPC_OPS::get_send_select_fd 
    *   return a file descriptor which can be given to select. this fd is
    *   for sending.
    * parameters:
@@ -276,9 +276,9 @@ struct OCF_IPC_OPS{
    *      -1         : there is no send fd.
    *
   */
-  int   (* get_send_select_fd) (struct OCF_IPC_CHANNEL* ch);
+  int   (* get_send_select_fd) (struct IPC_CHANNEL* ch);
   /*
-   * OCF_IPC_OPS::get_recv_select_fd
+   * IPC_OPS::get_recv_select_fd
    *   return a file descriptor which can be given to select. This fd
    *   is for receiving.
    * parameters:
@@ -288,9 +288,9 @@ struct OCF_IPC_OPS{
    *       -1        : there is no recv fd.
    *
   */
-  int   (* get_recv_select_fd) (struct OCF_IPC_CHANNEL* ch);
+  int   (* get_recv_select_fd) (struct IPC_CHANNEL* ch);
   /*
-   * OCF_IPC_OPS::set_send_qlen
+   * IPC_OPS::set_send_qlen
    *   allow user to set the maximum send_queue length.
    * parameters
    *   ch    (IN) : the pointer to the channel.
@@ -301,9 +301,9 @@ struct OCF_IPC_OPS{
    *                It means something bad happened.
    *
   */
-  int  (* set_send_qlen) (struct OCF_IPC_CHANNEL* ch, int q_len);
+  int  (* set_send_qlen) (struct IPC_CHANNEL* ch, int q_len);
   /*
-   * OCF_IPC_OPS::set_recv_qlen
+   * IPC_OPS::set_recv_qlen
    *   allow user to set the maximum recv_queue length.
    * parameters:
    *   ch    (IN) : the pointer to the channel.
@@ -313,7 +313,7 @@ struct OCF_IPC_OPS{
    *   IPC_FAIL    : there is no recv queue.
    *
   */
-  int  (* set_recv_qlen) (struct OCF_IPC_CHANNEL* ch, int q_len);
+  int  (* set_recv_qlen) (struct IPC_CHANNEL* ch, int q_len);
 };
 
 /* below functions are implemented in ocf_ipc.c */
@@ -334,7 +334,7 @@ struct OCF_IPC_OPS{
  *    whose type is IPC_DOMAIN_SOCKET 
  *
 */
-extern struct OCF_IPC_WAIT_CONNECTION * ipc_wait_conn_constructor(const char * ch_type
+extern struct IPC_WAIT_CONNECTION * ipc_wait_conn_constructor(const char * ch_type
 ,	GHashTable* ch_attrs);
 
 /*
@@ -353,7 +353,7 @@ extern struct OCF_IPC_WAIT_CONNECTION * ipc_wait_conn_constructor(const char * c
  *   whose type is IPC_DOMAIN_SOCKET 
  *
 */
-extern struct OCF_IPC_CHANNEL * ipc_channel_constructor(const char * ch_type
+extern struct IPC_CHANNEL * ipc_channel_constructor(const char * ch_type
 ,	GHashTable* ch_attrs);
 
 /*
@@ -369,9 +369,9 @@ extern struct OCF_IPC_CHANNEL * ipc_channel_constructor(const char * ch_type
  *   set of uid and the set of gid. Or NULL if this sturcture can't be created.
  *
 */
-extern struct OCF_IPC_AUTH * ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid);			   
+extern struct IPC_AUTH * ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid);			   
 
-extern void ipc_destroy_auth(struct OCF_IPC_AUTH * auth);
+extern void ipc_destroy_auth(struct IPC_AUTH * auth);
 
 
 #define	PATH_ATTR		"path"		/* pathname attribute */
