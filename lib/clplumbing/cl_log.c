@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.20 2004/11/18 00:34:37 gshi Exp $ */
+/* $Id: cl_log.c,v 1.21 2004/11/18 01:24:18 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -426,7 +426,7 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 		   gboolean use_prio_str, IPC_Channel* ch)
 {
 	IPC_Message*	ret;
-	LogDaemonMsg*	logbuf;
+	LogDaemonMsg	logbuf;
 	int		msglen;
 	char*		bodybuf;
 
@@ -444,15 +444,14 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 		return NULL;
 	}
 	
-	logbuf = (LogDaemonMsg*) (bodybuf + ch->msgpad);
-	
-	logbuf->msgtype = LD_LOGIT;
-	logbuf->facility = cl_log_facility;
-	logbuf->priority = priority;
-	logbuf->use_pri_str = use_prio_str;
-	logbuf->msglen = bufstrlen + 1;
-	strncpy(logbuf->message, buf, bufstrlen);
-	logbuf->message[bufstrlen] = EOS;
+	logbuf.msgtype = LD_LOGIT;
+	logbuf.facility = cl_log_facility;
+	logbuf.priority = priority;
+	logbuf.use_pri_str = use_prio_str;
+	logbuf.msglen = bufstrlen + 1;
+	strncpy(logbuf.message, buf, bufstrlen);
+	logbuf.message[bufstrlen] = EOS;
+	memcpy(bodybuf + ch->msgpad, &logbuf, sizeof(logbuf));
 
 	ret->msg_len = msglen;
 	ret->msg_buf = bodybuf;
