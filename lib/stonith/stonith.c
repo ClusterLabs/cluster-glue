@@ -1,4 +1,4 @@
-/* $Id: stonith.c,v 1.10 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: stonith.c,v 1.11 2004/09/03 18:14:00 gshi Exp $ */
 /*
  * Stonith API infrastructure.
  *
@@ -79,7 +79,7 @@ init_pluginsys(void) {
 			DelPILPluginUniv(PIsys);
 			PIsys = NULL;
 		}
-		/* PILSetDebugLevel(PIsys, PI_IFMANAGER, "generic", 10); */
+		/*PILSetDebugLevel(PIsys, PI_IFMANAGER, "generic", 10);*/
 	}else{
 		fprintf(stderr, "pi univ creation failed\n");
 	}
@@ -171,11 +171,8 @@ stonith_delete(Stonith *s)
 	if (s->s_ops) {
 		s->s_ops->destroy(s);
 	}
-	/*
-	 * FIXME:  This triggers a bug!
-	PILIncrIFRefCount(PIsys, STONITH_TYPE_S, s->stype, -1);
-	 * Naughty Bug!
-	 */
+
+        PILIncrIFRefCount(PIsys, STONITH_TYPE_S, s->stype, -1);
 	s->pinfo = NULL;
 	s->s_ops = NULL;
 	s->stype = NULL;	/* It is part of plugin system */

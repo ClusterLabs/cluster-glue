@@ -1,4 +1,4 @@
-/* $Id: pils.c,v 1.36 2004/04/16 05:23:10 alan Exp $ */
+/* $Id: pils.c,v 1.37 2004/09/03 18:13:11 gshi Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -546,8 +546,8 @@ RemoveAPILPluginType(PILPluginType*Plugintype)
 	if (g_hash_table_lookup_extended(Pluginuniv->PluginTypes
 	,	Plugintype->plugintype, &key, (void*)&Plugintype)) {
 
-		RmAPILPluginType(key, Plugintype, NULL);
 		g_hash_table_remove(Pluginuniv->PluginTypes, key);
+		RmAPILPluginType(key, Plugintype, NULL);
 	}else{
 		g_assert_not_reached();
 	}
@@ -947,8 +947,8 @@ RemoveAPILInterface(PILInterface* pif)
 	if (g_hash_table_lookup_extended(Iftype->interfaces
 	,	pif->interfacename, &key, (void*)&pif)) {
 		g_assert(IS_PILINTERFACE(pif));
-		RmAPILInterface(key, pif, NULL);
 		g_hash_table_remove(Iftype->interfaces, key);
+		RmAPILInterface(key, pif, NULL);
 	}else{
 		g_assert_not_reached();
 	}
