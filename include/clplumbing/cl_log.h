@@ -1,4 +1,4 @@
-/* $Id: cl_log.h,v 1.13 2005/04/04 21:08:18 gshi Exp $ */
+/* $Id: cl_log.h,v 1.14 2005/04/05 20:55:42 gshi Exp $ */
 #ifndef _CLPLUMBING_CL_LOG_H
 #	define _CLPLUMBING_CL_LOG_H
 #	include <glib.h>
@@ -20,6 +20,7 @@ void		cl_log_set_facility(int facility);
 void		cl_log_set_entity(const char *	entity);
 void		cl_log_set_logfile(const char *	path);
 void		cl_log_set_debugfile(const char * path);
+void		cl_inherit_use_logd(const char*, int);
 
 char *		ha_timestamp(TIME_T t);
 void		cl_glib_msg_handler(const gchar *log_domain

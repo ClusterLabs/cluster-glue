@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.47 2005/04/05 16:44:48 andrew Exp $ */
+/* $Id: cl_log.c,v 1.48 2005/04/05 20:55:42 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -80,6 +80,56 @@ cl_log_get_uselogd(void)
 {
 	return	use_logging_daemon;
 }
+
+
+static int
+cl_str_to_boolean(const char * s, int * ret)
+{
+	if(s == NULL) {
+		return -1;
+		
+	} else if (strcasecmp(s, "true") == 0
+	||	strcasecmp(s, "on") == 0
+	||	strcasecmp(s, "yes") == 0
+	||	strcasecmp(s, "y") == 0
+	||	strcasecmp(s, "1") == 0){
+		*ret = TRUE;
+		return 1;
+
+	} else if (strcasecmp(s, "false") == 0
+	||	strcasecmp(s, "off") == 0
+	||	strcasecmp(s, "no") == 0
+	||	strcasecmp(s, "n") == 0
+	||	strcasecmp(s, "0") == 0){
+		*ret = FALSE;
+		return 1;
+	}
+	return -1;
+}
+
+void
+cl_inherit_use_logd(const char* param_name, int sendq_length) 
+{
+	char*		param_val;
+	gboolean	truefalse = FALSE;
+	
+	param_val = getenv(param_name);
+	
+	if(param_val != NULL) {
+		cl_str_to_boolean(param_val, &truefalse);
+		cl_log_set_uselogd(truefalse) ;
+	}
+	
+	if (truefalse){
+		if (sendq_length > 0){
+			cl_set_logging_wqueue_maxlen(sendq_length);
+		}
+		cl_log(LOG_INFO, "Enable using logging daemon");
+	}else {
+		cl_log(LOG_INFO, "Disable using logging daemon");
+	}
+	
+}     
 
 static IPC_Channel* 
 create_logging_channel(void)
