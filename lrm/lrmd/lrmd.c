@@ -1592,7 +1592,7 @@ perform_ra_op(lrmd_op_t* op)
 			return HA_FAIL;
 
 		default:	/* Parent */
-			NewTrackedProc(pid, 1, PT_LOGVERBOSE,op, &ManagedChildTrackOps);
+			NewTrackedProc(pid, 1, PT_LOGNONE, op, &ManagedChildTrackOps);
 			close(fd[1]);
 			op->output_fd = fd[0];
 			op->exec_pid = pid;
