@@ -102,7 +102,7 @@ int main (int argc, char* argv[])
 	get_cur_state(rsc);
 
         puts("stop_op...");
-	rsc->ops->stop_op(rsc,call_id);
+	rsc->ops->cancel_op(rsc,call_id);
 
 	puts("get_cur_state...");
         get_cur_state(rsc);
