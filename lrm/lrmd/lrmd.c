@@ -251,7 +251,7 @@ main(int argc, char ** argv)
 	}
 
 	if (argerr) {
-		usage(lrm_system_name,LSB_EXIT_OK);
+		usage(lrm_system_name, LSB_EXIT_GENERIC);
 	}
 
 	return init_start();
@@ -319,8 +319,8 @@ register_pid(const char *pid_file,gboolean do_fork,void (*shutdown)(int nsig))
 	pid = getpid();
 	lockfd = fopen(pid_file, "w");
 	if (lockfd == NULL) {
-		lrmd_log(LOG_CRIT, "cannot create pid file: %s", pid_file);
-		exit(LSB_EXIT_GENERIC);
+		lrmd_log(LOG_ERR, "cannot create pid file: %s", pid_file);
+		exit(100);
 	}else{
 		pid = getpid();
 		fprintf(lockfd, "%ld\n", pid);
@@ -363,21 +363,22 @@ init_start ()
 	char cmd_path[] = LRM_CMDPATH;
 	char cbk_path[] = LRM_CALLBACKPATH;
 
+	cl_log_send_to_logging_daemon(TRUE);
+	cl_log_set_logfile(DAEMON_LOG);
+	cl_log_set_debugfile(DAEMON_DEBUG);
+
 	PILGenericIfMgmtRqst RegisterRqsts[]= {
 		{"RAExec", &RAExecFuncs, NULL, NULL, NULL},
 		{ NULL, NULL, NULL, NULL, NULL} };
 
 
 	if ((pid = get_running_pid(PID_FILE, NULL)) > 0) {
-		lrmd_log(LOG_CRIT, "already running: [pid %ld].", pid);
-		exit(LSB_EXIT_OK);
+		lrmd_log(LOG_ERR, "already running: [pid %ld].", pid);
+		exit(100);
 	}
 
 	register_pid(PID_FILE, TRUE, FALSE);
 
-	cl_log_send_to_logging_daemon(TRUE);
-	cl_log_set_logfile(DAEMON_LOG);
-	cl_log_set_debugfile(DAEMON_DEBUG);
 
 	/* load RA plugins   */
 	PluginLoadingSystem = NewPILPluginUniv (PLUGIN_DIR);
@@ -387,7 +388,7 @@ init_start ()
 	dir = opendir(RA_PLUGIN_DIR);
 	if (NULL == dir) {
 		lrmd_log(LOG_ERR, "main: can not open RA plugin dir.");
-		return 1;
+		exit(100);
 	}
 
 	while ( NULL != (subdir = readdir(dir))) {
@@ -433,7 +434,7 @@ init_start ()
 	if (NULL == conn_cmd) {
 		lrmd_log(LOG_ERR,
 			"main: can not create wait connection for command.");
-		return 1;
+		exit(100);
 	}
 
 	/*Create a source to handle new connect rquests for command*/
@@ -449,7 +450,7 @@ init_start ()
 	if (NULL == conn_cbk) {
 		lrmd_log(LOG_ERR,
 			"main: can not create wait connection for callback.");
-		return 1;
+		exit(100);
 	}
 
 	/*Create a source to handle new connect rquests for callback*/
