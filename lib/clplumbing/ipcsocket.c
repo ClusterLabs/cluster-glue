@@ -450,6 +450,9 @@ static int
 socket_check_poll(struct IPC_CHANNEL * ch
 ,		struct pollfd * sockpoll)
 {
+	if (ch->ch_status == IPC_DISCONNECT) {
+		return IPC_OK;
+	}
 	if (sockpoll->revents & POLLHUP) {
 		ch->ch_status = IPC_DISCONNECT;
 		if (sockpoll->revents & POLLIN) {
@@ -457,6 +460,11 @@ socket_check_poll(struct IPC_CHANNEL * ch
 		}
 		return IPC_BROKEN;
 	}else if (sockpoll->revents & (POLLNVAL|POLLERR)) {
+		/* Have we already closed the socket? */
+		if (fcntl(sockpoll->fd, F_GETFL) < 0) {
+			ch->ch_status = IPC_DISCONNECT;
+			return IPC_OK;
+		}
 		cl_log(LOG_ERR
 		,	"revents failure: fd %d, flags 0x%x"
 		,	sockpoll->fd, sockpoll->revents);
@@ -483,7 +491,7 @@ socket_waitfor(struct IPC_CHANNEL * ch
 	}
 	sockpoll.fd = ch->ops->get_recv_select_fd(ch);
 	
-	while (!finished(ch)) {
+	while (!finished(ch) && ch->ch_status == IPC_CONNECT) {
 		int	rc;
 
 		sockpoll.events = POLLIN;
