@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.h,v 1.1 2004/03/25 08:20:33 alan Exp $ */
+/* $Id: cl_malloc.h,v 1.2 2005/02/06 01:01:53 alan Exp $ */
 /*
  * ha_malloc.h: malloc utilities for the Linux-HA heartbeat program
  *
@@ -23,8 +23,9 @@
 #define	 _CLPLUMBING_CLMALLOC_H
 
 typedef struct cl_mem_stats_s {
-	unsigned long		numalloc;	/* # of ha_malloc calls */
-	unsigned long		numfree;	/* # of ha_free calls */
+	unsigned long		numalloc;	/* # of cl_malloc calls */
+	unsigned long		numfree;	/* # of cl_free calls */
+	unsigned long		numrealloc;	/* # of cl_realloc calls */
 	unsigned long		nbytes_req;	/* # malloc bytes req'd */
 	unsigned long		nbytes_alloc;	/* # bytes currently allocated
 						 */
@@ -35,6 +36,7 @@ typedef struct cl_mem_stats_s {
 
 void*		cl_malloc(size_t size);
 void*		cl_calloc(size_t nmemb, size_t size);
+void*		cl_realloc(void* oldval, size_t newsize);
 char*		cl_strdup(const char *s);
 void		cl_free(void *ptr);
 int		cl_is_allocated(const void *ptr);
