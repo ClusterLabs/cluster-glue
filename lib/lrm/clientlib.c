@@ -1,4 +1,4 @@
-/*
+/* 
  * Client Library for Local Resource Manager  API.
  *
  * Author:  Huang Zhen <zhenh@cn.ibm.com>
@@ -33,11 +33,11 @@
 #include <lrm/lrm_api.h>
 #include <lrm/lrm_msg.h>
 
-/*Notice: this define should be replaced when merge to the whole pkg*/
+/* Notice: this define should be replaced when merge to the whole pkg*/
 #define	LRM_MAXPIDLEN 	256
 #define LRM_ID		"lrm"
 
-/*declare the functions used by the lrm_ops structure*/
+/* declare the functions used by the lrm_ops structure*/
 static int lrm_signon (ll_lrm_t* lrm, const char * app_name);
 static int lrm_signoff (ll_lrm_t*);
 static int lrm_delete (ll_lrm_t*);
@@ -75,7 +75,7 @@ static struct lrm_ops lrm_ops_instance =
 	lrm_msgready,
 	lrm_rcvmsg
 };
-/*declare the functions used by the lrm_rsc_ops structure*/
+/* declare the functions used by the lrm_rsc_ops structure*/
 static int rsc_perform_op (lrm_rsc_t*, lrm_op_t* op);
 static int rsc_stop_op (lrm_rsc_t*, int call_id);
 static int rsc_flush_ops (lrm_rsc_t*);
@@ -90,7 +90,7 @@ static struct rsc_ops rsc_ops_instance =
 };
 
 
-/*define the internal data used by the client library*/
+/* define the internal data used by the client library*/
 typedef struct {
 	char*		rsc_id;
 	int 		call_id;
@@ -104,7 +104,7 @@ static IPC_Channel* ch_cbk 				= NULL;
 static lrm_op_done_callback_t	op_done_callback 	= NULL;
 static GList* op_save_list				= NULL;
 
-/*define some utility functions*/
+/* define some utility functions*/
 static int get_rc_from_ch(IPC_Channel* ch);
 static int get_rc_from_msg(struct ha_msg* msg);
 static void client_log (int priority, const char* fmt);
@@ -112,7 +112,7 @@ static struct ha_msg* op_to_msg (lrm_op_t* op);
 static lrm_op_t* msg_to_op(struct ha_msg* msg);
 static op_save_t* lookup_op_save(int call_id);
 
-/*define of the api functions*/
+/* define of the api functions*/
 ll_lrm_t*
 ll_lrm_new (const char * llctype)
 {
@@ -120,18 +120,18 @@ ll_lrm_new (const char * llctype)
 
 	client_log(LOG_INFO, "ll_lrm_new: start.");
 
-	/*check the parameter*/
+	/* check the parameter*/
 	if (0 != strncmp(LRM_ID, llctype, strlen(LRM_ID))) {
 		client_log(LOG_ERR, "ll_lrm_new: wrong parameter");
 		return NULL;
 	}
 
-	/*alloc memory for lrm*/
+	/* alloc memory for lrm*/
 	if (NULL == (lrm = (ll_lrm_t*) g_new(ll_lrm_t,1))) {
 		client_log(LOG_ERR, "ll_lrm_new: can not alloc memory");
 		return NULL;
 	}
-	/*assign the ops*/
+	/* assign the ops*/
 	lrm->lrm_ops = &lrm_ops_instance;
 
 	client_log(LOG_INFO, "ll_lrm_new: end.");
@@ -153,20 +153,20 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 
 	client_log(LOG_INFO, "lrm_signon: start.");
 
-	/*check parameters*/
+	/* check parameters*/
 	if (NULL == lrm || NULL == app_name) {
 		client_log(LOG_ERR, "lrm_signon: wrong parameter");
 		return HA_FAIL;
 	}
 
-	/*if already signed on, sign off first*/
+	/* if already signed on, sign off first*/
 	if (is_signed_on) {
 		client_log(LOG_INFO,
 			"lrm_signon: the client is alreay signed on,re-sign");
 		lrm_signoff(lrm);
 	}
 
-	/*create the command ipc channel to lrmd*/
+	/* create the command ipc channel to lrmd*/
 	ch_cmd_attrs = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(ch_cmd_attrs, path, cmd_path);
 	if (NULL ==
@@ -184,21 +184,21 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 		return HA_FAIL;
 	}
 
-	/*construct the reg msg*/
+	/* construct the reg msg*/
 	if (NULL == (msg = create_lrm_reg_msg(app_name))) {
 		lrm_signoff(lrm);
 		client_log(LOG_ERR,"lrm_signon: can not create reg msg");
 		return HA_FAIL;
 	}
 
-	/*send the msg*/
+	/* send the msg*/
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		lrm_signoff(lrm);
 		ha_msg_del(msg);
 		client_log(LOG_ERR,"lrm_signon: can not send msg to lrmd");
 		return HA_FAIL;
 	}
-	/*parse the return msg*/
+	/* parse the return msg*/
 	if (HA_OK != get_rc_from_ch(ch_cmd)) {
 		lrm_signoff(lrm);
 		client_log(LOG_ERR,
@@ -206,7 +206,7 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 		return HA_FAIL;
 	}
 
-	/*create the callback ipc channel to lrmd*/
+	/* create the callback ipc channel to lrmd*/
 	ch_cbk_attrs = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(ch_cbk_attrs, path, callback_path);
 	if (NULL ==
@@ -223,7 +223,7 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 			"lrm_signon: can not initiate connection");
 		return HA_FAIL;
 	}
-	/*send the msg*/
+	/* send the msg*/
 	if (HA_OK != msg2ipcchan(msg,ch_cbk)) {
 		lrm_signoff(lrm);
 		ha_msg_del(msg);
@@ -231,14 +231,14 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 		return HA_FAIL;
 	}
 	ha_msg_del(msg);
-	/*parse the return msg*/
+	/* parse the return msg*/
 	if (HA_OK != get_rc_from_ch(ch_cbk)) {
 		lrm_signoff(lrm);
 		client_log(LOG_ERR,
 			"lrm_signon: can not recv result from lrmd");
 		return HA_FAIL;
 	}
-	/*ok, we sign on sucessfully now*/
+	/* ok, we sign on sucessfully now*/
 	is_signed_on = TRUE;
 	client_log(LOG_INFO, "lrm_signon: end.");
 	return HA_OK;
@@ -251,7 +251,7 @@ lrm_signoff (ll_lrm_t* lrm)
 	struct ha_msg* msg = NULL;
 	client_log(LOG_INFO,"lrm_signoff: start.");
 
-	/*construct the unreg msg*/
+	/* construct the unreg msg*/
 	if ( NULL == ch_cmd ) {
 		client_log(LOG_ERR,"lrm_signoff: ch_cmd is NULL");
 		ret = HA_FAIL;
@@ -262,13 +262,13 @@ lrm_signoff (ll_lrm_t* lrm)
 		ret = HA_FAIL;
 	}
 	else
-	/*send the msg*/
+	/* send the msg*/
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		client_log(LOG_ERR,"lrm_signoff: can not send msg to lrmd");
 		ret = HA_FAIL;
 	}
 	else
-	/*parse the return msg*/
+	/* parse the return msg*/
 	if (HA_OK != get_rc_from_ch(ch_cmd)) {
 		client_log(LOG_ERR,
 			"lrm_signoff: can not return failed from lrmd");
@@ -279,7 +279,7 @@ lrm_signoff (ll_lrm_t* lrm)
 		ha_msg_del(msg);
 	}
 
-	/*close channels */
+	/* close channels */
 	if (NULL != ch_cmd) {
  		ch_cmd->ops->destroy(ch_cmd);
 		ch_cmd = NULL;
@@ -298,7 +298,7 @@ int
 lrm_delete (ll_lrm_t* lrm)
 {
 	client_log(LOG_INFO,"lrm_delete: start.");
-	//check the parameter
+	/* check the parameter */
 	if (NULL == lrm) {
 		client_log(LOG_ERR,"lrm_delete: lrm is null.");
 		return HA_FAIL;
@@ -328,7 +328,7 @@ lrm_get_rsc_class_supported (ll_lrm_t* lrm)
 	struct ha_msg* msg;
 	struct ha_msg* ret;
 	GList* class_list = NULL;
-	//check whether the channel to lrmd is available
+	/* check whether the channel to lrmd is available */
 	client_log(LOG_INFO, "lrm_get_rsc_class_supported: start.");
 	if (NULL == ch_cmd)
 	{
@@ -336,7 +336,7 @@ lrm_get_rsc_class_supported (ll_lrm_t* lrm)
 			"lrm_get_rsc_class_supported: ch_mod is null.");
 		return NULL;
 	}
-	//create the get ra type message
+	/* create the get ra type message */
 	msg = create_lrm_msg(GETRSCCLASSES);
 	if ( NULL == msg) {
 		client_log(LOG_ERR,
@@ -344,7 +344,7 @@ lrm_get_rsc_class_supported (ll_lrm_t* lrm)
 		return NULL;
 	}
 
-	//send the msg to lrmd
+	/* send the msg to lrmd */
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		ha_msg_del(msg);
 		client_log(LOG_ERR,
@@ -352,21 +352,21 @@ lrm_get_rsc_class_supported (ll_lrm_t* lrm)
 		return NULL;
 	}
 	ha_msg_del(msg);
-	//get the return message
+	/* get the return message */
 	ret = msgfromIPC_noauth(ch_cmd);
 	if (NULL == ret) {
 		client_log(LOG_ERR,
 			"lrm_get_rsc_class_supported: can not recieve ret msg");
 		return NULL;
 	}
-	//get the rc of the message
+	/* get the rc of the message */
 	if (HA_FAIL == get_rc_from_msg(ret)) {
 		ha_msg_del(ret);
 		client_log(LOG_ERR,
 			"lrm_get_rsc_class_supported: rc from msg is fail");
 		return NULL;
 	}
-	//get the ra type list from message
+	/* get the ra type list from message */
 	class_list = ha_msg_value_list(ret,F_LRM_RCLASS);
 
 	ha_msg_del(ret);
@@ -380,7 +380,7 @@ lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rclass)
 	struct ha_msg* msg;
 	struct ha_msg* ret;
 	GList* type_list = NULL;
-	//check whether the channel to lrmd is available
+	/* check whether the channel to lrmd is available */
 	client_log(LOG_INFO, "lrm_get_rsc_type_supported: start.");
 	if (NULL == ch_cmd)
 	{
@@ -388,7 +388,7 @@ lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rclass)
 			"lrm_get_rsc_type_supported: ch_mod is null.");
 		return NULL;
 	}
-	//create the get ra type message
+	/* create the get ra type message */
 	msg = create_lrm_msg(GETRSCTYPES);
 	if ( NULL == msg) {
 		client_log(LOG_ERR,
@@ -399,7 +399,7 @@ lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rclass)
 		return NULL;
 	}
 
-	//send the msg to lrmd
+	/* send the msg to lrmd */
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		ha_msg_del(msg);
 		client_log(LOG_ERR,
@@ -407,21 +407,21 @@ lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rclass)
 		return NULL;
 	}
 	ha_msg_del(msg);
-	//get the return message
+	/* get the return message */
 	ret = msgfromIPC_noauth(ch_cmd);
 	if (NULL == ret) {
 		client_log(LOG_ERR,
 			"lrm_get_rsc_type_supported: can not recieve ret msg");
 		return NULL;
 	}
-	//get the rc of the message
+	/* get the rc of the message */
 	if (HA_FAIL == get_rc_from_msg(ret)) {
 		ha_msg_del(ret);
 		client_log(LOG_ERR,
 			"lrm_get_rsc_type_supported: rc from msg is fail");
 		return NULL;
 	}
-	//get the ra type list from message
+	/* get the ra type list from message */
 	type_list = ha_msg_value_list(ret,F_LRM_RTYPES);
 
 	ha_msg_del(ret);
@@ -459,7 +459,7 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype)
 	const char* tmp = NULL;
 	char* metadata = NULL;
 	size_t len;
-	//check whether the channel to lrmd is available
+	/* check whether the channel to lrmd is available */
 	client_log(LOG_INFO, "lrm_get_rsc_type_metadata: start.");
 	if (NULL == ch_cmd)
 	{
@@ -467,7 +467,7 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype)
 			"lrm_get_rsc_type_metadata: ch_mod is null.");
 		return NULL;
 	}
-	//create the get ra type message
+	/* create the get ra type message */
 	msg = create_lrm_msg(GETRSCMETA);
 	if ( NULL == msg) {
 		client_log(LOG_ERR,
@@ -482,7 +482,7 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype)
 		return NULL;
 	}
 
-	//send the msg to lrmd
+	/* send the msg to lrmd */
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		ha_msg_del(msg);
 		client_log(LOG_ERR,
@@ -490,14 +490,14 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype)
 		return NULL;
 	}
 	ha_msg_del(msg);
-	//get the return message
+	/* get the return message */
 	ret = msgfromIPC_noauth(ch_cmd);
 	if (NULL == ret) {
 		client_log(LOG_ERR,
 			"lrm_get_rsc_type_supported: can not recieve ret msg");
 		return NULL;
 	}
-	//get the rc of the message
+	/* get the rc of the message */
 	if (HA_FAIL == get_rc_from_msg(ret)) {
 		ha_msg_del(ret);
 		client_log(LOG_ERR,
@@ -505,7 +505,7 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype)
 		return NULL;
 	}
 
-	//get the metadata from message
+	/* get the metadata from message */
 	tmp = cl_get_binary(ret, F_LRM_METADATA, &len);
 
 	metadata= strndup(tmp,len);
@@ -525,19 +525,19 @@ lrm_get_all_rscs (ll_lrm_t* lrm)
 
 	client_log(LOG_INFO, "lrm_get_all_rscs: start.");
 
-	//check whether the channel to lrmd is available
+	/* check whether the channel to lrmd is available */
 	if (NULL == ch_cmd) {
 		client_log(LOG_ERR, "lrm_get_all_rscs: ch_mod is null.");
 		return NULL;
 	}
-	//create the msg of get all resource
+	/* create the msg of get all resource */
 	msg = create_lrm_msg(GETALLRCSES);
 	if ( NULL == msg) {
 		client_log(LOG_ERR,
 			"lrm_get_all_rscs: can not create types msg");
 		return NULL;
 	}
-	//send the msg to lrmd
+	/* send the msg to lrmd */
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		ha_msg_del(msg);
 		client_log(LOG_ERR,
@@ -545,26 +545,26 @@ lrm_get_all_rscs (ll_lrm_t* lrm)
 		return NULL;
 	}
 	ha_msg_del(msg);
-	//get the return msg
+	/* get the return msg */
 	ret = msgfromIPC_noauth(ch_cmd);
 	if (NULL == ret) {
 		client_log(LOG_ERR,
 			"lrm_get_all_rscs: can not recieve ret msg");
 		return NULL;
 	}
-	//get the rc of msg
+	/* get the rc of msg */
 	if (HA_FAIL == get_rc_from_msg(ret)) {
 		ha_msg_del(ret);
 		client_log(LOG_ERR,
 			"lrm_get_all_rscs: rc from msg is fail");
 		return NULL;
 	}
-	//get the rsc_id list from msg
+	/* get the rsc_id list from msg */
 	rid_list = ha_msg_value_list(ret,F_LRM_RID);
 
 	ha_msg_del(ret);
 	client_log(LOG_INFO, "lrm_get_all_rscs: end.");
-	//return the id list
+	/* return the id list */
 	return rid_list;
 
 }
@@ -578,46 +578,46 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 
 	client_log(LOG_INFO, "lrm_get_rsc: start.");
 
-	//check whether the rsc_id is available
+	/* check whether the rsc_id is available */
 	if (RID_LEN <= strlen(rsc_id))	{
 		client_log(LOG_ERR, "lrm_get_rsc: rsc_id is too long.");
 		return NULL;
 	}
 
-	//check whether the channel to lrmd is available
+	/* check whether the channel to lrmd is available */
 	if (NULL == ch_cmd)	{
 		client_log(LOG_ERR, "lrm_get_rsc: ch_mod is null.");
 		return NULL;
 	}
-	//create the msg of get resource
+	/* create the msg of get resource */
 	msg = create_lrm_rsc_msg(rsc_id, GETRSC);
 	if ( NULL == msg) {
 		client_log(LOG_ERR, "lrm_get_rsc: can not create types msg");
 		return NULL;
 	}
-	//send the msg to lrmd
+	/* send the msg to lrmd */
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		ha_msg_del(msg);
 		client_log(LOG_ERR, "lrm_get_rsc: can not send msg to lrmd");
 		return NULL;
 	}
 	ha_msg_del(msg);
-	//get the return msg from lrmd
+	/* get the return msg from lrmd */
 	ret = msgfromIPC_noauth(ch_cmd);
 	if (NULL == ret) {
 		client_log(LOG_ERR, "lrm_get_rsc: can not recieve ret msg");
 		return NULL;
 	}
-	//get the rc of return message
+	/* get the rc of return message */
 	if (HA_FAIL == get_rc_from_msg(ret)) {
 		ha_msg_del(ret);
 		client_log(LOG_ERR, "lrm_get_rsc: rc from msg is fail");
 		return NULL;
 	}
-	//create a new resource structure
+	/* create a new resource structure */
 	rsc = g_new(lrm_rsc_t, 1);
 
-	//fill the field of resource with the data from msg
+	/* fill the field of resource with the data from msg */
 	rsc->id = g_strdup(ha_msg_value(msg, F_LRM_RID));
 	rsc->type = g_strdup(ha_msg_value(msg, F_LRM_RTYPE));
 	rsc->class = g_strdup(ha_msg_value(msg, F_LRM_RCLASS));
@@ -626,7 +626,7 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	rsc->ops = &rsc_ops_instance;
 	ha_msg_del(ret);
 	client_log(LOG_INFO, "lrm_get_rsc: end.");
-	//return the new resource
+	/* return the new resource */
 	return rsc;
 }
 
@@ -637,32 +637,32 @@ lrm_add_rsc (ll_lrm_t* lrm, const char* rsc_id, const char* class
 	struct ha_msg* msg;
 	client_log(LOG_INFO, "lrm_add_rsc: start.");
 
-	//check whether the rsc_id is available
+	/* check whether the rsc_id is available */
 	if (RID_LEN <= strlen(rsc_id))	{
 		client_log(LOG_ERR, "lrm_add_rsc: rsc_id is too long.");
 		return HA_FAIL;
 	}
 
-	//check whether the channel to lrmd is available
+	/* check whether the channel to lrmd is available */
 	if (NULL == ch_cmd)	{
 		client_log(LOG_ERR, "lrm_add_rsc: ch_mod is null.");
 		return HA_FAIL;
 	}
 
-	//create the message of add resource
+	/* create the message of add resource */
 	msg = create_lrm_addrsc_msg(rsc_id, type, class, parameter);
 	if ( NULL == msg) {
 		client_log(LOG_ERR, "lrm_add_rsc: can not create types msg");
 		return HA_FAIL;
 	}
-	//send to lrmd
+	/* send to lrmd */
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		ha_msg_del(msg);
 		client_log(LOG_ERR, "lrm_add_rsc: can not send msg to lrmd");
 		return HA_FAIL;
 	}
 	ha_msg_del(msg);
-	//check the result
+	/* check the result */
 	if (HA_OK != get_rc_from_ch(ch_cmd)) {
 		client_log(LOG_ERR, "lrm_add_rsc: rc is fail");
 		return HA_FAIL;
@@ -679,27 +679,27 @@ lrm_delete_rsc (ll_lrm_t* lrm, const char* rsc_id)
 
 	client_log(LOG_INFO, "lrm_delete_rsc: start.");
 
-	//check whether the rsc_id is available
+	/* check whether the rsc_id is available */
 	if (RID_LEN <= strlen(rsc_id))	{
 		client_log(LOG_ERR, "lrm_delete_rsc: rsc_id is too long.");
 		return HA_FAIL;
 	}
 
 
-	//check whether the channel to lrmd is available
+	/* check whether the channel to lrmd is available */
 	if (NULL == ch_cmd)	{
 		client_log(LOG_ERR, "lrm_delete_rsc: ch_mod is null.");
 		return HA_FAIL;
 	}
 
-	//create the msg of del resource
+	/* create the msg of del resource */
 	msg = create_lrm_rsc_msg(rsc_id, DELRSC);
 	if ( NULL == msg) {
 		client_log(LOG_ERR,
 			"lrm_delete_rsc: can not create types msg");
 		return HA_FAIL;
 	}
-	//send the msg to lrmd
+	/* send the msg to lrmd */
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		ha_msg_del(msg);
 		client_log(LOG_ERR,
@@ -707,7 +707,7 @@ lrm_delete_rsc (ll_lrm_t* lrm, const char* rsc_id)
 		return HA_FAIL;
 	}
 	ha_msg_del(msg);
-	//check the response of the msg
+	/* check the response of the msg */
 	if (HA_FAIL == get_rc_from_ch(ch_cmd)) {
 		client_log(LOG_ERR, "lrm_delete_rsc: rc from msg is fail");
 		return HA_FAIL;
@@ -750,22 +750,23 @@ int
 lrm_rcvmsg (ll_lrm_t* lrm, int blocking)
 {
 	struct ha_msg* msg = NULL;
+	lrm_op_t* op = NULL;
 	int msg_count = 0;
 
 	client_log(LOG_INFO, "lrm_rcvmsg: start.");
 
-	//if it is not blocking mode and no message in the channel, return
+	/* if it is not blocking mode and no message in the channel, return */
 	if ((!lrm_msgready(lrm)) && (!blocking)) {
 		client_log(LOG_INFO,
 			"lrm_rcvmsg: no message and non-block.");
 		return msg_count;
 	}
-	//wait until message ready
+	/* wait until message ready */
 	if (!lrm_msgready(lrm)) {
 		ch_cbk->ops->waitin(ch_cbk);
 	}
 	while (lrm_msgready(lrm)) {
-		//get the message
+		/* get the message */
 		msg = msgfromIPC_noauth(ch_cbk);
 		if (msg == NULL) {
 			client_log(LOG_ERR,
@@ -774,7 +775,7 @@ lrm_rcvmsg (ll_lrm_t* lrm, int blocking)
 		}
 		msg_count++;
 
-		lrm_op_t* op = msg_to_op(msg);
+		op = msg_to_op(msg);
 		op->rsc = lrm_get_rsc( NULL, op->rsc_id );
 		if (NULL!=op && NULL!=op_done_callback) {
 			(*op_done_callback)(op);
@@ -786,7 +787,7 @@ lrm_rcvmsg (ll_lrm_t* lrm, int blocking)
 	return msg_count;
 }
 
-// following are the functions for rsc_ops
+/* following are the functions for rsc_ops */
 int
 rsc_perform_op (lrm_rsc_t* rsc, lrm_op_t* op)
 {
@@ -796,12 +797,12 @@ rsc_perform_op (lrm_rsc_t* rsc, lrm_op_t* op)
 	client_log(LOG_INFO, "rsc_perform_op: start.");
 
 
-	//check whether the channel to lrmd is available
+	/* check whether the channel to lrmd is available */
 	if (NULL == ch_cmd)	{
 		client_log(LOG_ERR, "rsc_perform_op: ch_cmd is null.");
 		return HA_FAIL;
 	}
-	//check the parameters
+	/* check the parameters */
 	if (NULL == rsc) {
 		client_log(LOG_ERR, "rsc_perform_op: rsc is null.");
 		return HA_FAIL;
@@ -811,14 +812,14 @@ rsc_perform_op (lrm_rsc_t* rsc, lrm_op_t* op)
 			"rsc_perform_op: op or op_type is null.");
 		return HA_FAIL;
 	}
-	//create the msg of perform op
+	/* create the msg of perform op */
 	op->rsc_id = g_strdup(rsc->id);
 	msg = op_to_msg(op);
 	if ( NULL == msg) {
 		client_log(LOG_ERR, "rsc_perform_op: can not create msg");
 		return HA_FAIL;
 	}
-	//send it to lrmd
+	/* send it to lrmd */
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		ha_msg_del(msg);
 		client_log(LOG_ERR,
@@ -827,7 +828,7 @@ rsc_perform_op (lrm_rsc_t* rsc, lrm_op_t* op)
 	}
 	ha_msg_del(msg);
 
-	//check return code, the return code is the call_id of the op
+	/* check return code, the return code is the call_id of the op */
 	rc = get_rc_from_ch(ch_cmd);
 	if (rc > 0) {
 		op_save_t* op_save = g_new(op_save_t, 1);
@@ -848,17 +849,17 @@ rsc_stop_op (lrm_rsc_t* rsc, int call_id)
 	struct ha_msg* msg = NULL;
 
 	client_log(LOG_INFO, "rsc_stop_ops: start.");
-	//check whether the channel to lrmd is available
+	/* check whether the channel to lrmd is available */
 	if (NULL == ch_cmd)	{
 		client_log(LOG_ERR, "rsc_stop_ops: ch_mod is null.");
 		return HA_FAIL;
 	}
-	//check parameter
+	/* check parameter */
 	if (NULL == rsc) {
 		client_log(LOG_ERR, "rsc_stop_ops: rsc is null.");
 		return HA_FAIL;
 	}
-	//create the msg of flush ops
+	/* create the msg of flush ops */
 	msg = create_lrm_rsc_msg(rsc->id,STOPOP);
 	if ( NULL == msg) {
 		client_log(LOG_ERR, "rsc_stop_ops: can not create msg");
@@ -868,7 +869,7 @@ rsc_stop_op (lrm_rsc_t* rsc, int call_id)
 		return HA_FAIL;
 	}
 	
-	//send the msg to lrmd
+	/* send the msg to lrmd */
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		ha_msg_del(msg);
 		client_log(LOG_ERR,
@@ -891,23 +892,23 @@ rsc_flush_ops (lrm_rsc_t* rsc)
 	struct ha_msg* msg = NULL;
 
 	client_log(LOG_INFO, "rsc_flush_ops: start.");
-	//check whether the channel to lrmd is available
+	/* check whether the channel to lrmd is available */
 	if (NULL == ch_cmd)	{
 		client_log(LOG_ERR, "rsc_flush_ops: ch_mod is null.");
 		return HA_FAIL;
 	}
-	//check parameter
+	/* check parameter */
 	if (NULL == rsc) {
 		client_log(LOG_ERR, "rsc_flush_ops: rsc is null.");
 		return HA_FAIL;
 	}
-	//create the msg of flush ops
+	/* create the msg of flush ops */
 	msg = create_lrm_rsc_msg(rsc->id,FLUSHOPS);
 	if ( NULL == msg) {
 		client_log(LOG_ERR, "rsc_flush_ops: can not create msg");
 		return HA_FAIL;
 	}
-	//send the msg to lrmd
+	/* send the msg to lrmd */
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		ha_msg_del(msg);
 		client_log(LOG_ERR,
@@ -935,23 +936,23 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 	int op_count, i;
 
 	client_log(LOG_INFO, "rsc_get_cur_state: start.");
-	//check whether the channel to lrmd is available
+	/* check whether the channel to lrmd is available */
 	if (NULL == ch_cmd)	{
 		client_log(LOG_ERR, "rsc_get_cur_state: ch_mod is null.");
 		return HA_FAIL;
 	}
-	//check paramter
+	/* check paramter */
 	if (NULL == rsc) {
 		client_log(LOG_ERR, "rsc_get_cur_state: rsc is null.");
 		return NULL;
 	}
-	//create the msg of get current state of resource
+	/* create the msg of get current state of resource */
 	msg = create_lrm_rsc_msg(rsc->id,GETRSCSTATE);
 	if ( NULL == msg) {
 		client_log(LOG_ERR, "rsc_get_cur_state: can not create msg");
 		return NULL;
 	}
-	//send the msg to lrmd
+	/* send the msg to lrmd */
 	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
 		ha_msg_del(msg);
 		client_log(LOG_ERR,
@@ -960,7 +961,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 	}
 	ha_msg_del(msg);
 
-	//get the return msg
+	/* get the return msg */
 	ret = msgfromIPC_noauth(ch_cmd);
 	if (NULL == ret) {
 		client_log(LOG_ERR,
@@ -968,7 +969,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 		return NULL;
 	}
 
-	//get the state of the resource from the message
+	/* get the state of the resource from the message */
 	if (HA_FAIL == ha_msg_value_int(ret, F_LRM_STATE, &state)) {
 		ha_msg_del(ret);
 		client_log(LOG_ERR,
@@ -978,8 +979,8 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 	*cur_state = (state_flag_t)state;
 
 	if (LRM_RSC_IDLE == *cur_state) {
-		//if the state is idle, the last finsihed op returned.
-		//the op is stored in the same msg, just get it out
+		/* if the state is idle, the last finsihed op returned. */
+		/* the op is stored in the same msg, just get it out */
 		op = msg_to_op(ret);
 		if (NULL != op) {
 			pending_op_list = g_list_append(pending_op_list, op);
@@ -989,8 +990,8 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 		return pending_op_list;
 	}
 	if (LRM_RSC_BUSY == *cur_state) {
-	//if the state is busy, the whole pending op list would be return
-		//the first msg includes the count of pending ops.
+	/* if the state is busy, the whole pending op list would be return */
+		/* the first msg includes the count of pending ops. */
 		if (HA_FAIL == ha_msg_value_int(ret, F_LRM_OPCNT, &op_count)) {
 			client_log(LOG_ERR,
 				"rsc_get_cur_state: can not get op count");
@@ -998,7 +999,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 			return NULL;
 		}
 		for (i = 0; i < op_count; i++) {
-			//one msg for one pending op
+			/* one msg for one pending op */
 			op_msg = msgfromIPC_noauth(ch_cmd);
 
 			if (NULL == op_msg) {
@@ -1007,7 +1008,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 				continue;
 			}
 			op = msg_to_op(op_msg);
-			//add msg to the return list
+			/* add msg to the return list */
 			if (NULL != op) {
 				pending_op_list =
 					g_list_append(pending_op_list, op);
@@ -1021,7 +1022,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 	client_log(LOG_ERR, "rsc_get_cur_state: can not get state from msg");
 	return NULL;
 }
-/*
+/* 
  * following are the implements of the utility functions
  */
 
@@ -1037,7 +1038,7 @@ msg_to_op(struct ha_msg* msg)
 	client_log(LOG_INFO, "msg_to_op: start.");
 	op = g_new0(lrm_op_t, 1);
 
-	//op->op_type
+	/* op->op_type */
 	op_type = ha_msg_value(msg, F_LRM_OP);
 	if (NULL == op_type) {
 		client_log(LOG_ERR, "msg_to_op: can not get op_type.");
@@ -1045,44 +1046,44 @@ msg_to_op(struct ha_msg* msg)
 	}
 	op->op_type = g_strdup(op_type);
 
-	//op->params
+	/* op->params */
 	op->params = ha_msg_value_hash_table(msg, F_LRM_PARAM);
 
-	//op->timeout
+	/* op->timeout */
 	if (HA_FAIL == ha_msg_value_int(msg,F_LRM_TIMEOUT, &op->timeout)) {
 		client_log(LOG_ERR, "msg_to_op: can not get op_type.");
 		return NULL;
 	}
 
 
-	//op->interval
+	/* op->interval */
 	if (HA_FAIL == ha_msg_value_int(msg,F_LRM_INTERVAL, &op->interval)) {
 		client_log(LOG_ERR, "msg_to_op: can not get op_interval.");
 		return NULL;
 	}
 
-	//op->target_rc
+	/* op->target_rc */
 	if (HA_FAIL == ha_msg_value_int(msg,F_LRM_TARGETRC, &op->target_rc)) {
 		client_log(LOG_ERR, "msg_to_op: can not get op_target_status.");
 		return NULL;
 	}
 
-	//op->op_status
+	/* op->op_status */
 	if (HA_FAIL ==
 		ha_msg_value_int(msg, F_LRM_OPSTATUS, (int*)&op->op_status)) {
 		client_log(LOG_INFO,
 			"on_op_done: can not get op status from msg.");
                 op->op_status = -1;
 	}
-	//if it finished successfully
+	/* if it finished successfully */
 	if (LRM_OP_DONE == op->op_status ) {
-		//op->rc
+		/* op->rc */
 		if (HA_FAIL == ha_msg_value_int(msg, F_LRM_RC, &op->rc)) {
 			client_log(LOG_ERR,
 				"on_op_done: can not get op rc from msg.");
 			return NULL;
 		}
-		//op->output
+		/* op->output */
 		output = cl_get_binary(msg, F_LRM_DATA,&output_len);
 		if (NULL != output){
 			op->output = strndup(output, output_len);
@@ -1093,14 +1094,14 @@ msg_to_op(struct ha_msg* msg)
 	}
 
 
-	//op->call_id
+	/* op->call_id */
 	if (HA_FAIL == ha_msg_value_int(msg,F_LRM_CALLID, &op->call_id)) {
 		client_log(LOG_ERR, "msg_to_op: can not get call_id.");
 		return NULL;
 	}
 
 
-	//op->app_name
+	/* op->app_name */
 	op->app_name = g_strdup(ha_msg_value(msg, F_LRM_APP));
 
 	if (0<op->call_id) {

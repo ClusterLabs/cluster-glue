@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.11 2004/08/29 04:42:03 msoffen Exp $ */
+/* $Id: lrmadmin.c,v 1.12 2004/08/30 03:17:40 msoffen Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -396,7 +396,7 @@ int main(int argc, char **argv)
 			if (ratype_list) {
 				g_list_foreach(ratype_list, g_print_rainfo_item,
 						NULL);
-				//g_list_free(ratype_list);
+				/* g_list_free(ratype_list); */
 			} else {
 				printf("For this RA class, no any RA type is "
 					"supported\n");
@@ -640,7 +640,7 @@ GHashTable ** params_ht)
 			snprintf(buffer, 20, "%d", i-start+1);
 			g_hash_table_insert( *params_ht, g_strdup(buffer), 
 						g_strdup(argv[i]));
-			//printf("index: %d  value: %s \n", i-start+1, argv[i]);
+			/* printf("index: %d  value: %s \n", i-start+1, argv[i]); */
 		}
 	} else {
 		fprintf(stderr, "Not supported resource agency class.\n");
@@ -824,6 +824,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.12  2004/08/30 03:17:40  msoffen
+ * Fixed more comments from // to standard C comments
+ *
  * Revision 1.11  2004/08/29 04:42:03  msoffen
  * Added missing ID and Log
  *

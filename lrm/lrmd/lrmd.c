@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.26 2004/08/29 04:40:02 msoffen Exp $ */
+/* $Id: lrmd.c,v 1.27 2004/08/30 03:17:40 msoffen Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -57,8 +57,8 @@
 #define PID_FILE 	"/var/run/lrmd.pid"
 #define DAEMON_LOG   	"/var/log/lrmd.log"
 #define DAEMON_DEBUG 	"/var/log/lrmd.debug"
-//#define PLUGIN_DIR	"/usr/lib/pils/plugins"
-//#define RA_PLUGIN_DIR	"/usr/lib/heartbeat/plugins/RAExec"
+/* #define PLUGIN_DIR	"/usr/lib/pils/plugins" */
+/* #define RA_PLUGIN_DIR	"/usr/lib/heartbeat/plugins/RAExec" */
 
 typedef struct
 {
@@ -101,7 +101,7 @@ struct lrmd_rsc
 	lrmd_op_t*	last_op;
 };
 
-//glib loop call back functions
+/* glib loop call back functions */
 static gboolean on_connect_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_connect_cbk(IPC_Channel* ch_cbk, gpointer user_data);
 static gboolean on_receive_cmd(IPC_Channel* ch_cmd, gpointer user_data);
@@ -109,7 +109,7 @@ static gboolean on_timeout_op_done(gpointer data);
 static gboolean on_repeat_op_done(gpointer data);
 static void on_remove_client(gpointer user_data);
 
-//message handlers
+/* message handlers */
 static int on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_register(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg);
@@ -122,10 +122,10 @@ static int on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg);
 
-//functions wrap the call to ra plugins
+/* functions wrap the call to ra plugins */
 static int perform_ra_op(lrmd_op_t* op);
 
-//Utility functions
+/* Utility functions */
 static int flush_op(lrmd_op_t* op);
 static int perform_op(lrmd_rsc_t* rsc);
 static int on_op_done(lrmd_op_t* op);
@@ -175,7 +175,7 @@ ProcTrack_ops ManagedChildTrackOps = {
 };
 
 
-//msg dispatch table
+/* msg dispatch table */
 typedef int (*msg_handler)(lrmd_client_t* client, struct ha_msg* msg);
 struct msg_map
 {
@@ -443,14 +443,13 @@ init_start ()
 	char cmd_path[] = LRM_CMDPATH;
 	char cbk_path[] = LRM_CALLBACKPATH;
 
-	cl_log_send_to_logging_daemon(TRUE);
-	cl_log_set_logfile(DAEMON_LOG);
-	cl_log_set_debugfile(DAEMON_DEBUG);
-
 	PILGenericIfMgmtRqst RegisterRqsts[]= {
 		{"RAExec", &RAExecFuncs, NULL, NULL, NULL},
 		{ NULL, NULL, NULL, NULL, NULL} };
 
+	cl_log_send_to_logging_daemon(TRUE);
+	cl_log_set_logfile(DAEMON_LOG);
+	cl_log_set_debugfile(DAEMON_DEBUG);
 
 	if ((pid = get_running_pid(PID_FILE, NULL)) > 0) {
 		lrmd_log(LOG_ERR, "already running: [pid %ld].", pid);
@@ -472,15 +471,15 @@ init_start ()
 	}
 
 	while ( NULL != (subdir = readdir(dir))) {
-		//skip . and ..
+		/* skip . and .. */
 		if ( '.' == subdir->d_name[0]) {
 			continue;
 		}
-		//skip the other type files
+		/* skip the other type files */
 		if (NULL == strstr(subdir->d_name, ".so")) {
 			continue;
 		}
-		//remove the ".so"
+		/* remove the ".so" */
 		dot = strchr(subdir->d_name,'.');
 		if (NULL != dot) {
 			len = (int)(dot - subdir->d_name);
@@ -570,13 +569,13 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 	lrmd_client_t* client = NULL;
 
 	lrmd_log(LOG_INFO, "on_connect_cmd: start.");
-	//check paremeters
+	/* check paremeters */
 	if (NULL == ch) {
 		lrmd_log(LOG_ERR, "on_connect_cmd: channel is null");
 		return TRUE;
 	}
-	//create new client
-	//the register will be finished in on_msg_register
+	/* create new client */
+	/* the register will be finished in on_msg_register */
 	client = g_new(lrmd_client_t, 1);
 	client->app_name = NULL;
 	client->ch_cmd = ch;
@@ -744,6 +743,7 @@ gboolean
 on_repeat_op_done(gpointer data)
 {
 	lrmd_op_t* op = NULL;
+	int timeout = 0;
 
 	lrmd_log(LOG_INFO, "on_repeat_op_done: start.");
 	op = (lrmd_op_t*)data;
@@ -756,7 +756,6 @@ on_repeat_op_done(gpointer data)
 
 	op->rsc->op_list = g_list_append(op->rsc->op_list, op);
 	
-	int timeout = 0;
 	ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout);
 	if (0 < timeout ) {
 		op->timeout_tag = g_timeout_add(timeout,
@@ -831,13 +830,13 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 			"on_msg_unregister: can not find the client.");
 		return HA_FAIL;
 	}
-	//remove from client_list
+	/* remove from client_list */
 	client_list = g_list_remove(client_list, client);
-	//remove all monitors and pending ops
+	/* remove all monitors and pending ops */
 	for(rsc_node = g_list_first(rsc_list);
 		NULL != rsc_node; rsc_node = g_list_next(rsc_node)){
 		rsc = (lrmd_rsc_t*)rsc_node->data;
-		//remove pending ops belong to this client
+		/* remove pending ops belong to this client */
 		op_node = g_list_first(rsc->op_list);
 		while (NULL != op_node) {
 			op = (lrmd_op_t*)op_node->data;
@@ -851,7 +850,7 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 			}
 
 		}
-		//remove repeat ops belong to this client
+		/* remove repeat ops belong to this client */
 		op_node = g_list_first(rsc->repeat_op_list);
 		while (NULL != op_node) {
 			op = (lrmd_op_t*)op_node->data;
@@ -1086,7 +1085,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	else {
 		rsc_list = g_list_remove(rsc_list, rsc);
-		//remove pending ops
+		/* remove pending ops */
 		op_node = g_list_first(rsc->op_list);
 		while (NULL != op_node) {
 			op = (lrmd_op_t*)op_node->data;
@@ -1094,7 +1093,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 			rsc->op_list = g_list_remove(rsc->op_list, op);
 			free_op(op);
 		}
-		//remove repeat ops
+		/* remove repeat ops */
 		op_node = g_list_first(rsc->repeat_op_list);
 		while (NULL != op_node) {
 			op = (lrmd_op_t*)op_node->data;
@@ -1102,13 +1101,13 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
 			free_op(op);
 		}
-		//free the last_op
+		/* free the last_op */
 		if ( NULL!=rsc->last_op) {
 			ha_msg_del(rsc->last_op->msg);
 			g_free(rsc->last_op);
 		}
 		
-		//free the memeroy of rsc
+		/* free the memeroy of rsc */
 		g_free(rsc->id);
 		g_free(rsc->type);
 		g_free(rsc->class);
@@ -1193,7 +1192,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 
 	call_id++;
 	type = ha_msg_value(msg, F_LRM_TYPE);
-	//when a flush request arrived, flush all pending ops
+	/* when a flush request arrived, flush all pending ops */
 	if (0 == strncmp(type, FLUSHOPS, strlen(FLUSHOPS))) {
 		node = g_list_first(rsc->op_list);
 		while (NULL != node ) {
@@ -1347,7 +1346,7 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	lrmd_log(LOG_INFO, "on_msg_get_state: end.");
 	return HA_OK;
 }
-///////////////////////op functions////////////////////////////////////////////
+/* /////////////////////op functions//////////////////////////////////////////// */
 
 /* this function return the op result to client if it is generated by client.
  * or do some monitor check if it is generated by monitor.
@@ -1364,12 +1363,12 @@ on_op_done(lrmd_op_t* op)
 	
 	
 	lrmd_log(LOG_INFO, "on_op_done: start.");
-	// we should check if the resource exists.
+	/*  we should check if the resource exists. */
 	if (NULL == g_list_find(rsc_list, op->rsc)) {
 		if( op->timeout_tag > 0 ) {
 			g_source_remove(op->timeout_tag);
 		}
-		//delete the op
+		/* delete the op */
 		ha_msg_del(op->msg);
 		g_free(op);
 
@@ -1425,12 +1424,12 @@ on_op_done(lrmd_op_t* op)
 	}
 	
 	if ( need_notify ) {
-		//send the result to client
+		/* send the result to client */
 		lrmd_log(LOG_INFO, "on_op_done: a normal op done.");
-		//we have to check whether the client still exists
-		//for the client may signoff during the op running.
+		/* we have to check whether the client still exists */
+		/* for the client may signoff during the op running. */
 		if (NULL != g_list_find(client_list, op->client)) {
-			//the client still exists
+			/* the client still exists */
 			if (NULL == op->client->ch_cbk) {
 				lrmd_log(LOG_ERR,
 					"on_op_done: client->ch_cbk is null");
@@ -1443,12 +1442,12 @@ on_op_done(lrmd_op_t* op)
 		}
 
 	}
-	//release the old last_op
+	/* release the old last_op */
 	if ( NULL!=op->rsc->last_op) {
 		ha_msg_del(op->rsc->last_op->msg);
 		g_free(op->rsc->last_op);
 	}
-	//remove the op from op_list and copy to last_op
+	/* remove the op from op_list and copy to last_op */
 	op->rsc->op_list = g_list_remove(op->rsc->op_list,op);
 	
 	op->rsc->last_op = g_new(lrmd_op_t, 1);
@@ -1569,7 +1568,7 @@ op_to_msg(lrmd_op_t* op)
 	return msg;
 }
 
-////////////////////////////////RA wrap funcs///////////////////////////////////
+/* //////////////////////////////RA wrap funcs/////////////////////////////////// */
 int
 perform_ra_op(lrmd_op_t* op)
 {
@@ -1622,7 +1621,7 @@ perform_ra_op(lrmd_op_t* op)
 
 			free_hash_table(op_params);
 			free_hash_table(params);
-			//execra should never return.
+			/* execra should never return. */
 			exit(EXECRA_EXEC_UNKNOWN_ERROR);
 
 	}
@@ -1740,14 +1739,16 @@ static const char *
 on_ra_proc_query_name(ProcTrack* p)
 {
 	static char proc_name[MAX_PROC_NAME];
+	lrmd_op_t* op = NULL;
+	const char* op_type = NULL;
 	
 	lrmd_log(LOG_INFO, "on_ra_proc_query_name: start.");
-	lrmd_op_t* op = (lrmd_op_t*)(p->privatedata);
+	op = (lrmd_op_t*)(p->privatedata);
 	if (NULL == op) {
 		lrmd_log(LOG_INFO, "on_ra_proc_query_name: end.");
 		return "*unknown*";
 	}
-	const char* op_type = ha_msg_value(op->msg, F_LRM_OP);
+	op_type = ha_msg_value(op->msg, F_LRM_OP);
 
 	snprintf(proc_name, MAX_PROC_NAME, "%s:%s", op->rsc->id, op_type);
 	lrmd_log(LOG_INFO, "on_ra_proc_query_name: end.");
@@ -1786,7 +1787,7 @@ set_child_signal()
 	}
 }
 
-///////////////////Util Functions//////////////////////////////////////////////
+/* /////////////////Util Functions////////////////////////////////////////////// */
 int
 send_rc_msg (IPC_Channel* ch, int rc)
 {
@@ -1937,6 +1938,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.27  2004/08/30 03:17:40  msoffen
+ * Fixed more comments from // to standard C comments
+ *
  * Revision 1.26  2004/08/29 04:40:02  msoffen
  * Added missing Id and Log
  *
