@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.61 2005/02/16 06:59:55 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.62 2005/02/17 16:19:17 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -135,7 +135,7 @@ static int perform_op(lrmd_rsc_t* rsc);
 static int on_op_done(lrmd_op_t* op);
 static int send_rc_msg ( IPC_Channel* ch, int rc);
 static lrmd_client_t* lookup_client (pid_t pid);
-static lrmd_rsc_t* lookup_rsc (char* rid);
+static lrmd_rsc_t* lookup_rsc (const char* rid);
 static lrmd_rsc_t* lookup_rsc_by_msg (struct ha_msg* msg);
 static int read_pipe(int fd, char ** data);
 static void lrmd_log(int priority, const char * fmt, ...)G_GNUC_PRINTF(2,3);
@@ -1967,7 +1967,7 @@ lookup_client (pid_t pid)
 }
 
 lrmd_rsc_t*
-lookup_rsc (char* rid)
+lookup_rsc (const char* rid)
 {
 	GList* node;
 	lrmd_rsc_t* rsc = NULL;
@@ -1989,16 +1989,19 @@ lookup_rsc (char* rid)
 lrmd_rsc_t*
 lookup_rsc_by_msg (struct ha_msg* msg)
 {
-	char* id = NULL;
+	const char* id = NULL;
 	lrmd_rsc_t* rsc = NULL;
 
-	id = g_strdup(ha_msg_value(msg,F_LRM_RID));
+	id = ha_msg_value(msg, F_LRM_RID);
+	if (id == NULL) {
+		lrmd_log(LOG_ERR, "lookup_rsc_by_msg: NULL F_LRM_RID");
+		return NULL;
+	}
 	if (RID_LEN <= strlen(id))	{
 		lrmd_log(LOG_ERR, "lookup_rsc_by_msg: rsc id is too long.");
 		return NULL;
 	}
 	rsc = lookup_rsc(id);
-	g_free(id);
 	return rsc;
 }
 void
@@ -2078,6 +2081,12 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.62  2005/02/17 16:19:17  alan
+ * BEAM found that lookup_rsc had a memory leak in it.  It was right.
+ * But, the resource allocation was unnecessary, so I fixed the leak by
+ * getting rid of the allocation.  I had to change an argument from
+ * char * to const char *, but that was right anyway ;-)
+ *
  * Revision 1.61  2005/02/16 06:59:55  zhenh
  * add cl_malloc_forced_for_glib() to lrmd.
  *
