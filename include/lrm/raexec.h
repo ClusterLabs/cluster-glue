@@ -23,8 +23,36 @@
 #define RAEXEC_H
 #include <glib.h>
 
-const int EXECRA_OK  = 0,
-	  EXECRA_BAD = -1;
+typedef enum UNIFORM_RET_EXECRA uniform_ret_execra_t;
+/* Uniform return value of executing RA */
+enum UNIFORM_RET_EXECRA {
+	EXECRA_EXEC_UNKNOWN_ERROR = -200,
+	EXECRA_NO_RA = -100,
+	EXECRA_OK = 0,
+	EXECRA_UNKNOWN_ERROR = 1,
+	EXECRA_INVALID_PARAM = 2,
+	EXECRA_UNIMPLEMENT_FEATURE = 3,
+	EXECRA_INSUFFICIENT_PRIV = 4,
+	EXECRA_NOT_INSTALLED = 5,
+	EXECRA_NOT_CONFIGURED = 6,
+	EXECRA_NOT_RUNNING = 7,
+		
+	/* For status command only */
+	EXECRA_RA_DEAMON_DEAD1 = 11,
+	EXECRA_RA_DEAMON_DEAD2 = 12,
+	EXECRA_RA_DEAMON_STOPPED = 13,
+	EXECRA_STATUS_UNKNOWN = 14
+};
+
+const int RA_MAX_DIRNAME_LENGTH  = 200,
+	  RA_MAX_BASENAME_LENGTH = 40; 
+
+
+typedef struct {
+	gchar * rsc_type;
+	/* As for version, no definite definition yet */
+	gchar * version;	
+} rsc_info_t;
 
 /* 
  * RA Execution Interfaces 
@@ -48,12 +76,7 @@ struct RAExecOps {
 	 *		      affecting the action of a RA execution. As for 
 	 *		      OCF style RA, it's the only way to pass 
 	 *		      parameter to the RA.
-	 *	need_stdout_data: If need get the output to stdout from this
-	 *		    executon of the RA, especially the meta_data for
-	 *		    OCF style RA.
-	 *	exec_key: A key set by this function, the caller should pass it
-	 *		    to the function post_query_result for querying the 
-	 *		    exection result. 
+	 *
 	 * Return Value:
 	 *	0:  RA execution is ok, while the exec_key is a valid value.
 	 *	-1: The RA don't exist.
@@ -64,28 +87,36 @@ struct RAExecOps {
 		const char * ra_name,	
 		const char * op,
 		GHashTable * cmd_params,
-		GHashTable * env_params,
-		gboolean need_stdout_data,
-		int * exec_key);
+		GHashTable * env_params);
 
 	/*
 	 * Description:
-	 *	Query a RA execution distiguished by exec_key.
+	 *	Map the specific ret value to a uniform value.
 	 *
 	 * Parameters:
-	 *	exec_key: The only key to distinguish a RA execution, get from
-	 *		    the former calling to execra.
-	 *	result:	  The exit status directly from RA in this execution.
-	 *	stdout_data: The output to stdout during this RA execution. 
+	 *	ret_execra: the RA type specific ret value. 
 	 *	
 	 * Return Value:
-	 * 	0: The execution isn't finished yet, can query it next time.
-	 *	>0:The execution is finished. can't query any more.
-	 *	<0:The query failed. For example, the exec_key is invalid, no
-	 *	     a corresponding execution.
+	 *	A uniform value without regarding RA type.
 	 */
-	int (*post_query_result)(int exec_key, int * result, char ** stdout_data);
+	uniform_ret_execra_t (*map_ra_retvalue)(int ret_execra,
+				const char * op);
 
+	/*
+	 * Description:
+	 * 	List all resource info of this class ( OCF )	
+	 *
+	 * Parameters:
+	 *	rsc_info: a GList which item data type is rsc_info_t as 
+	 *		  defined above, containing all resource info of
+	 *		  this class in the local machine.
+	 *
+	 * Return Value:
+	 *	0 : succeed
+	 *	-1: failed due to invalid RA directory such as not existing.
+	 *	-2: failed due to other factors
+	 */
+	int (*get_resource_list)(GList ** rsc_info);
 };
 
 #define RA_EXEC_TYPE	RAExec
