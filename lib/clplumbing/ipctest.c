@@ -222,7 +222,6 @@ EOFcheck(IPC_Channel* chan)
 		cl_log(LOG_INFO, "EOFcheck PollFunc() bits: 0x%lx"
 		,	(unsigned long)pf[0].revents);
 	}
-	abort();
 }
 
 static int
@@ -414,26 +413,21 @@ checkinput(IPC_Channel* chan, const char * where, int* rdcount, int maxcount)
 	int		errs = 0;
 	int		rc;
 
-	if (chan->ch_status == IPC_DISCONNECT) {
-		cl_log(LOG_ERR
-		,	"checkinput0[0x%lx %s]: EOF in iter %d"
-		,	(unsigned long)chan, where, *rdcount);
-		EOFcheck(chan);
-		return errs;
-	}
 	while (chan->ops->is_message_pending(chan)
 	&&	errs < 10 && *rdcount < maxcount) {
 
-		if (rmsg != NULL) {
-			rmsg->msg_done(rmsg);
-			rmsg = NULL;
-		}
-		if (chan->ch_status == IPC_DISCONNECT) {
+		if (chan->ch_status == IPC_DISCONNECT && *rdcount < maxcount){
 			cl_log(LOG_ERR
 			,	"checkinput1[0x%lx %s]: EOF in iter %d"
 			,	(unsigned long)chan, where, *rdcount);
 			EOFcheck(chan);
 		}
+
+		if (rmsg != NULL) {
+			rmsg->msg_done(rmsg);
+			rmsg = NULL;
+		}
+
 		if ((rc = chan->ops->recv(chan, &rmsg)) != IPC_OK) {
 			if (chan->ch_status == IPC_DISCONNECT) {
 				cl_log(LOG_ERR
@@ -456,7 +450,7 @@ checkinput(IPC_Channel* chan, const char * where, int* rdcount, int maxcount)
 			dump_ipc_info(chan);
 			++errs;
 		}
-		if (chan->ch_status == IPC_DISCONNECT) {
+		if (*rdcount < maxcount && chan->ch_status == IPC_DISCONNECT){
 			cl_log(LOG_ERR
 			,	"checkinput3[0x%lx %s]: EOF in iter %d"
 			,	(unsigned long)chan, where, *rdcount);
