@@ -417,7 +417,7 @@ socket_is_message_pending(struct IPC_CHANNEL * ch)
   struct SOCKET_CH_PRIVATE * conn_info = ch->ch_private;
   struct pollfd sockpoll;
 
-  if (ch->recv_queue->current_qlen > 0 || conn_info->buf_msg != NULL) {
+  if (ch->recv_queue->current_qlen > 0) {
     return TRUE;
   }
 
