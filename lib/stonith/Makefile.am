@@ -54,6 +54,6 @@ libstonith_la_LIBADD	= -L$(top_builddir)/lib/pils/ \
 
 ## Man pages
 
-man_MANS		= stonith.8
+man_MANS		= stonith.8 meatclient.8
 
 EXTRA_DIST              = $(man_MANS)
