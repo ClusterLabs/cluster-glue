@@ -24,7 +24,7 @@
 
 #define PLUGINSUFFIX	LTDL_SHLIB_EXT
 
-static int	PluginDebugLevel = 5;
+static int	PluginDebugLevel = 0;
 
 #define DEBUGPLUGIN	(PluginDebugLevel > 0)
 
@@ -287,7 +287,7 @@ DelPILPlugin(PILPlugin*pi)
 	pi->plugintype = NULL;
 
 	if (pi->refcnt > 0) {
-		PILLog(PIL_CRIT, "DelPILPlugin: Non-zero refcnt");
+		PILLog(PIL_INFO, "DelPILPlugin: Non-zero refcnt");
 	}
 
 	lt_dlclose(pi->dlhandle);
@@ -632,8 +632,6 @@ NewPILInterface(PILInterfaceType*	interfacetype
 		ret->loadingpi = loading_plugin;
 		g_hash_table_insert(interfacetype->interfaces
 		,	g_strdup(ret->interfacename), ret);
-		PILLog(PIL_CRIT, "Inserting %s into %s interface type table......................"
-		,	ret->interfacename, interfacetype->typename);
 		
 		ret->if_close = closefun;
 		ret->refcnt = 1;
@@ -1331,9 +1329,6 @@ PILRegisterInterface(PILPlugin* piinfo
 	g_assert(ifmgrinfo == ifinfo->ifmanager);
 	*interfaceid = ifinfo;
 
-	PILLog(PIL_CRIT
-	,	"Caling registration function for type %s, plugin %s"
-	,	interfacetype, interfacename);
 	/* Call the registration function for our interface type */
 	rc = ifops->RegisterInterface(ifinfo, Imports);
 
