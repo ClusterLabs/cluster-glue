@@ -256,7 +256,7 @@ socket_initiate_connection(struct IPC_CHANNEL * ch)
   peer_addr.sun_family = AF_UNIX;    /* host byte order */ 
 
   if (strlen(conn_info->path_name) >= sizeof(peer_addr.sun_path)) {
-    fprintf(stderr,"the max path length is %d\n", sizeof(peer_addr.sun_path));
+    fprintf(stderr,"the max path length is %zu\n", sizeof(peer_addr.sun_path));
     return IPC_FAIL;
   }
   strncpy(peer_addr.sun_path, conn_info->path_name, sizeof(peer_addr.sun_path));
@@ -716,7 +716,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
 
   if ((path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR)) != NULL) { 
     if (strlen(path_name) >= sizeof(conn_info->path_name)) {
-      fprintf(stderr,"the max path length is %d\n"
+      fprintf(stderr,"the max path length is %zu\n"
       ,	sizeof(conn_info->path_name));
       	return NULL;
     }
@@ -843,7 +843,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch)
 {
   struct SOCKET_CH_PRIVATE *conn_info;
   struct IPC_AUTH *auth_info;
-  ssize_t n;
+  socklen_t n;
   int ret = IPC_OK;
   struct ucred *cred;
   
@@ -885,7 +885,7 @@ pid_t
 socket_get_farside_pid(int sockfd )
 {
 
-  ssize_t n;
+  socklen_t n;
   struct ucred *cred;
   pid_t f_pid;
   
