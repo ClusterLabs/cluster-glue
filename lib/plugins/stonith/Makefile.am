@@ -65,16 +65,16 @@ plugin_LTLIBRARIES =	apcmaster.la		\
 			$(vacm_LIB)		\
 			wti_nps.la
 
-apcmaster_la_SOURCES	= apcmaster.c
+apcmaster_la_SOURCES	= apcmaster.c stonith_signal.h
 apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version
 
 apcmastersnmp_la_SOURCES= apcmastersnmp.c
 apcmastersnmp_la_LDFLAGS= -export-dynamic -module -avoid-version -lsnmp -lcrypto
 
-apcsmart_la_SOURCES	= apcsmart.c
+apcsmart_la_SOURCES	= apcsmart.c stonith_signal.h
 apcsmart_la_LDFLAGS	= -export-dynamic -module -avoid-version
 
-baytech_la_SOURCES	= baytech.c
+baytech_la_SOURCES	= baytech.c stonith_signal.h
 baytech_la_LDFLAGS	= -export-dynamic -module -avoid-version
 
 meatware_la_SOURCES	= meatware.c
@@ -87,7 +87,7 @@ nw_rpc100s_la_SOURCES	= nw_rpc100s.c
 nw_rpc100s_la_LDFLAGS	= -export-dynamic -module -avoid-version
 nw_rpc100s_la_LIBADD	= $(top_builddir)/replace/libreplace.la
 
-rps10_la_SOURCES	= rps10.c
+rps10_la_SOURCES	= rps10
 rps10_la_LDFLAGS	= -export-dynamic -module -avoid-version
 
 ssh_la_SOURCES		= ssh.c
@@ -98,6 +98,6 @@ vacm_la_SOURCES		= vacm.c
 vacm_la_LDFLAGS		= -export-dynamic -module -avoid-version
 vacm_la_LIBADD		= $(top_builddir)/replace/libreplace.la
 
-wti_nps_la_SOURCES	= wti_nps.c
+wti_nps_la_SOURCES	= wti_nps.c stonith_signal.h
 wti_nps_la_LDFLAGS	= -export-dynamic -module -avoid-version
 wti_nps_la_LIBADD	= $(top_builddir)/replace/libreplace.la

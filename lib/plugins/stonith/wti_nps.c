@@ -51,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.3 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.4 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -72,7 +72,8 @@ static const char *version __attribute__ ((unused)) = "$Revision: 1.3 $";
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
-#include <clplumbing/cl_signal.h>
+
+#include "stonith_signal.h"
 
 /*
  * wti_npsclose is called as part of unloading the wti_nps STONITH plugin.
@@ -403,7 +404,7 @@ NPSkillcomm(struct WTINPS* nps)
   	        nps->wrfd = -1;
 	}
         if (nps->pid > 0) {
-	        CL_KILL(nps->pid, SIGKILL);		
+	        STONITH_KILL(nps->pid, SIGKILL);		
 		(void)waitpid(nps->pid, NULL, 0);
 		nps->pid = -1;
 	}

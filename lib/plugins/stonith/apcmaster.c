@@ -49,7 +49,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.3 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.4 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -69,7 +69,8 @@ static const char *version __attribute__ ((unused)) = "$Revision: 1.3 $";
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
-#include <clplumbing/cl_signal.h>
+
+#include "stonith_signal.h"
 
 /*
  * apcmasterclose is called as part of unloading the apcmaster STONITH plugin.
@@ -410,7 +411,7 @@ MSkillcomm(struct APCMS* ms)
 		ms->wrfd = -1;
 	}
 	if (ms->pid > 0) {
-		CL_KILL(ms->pid, SIGKILL);
+		STONITH_KILL(ms->pid, SIGKILL);
 		(void)waitpid(ms->pid, NULL, 0);
 		ms->pid = -1;
 	}
