@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.38 2004/09/27 08:29:07 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.39 2004/09/30 13:26:57 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -165,7 +165,7 @@ static void on_ra_proc_registered(ProcTrack* p);
 static void on_ra_proc_finished(ProcTrack* p, int status
 ,			int signo, int exitcode, int waslogged);
 static const char* on_ra_proc_query_name(ProcTrack* p);
-static unsigned int signal_pending = 0;
+static volatile unsigned int signal_pending = 0;
 static unsigned int debug_level = 0;
 
 ProcTrack_ops ManagedChildTrackOps = {
@@ -2032,6 +2032,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.39  2004/09/30 13:26:57  alan
+ * Redeclared signal_pending as volatile.
+ *
  * Revision 1.38  2004/09/27 08:29:07  zhenh
  * apply the new cl_msg_list_xxx() funcions in lrm
  *
