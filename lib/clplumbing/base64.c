@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <clplumbing/base64.h>
 /*
  *
  * Base64 conversion functions.
@@ -14,14 +15,6 @@
  *
  */
 
-#define	B64inunit	3
-#define	B64outunit	4
-
-#define	B64_stringlen(bytes)	\
-	((((bytes)+(B64inunit-1))/B64inunit)*B64outunit)
-
-#define	B64_maxbytelen(slen)	(((slen) / B64outunit)*B64inunit)
-
 
 static char b64chars[]
 =	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -30,8 +23,6 @@ static char b64chars[]
 #define	MASK6	(077)
 #define	MASK24	(077777777)
 
-int binary_to_base64(void * data, int nbytes, char * output, int outlen);
-int base64_to_binary(char * input, int inlen, void * output, int outlen);
 
 /* Convert from binary to a base64 string (~ according to RFC1341) */
 int
