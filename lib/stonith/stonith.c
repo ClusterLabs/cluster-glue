@@ -1,4 +1,4 @@
-/* $Id: stonith.c,v 1.17 2005/02/01 20:26:20 gshi Exp $ */
+/* $Id: stonith.c,v 1.18 2005/02/24 06:18:46 sunjd Exp $ */
 /*
  * Stonith API infrastructure.
  *
@@ -380,11 +380,12 @@ stonith_walk_ghash(gpointer key, gpointer value, gpointer user_data)
 	if (NVcur <= NVmax && !NVerr) {
 		u[NVcur].s_name = strdup(key);
 		u[NVcur].s_value = strdup(value);
-		++NVcur;
 		if (u[NVcur].s_name == NULL || u[NVcur].s_value == NULL) {
+			/* Memory allocation error */
 			NVerr = TRUE;
 			return;
 		}
+		++NVcur;
 	}else{
 		NVerr = TRUE;
 	}
@@ -402,6 +403,8 @@ stonith_ghash_to_NVpair(GHashTable* stringtable)
 	}
 	NVmax = hsize;
 	NVcur = 0;
+	ret[hsize].s_name = NULL;
+	ret[hsize].s_value = NULL;
 	g_hash_table_foreach(stringtable, stonith_walk_ghash, ret);
 	NVmax = NVcur = -1;
 	if (NVerr) {
