@@ -441,20 +441,34 @@ RemoveAPILPlugin(PILPlugin*Plugin)
 }
 
 PILPluginUniv*
-NewPILPluginUniv(const char * baseplugindirectory)
+NewPILPluginUniv(const char * basepluginpath)
 {
 	PILPluginUniv*	ret = NEW(PILPluginUniv);
 
+	/* The delimiter separating search path components */
+	const char*	path_delim = G_SEARCHPATH_SEPARATOR_S;
+	char *		fullpath;
+
 	STATNEW(piuniv);
 	if (DEBUGPLUGIN) {
-		PILLog(PIL_DEBUG, "NewPILPluginUniv(0x%x)", (unsigned long)ret);
+		PILLog(PIL_DEBUG, "NewPILPluginUniv(0x%x)"
+		,	(unsigned long)ret);
 	}
-	if (!g_path_is_absolute(baseplugindirectory)) {
+	if (!g_path_is_absolute(basepluginpath)) {
 		DELETE(ret);
 		return(ret);
 	}
 	ret->MagicNum = PIL_MAGIC_PLUGINUNIV;
-	ret->rootdirectory = g_strdup(baseplugindirectory);
+	fullpath = g_strdup_printf("%s%s%s", basepluginpath
+	,	path_delim, PILS_BASE_PLUGINDIR);
+	if (DEBUGPLUGIN) {
+		PILLog(PIL_DEBUG
+		,	"PILS: Plugin path = %s", fullpath);
+	}
+
+	/* Separate the root directory PATH into components */
+	ret->rootdirlist = g_strsplit(fullpath, path_delim, 100);
+	g_free(fullpath);
 
 	ret->PluginTypes = g_hash_table_new(g_str_hash, g_str_equal);
 	ret->imports = &PILPluginImportSet;
@@ -476,9 +490,10 @@ DelPILPluginUniv(PILPluginUniv* piuniv)
 	PILValidatePluginUniv(NULL, piuniv, NULL);
 	DelPILInterfaceUniv(piuniv->ifuniv);
 	piuniv->ifuniv = NULL;
-	g_hash_table_foreach_remove(piuniv->PluginTypes, RmAPILPluginType, NULL);
+	g_hash_table_foreach_remove(piuniv->PluginTypes
+	,	RmAPILPluginType, NULL);
 	g_hash_table_destroy(piuniv->PluginTypes);
-	DELETE(piuniv->rootdirectory);
+	g_strfreev(piuniv->rootdirlist);
 	ZAP(piuniv);
 	DELETE(piuniv);
 }
@@ -1251,24 +1266,50 @@ PIL_strerror(PIL_rc rc)
 	return PIL_strerrmsgs[irc];
 }
 
+/*
+ * Returns the PATHname of the file containing the requested plugin
+ * This file handles PATH-like semantics from the rootdirlist.
+ * It is also might be the right place to put alias handing in the future...
+ */
 static char *
 PILPluginPath(PILPluginUniv* universe, const char * plugintype
 ,	const char *	pluginname)
 {
-	char * PluginPath;
+	char * PluginPath = NULL;
+	char **	spath_component;
 
-	PluginPath = g_strdup_printf("%s%s%s%s%s%s"
-	,	universe->rootdirectory
-	,	G_DIR_SEPARATOR_S
-	,	plugintype
-	,	G_DIR_SEPARATOR_S
-	,	pluginname
-	,	LTDL_SHLIB_EXT);
+	for (spath_component = universe->rootdirlist; *spath_component
+	;	++ spath_component) {
 
-	if (DEBUGPLUGIN) {
-		PILLog(PIL_DEBUG, "Plugin path for %s/%s => [%s]"
-		,	plugintype, pluginname, PluginPath);
+		if (PluginPath) {
+			g_free(PluginPath); PluginPath=NULL;
+		}
+	
+		PluginPath = g_strdup_printf("%s%s%s%s%s%s"
+		,	*spath_component
+		,	G_DIR_SEPARATOR_S
+		,	plugintype
+		,	G_DIR_SEPARATOR_S
+		,	pluginname
+		,	LTDL_SHLIB_EXT);
+		if (DEBUGPLUGIN) {
+			PILLog(PIL_DEBUG
+			,	"PILS: Looking for %s/%s => [%s]"
+			,	plugintype, pluginname, PluginPath);
+		}
+
+		if (PluginExists(PluginPath) == PIL_OK) {
+			if (DEBUGPLUGIN) {
+				PILLog(PIL_DEBUG
+				,	"Plugin path for %s/%s => [%s]"
+				,	plugintype, pluginname, PluginPath);
+			}
+			return PluginPath;
+		}
+		/* FIXME:  Put alias file processing here... */
 	}
+
+	/* Can't find 'em all... */
 	return PluginPath;
 }
 
@@ -1814,57 +1855,85 @@ static char**
 PILPluginTypeListPlugins(PILPluginType* pitype
 ,	int *		picount	/* Can be NULL ... */)
 {
-	const char *	basedir = pitype->piuniv->rootdirectory;
 	const char *	piclass = pitype->plugintype;
-	GString*	path;
+	int		plugincount = 0;
 	char **		result = NULL;
-	struct dirent**	files;
-	int		plugincount;
-	int		j;
+	int		initoff = 0;
+	char **		pelem;
 
+	/* Return all the plugins in all the directories in the PATH */
 
-	path = g_string_new(basedir);
-	if (piclass) {
-		if (g_string_append_c(path, G_DIR_SEPARATOR) == NULL
-		||	g_string_append(path, piclass) == NULL) {
-			g_string_free(path, 1); path = NULL;
-			return(NULL);
+	for (pelem=pitype->piuniv->rootdirlist; *pelem; ++pelem) {
+		int		j;
+		GString*	path;
+		int		dircount;
+		struct dirent**	files;
+
+		path = g_string_new(*pelem);
+		g_assert(piclass != NULL);
+		if (piclass) {
+			if (g_string_append_c(path, G_DIR_SEPARATOR) == NULL
+			||	g_string_append(path, piclass) == NULL) {
+				g_string_free(path, 1); path = NULL;
+				return(NULL);
+			}
 		}
+
+		files = NULL;
+		dircount = scandir(path->str, &files
+		,	SCANSEL_CAST &so_select, NULL);
+		g_string_free(path, 1); path=NULL;
+
+		if (dircount <= 0) {
+			if (files != NULL) {
+				FREE_DIRLIST(files, dircount);
+			}
+			continue;
+		}
+
+		initoff = plugincount;
+		plugincount += dircount;
+		if (result == NULL) {
+			result = (char **) g_malloc((plugincount+1)*sizeof(char *));
+		}else{
+			result = (char **) g_realloc(result
+			,	(plugincount+1)*sizeof(char *));
+		}
+
+		for (j=0; j < dircount; ++j) {
+			char*	s;
+			int	slen = strlen(files[j]->d_name)
+			-	STRLEN(PLUGINSUFFIX);
+
+			s = g_malloc(slen+1);
+			strncpy(s, files[j]->d_name, slen);
+			s[slen] = EOS;
+			result[initoff+j] = s;
+		}
+		FREE_DIRLIST(files, dircount);
 	}
-
-	plugincount = scandir(path->str, &files
-	,	SCANSEL_CAST &so_select, NULL);
-	g_string_free(path, 1); path=NULL;
-
-	result = (char **) g_malloc((plugincount+1)*sizeof(char *));
-
-	for (j=0; j < plugincount; ++j) {
-		char*	s;
-		int	slen = strlen(files[j]->d_name)
-		-	STRLEN(PLUGINSUFFIX);
-
-		s = g_malloc(slen+1);
-		strncpy(s, files[j]->d_name, slen);
-		s[slen] = EOS;
-		result[j] = s;
-	}
-	result[j] = NULL;
-	FREE_DIRLIST(files, plugincount);
-
-	/* Return them in sorted order... */
-	qsort(result, plugincount, sizeof(char *), qsort_string_cmp);
 
 	if (picount != NULL) {
 		*picount = plugincount;
 	}
+	if (result) {
+		result[plugincount] = NULL;
+		/* Return them in sorted order... */
+		qsort(result, plugincount, sizeof(char *), qsort_string_cmp);
+	}
 
-	return(result);
+
+	return result;
 }
 
 void
 PILFreePluginList(char ** pluginlist)
 {
 	char **	ml = pluginlist;
+
+	if (!ml) {
+		return;
+	}
 
 	while (*ml != NULL) {
 		DELETE(*ml);
@@ -1915,7 +1984,7 @@ PILValidatePluginUniv(gpointer key, gpointer piuniv, gpointer dummy)
 	PILPluginUniv * Muniv = piuniv;
 
 	g_assert(IS_PILPLUGINUNIV(Muniv));
-	g_assert(Muniv->rootdirectory != NULL);
+	g_assert(Muniv->rootdirlist != NULL);
 	g_assert(Muniv->imports != NULL);
 	g_hash_table_foreach(Muniv->PluginTypes, PILValidatePluginType, piuniv);
 	PILValidateInterfaceUniv(NULL, Muniv->ifuniv, piuniv);
