@@ -25,7 +25,11 @@
 #include <heartbeat.h>
 #include <clplumbing/proctrack.h>
 
+#define	PT	"clplumbing/proctrack"
+#define	DEBUGPROCTRACK	debugproctrack
 
+
+int			debugproctrack = 0;
 static int		LoggingIsEnabled = 1;
 static GHashTable*	ProcessTable = NULL;
 static void		InitProcTable(void);
@@ -61,10 +65,6 @@ NewTrackedProc(pid_t pid, int isapgrp, ProcTrackLogType loglevel
 	p->starttime = time(NULL);
 
 	g_hash_table_insert(ProcessTable, GINT_TO_POINTER(pid), p);
-	if (ANYDEBUG) {
-		ha_log(LOG_DEBUG, "Creating tracked %s process %d"
-		,	ops->proctype(p), pid);
-	}
 
 	/* Tell them that someone registered a process */
 	if (p->ops->procregistered) {
@@ -89,8 +89,8 @@ ReportProcHasDied(int pid, int status)
 	int		didcoredump = 0;
 #endif
 	if ((p = GetProcInfo(pid)) == NULL) {
-		if (ANYDEBUG) {
-			ha_log(LOG_DEBUG
+		if (DEBUGPROCTRACK) {
+			g_log(PT, G_LOG_LEVEL_DEBUG
 			,	"Process %d died (%d) but is not tracked."
 			,	pid, status);
 		}
@@ -128,14 +128,14 @@ ReportProcHasDied(int pid, int status)
 	if (!LoggingIsEnabled) {
 		doreport = 0;
 	}
-	if (ANYDEBUG && !doreport) {
+	if (DEBUGPROCTRACK && !doreport) {
 		doreport = 1;
 		debugreporting = 1;
 	}
 
 	if (doreport) {
 		if (deathbyexit) {
-			ha_log((exitcode == 0 ? LOG_INFO :  LOG_WARNING)
+			g_log(PT, (exitcode == 0 ? LOG_INFO :  LOG_WARNING)
 			,	"Exiting %s process %d returned rc %d."
 			,	type, pid, exitcode);
 		}else if (deathbysig) {
@@ -143,11 +143,13 @@ ReportProcHasDied(int pid, int status)
 			 * Processes being killed isn't an error if
 			 * we're only logging because of debugging.
 			 */
-			ha_log((debugreporting ? LOG_DEBUG : LOG_ERR)
+			g_log(PT
+			,	(debugreporting ? G_LOG_LEVEL_DEBUG
+			:	G_LOG_LEVEL_CRITICAL)
 			,	"Exiting %s process %d killed by signal %d."
 			,	type, pid, signo);
 		}else{
-			ha_log(LOG_ERR
+			g_log(PT, G_LOG_LEVEL_CRITICAL
 			,	"Exiting %s process %d went away"
 			" strangely (!)"
 			,	type, pid);
@@ -156,7 +158,7 @@ ReportProcHasDied(int pid, int status)
 #ifdef WCOREDUMP
 	if (didcoredump) {
 		/* We report ALL core dumps without exception */
-		ha_log(LOG_ERR
+		g_log(PT, G_LOG_LEVEL_CRITICAL
 		,	"Exiting %s process %d dumped core"
 		,	type, pid);
 	}
@@ -166,7 +168,7 @@ ReportProcHasDied(int pid, int status)
 		p->ops->procdied(p, status, exitcode, signo, doreport);
 		if (p->privatedata) {
 			/* They may have forgotten to free something... */
-			ha_log(LOG_ERR
+			g_log(PT, G_LOG_LEVEL_CRITICAL
 			,	"Exiting %s process %d did not"
 			" clean up private data!"
 			,	type, pid);

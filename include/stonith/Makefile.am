@@ -20,6 +20,4 @@
 #
 MAINTAINERCLEANFILES    = Makefile.in
 
-SOURCES 	        = expect.h
-
-include_HEADERS	        = stonith.h
+include_HEADERS	        = expect.h stonith.h
