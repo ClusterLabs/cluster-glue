@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.39 2005/03/08 20:54:51 gshi Exp $ */
+/* $Id: ipc.h,v 1.40 2005/03/15 18:40:06 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -144,7 +144,7 @@ struct IPC_CHANNEL{
 
 
 	/* is the send blocking or nonblocking*/
-	gboolean	should_send_blocking;
+	gboolean	should_send_block;
 	
 /*  There are two queues in channel. One is for sending and the other
  *  is for receiving. 
