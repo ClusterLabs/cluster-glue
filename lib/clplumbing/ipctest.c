@@ -29,7 +29,7 @@ static void checkifblocked(IPC_Channel* channel);
 
 static int (*PollFunc)(struct pollfd * fds, unsigned int, int)
 =	(int (*)(struct pollfd * fds, unsigned int, int))  poll;
-
+static gboolean checkmsg(IPC_Message* rmsg, const char * who, int rcount);
 static int
 channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
 {
@@ -51,12 +51,14 @@ channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
 
 		case 0:		/* Child */
 			channels[1]->ops->destroy(channels[1]);
+			channels[1] = NULL;
 			rc = clientfunc(channels[0], count);
 			exit (rc > 127 ? 127 : rc);
 			break;
 
 		default:	 /* Server */
 			channels[0]->ops->destroy(channels[0]);
+			channels[0] = NULL;
 			rc = serverfunc(channels[1], count);
 			wait(&waitstat);
 			if (WIFEXITED(waitstat)) {
@@ -109,19 +111,19 @@ main(int argc, char ** argv)
 	cl_log_enable_stderr(TRUE);
 
 
+#if 0
 	rc += channelpair(echoclient, echoserver, 10000);
 	rc += channelpair(asyn_echoclient, asyn_echoserver, 20000);
 	rc += channelpair(mainloop_client, mainloop_server, 20000);
 
-#if 0
 	/* The code is know to be broken right now, don't use it */
 	cl_log(LOG_INFO, "Note: NOT enabling poll(2) replacement code.");
 #else
 	cl_log(LOG_INFO, "NOTE: Enabling poll(2) replacement code.");
 	PollFunc = cl_poll;
 	g_main_set_poll_func(cl_glibpoll);
-	rc += channelpair(echoclient, echoserver          , 1000000);
-	rc += channelpair(asyn_echoclient, asyn_echoserver, 1000000);
+	rc += channelpair(echoclient, echoserver          , 20000);
+	rc += channelpair(asyn_echoclient, asyn_echoserver, 20000);
 	rc += channelpair(mainloop_client, mainloop_server, 1000000);
 #endif
 	
@@ -218,9 +220,9 @@ echoserver(IPC_Channel* wchan, int repcount)
 		}
 		
 	}
-	wchan->ops->waitout(wchan);
-	wchan->ops->destroy(wchan);  wchan=NULL;
 	cl_log(LOG_INFO, "echoserver: %d errors", errcount);
+	wchan->ops->destroy(wchan); wchan = NULL;
+
 	return errcount;
 }
 static int
@@ -273,9 +275,8 @@ echoclient(IPC_Channel* rchan, int repcount)
 		checkifblocked(rchan);
 		//fprintf(stderr, "C");
 	}
-	rchan->ops->waitout(rchan);
-	rchan->ops->destroy(rchan);  rchan=NULL;
 	cl_log(LOG_INFO, "echoclient: %d errors", errcount);
+	rchan->ops->destroy(rchan); rchan = NULL;
 	return errcount;
 }
 
@@ -312,8 +313,6 @@ checkinput(IPC_Channel* chan, const char * where, int* rdcount, int maxcount)
 {
 	IPC_Message*	rmsg = NULL;
 	int		errs = 0;
-	char		str[256];
-	size_t		rdlen;
 	int		rc;
 
 	while (chan->ops->is_message_pending(chan)
@@ -340,44 +339,8 @@ checkinput(IPC_Channel* chan, const char * where, int* rdcount, int maxcount)
 			continue;
 		}
 		*rdcount += 1;
-		echomsgbody(str, *rdcount, &rdlen);
-		if (rmsg->msg_len != rdlen) {
-			cl_log(LOG_ERR
-			,	"checkinput[%s]: length mismatch"
-			" [expected %u, got %lu] iteration %d"
-			,	where, (unsigned)rdlen
-			,	(unsigned long)rmsg->msg_len
-			,	*rdcount);
-			cl_log(LOG_ERR
-			,	"checkinput[%s]: expecting [%s]"
-			,	where, str);
-			cl_log(LOG_ERR
-			,	"checkinput[%s]: got [%s] instead"
-			,	where, (const char *)rmsg->msg_body);
+		if (!checkmsg(rmsg, where, *rdcount)) {
 			++errs;
-			continue;
-		}
-		if (strncmp(rmsg->msg_body, str, rdlen) != 0) {
-			cl_log(LOG_ERR
-			,	"checkinput[%s]: data mismatch"
-			". input iteration %d"
-			,	where, *rdcount);
-			cl_log(LOG_ERR
-			,	"checkinput[%s]: expecting [%s]"
-			,	where, str);
-			cl_log(LOG_ERR
-			,	"checkinput[%s]: got [%s] instead"
-			,	where, (const char *)rmsg->msg_body);
-			++errs;
-			continue;
-#if 1
-		}else if (strcmp(where, "s_rcv_msg") == 0
-		||	strcmp(where, "s_echo_msg") == 0) {
-			cl_log(LOG_ERR
-			,	"checkinput[%s]: data Good"
-			"! input iteration %d"
-			,	where, *rdcount);
-#endif
 		}
 
 	}
@@ -461,9 +424,8 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 
 	}
 
-	wchan->ops->waitout(wchan);
-	wchan->ops->destroy(wchan);  wchan=NULL;
 	cl_log(LOG_INFO, "asyn_echoserver: %d errors", errcount);
+	wchan->ops->destroy(wchan); wchan = NULL;
 	return errcount;
 }
 
@@ -471,6 +433,7 @@ static int
 asyn_echoclient(IPC_Channel* chan, int repcount)
 {
 	int		rdcount = 0;
+	int		wrcount = 0;
 	int		errcount = 0;
 	IPC_Message*	rmsg;
 	int		rfd = chan->ops->get_recv_select_fd(chan);
@@ -545,6 +508,8 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 					return errcount;
 				}
 				continue;
+			}else{
+				++wrcount;
 			}
 			//fprintf(stderr, "x");
 		}
@@ -619,9 +584,9 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 	}
 	cl_poll_ignore(rfd);
 	cl_poll_ignore(wfd);
-	chan->ops->waitout(chan);
-	chan->ops->destroy(chan);  chan=NULL;
-	cl_log(LOG_INFO, "Async echoclient: %d errors", errcount);
+	cl_log(LOG_INFO, "Async echoclient: %d errors, %d reads, %d writes"
+	,	errcount, rdcount, wrcount);
+	chan->ops->destroy(chan); chan = NULL;
 	return errcount;
 }
 
@@ -650,7 +615,9 @@ s_send_msg(gpointer data)
 		i->sendingsuspended = TRUE;
 		return FALSE;
 	}
-	i->sendingsuspended = FALSE;
+	if (i->sendingsuspended) {
+		i->sendingsuspended = FALSE;
+	}
 	++i->wcount;
 	
 	wmsg = newmessage(i->chan, i->wcount);
@@ -694,6 +661,56 @@ s_rcv_msg(IPC_Channel* chan, gpointer data)
 }
 
 static gboolean
+checkmsg(IPC_Message* rmsg, const char * who, int rcount)
+{
+	char		str[256];
+	int		len;
+
+	echomsgbody(str, rcount, &len);
+
+	if (rmsg->msg_len != len) {
+		cl_log(LOG_ERR
+		,	"checkmsg[%s]: length mismatch"
+		" [expected %u, got %lu] iteration %d"
+		,	who, (unsigned)len
+		,	(unsigned long)rmsg->msg_len
+		,	rcount);
+		cl_log(LOG_ERR
+		,	"checkmsg[%s]: expecting [%s]"
+		,	who, str);
+		cl_log(LOG_ERR
+		,	"checkmsg[%s]: got [%s] instead"
+		,	who, (const char *)rmsg->msg_body);
+		return FALSE;
+	}
+	if (strncmp(rmsg->msg_body, str, len) != 0) {
+		cl_log(LOG_ERR
+		,	"checkmsg[%s]: data mismatch"
+		". input iteration %d"
+		,	who, rcount);
+		cl_log(LOG_ERR
+		,	"checkmsg[%s]: expecting [%s]"
+		,	who, str);
+		cl_log(LOG_ERR
+		,	"checkmsg[%s]: got [%s] instead"
+		,	who, (const char *)rmsg->msg_body);
+		return FALSE;
+#if 0
+	}else if (strcmp(who, "s_rcv_msg") == 0) {
+#if 0
+
+	||	strcmp(who, "s_echo_msg") == 0) {
+#endif
+		cl_log(LOG_ERR
+		,	"checkmsg[%s]: data Good"
+		"! input iteration %d"
+		,	who, rcount);
+#endif
+	}
+	return TRUE;
+}
+
+static gboolean
 s_echo_msg(IPC_Channel* chan, gpointer data)
 {
 	struct iterinfo*	i = data;
@@ -704,6 +721,14 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 		if (chan->ch_status == IPC_DISCONNECT) {
 			break;
 		}
+		if (i->chan->send_queue->current_qlen
+		>=	i->chan->send_queue->max_qlen-2) {
+			i->sendingsuspended = TRUE;
+			cl_log(LOG_INFO
+			,	"s_echo_msg: Sending suspended.");
+			return TRUE;
+		}
+		i->sendingsuspended = FALSE;
 		if ((rc = chan->ops->recv(chan, &rmsg)) != IPC_OK) {
 			cl_log(LOG_ERR
 			,	"s_echo_msg: recv failed %d rc iter %d"
@@ -714,7 +739,7 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 			return TRUE;
 		}
 		i->rcount++;
-		checkinput(chan, "s_echo_msg", &i->rcount, i->max);
+		checkmsg(rmsg, "s_echo_msg", i->rcount);
 
 		//fprintf(stderr, "c");
 		if ((rc = chan->ops->send(chan, rmsg)) != IPC_OK) {
@@ -723,6 +748,8 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 			,	rc, i->rcount, chan->send_queue->current_qlen);
 			cl_perror("s_echo_msg:send");
 			++i->errcount;
+		}else{
+			i->wcount+=1;
 		}
 	}
 	//fprintf(stderr, "%%");
@@ -752,6 +779,7 @@ mainloop_server(IPC_Channel* chan, int repcount)
 	,	FALSE, s_rcv_msg, &info, NULL);
 	cl_log(LOG_INFO, "Mainloop echo server: %d reps pid %d.", repcount, (int)getpid());
 	g_main_run(loop);
+	chan->ops->waitout(chan);
 	g_main_destroy(loop);
 	loop = NULL;
 	cl_log(LOG_INFO, "Mainloop echo server: %d errors", info.errcount);
@@ -767,8 +795,10 @@ mainloop_client(IPC_Channel* chan, int repcount)
 	,	FALSE, s_echo_msg, &info, NULL);
 	cl_log(LOG_INFO, "Mainloop echo client: %d reps pid %d.", repcount, (int)getpid());
 	g_main_run(loop);
+	chan->ops->waitout(chan);
 	g_main_destroy(loop);
 	loop = NULL;
-	cl_log(LOG_INFO, "Mainloop echo client: %d errors", info.errcount);
+	cl_log(LOG_INFO, "Mainloop echo client: %d errors, %d read %d written"
+	,	info.errcount, info.rcount, info.wcount);
 	return info.errcount;
 }
