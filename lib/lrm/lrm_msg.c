@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.17 2004/09/17 03:33:24 zhenh Exp $ */
+/* $Id: lrm_msg.c,v 1.18 2004/09/27 08:33:55 zhenh Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -103,24 +103,23 @@ ha_msg_value_str_list(struct ha_msg * msg, const char * name)
 {
 	
 	int i = 1;
-	char paramname[MAX_NAME_LEN+MAX_INT_LEN];
+	int len = 0;
 	const char* value;
 	char* element;
 	GList* list = NULL;
 	
+	
 	if( NULL==msg||NULL==name||strnlen(name, MAX_NAME_LEN)>=MAX_NAME_LEN ){
 		return NULL;
 	}	
-
-	for(;;) {
-		snprintf(paramname, MAX_NAME_LEN+MAX_INT_LEN, "%s%d", name, i);
-		value = ha_msg_value(msg,paramname);
+	len = cl_msg_list_length(msg,name);
+	for(i=0; i<len; i++) {
+		value = cl_msg_list_nth_data(msg,name,i);
 		if (NULL == value) {
 			break;
 		}
 		element = g_strdup(value);
 		list = g_list_append(list, element);
-		i++;
 	}
 	return list;
 }
@@ -129,7 +128,6 @@ int
 ha_msg_add_str_list(struct ha_msg * msg, const char * name, GList* list)
 {
 	int i = 1;
-	char paramname[MAX_NAME_LEN+MAX_INT_LEN];
 	if( NULL==msg||NULL==name||strnlen(name, MAX_NAME_LEN)>=MAX_NAME_LEN ){
 		return HA_FAIL;
 	}
@@ -138,12 +136,9 @@ ha_msg_add_str_list(struct ha_msg * msg, const char * name, GList* list)
 		GList* element = g_list_first(list);
 		while (NULL != element) {
 			char* value = (char*)element->data;
-			snprintf(paramname, MAX_NAME_LEN+MAX_INT_LEN, "%s%d",
-				 name, i);
-			if( HA_OK != ha_msg_add(msg,paramname, value)) {
+			if( HA_OK != cl_msg_list_add_string(msg,name,value)) {
 				cl_log(LOG_ERR,
-				"ha_msg_add in ha_msg_add_str_list failed");
-				
+				"cl_msg_list_add_string failed");
 				return HA_FAIL;
 			}
 			element = g_list_next(element);
@@ -419,6 +414,9 @@ create_lrm_ret(int rc, int fields)
 
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.18  2004/09/27 08:33:55  zhenh
+ * apply the new cl_msg_list_xxx() funcions in lrm
+ *
  * Revision 1.17  2004/09/17 03:33:24  zhenh
  * in some platform(maybe 64bits), using int as size_t causes warning.
  *
