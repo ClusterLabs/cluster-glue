@@ -66,7 +66,7 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
 
 	/* Figure out when to give up. */
 
-	starttime = times(NULL);
+	starttime = time_longclock();
 	ticks = secsto_longclock(to_secs);
 	endtime = add_longclock(starttime, ticks);
 
