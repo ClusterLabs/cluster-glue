@@ -45,7 +45,7 @@ struct GWCSource_s {
 	guint			gsourceid;
 };
 
-#define	DEF_EVENTS	(G_IO_IN|G_IO_PRI||G_IO_HUP|G_IO_ERR|G_IO_NVAL)
+#define	DEF_EVENTS	(G_IO_IN|G_IO_PRI|G_IO_HUP|G_IO_ERR|G_IO_NVAL)
 #define	OUTPUT_EVENTS	(G_IO_OUT)
 
 static gboolean G_fd_prepare(gpointer source_data
