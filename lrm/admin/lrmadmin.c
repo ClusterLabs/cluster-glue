@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.14 2004/09/09 03:32:50 zhenh Exp $ */
+/* $Id: lrmadmin.c,v 1.15 2004/09/10 00:28:17 zhenh Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -105,9 +105,7 @@ const char * simple_help_screen =
 "         {-A|--add} <rscid> <raclass> <ratype> <provider|NULL>[<rsc_params_list>]\n"
 "         {-D|--delete} <rscid>\n"
 "         {-F|--flush} <rscid>\n"
-"         {-E|--execute} <rscid> <operator> <timeout> <interval> <target_rc> [<operator_parameters_"
-"list>]\n"\
-"[<operator_parameters_list>]\n"
+"         {-E|--execute} <rscid> <operator> <timeout> <interval> <target_rc|EVERYTIME|CHANGED> [<operator_parameters_list>]\n"
 "         {-S|--state} <rscid>\n"
 "         {-L|--listall}\n"
 "         {-I|--information} <rsc_id>\n"
@@ -881,6 +879,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.15  2004/09/10 00:28:17  zhenh
+ * change the usage information
+ *
  * Revision 1.14  2004/09/09 03:32:50  zhenh
  * fix a mis type
  *
