@@ -25,6 +25,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <sys/stat.h>
 
 /* Dumbness... */
@@ -2094,6 +2095,6 @@ PILCallLog(PILLogFun logfun, PILLogLevel priority, const char * fmt, ...)
 	va_start (args, fmt);
 	str = g_strdup_vprintf(fmt, args);
 	va_end (args);
-	logfun(priority, "%s", args);
+	logfun(priority, "%s", str);
 	g_free(str);
 }
