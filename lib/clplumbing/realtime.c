@@ -201,7 +201,7 @@ cl_enable_realtime(void)
 int
 cl_shortsleep(void)
 {
-	static const struct timespec	req = {0,0};
+	static const struct timespec	req = {0,2000001L};
 
 	return nanosleep(&req, NULL);
 }
