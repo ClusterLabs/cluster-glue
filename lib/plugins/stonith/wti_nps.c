@@ -51,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.8 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.9 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -447,7 +447,7 @@ NPSReset(struct WTINPS* nps, char * outlets, const char * rebootid)
 	syslog(LOG_INFO, _("Host %s being rebooted."), rebootid);
 
 	/* Expect "PS>" */
-	if (NPSLookFor(nps, Prompt, 10) < 0) {
+	if (NPSLookFor(nps, Prompt, 60) < 0) {
 		return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
 
@@ -487,7 +487,7 @@ NPS_onoff(struct WTINPS* nps, const char * outlets, const char * unitid, int req
 		/* They've turned on that annoying command confirmation :-( */
 		SEND("Y\r");
 	}
-	EXPECT(Prompt, 10);
+	EXPECT(Prompt, 60);
 
 	/* All Right!  Command done. Life is Good! */
 	syslog(LOG_NOTICE, _("Power to NPS outlet(s) %s turned %s."), outlets, onoff);
@@ -505,7 +505,6 @@ NPSNametoOutlet(struct WTINPS* nps, const char * name, char **outlets)
   	char	NameMapping[128];
   	int	sockno;
   	char	sockname[32];
-  	int times = 0;
         char buf[32];
         int left = 17;
   	int ret = -1;
@@ -528,7 +527,6 @@ NPSNametoOutlet(struct WTINPS* nps, const char * name, char **outlets)
     	EXPECT(Separator, 5); 
 	
   	do {
-  		times++;
   		NameMapping[0] = EOS;
   		SNARF(NameMapping, 5);
   		
@@ -553,7 +551,7 @@ NPSNametoOutlet(struct WTINPS* nps, const char * name, char **outlets)
   				left = left - 2;
   			}
   		}
-  	} while (strlen(NameMapping) > 2 && times < 8 && left > 0);
+  	} while (strlen(NameMapping) > 2 && left > 0);
 
   	return(ret);
 }
