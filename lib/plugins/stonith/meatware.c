@@ -1,4 +1,4 @@
-/* $Id: meatware.c,v 1.11 2004/09/13 20:32:31 gshi Exp $ */
+/* $Id: meatware.c,v 1.12 2004/09/20 18:44:04 msoffen Exp $ */
 /*
  * Stonith module for Human Operator Stonith device
  *
@@ -375,7 +375,7 @@ meatware_reset_req(Stonith * s, int request, const char * host)
 		goto out;
 	}
 	else {
-		PILCallLog(PluginImports->log,PIL_INFO, _("node %s Meatware-reset."), shost);
+		PILCallLog(PluginImports->log,PIL_INFO, "%s: %s", _("node Meatware-reset."), shost);
 		unlink(meatpipe);
 		rc = S_OK;
 	}

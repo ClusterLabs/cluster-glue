@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.12 2004/09/13 20:32:31 gshi Exp $ */
+/* $Id: rps10.c,v 1.13 2004/09/20 18:44:04 msoffen Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -258,7 +258,7 @@ static int gbl_debug = DEBUG;
 			}					\
 			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
-				PILCallLog(PluginImports->log,PIL_CRIT, _("out of memory"));\
+				PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("out of memory"));\
 			}					\
 			}
 
@@ -350,8 +350,10 @@ RPSLookFor(struct WTI_RPS10* ctx, struct Etoken * tlist, int timeout)
 {
 	int	rc;
 	if ((rc = EXPECT_TOK(ctx->fd, tlist, timeout, NULL, 0)) < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Did not find string: '%s' from " DEVICE ".")
-		,	tlist[0].string);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s '%s' %s"
+		,	_("Did not find string:")
+		,	tlist[0].string
+		,	_(" from " DEVICE "."));
 		RPSDisconnect(ctx);
 		return(-1);
 	}
@@ -443,7 +445,7 @@ RPSReset(struct WTI_RPS10* ctx, char unit_id, const char * rebootid)
 	EXPECT(WTItokOff, 2);
 	if (gbl_debug) printf ("Got Off\n");	
 	EXPECT(WTItokCRNL, 2);
-	PILCallLog(PluginImports->log,PIL_INFO, _("Host %s being rebooted."), rebootid);
+	PILCallLog(PluginImports->log,PIL_INFO, "%s: %s",_("Host is being rebooted"), rebootid);
 	
 	/* Expect "Complete" */
 	EXPECT(WTItokComplete, 14);
@@ -478,7 +480,7 @@ RPSOn(struct WTI_RPS10* ctx, char unit_id, const char * host)
 	EXPECT(WTItokOutlet, 2);
 	EXPECT(WTItokOn, 2);
 	EXPECT(WTItokCRNL, 2);
-	PILCallLog(PluginImports->log,PIL_INFO, _("Host %s being turned on."), host);
+	PILCallLog(PluginImports->log,PIL_INFO, "%s: %s", _("Host is being turned on"), host);
 	
 	/* Expect "Complete" */
 	EXPECT(WTItokComplete, 5);
@@ -512,7 +514,7 @@ RPSOff(struct WTI_RPS10* ctx, char unit_id, const char * host)
 	EXPECT(WTItokOutlet, 2);
 	EXPECT(WTItokOff, 2);
 	EXPECT(WTItokCRNL, 2);
-	PILCallLog(PluginImports->log,PIL_INFO, _("Host %s being turned on."), host);
+	PILCallLog(PluginImports->log,PIL_INFO, "%s: %s", _("Host is being turned on."), host);
 	
 	/* Expect "Complete" */
 	EXPECT(WTItokComplete, 5);
@@ -960,9 +962,9 @@ rps10_reset_req(Stonith * s, int request, const char * host)
 	outlet_id = RPSNametoOutlet(ctx, host);
 
 	if (outlet_id < 0) {
-		PILCallLog(PluginImports->log,PIL_WARN, _("%s %s "
-				      "doesn't control host [%s]."), 
-		       ctx->idinfo, ctx->unitid, host);
+		PILCallLog(PluginImports->log,PIL_WARN, "%s %s %s[%s]"
+		,	ctx->idinfo, ctx->unitid
+		,	_("doesn't control host"), host );
 		RPSDisconnect(ctx);
 		return(S_BADHOST);
 	}
@@ -1012,7 +1014,7 @@ rps10_set_config_file(Stonith* s, const char * configname)
 	ctx = (struct WTI_RPS10*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot open %s"), configname);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s %s", _("Cannot open"), configname);
 		return(S_BADCONFIG);
 	}
 

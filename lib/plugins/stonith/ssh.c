@@ -1,4 +1,4 @@
-/* $Id: ssh.c,v 1.11 2004/09/13 20:32:31 gshi Exp $ */
+/* $Id: ssh.c,v 1.12 2004/09/20 18:44:04 msoffen Exp $ */
 /*
  * Stonith module for SSH Stonith device
  *
@@ -325,7 +325,7 @@ ssh_reset_req(Stonith * s, int request, const char * host)
     PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to %s", __FUNCTION__);
     return(S_OOPS);
   }
-  PILCallLog(PluginImports->log,PIL_INFO, _("Host %s ssh-reset initiating"), host);
+  PILCallLog(PluginImports->log,PIL_INFO, "%s: %s", _("Initiating ssh-reset on host"), host);
 
   snprintf(cmd, 4096, "%s \"%s\" \"%s\"", SSH_COMMAND, host, REBOOT_COMMAND);
   

@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.13 2004/09/13 20:32:31 gshi Exp $ */
+/* $Id: apcmaster.c,v 1.14 2004/09/20 18:44:04 msoffen Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -50,7 +50,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.13 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.14 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -202,7 +202,7 @@ static const char * NOTmsid = "Hey dummy, this has been destroyed (APCMS)";
 			}					\
 			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
-				PILCallLog(PluginImports->log,PIL_CRIT, _("out of memory"));\
+				PILCallLog(PluginImports->log,PIL_CRIT, "%s",  _("out of memory"));\
 			} 					\
 			}
 
@@ -282,9 +282,10 @@ static int
 MSLookFor(struct APCMS* ms, struct Etoken * tlist, int timeout)
 {
 	int	rc;
+
 	if ((rc = EXPECT_TOK(ms->rdfd, tlist, timeout, NULL, 0)) < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Did not find string: '%s' from" DEVICE ".")
-		,	tlist[0].string);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s %s %s"
+		,	_("Did not find string"), tlist[0].string, _("from " DEVICE "."));
 		MSkillcomm(ms);
 	}
 	return(rc);
@@ -296,7 +297,7 @@ static int
 MSScanLine(struct APCMS* ms, int timeout, char * buf, int max)
 {
 	if (EXPECT_TOK(ms->rdfd, CRNL, timeout, buf, max) < 0) {
-		PILCallLog(PluginImports->log,PIL_CRIT, ("Could not read line from " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Could not read line from" DEVICE "."));
 		MSkillcomm(ms);
 		return(S_OOPS);
 	}
@@ -330,11 +331,11 @@ MSLogin(struct APCMS * ms)
 	switch (MSLookFor(ms, LoginOK, 30)) {
 
 		case 0:	/* Good! */
-			PILCallLog(PluginImports->log,PIL_INFO, _("Successful login to " DEVICE "."));
+			PILCallLog(PluginImports->log,PIL_INFO, "%s", _("Successful login to " DEVICE ".")); 
 			break;
 
 		case 1:	/* Uh-oh - bad password */
-			PILCallLog(PluginImports->log,PIL_CRIT, _("Invalid password for " DEVICE "."));
+			PILCallLog(PluginImports->log,PIL_CRIT,"%s", _("Invalid password for " DEVICE "."));
 			return(S_ACCESS);
 
 		default:
@@ -422,7 +423,6 @@ MSReset(struct APCMS* ms, int outletNum, const char *host)
 {
   	char		unum[32];
 
-
 	/* Make sure we're in the top level menu */
         SEND("\033");
 	EXPECT(Prompt, 5);
@@ -467,7 +467,9 @@ MSReset(struct APCMS* ms, int outletNum, const char *host)
 		default: 
 			return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
-	PILCallLog(PluginImports->log,PIL_INFO, _("Host %s being rebooted."), host);
+
+	
+	PILCallLog(PluginImports->log,PIL_INFO, "%s: %s", _("Host being rebooted"), host); 
 
 	/* Expect ">" */
 	if (MSLookFor(ms, Prompt, 10) < 0) {
@@ -476,7 +478,7 @@ MSReset(struct APCMS* ms, int outletNum, const char *host)
 
 	/* All Right!  Power is back on.  Life is Good! */
 
-	PILCallLog(PluginImports->log,PIL_INFO, _("Power restored to host %s."), host);
+	PILCallLog(PluginImports->log,PIL_INFO, "%s: %s", _("Power restored to host"), host);
 
 	/* Return to top level menu */
 	SEND("\033");
@@ -504,7 +506,7 @@ apcmaster_onoff(struct APCMS* ms, int outletNum, const char * unitid, int req)
 	int	rc;
 
 	if ((rc = MSRobustLogin(ms) != S_OK)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
 	
@@ -553,7 +555,7 @@ apcmaster_onoff(struct APCMS* ms, int outletNum, const char * unitid, int req)
 	EXPECT(Prompt, 10);
 
 	/* All Right!  Command done. Life is Good! */
-	PILCallLog(PluginImports->log,PIL_INFO, _("Power to MS outlet(s) %d turned %s."), outletNum, onoff);
+	PILCallLog(PluginImports->log,PIL_INFO, "%s %d %s %s", _("Power to MS outlet(s)"), outletNum, _("turned"), onoff);
 	/* Pop back to main menu */
 	SEND("\033\033\033\033\033\033\033\r");
 	return(S_OK);
@@ -652,7 +654,7 @@ apcmaster_status(Stonith  *s)
 	ms = (struct APCMS*) s->pinfo;
 
 	if ((rc = MSRobustLogin(ms) != S_OK)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
 
@@ -692,7 +694,7 @@ apcmaster_hostlist(Stonith  *s)
 	ms = (struct APCMS*) s->pinfo;
 		
 	if (MSRobustLogin(ms) != S_OK) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
 		return(NULL);
 	}
 
@@ -857,7 +859,7 @@ apcmaster_reset_req(Stonith * s, int request, const char * host)
 	struct APCMS*	ms;
 
 	if (!ISAPCMS(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to apcmaster_reset_req");
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s", "invalid argument to apcmaster_reset_req");
 		return(S_OOPS);
 	}
 	if (!ISCONFIGED(s)) {
@@ -868,15 +870,14 @@ apcmaster_reset_req(Stonith * s, int request, const char * host)
 	ms = (struct APCMS*) s->pinfo;
 
 	if ((rc = MSRobustLogin(ms)) != S_OK) {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
 		return(rc);
 	}else{
 		int noutlet; 
 		noutlet = MSNametoOutlet(ms, host);
 		if (noutlet < 1) {
-			PILCallLog(PluginImports->log,PIL_WARN, _("%s %s "
-			"doesn't control host [%s]."), ms->idinfo
-			,	ms->unitid, host);
+			PILCallLog(PluginImports->log,PIL_WARN, "%s %s %s [%s]"
+			, ms->idinfo ,ms->unitid, _("doesn't control host"), host);
 			MSkillcomm(ms);
 			return(S_BADHOST);
 		}
@@ -911,19 +912,18 @@ static int
 apcmaster_set_config_file(Stonith* s, const char * configname)
 {
 	FILE *	cfgfile;
-
 	char	APCMSid[256];
 
 	struct APCMS*	ms;
 
 	if (!ISAPCMS(s)) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to apcmaster_set_config_file");
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s", "invalid argument to apcmaster_set_config_file");
 		return(S_OOPS);
 	}
 	ms = (struct APCMS*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot open %s"), configname);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s %s", _("Cannot open"), configname);
 		return(S_BADCONFIG);
 	}
 	while (fgets(APCMSid, sizeof(APCMSid), cfgfile) != NULL){
