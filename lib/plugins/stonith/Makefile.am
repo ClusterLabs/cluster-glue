@@ -87,7 +87,7 @@ nw_rpc100s_la_SOURCES	= nw_rpc100s.c
 nw_rpc100s_la_LDFLAGS	= -export-dynamic -module -avoid-version
 nw_rpc100s_la_LIBADD	= $(top_builddir)/replace/libreplace.la
 
-rps10_la_SOURCES	= rps10
+rps10_la_SOURCES	= rps10.c
 rps10_la_LDFLAGS	= -export-dynamic -module -avoid-version
 
 ssh_la_SOURCES		= ssh.c

@@ -37,6 +37,7 @@ stonith_signal_set_simple_handler(int sig, void (*handler)(int)
 	struct sigaction sa;
 	sigset_t mask;
 
+	(void)stonith_signal_set_simple_handler;
 	if(sigemptyset(&mask) < 0) {
 		return(-1);
 	}
