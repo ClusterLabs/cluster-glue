@@ -340,7 +340,7 @@ lrm_get_rsc_class_supported (ll_lrm_t* lrm)
 	}
 	ha_msg_del(msg);
 	/* get the return message */
-	ret = msgfromIPC(ch_cmd, 0);
+	ret = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"lrm_get_rsc_class_supported: can not recieve ret msg");
@@ -396,7 +396,7 @@ lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rclass)
 	}
 	ha_msg_del(msg);
 	/* get the return message */
-	ret = msgfromIPC(ch_cmd, 0);
+	ret = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"lrm_get_rsc_type_supported: can not recieve ret msg");
@@ -453,7 +453,7 @@ lrm_get_rsc_provider_supported (ll_lrm_t* lrm, const char* class, const char* ty
 	}
 	ha_msg_del(msg);
 	/* get the return message */
-	ret = msgfromIPC(ch_cmd, 0);
+	ret = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"lrm_get_rsc_provider_supported: can not recieve ret msg");
@@ -549,7 +549,7 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype,
 	}
 	ha_msg_del(msg);
 	/* get the return message */
-	ret = msgfromIPC(ch_cmd, 0);
+	ret = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"lrm_get_rsc_type_supported: can not recieve ret msg");
@@ -601,7 +601,7 @@ lrm_get_all_rscs (ll_lrm_t* lrm)
 	}
 	ha_msg_del(msg);
 	/* get the return msg */
-	ret = msgfromIPC(ch_cmd, 0);
+	ret = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"lrm_get_all_rscs: can not recieve ret msg");
@@ -655,7 +655,7 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	}
 	ha_msg_del(msg);
 	/* get the return msg from lrmd */
-	ret = msgfromIPC(ch_cmd, 0);
+	ret = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
 	if (NULL == ret) {
 		cl_log(LOG_ERR, "lrm_get_rsc: can not recieve ret msg");
 		return NULL;
@@ -805,7 +805,7 @@ lrm_rcvmsg (ll_lrm_t* lrm, int blocking)
 	}
 	while (lrm_msgready(lrm)) {
 		/* get the message */
-		msg = msgfromIPC(ch_cbk, 0);
+		msg = msgfromIPC(ch_cbk, MSG_ALLOWINTR);
 		if (msg == NULL) {
 			cl_log(LOG_WARNING,
 				"lrm_rcvmsg: recieve a null msg.");
@@ -979,7 +979,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 	ha_msg_del(msg);
 
 	/* get the return msg */
-	ret = msgfromIPC(ch_cmd, 0);
+	ret = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"rsc_get_cur_state: can not receive ret msg");
@@ -1018,7 +1018,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 		ha_msg_del(ret);
 		for (i = 0; i < op_count; i++) {
 			/* one msg for one pending op */
-			op_msg = msgfromIPC(ch_cmd, 0);
+			op_msg = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
 
 			if (NULL == op_msg) {
 				cl_log(LOG_WARNING,
@@ -1194,7 +1194,7 @@ get_rc_from_ch(IPC_Channel* ch)
 	int rc;
 	struct ha_msg* msg;
 
-	msg = msgfromIPC(ch, 0);
+	msg = msgfromIPC(ch, MSG_ALLOWINTR);
 
 	if (NULL == msg) {
 		cl_log(LOG_ERR, "get_rc_from_ch: can not recieve msg");
