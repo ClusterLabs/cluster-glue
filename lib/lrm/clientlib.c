@@ -1158,7 +1158,9 @@ msg_to_op(struct ha_msg* msg)
 			op->output = NULL;
 		}
 	}
-
+	else  {
+		op->rc = EXECRA_EXEC_UNKNOWN_ERROR;
+	}
 
 
 	/* op->app_name */
