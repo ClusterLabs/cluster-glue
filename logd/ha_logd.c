@@ -54,6 +54,7 @@ int	logd_keepalive_ms = 1000;
 int	logd_warntime_ms = 5000;
 int	logd_deadtime_ms = 10000;
 gboolean RegisteredWithApphbd = FALSE;
+gboolean	verbose =FALSE;
 
 struct {
 	char		debugfile[MAXLINE];
@@ -120,14 +121,13 @@ logd_log( const char * fmt, ...)
 	va_list		ap;
 	int		nbytes;
 	
-	
 	buf[MAXLINE-1] = EOS;
 	va_start(ap, fmt);
 	nbytes=vsnprintf(buf, sizeof(buf)-1, fmt, ap);
 	va_end(ap);
-
-	fprintf(stderr, "%s", buf);
 	
+	fprintf(stderr, "%s", buf);
+
 	return;
 }
 
@@ -276,9 +276,15 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 		int		priority = logmsg->priority;
 		
 		cl_direct_log(priority, logmsg->message, logmsg->use_pri_str,
-			      logmsg->entity, logmsg->entity_pid);
+			      logmsg->entity, logmsg->entity_pid, logmsg->timestamp);
 		
-		/*logd_log("%s: %s\n", logmsg->entity,logmsg->message);*/
+		if (verbose){
+			logd_log("%s[%d]: %s %s\n", 
+				 logmsg->entity,
+				 logmsg->entity_pid, 
+				 ha_timestamp(logmsg->timestamp),
+				 logmsg->message);
+		}
 		
 		if (ipcmsg->msg_done){
 			ipcmsg->msg_done(ipcmsg);
@@ -601,6 +607,7 @@ usage(void)
 	       "-k	stop the logging daemon if it is already running\n"
 	       "-s	return logging daemon status \n"
 	       "-c	use this config file\n"
+	       "-v	verbosely print debug messages"
 	       "-h	print out this message\n\n",
 	       cmdname);
 	
@@ -618,9 +625,10 @@ main(int argc, char** argv)
 	gboolean		stop_logd = FALSE;
 	gboolean		ask_status= FALSE;
 	const char*		cfgfile = NULL;
+	
 
 	cmdname = argv[0];
-	while ((c = getopt(argc, argv, "c:dksh")) != -1){
+	while ((c = getopt(argc, argv, "c:dksvh")) != -1){
 
 		switch(c){
 			
@@ -635,6 +643,9 @@ main(int argc, char** argv)
 			break;
 		case 'c':	/* config file*/
 			cfgfile = optarg;
+			break;
+		case 'v':
+			verbose = TRUE;
 			break;
 		case 'h':	/*help message */
 		default:
