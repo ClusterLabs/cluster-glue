@@ -58,7 +58,7 @@ extern const char* FT_strings[];
 
 
 struct ha_msg* string2msg_ll(const char*, size_t, int, int);
-int compose_netstring(char*, const char*, const char*, size_t, int*);
+int compose_netstring(char*, const char*, const char*, size_t, size_t*);
 int msg2netstring_buf(const struct ha_msg*, char*, size_t, size_t*);
 
 
@@ -854,7 +854,7 @@ str2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	
 	if ( strlen(s) != len){
 		cl_log(LOG_ERR, "str2string:"
-		       "the input len(%d) != string length(%d)",
+		       "the input len(%ld) != string length(%ld)",
 		       len, strlen(s));
 		return 0;
 	}
