@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.42 2004/10/08 09:22:51 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.43 2004/10/08 21:54:27 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -515,6 +515,7 @@ init_start ()
 		lrmd_log(LOG_ERR,
 			"main: can not create wait connection for command.");
 		lrmd_log(LOG_INFO, "lrmd: failed (can't create comm channel)");
+		exit(100);
 	}
 
 	/*Create a source to handle new connect rquests for command*/
@@ -2035,6 +2036,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.43  2004/10/08 21:54:27  alan
+ * BEAM FIX:  Got rid of an freeing-null-pointer-error.
+ *
  * Revision 1.42  2004/10/08 09:22:51  zhenh
  * change the log levels to make the logs more clear
  *
