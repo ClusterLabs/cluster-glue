@@ -688,11 +688,11 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	rsc = g_new(lrm_rsc_t, 1);
 
 	/* fill the field of resource with the data from msg */
-	rsc->id = g_strdup(ha_msg_value(msg, F_LRM_RID));
-	rsc->type = g_strdup(ha_msg_value(msg, F_LRM_RTYPE));
-	rsc->class = g_strdup(ha_msg_value(msg, F_LRM_RCLASS));
-	rsc->provider = g_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
-	rsc->params = ha_msg_value_str_table(msg,F_LRM_PARAM);
+	rsc->id = g_strdup(ha_msg_value(ret, F_LRM_RID));
+	rsc->type = g_strdup(ha_msg_value(ret, F_LRM_RTYPE));
+	rsc->class = g_strdup(ha_msg_value(ret, F_LRM_RCLASS));
+	rsc->provider = g_strdup(ha_msg_value(ret, F_LRM_RPROVIDER));
+	rsc->params = ha_msg_value_str_table(ret,F_LRM_PARAM);
 
 	rsc->ops = &rsc_ops_instance;
 	ha_msg_del(ret);
