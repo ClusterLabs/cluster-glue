@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.33 2004/09/10 02:15:40 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.34 2004/09/13 10:49:13 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1674,7 +1674,8 @@ perform_ra_op(lrmd_op_t* op)
 			/* Name of the resource and some others also
 			 * need to be passed in. Maybe pass through the
 			 * entire lrm_op_t too? */
-			RAExec->execra (op->rsc->type,
+			RAExec->execra (op->rsc_id,
+					op->rsc->type,
 					op->rsc->provider,
 					op_type,
 					params);
@@ -1997,6 +1998,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.34  2004/09/13 10:49:13  sunjd
+ * change for setting OCF environment variables
+ *
  * Revision 1.33  2004/09/10 02:15:40  zhenh
  * make names of functions more clear,fix some bug
  *
