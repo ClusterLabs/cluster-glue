@@ -1,4 +1,4 @@
-/* $Id: base64.c,v 1.11 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: base64.c,v 1.12 2005/03/14 18:11:52 alan Exp $ */
 #include <portability.h>
 #include <heartbeat.h>
 #include <syslog.h>
@@ -192,7 +192,7 @@ base64_to_binary(const char * in, int inlen, void * output, int outlen)
 
 	/* We have enough space.  We are happy :-)  */
 
-	startout = out = (char *)output;
+	startout = out = (unsigned char *)output;
 
 	while (input < lastinput) {
 		Char2SixBits(*input, sixbits1); ++input;
