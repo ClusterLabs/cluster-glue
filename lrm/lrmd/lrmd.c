@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.30 2004/09/06 04:36:18 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.31 2004/09/06 12:41:52 lars Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1678,7 +1678,10 @@ perform_ra_op(lrmd_op_t* op)
 
 			op_params = ha_msg_value_hash_table(op->msg, F_LRM_PARAM);
 			params = merge_hash_tables(op->rsc->params,op_params);
-			
+		
+			/* Name of the resource and some others also
+			 * need to be passed in. Maybe pass through the
+			 * entire lrm_op_t too? */
 			RAExec->execra (op->rsc->type,
 					op->rsc->provider,
 					op_type,
@@ -2002,6 +2005,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.31  2004/09/06 12:41:52  lars
+ * Add some additional required mandatory OCF environment variables.
+ *
  * Revision 1.30  2004/09/06 04:36:18  zhenh
  * fix a bug
  *
