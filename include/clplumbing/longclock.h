@@ -48,7 +48,7 @@
  *			NOTE: Can overflow!
  *
  *	longclock_t	secsto_longclock(unsigned long);
- *			Converts qualtity in seconds to longclock_t
+ *			Converts quantity in seconds to longclock_t
  *
  *	longclock_t	add_longclock(longclock_t l, longclock_t r);
  *			Adds two longclock_t values
