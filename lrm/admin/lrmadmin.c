@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.18 2004/09/16 06:16:45 sunjd Exp $ */
+/* $Id: lrmadmin.c,v 1.19 2004/10/08 04:47:54 zhenh Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -576,9 +576,10 @@ ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	}
 	
 	char* metadata = lrmd->lrm_ops->get_rsc_type_metadata(lrmd, class, type, provider);
-	printf ("metadata of %s(%s) is: %s\n",type,class,metadata);
-	g_free (metadata);
-		
+	if (NULL!=metadata) {
+		printf ("metadata of %s(%s) is: %s\n",type,class,metadata);
+		g_free (metadata);
+	}
 	return 0; 
 }
 
@@ -878,6 +879,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.19  2004/10/08 04:47:54  zhenh
+ * fix a bug: checking the return value of get_rsc_type_metadata
+ *
  * Revision 1.18  2004/09/16 06:16:45  sunjd
  * BEAM bug fix: passing NULL to argument 1 of g_free
  *
