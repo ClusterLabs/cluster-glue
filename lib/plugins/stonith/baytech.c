@@ -1066,8 +1066,8 @@ baytech_destroy(Stonith *s)
 	bt->BTid = NOTbtid;
 	RPCkillcomm(bt);
 	if (bt->rdfd >= 0) {
-		bt->rdfd = -1;
 		close(bt->rdfd);
+		bt->rdfd = -1;
 	}
 	if (bt->wrfd >= 0) {
 		close(bt->wrfd);
