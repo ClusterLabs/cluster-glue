@@ -56,7 +56,7 @@ main(int argc, char ** argv)
     cl_log_set_entity("ipc_transient_server_test");
     cl_log_enable_stderr(TRUE);
     
-    init_server_ipc_comms("echo", transient_server_connect, default_ipc_input_destroy, TRUE);
+    init_server_ipc_comms("echo", transient_server_connect, default_ipc_input_destroy, FALSE);
     
     /* wait for the reply by creating a mainloop and running it until
      * the callbacks are invoked...
@@ -143,7 +143,12 @@ transient_server_callback(IPC_Channel *client, gpointer user_data)
 
     cl_log(LOG_DEBUG, "Client status %d (disconnect=%d)", client->ch_status, IPC_DISCONNECT);
 
-    while(client->ch_status != IPC_DISCONNECT && client->ops->is_message_pending(client) == TRUE) {
+    while(client->ops->is_message_pending(client)) {
+    		if (client->ch_status == IPC_DISCONNECT) {
+			/* The message which was pending for us is that
+			 * the IPC status is now IPC_DISCONNECT */
+			break;
+	        }
 		if(client->ops->recv(client, &msg) != IPC_OK) {
 			cl_perror("[Server] Receive failure");
 			return FALSE;
