@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.18 2004/12/09 20:56:48 gshi Exp $ */
+/* $Id: GSource.c,v 1.19 2004/12/16 19:25:02 gshi Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -344,22 +344,12 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 gboolean 
 G_main_del_IPC_Channel(GCHSource* chp)
 {
-	/*gboolean	rc;*/
-/*  	GSource * source; */
-
-
 	if (chp->gsourceid <= 0) {
 		cl_log(LOG_CRIT, "Bad gsource in G_main_del_IPC_channel");
 		return FALSE;
 	}
 
-/*  	source = g_main_context_find_source_by_id(NULL, chp->gsourceid); */
-/*  	if (source == NULL){ */
-/*  		cl_log(LOG_ERR, "G_main_del_IPC_Channel: Cannot find source using source id"); */
-/*  		return FALSE; */
-/*  	} */
-
-/*  	g_source_unref(source); */
+	g_source_remove(chp->gsourceid);
 	chp->gsourceid = 0;
 	return TRUE;
 }
