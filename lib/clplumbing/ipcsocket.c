@@ -69,6 +69,7 @@
 #define         AF_LOCAL AF_UNIX
 #endif
 
+
 /* wait connection private data. */
 struct SOCKET_WAIT_CONN_PRIVATE{
   /* the path name wich the connection will be built on. */
@@ -557,9 +558,10 @@ static gboolean
 socket_is_output_pending(struct IPC_CHANNEL * ch)
 {
 
-  socket_resume_io(ch);
+	socket_resume_io(ch);
 
-  return ch->send_queue->current_qlen > 0;
+	return 	ch->ch_status == IPC_CONNECT
+	&&	 ch->send_queue->current_qlen > 0;
 }
 
 
@@ -587,7 +589,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 	*started = FALSE;
 
  
-	while (ch->recv_queue->current_qlen < ch->recv_queue->max_qlen
+  	while (ch->recv_queue->current_qlen < ch->recv_queue->max_qlen
 	&&	retcode == IPC_OK) {
 
 		gboolean			new_msg;
@@ -622,19 +624,19 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 		/* Now try to receive some data */
 
 		msg_len = recv(conn_info->s, msg_begin, len, MSG_DONTWAIT);
+#ifdef DEBUG
+		cl_perror("recv() => %d, errno = %d loopcount = %d, %s"
+		,	msg_len, errno, debug_loopcount
+		,	(new_msg ? "msg head": "msg body"));
+#endif
 
 		CHANAUDIT(ch);
 
-		if (msg_len == 0) {
-			/* We don't think this should happen */
-			break;
-		}
+		/* Did we get an error? */
 		if (msg_len < 0) {
+			/* What kind of error did we get? */
 			switch (errno) {
 				case EAGAIN:
-					if (conn_info->remaining_data > 0) {
-						*started = TRUE;
-					}
 					break;
 
 				case ECONNREFUSED:
@@ -649,64 +651,72 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 					break;
 			}
 			break; /* out of loop */
-    		} else {
-			debug_bytecount += msg_len;
+    		}
+		if (msg_len == 0) {
+			/* We don't think this should happen */
+			cl_log(LOG_ERR, "zero length recv return!");
+			break;
+		}
+		/* How about that!  We read something! */
+		/* Note that all previous cases break out of the loop */
+		debug_bytecount += msg_len;
+		*started=TRUE;
 
 #if 0
 		cl_log(LOG_DEBUG, "Got %d byte message", msg_len);
 		cl_log(LOG_DEBUG, "Contents: %s", (char*)msg_begin);
 #endif
-			if (new_msg){
-				if (head.msg_len <= 0
-				||	head.msg_len > MAXDATASIZE) {
-					cl_log(LOG_CRIT
-					,	"invalid msg len [%d]"
-					,	head.msg_len);
-					ch->ch_status = IPC_DISCONNECT;
-					retcode = IPC_FAIL;
-					break;
-				}
-				conn_info->buf_msg
-				= socket_message_new(ch, head.msg_len);
-				conn_info->remaining_data = head.msg_len;
-				*started=TRUE;
-				/* Next time we'll read the message body */
-				continue;
-			}
-
-
-			/* We received (more) data from an old message */
-
-			conn_info->remaining_data = conn_info->remaining_data
-			-	msg_len;
-
-			if (conn_info->remaining_data < 0){
+		/* Is this data for the start of a new message? */
+		if (new_msg){
+			/* We assume we read 'len' bytes */
+			if (head.msg_len <= 0
+			||	head.msg_len > MAXDATASIZE) {
 				cl_log(LOG_CRIT
-				,	"received more data than expected");
-				conn_info->remaining_data = 0;
+				,	"invalid msg len [%d]"
+				,	head.msg_len);
+				ch->ch_status = IPC_DISCONNECT;
 				retcode = IPC_FAIL;
-
-			}else if (conn_info->remaining_data == 0){
-				*started=TRUE;
-#if 0
-				cl_log(LOG_DEBUG, "channel: 0x%lx"
-				,	(unsigned long)ch);
-				cl_log(LOG_DEBUG, "New recv_queue = 0x%lx"
-				,	(unsigned long)ch->recv_queue);
-				cl_log(LOG_DEBUG, "buf_msg: len = %ld, body =  0x%lx"
-				,	(unsigned long)conn_info->buf_msg->msg_len
-				,	(unsigned long)conn_info->buf_msg->msg_body);
-				cl_log(LOG_DEBUG, "buf_msg: contents: %s"
-				,	(char *)conn_info->buf_msg->msg_body);
-#endif
-				/* Got the last of the message! */
-
-				/* Append gotten message to receive queue */
-				ch->recv_queue->queue =	g_list_append
-				(	ch->recv_queue->queue, conn_info->buf_msg);
-				ch->recv_queue->current_qlen++;
-				conn_info->buf_msg = NULL;
+				break;
 			}
+			conn_info->buf_msg
+			= socket_message_new(ch, head.msg_len);
+			conn_info->remaining_data = head.msg_len;
+			/* Next time we'll read the message body */
+			continue;
+		}
+
+
+		/* No, not the start of a new message. Therefore we */
+		/* must have received (more) data from an old message */
+
+		conn_info->remaining_data = conn_info->remaining_data
+		-	msg_len;
+
+		if (conn_info->remaining_data < 0){
+			cl_log(LOG_CRIT
+			,	"received more data than expected");
+			conn_info->remaining_data = 0;
+			retcode = IPC_FAIL;
+
+		}else if (conn_info->remaining_data == 0){
+#if 0
+			cl_log(LOG_DEBUG, "channel: 0x%lx"
+			,	(unsigned long)ch);
+			cl_log(LOG_DEBUG, "New recv_queue = 0x%lx"
+			,	(unsigned long)ch->recv_queue);
+			cl_log(LOG_DEBUG, "buf_msg: len = %ld, body =  0x%lx"
+			,	(unsigned long)conn_info->buf_msg->msg_len
+			,	(unsigned long)conn_info->buf_msg->msg_body);
+			cl_log(LOG_DEBUG, "buf_msg: contents: %s"
+			,	(char *)conn_info->buf_msg->msg_body);
+#endif
+			/* Got the last of the message! */
+
+			/* Append gotten message to receive queue */
+			ch->recv_queue->queue =	g_list_append
+			(	ch->recv_queue->queue, conn_info->buf_msg);
+			ch->recv_queue->current_qlen++;
+			conn_info->buf_msg = NULL;
 		}
 	}
 
@@ -762,7 +772,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 		sendrc=send(conn_info->s, (char *)&head
 		,	sizeof(struct SOCKET_MSG_HEAD)
 		,	(MSG_DONTWAIT|MSG_NOSIGNAL));
-#if 0
+#ifdef DEBUG
 		cl_log(LOG_DEBUG, "Sent %d byte message header"
 		,	sizeof(struct SOCKET_MSG_HEAD));
 #endif
@@ -771,10 +781,16 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 		if (sendrc < 0) {
 			switch (errno) {
 				case EAGAIN:
-#if 0
+#ifdef DEBUG
 					cl_log(LOG_DEBUG,
 						"socket send returned EAGAIN");
 #endif
+					/* FIXME! KLUDGE! */
+					/* We could fix this if we kept better
+					 * state info so we could retry this
+					 * operation later and not be confused.
+					 * This is the right thing to do!
+					 */
 					cl_shortsleep();
 					continue;
 				case EPIPE:
@@ -796,8 +812,18 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 			CHANAUDIT(ch);
 			sendrc=send(conn_info->s, msg->msg_body, msg->msg_len
 			,	(MSG_DONTWAIT|MSG_NOSIGNAL));
+#ifdef DEBUG
+			cl_log(LOG_DEBUG, "send(%d bytes)  => %d errno=%d"
+			,	msg->msg_len, sendrc, errno);
+#endif
 
 			/* if send failed with EAGAIN, delay and try again */
+			/* FIXME! KLUDGE! */
+			/* We could fix this if we kept better
+			 * state info so we could retry this
+			 * operation later and not be confused.
+			 * This is the right thing to do!
+			 */
 		} while(sendrc < 0
 		&&	(errno == EAGAIN ? (cl_shortsleep(), TRUE) : FALSE));
 
@@ -825,7 +851,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 					break;
 			}
 			break;
-		} else {
+		}else{
 			ch->send_queue->queue = g_list_remove(
 					ch->send_queue->queue ,	msg);
 			if (msg->msg_done != NULL) {
@@ -848,8 +874,14 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	gboolean	rstarted;
 	gboolean	wstarted;
 	gboolean	OKonce = FALSE;
+#ifdef DEBUG
+	int		count = 0;
+#endif
 
 	CHANAUDIT(ch);
+	if (ch->ch_status != IPC_CONNECT) {
+		return IPC_BROKEN;
+	}
 	do {
 		rc1 = socket_resume_io_read(ch, &rstarted);
 		CHANAUDIT(ch);
@@ -858,16 +890,24 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 		if (rc1 == IPC_OK || rc2 == IPC_OK) {
 			OKonce = TRUE;
 		}
+#ifdef DEBUG
+		++count;
+		if (rc1 == IPC_OK && rc2 == IPC_OK && (rstarted||wstarted)) {
+			cl_log(LOG_DEBUG
+			,	"continuing: rstarted = %d wstarted = %d count: %d"
+			,	rstarted, wstarted, count);
+		}
+#endif
 	}while (rc1 == IPC_OK && rc2 == IPC_OK && (rstarted||wstarted));
 
 	if (ch->ch_status == IPC_CONNECT) {
 		if (rc1 != IPC_OK) {
 			cl_log(LOG_ERR
-			,	"resume_io_read() failure");
+			,	"socket_resume_io_read() failure");
 		}
 		if (rc2 != IPC_OK) {
 			cl_log(LOG_ERR
-			,	"resume_io_write() failure");
+			,	"socket_resume_io_write() failure");
 		}
 	}else{
 		return (OKonce ? IPC_OK : IPC_BROKEN);
@@ -1266,40 +1306,51 @@ socket_free_message(struct IPC_MESSAGE * msg) {
 static int 
 socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 {
-  struct SOCKET_CH_PRIVATE *conn_info;
-  socklen_t n;
-  int ret = IPC_FAIL;
-  struct ucred *cred;
+	struct SOCKET_CH_PRIVATE *	conn_info;
+	int				ret = IPC_FAIL;
+	struct ucred			cred;
+	socklen_t			n = sizeof(cred);
   
 
-  if (auth_info == NULL
-  ||	(auth_info->uid == NULL && auth_info->gid == NULL)) {
-    return IPC_OK;    /* no restriction for authentication */
-  }
+	if (ch == NULL || ch->ch_private == NULL) {
+		return IPC_FAIL;
+	}
+	if (auth_info == NULL
+	||	(auth_info->uid == NULL && auth_info->gid == NULL)) {
+		return IPC_OK;    /* no restriction for authentication */
+	  }
 
-  /* get the credential information for peer */
-  n = sizeof(struct ucred);
-  conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
-  cred = g_new(struct ucred, 1); 
-  if (getsockopt(conn_info->s, SOL_SOCKET, SO_PEERCRED, cred, &n) != 0) {
-    g_free(cred);
-    return IPC_FAIL;
-  }
+	/* Get the credential information for our peer */
+	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
+	if (getsockopt(conn_info->s, SOL_SOCKET, SO_PEERCRED, &cred, &n) != 0
+	||	(size_t)n != sizeof(cred)) {
+		return IPC_FAIL;
+	}
+#if 1
+	cl_log(LOG_DEBUG, "SO_PEERCRED returned [%d, (%ld:%ld)]"
+	,	cred.pid, (long)cred.uid, (long)cred.uid);
+	cl_log(LOG_DEBUG, "Verifying authentication: cred.uid=%d cred.gid=%d"
+	,	cred.uid, cred.gid);
+	cl_log(LOG_DEBUG, "Verifying authentication: uidptr=0x%lx gidptr=0x%lx"
+	,	(unsigned long)auth_info->uid
+	,	(unsigned long)auth_info->gid);
+#endif
+
   
-  /* verify the credential information. */
-  if (	auth_info->uid
-  &&	g_hash_table_lookup(auth_info->uid
-	,	GUINT_TO_POINTER((guint)cred->uid)) != NULL) {
+	/* verify the credential information. */
+	if (	auth_info->uid
+	&&	(g_hash_table_lookup(auth_info->uid
+		,	GUINT_TO_POINTER((guint)cred.uid)) != NULL)) {
 		ret = IPC_OK;
-  }else if (auth_info->gid
-  &&	g_hash_table_lookup(auth_info->gid
-	,	GUINT_TO_POINTER((guint)cred->gid)) != NULL) {
+	}else if (auth_info->gid
+	&&	(g_hash_table_lookup(auth_info->gid
+		,	GUINT_TO_POINTER((guint)cred.gid)) != NULL)) {
 		ret = IPC_OK;
-  }
-  g_free(cred);
-  return ret;
+  	}
+	return ret;
 }
-/* get farside pid through*/
+
+/* get farside pid for our peer process */
 
 pid_t
 socket_get_farside_pid(int sockfd)
