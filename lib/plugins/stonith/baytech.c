@@ -37,6 +37,7 @@
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
+#include <clplumbing/cl_signal.h>
 
 /*
  * baytechclosepi is called as part of unloading the baytech STONITH plugin.
@@ -466,7 +467,7 @@ static void
 RPCkillcomm(struct BayTech* bt)
 {
 	if (bt->pid > 0) {
-		kill(bt->pid, SIGKILL);
+		CL_KILL(bt->pid, SIGKILL);
 		(void)waitpid(bt->pid, NULL, 0);
 		bt->pid = -1;
 	}

@@ -1,9 +1,9 @@
 /*
-*
-*  Copyright 2001 Mission Critical Linux, Inc.
-*
-*  All Rights Reserved.
-*/
+ *
+ *  Copyright 2001 Mission Critical Linux, Inc.
+ *
+ *  All Rights Reserved.
+ */
 /*
  *	Stonith module for WTI Network Power Switch Devices (NPS-xxx)
  *	Also supports the WTI Telnet Power Switch Devices (TPS-xxx)
@@ -51,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.2 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.3 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -72,6 +72,7 @@ static const char *version __attribute__ ((unused)) = "$Revision: 1.2 $";
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
+#include <clplumbing/cl_signal.h>
 
 /*
  * wti_npsclose is called as part of unloading the wti_nps STONITH plugin.
@@ -402,7 +403,7 @@ NPSkillcomm(struct WTINPS* nps)
   	        nps->wrfd = -1;
 	}
         if (nps->pid > 0) {
-	        kill(nps->pid, SIGKILL);		
+	        CL_KILL(nps->pid, SIGKILL);		
 		(void)waitpid(nps->pid, NULL, 0);
 		nps->pid = -1;
 	}
