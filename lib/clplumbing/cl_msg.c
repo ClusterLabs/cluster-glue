@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.49 2005/02/14 21:16:20 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.50 2005/02/16 06:54:51 zhenh Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -813,8 +813,8 @@ msg_to_str_table(struct ha_msg * msg)
 			continue;
 		}
 		g_hash_table_insert(hash_table,
-				    strndup(msg->names[i],msg->nlens[i]),
-				    strndup(msg->values[i],msg->vlens[i]));
+				    g_strndup(msg->names[i],msg->nlens[i]),
+				    g_strndup(msg->values[i],msg->vlens[i]));
 	}
 	return hash_table;
 }
@@ -2146,6 +2146,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.50  2005/02/16 06:54:51  zhenh
+ * add cl_malloc_forced_for_glib() to lrmd.
+ *
  * Revision 1.49  2005/02/14 21:16:20  gshi
  * fix a warning in IA64 machine
  *

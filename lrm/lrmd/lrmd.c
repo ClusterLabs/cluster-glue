@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.60 2005/02/16 05:28:09 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.61 2005/02/16 06:59:55 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -269,7 +269,7 @@ main(int argc, char ** argv)
 	cl_log_set_entity(lrm_system_name);
 	cl_log_enable_stderr(debug_level?TRUE:FALSE);
 	cl_log_set_facility(LOG_DAEMON);
-	
+	cl_malloc_forced_for_glib();
 	if (req_status){
 		return init_status(PID_FILE, lrm_system_name);
 	}
@@ -486,7 +486,7 @@ init_start ()
 		dot = strchr(subdir->d_name,'.');
 		if (NULL != dot) {
 			len = (int)(dot - subdir->d_name);
-			ra_name = strndup(subdir->d_name,len);
+			ra_name = g_strndup(subdir->d_name,len);
 		}
 		else {
 			ra_name = g_strdup(subdir->d_name);
@@ -2049,7 +2049,7 @@ read_pipe(int fd, char ** data)
 		return 0;
 	}
 
-	*data = malloc(gstr_tmp->len + 1);
+	*data = g_malloc(gstr_tmp->len + 1);
 	if ( *data == NULL ) {
 		lrmd_log(LOG_ERR, "malloc error in read_pipe.");
 		return -1;
@@ -2057,7 +2057,7 @@ read_pipe(int fd, char ** data)
 
 	(*data)[0] = '\0';
 	(*data)[gstr_tmp->len] = '\0';
-	strncpy(*data, gstr_tmp->str, gstr_tmp->len);
+	g_strlcpy(*data, gstr_tmp->str, gstr_tmp->len);
 	g_string_free(gstr_tmp, TRUE);
 	return 0;
 }
@@ -2078,6 +2078,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.61  2005/02/16 06:59:55  zhenh
+ * add cl_malloc_forced_for_glib() to lrmd.
+ *
  * Revision 1.60  2005/02/16 05:28:09  zhenh
  * Fix a bug.
  * Free operation data in on_ra_proc_finished() instead of free_op()
