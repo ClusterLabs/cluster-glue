@@ -159,9 +159,9 @@ socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn)
   if (wc != NULL) {
     close(wc->s);
     unlink(wc->path_name);
-    free(wc);
+    g_free(wc);
   }
-  free((void*) wait_conn);
+  g_free((void*) wait_conn);
 }
 
 /* return a fd which can be listened on for new connections. */
@@ -229,10 +229,10 @@ socket_destroy_channel(struct IPC_CHANNEL * ch)
   socket_disconnect(ch);
   socket_destroy_queue(ch->send_queue);
   socket_destroy_queue(ch->recv_queue);
-  if(ch->ch_private != NULL)
-    free((void*)(ch->ch_private));
-  
-  free((void*) ch);
+  if(ch->ch_private != NULL) {
+    g_free((void*)(ch->ch_private));
+  }
+  g_free((void*) ch);
 }
 
 /* 
@@ -680,7 +680,7 @@ socket_queue_new(void)
   struct IPC_QUEUE *temp_queue;
   
   /* temp queue with length = 0 and inner queue = NULL. */
-  temp_queue = (struct IPC_QUEUE *) malloc(sizeof(struct IPC_QUEUE));
+  temp_queue =  g_new(struct IPC_QUEUE, 1);
   temp_queue->current_qlen = 0;
   temp_queue->max_qlen = DEFAULT_MAX_QLEN;
   temp_queue->queue = NULL;
@@ -692,13 +692,17 @@ socket_queue_new(void)
  * destory a ipc queue and clean all memory space assigned to this queue.
  * parameters:
  *      q  (IN) the pointer to the queue which should be destroied.
+ *
+ *	FIXME:  This function does not free up messages that might
+ *	be in the queue.
  */ 
 
 void
 socket_destroy_queue(struct IPC_QUEUE * q)
 {
   g_list_free(q->queue);
-  free((void *) q);
+
+  g_free((void *) q);
 }
 
 
@@ -777,7 +781,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     return NULL;
   }
   
-  wait_private = (struct SOCKET_WAIT_CONN_PRIVATE* ) malloc(sizeof(struct SOCKET_WAIT_CONN_PRIVATE));
+  wait_private =  g_new(struct SOCKET_WAIT_CONN_PRIVATE, 1);
   wait_private->s = s;
   strncpy(wait_private->path_name, path_name, sizeof(wait_private->path_name));
   temp_ch = g_new(struct IPC_WAIT_CONNECTION, 1);
@@ -944,8 +948,8 @@ socket_message_new(struct IPC_CHANNEL *ch, int msg_len)
 void
 socket_free_message(struct IPC_MESSAGE * msg) {
 
-  free(msg->msg_body);
-  free((void *)msg);
+  g_free(msg->msg_body);
+  g_free((void *)msg);
 }
 
 
@@ -995,7 +999,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
   cred = g_new(struct ucred, 1); 
   if (getsockopt(conn_info->s, SOL_SOCKET, SO_PEERCRED, cred, &n) != 0) {
-    free(cred);
+    g_free(cred);
     return IPC_FAIL;
   }
   
@@ -1008,7 +1012,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
   &&	g_hash_table_lookup(auth_info->gid, &(cred->gid)) == NULL) {
 		ret = IPC_FAIL;
   }
-  free(cred);
+  g_free(cred);
   return ret;
 }
 /* get farside pid through*/
@@ -1025,12 +1029,12 @@ socket_get_farside_pid(int sockfd )
   n = sizeof(struct ucred);
   cred = g_new(struct ucred, 1); 
   if (getsockopt(sockfd, SOL_SOCKET, SO_PEERCRED, cred, &n) != 0) {
-    free(cred);
+    g_free(cred);
     return -1;
   }
   
   f_pid = cred->pid;
-  free(cred);
+  g_free(cred);
   return f_pid;
 }
 #endif /* SO_PEERCRED version */
@@ -1092,7 +1096,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 
   memset(&msg, 0, sizeof(msg));
-  msg.msg_iov = (struct iovec *) malloc(sizeof(struct iovec));
+  msg.msg_iov =  g_new(sizeof(struct iovec, 1);
   msg.msg_iovlen = 1;
   msg.msg_control = (char *) cmsg;
   msg.msg_controllen = sizeof(cmsgmem);
