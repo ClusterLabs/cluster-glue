@@ -94,6 +94,7 @@ plugin_LTLIBRARIES =	apcmaster.la	\
 			$(apcmastersnmp_LIB)	\
 			apcsmart.la		\
 			baytech.la		\
+			cyclades.la		\
 			$(drac3_LIB)		\
 			external.la		\
 			ibmhmc.la		\
@@ -124,6 +125,10 @@ apcsmart_la_LIBADD	= $(GLIBLIB)
 baytech_la_SOURCES	= baytech.c $(INCFILES)
 baytech_la_LDFLAGS	= -export-dynamic -module -avoid-version
 baytech_la_LIBADD	= $(GLIBLIB)
+
+cyclades_la_SOURCES	= cyclades.c $(INCFILES)
+cyclades_la_LDFLAGS	= -export-dynamic -module -avoid-version
+cyclades_la_LIBADD	= $(GLIBLIB)
 
 drac3_la_SOURCES	= drac3.c drac3_command.c drac3_command.h drac3_hash.c drac3_hash.h	$(INCFILES)
 drac3_la_LDFLAGS	= -export-dynamic -module -avoid-version -lcurl -lxml2 -lssl $(GLIBLIB)
