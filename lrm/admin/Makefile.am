@@ -18,8 +18,9 @@
 #
 MAINTAINERCLEANFILES = Makefile.in
 
-INCLUDES 			=	-I$(top_builddir)/include \
-					-I$(top_builddir)/libltdl
+INCLUDES 			=	-I$(top_builddir)/include -I$(top_srcdir)/include \
+					-I$(top_builddir)/linux-ha -I$(top_srcdir)/linux-ha \
+					-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 
 halibdir			=	$(libdir)/@HB_PKG@
 havarlibdir			=	$(localstatedir)/lib/@HB_PKG@
