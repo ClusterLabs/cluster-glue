@@ -1,4 +1,4 @@
-/* $Id: ipctransientserver.c,v 1.11 2004/10/01 12:04:13 lge Exp $ */
+/* $Id: ipctransientserver.c,v 1.12 2004/10/01 21:30:39 gshi Exp $ */
 /* 
  * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
  * 
@@ -93,8 +93,13 @@ init_server_ipc_comms(const char *child,
 	
     local_sock_len += strlen(child);
     local_sock_len += strlen(WORKING_DIR);
-
+    
     commpath = (char*)malloc(sizeof(char)*local_sock_len);
+    if (commpath == NULL){
+	    cl_log(LOG_ERR, "init_server_ipc_comms:"
+		   " allocating memory failed");
+	    exit(1);
+    }
     sprintf(commpath, WORKING_DIR "/%s", child);
     commpath[local_sock_len - 1] = '\0';
 
@@ -103,8 +108,8 @@ init_server_ipc_comms(const char *child,
     mask = umask(0);
     wait_ch = ipc_wait_conn_constructor(IPC_ANYTYPE, attrs);
     if (wait_ch == NULL){
-		cl_perror("[Server] Can't create wait channel of type %s", IPC_ANYTYPE);
-		exit(1);
+	    cl_perror("[Server] Can't create wait channel of type %s", IPC_ANYTYPE);
+	    exit(1);
     }
     mask = umask(mask);
     g_hash_table_destroy(attrs);
@@ -239,8 +244,14 @@ create_simple_message(char *text, IPC_Channel *ch)
 	}
 
     ack_msg = (IPC_Message *)malloc(sizeof(IPC_Message));
-	copy_text = strdup(text);
-    
+    if (ack_msg == NULL){
+	    cl_log(LOG_ERR, "create_simple_message:"
+		   "allocating memory for IPC_Message failed");		
+	    return NULL;
+    }
+
+    copy_text = strdup(text);
+	
     ack_msg->msg_private = NULL;
     ack_msg->msg_done    = NULL;
     ack_msg->msg_body    = copy_text;
