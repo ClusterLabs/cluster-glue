@@ -46,6 +46,14 @@ ha_msg_add_int(struct ha_msg * msg, const char * name, int value)
 }
 
 int
+ha_msg_mod_int(struct ha_msg * msg, const char * name, int value)
+{
+	char buf[MAX_INT_LEN];
+	snprintf(buf, MAX_INT_LEN, "%d", value);
+	return (cl_msg_modstring(msg, name, buf));
+}
+
+int
 ha_msg_value_int(struct ha_msg * msg, const char * name, int* value)
 {
 	const char* svalue = ha_msg_value(msg, name);
@@ -382,65 +390,6 @@ create_lrm_ret(int rc, int fields)
 		return NULL;
 	}
 	return ret;
-}
-
-struct ha_msg*
-create_rsc_perform_op_msg (const char* rid, lrm_op_t* op)
-{
-	struct ha_msg* msg = ha_msg_new(5);
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_TYPE, PERFORMOP)) {
-		return NULL;
-	}
-
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_RID, rid)) {
-		return NULL;
-	}
-
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_OP, op->op_type)) {
-		return NULL;
-	}
-
-	if (HA_FAIL == ha_msg_add_int(msg, F_LRM_TIMEOUT, op->timeout))	{
-		return NULL;
-	}
-	if (NULL != op->params) {
-		ha_msg_add_hash_table(msg,F_LRM_PARAM,op->params);
-	}
-	return msg;
-}
-
-struct ha_msg*
-create_rsc_set_monitor_msg (const char* rid, lrm_mon_t* monitor)
-{
-	struct ha_msg* msg = ha_msg_new(5);
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_TYPE, SETMONITOR)) {
-		return NULL;
-	}
-
-	if (HA_FAIL == ha_msg_add_int(msg, F_LRM_MONMODE, monitor->mode)) {
-		return NULL;
-	}
-	if (HA_FAIL == ha_msg_add_int(msg, F_LRM_MONINTVL, monitor->interval)) {
-		return NULL;
-	}
-	if (HA_FAIL == ha_msg_add_int(msg, F_LRM_MONTGT, monitor->target)) {
-		return NULL;
-	}
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_RID, rid)) {
-		return NULL;
-	}
-
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_OP, monitor->op_type)) {
-		return NULL;
-	}
-
-	if (HA_FAIL == ha_msg_add_int(msg, F_LRM_TIMEOUT, monitor->timeout))	{
-		return NULL;
-	}
-	if (NULL != monitor->params) {
-		ha_msg_add_hash_table(msg, F_LRM_PARAM, monitor->params);
-	}
-	return msg;
 }
 
 void

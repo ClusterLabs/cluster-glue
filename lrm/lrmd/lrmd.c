@@ -73,35 +73,18 @@ typedef struct
 }lrmd_client_t;
 
 typedef struct lrmd_rsc lrmd_rsc_t;
-typedef struct lrmd_mon lrmd_mon_t;
 typedef struct lrmd_op	lrmd_op_t;
 
 struct lrmd_op
 {
 	lrmd_rsc_t*	rsc;
 	lrmd_client_t*	client;
-	char*		app_name;
 	int		call_id;
 	int		exec_pid;
 	int		output_fd;
 	guint		timeout_tag;
-	lrmd_mon_t*	mon;
-	struct ha_msg*	msg;
-};
-
-struct lrmd_mon
-{
-	mon_mode_t	mode;
-	lrmd_rsc_t*	rsc;
-	lrmd_client_t*	client;
-	char*		app_name;
-	int		call_id;
+	guint		repeat_timeout_tag;
 	int		interval;
-	int		target;
-	guint		timeout_tag;
-	int		pending_op;
-	gboolean	is_deleted;
-	int		last_status;
 	struct ha_msg*	msg;
 };
 
@@ -113,7 +96,7 @@ struct lrmd_rsc
 	GHashTable* 	params;
 
 	GList*		op_list;
-	GList*		mon_list;
+	GList*		repeat_op_list;
 	lrmd_op_t*	last_op;
 };
 
@@ -121,8 +104,8 @@ struct lrmd_rsc
 static gboolean on_connect_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_connect_cbk(IPC_Channel* ch_cbk, gpointer user_data);
 static gboolean on_receive_cmd(IPC_Channel* ch_cmd, gpointer user_data);
-static gboolean on_timeout_monitor(gpointer data);
 static gboolean on_timeout_op_done(gpointer data);
+static gboolean on_repeat_op_done(gpointer data);
 static void on_remove_client(gpointer user_data);
 
 //message handlers
@@ -136,7 +119,6 @@ static int on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg);
-static int on_msg_set_monitor(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg);
 
 //functions wrap the call to ra plugins
@@ -145,16 +127,15 @@ static int perform_ra_op(lrmd_op_t* op);
 //Utility functions
 static int flush_op(lrmd_op_t* op);
 static int perform_op(lrmd_rsc_t* rsc);
-static int op_done(lrmd_op_t* op);
-static void free_mon(lrmd_mon_t* mon);
-static void free_rsc(lrmd_rsc_t* rsc);
+static int on_op_done(lrmd_op_t* op);
 static int send_rc_msg ( IPC_Channel* ch, int rc);
 static lrmd_client_t* lookup_client (pid_t pid);
 static lrmd_rsc_t* lookup_rsc (char* rid);
 static lrmd_rsc_t* lookup_rsc_by_msg (struct ha_msg* msg);
-static struct ha_msg* op_to_msg(lrmd_op_t* op);
 static int read_pipe(int fd, char ** data);
 static void lrmd_log(int priority, const char * fmt, ...)G_GNUC_PRINTF(2,3);
+static struct ha_msg* op_to_msg(lrmd_op_t* op);
+static void free_op(lrmd_op_t* op);
 
 
 /*
@@ -213,7 +194,7 @@ struct msg_map msg_maps[] = {
 	{DELRSC,	TRUE,	on_msg_del_rsc},
 	{PERFORMOP,	TRUE,	on_msg_perform_op},
 	{FLUSHOPS,	TRUE,	on_msg_perform_op},
-	{SETMONITOR,	TRUE,	on_msg_set_monitor},
+	{STOPOP,	TRUE,	on_msg_perform_op},
 	{GETRSCSTATE,	FALSE,	on_msg_get_state},
 	{GETRSCMETA,	FALSE, 	on_msg_get_metadata},
 };
@@ -671,48 +652,38 @@ on_timeout_op_done(gpointer data)
 	kill(op->exec_pid, 9);
 
 	rsc = op->rsc;
-	op_done(op);
+	on_op_done(op);
 	perform_op(rsc);
 
 	lrmd_log(LOG_INFO, "on_timeout_op_done: end.");
 	return TRUE;
 }
-
 gboolean
-on_timeout_monitor(gpointer data)
+on_repeat_op_done(gpointer data)
 {
-	lrmd_mon_t* mon = NULL;
 	lrmd_op_t* op = NULL;
-	int timeout = 0;
 
-	lrmd_log(LOG_INFO, "on_timeout_monitor: start.");
-	mon = (lrmd_mon_t*)data;
-	mon->pending_op++;
+	lrmd_log(LOG_INFO, "on_repeat_op_done: start.");
+	op = (lrmd_op_t*)data;
+	op->rsc->repeat_op_list = g_list_remove(op->rsc->repeat_op_list, op);
+	g_source_remove(op->repeat_timeout_tag);
 
-	//create a op
-	op = g_new(lrmd_op_t, 1);
-	op->call_id = mon->call_id;
+	op->repeat_timeout_tag = -1;
 	op->exec_pid = -1;
-	op->client = NULL;
 	op->timeout_tag = -1;
-	op->rsc = mon->rsc;
-	op->mon	= mon;
-	op->app_name = mon->app_name;
-	op->msg = ha_msg_copy(mon->msg);
-	mon->rsc->op_list = g_list_append(mon->rsc->op_list, op);
 
-	if (HA_FAIL == ha_msg_add(op->msg, F_LRM_APP, mon->app_name)) {
-		lrmd_log(LOG_ERR, "on_timeout_monitor: can not add app_name.");
-	}
-
+	op->rsc->op_list = g_list_append(op->rsc->op_list, op);
+	
+	int timeout = 0;
 	ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout);
-	if( 0 < timeout ) {
-		op->timeout_tag = g_timeout_add(timeout*1000,
-						on_timeout_op_done, op);
+	if (0 < timeout ) {
+		op->timeout_tag = g_timeout_add(timeout,
+			on_timeout_op_done, op);
 	}
 
-	perform_op(mon->rsc);
-	lrmd_log(LOG_INFO, "on_timeout_monitor: end.");
+	perform_op(op->rsc);
+
+	lrmd_log(LOG_INFO, "on_repeat_op_done: end.");
 	return TRUE;
 }
 
@@ -767,9 +738,7 @@ int
 on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 {
 	lrmd_rsc_t* rsc = NULL;
-	lrmd_mon_t* mon = NULL;
 	GList* rsc_node = NULL;
-	GList* mon_node = NULL;
 	GList* op_node = NULL;
 	lrmd_op_t* op = NULL;
 
@@ -786,31 +755,28 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 	for(rsc_node = g_list_first(rsc_list);
 		NULL != rsc_node; rsc_node = g_list_next(rsc_node)){
 		rsc = (lrmd_rsc_t*)rsc_node->data;
-		//remove monitors belong to this client
-		mon_node = g_list_first(rsc->mon_list);
-		while (NULL != mon_node) {
-			mon = (lrmd_mon_t*)mon_node->data;
-			if (mon->client == client) {
-				mon_node = g_list_next(mon_node);
-				rsc->mon_list =
-					 g_list_remove(rsc->mon_list, mon);
-				free_mon(mon);
-			}
-			else {
-				mon_node = g_list_next(mon_node);
-			}
-
-		}
 		//remove pending ops belong to this client
 		op_node = g_list_first(rsc->op_list);
-		op_node = g_list_next(op_node);
 		while (NULL != op_node) {
 			op = (lrmd_op_t*)op_node->data;
 			if (op->client == client) {
 				op_node = g_list_next(op_node);
 				rsc->op_list = g_list_remove(rsc->op_list, op);
-				ha_msg_del(op->msg);
-				g_free(op);
+				free_op(op);				
+			}
+			else {
+				op_node = g_list_next(op_node);
+			}
+
+		}
+		//remove repeat ops belong to this client
+		op_node = g_list_first(rsc->repeat_op_list);
+		while (NULL != op_node) {
+			op = (lrmd_op_t*)op_node->data;
+			if (op->client == client) {
+				op_node = g_list_next(op_node);
+				rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
+				free_op(op);
 			}
 			else {
 				op_node = g_list_next(op_node);
@@ -924,7 +890,6 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 				return HA_FAIL;
 			}
 			ha_msg_addbin(ret,F_LRM_METADATA,meta, strlen(meta));
-//			ha_msg_add(ret,F_LRM_METADATA,meta);
 		}
 		else {
 			ret = create_lrm_ret(HA_FAIL, 5);
@@ -1028,8 +993,8 @@ int
 on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 {
 	lrmd_rsc_t* rsc = NULL;
-	GList* mon_node = NULL;
 	GList* op_node = NULL;
+	lrmd_op_t* op = NULL;
 
 	lrmd_log(LOG_INFO, "on_msg_del_rsc: start.");
 
@@ -1041,46 +1006,29 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	else {
 		rsc_list = g_list_remove(rsc_list, rsc);
-		mon_node = g_list_first(rsc->mon_list);
-		while (NULL != mon_node) {
-			lrmd_mon_t* mon = (lrmd_mon_t*)mon_node->data;
-			if (mon->client == client) {
-				mon_node = g_list_next(mon_node);
-				rsc->mon_list =
-					g_list_remove(rsc->mon_list, mon);
-				free_mon(mon);
-			}
-			else {
-				mon_node = g_list_next(mon_node);
-			}
-
-		}
 		//remove pending ops
 		op_node = g_list_first(rsc->op_list);
-		if (NULL == op_node) {
-			//no ops, just remove the resource.
-			free_rsc(rsc);
-		}
-		else {
-			//the first op is running, so skip it
-			//and remove others.
-			//when the running op done,
-			//it will release the memory of rsc.
+		while (NULL != op_node) {
+			op = (lrmd_op_t*)op_node->data;
 			op_node = g_list_next(op_node);
-			while (NULL != op_node) {
-				lrmd_op_t* op = (lrmd_op_t*)op_node->data;
-				if (op->client == client) {
-					op_node = g_list_next(op_node);
-					rsc->op_list =
-						g_list_remove(rsc->op_list, op);
-					ha_msg_del(op->msg);
-					g_free(op);
-				}
-				else {
-					op_node = g_list_next(op_node);
-				}
-			}
+			rsc->op_list = g_list_remove(rsc->op_list, op);
+			free_op(op);
 		}
+		//remove repeat ops
+		op_node = g_list_first(rsc->repeat_op_list);
+		while (NULL != op_node) {
+			op = (lrmd_op_t*)op_node->data;
+			op_node = g_list_next(op_node);
+			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
+			free_op(op);
+		}
+		//free the memeroy of rsc
+		g_free(rsc->type);
+		g_free(rsc->class);
+		if (NULL != rsc->params) {
+			free_hash_table(rsc->params);
+		}
+		g_free(rsc);
 	}
 
 	lrmd_log(LOG_INFO, "on_msg_del_rsc: end.");
@@ -1113,7 +1061,6 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	rsc->id = id;
 	rsc->type = g_strdup(ha_msg_value(msg, F_LRM_RTYPE));
 	rsc->class = g_strdup(ha_msg_value(msg, F_LRM_RCLASS));
-
 	ra_type_exist = FALSE;
 	for(node=g_list_first(ra_list); NULL!=node; node=g_list_next(node)){
 		type = (char*)node->data;
@@ -1130,7 +1077,7 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	rsc->params = NULL;
 	rsc->op_list = NULL;
-	rsc->mon_list = NULL;
+	rsc->repeat_op_list = NULL;
 	rsc->last_op = NULL;
 	rsc->params = ha_msg_value_hash_table(msg,F_LRM_PARAM);
 	rsc_list = g_list_append(rsc_list, rsc);
@@ -1158,11 +1105,6 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	}
 
 	call_id++;
-	if (HA_FAIL == ha_msg_add_int(msg, F_LRM_CALLID, call_id)) {
-		lrmd_log(LOG_ERR, "on_msg_perform_op: can not add callid.");
-		return HA_FAIL;
-	}
-
 	type = ha_msg_value(msg, F_LRM_TYPE);
 	//when a flush request arrived, flush all pending ops
 	if (0 == strncmp(type, FLUSHOPS, strlen(FLUSHOPS))) {
@@ -1174,116 +1116,70 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			flush_op(op);
 		}
 	}
+	else
+	if (0 == strncmp(type, STOPOP, strlen(STOPOP))) {
+		int call_id;
+		ha_msg_value_int(msg, F_LRM_CALLID, &call_id);
+		
+		node = g_list_first(rsc->op_list);
+lrmd_log(LOG_ERR, "on_msg_perform_op: op_list:%p",rsc->op_list);
+		while (NULL != node ) {
+			op = (lrmd_op_t*)node->data;
+			node = g_list_next(node);
+			if ( op->call_id == call_id) {
+				rsc->op_list = g_list_remove(rsc->op_list, op);
+				free_op(op);
+lrmd_log(LOG_ERR, "on_msg_perform_op: free op %d from op_list.",call_id);
+				break;
+			}
+		}
+		node = g_list_first(rsc->repeat_op_list);
+		while (NULL != node ) {
+			op = (lrmd_op_t*)node->data;
+			node = g_list_next(node);
+			if ( op->call_id == call_id) {
+				rsc->repeat_op_list =
+					g_list_remove(rsc->repeat_op_list, op);
+lrmd_log(LOG_ERR, "on_msg_perform_op: free op %d from repeat_op_list.",call_id);
+				free_op(op);
+				break;
+			}
+		}
+		
+	}
 	else {
+		if (HA_FAIL == ha_msg_add_int(msg, F_LRM_CALLID, call_id)) {
+			lrmd_log(LOG_ERR, "on_msg_perform_op: can not add callid.");
+		}
+		if (HA_FAIL==ha_msg_add(msg, F_LRM_APP, client->app_name)) {
+			lrmd_log(LOG_ERR,
+				"on_msg_perform_op: can not add app_name.");
+		}
+		lrmd_log(LOG_INFO,"app_name:%s", client->app_name);
+
 		op = g_new(lrmd_op_t, 1);
 		op->call_id = call_id;
 		op->exec_pid = -1;
 		op->client = client;
 		op->timeout_tag = -1;
 		op->rsc = rsc;
-		op->mon	= NULL;
-		op->app_name = client->app_name;
 		op->msg = ha_msg_copy(msg);
-		rsc->op_list = g_list_append(rsc->op_list, op);
-		if (HA_FAIL==ha_msg_add(op->msg, F_LRM_APP, client->app_name)) {
-			lrmd_log(LOG_ERR,
-				"on_msg_perform_op: can not add app_name.");
-		}
+
 		ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout);
 		if (0 < timeout ) {
-			op->timeout_tag = g_timeout_add(timeout*1000,
+			op->timeout_tag = g_timeout_add(timeout,
 						on_timeout_op_done, op);
 		}
+		ha_msg_value_int(op->msg, F_LRM_INTERVAL, &op->interval);
+
+		rsc->op_list = g_list_append(rsc->op_list, op);
+
 		perform_op(rsc);
 	}
 
 	lrmd_log(LOG_INFO, "on_msg_perform_op: end.");
 	return call_id;
 }
-int
-on_msg_set_monitor(lrmd_client_t* client, struct ha_msg* msg)
-{
-	lrmd_rsc_t* rsc = NULL;
-	mon_mode_t mode;
-	lrmd_mon_t* mon = NULL;
-
-	lrmd_log(LOG_INFO, "on_msg_set_monitor: start.");
-
-	rsc = lookup_rsc_by_msg(msg);
-
-	if (NULL == rsc) {
-		lrmd_log(LOG_ERR,
-			"on_msg_set_monitor: no rsc with such id.");
-		return HA_FAIL;
-	}
-
-	call_id++;
-
-	if (HA_FAIL == ha_msg_add_int(msg, F_LRM_CALLID, call_id)) {
-		lrmd_log(LOG_ERR,
-			"on_msg_set_monitor: can not add callid.");
-		return HA_FAIL;
-	}
-
-	//if the monitor mode is clear, remove all monitors on the resource.
-	if (HA_FAIL == ha_msg_value_int(msg, F_LRM_MONMODE, (int*)&mode)) {
-		lrmd_log(LOG_ERR,
-			"on_msg_set_monitor: can not get monitor mode.");
-		return HA_FAIL;
-	}
-	if (LRM_MONITOR_CLEAR == mode) {
-		GList* first = g_list_first(rsc->mon_list);
-		while (NULL != first) {
-			lrmd_mon_t* mon = (lrmd_mon_t*)first->data;
-			rsc->mon_list = g_list_remove(rsc->mon_list, mon);
-			free_mon(mon);
-			first = g_list_first(rsc->mon_list);
-		}
-	}
-	else {
-	//otherwise, create a mon object
-		mon = g_new(lrmd_mon_t, 1);
-		mon->mode = mode;
-		mon->rsc = rsc;
-		mon->call_id = call_id;
-		mon->client = client;
-		mon->app_name = client->app_name;
-		mon->pending_op = 0;
-		mon->is_deleted = FALSE;
-		mon->last_status = -1;
-		if (HA_FAIL == ha_msg_value_int(msg, F_LRM_MONINTVL,
-						&mon->interval)) {
-			g_free(mon);
-			lrmd_log(LOG_ERR,
-				"on_msg_set_monitor: can not get interval.");
-			return HA_FAIL;
-		}
-		if (0 >= mon->interval) {
-			g_free(mon);
-			lrmd_log(LOG_ERR,
-				"on_msg_set_monitor: interal less 1 second.");
-			return HA_FAIL;
-
-		}
-		if (HA_FAIL == ha_msg_value_int(msg, F_LRM_MONTGT,
-						&mon->target)) {
-			g_free(mon);
-			lrmd_log(LOG_ERR,
-				"on_msg_set_monitor: can not get target.");
-			return HA_FAIL;
-		}
-		mon->msg = ha_msg_copy(msg);
-		//add a time GSource to g_loop
-		mon->timeout_tag = g_timeout_add(mon->interval*1000,
-						 on_timeout_monitor, mon);
-		//insert the monitor to the list of resource
-		rsc->mon_list = g_list_append(rsc->mon_list, mon);
-	}
-
-	lrmd_log(LOG_INFO, "on_msg_set_monitor: end.");
-	return call_id;
-}
-
 int
 on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 {
@@ -1302,6 +1198,7 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 		send_rc_msg(client->ch_cmd, HA_FAIL);
 		return HA_FAIL;
 	}
+lrmd_log(LOG_ERR, "on_msg_get_state: op_list:%p",rsc->op_list);
 	if ( NULL == rsc->op_list )
 	{
 		ret = NULL;
@@ -1375,12 +1272,16 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
  * then remove it from the op list and put it into the lastop field of rsc.
  */
 int
-op_done(lrmd_op_t* op)
+on_op_done(lrmd_op_t* op)
 {
-	gboolean need_send = FALSE;
-	lrmd_mon_t* mon = NULL;
-
-	lrmd_log(LOG_INFO, "op_done: start.");
+	int target_rc = 0;
+	int last_rc = 0;
+	int op_rc = 0;
+	op_status_t op_status;
+	int need_notify = 0;
+	
+	
+	lrmd_log(LOG_INFO, "on_op_done: start.");
 	// we should check if the resource exists.
 	if (NULL == g_list_find(rsc_list, op->rsc)) {
 		if( op->timeout_tag > 0 ) {
@@ -1391,103 +1292,114 @@ op_done(lrmd_op_t* op)
 		g_free(op);
 
 		lrmd_log(LOG_INFO,
-			"op_done: the resource of this op does not exists");
+			"on_op_done: the resource of this op does not exists");
 		return HA_FAIL;
 
 	}
-
-	//if the op is create by client
-	if (NULL != op->client) {
+	
+	if (HA_FAIL == ha_msg_value_int(op->msg,F_LRM_TARGETRC,&target_rc)){
+		lrmd_log(LOG_ERR,"on_op_done: can not get tgt status from msg");
+		return HA_FAIL;
+	}
+	if (HA_FAIL ==
+		ha_msg_value_int(op->msg, F_LRM_OPSTATUS, (int*)&op_status)) {
+		lrmd_log(LOG_ERR,
+			"on_op_done: can not get op status from msg.");
+		return HA_FAIL;
+	}
+	
+	if (LRM_OP_DONE!= op_status) {
+		need_notify = 1;
+	}
+	else
+	if (HA_FAIL == ha_msg_value_int(op->msg,F_LRM_RC,&op_rc)){
+		need_notify = 1;
+	}
+	else
+	if (EVERYTIME == target_rc) {
+		need_notify = 1;
+	}
+	else
+	if (CHANGED == target_rc) {
+		if (HA_FAIL == ha_msg_value_int(op->msg,F_LRM_LASTRC,
+						&last_rc)){
+			need_notify = 0;
+		}
+		else {
+			if (last_rc != op_rc) {
+				need_notify = 1;
+			}
+		}
+		if (HA_FAIL == ha_msg_mod_int(op->msg,F_LRM_LASTRC,
+						op_rc)){
+			lrmd_log(LOG_ERR,"on_op_done: can not save status ");
+			return HA_FAIL;
+		}
+	}
+	else {
+		lrmd_log(LOG_ERR,"on_op_done: op_rc:%d, target_rc:%d",op_rc,target_rc);
+		if ( op_rc==target_rc ) {
+			need_notify = 1;
+		}
+	}
+	
+	if ( need_notify ) {
 		//send the result to client
-		lrmd_log(LOG_INFO, "op_done: a normal op done.");
+		lrmd_log(LOG_INFO, "on_op_done: a normal op done.");
 		//we have to check whether the client still exists
 		//for the client may signoff during the op running.
 		if (NULL != g_list_find(client_list, op->client)) {
 			//the client still exists
 			if (NULL == op->client->ch_cbk) {
 				lrmd_log(LOG_ERR,
-					"op_done: client->ch_cbk is null");
+					"on_op_done: client->ch_cbk is null");
 			}
 			else
 			if (HA_OK != msg2ipcchan(op->msg, op->client->ch_cbk)) {
 				lrmd_log(LOG_ERR,
-					"op_done: can not send the ret msg");
+					"on_op_done: can not send the ret msg");
 			}
-		}
-		//release the old last_op
-		if (NULL != op->rsc->last_op) {
-			ha_msg_del(op->rsc->last_op->msg);
-			g_free(op->rsc->last_op);
-		}
-		//remove the op from op_list and assign to last_op
-		op->rsc->op_list = g_list_remove(op->rsc->op_list,op);
-		op->rsc->last_op = op;
-		if( op->timeout_tag > 0 ) {
-			g_source_remove(op->timeout_tag);
 		}
 
 	}
+
+	lrmd_log(LOG_INFO, "on_op_done: release the old last_op");
+	//release the old last_op
+	if ( NULL!=op->rsc->last_op) {
+		ha_msg_del(op->rsc->last_op->msg);
+		g_free(op->rsc->last_op);
+	}
+	
+	lrmd_log(LOG_INFO, "on_op_done: remove the op from op_list and copy to last_op");
+	//remove the op from op_list and copy to last_op
+	op->rsc->op_list = g_list_remove(op->rsc->op_list,op);
+
+	op->rsc->last_op = g_new(lrmd_op_t, 1);
+	op->rsc->last_op->rsc = op->rsc;
+	op->rsc->last_op->client = op->client;
+	op->rsc->last_op->call_id = op->call_id;
+	op->rsc->last_op->exec_pid = op->exec_pid;
+	op->rsc->last_op->output_fd = op->output_fd;
+	op->rsc->last_op->timeout_tag = op->timeout_tag;
+	op->rsc->last_op->repeat_timeout_tag = op->repeat_timeout_tag;
+	op->rsc->last_op->interval = op->interval;
+	op->rsc->last_op->msg = ha_msg_copy(op->msg);
+
+	if( op->timeout_tag > 0 ) {
+		g_source_remove(op->timeout_tag);
+	}
+
+	if ( 0!=op->interval && NULL != g_list_find(client_list, op->client)) {
+		op->repeat_timeout_tag = g_timeout_add(op->interval,
+					on_repeat_op_done, op);
+		op->rsc->repeat_op_list = g_list_append (op->rsc->repeat_op_list, op);
+	}
 	else {
-	//if the op is created by monitor
-		lrmd_log(LOG_INFO, "op_done: a monitor op done.");
-
-		mon = op->mon;
-		mon->pending_op--;
-		if (!mon->is_deleted) {
-			//check status
-			op_status_t status = LRM_OP_ERROR;
-			int rc = -1;
-			ha_msg_value_int(op->msg,F_LRM_OPSTATUS,(int*)&status);
-			ha_msg_value_int(op->msg, F_LRM_RC, &rc);
-
-			need_send = FALSE;
-			if (LRM_OP_TIMEOUT == status||LRM_OP_ERROR == status) {
-				need_send = TRUE;
-			}
-			else
-			if (LRM_OP_DONE == status) {
-				if ((LRM_MONITOR_SET == mon->mode &&
-				     rc == mon->target &&
-				     mon->last_status != rc) ||
-				    (LRM_MONITOR_CHANGE == mon->mode &&
-				     rc != mon->last_status)) {
-					need_send = TRUE;
-				}
-				mon->last_status = rc;
-			}
-			//send monitor msg to client
-			if (need_send) {
-				if (NULL == mon->client->ch_cbk) {
-					lrmd_log(LOG_ERR,
-						"op_done: ch_cbk is null");
-				}
-				else
-				if (HA_OK != msg2ipcchan(op->msg,
-						mon->client->ch_cbk)) {
-					lrmd_log(LOG_ERR,
-						"op_done: can not send msg");
-				}
-			}
-
-		}
-		else {
-			//delete the monitor
-			if (0 == mon->pending_op) {
-				ha_msg_del(mon->msg);
-				g_free(mon);
-			}
-		}
-		//remove timeout source
-		if( op->timeout_tag > 0 ) {
-			g_source_remove(op->timeout_tag);
-		}
-
-		//delete the op
-		op->rsc->op_list = g_list_remove(op->rsc->op_list,op);
 		ha_msg_del(op->msg);
 		g_free(op);
 	}
-	lrmd_log(LOG_INFO, "op_done: end.");
+	
+	lrmd_log(LOG_INFO, "on_op_done: end.");
 	return HA_OK;
 }
 /* this function flush one op */
@@ -1504,8 +1416,10 @@ flush_op(lrmd_op_t* op)
 		lrmd_log(LOG_ERR,"flush_op: can not add op status");
 		return HA_FAIL;
 	}
-
-	op_done(op);
+	if (-1 != op->exec_pid ) {
+		kill(op->exec_pid, 9);
+	}
+	on_op_done(op);
 
 	lrmd_log(LOG_INFO, "flush_op: end.");
 	return HA_OK;
@@ -1521,7 +1435,7 @@ perform_op(lrmd_rsc_t* rsc)
 	lrmd_log(LOG_INFO, "perform_op: start.");
 	if (NULL == g_list_find(rsc_list, rsc)) {
 		lrmd_log(LOG_INFO,
-			"op_done: the resource of this op does not exists");
+			"perform_op: the resource of this op does not exists");
 		return HA_FAIL;
 
 	}
@@ -1543,7 +1457,7 @@ perform_op(lrmd_rsc_t* rsc)
 						LRM_OP_ERROR)) {
 				lrmd_log(LOG_ERR, "perform_op: can not add opstatus to msg");
 			}
-			op_done(op);
+			on_op_done(op);
 			node = g_list_first(rsc->op_list);
 		}
 		else {
@@ -1572,11 +1486,6 @@ op_to_msg(lrmd_op_t* op)
 	if (HA_FAIL == ha_msg_add_int(msg, F_LRM_CALLID, op->call_id)) {
 		ha_msg_del(msg);
 		lrmd_log(LOG_ERR,"op_to_msg: can not add call_id");
-		return NULL;
-	}
-	if (HA_FAIL == ha_msg_add(msg, F_LRM_APP, op->app_name)) {
-		ha_msg_del(msg);
-		lrmd_log(LOG_ERR,"op_to_msg: can not add app_name");
 		return NULL;
 	}
 	lrmd_log(LOG_INFO, "op_to_msg: end.");
@@ -1702,7 +1611,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	lrmd_log(LOG_INFO, "on_ra_proc_finished: start.");
 	if (9 == signo) {
 		p->privatedata = NULL;
-		lrmd_log(LOG_INFO, "on_ra_proc_finished: this op is timeout.");
+		lrmd_log(LOG_INFO, "on_ra_proc_finished: this op is killed.");
 		return;
 	}
 
@@ -1717,17 +1626,17 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	rc = RAExec->map_ra_retvalue(exitcode, op_type);
 
 	if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
-		if (HA_FAIL == ha_msg_add_int(op->msg, F_LRM_OPSTATUS, LRM_OP_ERROR)) {
+		if (HA_FAIL == ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_ERROR)) {
 			lrmd_log(LOG_ERR,	"on_ra_proc_finished: can not add opstatus to msg");
 			return ;
 		}
 	}
 	else {
-		if (HA_FAIL == ha_msg_add_int(op->msg, F_LRM_OPSTATUS, LRM_OP_DONE)) {
+		if (HA_FAIL == ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_DONE)) {
 			lrmd_log(LOG_ERR,	"on_ra_proc_finished: can not add opstatus to msg");
 			return ;
 		}
-		if (HA_FAIL == ha_msg_add_int(op->msg, F_LRM_RC, rc)) {
+		if (HA_FAIL == ha_msg_mod_int(op->msg, F_LRM_RC, rc)) {
 			lrmd_log(LOG_ERR,"on_ra_proc_finished: can not add rc to msg");
 			return ;
 		}
@@ -1736,14 +1645,14 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	data = NULL;
 	read_pipe(op->output_fd, &data);
 	if (NULL != data) {
-		ret = ha_msg_addbin(op->msg, F_LRM_DATA,data,strlen(data));
+		ret = cl_msg_modbin(op->msg, F_LRM_DATA,data,strlen(data));
 		if (HA_FAIL == ret) {
 			lrmd_log(LOG_ERR,	"on_ra_proc_finished: can not add data to msg");
 		}
 		g_free(data);
 	}
 
-	op_done(op);
+	on_op_done(op);
 	perform_op(rsc);
 	p->privatedata = NULL;
 	lrmd_log(LOG_INFO, "on_ra_proc_finished: end.");
@@ -1866,36 +1775,24 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 	g_free(id);
 	return rsc;
 }
-
 void
-free_rsc(lrmd_rsc_t* rsc)
+free_op(lrmd_op_t* op)
 {
-	g_free(rsc->type);
-	g_free(rsc->class);
-	if (NULL != rsc->params) {
-		free_hash_table(rsc->params);
+	if (-1 != op->exec_pid ) {
+		kill(op->exec_pid, 9);
 	}
-	g_free(rsc);
-}
+	
+	if (-1 != op->repeat_timeout_tag) {
+		g_source_remove(op->repeat_timeout_tag);
+	}
+	
+	if (-1 != op->timeout_tag) {
+		g_source_remove(op->timeout_tag);
+	}
 
-void
-free_mon(lrmd_mon_t* mon)
-{
-	if (mon->timeout_tag > 0 ) {
-		g_source_remove(mon->timeout_tag);
-	}
-	//if there is no status op is pending, just release it.
-	if (!mon->pending_op) {
-		ha_msg_del(mon->msg);
-		g_free(mon);
-	}
-	else {
-		// the op stores this pointer so let the op done routine release
-		// the memory
-		mon->is_deleted = TRUE;
-	}
+	ha_msg_del(op->msg);
+	g_free(op);
 }
-
 int
 read_pipe(int fd, char ** data)
 {
