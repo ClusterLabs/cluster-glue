@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.29 2004/11/04 21:19:29 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.30 2004/11/04 22:56:11 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -843,8 +843,9 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 			int	netstring_sizediff = 0;
 			
 			newv = fieldtypefuncs[type].dup(value,vlen);
-			if (!newv){
-				cl_log(LOG_ERR, "dupliationg message fields failed");
+			if (!newv && vlen != 0){
+				cl_log(LOG_ERR, "dupliationg message fields failed"
+				       "value=%p, vlen=%d, msg->names[j]=%s", value, vlen, msg->names[j]);
 				return HA_FAIL;
 			}
 			
@@ -1754,6 +1755,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.30  2004/11/04 22:56:11  gshi
+ * fixed a bug in 0-length binary field
+ *
  * Revision 1.29  2004/11/04 21:19:29  gshi
  * added zero length binary field support
  *
