@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.12 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: cl_log.c,v 1.13 2004/03/18 12:07:39 lars Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -158,8 +158,9 @@ cl_log(int priority, const char * fmt, ...)
 	}
 
 	if (stderr_enabled) {
-		fprintf(stderr, "%s: %s: %s\n"
+		fprintf(stderr, "%s: %s %s: %s\n"
 		,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+		,	ha_timestamp()
 		,	pristr,  buf);
 	}
 
