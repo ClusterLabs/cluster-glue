@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.51 2005/02/16 19:14:35 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.52 2005/02/16 20:38:29 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1028,8 +1028,8 @@ cl_get_uuid(const struct ha_msg *msg, const char * name, uuid_t retval)
 	
 	uuid_clear(retval);
 
-	if ((vret = cl_get_binary(msg, name, &vretsize)) == NULL) {
-		/*discouraged function*/ /* But perfectly portable in this case */
+	if ((vret = cl_get_binary(msg, name, &vretsize)/*discouraged function*/) == NULL) {
+		/* But perfectly portable in this case */
 		return HA_FAIL;
 	}
 	if (vretsize != sizeof(uuid_t)) {
@@ -2149,6 +2149,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.52  2005/02/16 20:38:29  alan
+ * tried to move around a BEAM comment so it makes it shut up at the right time.
+ *
  * Revision 1.51  2005/02/16 19:14:35  gshi
  * Don't check a message's stringlen/netstringlen until it is time to encode the message to string or netstring
  *
