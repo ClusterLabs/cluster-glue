@@ -42,7 +42,10 @@ longclock_t	time_longclock(void);
 longclock_t	msto_longclock(unsigned long);
 longclock_t	secsto_longclock(unsigned long);
 longclock_t	dsecsto_longclock(double);
+unsigned long	longclock_to_ms(longclock_t);	/* Can overflow! */
 longclock_t	add_longclock(longclock_t l, longclock_t r);
+/* Undefined if l is < r according to cmp_longclock() */
+longclock_t	sub_longclock(longclock_t l, longclock_t r);
 int		cmp_longclock(longclock_t l, longclock_t r);
 
 #endif
