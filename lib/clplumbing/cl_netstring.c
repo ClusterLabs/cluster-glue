@@ -224,9 +224,11 @@ peel_netstring(const char * s, const char * smax, int* len,
 		return(HA_FAIL);
 	}
 
-	sscanf(sp,"%d", len);
+	if (sscanf(sp,"%d", len) != 1){
+		return(HA_FAIL);
+	}
 
-	if (len <= 0){
+	if (*len <= 0){
 		return(HA_FAIL);
 	}
 
