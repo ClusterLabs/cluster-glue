@@ -1,0 +1,10 @@
+Currently no resource is managed by LRM.
+Succeeded in adding this resource.
+Failed to add this resource.
+
+Resource ID:ip
+Resource agency class:heartbeat
+Resource agency type:IPaddr
+Resource agency parameters:192.168.58.4  
+Succeeded in delete this resource.
+Currently no resource is managed by LRM.

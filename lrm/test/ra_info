@@ -1,0 +1,9 @@
+#!/bin/bash
+../admin/lrmadmin -d
+../admin/lrmadmin -C
+../admin/lrmadmin -T lsb
+../admin/lrmadmin -T ocf
+../admin/lrmadmin -T heartbeat
+../admin/lrmadmin -M lsb sshd
+../admin/lrmadmin -M heartbeat IPv6addr
+ 
