@@ -48,9 +48,18 @@ libplumb_la_SOURCES	= 		\
 			uids.c
 
 testdir = $(libdir)/@HB_PKG@
-test_PROGRAMS = ipctest
+test_PROGRAMS = ipctest ipctransientclient ipctransientserver
 
 libplumb_la_LDFLAGS	= -version-info 0:0:0
 
 ipctest_SOURCES = ipctest.c
 ipctest_LDADD = libplumb.la $(GLIBLIB)
+
+#ipctransient_SOURCES = ipctransient.c
+#ipctransient_LDADD = libplumb.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
+
+ipctransientclient_SOURCES = ipctransientclient.c
+ipctransientclient_LDADD = libplumb.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
+
+ipctransientserver_SOURCES = ipctransientserver.c
+ipctransientserver_LDADD = libplumb.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
