@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.62 2005/03/15 01:01:09 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.63 2005/03/15 01:37:38 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -149,7 +149,7 @@ ha_msg_new(nfields)
 
 		ret->nalloc    = nalloc;
 		ret->names     = (char **)ha_calloc(sizeof(char *), nalloc);
-		ret->nlens     = (int *)ha_calloc(sizeof(int), nalloc);
+		ret->nlens     = (size_t *)ha_calloc(sizeof(size_t), nalloc);
 		ret->values    = (void **)ha_calloc(sizeof(void *), nalloc);
 		ret->vlens     = (size_t *)ha_calloc(sizeof(size_t), nalloc);
 		ret->stringlen = sizeof(MSG_START)+sizeof(MSG_END)-1;
@@ -373,7 +373,7 @@ static int
 ha_msg_expand(struct ha_msg* msg )
 {	
 	char **	names ;
-	int  *	nlens ;
+	size_t  *nlens ;
 	void **	values ;
 	size_t*	vlens ;
 	int *	types ;
@@ -393,7 +393,7 @@ ha_msg_expand(struct ha_msg* msg )
 	
 	nalloc = msg->nalloc + MINFIELDS;
 	msg->names = 	(char **)ha_calloc(sizeof(char *), nalloc);
-	msg->nlens = 	(int *)ha_calloc(sizeof(int), nalloc);
+	msg->nlens = 	(size_t *)ha_calloc(sizeof(size_t), nalloc);
 	msg->values = 	(void **)ha_calloc(sizeof(void *), nalloc);
 	msg->vlens = 	(size_t *)ha_calloc(sizeof(size_t), nalloc);
 	msg->types= 	(int*)ha_calloc(sizeof(int), nalloc);
@@ -2277,6 +2277,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.63  2005/03/15 01:37:38  gshi
+ * fix IA64 compiling warnings
+ *
  * Revision 1.62  2005/03/15 01:01:09  gshi
  * enable message auditing
  *
