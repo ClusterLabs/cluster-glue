@@ -1,4 +1,4 @@
-/* $Id: drac3.c,v 1.5 2004/03/25 11:58:22 lars Exp $ */
+/* $Id: drac3.c,v 1.6 2004/09/13 20:32:31 gshi Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -30,7 +30,6 @@
 #include <signal.h>
 #include <string.h>
 #include <errno.h>
-#include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
 #include <glib.h>
@@ -159,7 +158,7 @@ drac3_new(void)
 	struct DRAC3Device *drac3d = MALLOCT(struct DRAC3Device);
 
 	if (drac3d == NULL) {
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 			return(NULL);
 	}
 	memset(drac3d, 0, sizeof(*drac3d));
@@ -179,7 +178,7 @@ drac3_destroy(Stonith * s)
 	struct DRAC3Device *drac3d;
 
 	if (!ISDRAC3DEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument.", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
 		return;
 	}
 	drac3d = (struct DRAC3Device *) s->pinfo;
@@ -219,14 +218,14 @@ drac3_set_config_file(Stonith * s, const char *configname)
 	struct DRAC3Device *drac3d;
 
 	if (!ISDRAC3DEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument.", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
 		return (S_INVAL);
 	}
 
 	drac3d = (struct DRAC3Device *) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL) {
-		syslog(LOG_ERR, "Cannot open %s", configname);
+		PILCallLog(PluginImports->log,PIL_CRIT, "Cannot open %s", configname);
 		return (S_BADCONFIG);
 	}
 
@@ -245,7 +244,7 @@ drac3_set_config_info(Stonith * s, const char *info)
 	struct DRAC3Device *drac3d;
 
 	if (!ISDRAC3DEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument.", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
 		return (S_OOPS);
 	}
 
@@ -262,7 +261,7 @@ drac3_getinfo(Stonith * s, int reqtype)
 	const char *ret = NULL;
 
 	if (!ISDRAC3DEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument.", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
 		return (NULL);
 	}
 
@@ -302,12 +301,12 @@ drac3_status(Stonith  *s)
 	struct DRAC3Device *drac3d;
 
 	if (!ISDRAC3DEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument.", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
 		return (S_INVAL);
 	}
 
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR, "%s: device is UNCONFIGURED!", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device is UNCONFIGURED!", __FUNCTION__);
 		return (S_OOPS);
 	}
 
@@ -316,7 +315,7 @@ drac3_status(Stonith  *s)
 	if (drac3VerifyLogin(drac3d->curl, drac3d->host)) {
 		if (drac3Login(drac3d->curl, drac3d->host,
 		                drac3d->user, drac3d->pass)) {
-		 	syslog(LOG_ERR, "%s: cannot log into %s at %s", 
+		 	PILCallLog(PluginImports->log,PIL_CRIT, "%s: cannot log into %s at %s", 
 							__FUNCTION__,
 							DEVICE,
 							drac3d->host);
@@ -338,12 +337,12 @@ drac3_reset_req(Stonith * s, int request, const char *host)
 	int rc = S_OK;
 
 	if (!ISDRAC3DEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument.", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
 		return (S_INVAL);
 	}
 
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR, "%s: device is UNCONFIGURED!", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device is UNCONFIGURED!", __FUNCTION__);
 		return (S_OOPS);
 	}
 
@@ -352,7 +351,7 @@ drac3_reset_req(Stonith * s, int request, const char *host)
 	if (drac3VerifyLogin(drac3d->curl, drac3d->host)) {
 		if (drac3Login(drac3d->curl, drac3d->host,
 		                drac3d->user, drac3d->pass)) {
-		 	syslog(LOG_ERR, "%s: cannot log into %s at %s", 
+		 	PILCallLog(PluginImports->log,PIL_CRIT, "%s: cannot log into %s at %s", 
 							__FUNCTION__,
 							DEVICE,
 							drac3d->host);
@@ -386,12 +385,12 @@ drac3_hostlist(Stonith * s)
 	char **hl;
 
 	if (!ISDRAC3DEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument.", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument.", __FUNCTION__);
 		return (NULL);
 	}
 
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR, "%s: device is UNCONFIGURED!", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device is UNCONFIGURED!", __FUNCTION__);
 		return (NULL);
 	}
 
@@ -399,12 +398,12 @@ drac3_hostlist(Stonith * s)
 
 	hl = (char **)MALLOC(2*sizeof(char*));
 	if (hl == NULL) {
-		syslog(LOG_ERR, "%s: out of memory", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory", __FUNCTION__);
 	} else {
 		hl[1]=NULL;
 		hl[0]=STRDUP(drac3d->host);
 		if (hl[0]) {
-			syslog(LOG_ERR, "%s: out of memory", __FUNCTION__);
+			PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory", __FUNCTION__);
 			FREE(hl);
 			hl = NULL;
 		}
@@ -448,19 +447,19 @@ DRAC3_parse_config_info(struct DRAC3Device * drac3d, const char * info)
 	if (sscanf(info, "%s %s %s", host, user, pass) == 3) {
 
 			if ((drac3d->host = STRDUP(host)) == NULL) {
-					syslog(LOG_ERR, "%s: out of memory", 
+					PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory", 
 							__FUNCTION__);
 					return(S_OOPS);
 			}
 			g_strdown(drac3d->host);
 			if ((drac3d->user = STRDUP(user)) == NULL) {
-					syslog(LOG_ERR, "%s: out of memory", 
+					PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory", 
 							__FUNCTION__);
 					FREE(drac3d->host);
 					return(S_OOPS);
 			}
 			if ((drac3d->pass = STRDUP(pass)) == NULL) {
-					syslog(LOG_ERR, "%s: out of memory", 
+					PILCallLog(PluginImports->log,PIL_CRIT, "%s: out of memory", 
 							__FUNCTION__);
 					FREE(drac3d->host);
 					FREE(drac3d->user);
@@ -469,7 +468,7 @@ DRAC3_parse_config_info(struct DRAC3Device * drac3d, const char * info)
 
 			curl = curl_easy_init();
 			if ((drac3d->curl = curl_easy_init()) == NULL) { 
-					syslog(LOG_ERR, "%s: cannot init curl", 
+					PILCallLog(PluginImports->log,PIL_CRIT, "%s: cannot init curl", 
 							__FUNCTION__);
 					FREE(drac3d->host);
 					FREE(drac3d->user);

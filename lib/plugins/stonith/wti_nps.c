@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.13 2004/08/29 03:01:13 msoffen Exp $ */
+/* $Id: wti_nps.c,v 1.14 2004/09/13 20:32:31 gshi Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -54,7 +54,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
 #include <glib.h>
@@ -205,7 +204,7 @@ static const char * NOTnpsid = "Hey, dummy this has been destroyed (WTINPS)";
 			}					\
 			(s) = strdup(v);			\
 			if ((s) == NULL) {			\
-				syslog(LOG_ERR, _("out of memory"));\
+				PILCallLog(PluginImports->log,PIL_CRIT, _("out of memory"));\
 			}					\
 			}
 
@@ -283,7 +282,7 @@ NPSLookFor(struct WTINPS* nps, struct Etoken * tlist, int timeout)
 {
 	int	rc;
 	if ((rc = EXPECT_TOK(nps->rdfd, tlist, timeout, NULL, 0)) < 0) {
-		syslog(LOG_ERR, _("Did not find string: '%s' from " DEVICE ".")
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Did not find string: '%s' from " DEVICE ".")
 		,	tlist[0].string);
 		NPSkillcomm(nps);
 	}
@@ -296,7 +295,7 @@ static int
 NPSScanLine(struct WTINPS* nps, int timeout, char * buf, int max)
 {
 	if (EXPECT_TOK(nps->rdfd, CRNL, timeout, buf, max) < 0) {
-		syslog(LOG_ERR, ("Could not read line from " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, ("Could not read line from " DEVICE "."));
 		NPSkillcomm(nps);
 		return(S_OOPS);
 	}
@@ -343,7 +342,7 @@ NPSLogin(struct WTINPS * nps)
 	/* Look for the unit type info */
 	if (EXPECT_TOK(nps->rdfd, password, 2, IDinfo
 	,	sizeof(IDinfo)) < 0) {
-		syslog(LOG_ERR, _("No initial response from " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, _("No initial response from " DEVICE "."));
 		NPSkillcomm(nps);
  		return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	}
@@ -360,11 +359,11 @@ NPSLogin(struct WTINPS * nps)
 	switch (NPSLookFor(nps, LoginOK, 5)) {
 
 		case 0:	/* Good! */
-			syslog(LOG_INFO, _("Successful login to " DEVICE "."));
+			PILCallLog(PluginImports->log,PIL_INFO, _("Successful login to " DEVICE "."));
 			break;
 
 		case 1:	/* Uh-oh - bad password */
-			syslog(LOG_ERR, _("Invalid password for " DEVICE "."));
+			PILCallLog(PluginImports->log,PIL_CRIT, _("Invalid password for " DEVICE "."));
 			return(S_ACCESS);
 
 		default:
@@ -441,7 +440,7 @@ NPSReset(struct WTINPS* nps, char * outlets, const char * rebootid)
 		default: 
 			return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
-	syslog(LOG_INFO, _("Host %s being rebooted."), rebootid);
+	PILCallLog(PluginImports->log,PIL_INFO, _("Host %s being rebooted."), rebootid);
 
 	/* Expect "PS>" */
 	if (NPSLookFor(nps, Prompt, 60) < 0) {
@@ -450,7 +449,7 @@ NPSReset(struct WTINPS* nps, char * outlets, const char * rebootid)
 
 	/* All Right!  Power is back on.  Life is Good! */
 
-	syslog(LOG_INFO, _("Power restored to host %s."), rebootid);
+	PILCallLog(PluginImports->log,PIL_INFO, _("Power restored to host %s."), rebootid);
 	SEND("/h\r");
 	return(S_OK);
 }
@@ -465,7 +464,7 @@ NPS_onoff(struct WTINPS* nps, const char * outlets, const char * unitid, int req
 	int	rc;
 
 	if ((rc = NPSRobustLogin(nps) != S_OK)) {
-		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
        
@@ -487,7 +486,7 @@ NPS_onoff(struct WTINPS* nps, const char * outlets, const char * unitid, int req
 	EXPECT(Prompt, 60);
 
 	/* All Right!  Command done. Life is Good! */
-	syslog(LOG_NOTICE, _("Power to NPS outlet(s) %s turned %s."), outlets, onoff);
+	PILCallLog(PluginImports->log,PIL_INFO, _("Power to NPS outlet(s) %s turned %s."), outlets, onoff);
 	return(S_OK);
 }
 #endif /* defined(ST_POWERON) && defined(ST_POWEROFF) */
@@ -508,7 +507,7 @@ NPSNametoOutlet(struct WTINPS* nps, const char * name, char **outlets)
 	
         
         if ((*outlets = (char *)MALLOC(left*sizeof(char))) == NULL) {
-                syslog(LOG_ERR, "out of memory");
+                PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
                 return(-1);
         }
 	
@@ -561,18 +560,18 @@ wti_nps_status(Stonith  *s)
 	int	rc;
 
 	if (!ISWTINPS(s)) {
-		syslog(LOG_ERR, "invalid argument to NPS_status");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to NPS_status");
 		return(S_OOPS);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in NPS_status");
 		return(S_OOPS);
 	}
 	nps = (struct WTINPS*) s->pinfo;
 
        	if ((rc = NPSRobustLogin(nps) != S_OK)) {
-		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
 
@@ -599,11 +598,11 @@ wti_nps_hostlist(Stonith  *s)
 
 
 	if (!ISWTINPS(s)) {
-		syslog(LOG_ERR, "invalid argument to NPS_list_hosts");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to NPS_list_hosts");
 		return(NULL);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in NPS_list_hosts");
 		return(NULL);
 	}
@@ -613,7 +612,7 @@ wti_nps_hostlist(Stonith  *s)
 	}
  
 	if (NPSRobustLogin(nps) != S_OK) {
-		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
 		return(NULL);
 	}
 	
@@ -654,7 +653,7 @@ wti_nps_hostlist(Stonith  *s)
 				break;
 			}
 			if ((nm = strdup(sockname)) == NULL) {
-				syslog(LOG_ERR, "out of memory");
+				PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 				return(NULL);
 			}
 			g_strdown(nm);
@@ -667,7 +666,7 @@ wti_nps_hostlist(Stonith  *s)
 	if (numnames >= 1) {
 		ret = (char **)MALLOC((numnames+1)*sizeof(char*));
 		if (ret == NULL) {
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		}else{
 			memset(ret, 0, (numnames+1)*sizeof(char*));
 			memcpy(ret, NameList, (numnames+1)*sizeof(char*));
@@ -714,13 +713,13 @@ NPS_parse_config_info(struct WTINPS* nps, const char * info)
 	&&	strlen(passwd) > 1) {
 
 		if ((nps->device = strdup(dev)) == NULL) {
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 			return(S_OOPS);
 		}
 		if ((nps->passwd = strdup(passwd)) == NULL) {
 			free(nps->device);
 			nps->device=NULL;
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 			return(S_OOPS);
 		}
 		nps->config = 1;
@@ -759,25 +758,25 @@ wti_nps_reset_req(Stonith * s, int request, const char * host)
 	struct WTINPS*	nps;
 
 	if (!ISWTINPS(s)) {
-		syslog(LOG_ERR, "invalid argument to NPS_reset_host");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to NPS_reset_host");
 		return(S_OOPS);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in NPS_reset_host");
 		return(S_OOPS);
 	}
 	nps = (struct WTINPS*) s->pinfo;
 
         if ((rc = NPSRobustLogin(nps)) != S_OK) {
-		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
         }else{
 	        char *outlets;
 		char *shost;
 		int noutlet;
      
 		if ((shost = STRDUP(host)) == NULL) {
-			syslog(LOG_ERR, "strdup failed in NPS_reset_host");
+			PILCallLog(PluginImports->log,PIL_CRIT, "strdup failed in NPS_reset_host");
 			return(S_OOPS);
 		}
 		g_strdown(shost);
@@ -785,7 +784,7 @@ wti_nps_reset_req(Stonith * s, int request, const char * host)
 		free(shost);
 
 		if (noutlet < 1) {
-			syslog(LOG_WARNING, _("%s %s "
+			PILCallLog(PluginImports->log,PIL_WARN, _("%s %s "
 			"doesn't control host [%s]."), nps->idinfo
 			,	nps->unitid, host);
 			NPSkillcomm(nps);
@@ -838,13 +837,13 @@ wti_nps_set_config_file(Stonith* s, const char * configname)
 	struct WTINPS*	nps;
 
 	if (!ISWTINPS(s)) {
-		syslog(LOG_ERR, "invalid argument to NPS_set_configfile");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to NPS_set_configfile");
 		return(S_OOPS);
 	}
 	nps = (struct WTINPS*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		syslog(LOG_ERR, _("Cannot open %s"), configname);
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot open %s"), configname);
 		return(S_BADCONFIG);
 	}
 	while (fgets(WTINPSid, sizeof(WTINPSid), cfgfile) != NULL){
@@ -865,7 +864,7 @@ wti_nps_set_config_info(Stonith* s, const char * info)
 	struct WTINPS* nps;
 
 	if (!ISWTINPS(s)) {
-		syslog(LOG_ERR, "NPS_provide_config_info: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "NPS_provide_config_info: invalid argument");
 		return(S_OOPS);
 	}
 	nps = (struct WTINPS *)s->pinfo;
@@ -880,7 +879,7 @@ wti_nps_getinfo(Stonith * s, int reqtype)
 	const char *	ret;
 
 	if (!ISWTINPS(s)) {
-		syslog(LOG_ERR, "NPS_idinfo: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "NPS_idinfo: invalid argument");
 		return NULL;
 	}
 	/*
@@ -933,7 +932,7 @@ wti_nps_destroy(Stonith *s)
 	struct WTINPS* nps;
 
 	if (!ISWTINPS(s)) {
-		syslog(LOG_ERR, "wtinps_del: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "wtinps_del: invalid argument");
 		return;
 	}
 	nps = (struct WTINPS *)s->pinfo;
@@ -966,7 +965,7 @@ wti_nps_new(void)
 	struct WTINPS*	nps = MALLOCT(struct WTINPS);
 
 	if (nps == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(nps, 0, sizeof(*nps));

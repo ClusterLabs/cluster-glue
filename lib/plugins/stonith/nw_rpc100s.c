@@ -1,4 +1,4 @@
-/* $Id: nw_rpc100s.c,v 1.12 2004/03/25 11:58:22 lars Exp $ */
+/* $Id: nw_rpc100s.c,v 1.13 2004/09/13 20:32:31 gshi Exp $ */
 /*
  *	Stonith module for Night/Ware RPC100S 
  *
@@ -31,7 +31,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
 #include <termios.h>
@@ -239,7 +238,7 @@ static int gbl_debug = DEBUG;
 			}					\
 			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
-				syslog(LOG_ERR, _("out of memory"));\
+				PILCallLog(PluginImports->log,PIL_CRIT, _("out of memory"));\
 			}					\
 			}
 
@@ -307,7 +306,7 @@ RPCLookFor(struct NW_RPC100S* ctx, struct Etoken * tlist, int timeout)
 {
 	int	rc;
 	if ((rc = EXPECT_TOK(ctx->fd, tlist, timeout, NULL, 0)) < 0) {
-		syslog(LOG_ERR, _("Did not find string: '%s' from" DEVICE ".")
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Did not find string: '%s' from" DEVICE ".")
 		,	tlist[0].string);
 		RPCDisconnect(ctx);
 		return(-1);
@@ -349,12 +348,12 @@ RPCSendCommand (struct NW_RPC100S *ctx, const char *command, int timeout)
 	return_val = select(ctx->fd+1, NULL, &wfds,&xfds, &tv);
 	if (return_val == 0) {
 		/* timeout waiting on serial port */
-		syslog (LOG_ERR, "%s: Timeout writing to %s",
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Timeout writing to %s",
 			RPCid, ctx->device);
 		return S_TIMEOUT;
 	} else if ((return_val == -1) || FD_ISSET(ctx->fd, &xfds)) {
 		/* an error occured */
-		syslog (LOG_ERR, "%s: Error before writing to %s: %s",
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Error before writing to %s: %s",
 			RPCid, ctx->device, strerror(errno));		
 		return S_OOPS;
 	}
@@ -362,7 +361,7 @@ RPCSendCommand (struct NW_RPC100S *ctx, const char *command, int timeout)
 	/* send the command */
 	if (write(ctx->fd, writebuf, strlen(writebuf)) != 
 			(int)strlen(writebuf)) {
-		syslog (LOG_ERR, "%s: Error writing to  %s : %s",
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Error writing to  %s : %s",
 			RPCid, ctx->device, strerror(errno));
 		return S_OOPS;
 	}
@@ -385,7 +384,7 @@ RPCReset(struct NW_RPC100S* ctx, int unitnum, const char * rebootid)
 	if (gbl_debug) printf ("Calling RPCReset (%s)\n", RPCid);
 	
 	if (ctx->fd < 0) {
-		syslog(LOG_ERR, "%s: device %s is not open!", RPCid, 
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device %s is not open!", RPCid, 
 		       ctx->device);
 		return S_OOPS;
 	}
@@ -413,7 +412,7 @@ RPCOn(struct NW_RPC100S* ctx, int unitnum, const char * host)
 {
 
 	if (ctx->fd < 0) {
-		syslog(LOG_ERR, "%s: device %s is not open!", RPCid, 
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device %s is not open!", RPCid, 
 		       ctx->device);
 		return S_OOPS;
 	}
@@ -440,7 +439,7 @@ RPCOff(struct NW_RPC100S* ctx, int unitnum, const char * host)
 {
 
 	if (ctx->fd < 0) {
-		syslog(LOG_ERR, "%s: device %s is not open!", RPCid, 
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device %s is not open!", RPCid, 
 		       ctx->device);
 		return S_OOPS;
 	}
@@ -475,11 +474,11 @@ nw_rpc100s_status(Stonith  *s)
 	if (gbl_debug) printf ("Calling nw_rpc100s_status (%s)\n", RPCid);
 	
 	if (!ISNWRPC100S(s)) {
-		syslog(LOG_ERR, "invalid argument to RPC_status");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RPC_status");
 		return(S_OOPS);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in RPC_status");
 		return(S_OOPS);
 	}
@@ -517,11 +516,11 @@ nw_rpc100s_hostlist(Stonith  *s)
 	if (gbl_debug) printf ("Calling nw_rpc100s_hostlist (%s)\n", RPCid);
 	
 	if (!ISNWRPC100S(s)) {
-		syslog(LOG_ERR, "invalid argument to RPC_list_hosts");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RPC_list_hosts");
 		return(NULL);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in RPC_list_hosts");
 		return(NULL);
 	}
@@ -530,12 +529,12 @@ nw_rpc100s_hostlist(Stonith  *s)
 
 	ret = (char **)MALLOC(2*sizeof(char*));
 	if (ret == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 	} else {
 		ret[1]=NULL;
 		ret[0]=STRDUP(ctx->node);
 		if (ret[0] == NULL) {
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 			FREE(ret);
 			ret = NULL;
 		} else {
@@ -608,21 +607,21 @@ RPC_parse_config_info(struct NW_RPC100S* ctx, const char * info)
 
 	copy = STRDUP(info);
 	if (!copy) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return S_OOPS;
 	}
 
 	/* Grab the serial device */
 	token = strtok (copy, " \t");
 	if (!token) {
-		syslog(LOG_ERR, "%s: Can't find serial device on config line '%s'",
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't find serial device on config line '%s'",
 		       RPCid, info);
 		goto token_error;		
 	}
 
 	ctx->device = STRDUP(token);
 	if (!ctx->device) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		goto token_error;
 	}
 
@@ -630,14 +629,14 @@ RPC_parse_config_info(struct NW_RPC100S* ctx, const char * info)
 	/* Grab <nodename>  */
 	token = strtok (NULL, " \t");
 	if (!token) {
-		syslog(LOG_ERR, "%s: Can't find node name on config line '%s'",
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't find node name on config line '%s'",
 		       RPCid, info);
 		goto token_error;		
 	}
 
 	ctx->node = STRDUP(token);
 	if (!ctx->node) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		goto token_error;
 	}
 	
@@ -679,7 +678,7 @@ RPCConnect(struct NW_RPC100S * ctx)
 
 		ctx->fd = open (ctx->device, O_RDWR);
 		if (ctx->fd <0) {
-			syslog (LOG_ERR, "%s: Can't open %s : %s",
+			PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't open %s : %s",
 				RPCid, ctx->device, strerror(errno));
 			return S_OOPS;
 		}
@@ -699,7 +698,7 @@ RPCConnect(struct NW_RPC100S * ctx)
 		tio.c_lflag = ICANON;
 
 		if (tcsetattr (ctx->fd, TCSANOW, &tio) < 0) {
-			syslog (LOG_ERR, "%s: Can't set attributes %s : %s",
+			PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't set attributes %s : %s",
 				RPCid, ctx->device, strerror(errno));
 			close (ctx->fd);
 			ctx->fd=-1;
@@ -707,7 +706,7 @@ RPCConnect(struct NW_RPC100S * ctx)
 		}
 		/* flush all data to and fro the serial port before we start */
 		if (tcflush (ctx->fd, TCIOFLUSH) < 0) {
-			syslog (LOG_ERR, "%s: Can't flush %s : %s",
+			PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't flush %s : %s",
 				RPCid, ctx->device, strerror(errno));
 			close (ctx->fd);
 			ctx->fd=-1;
@@ -761,7 +760,7 @@ RPCNametoOutlet ( struct NW_RPC100S * ctx, const char * host )
 	int rc = -1;
 	
 	if ( (shost = strdup(host)) == NULL) {
-		syslog(LOG_ERR, "strdup failed in RPCNametoOutlet");
+		PILCallLog(PluginImports->log,PIL_CRIT, "strdup failed in RPCNametoOutlet");
 		return -1;
 	}
 	if (!strcmp(ctx->node, host))
@@ -789,11 +788,11 @@ nw_rpc100s_reset_req(Stonith * s, int request, const char * host)
 	if (gbl_debug) printf ("Calling nw_rpc100s_reset (%s)\n", RPCid);
 	
 	if (!ISNWRPC100S(s)) {
-		syslog(LOG_ERR, "invalid argument to RPC_reset_host");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RPC_reset_host");
 		return(S_OOPS);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in RPC_reset_host");
 		return(S_OOPS);
 	}
@@ -806,7 +805,7 @@ nw_rpc100s_reset_req(Stonith * s, int request, const char * host)
 	outletnum = RPCNametoOutlet(ctx, host);
 
 	if (outletnum < 0) {
-		syslog(LOG_WARNING, _("%s %s "
+		PILCallLog(PluginImports->log,PIL_WARN, _("%s %s "
 				      "doesn't control host [%s]."), 
 		       ctx->idinfo, ctx->unitid, host);
 		RPCDisconnect(ctx);
@@ -852,13 +851,13 @@ nw_rpc100s_set_config_file(Stonith* s, const char * configname)
 	struct NW_RPC100S*	ctx;
 
 	if (!ISNWRPC100S(s)) {
-		syslog(LOG_ERR, "invalid argument to RPC_set_configfile");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RPC_set_configfile");
 		return(S_OOPS);
 	}
 	ctx = (struct NW_RPC100S*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		syslog(LOG_ERR, _("Cannot open %s"), configname);
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot open %s"), configname);
 		return(S_BADCONFIG);
 	}
 
@@ -882,7 +881,7 @@ nw_rpc100s_set_config_info(Stonith* s, const char * info)
 	struct NW_RPC100S* ctx;
 
 	if (!ISNWRPC100S(s)) {
-		syslog(LOG_ERR, "RPC_provide_config_info: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "RPC_provide_config_info: invalid argument");
 		return(S_OOPS);
 	}
 	ctx = (struct NW_RPC100S *)s->pinfo;
@@ -900,7 +899,7 @@ nw_rpc100s_getinfo(Stonith * s, int reqtype)
 	const char *		ret;
 
 	if (!ISNWRPC100S(s)) {
-		syslog(LOG_ERR, "RPC_idinfo: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "RPC_idinfo: invalid argument");
 		return NULL;
 	}
 	/*
@@ -948,7 +947,7 @@ nw_rpc100s_destroy(Stonith *s)
 	struct NW_RPC100S* ctx;
 
 	if (!ISNWRPC100S(s)) {
-		syslog(LOG_ERR, "nw_rpc100s_del: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "nw_rpc100s_del: invalid argument");
 		return;
 	}
 	ctx = (struct NW_RPC100S *)s->pinfo;
@@ -982,7 +981,7 @@ nw_rpc100s_new(void)
 	struct NW_RPC100S*	ctx = MALLOCT(struct NW_RPC100S);
 
 	if (ctx == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(ctx, 0, sizeof(*ctx));

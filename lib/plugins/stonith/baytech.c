@@ -1,4 +1,4 @@
-/* $Id: baytech.c,v 1.15 2004/03/25 11:58:22 lars Exp $ */
+/* $Id: baytech.c,v 1.16 2004/09/13 20:32:31 gshi Exp $ */
 /*
  *	Stonith module for BayTech Remote Power Controllers (RPC-x devices)
  *
@@ -26,7 +26,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
 #include <glib.h>
@@ -184,7 +183,8 @@ static const char * NOTbtid = "Hey, dummy this has been destroyed (BayTech)";
 			}					\
 			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
-				syslog(LOG_ERR, _("out of memory"));\
+				PILCallLog(PluginImports->log,PIL_CRIT,	\
+				_("out of memory"));		\
 			}					\
 			}
 
@@ -289,15 +289,17 @@ RPCLookFor(struct BayTech* bt, struct Etoken * tlist, int timeout)
 	savebuf[0] = EOS;
 
 	if ((rc = EXPECT_TOK(bt->rdfd, tlist, timeout, savebuf, MAXSAVE)) < 0){
-		syslog(LOG_ERR, _("Did not find string: '%s' from " DEVICE ".")
-		,	tlist[0].string);
-		syslog(LOG_ERR, _("Got '%s' from " DEVICE " instead.")
-		,	savebuf);
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   _("Did not find string: '%s' from " DEVICE "."),
+			   tlist[0].string);
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   _("Got '%s' from " DEVICE " instead."),
+			   savebuf);
 		RPCkillcomm(bt);
 		return(-1);
 	}
 #if 0
-	syslog(LOG_INFO
+	PILCallLog(PluginImports->log,PIL_INFO					   
 	,	"BayTech: Expecting [%s] Received [%s]"
 	,	tlist[0].string
 	,	savebuf);
@@ -311,7 +313,8 @@ static int
 RPCScanLine(struct BayTech* bt, int timeout, char * buf, int max)
 {
 	if (EXPECT_TOK(bt->rdfd, CRNL, timeout, buf, max) < 0) {
-		syslog(LOG_ERR, ("Could not read line from " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   ("Could not read line from " DEVICE "."));
 		RPCkillcomm(bt);
 		bt->pid = -1;
 		return(S_OOPS);
@@ -335,7 +338,8 @@ RPCLogin(struct BayTech * bt)
 	/* Look for the unit type info */
 	if (EXPECT_TOK(bt->rdfd, BayTechAssoc, 2, IDinfo
 	,	sizeof(IDinfo)) < 0) {
-		syslog(LOG_ERR, _("No initial response from " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   _("No initial response from " DEVICE "."));
 		RPCkillcomm(bt);
 		return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	}
@@ -387,7 +391,8 @@ RPCLogin(struct BayTech * bt)
 			break;
 
 		case 1:	/* OOPS!  got another username prompt */
-			syslog(LOG_ERR, _("Invalid username for " DEVICE "."));
+			PILCallLog(PluginImports->log,PIL_CRIT,	
+				   _("Invalid username for " DEVICE "."));
 			return(S_ACCESS);
 
 		default:
@@ -405,7 +410,8 @@ RPCLogin(struct BayTech * bt)
 			break;
 
 		case 1:	/* Uh-oh - bad password */
-			syslog(LOG_ERR, _("Invalid password for " DEVICE "."));
+			PILCallLog(PluginImports->log,PIL_CRIT,	
+				   _("Invalid password for " DEVICE "."));
 			return(S_ACCESS);
 
 		default:
@@ -512,22 +518,25 @@ RPCReset(struct BayTech* bt, int unitnum, const char * rebootid)
 			goto retry;
 
 		case 2:	/* Outlet is turned off */
-			syslog(LOG_ERR, _("Host %s is OFF."), rebootid);
+			PILCallLog(PluginImports->log,PIL_CRIT,	
+				   _("Host %s is OFF."), rebootid);
 			return(S_ISOFF);
 
 		default:
 			return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
-	syslog(LOG_INFO, _("Host %s being rebooted."), rebootid);
-
+	PILCallLog(PluginImports->log,PIL_INFO,	
+		   _("Host %s being rebooted."), rebootid);
+	
 	/* Expect "ower applied to outlet" */
 	if (RPCLookFor(bt, PowerApplied, 30) < 0) {
 		return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
 
 	/* All Right!  Power is back on.  Life is Good! */
-
-	syslog(LOG_INFO, _("Power restored to host %s."), rebootid);
+	
+	PILCallLog(PluginImports->log,PIL_INFO,					   
+		   _("Power restored to host %s."), rebootid);
 
 	/* Expect: "RPC-x>" */
 	EXPECT(RPC,5);
@@ -549,7 +558,8 @@ RPC_onoff(struct BayTech* bt, int unitnum, const char * unitid, int req)
 
 
 	if ((rc = RPCRobustLogin(bt) != S_OK)) {
-		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
 	SEND("\r");
@@ -586,7 +596,8 @@ RPC_onoff(struct BayTech* bt, int unitnum, const char * unitid, int req)
 	EXPECT(GTSign, 10);
 
 	/* All Right!  Command done. Life is Good! */
-	syslog(LOG_NOTICE, _("Power to host %s turned %s."), unitid, onoff);
+	PILCallLog(PluginImports->log,PIL_INFO,	
+		   _("Power to host %s turned %s."), unitid, onoff);
 	/* Pop back to main menu */
 	SEND("MENU\r");
 	return(S_OK);
@@ -628,8 +639,8 @@ RPCNametoOutlet(struct BayTech* bt, const char * name)
 	SEND("STATUS\r");
 
 	/* Expect: "emperature:" so we can skip over it... */
-	EXPECT(bt->modelinfo->expect, 5);
-	EXPECT(CRNL, 5);
+/*  	EXPECT(bt->modelinfo->expect, 5); */
+/*  	EXPECT(CRNL, 5); */
 
 	/* Looks Good!  Parse the status output */
 
@@ -670,20 +681,22 @@ baytech_status(Stonith  *s)
 {
 	struct BayTech*	bt;
 	int	rc;
-
+	
 	if (!ISBAYTECH(s)) {
-		syslog(LOG_ERR, "invalid argument to RPC_status");
+		PILCallLog(PluginImports->log,PIL_CRIT,						   
+			   "invalid argument to RPC_status");
 		return(S_OOPS);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
-		,	"unconfigured stonith object in RPC_status");
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   "unconfigured stonith object in RPC_status");
 		return(S_OOPS);
 	}
 	bt = (struct BayTech*) s->pinfo;
-
+	
 	if ((rc = RPCRobustLogin(bt) != S_OK)) {
-		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			    _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
 
@@ -711,20 +724,22 @@ baytech_hostlist(Stonith  *s)
 
 
 	if (!ISBAYTECH(s)) {
-		syslog(LOG_ERR, "invalid argument to baytech_hostlist");
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   "invalid argument to baytech_hostlist");
 		return(NULL);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
-		,	"unconfigured stonith object in baytech_hostlist");
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   "unconfigured stonith object in baytech_hostlist");
 		return(NULL);
 	}
 	bt = (struct BayTech*) s->pinfo;
+	
 
-
-
+	
 	if (RPCRobustLogin(bt) != S_OK) {
-		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   _("Cannot log into " DEVICE "."));
 		return(NULL);
 	}
 
@@ -784,7 +799,8 @@ baytech_hostlist(Stonith  *s)
 			break;
 		}
 		if ((nm = (char*)STRDUP(sockname)) == NULL) {
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT,	
+				   "out of memory");
 			return(NULL);
 		}
 		g_strdown(nm);
@@ -798,7 +814,8 @@ baytech_hostlist(Stonith  *s)
 	if (numnames >= 1) {
 		ret = (char **)MALLOC((numnames+1)*sizeof(char*));
 		if (ret == NULL) {
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT,	
+				   "out of memory");
 		}else{
 			memcpy(ret, NameList, (numnames+1)*sizeof(char*));
 		}
@@ -843,13 +860,15 @@ RPC_parse_config_info(struct BayTech* bt, const char * info)
 	&&	strlen(passwd) > 1) {
 
 		if ((bt->device = STRDUP(dev)) == NULL) {
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT,	
+				   "out of memory");
 			return(S_OOPS);
 		}
 		if ((bt->user = STRDUP(user)) == NULL) {
 			FREE(bt->device);
 			bt->device=NULL;
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT,	
+				   "out of memory");
 			return(S_OOPS);
 		}
 		if ((bt->passwd = STRDUP(passwd)) == NULL) {
@@ -857,7 +876,8 @@ RPC_parse_config_info(struct BayTech* bt, const char * info)
 			bt->user=NULL;
 			FREE(bt->device);
 			bt->device=NULL;
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT,	
+				   "out of memory");
 			return(S_OOPS);
 		}
 		bt->config = 1;
@@ -895,28 +915,33 @@ baytech_reset_req(Stonith * s, int request, const char * host)
 	int	lorc = 0;
 	struct BayTech*	bt;
 
+
+
+
 	if (!ISBAYTECH(s)) {
-		syslog(LOG_ERR, "invalid argument to baytech_reset");
+		PILCallLog(PluginImports->log,PIL_CRIT,"invalid argument to baytech_reset");
 		return(S_OOPS);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
-		,	"unconfigured stonith object in baytech_reset");
+		PILCallLog(PluginImports->log,PIL_CRIT,		
+			   "unconfigured stonith object in baytech_reset");
 		return(S_OOPS);
 	}
 	bt = (struct BayTech*) s->pinfo;
 
-
+	
 	if ((rc = RPCRobustLogin(bt)) != S_OK) {
-		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT,		
+			   _("Cannot log into " DEVICE "."));
 	}else{
 		int	noutlet;
 		noutlet = RPCNametoOutlet(bt, host);
 
 		if (noutlet < 1) {
-			syslog(LOG_WARNING, _("%s %s "
-			"doesn't control host [%s]."), bt->idinfo
-			,	bt->unitid, host);
+			PILCallLog(PluginImports->log,PIL_WARN,		
+				   _("%s %s "
+				     "doesn't control hot [%s]."), bt->idinfo
+				   ,	bt->unitid, host);
 			RPCkillcomm(bt);
 			return(S_BADHOST);
 		}
@@ -957,13 +982,15 @@ baytech_set_config_file(Stonith* s, const char * configname)
 	struct BayTech*	bt;
 
 	if (!ISBAYTECH(s)) {
-		syslog(LOG_ERR, "invalid argument to baytech_set");
+		PILCallLog(PluginImports->log,PIL_CRIT,		
+			   "invalid argument to baytech_set");
 		return(S_OOPS);
 	}
 	bt = (struct BayTech*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		syslog(LOG_ERR, _("Cannot open %s"), configname);
+		PILCallLog(PluginImports->log,PIL_CRIT,		
+			   _("Cannot open %s"), configname);
 		return(S_BADCONFIG);
 	}
 	while (fgets(RPCid, sizeof(RPCid), cfgfile) != NULL){
@@ -984,7 +1011,8 @@ baytech_set_config_info(Stonith* s, const char * info)
 	struct BayTech* bt;
 
 	if (!ISBAYTECH(s)) {
-		syslog(LOG_ERR, "baytech_set_config_info: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   "baytech_set_config_info: invalid argument");
 		return(S_OOPS);
 	}
 	bt = (struct BayTech *)s->pinfo;
@@ -999,7 +1027,8 @@ baytech_getinfo(Stonith * s, int reqtype)
 	const char *		ret;
 
 	if (!ISBAYTECH(s)) {
-		syslog(LOG_ERR, "RPC_idinfo: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   "RPC_idinfo: invalid argument");
 		return NULL;
 	}
 	/*
@@ -1055,7 +1084,8 @@ baytech_destroy(Stonith *s)
 	struct BayTech* bt;
 
 	if (!ISBAYTECH(s)) {
-		syslog(LOG_ERR, "baytech_del: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   "baytech_del: invalid argument");
 		return;
 	}
 	bt = (struct BayTech *)s->pinfo;
@@ -1100,7 +1130,8 @@ baytech_new(void)
 	struct BayTech*	bt = MALLOCT(struct BayTech);
 
 	if (bt == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT,	
+			   "out of memory");
 		return(NULL);
 	}
 	memset(bt, 0, sizeof(*bt));

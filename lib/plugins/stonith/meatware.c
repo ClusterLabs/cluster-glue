@@ -1,4 +1,4 @@
-/* $Id: meatware.c,v 1.10 2004/03/25 11:58:22 lars Exp $ */
+/* $Id: meatware.c,v 1.11 2004/09/13 20:32:31 gshi Exp $ */
 /*
  * Stonith module for Human Operator Stonith device
  *
@@ -32,7 +32,6 @@
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -167,7 +166,7 @@ meatware_status(Stonith  *s)
 {
 
 	if (!ISMeatDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to Meatware_status");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to Meatware_status");
 		return(S_OOPS);
 	}
 	return S_OK;
@@ -187,12 +186,12 @@ meatware_hostlist(Stonith  *s)
 	int		j;
 
 	if (!ISMeatDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to Meatware_list_hosts");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to Meatware_list_hosts");
 		return(NULL);
 	}
 	nd = (struct MeatDevice*) s->pinfo;
 	if (nd->hostcount < 0) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in Meatware_list_hosts");
 		return(NULL);
 	}
@@ -200,7 +199,7 @@ meatware_hostlist(Stonith  *s)
 
 	ret = (char **)MALLOC(numnames*sizeof(char*));
 	if (ret == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return ret;
 	}
 
@@ -274,7 +273,7 @@ Meat_parse_config_info(struct MeatDevice* nd, const char * info)
 
 	ret = (char **)MALLOC(numnames*sizeof(char*));
 	if (ret == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return S_OOPS;
 	}
 
@@ -317,12 +316,12 @@ meatware_reset_req(Stonith * s, int request, const char * host)
 	char *		shost;
 	
 	if (!ISMeatDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to %s", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to %s", __FUNCTION__);
 		return(S_OOPS);
 	}
 	
 	if ((shost = STRDUP(host)) == NULL) {
-		syslog(LOG_ERR, "strdup failed in %s", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "strdup failed in %s", __FUNCTION__);
 		return(S_OOPS);
 	}
 	g_strdown(shost);
@@ -335,19 +334,19 @@ meatware_reset_req(Stonith * s, int request, const char * host)
 	rc = mkfifo(meatpipe, (S_IRUSR | S_IWUSR));
 
 	if (rc < 0) {
-		syslog(LOG_ERR, "cannot create FIFO for Meatware_reset_host");
+		PILCallLog(PluginImports->log,PIL_CRIT, "cannot create FIFO for Meatware_reset_host");
 		rc = S_OOPS;
 		goto out;
 	}
 
-	syslog(LOG_CRIT, "OPERATOR INTERVENTION REQUIRED to reset %s.", host);
-	syslog(LOG_CRIT, "Run \"meatclient -c %s\" AFTER power-cycling the "
+	PILCallLog(PluginImports->log,PIL_CRIT, "OPERATOR INTERVENTION REQUIRED to reset %s.", host);
+	PILCallLog(PluginImports->log,PIL_CRIT, "Run \"meatclient -c %s\" AFTER power-cycling the "
 	                 "machine.", shost);
 
 	fd = open(meatpipe, O_RDONLY);
 
 	if (fd < 0) {
-		syslog(LOG_ERR, "cannot open FIFO for Meatware_reset_host");
+		PILCallLog(PluginImports->log,PIL_CRIT, "cannot open FIFO for Meatware_reset_host");
 		rc = S_OOPS;
 		goto out;
 	}
@@ -356,7 +355,7 @@ meatware_reset_req(Stonith * s, int request, const char * host)
 	rc = read(fd, line, 256);
 
 	if (rc < 0) {
-		syslog(LOG_ERR, "read error on FIFO for Meatware_reset_host");
+		PILCallLog(PluginImports->log,PIL_CRIT, "read error on FIFO for Meatware_reset_host");
 		rc = S_OOPS;
 		goto out;
 	}
@@ -371,12 +370,12 @@ meatware_reset_req(Stonith * s, int request, const char * host)
 	if (strncmp(resp_mw, "meatware", 8) ||
 	    strncmp(resp_result, "reply", 5) ||
 	    strncmp(resp_addr, shost, strlen(resp_addr))) {
-		syslog(LOG_ERR, "failed to Meatware-reset node %s", shost);
+		PILCallLog(PluginImports->log,PIL_CRIT, "failed to Meatware-reset node %s", shost);
 		rc = S_RESETFAIL;
 		goto out;
 	}
 	else {
-		syslog(LOG_INFO, _("node %s Meatware-reset."), shost);
+		PILCallLog(PluginImports->log,PIL_INFO, _("node %s Meatware-reset."), shost);
 		unlink(meatpipe);
 		rc = S_OK;
 	}
@@ -398,13 +397,13 @@ meatware_set_config_file(Stonith* s, const char * configname)
 	struct MeatDevice*	nd;
 
 	if (!ISMeatDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to Meatware_set_configfile");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to Meatware_set_configfile");
 		return(S_OOPS);
 	}
 	nd = (struct MeatDevice*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		syslog(LOG_ERR, "cannot open %s", configname);
+		PILCallLog(PluginImports->log,PIL_CRIT, "cannot open %s", configname);
 		return(S_BADCONFIG);
 	}
 	while (fgets(Meatline, sizeof(Meatline), cfgfile) != NULL){
@@ -425,7 +424,7 @@ meatware_set_config_info(Stonith* s, const char * info)
 	struct MeatDevice* nd;
 
 	if (!ISMeatDEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
 		return(S_OOPS);
 	}
 	nd = (struct MeatDevice *)s->pinfo;
@@ -440,7 +439,7 @@ meatware_getinfo(Stonith * s, int reqtype)
 	char *		ret;
 
 	if (!ISMeatDEV(s)) {
-		syslog(LOG_ERR, "Meatware_idinfo: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "Meatware_idinfo: invalid argument");
 		return NULL;
 	}
 	/*
@@ -487,7 +486,7 @@ meatware_destroy(Stonith *s)
 	struct MeatDevice* nd;
 
 	if (!ISMeatDEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
 		return;
 	}
 	nd = (struct MeatDevice *)s->pinfo;
@@ -509,7 +508,7 @@ meatware_new(void)
 	struct MeatDevice*	nd = MALLOCT(struct MeatDevice);
 
 	if (nd == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(nd, 0, sizeof(*nd));
