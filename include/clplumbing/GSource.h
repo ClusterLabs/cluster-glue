@@ -1,4 +1,4 @@
-/* $Id: GSource.h,v 1.5 2004/09/14 15:07:29 gshi Exp $ */
+/* $Id: GSource.h,v 1.6 2004/12/09 20:56:48 gshi Exp $ */
 #ifndef _CLPLUMBING_GSOURCE_H
 #	define _CLPLUMBING_GSOURCE_H
 #	include <clplumbing/ipc.h>
@@ -61,6 +61,14 @@ GCHSource* G_main_add_IPC_Channel(int priority, IPC_Channel* ch
  *	object automatically.
  */
 gboolean G_main_del_IPC_Channel(GCHSource* chp);
+
+
+/*
+ *	Set the destroy notify function
+ *
+ */
+void	set_IPC_Channel_dnotify(GCHSource* chp,
+				GDestroyNotify notify);
 
 
 /*********************************************************************
