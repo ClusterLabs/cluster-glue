@@ -33,8 +33,8 @@ halib_PROGRAMS 	=  lrmd
 
 lrmd_SOURCES 	=  lrmd.c
 
-lrmd_LDFLAGS 	=  $(top_builddir)/lib/lrm/liblrm_la-lrm_msg.lo 	\
-		   $(COMMONLIBS) -luuid 				\
+lrmd_LDFLAGS 	=  $(top_builddir)/lib/lrm/liblrm.la 		\
+		   $(COMMONLIBS) -luuid 			\
 		   -L$(top_builddir)/lib/pils -lpils
 
 # make lrmd's owner as hacluster:haclient?
