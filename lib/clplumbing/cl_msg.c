@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.7 2004/04/21 14:33:56 msoffen Exp $ */
+/* $Id: cl_msg.c,v 1.8 2004/04/28 17:27:13 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1404,6 +1404,7 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 		/* This can happen if the sender gets killed */
 		/* at just the wrong time... */
 		cl_log(LOG_WARNING, "string2msg_ll: no MSG_START");
+		ha_msg_del(ret);
 		return(NULL);
 	}else{
 		sp += startlen;
@@ -1783,6 +1784,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.8  2004/04/28 17:27:13  gshi
+ * Fix potential (though probably unlikely) memory leak
+ * similar to the one found in cl_netstring.c by kevin
+ *
  * Revision 1.7  2004/04/21 14:33:56  msoffen
  * %z is not a standard formatting character.  Changed to a %x
  *
