@@ -42,7 +42,6 @@
 #	include <sched.h>
 #endif
 
-#include <clplumbing/longclock.h>
 #include <stonith/stonith.h>
 
 
@@ -55,20 +54,32 @@ static int
 ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
 ,	int maxline)
 {
-	longclock_t	starttime;
-	longclock_t	endtime;
-	longclock_t	now;
-	longclock_t	ticks;
+	/*
+	 * We use unsigned long instead of clock_t here because it's signed,
+	 * but the return value from times() is basically unsigned...
+	 * This is broken, but according to POSIX ;-)
+	 */
+	unsigned long	starttime;
+	unsigned long	endtime;
+	int		wraparound=0;
+	unsigned	hz =  sysconf(_SC_CLK_TCK);
+	int		tickstousec = (1000000/hz);
+	unsigned long	now;
+	unsigned long	ticks;
 	int		nchars = 1; /* reserve space for an EOS */
 	struct timeval	tv;
 
 	struct Etoken *	this;
 
-	/* Figure out when to give up. */
+	/* Figure out when to give up.  Handle lbolt wraparound */
 
-	starttime = time_longclock();
-	ticks = secsto_longclock(to_secs);
-	endtime = add_longclock(starttime, ticks);
+	starttime = times(NULL);
+	ticks = (to_secs*hz);
+	endtime = starttime + ticks;
+
+	if (endtime < starttime) {
+		wraparound = 1;
+	}
 
 	if (buf) {
 		*buf = EOS;
@@ -79,20 +90,24 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * buf
 	}
 
 
-	while (now = time_longclock(), (cmp_longclock(now, endtime) < 0)) {
+	while (now = times(NULL),
+		(wraparound && (now > starttime || now <= endtime))
+		||	(!wraparound && now <= endtime)) {
 
-		fd_set 		infds;
-		char		ch;
-		longclock_t	timeleft;
-		long		msleft;
+		fd_set infds;
+		char	ch;
+		unsigned long	timeleft;
 		int		retval;
 
-		timeleft = sub_longclock(endtime, now);
-		msleft = longclockto_ms(timeleft);
+		timeleft = endtime - now;
 
-		tv.tv_sec = msleft / 1000;
-		tv.tv_usec = (msleft % 1000) * 1000;
+		tv.tv_sec = timeleft / hz;
+		tv.tv_usec = (timeleft % hz) * tickstousec;
 
+		if (tv.tv_sec == 0 && tv.tv_usec < tickstousec) {
+			/* Give 'em a little chance */
+			tv.tv_usec = tickstousec;
+		}
 
 		/* Watch our FD to see when it has input. */
            	FD_ZERO(&infds);
