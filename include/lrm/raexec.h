@@ -67,8 +67,8 @@ struct RAExecOps {
 	 * 	Launch a exection of a resource agency -- normally is a script
 	 *
 	 * Parameters:
-	 * 	ra_name:  The basename of a RA.
-	 *	op:	  The operation that hope RA to do, such as "start",
+	 * 	rsc_type:  The basename of a RA.
+	 *	op_type:  The operation that hope RA to do, such as "start",
 	 *		    "stop" and so on.
 	 *	cmd_params: The command line parameters need to be passed to 
 	 *		      the RA for a execution. 
@@ -84,8 +84,8 @@ struct RAExecOps {
 	 *	-3: Other unkown error when launching the execution.
 	 */
 	int (*execra)(
-		const char * ra_name,	
-		const char * op,
+		const char * rsc_type,	
+		const char * op_type,
 		GHashTable * cmd_params,
 		GHashTable * env_params);
 
@@ -100,7 +100,7 @@ struct RAExecOps {
 	 *	A uniform value without regarding RA type.
 	 */
 	uniform_ret_execra_t (*map_ra_retvalue)(int ret_execra,
-				const char * op);
+				const char * op_type);
 
 	/*
 	 * Description:
@@ -123,13 +123,13 @@ struct RAExecOps {
 	 * 	List the metadata of the resource agent this class
 	 *
 	 * Parameters:
-	 *	ra_type: the type of the ra 
+	 *	rsc_type: the type of the ra 
 	 *
 	 * Return Value:
 	 *	!NULL : succeed. the RA metadata.
 	 *	NULL: failed
 	 */
-	char* (*get_resource_meta)(const char* ra_type);
+	char* (*get_resource_meta)(const char* rsc_type);
 };
 
 #define RA_EXEC_TYPE	RAExec
