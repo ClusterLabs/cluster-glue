@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.27 2005/02/17 19:52:16 andrew Exp $ */
+/* $Id: GSource.c,v 1.28 2005/02/17 20:11:51 andrew Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -17,6 +17,10 @@
 #define	IS_CHSOURCE(p)	((p)->magno == MAG_GCHSOURCE)
 #define	IS_WCSOURCE(p)	((p)->magno == MAG_GWCSOURCE)
 #define	IS_SIGSOURCE(p)	((p)->magno == MAG_GSIGSOURCE)
+
+#ifndef _NSIG
+# define _NSIG 2*NSIG
+#endif
 
 struct GFDSource_s {
 	unsigned	magno;	/* MAG_GFDSOURCE */
