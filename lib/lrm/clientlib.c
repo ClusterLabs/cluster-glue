@@ -55,8 +55,6 @@ static int lrm_inputfd (ll_lrm_t*);
 static int lrm_msgready (ll_lrm_t*);
 static int lrm_rcvmsg (ll_lrm_t*, int blocking);
 
-struct sys_config *		config  = NULL;
-
 static struct lrm_ops lrm_ops_instance =
 {
 	lrm_signon,
