@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.18 2005/02/03 20:08:21 msoffen Exp $ */
+/* $Id: rps10.c,v 1.19 2005/02/18 07:29:47 zhaokai Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -315,7 +315,7 @@ RPSReset(struct pluginDevice* ctx, char unit_id, const char * rebootid)
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
 
-	if (gbl_debug) printf ("Calling RPSReset (%s)\n", pluginid);
+	if (gbl_debug) {printf ("Calling RPSReset (%s)\n", pluginid);}
 	
 	if (ctx->fd < 0) {
 		LOG(PIL_CRIT, "%s: device %s is not open!", pluginid, 
@@ -332,19 +332,29 @@ RPSReset(struct pluginDevice* ctx, char unit_id, const char * rebootid)
 	 * for the first unit to report something and then wait until the
 	 * "Complete" */
 	EXPECT(ctx->fd, WTItokPlug, 5);
-	if (gbl_debug)	printf ("Got Plug\n");
+	if (gbl_debug)	{
+		printf ("Got Plug\n");
+	}
 	EXPECT(ctx->fd, WTItokOutlet, 2);
-	if (gbl_debug) printf ("Got Outlet #\n");
+	if (gbl_debug) {
+		printf ("Got Outlet #\n");
+	}
 	EXPECT(ctx->fd, WTItokOff, 2);
-	if (gbl_debug) printf ("Got Off\n");	
+	if (gbl_debug) {
+		printf ("Got Off\n");
+	}	
 	EXPECT(ctx->fd, WTItokCRNL, 2);
 	LOG(PIL_INFO, "%s: %s",_("Host is being rebooted"), rebootid);
 	
 	/* Expect "Complete" */
 	EXPECT(ctx->fd, WTItokComplete, 14);
-	if (gbl_debug) printf ("Got Complete\n");
+	if (gbl_debug) {
+		printf ("Got Complete\n");
+	}
 	EXPECT(ctx->fd, WTItokCRNL, 2);
-	if (gbl_debug) printf ("Got NL\n");
+	if (gbl_debug) {
+		printf ("Got NL\n");
+	}
 	
 	return(S_OK);
 
@@ -444,7 +454,9 @@ rps10_status(StonithPlugin  *s)
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
 	
-	if (gbl_debug) printf ("Calling rps10_status (%s)\n", pluginid);
+	if (gbl_debug) {
+		printf ("Calling rps10_status (%s)\n", pluginid);
+	}
 	
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
@@ -485,7 +497,9 @@ rps10_hostlist(StonithPlugin  *s)
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
 
-	if (gbl_debug) printf ("Calling rps10_hostlist (%s)\n", pluginid);
+	if (gbl_debug) {
+		printf ("Calling rps10_hostlist (%s)\n", pluginid);
+	}
 	
 	ERRIFNOTCONFIGED(s,NULL);
 
@@ -752,11 +766,17 @@ RPSConnect(struct pluginDevice * ctx)
 	   a broken serial cable, which doesn't connect hardware
 	   flow control.
 	*/
-	if (gbl_debug) printf ("Waiting for READY\n");
+	if (gbl_debug) {
+		printf ("Waiting for READY\n");
+	}
 	EXPECT(ctx->fd, WTItokReady, 12);
-	if (gbl_debug) printf ("Got READY\n");
+	if (gbl_debug) {
+		printf ("Got READY\n");
+	}
 	EXPECT(ctx->fd, WTItokCRNL, 2);
-	if (gbl_debug) printf ("Got NL\n");
+	if (gbl_debug) {
+		printf ("Got NL\n");
+	}
 
   return(S_OK);
 }

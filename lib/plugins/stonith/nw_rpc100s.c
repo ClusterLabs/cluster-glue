@@ -1,4 +1,4 @@
-/* $Id: nw_rpc100s.c,v 1.18 2005/01/31 10:06:33 sunjd Exp $ */
+/* $Id: nw_rpc100s.c,v 1.19 2005/02/18 07:32:09 zhaokai Exp $ */
 /*
  *	Stonith module for Night/Ware RPC100S 
  *
@@ -272,7 +272,9 @@ static int
 RPCReset(struct pluginDevice* ctx, int unitnum, const char * rebootid)
 {
 
-	if (gbl_debug) printf ("Calling RPCReset (%s)\n", pluginid);
+	if (gbl_debug) {
+		printf ("Calling RPCReset (%s)\n", pluginid);
+	}
 	
 	if (ctx->fd < 0) {
 		LOG(PIL_CRIT, "%s: device %s is not open!", pluginid, 
@@ -285,9 +287,13 @@ RPCReset(struct pluginDevice* ctx, int unitnum, const char * rebootid)
 
 	/* Expect "OK" */
 	EXPECT(ctx->fd, NWtokOK, 5);
-	if (gbl_debug) printf ("Got OK\n");
+	if (gbl_debug) {
+		printf ("Got OK\n");
+	}
 	EXPECT(ctx->fd, NWtokCRNL, 2);
-	if (gbl_debug) printf ("Got NL\n");
+	if (gbl_debug) {
+		printf ("Got NL\n");
+	}
 	
 	return(S_OK);
 
@@ -362,7 +368,9 @@ nw_rpc100s_status(StonithPlugin  *s)
 {
 	struct pluginDevice*	ctx;
 	
-	if (gbl_debug) printf ("Calling nw_rpc100s_status (%s)\n", pluginid);
+	if (gbl_debug) {
+		printf ("Calling nw_rpc100s_status (%s)\n", pluginid);
+	}
 	
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
@@ -397,7 +405,9 @@ nw_rpc100s_hostlist(StonithPlugin  *s)
 	char **		ret = NULL;	/* list to return */
 	struct pluginDevice*	ctx;
 
-	if (gbl_debug) printf ("Calling nw_rpc100s_hostlist (%s)\n", pluginid);
+	if (gbl_debug) {
+		printf ("Calling nw_rpc100s_hostlist (%s)\n", pluginid);
+	}
 	
 	ERRIFNOTCONFIGED(s,NULL);
 
@@ -577,11 +587,17 @@ RPCConnect(struct pluginDevice * ctx)
 	SENDCMD("//0,0,BOGUS;\r\n", 10);
 	
 	/* Should reply with "Invalid Command" */
-	if (gbl_debug) printf ("Waiting for \"Invalid Entry\"n");
+	if (gbl_debug) {
+		printf ("Waiting for \"Invalid Entry\"n");
+	}
 	EXPECT(ctx->fd, NWtokInvalidEntry, 12);
-	if (gbl_debug) printf ("Got Invalid Entry\n");
+	if (gbl_debug) {
+		printf ("Got Invalid Entry\n");
+	}
 	EXPECT(ctx->fd, NWtokCRNL, 2);
-	if (gbl_debug) printf ("Got NL\n");
+	if (gbl_debug) {
+		printf ("Got NL\n");
+	}
 	   
   return(S_OK);
 }
@@ -642,7 +658,9 @@ nw_rpc100s_reset_req(StonithPlugin * s, int request, const char * host)
 	int outletnum = -1;
 	struct pluginDevice*	ctx;
 	
-	if (gbl_debug) printf ("Calling nw_rpc100s_reset (%s)\n", pluginid);
+	if (gbl_debug) {
+		printf ("Calling nw_rpc100s_reset (%s)\n", pluginid);
+	}
 	
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
