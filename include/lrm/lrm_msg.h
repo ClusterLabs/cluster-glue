@@ -119,6 +119,7 @@ char* hash_table_to_string(GHashTable* hash_table);
 GHashTable* string_to_hash_table(const char* data);
 */
 GHashTable* copy_hash_table(GHashTable* hash_table);
+GHashTable* merge_hash_tables(GHashTable* old, GHashTable* new);
 void free_hash_table(GHashTable* hash_table);
 
  /*  

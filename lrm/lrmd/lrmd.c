@@ -1591,7 +1591,8 @@ perform_ra_op(lrmd_op_t* op)
 	pid_t pid;
 	struct RAExecOps * RAExec = NULL;
 	const char* op_type = NULL;
-        GHashTable* params_table = NULL;
+        GHashTable* params = NULL;
+        GHashTable* op_params = NULL;
 
 	lrmd_log(LOG_INFO, "perform_ra_op: start.");
 
@@ -1627,12 +1628,14 @@ perform_ra_op(lrmd_op_t* op)
 				return HA_FAIL;
 			}
 			op_type = ha_msg_value(op->msg, F_LRM_OP);
-			params_table = ha_msg_value_hash_table(op->msg, F_LRM_PARAM);
-			if ( NULL == params_table ) {
-				params_table = op->rsc->params;
-			}
-			RAExec->execra(op->rsc->type,op_type,params_table, NULL);
 
+			op_params = ha_msg_value_hash_table(op->msg, F_LRM_PARAM);
+			params = merge_hash_tables(op->rsc->params,op_params);
+			
+			RAExec->execra(op->rsc->type,op_type,params, NULL);
+
+			free_hash_table(op_params);
+			free_hash_table(params);
 			//execra should never return.
 			exit(EXECRA_EXEC_UNKNOWN_ERROR);
 
