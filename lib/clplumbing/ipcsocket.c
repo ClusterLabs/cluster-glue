@@ -844,6 +844,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	int		rc1, rc2;
 	gboolean	rstarted;
 	gboolean	wstarted;
+	gboolean	OKonce = FALSE;
 
 	CHANAUDIT(ch);
 	do {
@@ -851,15 +852,22 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 		CHANAUDIT(ch);
 		rc2 = socket_resume_io_write(ch, &wstarted);
 		CHANAUDIT(ch);
+		if (rc1 == IPC_OK || rc2 == IPC_OK) {
+			OKonce = TRUE;
+		}
 	}while (rc1 == IPC_OK && rc2 == IPC_OK && (rstarted||wstarted));
 
 	if (ch->ch_status == IPC_CONNECT) {
 		if (rc1 != IPC_OK) {
-			cl_log(LOG_ERR, "resume_io_read() failure");
+			cl_log(LOG_ERR
+			,	"resume_io_read() failure");
 		}
 		if (rc2 != IPC_OK) {
-			cl_log(LOG_ERR, "resume_io_write() failure");
+			cl_log(LOG_ERR
+			,	"resume_io_write() failure");
 		}
+	}else{
+		return (OKonce ? IPC_OK : IPC_BROKEN);
 	}
 
 	return (rc1 != IPC_OK ? rc1 : rc2);
