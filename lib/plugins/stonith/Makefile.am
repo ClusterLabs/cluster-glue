@@ -28,6 +28,8 @@ AM_CFLAGS			= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 			-DSTONITH_MODULES='"$(stonithlibdir)"' \
 			-DLOCALEDIR='"@LOCALE@"' 
 
+EXTRA_DIST = README.meatware README.rcd_serial README.vacm
+
 #
 #       We need "vacmclient_api.h" and -lvacmclient to make the VACM
 #       plugin work.
