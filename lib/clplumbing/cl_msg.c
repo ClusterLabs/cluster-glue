@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.28 2004/10/18 21:13:25 alan Exp $ */
+/* $Id: cl_msg.c,v 1.29 2004/11/04 21:19:29 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -430,7 +430,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 	int (*addfield) (struct ha_msg* msg, char* name, size_t namelen,
 			 void* value, size_t vallen, int depth);
 		
-	if (!msg || msg->names == NULL || msg->values == NULL) {
+	if (!msg || msg->names == NULL || (msg->values == NULL && vallen != 0) ) {
 		cl_log(LOG_ERR,	"ha_msg_addraw_ll: cannot add field to ha_msg");
 		return(HA_FAIL);
 	}
@@ -456,7 +456,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		}
 	}
 	
-	if (name == NULL || value == NULL
+	if (name == NULL || (value == NULL && vallen > 0)
 	    ||	namelen <= 0 || vallen < 0) {
 		cl_log(LOG_ERR, "ha_msg_addraw_ll: "
 		       "cannot add name/value to ha_msg");
@@ -464,7 +464,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 	}
 	
 	internal_type = type;
-
+	
 	HA_MSG_ASSERT(type < sizeof(fieldtypefuncs)/sizeof(fieldtypefuncs[0]));
 	
 	addfield =  fieldtypefuncs[type].addfield;
@@ -498,10 +498,11 @@ ha_msg_addraw(struct ha_msg * msg, const char * name, size_t namelen,
 	cpname[namelen] = EOS;
 	
 	HA_MSG_ASSERT(type < sizeof(fieldtypefuncs)/sizeof(fieldtypefuncs[0]));
+	
 	if (fieldtypefuncs[type].dup){
 		cpvalue = fieldtypefuncs[type].dup(value, vallen);	
 	}
-	if (cpvalue == NULL){
+	if (cpvalue == NULL && vallen != 0){
 		cl_log(LOG_ERR, "ha_msg_addraw: copying message failed");
 		ha_free(cpname);
 		return(HA_FAIL);
@@ -543,8 +544,8 @@ int
 ha_msg_addstruct(struct ha_msg * msg, const char * name, void * value)
 {
 	
-	/* size is 0 because size is useless/meaningless in this case*/
-	return ha_msg_addraw(msg, name, strlen(name), value, 0, FT_STRUCT, 0);
+	return ha_msg_addraw(msg, name, strlen(name), value, 
+			     sizeof(struct ha_msg), FT_STRUCT, 0);
 }
 
 int
@@ -633,6 +634,9 @@ ha_msg_add_nv_depth(struct ha_msg* msg, const char * nvline,
 	vallen = strcspn(valp, CRNL);
 	if ((valp + vallen) >= bufmax)	return HA_FAIL;
 
+	if (vallen == 0){
+		valp = NULL;
+	}
 	/* Call ha_msg_nadd to actually add the name/value pair */
 	return(ha_msg_addraw(msg, nvline, namelen, valp, vallen
 	,	FT_STRING, depth));
@@ -1576,7 +1580,7 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 		}
 		if (!tostring ||
 		    (truelen = tostring(bp, maxp, m->values[j], m->vlens[j], depth))
-		    <= 0){
+		    < 0){
 			cl_log(LOG_ERR, "tostring failed");
 			return HA_FAIL;			
 		}
@@ -1750,6 +1754,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.29  2004/11/04 21:19:29  gshi
+ * added zero length binary field support
+ *
  * Revision 1.28  2004/10/18 21:13:25  alan
  * Added functions to get/put/modify uuid fileds in our msgs...
  *

@@ -225,10 +225,8 @@ string_memfree(void* value)
 {
 	if (value){
 		ha_free(value);
-	}else {
-		cl_log(LOG_ERR, "string_memfree: "
-		       "value is NULL");
 	}
+	return;
 }
 
 static void
@@ -274,11 +272,21 @@ binary_dup(const void* value, size_t len){
 	
 	char* dupvalue;
 	
-	if (!value || len < 0 ){
+	/* 0 byte binary field should be allowed*/
+	if (len == 0){
+		return NULL;
+	} else if (len < 0 ){
 		cl_log(LOG_ERR,"binary_dup:"
-		       "value is NULL or len < 0");
+		       "len < 0");
 		return NULL ;
 	}	
+	
+	if ( value == NULL && len > 0){
+		cl_log(LOG_ERR, "binary_dup:"
+		       "NULL vlaue with len =%d", 
+		       len);
+		return NULL;
+	}
 	
 	dupvalue = ha_malloc(len + 1);
 	if (dupvalue == NULL){
@@ -286,7 +294,7 @@ binary_dup(const void* value, size_t len){
 		       "ha_malloc failed");
 		return NULL;
 	}
-
+	
 	memcpy(dupvalue, value, len);
 
 	dupvalue[len] =0;
@@ -395,7 +403,6 @@ static void
 binary_display(int seq, char* name, void* value)
 {
 	HA_MSG_ASSERT(name);
-	HA_MSG_ASSERT(value);
 	cl_log(LOG_INFO, "MSG[%d] : [(%s)%s=%p]",
 	       seq,	FT_strings[FT_BINARY],
 	       name,	value);
@@ -552,7 +559,7 @@ string_netstringlen(size_t namlen, size_t vallen, const void* value)
 	
 	HA_MSG_ASSERT(value);
 	HA_MSG_ASSERT( vallen == strlen(value));
-
+	
 	length = intlen(namlen) + (namlen)
 		+	intlen(vallen) + vallen + 4 ;
 	length  += 4; /* for type*/
@@ -564,7 +571,7 @@ string_netstringlen(size_t namlen, size_t vallen, const void* value)
 static int
 binary_stringlen(size_t namlen, size_t vallen, const void* value)
 {
-	HA_MSG_ASSERT(value);
+	HA_MSG_ASSERT(value || (value ==0 && vallen ==0));
 	HA_MSG_ASSERT(vallen >=0  && namlen >= 0);
 	
 	return namlen + B64_stringlen(vallen)  + 2 + 3;
@@ -575,10 +582,10 @@ static int
 binary_netstringlen(size_t namlen, size_t vallen, const void* value)
 {
 	int length;
- 
-	HA_MSG_ASSERT(value);
-	HA_MSG_ASSERT(vallen >=0  && namlen >= 0);
 	
+	HA_MSG_ASSERT(value || (value ==0 && vallen ==0));
+	HA_MSG_ASSERT(vallen >=0  && namlen >= 0);
+		      
 	length = intlen(namlen) + (namlen)
 		+	intlen(vallen) + vallen + 4 ;
 	length  += 4; /* for type*/
@@ -660,9 +667,9 @@ add_binary_field(struct ha_msg* msg, char* name, size_t namelen,
 
 	int next;
 
-	if ( !msg || !name || !value
+	if ( !msg || !name || (value == NULL && vallen >0)
 	     || namelen <= 0 
-	     || vallen <= 0
+	     || vallen < 0
 	     || depth < 0){
 		cl_log(LOG_ERR, "add_binary_field:"
 		       " invalid input argument");
@@ -963,17 +970,22 @@ static int
 string2binary(void* value, size_t len, int depth, void** nv, size_t* nlen )
 {
 	char	tmpbuf[MAXMSG];
-	
-	if (!value  || len <0 || !nv || !nlen || depth < 0){
+
+	if (value == NULL && len == 0){
+		*nv = NULL;
+		*nlen = 0;
+		return HA_OK;
+	}
+
+	if ( !value || len <0 || !nv || !nlen || depth < 0){
 		cl_log(LOG_ERR, "string2binary:invalid input");
 		return HA_FAIL;
 	}
 	
-
 	memcpy(tmpbuf, value,len);
 	*nlen = base64_to_binary(tmpbuf, len, value, len);				
 
-	if (*nlen <= 0){
+	if (*nlen < 0){
 		cl_log(LOG_ERR, "base64_to_binary() failed");
 		return HA_FAIL;
 	}
@@ -1047,7 +1059,8 @@ string2netstring(char* sp, char* smax, void* value,
 		 size_t vallen, size_t* comlen)
 {
 	
-	if ( !sp || !smax || !value || vallen < 0 || !comlen ){
+	if ( !sp || !smax || (!value && vallen >0)
+	     || vallen < 0 || !comlen ){
 		cl_log(LOG_ERR, "string2netstring:"
 		       "invalid input arguments");
 		return HA_FAIL;
@@ -1151,6 +1164,12 @@ netstring2string(const void* value, size_t vlen, void** retvalue, size_t* ret_vl
 {
 	char* dupvalue;
 	
+	if (value == NULL && vlen == 0){
+		*retvalue = NULL;
+		*ret_vlen = 0;
+		return HA_OK;
+	}
+
 	if ( !value || vlen < 0 || !retvalue || !ret_vlen){
 		cl_log(LOG_ERR, " netstring2string:"
 		       "invalid input arguments");
@@ -1247,9 +1266,9 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 	int	netstringlen_add =0;
 
 
-	if ( !msg || !name || !value
+	if ( !msg || !name || (value == NULL && vallen != 0)
 	     || namelen <= 0 
-	     || vallen <= 0
+	     || vallen < 0
 	     || depth < 0){
 		cl_log(LOG_ERR, "add_string_field:"
 		       " invalid input argument");
