@@ -27,7 +27,7 @@
 #include <string.h>
 #include <pils/plugin.h>
 #include <pils/generic.h>
-#include <raexec.h>
+#include <lrm/raexec.h>
 
 int main(void)
 {
