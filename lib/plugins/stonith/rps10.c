@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.17 2005/01/31 10:06:33 sunjd Exp $ */
+/* $Id: rps10.c,v 1.18 2005/02/03 20:08:21 msoffen Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -255,12 +255,12 @@ RPSSendCommand (struct pluginDevice *ctx, char outlet, char command, int timeout
 	char            writebuf[10]; /* all commands are 9 chars long! */
 	int		return_val;  /* system call result */
 	fd_set          rfds, wfds, xfds;
+	struct timeval 	tv;	     /*  */
+
 				     /*  list of FDs for select() */
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
-
-	struct timeval 	tv;	     /*  */
 
 	FD_ZERO(&rfds);
 	FD_ZERO(&wfds);
@@ -898,16 +898,16 @@ rps10_set_config(StonithPlugin* s, StonithNVpair* list)
 {
 	char	RPSid[MAX_PRSID];
 
-	if (Debug) {
-		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
-	}
-
 	struct pluginDevice*	ctx;
 	StonithNamesToGet	namestoget [] =
 	{	{ST_RPS10,	NULL}
 	,	{NULL,		NULL}
 	};
 	int rc=0;
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
 	ERRIFWRONGDEV(s,S_OOPS);
 
@@ -935,11 +935,12 @@ rps10_set_config(StonithPlugin* s, StonithNVpair* list)
 static const char**
 rps10_get_confignames(StonithPlugin* p)
 {
+	static const char *	Rps10Params[] = {ST_RPS10 ,NULL };
+
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
 
-	static const char *	Rps10Params[] = {ST_RPS10 ,NULL };
 	return Rps10Params;
 }
 
