@@ -314,17 +314,20 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 	
 	/* check paremeters */
 	if (NULL == ch) {
-		logd_log("on_connect_cmd: channel is null\n");
+		logd_log("on_connect_cmd: channel is null");
 		return TRUE;
 	}
 	/* create new client */
 	/* the register will be finished in on_msg_register */
-	client = cl_malloc(sizeof(ha_logd_client_t));
+	if (NULL == (client = cl_malloc(sizeof(ha_logd_client_t)))) {
+		return FALSE;
+	}
 	client->app_name = NULL;
 	client->chan = ch;
-	client->g_src = G_main_add_IPC_Channel(G_PRIORITY_DEFAULT,
-					       ch, FALSE, on_receive_cmd, (gpointer)client,
-					       on_remove_client);
+	client->g_src = G_main_add_IPC_Channel(G_PRIORITY_DEFAULT
+			,	ch, FALSE, on_receive_cmd
+			,	(gpointer)client
+			,	on_remove_client);
 	
 
 	return TRUE;
