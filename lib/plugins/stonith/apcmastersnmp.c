@@ -28,6 +28,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <ucd-snmp/ucd-snmp-config.h>
 #include <ucd-snmp/asn1.h>
 #include <ucd-snmp/snmp_api.h>
 #include <ucd-snmp/snmp.h>
