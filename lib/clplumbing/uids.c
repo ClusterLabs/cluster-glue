@@ -1,3 +1,4 @@
+/* $Id: uids.c,v 1.9 2004/02/17 22:11:59 lars Exp $ */
 #include <portability.h>
 #include <pwd.h>
 #include <sys/types.h>

@@ -1,3 +1,4 @@
+/* $Id: ipmi_os_handler.c,v 1.2 2004/02/17 22:12:00 lars Exp $ */
 /*
  * This program is largely based on the ipmicmd.c program that's part of OpenIPMI package.
  * 

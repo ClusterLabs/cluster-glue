@@ -1,3 +1,4 @@
+/* $Id: nw_rpc100s.c,v 1.11 2004/02/17 22:12:00 lars Exp $ */
 /*
  *	Stonith module for Night/Ware RPC100S 
  *

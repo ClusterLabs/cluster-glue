@@ -1,3 +1,4 @@
+/* $Id: loggingdaemon.h,v 1.2 2004/02/17 22:11:58 lars Exp $ */
 /* Messages sent to the logging daemon */
 #define	LD_LOGIT	2
 struct LogDaemonMsg_s {

@@ -1,3 +1,4 @@
+/* $Id: cpulimits.h,v 1.2 2004/02/17 22:11:58 lars Exp $ */
 /*
  * Functions to put limits on CPU consumption.
  * This allows us to better catch runaway realtime processes that

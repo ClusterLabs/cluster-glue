@@ -1,3 +1,4 @@
+/* $Id: mkstemp_mode.h,v 1.2 2004/02/17 22:11:58 lars Exp $ */
 /*
  * A slightly safer version of mkstemp(3)
  *

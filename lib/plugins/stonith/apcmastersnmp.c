@@ -1,3 +1,4 @@
+/* $Id: apcmastersnmp.c,v 1.9 2004/02/17 22:11:59 lars Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>

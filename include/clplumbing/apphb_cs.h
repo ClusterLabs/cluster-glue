@@ -1,3 +1,4 @@
+/* $Id: apphb_cs.h,v 1.8 2004/02/17 22:11:58 lars Exp $ */
 /*
  * Copyright (C) 2002 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.

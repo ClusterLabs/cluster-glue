@@ -1,3 +1,4 @@
+/* $Id: base64.c,v 1.11 2004/02/17 22:11:58 lars Exp $ */
 #include <portability.h>
 #include <heartbeat.h>
 #include <syslog.h>
@@ -34,9 +35,6 @@ binary_to_base64(const void * data, int nbytes, char * output, int outlen)
 	const unsigned char *	inlast;
 	const unsigned char *	inptr;
 	int	bytesleft;
-
-	(void)_ha_msg_h_Id;
-	(void)_heartbeat_h_Id;
 
 	if (outlen < requiredlen) {
 		syslog(LOG_ERR, "binary_to_base64: output area too small.");

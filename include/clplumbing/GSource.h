@@ -1,3 +1,4 @@
+/* $Id: GSource.h,v 1.4 2004/02/17 22:11:58 lars Exp $ */
 #ifndef _CLPLUMBING_GSOURCE_H
 #	define _CLPLUMBING_GSOURCE_H
 #	include <clplumbing/ipc.h>

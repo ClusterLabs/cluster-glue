@@ -1,3 +1,4 @@
+/* $Id: apcmaster.c,v 1.11 2004/02/17 22:11:59 lars Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -49,7 +50,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.10 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.11 $"; 
 
 #include <portability.h>
 #include <stdio.h>

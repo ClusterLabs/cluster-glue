@@ -1,3 +1,4 @@
+/* $Id: cl_poll.h,v 1.5 2004/02/17 22:11:58 lars Exp $ */
 #ifndef CLPLUMBING_CL_POLL_H
 #	define CLPLUMBING_CL_POLL_H
 
