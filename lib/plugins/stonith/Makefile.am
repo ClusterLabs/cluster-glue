@@ -28,7 +28,7 @@ AM_CFLAGS			= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 			-DSTONITH_MODULES='"$(stonithlibdir)"' \
 			-DLOCALEDIR='"@LOCALE@"' 
 
-EXTRA_DIST = README.meatware README.rcd_serial README.vacm README.drac3
+EXTRA_DIST = README.meatware README.rcd_serial README.vacm README.drac3 README.ipmilan
 
 #
 #       We need "vacmclient_api.h" and -lvacmclient to make the VACM
@@ -51,6 +51,14 @@ apcmastersnmp_LIB = apcmastersnmp.la
 else
 apcmastersnmp_LIB =
 endif
+if USE_OPENIPMI
+OPENIPMI_LIB = -lOpenIPMI
+ipmilan_LIB = ipmilan.la
+ipmilan_TEST = ipmilantest
+else
+OPENIPMI_LIB =
+ipmilan_LIB =
+endif
 #
 #       We need <curl/curl.h>, <libxml/xmlmemory.h>, 
 #       <libxml/parser.h>, <libxml/xpath.h>, 
@@ -63,7 +71,9 @@ else
 drac3_LIB =
 endif
 
-
+noinst_PROGRAMS = $(ipmilan_TEST)
+ipmilantest_SOURCES = ipmilan_test.c 
+ipmilantest_LDADD = $(top_builddir)/lib/plugins/stonith/ipmilan.la $(OPENIPMI_LIB)
 
 ## libraries
 
@@ -73,6 +83,7 @@ plugin_LTLIBRARIES =	apcmaster.la		\
 			apcsmart.la		\
 			baytech.la		\
 			$(drac3_LIB)		\
+			$(ipmilan_LIB)		\
 			meatware.la		\
 			null.la			\
 			nw_rpc100s.la		\
@@ -110,6 +121,11 @@ rps10_la_LDFLAGS	= -export-dynamic -module -avoid-version
 ssh_la_SOURCES		= ssh.c
 ssh_la_LDFLAGS		= -export-dynamic -module -avoid-version
 ssh_la_LIBADD		= $(top_builddir)/replace/libreplace.la
+
+ipmilan_la_SOURCES		= ipmilan.c ipmilan.h ipmilan_command.c ipmi_os_handler.c
+ipmilan_la_LDFLAGS		= -export-dynamic -module -avoid-version
+ipmilan_la_LIBADD		= $(top_builddir)/replace/libreplace.la $(OPENIPMI_LIB)
+					
 
 vacm_la_SOURCES		= vacm.c
 vacm_la_LDFLAGS		= -export-dynamic -module -avoid-version
