@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.50 2004/11/30 00:42:33 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.51 2004/12/01 02:20:30 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1689,6 +1689,7 @@ perform_ra_op(lrmd_op_t* op)
 			return HA_OK;
 
 		case 0:		/* Child */
+			setpgrp();
 			close(fd[0]);
 			if ( STDOUT_FILENO != fd[1]) {
 				if (dup2(fd[1], STDOUT_FILENO)!=STDOUT_FILENO) {
@@ -2035,6 +2036,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.51  2004/12/01 02:20:30  zhenh
+ * set RA to different process group with lrmd to avoid being interupted by heartbeat
+ *
  * Revision 1.50  2004/11/30 00:42:33  zhenh
  * make lrm wait a while when catch the SIGTERM signal for some cleanup work
  *
