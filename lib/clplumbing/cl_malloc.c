@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.4 2004/10/24 14:47:31 lge Exp $ */
+/* $Id: cl_malloc.c,v 1.5 2005/02/06 00:00:20 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -30,8 +30,8 @@ static volatile cl_mem_stats_t *	memstats = NULL;
  *
  */
 
-#undef	MARK_PRISTINE		/* Expensive in CPU time */
-#define	MAKE_GUARD	1	/* Adds 4 bytes memory - cheap in CPU*/
+#define	MARK_PRISTINE	1	/* Expensive in CPU time */
+#define	MAKE_GUARD	1	/* Adds 'n' bytes memory - cheap in CPU*/
 
 
 /*
@@ -144,7 +144,7 @@ static void	cl_dump_item(struct cl_bucket*b);
 #define	MEMORYSIZE(p)(CBHDR(p)->hdr.reqsize)
 
 #ifdef MAKE_GUARD
-#	define GUARDLEN 2
+#	define GUARDLEN 4
 	static const unsigned char cl_malloc_guard[] =
 #if GUARDLEN == 1
 	{0xA5};
