@@ -1628,6 +1628,9 @@ perform_ra_op(lrmd_op_t* op)
 			}
 			op_type = ha_msg_value(op->msg, F_LRM_OP);
 			params_table = ha_msg_value_hash_table(op->msg, F_LRM_PARAM);
+			if ( NULL == params_table ) {
+				params_table = op->rsc->params;
+			}
 			RAExec->execra(op->rsc->type,op_type,params_table, NULL);
 
 			//execra should never return.
