@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.27 2004/08/30 03:17:40 msoffen Exp $ */
+/* $Id: lrmd.c,v 1.28 2004/08/30 15:04:47 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -21,6 +21,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
+#include <config.h>
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -1938,6 +1939,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.28  2004/08/30 15:04:47  sunjd
+ * polish/fix as Lars' reminding
+ *
  * Revision 1.27  2004/08/30 03:17:40  msoffen
  * Fixed more comments from // to standard C comments
  *
