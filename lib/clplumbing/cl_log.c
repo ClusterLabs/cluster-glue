@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.17 2004/11/08 20:48:36 gshi Exp $ */
+/* $Id: cl_log.c,v 1.18 2004/11/08 23:11:04 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -35,7 +35,7 @@
 #define	cl_free		free
 #define	DFLT_ENTITY	"cluster"
 
-
+static IPC_Channel*	logging_daemon_chan = NULL;
 
 int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 IPC_Message* ChildLogIPCMessage(int priority, const char *buf, int bstrlen, 
@@ -334,12 +334,30 @@ ha_timestamp(void)
 	return(ts);
 }
 
+int
+cl_set_logging_wqueue_maxlen(int qlen)
+{
+	int sendrc;
+	IPC_Channel*		chan = logging_daemon_chan;
+	
+	if (chan == NULL){
+		return HA_FAIL;
+	}
+
+	sendrc =  chan->ops->set_recv_qlen(logging_daemon_chan, qlen);
+	
+	if (sendrc == IPC_OK) {
+		return HA_OK;
+	}else {
+		return HA_FAIL;
+	}
+}
 
 int
 LogToLoggingDaemon(int priority, const char * buf, 
 		   int bufstrlen, gboolean use_pri_str)
 {
-	static IPC_Channel*	chan;
+	IPC_Channel*		chan = logging_daemon_chan;
 	static longclock_t	nexttime = 0;
 	IPC_Message*		msg;
 	int			sendrc;
@@ -364,7 +382,9 @@ LogToLoggingDaemon(int priority, const char * buf,
 			attrs = g_hash_table_new(g_str_hash, g_str_equal);
 			g_hash_table_insert(attrs, path, sockpath);
 			
-			chan = ipc_channel_constructor(IPC_ANYTYPE, attrs);
+			logging_daemon_chan = chan =
+				ipc_channel_constructor(IPC_ANYTYPE, attrs);
+			
 			g_hash_table_destroy(attrs);
 			
 			if (chan == NULL) {

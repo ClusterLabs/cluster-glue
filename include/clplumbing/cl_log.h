@@ -1,4 +1,4 @@
-/* $Id: cl_log.h,v 1.4 2004/11/08 20:48:36 gshi Exp $ */
+/* $Id: cl_log.h,v 1.5 2004/11/08 23:11:04 gshi Exp $ */
 #ifndef _CLPLUMBING_CL_LOG_H
 #	define _CLPLUMBING_CL_LOG_H
 #	include <glib.h>
@@ -11,6 +11,7 @@ void		cl_direct_log(int priority, char* buf, gboolean);
 void            cl_log(int priority, const char * fmt, ...) G_GNUC_PRINTF(2,3);
 void            cl_perror(const char * fmt, ...) G_GNUC_PRINTF(1,2);
 void		cl_log_enable_stderr(int truefalse);
+int		cl_set_logging_wqueue_maxlen(int);
 void		cl_log_send_to_logging_daemon(int truefalse);
 void		cl_log_set_facility(int facility);
 void		cl_log_set_entity(const char *	entity);
