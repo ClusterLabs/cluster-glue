@@ -153,7 +153,7 @@ struct BayTech {
 
 struct BayTechModelInfo {
 	const char *	type;		/* Baytech model info */
-	int		socklen;	/* Length of socket name string */
+	size_t		socklen;	/* Length of socket name string */
 	struct Etoken *	expect;		/* Expect string before outlet list */
 };
 
