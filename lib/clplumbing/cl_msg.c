@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.4 2004/04/02 12:06:39 andrew Exp $ */
+/* $Id: cl_msg.c,v 1.5 2004/04/17 07:54:50 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -192,7 +192,7 @@ ha_msg_new(nfields)
 		ret->nalloc    = nalloc;
 		ret->names     = (char **)ha_calloc(sizeof(char *), nalloc);
 		ret->nlens     = (int *)ha_calloc(sizeof(int), nalloc);
-		ret->values    = (char **)ha_calloc(sizeof(char *), nalloc);
+		ret->values    = (void **)ha_calloc(sizeof(void *), nalloc);
 		ret->vlens     = (int *)ha_calloc(sizeof(int), nalloc);
 		ret->stringlen = sizeof(MSG_START)+sizeof(MSG_END)-1;
 		ret->netstringlen = sizeof(MSG_START_NETSTRING)
@@ -285,7 +285,7 @@ ha_msg_copy(const struct ha_msg *msg)
 
 	ret->names  = (char **)	ha_calloc(sizeof(char *), msg->nalloc);
 	ret->nlens  = (int *)	ha_calloc(sizeof(int), msg->nalloc);
-	ret->values = (char **)	ha_calloc(sizeof(char *), msg->nalloc);
+	ret->values = (void **)	ha_calloc(sizeof(void *), msg->nalloc);
 	ret->vlens  = (int *)	ha_calloc(sizeof(int), msg->nalloc);
 	ret->types  = (int *) ha_calloc(sizeof(int), msg->nalloc);
 	if (ret->names == NULL || ret->values == NULL
@@ -1571,7 +1571,7 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 	if (bp > buf + len){
 
 		cl_log(LOG_ERR, "msg2string_buf: out of memory bound,"
-		       "bp=%p, buf + len=%p, len=%d\n",
+		       "bp=%p, buf + len=%p, len=%zd \n",
 		       bp, buf + len, len);
 
 		cl_log_message(m);
@@ -1754,7 +1754,7 @@ cl_log_message (const struct ha_msg *m)
 		default: /* case(FT_STRING): */
 			cl_log(LOG_INFO, "MSG[%d] : [%s=%s]", j
 		       ,	m->names[j] ? m->names[j] : "NULL"
-		       ,	m->values[j] ? m->values[j] : "NULL");
+		       ,	(const char*)(m->values[j] ? m->values[j] : "NULL"));
 
 		}
 	}
@@ -1783,6 +1783,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.5  2004/04/17 07:54:50  alan
+ * Fixed a number of 64-bit portability issues discovered by Ward Viaene in FreeBSD.
+ *
  * Revision 1.4  2004/04/02 12:06:39  andrew
  * Link the size of the receive buffer/limit to that of the send buffer/limit
  *

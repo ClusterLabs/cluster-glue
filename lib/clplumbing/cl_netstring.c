@@ -73,7 +73,7 @@ intlen(int x)
 }
 
 static int
-compose_netstring(char * s, const char * smax, int len,
+compose_netstring(char * s, const char * smax, size_t len,
 		  const char * data, int* comlen)
 {
 
@@ -86,7 +86,7 @@ compose_netstring(char * s, const char * smax, int len,
 		return(HA_FAIL);
 	}
 
-	sp += sprintf(sp, "%d:",len );
+	sp += sprintf(sp, "%zd:", len );
 
 	memcpy(sp, data, len);
 	sp += len;
@@ -159,7 +159,7 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 
 			llen =  get_netstringlen((struct ha_msg *)m->values[i]
 			,	0);
-			sp += sprintf(sp, "%d:", (int)llen);
+			sp += sprintf(sp, "%zd:", llen);
 
 			if (msg2netstring_buf((struct ha_msg * )m->values[i]
 			,	sp, llen, &tmplen) != HA_OK){
@@ -197,7 +197,7 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 		return(HA_FAIL);
 	}
 	sprintf(authstring, "%d %s", authnum, authtoken);
-	sp += sprintf(sp, "%d:%s,", strlen(authstring), authstring);
+	sp += sprintf(sp, "%zd:%s,", strlen(authstring), authstring);
 
 	strcpy(sp, MSG_END_NETSTRING);
 	sp += sizeof(MSG_END_NETSTRING) -1;

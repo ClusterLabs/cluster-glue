@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.14 2004/04/16 19:30:00 alan Exp $ */
+/* $Id: cl_log.c,v 1.15 2004/04/17 07:54:50 alan Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -183,26 +183,15 @@ LogDone:
 	}
 }
 
-extern int      sys_nerr;
 void
 cl_perror(const char * fmt, ...)
 {
 	const char *    err;
-	char    errornumber[16];
 
 	va_list ap;
 	char buf[MAXLINE];
 
-	if (errno < 0 || errno >= sys_nerr) {
-		sprintf(errornumber, "error %d\n", errno);
-		err = errornumber;
-	}else{
-#ifdef HAVE_STRERROR
-		err = strerror(errno);
-#else
-		err = sys_errlist[errno];
-#endif
-	}
+	err = strerror(errno);
 	va_start(ap, fmt);
 	vsnprintf(buf, MAXLINE, fmt, ap);
 	va_end(ap);
