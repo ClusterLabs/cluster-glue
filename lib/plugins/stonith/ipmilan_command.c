@@ -1,4 +1,4 @@
-/* $Id: ipmilan_command.c,v 1.3 2004/08/17 21:58:46 yixiong Exp $ */
+/* $Id: ipmilan_command.c,v 1.4 2004/08/19 22:23:30 yixiong Exp $ */
 /*
  * This program is largely based on the ipmicmd.c program that's part of OpenIPMI package.
  * 
@@ -263,12 +263,6 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 	sel_timer_t * timer;
 	struct timeval timeout;
 
-	rv = ipmi_init(&ipmi_os_cb_handlers);
-	if (rv) {
-		syslog(LOG_ERR, "ipmi_init erro: %d ", rv);
-		return rv;
-	}
-
 	os_hnd = ipmi_posix_get_os_handler();
 	if (!os_hnd) {
 	    	syslog(LOG_ERR, "ipmi_smi_setup_con: Unable to allocate os handler");
@@ -278,6 +272,14 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 	rv = sel_alloc_selector(os_hnd, &os_sel);
 	if (rv) {
 		syslog(LOG_ERR, "Could not alloctate selector\n");
+		return rv;
+	}
+
+    	ipmi_posix_os_handler_set_sel(os_hnd, os_sel);
+
+	rv = ipmi_init(os_hnd);
+	if (rv) {
+		syslog(LOG_ERR, "ipmi_init erro: %d ", rv);
 		return rv;
 	}
 
@@ -301,7 +303,7 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 				authtype, privilege,
 				username, strlen(username),
 				password, strlen(password),
-				&ipmi_os_cb_handlers, os_sel,
+				os_hnd, os_sel,
 				&con);
 
 	if (rv) {

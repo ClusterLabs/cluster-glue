@@ -1,4 +1,4 @@
-/* $Id: ipmilan_test.c,v 1.2 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: ipmilan_test.c,v 1.3 2004/08/19 22:23:30 yixiong Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
@@ -23,7 +23,8 @@
 
 /*
  * A quick test program to verify that IPMI host is setup correctly.
- * Need to change the values in user, pass, and ip. 
+ * 
+ * You will need to modify the values in user, pass, ip, and port. 
  */
 
 #include <stdio.h>
@@ -34,12 +35,12 @@
 int main(int argc, char * argv[])
 {
 	struct ipmilanHostInfo host;
-	int request = 4;
+	int request = 2;
 	int rv;
 
 	char user[] = "joe";
 	char pass[] = "blow";
-	char ip[] = "172.16.1.249";
+	char ip[] = "192.168.1.7";
 
 	host.hostname = NULL;
 	host.portnumber = 999;
