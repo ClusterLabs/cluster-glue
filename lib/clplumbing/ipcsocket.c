@@ -254,7 +254,6 @@ socket_disconnect(struct OCF_IPC_CHANNEL* ch)
   conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
   close(conn_info->s);
   ch->ch_status = CH_DISCONNECT;
-  /*FIXME! return value??? -- done*/
   return CH_SUCCESS;
 }
 
@@ -271,12 +270,12 @@ socket_initiate_connection(struct OCF_IPC_CHANNEL * ch)
   //prepare the socket
   bzero(&peer_addr, sizeof(peer_addr));
   peer_addr.sun_family = AF_LOCAL;    // host byte order 
-  /* FIXME!  string truncation! --done*/
-  if(strlen(conn_info->path_name) >= UNIX_PATH_MAX){
-    fprintf(stderr,"the max path length is %d\n",UNIX_PATH_MAX-1);
+
+  if (strlen(conn_info->path_name) >= sizeof(peer_addr.sun_path)) {
+    fprintf(stderr,"the max path length is %d\n", sizeof(peer_addr.sun_path));
     return CH_FAIL;
   }
-  strncpy(peer_addr.sun_path, conn_info->path_name, sizeof(peer_addr.sun_path)-1);
+  strncpy(peer_addr.sun_path, conn_info->path_name, sizeof(peer_addr.sun_path));
   //send connection request
   if (connect(conn_info->s, (struct sockaddr *)&peer_addr
   , 	sizeof(struct sockaddr_un)) == -1) {
@@ -386,7 +385,6 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
     return AUTH_FAIL;
   }
   
-	/* FIXME! I don't think we need check_uid or check_gid -- done*/
   /* verify the credential information. */
   if (	auth_info->uid
   &&	g_hash_table_lookup(auth_info->uid, &(cred->uid)) == NULL) {
@@ -403,6 +401,7 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
 #elif defined(SCM_CREDS)
 
 /* FIXME!  Need to implement SCM_CREDS mechanism for BSD-based systems
+ * This isn't an emergency, but should be done in the future...
  * Hint: * Postgresql does both types of authentication...
  * see src/backend/libpq/auth.c
  * Not clear its SO_PEERCRED implementation works though ;-) 
@@ -558,7 +557,6 @@ socket_queue_new(void)
   temp_queue->current_qlen = 0;
   temp_queue->max_qlen = DEFAULT_MAX_QLEN;
   temp_queue->queue = NULL;
-  /* FIXME! return value? */
   return temp_queue;
 }
 
@@ -598,13 +596,13 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   unlink(path_name);
   bzero(&my_addr, sizeof(my_addr));
   my_addr.sun_family = AF_LOCAL;         // host byte order
-  /* FIXME!  string truncation! --done*/
-  if(strlen(path_name) >= UNIX_PATH_MAX){
-    fprintf(stderr,"the max path length is %d\n",UNIX_PATH_MAX-1);
+
+  if (strlen(path_name) >= sizeof(my_addr.sun_path)) {
+    fprintf(stderr,"the max path length is %d\n", sizeof(my_addr.sun_path));
     return NULL;
   }
     
-  strncpy(my_addr.sun_path, path_name, sizeof(my_addr.sun_path)-1);
+  strncpy(my_addr.sun_path, path_name, sizeof(my_addr.sun_path));
     
   if (bind(s, (struct sockaddr *)&my_addr, sizeof(my_addr)) == -1) {
     perror("bind");
@@ -619,8 +617,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   
   wait_private = (struct SOCKET_CH_PRIVATE* ) malloc(sizeof(struct SOCKET_CH_PRIVATE));
   wait_private->s = s;
-  /* FIXME!!  Don't use strcpy! --done*/
-  strncpy(wait_private->path_name, path_name,strlen(path_name));
+  strncpy(wait_private->path_name, path_name, sizeof(wait_private->path_name));
   temp_ch = g_new(struct OCF_IPC_WAIT_CONNECTION, 1);
   temp_ch->ch_private = (void *) wait_private;
   temp_ch->ch_status = CH_WAIT;
@@ -639,11 +636,21 @@ socket_channel_new(GHashTable *ch_attrs) {
   int sockfd;
   char *path_name;
 
+  /*
+   * I don't really understand why the client and the server use different
+   * parameter names...
+   *
+   * It's a really bad idea to store both integers and strings
+   * in the same table.
+   *
+   * Maybe we need an internal function with a different set of parameters?
+   */
 
   if ((path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR)) != NULL) { //client side connection
-    if(strlen(path_name) >= UNIX_PATH_MAX){
-       fprintf(stderr,"the max path length is %d\n",UNIX_PATH_MAX-1);
-       return NULL;
+    if (strlen(path_name) >= sizeof(conn_info->path_name)) {
+      fprintf(stderr,"the max path length is %d\n"
+      ,	sizeof(conn_info->path_name));
+      	return NULL;
     }
     //prepare the socket
     if ((sockfd = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
@@ -662,9 +669,11 @@ socket_channel_new(GHashTable *ch_attrs) {
 
 
   conn_info->s = sockfd;
+
   if (path_name) {
-    /* FIXME!!  Don't use strcpy! --done*/
-    strncpy(conn_info->path_name, path_name,strlen(path_name));
+    strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
+  }else{
+    conn_info->path_name[0] = '\0';
   }
   temp_ch->ch_status = CH_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
