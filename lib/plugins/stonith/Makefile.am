@@ -51,6 +51,19 @@ apcmastersnmp_LIB = apcmastersnmp.la
 else
 apcmastersnmp_LIB =
 endif
+#
+#       We need <curl/curl.h>, <libxml/xmlmemory.h>, 
+#       <libxml/parser.h>, <libxml/xpath.h>, 
+#       <openssl/bio.h>, <openssl/evp.h>, <openssl/md5.h>, 
+#       -lcurl, -lxml2 and -lssl for the drac3 plugin to work
+#
+if USE_DRAC3
+drac3_LIB = drac3.la
+else
+drac3_LIB =
+endif
+
+
 
 ## libraries
 
@@ -59,6 +72,7 @@ plugin_LTLIBRARIES =	apcmaster.la		\
 			$(apcmastersnmp_LIB)	\
 			apcsmart.la		\
 			baytech.la		\
+			$(drac3_LIB)		\
 			meatware.la		\
 			null.la			\
 			nw_rpc100s.la		\
@@ -107,3 +121,8 @@ wti_nps_la_LIBADD	= $(top_builddir)/replace/libreplace.la
 
 rcd_serial_la_SOURCES	= rcd_serial.c
 rcd_serial_la_LDFLAGS	= -export-dynamic -module -avoid-version
+
+
+drac3_la_SOURCES	= drac3.c drac3_command.c drac3_command.h drac3_hash.c drac_hash.h
+drac3_la_LDFLAGS	= -export-dynamic -module -avoid-version -lxml2 -lssl
+drac3_la_LIBADD		= /usr/lib/libcurl.la
