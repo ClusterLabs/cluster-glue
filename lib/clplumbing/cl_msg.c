@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.2 2004/03/25 08:05:23 alan Exp $ */
+/* $Id: cl_msg.c,v 1.3 2004/03/31 23:34:44 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -632,7 +632,7 @@ ha_msg_addraw(struct ha_msg * msg, const char * name, size_t namelen,
 		return(HA_FAIL);
 	}
 	memcpy(cpvalue, value, vallen);
-	cpvalue[vallen] = EOS; 	
+	cpvalue[vallen] = EOS;	
 
 	ret = ha_msg_addraw_ll(msg, cpname, namelen, cpvalue, vallen
 	,	type, depth);
@@ -1431,15 +1431,12 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 			ha_msg_del(ret);
 			return(NULL);
 		}
-		if (sp >= smax)		return(NULL);
+		if (sp >= smax) {
+			return(NULL);
+		}
 		sp += strcspn(sp, CRNL);
 	}
 
-	if (need_auth && !msg_authentication_method) {
-		cl_log(LOG_CRIT
-		,	"No auth method supplied to string2msg_ll!");
-	}
-		
 	if (need_auth && msg_authentication_method
 	&&		!msg_authentication_method(ret)) {
 		const char* from = ha_msg_value(ret, F_ORIG);
@@ -1786,6 +1783,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.3  2004/03/31 23:34:44  alan
+ * Fixed a bug I introduced into the netstrings stuff - when I moved things
+ * from the heartbeat directory to the lib directory
+ *
  * Revision 1.2  2004/03/25 08:05:23  alan
  * Moved libraries from heartbeat to lib directory
  * also fixed numerous signed/unsigned problems...
@@ -1961,10 +1962,10 @@ main(int argc, char ** argv)
  *
  * Revision 1.20  2001/10/24 20:46:28  alan
  * A large number of patches.  They are in these categories:
- * 	Fixes from Matt Soffen
- * 	Fixes to test environment things - including changing some ERRORs to
- * 		WARNings and vice versa.
- * 	etc.
+ *	Fixes from Matt Soffen
+ *	Fixes to test environment things - including changing some ERRORs to
+ *		WARNings and vice versa.
+ *	etc.
  *
  * Revision 1.19  2001/08/21 15:37:13  alan
  * Put in code to make sure the calls in msg2stream get checked for errors...
