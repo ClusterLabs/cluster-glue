@@ -1,18 +1,22 @@
-/* $Id: GSource.c,v 1.23 2005/02/12 17:15:16 alan Exp $ */
+/* $Id: GSource.c,v 1.24 2005/02/17 16:43:56 andrew Exp $ */
 #include <portability.h>
 #include <string.h>
 
 #include <clplumbing/cl_log.h>
+#include <clplumbing/cl_malloc.h>
+#include <clplumbing/cl_signal.h>
 #include <clplumbing/GSource.h>
 
 
 #define	MAG_GFDSOURCE	0xfeed0001U
 #define	MAG_GCHSOURCE	0xfeed0002U
 #define	MAG_GWCSOURCE	0xfeed0003U
+#define	MAG_GSIGSOURCE	0xfeed0004U
 
 #define	IS_FDSOURCE(p)	((p)->magno == MAG_GFDSOURCE)
 #define	IS_CHSOURCE(p)	((p)->magno == MAG_GCHSOURCE)
 #define	IS_WCSOURCE(p)	((p)->magno == MAG_GWCSOURCE)
+#define	IS_SIGSOURCE(p)	((p)->magno == MAG_GSIGSOURCE)
 
 struct GFDSource_s {
 	unsigned	magno;	/* MAG_GFDSOURCE */
@@ -49,6 +53,18 @@ struct GWCSource_s {
 	IPC_Auth*		auth_info;
 	gboolean (*dispatch)(IPC_Channel* accept_ch, gpointer udata);
 	guint			gsourceid;
+};
+
+struct GSIGSource_s {
+	GSource source;
+	unsigned	magno;	/* MAG_GCHSOURCE */
+	void*		udata;
+	int		signal;
+	gboolean	signal_triggered;
+	gboolean 	(*dispatch)(int signal, gpointer user_data);
+	GDestroyNotify	dnotify;
+	guint		gsourceid;
+	gboolean	pausenow;
 };
 
 #define	DEF_EVENTS	(G_IO_IN|G_IO_PRI|G_IO_HUP|G_IO_ERR|G_IO_NVAL)
@@ -685,4 +701,224 @@ G_WC_destroy(GSource* source)
 		wcp->dnotify(wcp->udata);
 	}
 	g_source_destroy(source);
+}
+
+
+/************************************************************
+ *		Functions for Signals
+ ***********************************************************/
+static gboolean G_SIG_prepare(GSource* source,
+			     gint* timeout);
+static gboolean G_SIG_check(GSource* source);
+
+static gboolean G_SIG_dispatch(GSource* source,
+			      GSourceFunc callback,
+			      gpointer user_data);
+static void G_SIG_destroy(GSource* source);
+
+static void G_main_signal(int nsig);
+
+static GSourceFuncs G_SIG_SourceFuncs = {
+	G_SIG_prepare,
+	G_SIG_check,
+	G_SIG_dispatch,
+	G_SIG_destroy,
+};
+
+GHashTable *G_main_signal_list = NULL;
+
+void
+set_SignalHandler_dnotify(GSIGSource* sig_src, GDestroyNotify notify)
+{
+	sig_src->dnotify = notify;	
+}
+
+/*
+ *	Add an Signal to the gmainloop world...
+ */
+GSIGSource*
+G_main_add_SignalHandler(int priority, int signal,
+			 gboolean (*dispatch)(int nsig, gpointer user_data),
+			 gpointer userdata, GDestroyNotify notify)
+{
+	GSIGSource* sig_src;
+	GSource * source = g_source_new(&G_SIG_SourceFuncs, sizeof(GSIGSource));
+	
+	sig_src = (GSIGSource*)source;
+	
+	sig_src->magno	= MAG_GSIGSOURCE;
+	sig_src->signal	= signal;
+	sig_src->dispatch	= dispatch;
+	sig_src->udata	= userdata;
+	sig_src->dnotify	= notify;
+	sig_src->pausenow	= FALSE;
+
+	sig_src->signal_triggered = FALSE;
+
+	g_source_set_priority(source, priority);
+	g_source_set_can_recurse(source, FALSE);
+	sig_src->gsourceid = g_source_attach(source, NULL);
+
+	if(G_main_signal_list == NULL) {
+		G_main_signal_list = g_hash_table_new(g_int_hash, g_int_equal);
+	}
+	
+	g_hash_table_replace(
+		G_main_signal_list, &signal, sig_src);
+	
+	if (sig_src->gsourceid == 0) {
+		g_source_unref(source);
+		source = NULL;
+		sig_src = NULL;
+	} else {
+		CL_SIGNAL(signal, G_main_signal);
+	}
+	
+	return sig_src;
+}
+
+
+void
+G_main_SignalHandler_pause(GSIGSource* sig_src)
+{
+	if (sig_src == NULL){
+		cl_log(LOG_ERR, "G_main_IPC_Channel_remove_source:"
+		       "invalid input");
+		return;
+	}
+	
+	sig_src->pausenow = TRUE;
+	return;
+}
+
+
+void 
+G_main_SignalHandler_resume(GSIGSource* sig_src)
+{
+	if (sig_src == NULL){
+		cl_log(LOG_ERR, "G_main_IPC_Channel_remove_source:"
+		       "invalid input");
+		return;
+	}
+	
+	sig_src->pausenow = FALSE;
+	return;	
+
+}
+
+/*
+ *	Delete a Signal from the gmainloop world...
+ */
+gboolean 
+G_main_del_SignalHandler(GSIGSource* sig_src)
+{
+	if (sig_src->gsourceid <= 0) {
+		cl_log(LOG_CRIT, "Bad gsource in G_main_del_IPC_channel");
+		return FALSE;
+	}
+
+	CL_SIGNAL(sig_src->signal, NULL);
+
+	g_source_remove(sig_src->gsourceid);
+	sig_src->gsourceid = 0;
+
+	g_hash_table_remove(
+		G_main_signal_list, GUINT_TO_POINTER(sig_src->signal));
+
+	return TRUE;
+}
+
+static gboolean
+G_SIG_prepare(GSource* source,
+	     gint* timeout)
+{
+	GSIGSource* sig_src = (GSIGSource*)source;
+	
+	g_assert(IS_SIGSOURCE(sig_src));
+	
+	if (sig_src->pausenow){
+		return FALSE;
+	}
+
+	return sig_src->signal_triggered;
+}
+
+/*
+ *	Did we notice any I/O events?
+ */
+
+static gboolean
+G_SIG_check(GSource* source)
+{
+
+	GSIGSource* sig_src = (GSIGSource*)source;
+
+	g_assert(IS_SIGSOURCE(sig_src));
+	
+	if (sig_src->pausenow){
+		return FALSE;
+	}
+	
+	return sig_src->signal_triggered;
+}
+
+/*
+ *	Some kind of event occurred - notify the user.
+ */
+static gboolean
+G_SIG_dispatch(GSource * source,
+	      GSourceFunc callback,
+	      gpointer user_data)
+{
+	GSIGSource* sig_src = (GSIGSource*)source;
+
+	g_assert(IS_SIGSOURCE(sig_src));
+
+	sig_src->signal_triggered = FALSE;
+
+	if(sig_src->dispatch) {
+		if(!(sig_src->dispatch(sig_src->signal, sig_src->udata))){
+			G_main_del_SignalHandler(sig_src);
+			return FALSE;
+		}
+	}
+	
+	return TRUE;
+}
+
+/*
+ *	Free up our data, and notify the user process...
+ */
+static void
+G_SIG_destroy(GSource* source)
+{
+	GSIGSource* sig_src = (GSIGSource*)source;
+	
+	g_assert(IS_SIGSOURCE(sig_src));
+	
+	if (sig_src->dnotify) {
+		sig_src->dnotify(sig_src->udata);
+	}	
+	g_source_destroy(source);
+}
+
+/* Find and set the correct mainloop input */
+
+void
+G_main_signal(int nsig)
+{
+	GSIGSource* sig_src = NULL;
+
+	if(sig_src->pausenow) {
+		return;
+	}
+	sig_src = (GSIGSource*)g_hash_table_lookup(G_main_signal_list, &nsig);
+
+	g_assert(sig_src != NULL);
+	if(sig_src == NULL) {
+		return;
+	}
+	
+	g_assert(IS_SIGSOURCE(sig_src));
+	sig_src->signal_triggered = TRUE;
 }

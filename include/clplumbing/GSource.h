@@ -1,4 +1,4 @@
-/* $Id: GSource.h,v 1.7 2005/01/20 19:17:50 gshi Exp $ */
+/* $Id: GSource.h,v 1.8 2005/02/17 16:43:56 andrew Exp $ */
 #ifndef _CLPLUMBING_GSOURCE_H
 #	define _CLPLUMBING_GSOURCE_H
 #	include <clplumbing/ipc.h>
@@ -6,6 +6,7 @@
 typedef	struct GFDSource_s	GFDSource;
 typedef struct GCHSource_s	GCHSource;
 typedef struct GWCSource_s	GWCSource;
+typedef struct GSIGSource_s	GSIGSource;
 
 
 
@@ -101,5 +102,38 @@ GWCSource* G_main_add_IPC_WaitConnection(int priority, IPC_WaitConnection* ch
  *	object automatically.
  */
 gboolean G_main_del_IPC_WaitConnection(GWCSource* wcp);
+
+
+/**************************************************************
+ *	Functions for interfacing Signals to the mainloop
+ **************************************************************/
+/*
+ *	Add an Signal to the gmainloop world...
+ */
+GSIGSource* G_main_add_SignalHandler(
+	int priority, int signal,
+	gboolean (*dispatch)(int nsig, gpointer user_data),
+	gpointer userdata, GDestroyNotify notify);
+
+/*
+ *	the events in this source is paused/resumed
+ */
+
+void	G_main_SignalHandler_pause(GSIGSource* chp);
+void	G_main_SignalHandler_resume(GSIGSource* chp);
+
+/*
+ *	Delete an signal from the gmainloop world...
+ *	Note: destroys the GSIGSource object, and the removes the
+ *	Signal Handler automatically.
+ */
+gboolean G_main_del_SignalHandler(GSIGSource* chp);
+
+
+/*
+ *	Set the destroy notify function
+ *
+ */
+void	set_SignalHandler_dnotify(GSIGSource* chp, GDestroyNotify notify);
 
 #endif
