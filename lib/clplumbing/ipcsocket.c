@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.90 2004/03/08 21:11:09 alan Exp $ */
+/* $Id: ipcsocket.c,v 1.91 2004/04/18 07:53:36 alan Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1600,6 +1600,8 @@ socket_free_message(struct IPC_MESSAGE * msg) {
 
 #ifdef SO_PEERCRED
 #	define	USE_SO_PEERCRED
+#elif HAVE_GETPEEREID
+#	define USE_GETPEEREID
 #elif defined(SCM_CREDS)
 #	define	USE_SCM_CREDS
 #else
@@ -1686,7 +1688,55 @@ socket_get_farside_pid(int sockfd)
 }
 #endif /* SO_PEERCRED version */
 
+#ifdef USE_GETPEEREID
+/*
+ * This is implemented in OpenBSD and FreeBSD.
+ *
+ * It's not a half-bad interface...
+ *
+ * This should probably be our standard way of doing it, and put it
+ * as a replacement library.  That would simplify things...
+ */
 
+static int 
+socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
+{
+	struct SOCKET_CH_PRIVATE *conn_info;
+	uid_t	euid;
+	gid_t	egid;
+	int	ret = IPC_FAIL;
+
+	if (auth_info == NULL
+	||	(auth_info->uid == NULL && auth_info->gid == NULL)) {
+		return IPC_OK;    /* no restriction for authentication */
+	}
+	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
+
+	if (getpeereid(conn_info->s, &euid, &egid) < 0) {
+		cl_perror("getpeereid() failure");
+		return IPC_FAIL;
+	}
+
+	/* Check credentials against authorization information */
+
+	if (	auth_info->uid
+	&&	(g_hash_table_lookup(auth_info->uid
+		,	GUINT_TO_POINTER((guint)euid)) != NULL)) {
+		ret = IPC_OK;
+	}else if (auth_info->gid
+	&&	(g_hash_table_lookup(auth_info->gid
+		,	GUINT_TO_POINTER((guint)egid)) != NULL)) {
+		ret = IPC_OK;
+  	}
+	return ret;
+}
+
+pid_t
+socket_get_farside_pid(int sock)
+{
+	return -1;
+}
+#endif /* USE_GETPEEREID */
 
 /***********************************************************************
  * SCM_CREDS VERSION... (*BSD systems)
@@ -1705,36 +1755,69 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 {
   struct msghdr msg;
   /* Credentials structure */
+
+#define	EXTRASPACE	0
+
 #ifdef HAVE_STRUCT_CMSGCRED
+	/* FreeBSD */
   typedef struct cmsgcred Cred;
-#define cruid cmcred_uid
+#	define crRuid	cmcred_uid
+#	define crEuid	cmcred_euid
+#	define crRgid	cmcred_gid
+#	define crEgid	cmcred_groups[0]	/* Best guess */
+#	define crpid	cmcred_pid
+#	define crngrp	cmcred_ngroups
+#	define crgrps	cmcred_groups
 
 #elif HAVE_STRUCT_FCRED
+	/* Stevens' book */
   typedef struct fcred Cred;
-#define cruid fc_uid
+#	define crRuid	fc_uid
+#	define crRgid	fc_rgid
+#	define crEgid	fc_gid
+#	define crngrp	fc_ngroups
+#	define crgrps	fc_groups
 
 #elif HAVE_STRUCT_SOCKCRED
+	/* NetBSD */
   typedef struct sockcred Cred;
-#define cruid sc_uid
+#	define crRuid	sc_uid
+#	define crEuid	sc_euid
+#	define crRgid	sc_gid
+#	define crEgid	sc_egid
+#	define crngrp	sc_ngroups
+#	define crgrps	sc_groups
+#	define EXTRASPACE	SOCKCREDSIZE(ngroups)
 
-#elif _HAVE_CRED_H
+#elif HAVE_STRUCT_CRED
   typedef struct cred Cred;
 #define cruid c_uid
-#else
+
+#elif HAVE_STRUCT_UCRED
  typedef struct ucred Cred;
-#define cruid c_uid
+#	define crEuid	c_uid
+#	define crEgid	c_gid
+
+#else
+#	error "No credential type found!"
 #endif
 
-  Cred	   *cred;
   struct SOCKET_CH_PRIVATE *conn_info;
   int ret = IPC_OK;
   char         buf;
   
   /* Compute size without padding */
-  char		cmsgmem[ALIGN(sizeof(struct cmsghdr)) + ALIGN(sizeof(Cred))];	/* for NetBSD */
+  #define CMSGSIZE	(sizeof(struct cmsghdr)+(sizeof(Cred))+EXTRASPACE)
+
+  union {
+  	char		mem[CMSGSIZE];
+	struct cmsghdr	hdr;
+	Cred		credu;
+  }cmsgmem;
+  Cred	   cred;
 
   /* Point to start of first structure */
-  struct cmsghdr *cmsg = (struct cmsghdr *) cmsgmem;
+  struct cmsghdr *cmsg = &cmsgmem.hdr;
   
 
   if (auth_info == NULL
@@ -1747,7 +1830,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
   msg.msg_iov =  g_new(struct iovec, 1);
   msg.msg_iovlen = 1;
   msg.msg_control = (char *) cmsg;
-  msg.msg_controllen = sizeof(cmsgmem);
+  msg.msg_controllen = CMSGSIZE;
   memset(cmsg, 0, sizeof(cmsgmem));
 
   /*
@@ -1759,32 +1842,30 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
   msg.msg_iov->iov_len = 1;
   
   if (recvmsg(conn_info->s, &msg, 0) < 0 
-      || cmsg->cmsg_len < sizeof(cmsgmem) 
+      || cmsg->cmsg_len < CMSGSIZE
       || cmsg->cmsg_type != SCM_CREDS) {
       cl_perror("can't get credential information from peer");
       return IPC_FAIL;
     }
 
-  cred = (Cred *) CMSG_DATA(cmsg);
+  /* Avoid alignment issues - just copy it! */
+  memcpy(cred, CMSG_DATA(cmsg), sizeof(cred));
 
-  /* This is weird... Shouldn't cr_uid be cruid instead? FIXME??*/
-  /* Either that, or we shouldn't be defining it above... */
-  /* Also, what about the group id field name? */
-  /* FIXME! */
 
   if (	auth_info->uid
-  &&	g_hash_table_lookup(auth_info->uid, &(cred->cr_uid)) == NULL) {
+  &&	g_hash_table_lookup(auth_info->uid, &(cred.crEuid)) == NULL) {
 		ret = IPC_FAIL;
   }
   if (	auth_info->gid
-  &&	g_hash_table_lookup(auth_info->gid, &(cred->cr_groups)) == NULL) {
+  &&	g_hash_table_lookup(auth_info->gid, &(cred.crEgid)) == NULL) {
 		ret = IPC_FAIL;
   }
 
   return ret;
 }
 
-/* FIXME!  Need to implement SCM_CREDS mechanism for BSD-based systems
+/*
+ * FIXME!  Need to implement SCM_CREDS mechanism for BSD-based systems
  * this is similar to the SCM_CREDS mechanism for verify_auth() function.
  * here we just want to get the pid of the other side from the credential 
  * information.
@@ -1801,6 +1882,22 @@ socket_get_farside_pid(int sock)
 
 /***********************************************************************
  * DUMMY VERSION... (other systems...)
+ *
+ * I'm afraid Solaris falls into this category :-(
+ * Other options that seem to be out there include
+ * SCM_CREDENTIALS and LOCAL_CREDS
+ * Or maybe something called doors for Solaris
+ * Unfortunately, it looks like Doors is tied to threads :-(
+ * Can the streams credentials code be used with local domain sockets?
+ * There are some kludgy things you can do with SCM_RIGHTS
+ * to pass an fd which could only be opened by the user id to
+ * validate the user id, but I don't know of a similar kludge which
+ * would work for group ids.  And, even the uid one will fail
+ * if normal users are allowed to give away (chown) files.
+ *
+ * Unfortunately, this set of authentication routines have become
+ * very important to this API and its users (like heartbeat).
+ *
  ***********************************************************************/
 
 #ifdef USE_DUMMY_CREDS
@@ -1811,7 +1908,8 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 }
 
 pid_t
-socket_get_farside_pid(int sock){
+socket_get_farside_pid(int sock)
+{
 	return -1;
 }
 #endif /* Dummy version */
