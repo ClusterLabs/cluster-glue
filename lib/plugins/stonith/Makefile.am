@@ -106,6 +106,10 @@ plugin_LTLIBRARIES =	apcmaster.la		\
 			wti_nps.la		\
 			riloe.la
 
+plugin_LTLIBRARIES =	baytech.la		\
+			null.la			\
+			ssh.la
+
 apcmaster_la_SOURCES	= apcmaster.c $(INCFILES)
 apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version
 apcmaster_la_LIBADD	= $(GLIBLIB)

@@ -1,4 +1,4 @@
-/* $Id: stonith.c,v 1.11 2004/09/03 18:14:00 gshi Exp $ */
+/* $Id: stonith.c,v 1.12 2005/01/03 18:12:11 alan Exp $ */
 /*
  * Stonith API infrastructure.
  *
@@ -23,9 +23,6 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-#ifdef HAVE_LIBINTL_H
-#    include <libintl.h>
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -39,10 +36,8 @@
 #include <pils/plugin.h>
 #include <pils/generic.h>
 #include <stonith/stonith.h>
+#include <stonith/stonith_plugin.h>
 
-#include <ltdl.h>
-
-#define MAX_FUNC_NAME 20
 
 #define	MALLOC(n)	malloc(n)
 #define MALLOCT(t)	(t*)(malloc(sizeof(t)))
@@ -93,54 +88,48 @@ init_pluginsys(void) {
 Stonith *
 stonith_new(const char * type)
 {
-	Stonith *		s;
-	struct stonith_ops*	ops;
+	StonithPlugin *		sp = NULL;
+	struct stonith_ops*	ops = NULL;
 	char *			key;
 
-	bindtextdomain(ST_TEXTDOMAIN, LOCALEDIR);
 
 	if (!init_pluginsys()) {
 		return NULL;
 	}
 
-	s = MALLOCT(Stonith);
 
-	if (s == NULL) {
-		return(NULL);
-	}
-
-	/* Look and see if we already have it loaded... */
+	/* Look and see if it's already loaded... */
 
 	if (g_hash_table_lookup_extended(Splugins, type
 	,	(gpointer)&key, (gpointer)&ops)) {
+		/* Yes!  Increment reference count */
 		PILIncrIFRefCount(PIsys, STONITH_TYPE_S, type, 1);
 
-	}else{		/* Try and load it... */
+	}else{		/* No.  Try and load it... */
 		if (PILLoadPlugin(PIsys, STONITH_TYPE_S, type, NULL)
 		!=	PIL_OK) {
-			FREE(s);
 			return NULL;
 		}
 
-		/* Look the plugin up in the Splugins table */
+		/* Look up the plugin in the Splugins table */
 		if (!g_hash_table_lookup_extended(Splugins, type
 		,		(void*)&key, (void*)&ops)) {
 			/* OOPS! didn't find it(!?!)... */
 			PILIncrIFRefCount(PIsys, STONITH_TYPE_S, type, -1);
-			FREE(s);
 			return NULL;
 		}
 	}
 
-	s->s_ops = ops;
-	s->stype = key;
-	s->pinfo = s->s_ops->new();
+	if (ops != NULL) {
+		sp = ops->new();
+		sp->s.stype = strdup(type);
+	}
 
-	return s;
+	return sp ? (&sp->s) : NULL;
 }
 
 /*
- *	Return the list of Stonith types which can be given to stonith_new()
+ *	Return list of STONITH types valid in stonith_new()
  */
 
 char **
@@ -165,18 +154,215 @@ stonith_types(void)
 void
 stonith_delete(Stonith *s)
 {
-	if (!s) {
+	StonithPlugin*	sp = (StonithPlugin*)s;
+
+	if (sp && sp->s_ops) {
+		char *	st = sp->s.stype;
+		sp->s_ops->destroy(sp);
+		PILIncrIFRefCount(PIsys, STONITH_TYPE_S, st, -1);
+		/* destroy should not free it */
+		free(st);
+	}
+}
+
+const char **
+stonith_get_confignames(Stonith* s)
+{
+	StonithPlugin*	sp = (StonithPlugin*)s;
+
+	if (sp && sp->s_ops) {
+		return sp->s_ops->get_confignames(sp);
+	}
+	return NULL;
+}
+
+const char*
+stonith_get_info(Stonith* s, int infotype)
+{
+	StonithPlugin*	sp = (StonithPlugin*)s;
+
+	if (sp && sp->s_ops) {
+		return sp->s_ops->get_info(sp, infotype);
+	}
+	return NULL;
+
+}
+
+int
+stonith_set_config(Stonith* s, StonithNVpair* list)
+{
+	StonithPlugin*	sp = (StonithPlugin*)s;
+
+	if (sp && sp->s_ops) {
+		int	rc = sp->s_ops->set_config(sp, list);
+		if (rc == S_OK) {
+			sp->isconfigured = TRUE;
+		}
+		return rc;
+	}
+	return S_INVAL;
+}
+
+char**
+stonith_get_hostlist(Stonith* s)
+{
+	StonithPlugin*	sp = (StonithPlugin*)s;
+	if (sp && sp->s_ops && sp->isconfigured) {
+		return sp->s_ops->get_hostlist(sp);
+	}
+	return NULL;
+}
+
+void
+stonith_free_hostlist(char** hostlist)
+{
+	char ** here;
+
+	for (here=hostlist; *here; ++here) {
+		FREE(*here);
+	}
+	FREE(hostlist);
+}
+
+int
+stonith_get_status(Stonith* s)
+{
+	StonithPlugin*	sp = (StonithPlugin*)s;
+	if (sp && sp->s_ops && sp->isconfigured) {
+		return sp->s_ops->get_status(sp);
+	}
+	return S_INVAL;
+}
+
+int
+stonith_req_reset(Stonith* s, int operation, const char* node)
+{
+	StonithPlugin*	sp = (StonithPlugin*)s;
+	if (sp && sp->s_ops && sp->isconfigured) {
+		char*		nodecopy = strdup(node);
+		int		rc;
+		if (nodecopy == NULL) {
+			return S_OOPS;
+		}
+		g_strdown(nodecopy);
+
+		rc = sp->s_ops->req_reset(sp, operation, node);
+		free(nodecopy);
+		return rc;
+	}
+	return S_INVAL;
+}
+/* Stonith 1 compatibility:  Convert a string to an NVpair set */
+StonithNVpair*
+stonith1_compat_string_to_NVpair(Stonith* s, const char * str)
+{
+	/* We make some assumptions that the order of parameters in the
+	 * result from stonith_get_confignames() matches that which
+	 * was required from a Stonith1 module.
+	 * Everything after the last delimiter is passed along as part of
+	 * the final argument - white space and all...
+	 */
+	const char **	config_names;
+	int		n_names;
+	int		j;
+	const char *	delims = " \t\n\r\f";
+	StonithNVpair*	ret;
+
+	if ((config_names = stonith_get_confignames(s)) == NULL) {
+		return NULL;
+	}
+	for (n_names=0; config_names[n_names] != NULL; ++n_names) {
+		/* Just count */;
+	}
+	ret = (StonithNVpair*) (malloc((n_names+1)*sizeof(StonithNVpair)));
+	if (ret == NULL) {
+		return NULL;
+	}
+	for (j=0; j < n_names; ++j) {
+		size_t	len;
+		if ((ret[j].s_name = strdup(config_names[j])) == NULL) {
+			goto freeandexit;
+		}
+		ret[j].s_value = NULL;
+		str += strspn(str, delims);
+		if (*str == EOS) {
+			goto freeandexit;
+		}
+		if (j == (n_names -1)) {
+			len = strlen(str);
+		}else{
+			len = strcspn(str, delims);
+		}
+		if ((ret[j].s_value = malloc((len+1)*sizeof(char))) == NULL) {
+			goto freeandexit;
+		}
+		memcpy(ret[j].s_value, str, len);
+		ret[j].s_value[len] = EOS;
+		str += len;
+	}
+	ret[j].s_name = NULL;
+	return ret;
+freeandexit:
+	free_NVpair(ret); ret = NULL;
+	return NULL;
+}
+
+static int NVcur = -1;
+static int NVmax = -1;
+static gboolean NVerr = FALSE;
+
+static void
+stonith_walk_ghash(gpointer key, gpointer value, gpointer user_data)
+{
+	StonithNVpair*	u = user_data;
+	
+	if (NVcur <= NVmax && !NVerr) {
+		u[NVcur].s_name = strdup(key);
+		u[NVcur].s_value = strdup(value);
+		++NVcur;
+		if (u[NVcur].s_name == NULL || u[NVcur].s_value == NULL) {
+			NVerr = TRUE;
+			return;
+		}
+	}else{
+		NVerr = TRUE;
+	}
+}
+
+
+StonithNVpair*
+stonith_ghash_to_NVpair(GHashTable* stringtable)
+{
+	int		hsize = g_hash_table_size(stringtable);
+	StonithNVpair*	ret;
+
+	if ((ret = (StonithNVpair*)malloc(sizeof(StonithNVpair)*(hsize+1))) == NULL) {
+		return NULL;
+	}
+	NVmax = hsize;
+	NVcur = 0;
+	g_hash_table_foreach(stringtable, stonith_walk_ghash, ret);
+	NVmax = NVcur = -1;
+	if (NVerr) {
+		free_NVpair(ret);
+		ret = NULL;
+	}
+	return ret;
+}
+
+void
+free_NVpair(StonithNVpair* nv)
+{
+	StonithNVpair* this;
+
+	if (nv == NULL) {
 		return;
 	}
-	if (s->s_ops) {
-		s->s_ops->destroy(s);
+	for (this=nv; this->s_name; ++this) {
+		free(this->s_name);
+		if (this->s_value) {
+			free(this->s_value);
+		}
 	}
-
-        PILIncrIFRefCount(PIsys, STONITH_TYPE_S, s->stype, -1);
-	s->pinfo = NULL;
-	s->s_ops = NULL;
-	s->stype = NULL;	/* It is part of plugin system */
-				/* we cannot free it */
-
-	FREE(s);
+	free(this);
 }

@@ -1,4 +1,4 @@
-/* $Id: baytech.c,v 1.20 2004/10/24 13:00:14 lge Exp $ */
+/* $Id: baytech.c,v 1.21 2005/01/03 18:12:11 alan Exp $ */
 /*
  *	Stonith module for BayTech Remote Power Controllers (RPC-x devices)
  *
@@ -22,6 +22,8 @@
 
 #define	DEVICE	"BayTech power switch"
 
+#define DOESNT_USE_STONITHKILLCOMM	1
+
 #include "stonith_plugin_common.h"
 
 #define PIL_PLUGIN              baytech
@@ -32,21 +34,21 @@
 
 #include "stonith_signal.h"
 
-static void *		baytech_new(void);
-static void		baytech_destroy(Stonith *);
-static int		baytech_set_config_file(Stonith *, const char * cfgname);
-static int		baytech_set_config_info(Stonith *, const char * info);
-static const char *	baytech_getinfo(Stonith * s, int InfoType);
-static int		baytech_status(Stonith * );
-static int		baytech_reset_req(Stonith * s, int request, const char * host);
-static char **		baytech_hostlist(Stonith  *);
+static StonithPlugin *	baytech_new(void);
+static void		baytech_destroy(StonithPlugin *);
+static int		baytech_set_config(StonithPlugin *, StonithNVpair *);
+static const char **	baytech_get_confignames(StonithPlugin * s);
+static const char *	baytech_get_info(StonithPlugin * s, int InfoType);
+static int		baytech_status(StonithPlugin *);
+static int		baytech_reset_req(StonithPlugin * s, int request, const char * host);
+static char **		baytech_hostlist(StonithPlugin  *);
 
 static struct stonith_ops baytechOps ={
-	baytech_new,		/* Create new STONITH object	*/
+	baytech_new,			/* Create new STONITH object	*/
 	baytech_destroy,		/* Destroy STONITH object	*/
-	baytech_set_config_file,	/* set configuration from file	*/
-	baytech_set_config_info,	/* Get configuration from file	*/
-	baytech_getinfo,		/* Return STONITH info string	*/
+	baytech_get_info,		/* Return STONITH info string	*/
+	baytech_get_confignames,	/* Return STONITH config vars */
+	baytech_set_config,		/* set configuration from vars	*/
 	baytech_status,			/* Return STONITH device status	*/
 	baytech_reset_req,		/* Request a reset */
 	baytech_hostlist,		/* Return list of supported hosts */
@@ -94,6 +96,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  */
 
 struct pluginDevice {
+	StonithPlugin			sp;
 	const char *			pluginid;
 	char *				idinfo;
 	char *				unitid;
@@ -101,7 +104,6 @@ struct pluginDevice {
 	pid_t				pid;
 	int				rdfd;
 	int				wrfd;
-	int				config;
 	char *				device;
 	char *				user;
 	char *				passwd;
@@ -126,8 +128,6 @@ static const char * NOTpluginID = "Hey, dummy this has been destroyed (BayTech)"
 
 #define BAYTECHASSOC	"Bay Technical Associates"
 
-static struct Etoken EscapeChar[] =	{ {"Escape character is '^]'.", 0, 0}
-					,	{NULL,0,0}};
 static struct Etoken BayTechAssoc[] =	{ {BAYTECHASSOC, 0, 0}, {NULL,0,0}};
 static struct Etoken UnitId[] =		{ {"Unit ID: ", 0, 0}, {NULL,0,0}};
 static struct Etoken login[] =		{ {"username>", 0, 0} ,{NULL,0,0}};
@@ -154,10 +154,10 @@ static struct Etoken Rebooting[] =	{ {"ebooting selected outlet", 0, 0}
 
 
 static struct BayTechModelInfo ModelInfo [] = {
-	{"RPC-5", 18, Temp},	/* This first model will be the default */
-	{"RPC-3", 10, Break},	
-	{"RPC-3A", 10, Break},
-	{NULL, 0, NULL},
+	{"RPC-5",	18, Temp},/* This first model will be the default */
+	{"RPC-3",	10, Break},	
+	{"RPC-3A",	10, Break},
+	{NULL,		0,  NULL},
 };
 
 static int	RPC_connect_device(struct pluginDevice * bt);
@@ -168,7 +168,6 @@ static int	RPCReset(struct pluginDevice*, int unitnum, const char * rebootid);
 static int	RPCLogout(struct pluginDevice * bt);
 
 
-static int	RPC_parse_config_info(struct pluginDevice* bt, const char * info);
 #if defined(ST_POWERON) && defined(ST_POWEROFF)
 static int	RPC_onoff(struct pluginDevice*, int unitnum, const char * unitid
 ,		int request);
@@ -186,13 +185,11 @@ RPCLogin(struct pluginDevice * bt)
 	int		j;
 
 
-	EXPECT(bt->rdfd, EscapeChar, 10);
 	/* Look for the unit type info */
 	if (EXPECT_TOK(bt->rdfd, BayTechAssoc, 2, IDinfo
 	,	sizeof(IDinfo)) < 0) {
 		LOG(PIL_CRIT,	 "%s",
-			   _("No initial response from " DEVICE "."));
-		Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
+			   "No initial response from " DEVICE ".");
 		return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	}
 	idptr += strspn(idptr, WHITESPACE);
@@ -244,7 +241,7 @@ RPCLogin(struct pluginDevice * bt)
 
 		case 1:	/* OOPS!  got another username prompt */
 			LOG(PIL_CRIT,	"%s",
-				   _("Invalid username for " DEVICE "."));
+				   "Invalid username for " DEVICE ".");
 			return(S_ACCESS);
 
 		default:
@@ -263,11 +260,10 @@ RPCLogin(struct pluginDevice * bt)
 
 		case 1:	/* Uh-oh - bad password */
 			LOG(PIL_CRIT,	"%s",
-				   _("Invalid password for " DEVICE "."));
+				   "Invalid password for " DEVICE ".");
 			return(S_ACCESS);
 
 		default:
-			Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 			return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	}
 	EXPECT(bt->rdfd, Menu, 2);
@@ -283,12 +279,8 @@ RPCRobustLogin(struct pluginDevice * bt)
 
 	for (j=0; j < 20 && rc != S_OK; ++j) {
 
-		if (bt->pid > 0) {
-			Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
-		}
 
 		if (RPC_connect_device(bt) != S_OK) {
-			Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 			continue;
 		}
 
@@ -316,7 +308,6 @@ RPCLogout(struct pluginDevice* bt)
 	close(bt->wrfd);
 	close(bt->rdfd);
 	bt->wrfd = bt->rdfd = -1;
-	Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 	return(rc >= 0 ? S_OK : (errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS));
 }
 
@@ -361,15 +352,15 @@ RPCReset(struct pluginDevice* bt, int unitnum, const char * rebootid)
 			goto retry;
 
 		case 2:	/* Outlet is turned off */
-			LOG(PIL_CRIT,	"%s: %s.",
-				   _("Host is OFF"), rebootid);
+			LOG(PIL_CRIT,	"%s: %s."
+			,	"Host is OFF", rebootid);
 			return(S_ISOFF);
 
 		default:
 			return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
-	LOG(PIL_INFO,	"%s: %s",
-		   _("Host being rebooted"), rebootid);
+	LOG(PIL_INFO,	"%s: %s"
+	,	"Host being rebooted", rebootid);
 	
 	/* Expect "ower applied to outlet" */
 	if (StonithLookFor(bt->rdfd, PowerApplied, 30) < 0) {
@@ -378,8 +369,8 @@ RPCReset(struct pluginDevice* bt, int unitnum, const char * rebootid)
 
 	/* All Right!  Power is back on.  Life is Good! */
 	
-	LOG(PIL_INFO,	"%s: %s",
-		   _("Power restored to host"), rebootid);
+	LOG(PIL_INFO,	"%s: %s"
+	,	"Power restored to host", rebootid);
 
 	/* Expect: "RPC-x>" */
 	EXPECT(bt->rdfd, RPC,5);
@@ -402,7 +393,7 @@ RPC_onoff(struct pluginDevice* bt, int unitnum, const char * unitid, int req)
 
 	if ((rc = RPCRobustLogin(bt) != S_OK)) {
 		LOG(PIL_CRIT,	"%s",
-			   _("Cannot log into " DEVICE "."));
+			   "Cannot log into " DEVICE ".");
 		return(rc);
 	}
 	SEND(bt->wrfd, "\r");
@@ -439,8 +430,8 @@ RPC_onoff(struct pluginDevice* bt, int unitnum, const char * unitid, int req)
 	EXPECT(bt->rdfd, GTSign, 10);
 
 	/* All Right!  Command done. Life is Good! */
-	LOG(PIL_INFO, "%s %s %s %s",
-		   _("Power to host"), unitid, _("turned"), onoff);
+	LOG(PIL_INFO, "%s %s %s %s"
+	,	"Power to host", unitid, "turned", onoff);
 	/* Pop back to main menu */
 	SEND(bt->wrfd, "MENU\r");
 	return(S_OK);
@@ -520,18 +511,18 @@ RPCNametoOutlet(struct pluginDevice* bt, const char * name)
 }
 
 static int
-baytech_status(Stonith  *s)
+baytech_status(StonithPlugin  *s)
 {
 	struct pluginDevice*	bt;
 	int	rc;
 
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
-	bt = (struct pluginDevice*) s->pinfo;
+	bt = (struct pluginDevice*) s;
 	
 	if ((rc = RPCRobustLogin(bt) != S_OK)) {
 		LOG(PIL_CRIT,	 "%s", 
-			    _("Cannot log into " DEVICE "."));
+			    "Cannot log into " DEVICE ".");
 		return(rc);
 	}
 
@@ -549,7 +540,7 @@ baytech_status(Stonith  *s)
  */
 
 static char **
-baytech_hostlist(Stonith  *s)
+baytech_hostlist(StonithPlugin  *s)
 {
 	char		NameMapping[128];
 	char*		NameList[64];
@@ -559,11 +550,11 @@ baytech_hostlist(Stonith  *s)
 
 	ERRIFNOTCONFIGED(s,NULL);
 
-	bt = (struct pluginDevice*) s->pinfo;
+	bt = (struct pluginDevice*) s;
 	
 	if (RPCRobustLogin(bt) != S_OK) {
 		LOG(PIL_CRIT,	"%s",
-			   _("Cannot log into " DEVICE "."));
+			   "Cannot log into " DEVICE ".");
 		return(NULL);
 	}
 
@@ -623,7 +614,7 @@ baytech_hostlist(Stonith  *s)
 		}
 		if ((nm = (char*)STRDUP(sockname)) == NULL) {
 			LOG(PIL_CRIT,	"%s",
-				   _("out of memory"));
+				   "out of memory");
 			return(NULL);
 		}
 		g_strdown(nm);
@@ -637,8 +628,7 @@ baytech_hostlist(Stonith  *s)
 	if (numnames >= 1) {
 		ret = (char **)MALLOC((numnames+1)*sizeof(char*));
 		if (ret == NULL) {
-			LOG(PIL_CRIT,	"%s",
-				   _("out of memory"));
+			LOG(PIL_CRIT, "%s" , "out of memory");
 		}else{
 			memcpy(ret, NameList, (numnames+1)*sizeof(char*));
 		}
@@ -648,66 +638,19 @@ baytech_hostlist(Stonith  *s)
 }
 
 /*
- *	Parse the given configuration information, and stash it away...
- */
-
-static int
-RPC_parse_config_info(struct pluginDevice* bt, const char * info)
-{
-	static char dev[1024];
-	static char user[1024];
-	static char passwd[1024];
-
-	if (bt->config) {
-		return(S_OOPS);
-	}
-
-	if (sscanf(info, "%s %s %[^\n\r\t]", dev, user, passwd) == 3
-	&&	strlen(passwd) > 1) {
-
-		if ((bt->device = STRDUP(dev)) == NULL) {
-			LOG(PIL_CRIT,	"%s", 
-				   _("out of memory"));
-			return(S_OOPS);
-		}
-		if ((bt->user = STRDUP(user)) == NULL) {
-			FREE(bt->device);
-			bt->device=NULL;
-			LOG(PIL_CRIT,	"%s",
-				   _("out of memory"));
-			return(S_OOPS);
-		}
-		if ((bt->passwd = STRDUP(passwd)) == NULL) {
-			FREE(bt->user);
-			bt->user=NULL;
-			FREE(bt->device);
-			bt->device=NULL;
-			LOG(PIL_CRIT,	"%s",
-				   _("out of memory"));
-			return(S_OOPS);
-		}
-		bt->config = 1;
-		return(S_OK);
-	}
-	return(S_BADCONFIG);
-}
-
-/*
- *	Connect to the given BayTech device.  We should add serial support here
- *	eventually...
+ *	Connect to the given BayTech device.
+ *	We should add serial support here eventually...
  */
 static int
 RPC_connect_device(struct pluginDevice * bt)
 {
-	char	TelnetCommand[256];
+	int fd = OurImports->OpenStreamSocket(bt->device
+	,	TELNET_PORT, TELNET_SERVICE);
 
-	snprintf(TelnetCommand, sizeof(TelnetCommand)
-	,	"exec telnet %s 2>/dev/null", bt->device);
-
-	bt->pid=STARTPROC(TelnetCommand, &bt->rdfd, &bt->wrfd);
-	if (bt->pid <= 0) {
+	if (fd < 0) {
 		return(S_OOPS);
 	}
+	bt->rdfd = bt->wrfd = fd;
 	return(S_OK);
 }
 
@@ -715,7 +658,7 @@ RPC_connect_device(struct pluginDevice * bt)
  *	Reset the given host on this Stonith device.
  */
 static int
-baytech_reset_req(Stonith * s, int request, const char * host)
+baytech_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	int	rc = 0;
 	int	lorc = 0;
@@ -723,19 +666,18 @@ baytech_reset_req(Stonith * s, int request, const char * host)
 
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
-	bt = (struct pluginDevice*) s->pinfo;
+	bt = (struct pluginDevice*) s;
 
 	if ((rc = RPCRobustLogin(bt)) != S_OK) {
-		LOG(PIL_CRIT, "%s",
-			   _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "%s", "Cannot log into " DEVICE ".");
 	}else{
 		int	noutlet;
 		noutlet = RPCNametoOutlet(bt, host);
 
 		if (noutlet < 1) {
-			LOG(PIL_WARN,	"%s %s %s [%s]",
-					bt->idinfo, bt->unitid, _("doesn't control hot"), host);
-			Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
+			LOG(PIL_WARN,	"%s %s %s [%s]"
+			,	bt->idinfo, bt->unitid
+			,	"doesn't control host", host);
 			return(S_BADHOST);
 		}
 		switch(request) {
@@ -756,96 +698,73 @@ baytech_reset_req(Stonith * s, int request, const char * host)
 	}
 
 	lorc = RPCLogout(bt);
-	Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 
 	return(rc != S_OK ? rc : lorc);
 }
 
-/*
- *	Parse the information in the given configuration file,
- *	and stash it away...
- */
-static int
-baytech_set_config_file(Stonith* s, const char * configname)
+static const char **
+baytech_get_confignames(StonithPlugin * s)
 {
-	FILE *	cfgfile;
-
-	char	RPCid[256];
-
-	struct pluginDevice*	bt;
-
-	ERRIFWRONGDEV(s,S_OOPS);
-
-	bt = (struct pluginDevice*) s->pinfo;
-
-	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		LOG(PIL_CRIT,	"%s %s",
-			   _("Cannot open"), configname);
-		return(S_BADCONFIG);
-	}
-	while (fgets(RPCid, sizeof(RPCid), cfgfile) != NULL){
-		if (*RPCid == '#' || *RPCid == '\n' || *RPCid == EOS) {
-			continue;
-		}
-		return(RPC_parse_config_info(bt, RPCid));
-	}
-	return(S_BADCONFIG);
+	static const char * ret[] = {ST_IPADDR, ST_LOGIN, ST_PASSWD, NULL};
+	return ret;
 }
+
 
 /*
  *	Parse the config information in the given string, and stash it away...
  */
 static int
-baytech_set_config_info(Stonith* s, const char * info)
+baytech_set_config(StonithPlugin* s, StonithNVpair* list)
 {
-	struct pluginDevice* bt;
+	struct pluginDevice* bt = (struct pluginDevice *)s;
+	int		rc;
+	StonithNamesToGet	namestoget [] =
+	{	{ST_IPADDR,	NULL}
+	,	{ST_LOGIN,	NULL}
+	,	{ST_PASSWD,	NULL}
+	,	{NULL,		NULL}
+	};
 
-	ERRIFWRONGDEV(s,S_OOPS);
+	ERRIFWRONGDEV(s, S_OOPS);
+	if (bt->sp.isconfigured) {
+		return S_OOPS;
+	}
 
-	bt = (struct pluginDevice *)s->pinfo;
+	if ((rc =OurImports->GetAllValues(namestoget, list)) != S_OK) {
+		return rc;
+	}
+	bt->device = namestoget[0].s_value;
+	bt->user   = namestoget[1].s_value;
+	bt->passwd = namestoget[2].s_value;
 
-	return(RPC_parse_config_info(bt, info));
+	return(S_OK);
 }
 
 static const char *
-baytech_getinfo(Stonith * s, int reqtype)
+baytech_get_info(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* bt;
 	const char *		ret;
 
 	ERRIFWRONGDEV(s,NULL);
 
-	/*
-	 *	We look in the ST_TEXTDOMAIN catalog for our messages
-	 */
-	bt = (struct pluginDevice *)s->pinfo;
+	bt = (struct pluginDevice *)s;
 
 	switch (reqtype) {
 
-		case ST_DEVICEID:		/* Exactly what type of device? */
+		case ST_DEVICEID:		/* What type of device? */
 			ret = bt->idinfo;
 			break;
 
-		case ST_DEVICENAME:		/* Which particular individual device? */
+		case ST_DEVICENAME:		/* Which particular device? */
 			ret = bt->device;
 			break;
 
-		case ST_CONF_INFO_SYNTAX:
-			ret = _("IP-address login password\n"
-			"The IP-address and login are white-space delimited.");
-			break;
-
-		case ST_CONF_FILE_SYNTAX:
-			ret = _("IP-address login password\n"
-			"The IP-address and login are white-space delimited.  "
-			"All three items must be on one line.  "
-			"Blank lines and lines beginning with # are ignored");
-			break;
-
-		case ST_DEVICEDESCR:		/* Description of device type */
-			ret = _("Bay Technical Associates (Baytech) RPC "
+		case ST_DEVICEDESCR:		/* Description of dev type */
+			ret = "Bay Technical Associates (Baytech) RPC "
 			"series power switches (via telnet).\n"
-			"The RPC-5, RPC-3 and RPC-3A switches are well tested.");
+			"The RPC-5, RPC-3 and RPC-3A switches are well tested"
+			".";
 			break;
 
 		case ST_DEVICEURL:		/* Manufacturer's web site */
@@ -863,16 +782,15 @@ baytech_getinfo(Stonith * s, int reqtype)
  *	Baytech Stonith destructor...
  */
 static void
-baytech_destroy(Stonith *s)
+baytech_destroy(StonithPlugin *s)
 {
 	struct pluginDevice* bt;
 
 	VOIDERRIFWRONGDEV(s);
 
-	bt = (struct pluginDevice *)s->pinfo;
+	bt = (struct pluginDevice *)s;
 
 	bt->pluginid = NOTpluginID;
-	Stonithkillcomm(&bt->rdfd, &bt->wrfd, &bt->pid);
 	if (bt->rdfd >= 0) {
 		close(bt->rdfd);
 		bt->rdfd = -1;
@@ -905,14 +823,13 @@ baytech_destroy(Stonith *s)
 
 /* Create a new BayTech Stonith device. */
 
-static void *
+static StonithPlugin *
 baytech_new(void)
 {
 	struct pluginDevice*	bt = MALLOCT(struct pluginDevice);
 
 	if (bt == NULL) {
-		LOG(PIL_CRIT,	"%s",
-			   _("out of memory"));
+		LOG(PIL_CRIT,	"%s", "out of memory");
 		return(NULL);
 	}
 	memset(bt, 0, sizeof(*bt));
@@ -920,20 +837,15 @@ baytech_new(void)
 	bt->pid = -1;
 	bt->rdfd = -1;
 	bt->wrfd = -1;
-	bt->config = 0;
-	bt->user = NULL;
-	bt->device = NULL;
-	bt->passwd = NULL;
-	bt->idinfo = NULL;
-	bt->unitid = NULL;
 	REPLSTR(bt->idinfo, DEVICE);
 	bt->modelinfo = &ModelInfo[0];
+	bt->sp.s_ops = &baytechOps;
 
-	return((void *)bt);
+	return &(bt->sp);	/* same as "bt" */
 }
 
 static int
-parse_socket_line(struct pluginDevice * bt,	const char *NameMapping
+parse_socket_line(struct pluginDevice * bt, const char *NameMapping
 ,	int *sockno, char *sockname)
 {
 #if 0

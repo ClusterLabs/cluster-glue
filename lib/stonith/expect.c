@@ -1,4 +1,4 @@
-/* $Id: expect.c,v 1.12 2004/02/17 22:12:00 lars Exp $ */
+/* $Id: expect.c,v 1.13 2005/01/03 18:12:11 alan Exp $ */
 /*
  * Simple expect module for the STONITH library
  *
@@ -27,7 +27,6 @@
 #include <string.h>
 #include <errno.h>
 #include <syslog.h>
-#include <libintl.h>
 #include <sys/wait.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,11 +38,15 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/times.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netdb.h>
 #ifdef _POSIX_PRIORITY_SCHEDULING
 #	include <sched.h>
 #endif
 
 #include <stonith/stonith.h>
+#include <stonith/stonith_plugin.h>
 
 
 /*
@@ -277,7 +280,204 @@ StartProcess(const char * cmd, int * readfd, int * writefd)
 	return(-1);
 }
 
+static char **
+stonith_copy_hostlist(const char** hostlist)
+{
+	int hlleng = 1;
+	const char ** here = hostlist;
+	char ** hret;
+	char **	ret;
+
+	for (here = hostlist; *here; ++here) {
+		++hlleng;
+	}
+	ret = (char**)malloc(hlleng * sizeof(char *));
+	if (ret == NULL) {
+		return ret;
+	}
+	
+	hret = ret;
+	for (here = hostlist; *here; ++here,++hret) {
+		*hret = strdup(*here);
+		if (*hret == NULL) {
+			stonith_free_hostlist(hret);
+			return NULL; 
+		}
+	}
+	*hret = NULL;
+	return ret;
+}
+
+static char **
+StringToHostList(const char * s)
+{
+	const char *	here;
+	int		hlleng = 0;
+	char **		ret;
+	char **		hret;
+	const char *	delims = " \t\n\f\r,";
+
+	/* Count the number of strings (words) in the result */
+	here = s;
+	while (*here != EOS) {
+		/* skip delimiters */
+		here += strspn(here, delims);
+		if (*here == EOS) {
+			break;
+		}
+		/* skip over substring proper... */
+		here += strcspn(here, delims);
+		++hlleng;
+	}
+
+
+	/* Malloc space for the result string pointers */
+	ret = (char**)malloc((hlleng+1) * sizeof(char *));
+	if (ret == NULL) {
+		return NULL;
+	}
+	
+	hret = ret;
+	here = s;
+
+	/* Copy each substring into a separate string */
+	while (*here != EOS) {
+		int	slen;	/* substring length */
+
+		/* skip delimiters */
+		here += strspn(here, delims);
+		if (*here == EOS) {
+			break;
+		}
+		/* Compute substring length */
+		slen = strcspn(here, delims);
+		*hret = malloc((slen+1) * sizeof(char));
+		if (*hret == NULL) {
+			stonith_free_hostlist(hret);
+			return NULL; 
+		}
+		/* Copy string (w/o EOS) */
+		memcpy(*hret, here, slen);
+		/* Add EOS to result string */
+		(*hret)[slen] = EOS;
+		g_strdown(*hret);
+		here += slen;
+		++hret;
+	}
+	*hret = NULL;
+	return ret;
+}
+
+
+static const char *
+GetValue(StonithNVpair* parameters, const char * name)
+{
+	while (parameters->s_name) {
+		if (strcmp(name, parameters->s_name) == 0) {
+			return parameters->s_value;
+		}
+		++parameters;
+	}
+	return NULL;
+}
+
+static int
+GetAllValues(StonithNamesToGet* output, StonithNVpair * input)
+{
+	int	j;
+	int	rc;
+
+	for (j=0; output[j].s_name; ++j) {
+		const char * value = GetValue(input, output[j].s_name);
+		if (value == NULL) {
+			rc = S_INVAL;
+			goto fail;
+		}
+		if ((output[j].s_value = strdup(value)) == NULL) {
+			rc = S_OOPS;
+			goto fail;
+		}
+	}
+	return S_OK;
+
+fail:
+	for (j=0; output[j].s_value; ++j) {
+		free(output[j].s_value);
+		output[j].s_value = NULL;
+	}
+	return rc;
+}
+
+
+static int
+OpenStreamSocket(const char * host, int port, const char * service)
+{
+	union s_un {
+		struct sockaddr_in	si4;
+		struct sockaddr_in6	si6;
+	}sockun;
+	int			sock;
+	int			addrlen = -1;
+
+
+	memset(&sockun, 0, sizeof(sockun));
+
+	if (inet_pton(AF_INET, host, (void*)&sockun.si4.sin_addr) < 0) {
+		sockun.si4.sin_family = AF_INET;
+	}else if (inet_pton(AF_INET6, host, (void*)&sockun.si6.sin6_addr)<0){
+		sockun.si6.sin6_family = AF_INET6;
+	}else{
+		struct hostent*	hostp = gethostbyname(host);
+		if (hostp == NULL) {
+			errno = EINVAL;
+			return -1;
+		}
+		sockun.si4.sin_family = hostp->h_addrtype;
+		memcpy(&sockun.si4.sin_addr, hostp->h_addr, hostp->h_length);
+	}
+	if ((sock = socket(sockun.si4.sin_family, SOCK_STREAM, 0)) < 0) {
+		return -1;
+	}
+	if (service != NULL) {
+		struct servent*	se = getservbyname(service, "tcp");
+		if (se != NULL) {
+			/* We convert it back later... */
+			port = ntohs(se->s_port);
+		}
+	}
+	if (port <= 0) {
+		errno = EINVAL;
+		return -1;
+	}
+	port = htons(port);
+	if (sockun.si6.sin6_family == AF_INET6) {
+		sockun.si6.sin6_port = port;
+		addrlen = sizeof(sockun.si6);
+	}else if (sockun.si4.sin_family == AF_INET) {
+		sockun.si4.sin_port = port;
+		addrlen = sizeof(sockun.si4);
+	}else{
+		errno = EINVAL;
+		return -1;
+	}
+		
+	if (connect(sock, (struct sockaddr*)(&sockun), addrlen)< 0){
+		int	save = errno;
+		perror("connect() failed");
+		close(sock);
+		errno = save;
+		return -1;
+	}
+	return sock;
+}
+
 StonithImports		stonithimports = {
 	ExpectToken,
 	StartProcess,
+	OpenStreamSocket,
+	GetValue,
+	GetAllValues,
+	StringToHostList,
+	stonith_copy_hostlist,
+	stonith_free_hostlist,
 };
