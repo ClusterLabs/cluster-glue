@@ -1,4 +1,4 @@
-/* $Id: ttylock.c,v 1.1 2004/03/25 08:05:23 alan Exp $ */
+/* $Id: ttylock.c,v 1.2 2005/01/05 06:54:27 alan Exp $ */
 #include <portability.h>
 
 #include <stdio.h>
@@ -48,6 +48,8 @@
 #define	DEVLEN	(sizeof(DEVDIR)-1)
 
 static void raw_device (const char *dev, char *dest_name, size_t size);
+static int DoLock(const char * prefix, const char *lockname);
+static int DoUnlock(const char * prefix, const char *lockname);
 
 /* The code in this file originally written by Guenther Thomsen */
 /* Somewhat mangled by Alan Robertson */
@@ -106,7 +108,7 @@ ttyunlock(const char *serial_device)
 /* This is what the FHS standard specifies for the size of our lock file */
 #define	LOCKSTRLEN	11
 
-int
+static int
 DoLock(const char * prefix, const char *lockname)
 {
 	char lf_name[256], tf_name[256], buf[LOCKSTRLEN+1];
@@ -191,7 +193,7 @@ DoLock(const char * prefix, const char *lockname)
 	return rc;
 }
 
-int
+static int
 DoUnlock(const char * prefix, const char *lockname)
 {
 	char lf_name[256];
