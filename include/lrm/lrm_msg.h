@@ -92,7 +92,7 @@
 #define MONITOR			"monitor"
 #define RETURN			"return"
 #define FLUSHOPS		"flushops"
-#define STOPOP			"stopop"
+#define CANCELOP		"cancelop"
 
 #define MAX_INT_LEN 		10
 #define MAX_NAME_LEN 		255

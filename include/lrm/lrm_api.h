@@ -148,14 +148,14 @@ struct rsc_ops
 
 
 /*
- *stop_op:	stop the operation on the resource.
+ *cancel_op:	cancel the operation on the resource.
  *
  *callid:	the call id returned by perform_op()
  *
  *return:	if the operation has been stopped then return HA_OK
  *		else return HA_FAIL
  */
-	int (*stop_op) (lrm_rsc_t*, int call_id);
+	int (*cancel_op) (lrm_rsc_t*, int call_id);
 
 /*
  *flush_ops:	throw away all operations queued for this resource,
