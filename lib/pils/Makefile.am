@@ -50,7 +50,7 @@ plugindir		= $(pkglibdir)/plugins/test
 plugin_LTLIBRARIES	= test.la 
 
 libpils_la_SOURCES	= pils.c
-libpils_la_LDFLAGS	= -version-info 0:0:0
+libpils_la_LDFLAGS	= -version-info 1:0:0
 libpils_la_LIBADD	= $(top_builddir)/libltdl/libltdlc.la	\
 			$(top_builddir)/replace/libreplace.la	\
 			$(GLIBLIB)
