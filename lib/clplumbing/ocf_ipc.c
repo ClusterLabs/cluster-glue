@@ -23,10 +23,10 @@
 #include <clplumbing/ipc.h>
 #include <string.h>
 
-struct OCF_IPC_WAIT_CONNECTION * socket_wait_conn_new(GHashTable* ch_attrs);
-struct OCF_IPC_CHANNEL * socket_client_channel_new(GHashTable* ch_attrs);
+struct IPC_WAIT_CONNECTION * socket_wait_conn_new(GHashTable* ch_attrs);
+struct IPC_CHANNEL * socket_client_channel_new(GHashTable* ch_attrs);
 
-struct OCF_IPC_WAIT_CONNECTION * 
+struct IPC_WAIT_CONNECTION * 
 ipc_wait_conn_constructor(const char * ch_type, GHashTable* ch_attrs)
 {
   if (strcmp(ch_type, "domain_socket") == 0
@@ -36,7 +36,7 @@ ipc_wait_conn_constructor(const char * ch_type, GHashTable* ch_attrs)
   return NULL;
 }
 
-struct OCF_IPC_CHANNEL * 
+struct IPC_CHANNEL * 
 ipc_channel_constructor(const char * ch_type, GHashTable* ch_attrs)
 {
   if	(strcmp(ch_type, "domain_socket") == 0
@@ -48,14 +48,14 @@ ipc_channel_constructor(const char * ch_type, GHashTable* ch_attrs)
 }
 
 
-struct OCF_IPC_AUTH * 
+struct IPC_AUTH * 
 ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid)
 {
-  struct OCF_IPC_AUTH *temp_auth;
+  struct IPC_AUTH *temp_auth;
   int i, v;
 
   v = 1;
-  temp_auth = g_new(struct OCF_IPC_AUTH, 1);
+  temp_auth = g_new(struct IPC_AUTH, 1);
   temp_auth->uid = g_hash_table_new(g_int_hash, g_int_equal);
   temp_auth->gid = g_hash_table_new(g_int_hash, g_int_equal);
 
@@ -75,7 +75,7 @@ ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid)
 }
 
 void
-ipc_destroy_auth(struct OCF_IPC_AUTH *auth)
+ipc_destroy_auth(struct IPC_AUTH *auth)
 {
   if(auth != NULL)
     free((void *)auth);
