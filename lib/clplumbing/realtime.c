@@ -12,6 +12,10 @@
 
 static gboolean	realtimepermitted = TRUE;
 
+#if defined(SCHED_RR) && defined(_POSIX_PRIORITY_SCHEDULING)
+#	define DEFAULT_REALTIME	SCHED_RR
+#endif
+
 /*
  *	Make us behave like a soft real-time process.
  *	We need scheduling priority and being locked in memory.
@@ -22,9 +26,6 @@ void
 make_realtime(int spolicy, int priority,  int heapgrowK)
 {
 
-#ifdef SCHED_RR
-#	define DEFAULT_REALTIME	SCHED_RR
-#endif
 
 #ifdef DEFAULT_REALTIME
 	struct sched_param	sp;
@@ -104,9 +105,9 @@ make_normaltime()
 	struct sched_param	sp;
 
 	memset(&sp, 0, sizeof(sp));
-	sp.sched_priority = 0;
+	sp.sched_priority = sched_get_priority_min(SCHED_OTHER);
 	if (sched_setscheduler(0, SCHED_OTHER, &sp) < 0) {
-		cl_log(LOG_ERR, "unable to (re)set scheduler parameters.");
+		cl_perror("unable to (re)set scheduler parameters.");
 	}
 #endif
 #ifdef _POSIX_MEMLOCK
