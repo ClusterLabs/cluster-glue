@@ -647,7 +647,6 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 		} while(sendrc < 0 && 
 			(errno == EAGAIN ?sched_yield(),TRUE: FALSE));
 
-
 #if 0
 		cl_log(LOG_DEBUG, "Sent %d byte message body"
 		,	msg->msg_len);
