@@ -30,4 +30,7 @@ void cl_disable_realtime(void);
  * This is the default behaviour */
 void cl_enable_realtime(void);
 
+/* Sleep a really short (the shortest) time */
+int cl_shortsleep(void);
+
 #endif
