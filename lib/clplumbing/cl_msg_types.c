@@ -287,7 +287,7 @@ binary_dup(const void* value, size_t len){
 	if ( value == NULL && len > 0){
 		cl_log(LOG_ERR, "binary_dup:"
 		       "NULL vlaue with len =%d", 
-		       len);
+		       (int)len);
 		return NULL;
 	}
 	
