@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.37 2005/03/02 22:54:29 alan Exp $ */
+/* $Id: cl_log.c,v 1.38 2005/03/14 16:31:20 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -233,7 +233,7 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 				fclose(fp);
 		} else {
 			fprintf(stderr, "Cannot open %s: %s\n",
-				debugfile_name, strerror(errno));
+				logfile_name, strerror(errno));
 		}
 	}
 	
