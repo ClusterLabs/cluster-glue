@@ -281,7 +281,7 @@ int main(int argc, char **argv)
         if (lrmd->lrm_ops->signon(lrmd, lrmadmin_name) != 1) { /* != HA_OK */
 		if (lrmadmin_cmd == DAEMON_OP) { 
 			printf("lrmd daemon is not running.\n");
-			return 0;
+			return LSB_STATUS_STOPPED;
 		} else {
 			cl_log(LOG_ERR,"Can't connect to lrmd, quit!");
 			return -2;
@@ -379,8 +379,10 @@ int main(int argc, char **argv)
 				g_list_foreach(raclass_list, g_print_stringitem,
 						NULL);
 				g_list_free(raclass_list);
+				ret_value = LSB_EXIT_OK;
 			} else {
 				printf("No any RA class is supported\n");
+				ret_value = -3;
 			}
 
 			ASYN_OPS = FALSE;
