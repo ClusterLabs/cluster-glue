@@ -45,9 +45,9 @@ enum UNIFORM_RET_EXECRA {
 };
 typedef enum UNIFORM_RET_EXECRA uniform_ret_execra_t;
 
-const int RA_MAX_NAME_LENGTH  = 240;
-const int RA_MAX_DIRNAME_LENGTH  = 200;
-const int RA_MAX_BASENAME_LENGTH  = 40;
+#define RA_MAX_NAME_LENGTH	240
+#define RA_MAX_DIRNAME_LENGTH	200
+#define RA_MAX_BASENAME_LENGTH	40
 
 /* 
  * RA Execution Interfaces 
