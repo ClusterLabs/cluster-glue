@@ -1044,7 +1044,7 @@ socket_get_farside_pid(int sockfd )
 /***********************************************************************
  * SCM_CREDS VERSION... (*BSD systems)
  ***********************************************************************/
-#ifdef	USE_SCM_CREDS
+#ifdef USE_SCM_CREDS
 /* FIXME!  Need to implement SCM_CREDS mechanism for BSD-based systems
  * This isn't an emergency, but should be done in the future...
  * Hint: * Postgresql does both types of authentication...
@@ -1077,6 +1077,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
  typedef struct ucred Cred;
 #define cruid c_uid
 #endif
+
   Cred	   *cred;
   struct SOCKET_CH_PRIVATE *conn_info;
   int ret = IPC_OK;
@@ -1096,7 +1097,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 
   memset(&msg, 0, sizeof(msg));
-  msg.msg_iov =  g_new(sizeof(struct iovec, 1);
+  msg.msg_iov =  g_new(struct iovec, 1);
   msg.msg_iovlen = 1;
   msg.msg_control = (char *) cmsg;
   msg.msg_controllen = sizeof(cmsgmem);
