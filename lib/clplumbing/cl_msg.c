@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.10 2004/06/18 03:04:33 alan Exp $ */
+/* $Id: cl_msg.c,v 1.11 2004/06/24 20:44:29 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -627,13 +627,22 @@ ha_msg_addraw(struct ha_msg * msg, const char * name, size_t namelen,
 	strncpy(cpname, name, namelen);
 	cpname[namelen] = EOS;
 
-	if ((cpvalue = ha_malloc(vallen+1)) == NULL) {
-		cl_log(LOG_ERR, "ha_msg_addraw: no memory for string (value)");
-		return(HA_FAIL);
+	if(type == FT_STRING || type == FT_BINARY){
+		if ((cpvalue = ha_malloc(vallen+1)) == NULL) {
+			cl_log(LOG_ERR, "ha_msg_addraw: no memory for string (value)");
+			return(HA_FAIL);
+		}
+		memcpy(cpvalue, value, vallen);
+		cpvalue[vallen] = EOS;	
+	}else{
+		cpvalue = (char*)ha_msg_copy( (const struct ha_msg*) value);
+		if(cpvalue == NULL){
+			cl_log(LOG_ERR, "ha_msg_addraw: copying message failed");
+			ha_free(cpname);
+			return(HA_FAIL);
+		}
 	}
-	memcpy(cpvalue, value, vallen);
-	cpvalue[vallen] = EOS;	
-
+	
 	ret = ha_msg_addraw_ll(msg, cpname, namelen, cpvalue, vallen
 	,	type, depth);
 
@@ -663,29 +672,33 @@ int
 ha_msg_addstruct(struct ha_msg * msg, const char * name, void * value)
 {
 
-	char	*cpname;
-	int	namelen = strlen(name);
-	int	ret;
+	/* size is 0 because size is useless in this case*/
+	return ha_msg_addraw(msg, name, strlen(name), value, 0, FT_STRUCT, 0);
 
-	if ((cpname = ha_malloc(namelen+1)) == NULL) {
-		cl_log(LOG_ERR, "ha_msg_addstruct():"
-		       "allocate memory for name failed");
 
-		return(HA_FAIL);
+/*  	char	*cpname; */
+/*  	int	namelen = strlen(name); */
+/*  	int	ret; */
 
-	}
-	strncpy(cpname, name, namelen);
-	cpname[namelen] = EOS;
+/*  	if ((cpname = ha_malloc(namelen+1)) == NULL) { */
+/*  		cl_log(LOG_ERR, "ha_msg_addstruct():" */
+/*  		       "allocate memory for name failed"); */
 
-	ret = ha_msg_addraw_ll(msg, cpname, namelen, value,
-			       sizeof(struct ha_msg), FT_STRUCT, 0);
+/*  		return(HA_FAIL); */
 
-	if (ret !=  HA_OK){
-		cl_log(LOG_ERR, "ha_msg_addstruct(): ha_msg_addraw_ll failed");
-		ha_free(cpname);
-	}
+/*  	} */
+/*  	strncpy(cpname, name, namelen); */
+/*  	cpname[namelen] = EOS; */
 
-	return(ret);
+/*  	ret = ha_msg_addraw_ll(msg, cpname, namelen, value, */
+/*  			       sizeof(struct ha_msg), FT_STRUCT, 0); */
+
+/*  	if (ret !=  HA_OK){ */
+/*  		cl_log(LOG_ERR, "ha_msg_addstruct(): ha_msg_addraw_ll failed"); */
+/*  		ha_free(cpname); */
+/*  	} */
+
+/*  	return(ret); */
 }
 
 
@@ -857,40 +870,87 @@ cl_get_struct(const struct ha_msg *msg, const char* name)
 }
 
 
-/* Modify the value associated with a particular name */
-int
-ha_msg_mod(struct ha_msg * msg, const char * name, const char * value)
-{
-	int	j;
-
+static int
+cl_msg_mod(struct ha_msg * msg, const char * name,
+	       const void* value, size_t vlen, int type)
+{  
+  	int j;
+	
 	AUDITMSG(msg);
 	if (msg == NULL || name == NULL || value == NULL) {
-		cl_log(LOG_ERR, "ha_msg_mod: NULL input.");
+		cl_log(LOG_ERR, "cl_msg_mod: NULL input.");
 		return HA_FAIL;
 	}
 	for (j=0; j < msg->nfields; ++j) {
 		if (strcmp(name, msg->names[j]) == 0) {
-			char *	newv = ha_strdup(value);
-			int	newlen;
+			
+			char *	newv ;
+			int	newlen = vlen;
 			int	sizediff = 0;
-			if (newv == NULL) {
-				cl_log(LOG_ERR, "ha_msg_mod: out of memory");
+			
+			if (type != msg->types[j]){
+				cl_log(LOG_ERR, "cl_msg_mod: type mismatch");
 				return(HA_FAIL);
 			}
-			ha_free(msg->values[j]);
+			
+			if(type == FT_STRING || type == FT_BINARY){
+				newv =  ha_malloc(vlen + 1);
+				if (newv == NULL) {
+					cl_log(LOG_ERR, "cl_msg_mod: out of memory");
+					return(HA_FAIL);
+				}
+				
+			
+				memcpy(newv, value, vlen);
+				newv[vlen] = '\0';			
+				ha_free(msg->values[j]);
+			} else{
+				newv = (char*)ha_msg_copy( (const struct ha_msg*)value);
+				if( newv == NULL){
+					cl_log(LOG_ERR, "cl_msg_mod: make a message copy failed");
+					return(HA_FAIL);
+				}
+				ha_msg_del((struct ha_msg *) msg->values[j]);
+			}
+
+
 			msg->values[j] = newv;
-			newlen = strlen(value);
 			sizediff = newlen - msg->vlens[j];
 			msg->stringlen += sizediff;
 			msg->netstringlen += intlen(newlen) + newlen
-			-	intlen(msg->vlens[j]) - msg->vlens[j];
-
+				-	intlen(msg->vlens[j]) - msg->vlens[j];
+			
 			msg->vlens[j] = newlen;
 			AUDITMSG(msg);
 			return(HA_OK);
 		}
 	}
-	return(ha_msg_add(msg, name, value));
+	
+	return(ha_msg_nadd_type(msg, name,strlen(name), value, vlen, type));
+  
+}
+
+int
+cl_msg_modstruct(struct ha_msg * msg, const char* name, 
+		 const struct ha_msg* value)
+{
+	return cl_msg_mod(msg, name, value, 0, FT_STRUCT);	
+}
+
+int
+cl_msg_modbin(struct ha_msg * msg, const char* name, 
+	      const void* value, size_t vlen)
+{
+	return cl_msg_mod(msg, name, value, vlen, FT_BINARY);
+	
+}
+
+
+/* Modify the value associated with a particular name */
+int
+cl_msg_modstring(struct ha_msg * msg, const char * name, const char * value)
+{
+	return cl_msg_mod(msg, name, value, strlen(value), FT_STRING);
 }
 
 
@@ -1781,6 +1841,14 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.11  2004/06/24 20:44:29  gshi
+ * added cl_msg_modstring() cl_msg_modstruct() cl_msg_modbin()
+ * they call call cl_msg_mod()
+ *
+ *
+ * fixed a bug in cl_msg_addstruct() that will cause memory getting freed twice
+ * if a parent and its child message is deleted.
+ *
  * Revision 1.10  2004/06/18 03:04:33  alan
  * Changed a few checks for non-existent fields to return NULL
  * silently.  This is the right behavior (really!).
