@@ -117,6 +117,19 @@ struct RAExecOps {
 	 *	-2: failed due to other factors
 	 */
 	int (*get_resource_list)(GList ** rsc_info);
+	
+	/*
+	 * Description:
+	 * 	List the metadata of the resource agent this class
+	 *
+	 * Parameters:
+	 *	ra_type: the type of the ra 
+	 *
+	 * Return Value:
+	 *	!NULL : succeed. the RA metadata.
+	 *	NULL: failed
+	 */
+	char* (*get_resource_meta)(const char* ra_type);
 };
 
 #define RA_EXEC_TYPE	RAExec

@@ -262,6 +262,25 @@ struct lrm_ops
 	GList* 	(*get_rsc_type_supported)(ll_lrm_t*, const char* rsc_class);
 
 /*
+ *get_rsc_type_metadata:
+ *		Returns the metadata of the resource type
+ *
+ *return:	the metadata.
+ *
+ */
+	char* (*get_rsc_type_metadata)(ll_lrm_t*, const char* rsc_class,
+			const char* rsc_type);
+
+/*
+ *get_all_type_metadatas:
+ *		Returns all the metadata of the resource type of the class
+ *
+ *return:	A GHashtable, the key is the RA type, the value is the metadata.
+ *
+ */
+	GHashTable* (*get_all_type_metadatas)(ll_lrm_t*, const char* rsc_class);
+
+/*
  *get_all_rscs:
  *		Returns all resources.
  *

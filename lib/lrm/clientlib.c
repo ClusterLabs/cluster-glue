@@ -46,6 +46,9 @@ static int lrm_set_lrm_callback (ll_lrm_t* lrm,
 				 lrm_monitor_callback_t	monitor_callback_func);
 static GList* lrm_get_rsc_class_supported (ll_lrm_t* lrm);
 static GList* lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rsc_class);
+static char* lrm_get_rsc_type_metadata(ll_lrm_t* lrm, const char* rsc_class,
+					     const char* rsc_type);
+static GHashTable* lrm_get_all_type_metadatas(ll_lrm_t*, const char* rsc_class);
 static GList* lrm_get_all_rscs (ll_lrm_t* lrm);
 static lrm_rsc_t* lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id);
 static int lrm_add_rsc (ll_lrm_t*, const char* rsc_id, const char* rsc_class
@@ -63,6 +66,8 @@ static struct lrm_ops lrm_ops_instance =
 	lrm_set_lrm_callback,
 	lrm_get_rsc_class_supported,
 	lrm_get_rsc_type_supported,
+	lrm_get_rsc_type_metadata,
+	lrm_get_all_type_metadatas,
 	lrm_get_all_rscs,
 	lrm_get_rsc,
 	lrm_add_rsc,
@@ -437,6 +442,91 @@ lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rclass)
 	return type_list;
 }
 
+GHashTable*
+lrm_get_all_type_metadatas (ll_lrm_t* lrm, const char* rclass)
+{
+	client_log(LOG_INFO,"lrm_get_all_type_metadatas: start.");
+	const char* meta;
+	GHashTable* metas = g_hash_table_new(g_str_hash, g_str_equal);
+	GList* types = lrm_get_rsc_type_supported (lrm, rclass);
+	GList* node = NULL;
+	for(node = g_list_first(types); NULL!=node; node=g_list_next(node)) {
+		meta = lrm_get_rsc_type_metadata(lrm,rclass,node->data);
+		if (NULL == meta) {
+			continue;
+		}
+		g_hash_table_insert(metas,node->data,strdup(meta));
+	}
+
+	client_log(LOG_INFO,"lrm_get_all_type_metadatas: end.");
+	return metas;
+}
+
+char*
+lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype)
+{
+	struct ha_msg* msg;
+	struct ha_msg* ret;
+	const char* tmp = NULL;
+	char* metadata = NULL;
+	size_t len;
+	//check whether the channel to lrmd is available
+	client_log(LOG_INFO, "lrm_get_rsc_type_metadata: start.");
+	if (NULL == ch_cmd)
+	{
+		client_log(LOG_ERR,
+			"lrm_get_rsc_type_metadata: ch_mod is null.");
+		return NULL;
+	}
+	//create the get ra type message
+	msg = create_lrm_msg(GETRSCMETA);
+	if ( NULL == msg) {
+		client_log(LOG_ERR,
+			"lrm_get_rsc_type_metadata: can not create msg");
+		return NULL;
+	}
+	if ( HA_FAIL == ha_msg_add(msg, F_LRM_RCLASS, rclass))	{
+		return NULL;
+	}
+
+	if ( HA_FAIL == ha_msg_add(msg, F_LRM_RTYPE, rtype))	{
+		return NULL;
+	}
+
+	//send the msg to lrmd
+	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
+		ha_msg_del(msg);
+		client_log(LOG_ERR,
+			"lrm_get_rsc_type_supported: can not send msg to lrmd");
+		return NULL;
+	}
+	ha_msg_del(msg);
+	//get the return message
+	ret = msgfromIPC_noauth(ch_cmd);
+	if (NULL == ret) {
+		client_log(LOG_ERR,
+			"lrm_get_rsc_type_supported: can not recieve ret msg");
+		return NULL;
+	}
+	//get the rc of the message
+	if (HA_FAIL == get_rc_from_msg(ret)) {
+		ha_msg_del(ret);
+		client_log(LOG_ERR,
+			"lrm_get_rsc_type_supported: rc from msg is fail");
+		return NULL;
+	}
+
+	//get the metadata from message
+	tmp = cl_get_binary(ret, F_LRM_METADATA, &len);
+	
+	metadata= strndup(tmp,len);
+	ha_msg_del(ret);
+
+	client_log(LOG_INFO, "lrm_get_rsc_type_supported: end.");
+
+	return metadata;
+}
+
 GList*
 lrm_get_all_rscs (ll_lrm_t* lrm)
 {
@@ -447,7 +537,7 @@ lrm_get_all_rscs (ll_lrm_t* lrm)
 	client_log(LOG_INFO, "lrm_get_all_rscs: start.");
 
 	//check whether the channel to lrmd is available
-	if (NULL == ch_cmd)	{
+	if (NULL == ch_cmd) {
 		client_log(LOG_ERR, "lrm_get_all_rscs: ch_mod is null.");
 		return NULL;
 	}

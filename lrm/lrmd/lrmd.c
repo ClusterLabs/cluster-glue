@@ -130,6 +130,7 @@ static int on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_register(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg);
+static int on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg);
@@ -212,6 +213,7 @@ struct msg_map msg_maps[] = {
 	{FLUSHOPS,	TRUE,	on_msg_perform_op},
 	{SETMONITOR,	TRUE,	on_msg_set_monitor},
 	{GETRSCSTATE,	FALSE,	on_msg_get_state},
+	{GETRSCMETA,	FALSE, 	on_msg_get_metadata},
 };
 
 GMainLoop* mainloop 		= NULL;
@@ -865,7 +867,6 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 				typeinfo = g_list_next(typeinfo)) {
 				rsc_info_t* info = typeinfo->data;
 				types = g_list_append(types, info->rsc_type);
-				cl_log(LOG_INFO,"TYPE:%s\n",info->rsc_type);			
 			}
 		}
 		ret = create_lrm_ret(HA_OK, g_list_length(types)+2);
@@ -885,6 +886,60 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 	ha_msg_del(ret);
 
 	cl_log(LOG_INFO, "on_msg_get_rsc_types: end.");
+	return HA_OK;
+}
+
+int
+on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
+{
+	struct ha_msg* ret = NULL;
+	struct RAExecOps * RAExec = NULL;
+	const char* rtype = NULL;
+	const char* rclass = NULL;
+
+	cl_log(LOG_INFO, "on_msg_get_metadata: start.");
+
+	rtype = ha_msg_value(msg, F_LRM_RTYPE);
+	rclass = ha_msg_value(msg, F_LRM_RCLASS);
+
+
+	RAExec = g_hash_table_lookup(RAExecFuncs,rclass);
+	if (NULL == RAExec) {
+		cl_log(LOG_INFO,"on_msg_get_metadata: can not find class");
+	}
+	else {
+		const char* meta = RAExec->get_resource_meta(rtype);
+		if (NULL != meta) {		
+			cl_log(LOG_INFO,"TYPE:%s;META:%s\n",rtype,meta);
+
+			ret = create_lrm_ret(HA_OK, 5);
+			if (NULL == ret) {
+				cl_log(LOG_ERR,
+					"on_msg_get_metadata: can not create msg.");
+				return HA_FAIL;
+			}
+			ha_msg_addbin(ret,F_LRM_METADATA,meta, strlen(meta));
+//			ha_msg_add(ret,F_LRM_METADATA,meta);
+		}
+		else {
+			ret = create_lrm_ret(HA_FAIL, 5);
+			if (NULL == ret) {
+				cl_log(LOG_ERR,
+					"on_msg_get_metadata: can not create msg.");
+				return HA_FAIL;
+			}
+			
+		}
+	}
+
+
+	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
+		cl_log(LOG_ERR,
+			"on_msg_get_metadata: can not send the ret msg");
+	}
+	ha_msg_del(ret);
+
+	cl_log(LOG_INFO, "on_msg_get_metadata: end.");
 	return HA_OK;
 }
 
