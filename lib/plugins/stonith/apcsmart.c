@@ -297,7 +297,7 @@ APC_sh_serial_timeout(int sig)
     syslog(LOG_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    sa.sa_handler = SIG_DFL;
+    sa.sa_handler = (void (*)(int))SIG_DFL;
     sigemptyset(&sigmask);
     sa.sa_mask = sigmask;
     sa.sa_flags = 0;
@@ -341,7 +341,7 @@ APC_open_serialport(const char *port, speed_t speed)
     fd = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK | O_EXCL);
 
     alarm(0);
-    signal(SIGALRM, SIG_IGN);
+    IGNORESIG(SIGALRM);
 
     if (fd < 0) {
 
@@ -383,7 +383,7 @@ APC_open_serialport(const char *port, speed_t speed)
     fd = open(port, O_RDWR | O_NOCTTY | O_EXCL);
 
     alarm(0);
-    signal(SIGALRM, SIG_IGN);
+    IGNORESIG(SIGALRM);
 
     if (fd < 0) {
 
@@ -504,7 +504,7 @@ APC_recv_rsp(int upsfd, char *rsp)
 
 	    if (inp == ENDCHAR) {
 		alarm(0);
-		signal(SIGALRM, SIG_IGN);
+		IGNORESIG(SIGALRM);
 
 		*p = '\0';
 		return (S_OK);
@@ -517,7 +517,7 @@ APC_recv_rsp(int upsfd, char *rsp)
 
 	} else {
 	    alarm(0);
-	    signal(SIGALRM, SIG_IGN);
+	    IGNORESIG(SIGALRM);
 	    *p = '\0';
 	    return (f_serialtimeout ? S_TIMEOUT : S_ACCESS);
 	}
