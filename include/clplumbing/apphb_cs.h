@@ -50,7 +50,10 @@ struct apphb_msg {
 struct apphb_signupmsg {
 	char msgtype [APPHB_TLEN];
 	char appname [APPHB_OLEN];
+	char appinstance [APPHB_OLEN];
 	pid_t	pid;
+	uid_t	uid;
+	gid_t	gid;
 };
 
 /* App heartbeat setinterval message */
