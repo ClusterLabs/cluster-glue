@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.16 2004/09/07 21:42:59 gshi Exp $ */
+/* $Id: GSource.c,v 1.17 2004/09/14 15:07:29 gshi Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -22,6 +22,9 @@ struct GFDSource_s {
 	GDestroyNotify	dnotify;
 	guint		gsourceid;
 };
+
+
+typedef gboolean 	(*GCHdispatch)(IPC_Channel* ch, gpointer user_data);
 
 struct GCHSource_s {
 	unsigned	magno;	/* MAG_GCHSOURCE */
@@ -49,16 +52,14 @@ struct GWCSource_s {
 #define	DEF_EVENTS	(G_IO_IN|G_IO_PRI|G_IO_HUP|G_IO_ERR|G_IO_NVAL)
 #define	OUTPUT_EVENTS	(G_IO_OUT)
 
-static gboolean G_fd_prepare(gpointer source_data
-,       GTimeVal* current_time
-,       gint* timeout, gpointer user_data);
-static gboolean G_fd_check(gpointer source_data
-,       GTimeVal* current_time
-,       gpointer user_data);
-static gboolean G_fd_dispatch(gpointer source_data
-,       GTimeVal* current_time
-,       gpointer user_data);
-static void G_fd_destroy(gpointer user_data);
+
+static gboolean G_fd_prepare(GSource* source,
+			     gint* timeout);
+static gboolean G_fd_check(GSource* source);
+static gboolean G_fd_dispatch(GSource* source,
+			      GSourceFunc callback,
+			      gpointer user_data);
+static void G_fd_destroy(GSource* source);
 
 static GSourceFuncs G_fd_SourceFuncs = {
 	G_fd_prepare,
@@ -67,9 +68,32 @@ static GSourceFuncs G_fd_SourceFuncs = {
 	G_fd_destroy,
 };
 
+GSource*
+G_main_add_input(int priority, 
+		 gboolean can_recurse,
+		 GSourceFuncs* funcs)
+{
+	GSource * input_source = g_source_new(funcs, sizeof(GSource));
+	if (input_source == NULL){
+		cl_log(LOG_ERR, "create glib source for input failed!");		
+	}else {
+		g_source_set_priority(input_source, priority);
+		g_source_set_can_recurse(input_source, can_recurse);
+		if(g_source_attach(input_source, NULL) == 0){
+			cl_log(LOG_ERR, "attaching input_source to main context"
+			       " failed!! ");
+		}
+	}
+	
+	return input_source;
+}
+
+
 /*
  *	Add the given file descriptor to the gmainloop world.
  */
+
+#define GET_FD_SOURCE(src) (GFDSource*)((GSource*)(src)+1)
 
 GFDSource*
 G_main_add_fd(int priority, int fd, gboolean can_recurse
@@ -77,9 +101,13 @@ G_main_add_fd(int priority, int fd, gboolean can_recurse
 ,	gpointer userdata
 ,	GDestroyNotify notify)
 {
-	GFDSource*	ret = g_new(GFDSource, 1);
 
-	memset(ret, 0, sizeof(*ret));
+	GSource* source = g_source_new(&G_fd_SourceFuncs, 
+				      sizeof(GSource)
+				      + sizeof(GFDSource));
+	GFDSource* ret = GET_FD_SOURCE(source);
+	
+	memset(ret, 0, sizeof(GFDSource));
 	ret->magno = MAG_GFDSOURCE;
 	ret->udata = userdata;
 	ret->dispatch = dispatch;
@@ -87,17 +115,21 @@ G_main_add_fd(int priority, int fd, gboolean can_recurse
 	ret->gpfd.events = DEF_EVENTS;
 	ret->gpfd.revents = 0;
 	ret->dnotify = notify;
-
-	g_main_add_poll(&ret->gpfd, priority);
-
-	ret->gsourceid = g_source_add(priority, can_recurse
-	,	&G_fd_SourceFuncs
-	,	ret, ret, NULL);
-
+	
+	g_source_add_poll(source, &ret->gpfd);
+	
+	
+	g_source_set_priority(source, priority);
+	
+	g_source_set_can_recurse(source, can_recurse);	
+	
+	ret->gsourceid = g_source_attach(source, NULL);
+	
 	if (ret->gsourceid == 0) {
-		g_main_remove_poll(&ret->gpfd);
-		memset(ret, 0, sizeof(*ret));
-		g_free(ret);
+		g_source_remove_poll(source, &ret->gpfd);
+		memset(ret, 0, sizeof(GFDSource));
+		g_source_unref(source);
+		source = NULL;
 		ret = NULL;
 	}
 	return ret;
@@ -106,7 +138,26 @@ G_main_add_fd(int priority, int fd, gboolean can_recurse
 gboolean
 G_main_del_fd(GFDSource* fdp)
 {
-	return g_source_remove(fdp->gsourceid);
+	GSource * source;
+
+
+	if (fdp->gsourceid <= 0) {
+		cl_log(LOG_CRIT, "Bad gsource in G_main_del_fd");
+		return FALSE;
+	}
+	
+	source = g_main_context_find_source_by_id(NULL, fdp->gsourceid);
+	if (source == NULL){
+		cl_log(LOG_ERR, "Cannot find source using source id");
+		return FALSE;
+	}
+
+	g_source_unref(source);
+	
+	fdp->gsourceid = 0;
+
+	return TRUE;
+
 }
 
 void
@@ -123,11 +174,10 @@ g_main_output_is_blocked(GFDSource* fdp)
  *	Note that we don't modify 'timeout' either.
  */
 static gboolean
-G_fd_prepare(gpointer source_data
-,       GTimeVal* current_time
-,       gint* timeout, gpointer user_data)
+G_fd_prepare(GSource* source,
+	     gint* timeout)
 {
-	GFDSource*	fdp = source_data;
+	GFDSource*	fdp = GET_FD_SOURCE(source);
 	g_assert(IS_FDSOURCE(fdp));
 	return FALSE;
 }
@@ -137,12 +187,10 @@ G_fd_prepare(gpointer source_data
  */
 
 static gboolean
-G_fd_check(gpointer source_data
-,       GTimeVal* current_time
-,       gpointer user_data)
+G_fd_check(GSource* source)
+     
 {
-	GFDSource*	fdp = source_data;
-
+	GFDSource*	fdp = GET_FD_SOURCE(source);
 	g_assert(IS_FDSOURCE(fdp));
 	return fdp->gpfd.revents != 0;
 }
@@ -151,13 +199,15 @@ G_fd_check(gpointer source_data
  *	Some kind of event occurred - notify the user.
  */
 static gboolean
-G_fd_dispatch(gpointer source_data
-,       GTimeVal* current_time
-,       gpointer user_data)
+G_fd_dispatch(GSource* source,
+	      GSourceFunc callback,
+	      gpointer user_data)
 {
-	GFDSource*	fdp = source_data;
+	GFDSource*	fdp = GET_FD_SOURCE(source);
 
 	g_assert(IS_FDSOURCE(fdp));
+	
+
 	/* Is output now unblocked? 
 	 *
 	 * If so, turn off OUTPUT_EVENTS to avoid going into
@@ -166,11 +216,15 @@ G_fd_dispatch(gpointer source_data
 	if (fdp->gpfd.revents & OUTPUT_EVENTS) {
 		fdp->gpfd.events &= ~OUTPUT_EVENTS;
 	}
-
+	
 	if(fdp->dispatch) {
-		return fdp->dispatch(fdp->gpfd.fd, fdp->udata);
+		if(!(fdp->dispatch(fdp->gpfd.fd, fdp->udata))){
+			g_source_remove_poll(source,&fdp->gpfd);
+			g_source_unref(source);
+			return FALSE;
+		}
 	}
-
+	
 	return TRUE;
 }
 
@@ -178,34 +232,31 @@ G_fd_dispatch(gpointer source_data
  *	Free up our data, and notify the user process...
  */
 static void
-G_fd_destroy(gpointer user_data)
+G_fd_destroy(GSource* source)
 {
-	GFDSource*	fdp = user_data;
 
+	GFDSource*	fdp = GET_FD_SOURCE(source);
+	
 	g_assert(IS_FDSOURCE(fdp));
 	if (fdp->dnotify) {
 		fdp->dnotify(fdp->udata);
 	}
-	g_main_remove_poll(&fdp->gpfd);
-	g_source_remove(fdp->gsourceid);
-	memset(fdp, 0, sizeof(*fdp));
-	g_free(fdp);
-	fdp = NULL;
+	g_source_unref(source);
 }
+
 
 /************************************************************
  *		Functions for IPC_Channels
  ***********************************************************/
-static gboolean G_CH_prepare(gpointer source_data
-,       GTimeVal* current_time
-,       gint* timeout, gpointer user_data);
-static gboolean G_CH_check(gpointer source_data
-,       GTimeVal* current_time
-,       gpointer user_data);
-static gboolean G_CH_dispatch(gpointer source_data
-,       GTimeVal* current_time
-,       gpointer user_data);
-static void G_CH_destroy(gpointer user_data);
+static gboolean G_CH_prepare(GSource* source,
+			     gint* timeout);
+static gboolean G_CH_check(GSource* source);
+
+static gboolean G_CH_dispatch(GSource* source,
+			      GSourceFunc callback,
+			      gpointer user_data);
+static void G_CH_destroy(GSource* source);
+
 
 static GSourceFuncs G_CH_SourceFuncs = {
 	G_CH_prepare,
@@ -214,54 +265,69 @@ static GSourceFuncs G_CH_SourceFuncs = {
 	G_CH_destroy,
 };
 
+
+
+#define GET_CH_SOURCE(src)	(GCHSource*)(src +1)
 /*
  *	Add an IPC_channel to the gmainloop world...
  */
 GCHSource*
 G_main_add_IPC_Channel(int priority, IPC_Channel* ch
-,	gboolean can_recurse
-,	gboolean (*dispatch)(IPC_Channel* source_data
-,		gpointer        user_data)
-,	gpointer userdata
-,	GDestroyNotify notify)
+		       ,	gboolean can_recurse
+		       ,	gboolean (*dispatch)(IPC_Channel* source_data,
+						     gpointer        user_data)
+		       ,	gpointer userdata
+		       ,	GDestroyNotify notify)
 {
-	GCHSource*	ret = g_new(GCHSource, 1);
 	int		rfd, wfd;
+	
+	GCHSource* chp;
+	
+	GSource * source = g_source_new(&G_CH_SourceFuncs, 
+					sizeof(GSource)
+					+ sizeof(GCHSource));
+	
+	chp = GET_CH_SOURCE(source);
 
-	memset(ret, 0, sizeof(*ret));
-	ret->magno = MAG_GCHSOURCE;
-	ret->udata = userdata;
-	ret->ch = ch;
-	ret->dispatch = dispatch;
-	ret->dnotify = notify;
+	memset(chp, 0, sizeof(GCHSource));
+	
+	chp->magno = MAG_GCHSOURCE;
+	chp->ch = ch;
+	chp->dispatch = dispatch;
+	chp->udata=userdata;
+	chp->dnotify = notify;
 
 	rfd = ch->ops->get_recv_select_fd(ch);
 	wfd = ch->ops->get_send_select_fd(ch);
-
-	ret->fd_fdx = (rfd == wfd);
-
-	ret->infd.fd      = rfd;
-	ret->infd.events  = DEF_EVENTS;
-	g_main_add_poll(&ret->infd, priority);
-	if (!ret->fd_fdx) {
-		ret->outfd.fd      = wfd;
-		ret->outfd.events  = DEF_EVENTS;
-		g_main_add_poll(&ret->outfd, priority);
+	
+	chp->fd_fdx = (rfd == wfd);
+	
+	chp->infd.fd      = rfd;
+	chp->infd.events  = DEF_EVENTS;
+	g_source_add_poll(source, &chp->infd);
+	if (!chp->fd_fdx) {
+		chp->outfd.fd      = wfd;
+		chp->outfd.events  = DEF_EVENTS;
+		g_source_add_poll(source, &chp->outfd);
 	}
-	ret->gsourceid = g_source_add(priority, can_recurse
-	,	&G_CH_SourceFuncs
-	,	ret, ret, NULL);
 
-	if (ret->gsourceid == 0) {
-		g_main_remove_poll(&ret->infd);
-		if (!ret->fd_fdx) {
-			g_main_remove_poll(&ret->outfd);
+	g_source_set_priority(source, priority);
+	
+	g_source_set_can_recurse(source, can_recurse);
+	
+	chp->gsourceid = g_source_attach(source, NULL);
+	
+
+	if (chp->gsourceid == 0) {
+		g_source_remove_poll(source, &chp->infd);
+		if (!chp->fd_fdx) {
+			g_source_remove_poll(source, &chp->outfd);
 		}
-		memset(ret, 0, sizeof(*ret));
-		g_free(ret);
-		ret = NULL;
+		g_source_unref(source);
+		source = NULL;
+		chp = NULL;
 	}
-	return ret;
+	return chp;
 }
 
 
@@ -269,16 +335,26 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
  *	Delete an IPC_channel from the gmainloop world...
  */
 gboolean 
-G_main_del_IPC_Channel(GCHSource* fdp)
+G_main_del_IPC_Channel(GCHSource* chp)
 {
-	gboolean	rc;
-	if (fdp->gsourceid <= 0) {
+	/*gboolean	rc;*/
+/*  	GSource * source; */
+
+
+	if (chp->gsourceid <= 0) {
 		cl_log(LOG_CRIT, "Bad gsource in G_main_del_IPC_channel");
 		return FALSE;
 	}
-	rc = g_source_remove(fdp->gsourceid);
-	fdp->gsourceid = 0;
-	return rc;
+
+/*  	source = g_main_context_find_source_by_id(NULL, chp->gsourceid); */
+/*  	if (source == NULL){ */
+/*  		cl_log(LOG_ERR, "G_main_del_IPC_Channel: Cannot find source using source id"); */
+/*  		return FALSE; */
+/*  	} */
+
+/*  	g_source_unref(source); */
+	chp->gsourceid = 0;
+	return TRUE;
 }
 
 /*
@@ -288,12 +364,11 @@ G_main_del_IPC_Channel(GCHSource* fdp)
  *	Note that we don't modify 'timeout' either.
  */
 static gboolean
-G_CH_prepare(gpointer source_data
-,       GTimeVal* current_time
-,       gint* timeout, gpointer user_data)
+G_CH_prepare(GSource* source,
+	     gint* timeout)
 {
-	GCHSource*	chp = source_data;
-
+	GCHSource* chp = GET_CH_SOURCE(source);
+	
 	g_assert(IS_CHSOURCE(chp));
 	if (chp->ch->ops->is_sending_blocked(chp->ch)) {
 		if (chp->fd_fdx) {
@@ -310,27 +385,26 @@ G_CH_prepare(gpointer source_data
  */
 
 static gboolean
-G_CH_check(gpointer source_data
-,       GTimeVal* current_time
-,       gpointer user_data)
+G_CH_check(GSource* source)
 {
-	GCHSource*	chp = source_data;
 
+	GCHSource* chp = GET_CH_SOURCE(source);
+	
 	g_assert(IS_CHSOURCE(chp));
 	return (chp->infd.revents != 0
-	||	(!chp->fd_fdx && chp->outfd.revents != 0)
-	||	chp->ch->ops->is_message_pending(chp->ch));
+		||	(!chp->fd_fdx && chp->outfd.revents != 0)
+		||	chp->ch->ops->is_message_pending(chp->ch));
 }
 
 /*
  *	Some kind of event occurred - notify the user.
  */
 static gboolean
-G_CH_dispatch(gpointer source_data
-,       GTimeVal* current_time
-,       gpointer user_data)
+G_CH_dispatch(GSource * source,
+	      GSourceFunc callback,
+	      gpointer user_data)
 {
-	GCHSource*	chp = source_data;
+	GCHSource* chp = GET_CH_SOURCE(source);
 
 	g_assert(IS_CHSOURCE(chp));
 	/* Is output now unblocked? 
@@ -347,7 +421,7 @@ G_CH_dispatch(gpointer source_data
 	}
 #if 0
 	/* If we got a HUP then mark channel as disconnected */
-	if ((chp->infd.revents|chp->outfd.revents) & G_IO_HUP) {
+	if ((apend->infd.revents|chp->outfd.revents) & G_IO_HUP) {
 		/* CHEAT!! */
 		chp->ch->ch_status = IPC_DISCONNECT;
 	}else{
@@ -356,10 +430,18 @@ G_CH_dispatch(gpointer source_data
 #else
 	chp->ch->ops->resume_io(chp->ch);
 #endif
-	if(chp->dispatch) {
-		return chp->dispatch(chp->ch, chp->udata);
-	}
 
+	if(chp->dispatch) {
+		if(!(chp->dispatch(chp->ch, chp->udata))){
+			g_source_remove_poll(source, &chp->infd);
+			if (!chp->fd_fdx) {
+				g_source_remove_poll(source, &chp->outfd);
+	}
+			g_source_unref(source);
+			return FALSE;
+		}
+	}
+	
 	return TRUE;
 }
 
@@ -367,39 +449,31 @@ G_CH_dispatch(gpointer source_data
  *	Free up our data, and notify the user process...
  */
 static void
-G_CH_destroy(gpointer user_data)
+G_CH_destroy(GSource* source)
 {
-	/* This was the source_data parameter passed to g_source_add */
-	/* It is a GCHSource* object */
-	GCHSource*	chp = user_data;
+	GCHSource* chp = GET_CH_SOURCE(source);
 
 	g_assert(IS_CHSOURCE(chp));
-	g_main_remove_poll(&chp->infd);
-	if (!chp->fd_fdx) {
-		g_main_remove_poll(&chp->outfd);
-	}
+	
 	if (chp->dnotify) {
 		chp->dnotify(chp->udata);
-	}
-	g_source_remove(chp->gsourceid);
+	}	
 	chp->ch->ops->destroy(chp->ch);
-	memset(chp, 0, sizeof(*chp));
-	g_free(chp);
+	
+	g_source_destroy(source);
 }
+
 
 /************************************************************
  *		Functions for IPC_WaitConnections
  ***********************************************************/
-static gboolean G_WC_prepare(gpointer source_data
-,       GTimeVal* current_time
-,       gint* timeout, gpointer user_data);
-static gboolean G_WC_check(gpointer source_data
-,       GTimeVal* current_time
-,       gpointer user_data);
-static gboolean G_WC_dispatch(gpointer source_data
-,       GTimeVal* current_time
-,       gpointer user_data);
-static void G_WC_destroy(gpointer user_data);
+static gboolean G_WC_prepare(GSource * source,
+			     gint* timeout);
+static gboolean G_WC_check(GSource* source);
+static gboolean G_WC_dispatch(GSource* source, 
+			      GSourceFunc callback,
+			      gpointer user_data);
+static void G_WC_destroy(GSource* source);
 
 static GSourceFuncs G_WC_SourceFuncs = {
 	G_WC_prepare,
@@ -407,6 +481,9 @@ static GSourceFuncs G_WC_SourceFuncs = {
 	G_WC_dispatch,
 	G_WC_destroy,
 };
+
+#define GET_WC_SOURCE(src)	(GWCSource*)(src +1)
+
 /*
  *	Add an IPC_WaitConnection to the gmainloop world...
  */
@@ -421,40 +498,57 @@ G_main_add_IPC_WaitConnection(int priority
 ,	GDestroyNotify notify)
 {
 
-
-	GWCSource*	ret = g_new(GWCSource, 1);
-
-	memset(ret, 0, sizeof(*ret));
-	ret->magno = MAG_GWCSOURCE;
-	ret->udata = userdata;
-	ret->gpfd.fd = wch->ops->get_select_fd(wch);
-	ret->gpfd.events = DEF_EVENTS;
-	ret->gpfd.revents = 0;
-	ret->wch = wch;
-	ret->dnotify = notify;
-	ret->auth_info = auth_info;
-	ret->dispatch = dispatch;
-
-	g_main_add_poll(&ret->gpfd, priority);
-
-	ret->gsourceid = g_source_add(priority, can_recurse
-	,	&G_WC_SourceFuncs
-	,	ret, ret, NULL);
-
-	if (ret->gsourceid == 0) {
-		g_main_remove_poll(&ret->gpfd);
-		memset(ret, 0, sizeof(*ret));
-		g_free(ret);
-		ret = NULL;
+	GWCSource* wcp;
+	GSource * source = g_source_new(&G_WC_SourceFuncs, 
+					sizeof(GSource)
+					+ sizeof(GWCSource));
+	
+	wcp = GET_WC_SOURCE(source);
+	
+	memset(wcp, 0, sizeof(GWCSource));
+	wcp->magno = MAG_GWCSOURCE;
+	wcp->udata = userdata;
+	wcp->gpfd.fd = wch->ops->get_select_fd(wch);
+	wcp->gpfd.events = DEF_EVENTS;
+	wcp->gpfd.revents = 0;
+	wcp->wch = wch;
+	wcp->dnotify = notify;
+	wcp->auth_info = auth_info;
+	wcp->dispatch = dispatch;
+	
+	g_source_add_poll(source, &wcp->gpfd);
+	
+	g_source_set_priority(source, priority);
+	
+	g_source_set_can_recurse(source, can_recurse);
+	
+	wcp->gsourceid = g_source_attach(source, NULL);
+	
+	if (wcp->gsourceid == 0) {
+		g_source_remove_poll(source, &wcp->gpfd);
+		g_source_unref(source);
+		source = NULL;
+		wcp = NULL;
 	}
-	return ret;
+	return wcp;
 }
 
 
 /* Delete the given IPC_WaitConnection from the gmainloop world */
 gboolean G_main_del_IPC_WaitConnection(GWCSource* wcp)
 {
-	return g_source_remove(wcp->gsourceid);
+
+	GSource* source = g_main_context_find_source_by_id(NULL, wcp->gsourceid);
+	if (source == NULL){
+		cl_log(LOG_ERR, "G_main_del_IPC_WaitConnection: Cannot find source using source id");
+		return FALSE;
+	}
+
+	g_source_unref(source);
+	
+	wcp->gsourceid = 0;
+
+	return TRUE;
 }
 
 
@@ -466,11 +560,11 @@ gboolean G_main_del_IPC_WaitConnection(GWCSource* wcp)
  *	We don't modify 'timeout' either.
  */
 static gboolean
-G_WC_prepare(gpointer source_data
-,       GTimeVal* current_time
-,       gint* timeout, gpointer user_data)
+G_WC_prepare(GSource* source,
+	     gint* timeout)
 {
-	GWCSource*	wcp = source_data;
+	GWCSource*  wcp = GET_WC_SOURCE(source);
+	
 	g_assert(IS_WCSOURCE(wcp));
 	return FALSE;
 }
@@ -480,13 +574,12 @@ G_WC_prepare(gpointer source_data
  */
 
 static gboolean
-G_WC_check(gpointer source_data
-,       GTimeVal* current_time
-,       gpointer user_data)
+G_WC_check(GSource * source)
 {
-	GWCSource*	wcp = source_data;
-
+	GWCSource*  wcp = GET_WC_SOURCE(source);
+	
 	g_assert(IS_WCSOURCE(wcp));
+
 	return wcp->gpfd.revents != 0;
 }
 
@@ -495,30 +588,32 @@ G_WC_check(gpointer source_data
  *	Try to accept the connection and notify the user.
  */
 static gboolean
-G_WC_dispatch(gpointer source_data
-,       GTimeVal* current_time
-,       gpointer user_data)
+G_WC_dispatch(GSource* source,
+	      GSourceFunc callback,
+	      gpointer user_data)
 {
-	GWCSource*	wcp = source_data;
+	GWCSource*  wcp = GET_WC_SOURCE(source);
 	IPC_Channel*	ch;
 	gboolean	rc = TRUE;
 	int		count = 0;
-
+	
 	g_assert(IS_WCSOURCE(wcp));
-       
+	
         while(1) {
 		ch = wcp->wch->ops->accept_connection(wcp->wch, wcp->auth_info);
 		if (ch == NULL) {
 			break;
 	  	}
 		++count;
-
+		
 		if(!wcp->dispatch) {
 			continue;
 		}
 
 		rc = wcp->dispatch(ch, wcp->udata);
 		if(!rc) {
+			g_source_remove_poll(source, &wcp->gpfd);
+			g_source_unref(source);
 			break;
 		}
 	}
@@ -529,18 +624,15 @@ G_WC_dispatch(gpointer source_data
  *	Free up our data, and notify the user process...
  */
 static void
-G_WC_destroy(gpointer user_data)
+G_WC_destroy(GSource* source)
 {
-	GWCSource*	wcp = user_data;
-
+	
+	GWCSource*  wcp = GET_WC_SOURCE(source);
+	
 	g_assert(IS_WCSOURCE(wcp));
-	g_main_remove_poll(&wcp->gpfd);
-	g_source_remove(wcp->gsourceid);
 	wcp->wch->ops->destroy(wcp->wch);
 	if (wcp->dnotify) {
 		wcp->dnotify(wcp->udata);
 	}
-	memset(wcp, 0, sizeof(*wcp));
-	g_free(wcp);
-	wcp = NULL;
+	g_source_destroy(source);
 }

@@ -1,4 +1,4 @@
-/* $Id: GSource.h,v 1.4 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: GSource.h,v 1.5 2004/09/14 15:07:29 gshi Exp $ */
 #ifndef _CLPLUMBING_GSOURCE_H
 #	define _CLPLUMBING_GSOURCE_H
 #	include <clplumbing/ipc.h>
@@ -6,6 +6,17 @@
 typedef	struct GFDSource_s	GFDSource;
 typedef struct GCHSource_s	GCHSource;
 typedef struct GWCSource_s	GWCSource;
+
+
+
+/***********************************************************************
+ *	Functions for interfacing input to the mainloop
+ ***********************************************************************/
+
+GSource*
+G_main_add_input(int priority, 
+		 gboolean can_recurse,
+		 GSourceFuncs* funcs);
 
 /***********************************************************************
  *	Functions for interfacing "raw" file descriptors to the mainloop
