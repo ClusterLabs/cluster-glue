@@ -311,7 +311,7 @@ riloe_reset_req(Stonith * s, int request, const char * host)
 		syslog(LOG_ERR, "invalid argument to %s", __FUNCTION__);
 		return(S_OOPS);
 	}
-	syslog(LOG_INFO, _("Host %s riloe-reset."), host);
+	syslog(LOG_INFO, "%s '%s'", _("riloe-reset host"), host);
 
 	sprintf(cmd, "%s %s reset", RILOE_COMMAND, host);
 
