@@ -1,4 +1,4 @@
-/* $Id: apcsmart.c,v 1.20 2004/10/24 13:00:14 lge Exp $ */
+/* $Id: apcsmart.c,v 1.21 2004/11/12 15:49:46 alan Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>
@@ -27,10 +27,6 @@
 
 /*
  * APCSmart (tested with 2 old 900XLI)
- *
- * no configfile needed. every host performing resets using
- * this module must be connected to a ups via /dev/ups,
- * /dev/ups is a symlink to the proper tty device.
  *
  * the reset is a combined reset (cmd: S@000).
  * that means if the ups is online, a scheduled reset (20s delay)
@@ -514,7 +510,9 @@ APC_set_ups_var(int upsfd, const char *cmd, char *newval)
 	}
     }
 
-    LOG(PIL_CRIT, "%s: variable '%s' wrapped!", __FUNCTION__, cmd);
+    LOG(PIL_CRIT, "%s(): variable '%s' wrapped!", __FUNCTION__, cmd);
+    LOG(PIL_CRIT, "%s(): This UPS may not support STONITH :-("
+    ,	 __FUNCTION__);
 
     return (S_OOPS);
 }
@@ -867,19 +865,19 @@ apcsmart_getinfo(Stonith * s, int reqtype)
 		break;
 
     	case ST_CONF_INFO_SYNTAX:
-        	ret = _("hostname devicename\n"
+        	ret = _("devicename hostname\n"
                 	"The hostname and devicename are white-space delimited.");
         	break;
 
     	case ST_CONF_FILE_SYNTAX:
-        	ret = _("hostname devicename\n"
+        	ret = _("devicename hostname\n"
                 	"The hostname and devicename are white-space delimited.\n"
-                	"All three items must be on one line.\n"
+                	"Both items must be on one line.\n"
                 	"Blank lines and lines beginning with # are ignored.");
 		break;
 
 	case ST_DEVICEDESCR:
-		ret = _("APC Smart UPS (via serial port)");
+		ret = _("APC Smart UPS (via serial port - model must be >= Smart-UPS 750)");
 		break;
 
 	case ST_DEVICEURL:
