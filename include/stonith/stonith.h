@@ -1,4 +1,4 @@
-/* $Id: stonith.h,v 1.9 2004/10/05 14:26:16 lars Exp $ */
+/* $Id: stonith.h,v 1.10 2004/10/07 11:22:27 lars Exp $ */
 /*
  *	S hoot
  *	T he
@@ -39,6 +39,8 @@
 
 #ifndef __STONITH_H
 #	define __STONITH_H
+
+#include <glib.h>
 
 /*
  *	Return codes from "Stonith" member functions.
@@ -185,11 +187,11 @@ stonith_free_hostlist (char ** hlist)
     return;
   }
   while (*hl) {
-    free(*hl);
+    g_free(*hl);
     *hl = NULL;
     ++hl;
   }
-  free(hlist);
+  g_free(hlist);
   hlist = NULL;
 }
 
