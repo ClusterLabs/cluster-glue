@@ -35,18 +35,32 @@ extern int	optind, opterr, optopt;
 void usage(const char * cmd, int exit_status);
 void confhelp(const char * cmd, FILE* stream);
 
+/*
+ * Note that we don't use the cl_log logging code because the STONITH
+ * command is intended to be shipped without the clplumbing libraries.
+ *
+ *	:-(
+ */
+
 void
 usage(const char * cmd, int exit_status)
 {
 	FILE *stream;
 
-	stream=(exit_status)?stderr:stdout;
+	stream = exit_status ? stderr : stdout;
 
 	fprintf(stream, "usage: %s [-sSlLvh] "
-	"[-t devicetype] "
-	"[-F options-file] "
-	"[-p stonith-parameters] "
+	"[-t stonith-device-type] "
+	"[-p stonith-device-parameters] "
+	"[-F stonith-device-parameters-file] "
 	"nodename\n", cmd);
+
+	fprintf(stream, "\t-L\tlist supported stonith device types\n");
+	fprintf(stream, "\t-l\tlist hosts controlled by this stonith device\n");
+	fprintf(stream, "\t-S\treport stonith device status\n");
+	fprintf(stream, "\t-s\tsilent\n");
+	fprintf(stream, "\t-v\tverbose\n");
+	fprintf(stream, "\t-h\tget this help message\n");
 
 	confhelp(cmd, stream);
 
@@ -203,7 +217,7 @@ main(int argc, char** argv)
 #ifndef LOG_PERROR
 #	define LOG_PERROR	0
 #endif
-	openlog(cmdname, (LOG_CONS|(silent ? 0 : LOG_PERROR)), LOG_DAEMON);
+	openlog(cmdname, (LOG_CONS|(silent ? 0 : LOG_PERROR)), LOG_USER);
 	s = stonith_new(SwitchType);
 
 	if (s == NULL) {
