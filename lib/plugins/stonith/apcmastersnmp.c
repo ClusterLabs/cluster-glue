@@ -1,7 +1,8 @@
-/* $Id: apcmastersnmp.c,v 1.17 2004/10/24 13:00:14 lge Exp $ */
+/* $Id: apcmastersnmp.c,v 1.18 2005/01/31 09:45:31 sunjd Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
+ * Mangled by Sun Jiang Dong <sunjd@cn.ibm.com>, IBM, 2005
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -55,23 +56,23 @@
     	LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);	\
     }
 
-static void *	apcmastersnmp_new(void);
-static void	apcmastersnmp_destroy(Stonith *);
-static int	apcmastersnmp_set_config_file(Stonith *, const char * cfgname);
-static int	apcmastersnmp_set_config_info(Stonith *, const char * info);
-static const char *	apcmastersnmp_getinfo(Stonith * s, int InfoType);
-static int	apcmastersnmp_status(Stonith * );
-static int	apcmastersnmp_reset_req(Stonith * s, int request, const char * host);
-static char **		apcmastersnmp_hostlist(Stonith  *);
+static StonithPlugin *	apcmastersnmp_new(void);
+static void	apcmastersnmp_destroy(StonithPlugin *);
+static const char **	apcmastersnmp_get_confignames(StonithPlugin *);
+static int	apcmastersnmp_set_config(StonithPlugin *, StonithNVpair *);
+static const char *	apcmastersnmp_getinfo(StonithPlugin * s, int InfoType);
+static int	apcmastersnmp_status(StonithPlugin * );
+static int	apcmastersnmp_reset_req(StonithPlugin * s, int request, const char * host);
+static char **	apcmastersnmp_hostlist(StonithPlugin  *);
 
 static struct stonith_ops apcmastersnmpOps ={
 	apcmastersnmp_new,		/* Create new STONITH object	*/
 	apcmastersnmp_destroy,		/* Destroy STONITH object	*/
-	apcmastersnmp_set_config_file,	/* set configuration from file	*/
-	apcmastersnmp_set_config_info,	/* Get configuration from file	*/
 	apcmastersnmp_getinfo,		/* Return STONITH info string	*/
+	apcmastersnmp_get_confignames,	/* Get configuration parameters	*/
+	apcmastersnmp_set_config,	/* Set configuration */
 	apcmastersnmp_status,		/* Return STONITH device status	*/
-	apcmastersnmp_reset_req,		/* Request a reset */
+	apcmastersnmp_reset_req,	/* Request a reset */
 	apcmastersnmp_hostlist,		/* Return list of supported hosts */
 };
 
@@ -127,10 +128,12 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 #define OID_OUTLET_REBOOT_DURATION	".1.3.6.1.4.1.318.1.1.4.5.2.1.5.%i"
 
 /* own defines */
-#define MAX_STRING			128
+#define MAX_STRING		128
+#define ST_PORT			"port"
 
 /* structur of stonith object */
 struct pluginDevice {
+	StonithPlugin		sp;		/* StonithPlugin object */
 	const char*		pluginid;	/* id of object		*/
 	struct snmp_session*	sptr;		/* != NULL->session created */
 	char *			hostname;	/* masterswitch's hostname  */
@@ -154,7 +157,6 @@ static const char *NOTpluginID = "destroyed (APCMasterswitch)";
 
 static struct snmp_session *APC_open(char *hostname, int port
 ,	char *community);
-static int APC_parse_config_info(struct pluginDevice *ad, const char *info);
 static void *APC_read(struct snmp_session *sptr, const char *objname
 ,	int type);
 static int APC_write(struct snmp_session *sptr, const char *objname
@@ -207,63 +209,6 @@ APC_open(char *hostname, int port, char *community)
 /*
  * parse config
  */
-
-static int
-APC_parse_config_info(struct pluginDevice *ad, const char *info)
-{
-    static char hostname[MAX_STRING];
-    static int port;
-    static char community[MAX_STRING];
-    int *i;
-
-    DEBUGCALL;
-
-    if (sscanf(info, "%s %i %s", hostname, &port, community) == 3) {
-
-	ad->hostname = hostname;
-	ad->port = port;
-	ad->community = community;
-
-	/* try to resolve the hostname/ip-address */
-	if (gethostbyname(hostname) != NULL) {
-
-        /* init snmp library */
-        init_snmp("apcmastersnmp");
-
-	    /* now try to get a snmp session */
-	    if ((ad->sptr = APC_open(hostname, port, community)) != NULL) {
-
-		/* ok, get the number of outlets from the masterswitch */
-		if ((i = APC_read(ad->sptr, OID_NUM_OUTLETS, ASN_INTEGER))
-		    == NULL) {
-		    	LOG(PIL_DEBUG
-			, "%s: cannot read number of outlets."
-			,	__FUNCTION__);
-			return (S_ACCESS);
-		}
-		/* store the number of outlets */
-		ad->num_outlets = *i;
-		if (Debug) {
-			LOG(PIL_DEBUG, "%s: number of outlets: %i"
-			,	__FUNCTION__, ad->num_outlets );
-		}
-
-
-		/* Everything went well */
-		ad->config = TRUE;
-		return (S_OK);
-	    }
-	    if (Debug) {
-		LOG(PIL_DEBUG, "%s: cannot create snmp session"
-		,	__FUNCTION__);
-	    }
-	}
-	LOG(PIL_DEBUG, "%s: cannot resolve hostname '%s'"
-	,	__FUNCTION__, hostname);
-    }
-    /* no valid config */
-    return (S_BADCONFIG);
-}
 
 /*
  * read value of given oid and return it as string
@@ -381,7 +326,7 @@ APC_write(struct snmp_session *sptr, const char *objname, char type,
  */
 
 static int
-apcmastersnmp_status(Stonith * s)
+apcmastersnmp_status(StonithPlugin * s)
 {
     struct pluginDevice *ad;
     char *ident;
@@ -391,7 +336,7 @@ apcmastersnmp_status(Stonith * s)
 
     ERRIFNOTCONFIGED(s, S_OOPS);
 
-    ad = (struct pluginDevice *) s->pinfo;
+    ad = (struct pluginDevice *) s;
 
     if ((ident = APC_read(ad->sptr, OID_IDENT, ASN_OCTET_STR)) == NULL) {
 	if (Debug) {
@@ -417,7 +362,7 @@ apcmastersnmp_status(Stonith * s)
  */
 
 static char **
-apcmastersnmp_hostlist(Stonith * s)
+apcmastersnmp_hostlist(StonithPlugin * s)
 {
     char **hl;
     struct pluginDevice *ad;
@@ -429,7 +374,7 @@ apcmastersnmp_hostlist(Stonith * s)
 
     ERRIFNOTCONFIGED(s, NULL);
 
-    ad = (struct pluginDevice *) s->pinfo;
+    ad = (struct pluginDevice *) s;
 
     /* allocate memory for array of up to NUM_OUTLETS strings */
     if ((hl = (char **) MALLOC(ad->num_outlets * sizeof(char *))) == NULL) {
@@ -491,7 +436,7 @@ apcmastersnmp_hostlist(Stonith * s)
  */
 
 static int
-apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
+apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 {
     struct pluginDevice *ad;
     char objname[MAX_STRING];
@@ -505,7 +450,7 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 
     ERRIFNOTCONFIGED(s, S_OOPS);
 
-    ad = (struct pluginDevice *) s->pinfo;
+    ad = (struct pluginDevice *) s;
 
     num_outlets = 0;
     reboot_duration = 0;
@@ -684,52 +629,84 @@ apcmastersnmp_reset_req(Stonith * s, int request, const char *host)
 }
 
 /*
- * parse the information in the given configuration file,
- * and stash it away... 
+ * Get the configuration parameter names.
  */
 
-static int
-apcmastersnmp_set_config_file(Stonith * s, const char *configname)
+static const char **
+apcmastersnmp_get_confignames(StonithPlugin * s)
 {
-    FILE *cfgfile;
-    char confline[MAX_STRING];
-    struct pluginDevice *ad;
-
-    DEBUGCALL;
-
-    ERRIFWRONGDEV(s,S_INVAL);    
-
-    ad = (struct pluginDevice *) s->pinfo;
-
-    if ((cfgfile = fopen(configname, "r")) == NULL) {
-	LOG(PIL_CRIT, "Cannot open %s", configname);
-	return (S_BADCONFIG);
-    }
-
-    while (fgets(confline, sizeof(confline), cfgfile) != NULL) {
-	if (*confline == '#' || *confline == '\n' || *confline == EOS)
-	    continue;
-	return (APC_parse_config_info(ad, confline));
-    }
-    return (S_BADCONFIG);
+	static const char * ret[] = {ST_IPADDR, ST_PORT, ST_COMMUNITY, NULL};
+	return ret;
 }
 
 /*
- * Parse the config information in the given string, and stash it away... 
+ * Set the configuration parameters.
  */
 
 static int
-apcmastersnmp_set_config_info(Stonith * s, const char *info)
+apcmastersnmp_set_config(StonithPlugin * s, StonithNVpair * list)
 {
-    struct pluginDevice *ad;
+	struct pluginDevice* sd = (struct pluginDevice *)s;
+	int	rc;
+	int *	i;
+	StonithNamesToGet	namestoget [] =
+	{	{ST_IPADDR,	NULL}
+	,	{ST_PORT,	NULL}
+	,	{ST_COMMUNITY,	NULL}
+	,	{NULL,		NULL}
+	};
 
-    DEBUGCALL;
-    
-    ERRIFWRONGDEV(s,S_INVAL);
+	DEBUGCALL;
+	ERRIFWRONGDEV(s,S_INVAL);
+	if (sd->sp.isconfigured) {
+		return S_OOPS;
+	}
 
-    ad = (struct pluginDevice *) s->pinfo;
+	if ((rc=OurImports->GetAllValues(namestoget, list)) != S_OK) {
+		return rc;
+	}
+	sd->hostname = namestoget[0].s_value;
+	sd->port = atoi(namestoget[1].s_value);
+	sd->community = namestoget[2].s_value;
 
-    return (APC_parse_config_info(ad, info));
+        /* try to resolve the hostname/ip-address */
+	if (gethostbyname(sd->hostname) != NULL) {
+        	/* init snmp library */
+		init_snmp("apcmastersnmp");
+
+		/* now try to get a snmp session */
+		if ((sd->sptr = APC_open(sd->hostname, sd->port, sd->community)) != NULL) {
+
+			/* ok, get the number of outlets from the masterswitch */
+			if ((i = APC_read(sd->sptr, OID_NUM_OUTLETS, ASN_INTEGER))
+                    		== NULL) {
+				LOG(PIL_DEBUG
+					, "%s: cannot read number of outlets."
+					,       __FUNCTION__);
+				return (S_ACCESS);
+			}
+			/* store the number of outlets */
+			sd->num_outlets = *i;
+			if (Debug) {
+				LOG(PIL_DEBUG, "%s: number of outlets: %i"
+				,       __FUNCTION__, sd->num_outlets );
+			}
+
+			/* Everything went well */
+			sd->config = TRUE;
+			return (S_OK);
+		}
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: cannot create snmp session"
+			,       __FUNCTION__);
+		}
+	} else {
+		LOG(PIL_DEBUG, "%s: cannot resolve hostname '%s'"
+		,       __FUNCTION__, sd->hostname);
+	}
+
+	/* not a valid config */
+	return (S_BADCONFIG);
 }
 
 /*
@@ -737,7 +714,7 @@ apcmastersnmp_set_config_info(Stonith * s, const char *info)
  */
 
 static const char *
-apcmastersnmp_getinfo(Stonith * s, int reqtype)
+apcmastersnmp_getinfo(StonithPlugin * s, int reqtype)
 {
     struct pluginDevice *ad;
     const char *ret = NULL;
@@ -746,23 +723,11 @@ apcmastersnmp_getinfo(Stonith * s, int reqtype)
 
     ERRIFWRONGDEV(s, NULL);
 
-    ad = (struct pluginDevice *) s->pinfo;
+    ad = (struct pluginDevice *) s;
 
     switch (reqtype) {
 	    case ST_DEVICEID:
 		ret = ad->pluginid;
-		break;
-
-	    case ST_CONF_INFO_SYNTAX:
-		ret = _("hostname/ip-address port community\n"
-			"The hostname/IP-address, SNMP port and community string are white-space delimited.");
-		break;
-
-	    case ST_CONF_FILE_SYNTAX:
-		ret = _("hostname/ip-address port community\n"
-			"The hostname/IP-address, SNMP port and community string are white-space delimited.\n"
-			"All items must be on one line.\n"
-			"Blank lines and lines beginning with # are ignored.");
 		break;
 
 	    case ST_DEVICEDESCR:
@@ -780,11 +745,11 @@ apcmastersnmp_getinfo(Stonith * s, int reqtype)
 
 
 /*
- * APC Stonith destructor... 
+ * APC StonithPlugin destructor... 
  */
 
 static void
-apcmastersnmp_destroy(Stonith * s)
+apcmastersnmp_destroy(StonithPlugin * s)
 {
 	struct pluginDevice *ad;
 
@@ -792,7 +757,7 @@ apcmastersnmp_destroy(Stonith * s)
 
 	VOIDERRIFWRONGDEV(s);
 
-	ad = (struct pluginDevice *) s->pinfo;
+	ad = (struct pluginDevice *) s;
 
 	ad->pluginid = NOTpluginID;
 	ad->config = FALSE;
@@ -813,11 +778,11 @@ apcmastersnmp_destroy(Stonith * s)
 }
 
 /*
- * Create a new APC Stonith device.  Too bad this function can't be
+ * Create a new APC StonithPlugin device.  Too bad this function can't be
  * static 
  */
 
-static void *
+static StonithPlugin *
 apcmastersnmp_new(void)
 {
 	struct pluginDevice *ad = MALLOCT(struct pluginDevice);
@@ -839,7 +804,8 @@ apcmastersnmp_new(void)
 	ad->hostname = NULL;
 	ad->community = NULL;
 	ad->num_outlets = 0;
+	ad->sp.s_ops = &apcmastersnmpOps;
 
 	/* return the object */
-	return ((void *) ad);
+	return (&(ad->sp));
 }

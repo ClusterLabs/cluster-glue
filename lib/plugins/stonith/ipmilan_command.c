@@ -1,4 +1,4 @@
-/* $Id: ipmilan_command.c,v 1.7 2004/10/09 01:49:42 lge Exp $ */
+/* $Id: ipmilan_command.c,v 1.8 2005/01/31 09:45:31 sunjd Exp $ */
 /*
  * This program is largely based on the ipmicmd.c program that's part of OpenIPMI package.
  * 
@@ -60,14 +60,7 @@ typedef enum chassis_control_request {
 } chassis_control_request_t;
 
 void dump_msg_data(ipmi_msg_t *msg, ipmi_addr_t *addr, char *type);
-void rsp_handler(ipmi_con_t *ipmi,
-		ipmi_addr_t *addr,
-		unsigned int addr_len,
-		ipmi_msg_t *rsp,
-		void *data1,
-		void *data2,
-		void *data3,
-		void *data4);
+int rsp_handler(ipmi_con_t *ipmi, ipmi_msgi_t *rsp);
 
 void send_ipmi_cmd(ipmi_con_t *con, int request);
 
@@ -135,20 +128,13 @@ dump_msg_data(ipmi_msg_t *msg, ipmi_addr_t *addr, char *type)
  *
  */
 
-void
-rsp_handler(ipmi_con_t *ipmi,
-		ipmi_addr_t *addr,
-		unsigned int addr_len,
-		ipmi_msg_t *rsp,
-		void *data1,
-		void *data2,
-		void *data3,
-		void *data4)
+int
+rsp_handler(ipmi_con_t *ipmi, ipmi_msgi_t *rsp)
 {
 	int rv;
 	int * request;
 
-	request = (int *) data1;
+	request = (int *) rsp->data1;
 
 #if 0
 	dump_msg_data(rsp, addr, NULL);
@@ -164,7 +150,7 @@ rsp_handler(ipmi_con_t *ipmi,
 	}
 
 	free(request);
-	return;
+	return gstatus;
 }
 
 void
@@ -175,7 +161,7 @@ send_ipmi_cmd(ipmi_con_t *con, int request)
 	ipmi_msg_t msg;
 	struct ipmi_system_interface_addr *si;
 	int rv;
-	int * data1;
+	ipmi_msgi_t msgi;
 	/* chassis control command request is only 1 byte long */
 	unsigned char cc_data = POWER_CYCLE; 
 
@@ -215,11 +201,9 @@ send_ipmi_cmd(ipmi_con_t *con, int request)
 			return;
 	}
 
-	data1 = (int *) malloc(sizeof(int));
-	*data1 = request;
-
-	rv = con->send_command(con, &addr, addr_len, &msg, rsp_handler, 
-				data1, NULL, NULL, NULL);
+	msgi.data1 = (int *) malloc(sizeof(int));
+	*((int *)msgi.data1) = request;
+	rv = con->send_command(con, &addr, addr_len, &msg, rsp_handler, &msgi);
 	if (rv == -1) {
 		PILCallLog(PluginImports->log,PIL_CRIT, "Error sending IPMI command: %x\n", rv);
 		gstatus = S_ACCESS;

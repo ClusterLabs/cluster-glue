@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.17 2004/10/24 13:00:13 lge Exp $ */
+/* $Id: apcmaster.c,v 1.18 2005/01/31 09:45:31 sunjd Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -11,6 +11,7 @@
  *  Copyright (c) 2001 Mission Critical Linux, Inc.
  *  author: mike ledoux <mwl@mclinux.com>
  *  author: Todd Wheeling <wheeling@mclinux.com>
+ *  mangled by Sun Jiang Dong, <sunjd@cn.ibm.com>, IBM, 2005
  *
  *  Based strongly on original code from baytech.c by Alan Robertson.
  *
@@ -50,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.17 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.18 $"; 
 
 #define	DEVICE	"APC MasterSwitch"
 
@@ -64,21 +65,21 @@ static const char *version __attribute__ ((unused)) = "$Revision: 1.17 $";
 
 #include "stonith_signal.h"
 
-static void *		apcmaster_new(void);
-static void		apcmaster_destroy(Stonith *);
-static int		apcmaster_set_config_file(Stonith *, const char * cfgname);
-static int		apcmaster_set_config_info(Stonith *, const char * info);
-static const char *	apcmaster_getinfo(Stonith * s, int InfoType);
-static int		apcmaster_status(Stonith * );
-static int		apcmaster_reset_req(Stonith * s, int request, const char * host);
-static char **		apcmaster_hostlist(Stonith  *);
+static StonithPlugin *	apcmaster_new(void);
+static void		apcmaster_destroy(StonithPlugin *);
+static const char **	apcmaster_get_confignames(StonithPlugin *);
+static int		apcmaster_set_config(StonithPlugin *, StonithNVpair *);
+static const char *	apcmaster_getinfo(StonithPlugin * s, int InfoType);
+static int		apcmaster_status(StonithPlugin * );
+static int		apcmaster_reset_req(StonithPlugin * s, int request, const char * host);
+static char **		apcmaster_hostlist(StonithPlugin  *);
 
 static struct stonith_ops apcmasterOps ={
 	apcmaster_new,		/* Create new STONITH object	*/
 	apcmaster_destroy,		/* Destroy STONITH object	*/
-	apcmaster_set_config_file,	/* set configuration from file	*/
-	apcmaster_set_config_info,	/* Get configuration from file	*/
 	apcmaster_getinfo,		/* Return STONITH info string	*/
+	apcmaster_get_confignames,	/* Get configuration parameters */
+	apcmaster_set_config,		/* Set configuration */
 	apcmaster_status,		/* Return STONITH device status	*/
 	apcmaster_reset_req,		/* Request a reset */
 	apcmaster_hostlist,		/* Return list of supported hosts */
@@ -124,6 +125,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  */
 
 struct pluginDevice {
+	StonithPlugin	sp;
 	const char *	pluginid;
 	char *		idinfo;
 	char *		unitid;
@@ -166,14 +168,10 @@ static int	MSNametoOutlet(struct pluginDevice*, const char * name);
 static int	MSReset(struct pluginDevice*, int outletNum, const char * host);
 static int	MSLogout(struct pluginDevice * ms);
 
-static int	apcmaster_parse_config_info(struct pluginDevice* ms, const char * info);
-
 #if defined(ST_POWERON) && defined(ST_POWEROFF)
 static int	apcmaster_onoff(struct pluginDevice*, int outletnum, const char * unitid
 ,		int request);
 #endif
-static void	apcmaster_destroy(Stonith *);
-static void *	apcmaster_new(void);
 
 /* Login to the APC Master Switch */
 
@@ -486,14 +484,14 @@ MSNametoOutlet(struct pluginDevice* ms, const char * name)
 }
 
 static int
-apcmaster_status(Stonith  *s)
+apcmaster_status(StonithPlugin  *s)
 {
 	struct pluginDevice*	ms;
 	int	rc;
 
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
-	ms = (struct pluginDevice*) s->pinfo;
+	ms = (struct pluginDevice*) s;
 
 	if ((rc = MSRobustLogin(ms) != S_OK)) {
 		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
@@ -512,7 +510,7 @@ apcmaster_status(Stonith  *s)
  */
 
 static char **
-apcmaster_hostlist(Stonith  *s)
+apcmaster_hostlist(StonithPlugin  *s)
 {
 	char		NameMapping[128];
 	char*		NameList[64];
@@ -522,7 +520,7 @@ apcmaster_hostlist(Stonith  *s)
 
 	ERRIFNOTCONFIGED(s,NULL);
 
-	ms = (struct pluginDevice*) s->pinfo;
+	ms = (struct pluginDevice*) s;
 		
 	if (MSRobustLogin(ms) != S_OK) {
 		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
@@ -600,48 +598,6 @@ apcmaster_hostlist(Stonith  *s)
 }
 
 /*
- *	Parse the given configuration information, and stash it away...
- */
-
-static int
-apcmaster_parse_config_info(struct pluginDevice* ms, const char * info)
-{
-	static char dev[1024];
-	static char user[1024];
-	static char passwd[1024];
-
-	if (ms->config) {
-		return(S_OOPS);
-	}
-
-	if (sscanf(info, "%s %s %[^\n\r\t]", dev, user, passwd) == 3
-	&&	strlen(passwd) > 1) {
-
-		if ((ms->device = STRDUP(dev)) == NULL) {
-			LOG(PIL_CRIT, "out of memory");
-			return(S_OOPS);
-		}
-		if ((ms->user = STRDUP(user)) == NULL) {
-			FREE(ms->device);
-			ms->device=NULL;
-			LOG(PIL_CRIT, "out of memory");
-			return(S_OOPS);
-		}
-		if ((ms->passwd = STRDUP(passwd)) == NULL) {
-			FREE(ms->device);
-			ms->device=NULL;
-			FREE(ms->user);
-			ms->user=NULL;
-			LOG(PIL_CRIT, "out of memory");
-			return(S_OOPS);
-		}
-		ms->config = 1;
-		return(S_OK);
-	}
-	return(S_BADCONFIG);
-}
-
-/*
  *	Connect to the given MS device.  We should add serial support here
  *	eventually...
  */
@@ -661,10 +617,10 @@ MS_connect_device(struct pluginDevice * ms)
 }
 
 /*
- *	Reset the given host on this Stonith device.  
+ *	Reset the given host on this StonithPlugin device.  
  */
 static int
-apcmaster_reset_req(Stonith * s, int request, const char * host)
+apcmaster_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	int	rc = 0;
 	int	lorc = 0;
@@ -672,7 +628,7 @@ apcmaster_reset_req(Stonith * s, int request, const char * host)
 
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
-	ms = (struct pluginDevice*) s->pinfo;
+	ms = (struct pluginDevice*) s;
 
 	if ((rc = MSRobustLogin(ms)) != S_OK) {
 		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
@@ -710,50 +666,48 @@ apcmaster_reset_req(Stonith * s, int request, const char * host)
 }
 
 /*
- *	Parse the information in the given configuration file,
- *	and stash it away...
+ *	Get the configuration parameters names
  */
-static int
-apcmaster_set_config_file(Stonith* s, const char * configname)
+static const char **
+apcmaster_get_confignames(StonithPlugin * s)
 {
-	FILE *	cfgfile;
-	char	APCMSid[256];
-
-	struct pluginDevice*	ms;
-	
-	ERRIFWRONGDEV(s,S_OOPS);
-
-	ms = (struct pluginDevice*) s->pinfo;
-
-	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		LOG(PIL_CRIT, "%s %s", _("Cannot open"), configname);
-		return(S_BADCONFIG);
-	}
-	while (fgets(APCMSid, sizeof(APCMSid), cfgfile) != NULL){
-		if (*APCMSid == '#' || *APCMSid == '\n' || *APCMSid == EOS) {
-			continue;
-		}
-		return(apcmaster_parse_config_info(ms, APCMSid));
-	}
-	return(S_BADCONFIG);
+	static const char * ret[] = {ST_IPADDR, ST_LOGIN, ST_PASSWD, NULL};
+	return ret;
 }
 
 /*
- *	Parse the config information in the given string, and stash it away...
+ *	Set the configuration parameters
  */
 static int
-apcmaster_set_config_info(Stonith* s, const char * info)
+apcmaster_set_config(StonithPlugin * s, StonithNVpair * list)
 {
-	struct pluginDevice* ms;
+	struct pluginDevice* sd = (struct pluginDevice *)s;
+	int		rc;
+	StonithNamesToGet	namestoget [] =
+	{	{ST_IPADDR,	NULL}
+	,	{ST_LOGIN,	NULL}
+	,	{ST_PASSWD,	NULL}
+	,	{NULL,		NULL}
+	};
 
-	ERRIFWRONGDEV(s,S_OOPS);
+	ERRIFWRONGDEV(s, S_OOPS);
+	if (sd->sp.isconfigured) {
+		return S_OOPS;
+	}
 
-	ms = (struct pluginDevice *)s->pinfo;
+	if ((rc=OurImports->GetAllValues(namestoget, list)) != S_OK) {
+		return rc;
+	}
+	sd->device = namestoget[0].s_value;
+	sd->user = namestoget[1].s_value;
+	sd->passwd = namestoget[2].s_value;
+	sd->config = 1;
 
-	return(apcmaster_parse_config_info(ms, info));
+	return(S_OK);
 }
+
 static const char *
-apcmaster_getinfo(Stonith * s, int reqtype)
+apcmaster_getinfo(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* ms;
 	const char *		ret;
@@ -763,23 +717,11 @@ apcmaster_getinfo(Stonith * s, int reqtype)
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	ms = (struct pluginDevice *)s->pinfo;
+	ms = (struct pluginDevice *)s;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
 			ret = ms->idinfo;
-			break;
-
-		case ST_CONF_INFO_SYNTAX:
-			ret = _("IP-address login password\n"
-			"The IP-address, login and password are white-space delimited.");
-			break;
-
-		case ST_CONF_FILE_SYNTAX:
-			ret = _("IP-address login password\n"
-			"The IP-address, login and password are white-space delimited.  "
-			"All three items must be on one line.  "
-			"Blank lines and lines beginning with # are ignored");
 			break;
 
 		case ST_DEVICEDESCR:
@@ -802,16 +744,16 @@ apcmaster_getinfo(Stonith * s, int reqtype)
 }
 
 /*
- *	APC MasterSwitch Stonith destructor...
+ *	APC MasterSwitch StonithPlugin destructor...
  */
 static void
-apcmaster_destroy(Stonith *s)
+apcmaster_destroy(StonithPlugin *s)
 {
 	struct pluginDevice* ms;
 
 	VOIDERRIFWRONGDEV(s);
 
-	ms = (struct pluginDevice *)s->pinfo;
+	ms = (struct pluginDevice *)s;
 
 	ms->pluginid = NOTpluginID;
 	Stonithkillcomm(&ms->rdfd,&ms->wrfd,&ms->pid);
@@ -837,9 +779,9 @@ apcmaster_destroy(Stonith *s)
 	}
 }
 
-/* Create a new APC Master Switch Stonith device. */
+/* Create a new APC Master Switch StonithPlugin device. */
 
-static void *
+static StonithPlugin *
 apcmaster_new(void)
 {
 	struct pluginDevice*	ms = MALLOCT(struct pluginDevice);
@@ -861,20 +803,7 @@ apcmaster_new(void)
 	ms->unitid = NULL;
 	REPLSTR(ms->idinfo, DEVICE);
 	REPLSTR(ms->unitid, "unknown");
+	ms->sp.s_ops = &apcmasterOps;
 
-	return((void *)ms);
+	return(&(ms->sp));
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
