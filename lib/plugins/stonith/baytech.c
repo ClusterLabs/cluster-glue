@@ -152,10 +152,13 @@ struct BayTech {
 };
 
 struct BayTechModelInfo {
-		const char *	type;		/* Baytech model info */
-		int		socklen;	/* Length of socket name string */
-		struct Etoken *	expect;		/* Expect string before outlet list */
+	const char *	type;		/* Baytech model info */
+	int		socklen;	/* Length of socket name string */
+	struct Etoken *	expect;		/* Expect string before outlet list */
 };
+
+static int		parse_socket_line(struct BayTech*,const char *
+,			int *, char *);
 
 static const char * BTid = "BayTech-Stonith";
 static const char * NOTbtid = "Hey, dummy this has been destroyed (BayTech)";
@@ -221,16 +224,16 @@ static struct Etoken CRNL[] =		{ {"\n\r",0,0},{"\r\n",0,0},{NULL,0,0}};
 
 /* We may get a notice about rebooting, or a request for confirmation */
 static struct Etoken Rebooting[] =	{ {"ebooting selected outlet", 0, 0}
-				,	{"(Y/N)>", 1, 0}
-				,	{"already off.", 2, 0}
-				,	{NULL,0,0}};
+					,	{"(Y/N)>", 1, 0}
+					,	{"already off.", 2, 0}
+					,	{NULL,0,0}};
 
 
 static struct BayTechModelInfo ModelInfo [] = {
-		{"RPC-5", 18, Temp},	/* This first model will be the default */
-		{"RPC-3", 10, Break},	
-		{"RPC-3A", 10, Break},
-		{NULL, 0, NULL},
+	{"RPC-5", 18, Temp},	/* This first model will be the default */
+	{"RPC-3", 10, Break},	
+	{"RPC-3A", 10, Break},
+	{NULL, 0, NULL},
 };
 
 static int	RPCLookFor(struct BayTech* bt, struct Etoken * tlist, int timeout);
@@ -606,11 +609,8 @@ RPCNametoOutlet(struct BayTech* bt, const char * name)
 	int	sockno;
 	char	sockname[32];
 	int	ret = -1;
-	char	format[32];
 
 
-	snprintf(format, sizeof(format), "%%7d       %%%dc"
-	,	bt->modelinfo->socklen);
 
 	/* Verify that we're in the top-level menu */
 	SEND("\r");
@@ -639,25 +639,28 @@ RPCNametoOutlet(struct BayTech* bt, const char * name)
 	/* Looks Good!  Parse the status output */
 
 	do {
+		char *	last;
 		NameMapping[0] = EOS;
 		SNARF(NameMapping, 5);
-		if (sscanf(NameMapping, format, &sockno, sockname) == 2) {
 
-			char *	last = sockname+bt->modelinfo->socklen;
-			*last = EOS;
-			--last;
+		if (!parse_socket_line(bt, NameMapping, &sockno, sockname)) {
+			continue;
+		}
 
-			/* Strip off trailing blanks */
-			for(; last > sockname; --last) {
-				if (*last == ' ') {
-					*last = EOS;
-				}else{
-					break;
-				}
+		last = sockname+bt->modelinfo->socklen;
+		*last = EOS;
+		--last;
+
+		/* Strip off trailing blanks */
+		for(; last > sockname; --last) {
+			if (*last == ' ') {
+				*last = EOS;
+			}else{
+				break;
 			}
-			if (strcmp(name, sockname) == 0) {
-				ret = sockno;
-			}
+		}
+		if (strcmp(name, sockname) == 0) {
+			ret = sockno;
 		}
 	} while (strlen(NameMapping) > 2 && ret < 0);
 
@@ -709,7 +712,6 @@ baytech_hostlist(Stonith  *s)
 	unsigned int	numnames = 0;
 	char **		ret = NULL;
 	struct BayTech*	bt;
-	char		format[32];
 
 
 	if (!ISBAYTECH(s)) {
@@ -724,8 +726,6 @@ baytech_hostlist(Stonith  *s)
 	bt = (struct BayTech*) s->pinfo;
 
 
-	snprintf(format, sizeof(format), "%%7d       %%%dc"
-	,	bt->modelinfo->socklen);
 
 	if (RPCRobustLogin(bt) != S_OK) {
 		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
@@ -761,35 +761,40 @@ baytech_hostlist(Stonith  *s)
 	do {
 		int	sockno;
 		char	sockname[64];
+		char *	last;
+		char *	nm;
+
 		NameMapping[0] = EOS;
+
 		NULLSNARF(NameMapping, 5);
-		if (sscanf(NameMapping, format, &sockno, sockname) == 2) {
 
-			char *	last = sockname+bt->modelinfo->socklen;
-			char *	nm;
-			*last = EOS;
-			--last;
+		if (!parse_socket_line(bt, NameMapping, &sockno, sockname)) {
+			continue;
+		}
 
-			/* Strip off trailing blanks */
-			for(; last > sockname; --last) {
-				if (*last == ' ') {
-					*last = EOS;
-				}else{
-					break;
-				}
-			}
-			if (numnames >= DIMOF(NameList)-1) {
+		last = sockname+bt->modelinfo->socklen;
+		*last = EOS;
+		--last;
+
+		/* Strip off trailing blanks */
+		for(; last > sockname; --last) {
+			if (*last == ' ') {
+				*last = EOS;
+			}else{
 				break;
 			}
-			if ((nm = (char*)MALLOC(strlen(sockname)+1)) == NULL) {
-				syslog(LOG_ERR, "out of memory");
-				return(NULL);
-			}
-			strcpy(nm, sockname);
-			NameList[numnames] = nm;
-			++numnames;
-			NameList[numnames] = NULL;
 		}
+		if (numnames >= DIMOF(NameList)-1) {
+			break;
+		}
+		if ((nm = (char*)MALLOC(strlen(sockname)+1)) == NULL) {
+			syslog(LOG_ERR, "out of memory");
+			return(NULL);
+		}
+		strcpy(nm, sockname);
+		NameList[numnames] = nm;
+		++numnames;
+		NameList[numnames] = NULL;
 	} while (strlen(NameMapping) > 2);
 
 	/* Pop back out to the top level menu */
@@ -1120,4 +1125,32 @@ baytech_new(void)
 	bt->modelinfo = &ModelInfo[0];
 
 	return((void *)bt);
+}
+
+static int
+parse_socket_line(struct BayTech * bt,	const char *NameMapping
+,	int *sockno, char *sockname)
+{
+#if 0
+	char format[64];
+	snprintf(format, sizeof(format), "%%7d       %%%dc"
+	,	bt->modelinfo->socklen);
+	/* 7 digits, 7 blanks, then 'socklen' characters */
+	/* [0-6]: digits, NameMapping[13] begins the sockname */
+	/* NameMapping strlen must be >= socklen + 14 */
+
+	if (sscanf(NameMapping, format, sockno, sockname) != 2) {
+		return FALSE;
+	}
+#else
+#	define	OFFSET 14
+
+	if (sscanf(NameMapping, "%7d", sockno) != 1
+	||	strlen(NameMapping) < OFFSET+bt->modelinfo->socklen) {
+		return FALSE;
+	}
+	strncpy(sockname, NameMapping+OFFSET, bt->modelinfo->socklen);
+	sockname[bt->modelinfo->socklen] = EOS;
+#endif
+	return TRUE;
 }
