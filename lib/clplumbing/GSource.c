@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.24 2005/02/17 16:43:56 andrew Exp $ */
+/* $Id: GSource.c,v 1.25 2005/02/17 17:46:32 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -716,7 +716,7 @@ static gboolean G_SIG_dispatch(GSource* source,
 			      gpointer user_data);
 static void G_SIG_destroy(GSource* source);
 
-static void G_main_signal(int nsig);
+static void G_main_signal_handler(int nsig);
 
 static GSourceFuncs G_SIG_SourceFuncs = {
 	G_SIG_prepare,
@@ -725,7 +725,7 @@ static GSourceFuncs G_SIG_SourceFuncs = {
 	G_SIG_destroy,
 };
 
-GHashTable *G_main_signal_list = NULL;
+static GHashTable *G_main_signal_list = NULL;
 
 void
 set_SignalHandler_dnotify(GSIGSource* sig_src, GDestroyNotify notify)
@@ -771,40 +771,12 @@ G_main_add_SignalHandler(int priority, int signal,
 		source = NULL;
 		sig_src = NULL;
 	} else {
-		CL_SIGNAL(signal, G_main_signal);
+		CL_SIGNAL(signal, G_main_signal_handler);
 	}
 	
 	return sig_src;
 }
 
-
-void
-G_main_SignalHandler_pause(GSIGSource* sig_src)
-{
-	if (sig_src == NULL){
-		cl_log(LOG_ERR, "G_main_IPC_Channel_remove_source:"
-		       "invalid input");
-		return;
-	}
-	
-	sig_src->pausenow = TRUE;
-	return;
-}
-
-
-void 
-G_main_SignalHandler_resume(GSIGSource* sig_src)
-{
-	if (sig_src == NULL){
-		cl_log(LOG_ERR, "G_main_IPC_Channel_remove_source:"
-		       "invalid input");
-		return;
-	}
-	
-	sig_src->pausenow = FALSE;
-	return;	
-
-}
 
 /*
  *	Delete a Signal from the gmainloop world...
@@ -904,8 +876,8 @@ G_SIG_destroy(GSource* source)
 
 /* Find and set the correct mainloop input */
 
-void
-G_main_signal(int nsig)
+static void
+G_main_signal_handler(int nsig)
 {
 	GSIGSource* sig_src = NULL;
 
