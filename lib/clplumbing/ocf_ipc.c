@@ -68,22 +68,24 @@ struct IPC_AUTH *
 ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid)
 {
   struct IPC_AUTH *temp_auth;
-  int i, v;
+  int i;
+  static int v = 1;
 
-  v = 1;
   temp_auth = g_new(struct IPC_AUTH, 1);
-  temp_auth->uid = g_hash_table_new(g_int_hash, g_int_equal);
-  temp_auth->gid = g_hash_table_new(g_int_hash, g_int_equal);
+  temp_auth->uid = g_hash_table_new(g_direct_hash, g_direct_equal);
+  temp_auth->gid = g_hash_table_new(g_direct_hash, g_direct_equal);
 
   if (num_uid > 0) {
     for (i=0; i<num_uid; i++) {
-      g_hash_table_insert(temp_auth->uid, &a_uid[i], &v);
+      g_hash_table_insert(temp_auth->uid, GINT_TO_POINTER((gint)a_uid[i])
+      ,		&v);
     }
   }
 
   if (num_gid > 0) {
     for (i=0; i<num_gid; i++) {
-      g_hash_table_insert(temp_auth->gid, &a_gid[i], &v);
+      g_hash_table_insert(temp_auth->gid, GINT_TO_POINTER((gint)a_gid[i])
+      ,		&v);
     }
   }
 
