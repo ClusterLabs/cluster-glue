@@ -1056,8 +1056,8 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 		/* if the state is idle, the last finsihed op returned. */
 		/* the op is stored in the same msg, just get it out */
 		op = msg_to_op(ret);
-		op->rsc = lrm_get_rsc( NULL, op->rsc_id );
 		if (NULL != op) {
+			op->rsc = lrm_get_rsc( NULL, op->rsc_id );
 			pending_op_list = g_list_append(pending_op_list, op);
 		}
 		client_log(LOG_INFO, "rsc_get_cur_state: end.");
