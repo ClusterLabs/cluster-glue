@@ -69,7 +69,7 @@ apcmaster_la_SOURCES	= apcmaster.c
 apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version
 
 apcmastersnmp_la_SOURCES= apcmastersnmp.c
-apcmastersnmp_la_LDFLAGS= -export-dynamic -module -avoid-version
+apcmastersnmp_la_LDFLAGS= -export-dynamic -module -avoid-version -lsnmp -lcrypto
 
 apcsmart_la_SOURCES	= apcsmart.c
 apcsmart_la_LDFLAGS	= -export-dynamic -module -avoid-version
