@@ -44,8 +44,9 @@
 #define	F_LRM_UID		"lrm_uid"
 #define F_LRM_GID		"lrm_gid"
 #define F_LRM_RID		"lrm_rid"
-#define F_LRM_RNAME		"lrm_rname"
 #define F_LRM_RTYPE		"lrm_rtype"
+#define F_LRM_RTYPES		"lrm_rtypes"
+#define F_LRM_RCLASS		"lrm_rclass"
 #define F_LRM_PARAM		"lrm_param"
 #define F_LRM_TIMEOUT		"lrm_timeout"
 #define F_LRM_OP		"lrm_op"
@@ -69,7 +70,8 @@
 /*define the message typs between lrmd and client lib*/
 #define REGISTER		"reg"
 #define UNREGISTER		"unreg"
-#define GETRATYPES		"types"
+#define GETRSCCLASSES		"rclasses"
+#define GETRSCTYPES		"rtypes"
 #define GETALLRCSES		"getall"
 #define GETRSC			"getrsc"
 #define GETRSCSTATE		"getstate"
@@ -110,9 +112,12 @@ int ha_msg_add_hash_table(struct ha_msg * msg, const char * name,
 							
 GHashTable* msg_to_hash_table(struct ha_msg * msg);
 struct ha_msg* hash_table_to_msg(GHashTable* hash_table);
-							
+void ha_msg_print(struct ha_msg * msg);
+/*							
 char* hash_table_to_string(GHashTable* hash_table);
 GHashTable* string_to_hash_table(const char* data);
+*/
+GHashTable* copy_hash_table(GHashTable* hash_table);
 void free_hash_table(GHashTable* hash_table);
 
  /*  
