@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.44 2004/10/09 01:48:41 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.45 2004/10/10 02:42:03 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -265,8 +265,6 @@ main(int argc, char ** argv)
 	cl_log_set_entity(lrm_system_name);
 	cl_log_enable_stderr(debug_level?TRUE:FALSE);
 	cl_log_set_facility(LOG_DAEMON);
-	cl_log_send_to_logging_daemon(TRUE);
-	
 	
 	if (req_status){
 		return init_status(PID_FILE, lrm_system_name);
@@ -2036,6 +2034,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.45  2004/10/10 02:42:03  zhenh
+ * remove the call to enable log deamon
+ *
  * Revision 1.44  2004/10/09 01:48:41  zhenh
  * change the failure logs from LOG_INFO to LOG_ERR
  *
