@@ -71,6 +71,10 @@ int main (int argc, char* argv[])
 	op->params = param;
 	op->timeout = 0;
 	op->user_data = strdup("It is a start op!");
+	if ( op->user_data == NULL ) {
+		fprintf(stderr, "No enough memory.\n");
+		return -1;
+	}
 	op->user_data_len = strlen(op->user_data)+1;
 	op->interval = 0;
 	op->target_rc = EVERYTIME;
@@ -83,6 +87,10 @@ int main (int argc, char* argv[])
 	op->params = param;
 	op->timeout = 0;
 	op->user_data = strdup("It is a status op!");
+	if ( op->user_data == NULL ) {
+		fprintf(stderr, "No enough memory.\n");
+		return -1;
+	}
 	op->user_data_len = strlen(op->user_data)+1;
 	op->interval = 1000;
 	op->target_rc=EVERYTIME;
@@ -95,6 +103,10 @@ int main (int argc, char* argv[])
 	op->params = param;
 	op->timeout = 0;
 	op->user_data = strdup("It is a stop op!");
+	if ( op->user_data == NULL ) {
+		fprintf(stderr, "No enough memory.\n");
+		return -1;
+	}
 	op->user_data_len = strlen(op->user_data)+1;
 	op->interval = 0;
 	op->target_rc=EVERYTIME;
