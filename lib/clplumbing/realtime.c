@@ -19,6 +19,21 @@ static gboolean	cl_realtimepermitted = TRUE;
 #	define DEFAULT_REALTIME	SCHED_RR
 #endif
 
+/* Dummy function to touch "a lot" of stack so we have it pre-allocated
+ * inside our realtime code as per suggestion from mlockall(2) */
+int
+cl_stack_hogger()
+{
+#ifdef MCL_FUTURE
+	/* Needs to be volatile so it really can't be optimised away */
+	volatile char	buf[64*1024];
+	
+	memset(&buf,0xff,sizeof(buf));
+
+	return buf[sizeof(buf)-1];
+#endif
+}
+
 /*
  *	Make us behave like a soft real-time process.
  *	We need scheduling priority and being locked in memory.
@@ -71,6 +86,12 @@ cl_make_realtime(int spolicy, int priority,  int heapgrowK)
 #endif
 
 #ifdef MCL_FUTURE
+	if (mlockall(MCL_PRESENT|MCL_FUTURE) < 0) {
+		cl_perror("Unable to lock pid %d in memory", (int) getpid());
+	}else{
+		cl_log(LOG_INFO, "pid %d locked in memory.", (int) getpid());
+	}
+	
 	if (heapgrowK > 0) {
 	/*
 	 *	Try and pre-allocate a little memory before locking
@@ -78,18 +99,16 @@ cl_make_realtime(int spolicy, int priority,  int heapgrowK)
 	 */
 		void*	mval = malloc(heapgrowK*1024);
 
-			if (mval != NULL) {
-				free(mval);
-			}else{
-				cl_log(LOG_INFO
-				,	"Could not preallocate (%d) bytes"
+		if (mval != NULL) {
+			memset(mval,0, heapgrowK*1024);
+			free(mval);
+		}else{
+			cl_log(LOG_INFO, "Could not preallocate (%d) bytes" 
 			,	heapgrowK);
 		}
-	}
-	if (mlockall(MCL_PRESENT|MCL_FUTURE) < 0) {
-		cl_perror("Unable to lock pid %d in memory", (int) getpid());
-	}else{
-		cl_log(LOG_INFO, "pid %d locked in memory.", (int) getpid());
+		if (cl_stack_hogger() != 0xff) {
+			cl_log(LOG_INFO, "Stack hogger failed");
+		}
 	}
 #endif
 }
