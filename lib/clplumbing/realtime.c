@@ -1,7 +1,11 @@
 #include <sys/types.h>
 #include <unistd.h>
-#include <sched.h>
-#include <sys/mman.h>
+#ifdef _POSIX_MEMLOCK
+#	include <sys/mman.h>
+#endif
+#ifdef _POSIX_PRIORITY_SCHEDULING
+#	include <sched.h>
+#endif
 #include <string.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/realtime.h>
