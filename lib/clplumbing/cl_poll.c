@@ -170,8 +170,8 @@ cl_poll_setsig(int nsig)
 /*
  *	It's harmless to call us multiple times on the same signal.
  */
-static
-int cl_poll_prepsig(int nsig)
+static int
+cl_poll_prepsig(int nsig)
 {
 	static gboolean	setinityet=FALSE;
 	
@@ -655,7 +655,7 @@ cl_poll(struct pollfd *fds, unsigned int nfds, int timeoutms)
 			}
 		}
 	}
-	return (eventcount > 0 ? eventcount : -1);
+	return (eventcount > 0 ? eventcount : (errno == EAGAIN ? 0 : -1));
 }
 /*
  * Debugging routine for printing current poll arguments, etc.
