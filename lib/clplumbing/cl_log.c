@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.26 2005/02/01 22:37:09 andrew Exp $ */
+/* $Id: cl_log.c,v 1.27 2005/02/02 08:13:21 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -13,7 +13,7 @@
 #include <clplumbing/uids.h>
 #include <glib.h>
 #include <netinet/in.h>
-
+#include <clplumbing/cl_malloc.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -38,6 +38,7 @@
 #define	cl_free		free
 #define	DFLT_ENTITY	"cluster"
 
+char	log_entity[MAXENTITY];
 static IPC_Channel*	logging_daemon_chan = NULL;
 
 int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
@@ -90,7 +91,7 @@ cl_log_set_entity(const char *	entity)
 	if (entity == NULL) {
 		entity = DFLT_ENTITY;
 	}
-	cl_log_entity = entity;
+	cl_log_entity = cl_strdup(entity);
 	if (syslog_enabled) {
 		syslog_enabled = 0;
 		cl_opensyslog();
@@ -122,7 +123,7 @@ cl_log_get_debugfile(void)
 
 /* Cluster logging function */
 void
-cl_direct_log(int priority, char* buf, gboolean use_priority_str)
+cl_direct_log(int priority, char* buf, gboolean use_priority_str, const char* entity)
 {
 	FILE *		fp = NULL;
 	int		logpri;
@@ -139,6 +140,10 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str)
 		"info",
 		"debug"
 	};
+	
+	if (entity == NULL){
+		entity =cl_log_entity;
+	}
 	
 	if (use_priority_str){
 		logpri =  LOG_PRI(priority);
@@ -157,6 +162,11 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str)
 	}
 	
 	if (syslog_enabled) {
+		if(entity){
+			strncpy(log_entity, entity, MAXENTITY);
+		}else{
+			strncpy(log_entity, DFLT_ENTITY,MAXENTITY);
+		}
 		if (pristr){
 			syslog(priority, "%s: %s%c", pristr,  buf, 0);
 		}else {
@@ -172,13 +182,13 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str)
 	if (stderr_enabled) {
 		if (pristr){
 			fprintf(stderr, "%s[%d]: %s %s: %s\n"
-				,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+				,	(entity ? entity : DFLT_ENTITY)
 				,       process_pid
 				,	ha_timestamp()
 				,	pristr,  buf);
 		}else {
 			fprintf(stderr, "%s[%d]: %s %s\n"
-				,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+				,	(entity ? entity : DFLT_ENTITY)
 				,       process_pid
 				,	ha_timestamp()
 				,	buf);
@@ -192,13 +202,13 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str)
 		if (fp != NULL) {
 			if (pristr){
 				fprintf(fp, "%s[%d]: %s %s: %s\n"
-					,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+					,	(entity ? entity : DFLT_ENTITY)
 					,       process_pid
 					,	ha_timestamp()
 					,	pristr,  buf);
 			}else{
 				fprintf(fp, "%s[%d]: %s %s\n"
-					,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+					,	(entity ? entity : DFLT_ENTITY)
 					,       process_pid
 					,	ha_timestamp()
 					,	buf);
@@ -214,13 +224,13 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str)
 		if (fp != NULL) {
 			if (pristr){
 				fprintf(fp, "%s[%d]: %s %s: %s\n"
-				,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+				,	(entity ? entity : DFLT_ENTITY)
 				,       process_pid
 				,	ha_timestamp()
 				,	pristr,  buf);
 			}else {
 				fprintf(fp, "%s[%d]: %s %s\n"
-					,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+					,	(entity ? entity : DFLT_ENTITY)
 					,       process_pid
 					,	ha_timestamp()
 					,	buf);	
@@ -290,7 +300,7 @@ cl_log(int priority, const char * fmt, ...)
 	     LogToLoggingDaemon(priority, buf, nbytes, TRUE) == HA_OK){
 		goto LogDone;
 	}else {
-		cl_direct_log(priority, buf, TRUE);
+		cl_direct_log(priority, buf, TRUE, NULL);
 	}
 	
  LogDone:
@@ -479,6 +489,12 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	logbuf.facility = cl_log_facility;
 	logbuf.priority = priority;
 	logbuf.use_pri_str = use_prio_str;
+	if (cl_log_entity){
+		strncpy(logbuf.entity,cl_log_entity,MAXENTITY);
+	}else {
+		strncpy(logbuf.entity,DFLT_ENTITY,MAXENTITY);
+	}
+
 	logbuf.msglen = bufstrlen + 1;
 	memcpy(bodybuf + ch->msgpad, &logbuf, sizeof(logbuf));
 	memcpy(bodybuf + ch->msgpad + sizeof(logbuf),
@@ -517,5 +533,6 @@ cl_opensyslog(void)
 		return;
 	}
 	syslog_enabled = 1;
-	openlog(cl_log_entity, LOG_CONS|LOG_PID, cl_log_facility);
+	openlog(log_entity, LOG_CONS|LOG_PID, cl_log_facility);
+
 }
