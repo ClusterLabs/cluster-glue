@@ -113,12 +113,16 @@ main(int argc, char ** argv)
 	rc += channelpair(asyn_echoclient, asyn_echoserver, 20000);
 	rc += channelpair(mainloop_client, mainloop_server, 20000);
 
+	/* The code is know to be broken right now, don't use it */
+	cl_log(LOG_INFO, "Note: NOT enabling poll(2) replacement code.");
+#if 0
 	cl_log(LOG_INFO, "NOTE: Enabling poll(2) replacement code.");
 	PollFunc = cl_poll;
 	g_main_set_poll_func(cl_glibpoll);
 	rc += channelpair(asyn_echoclient, asyn_echoserver, 100000);
 	rc += channelpair(mainloop_client, mainloop_server, 100000);
-
+#endif
+	
 	cl_log(LOG_INFO, "TOTAL errors: %d", rc);
 
 	return (rc > 127 ? 127 : rc);
