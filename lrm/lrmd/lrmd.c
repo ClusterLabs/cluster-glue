@@ -51,6 +51,7 @@
 #include <lrm/raexec.h>
 
 #define	MAX_PID_LEN 256
+#define	MAX_PROC_NAME 256
 
 #define OPTARGS		"dh"
 #define PID_FILE 	"/var/run/lrmd.pid"
@@ -1658,9 +1659,19 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 static const char *
 on_ra_proc_query_name(ProcTrack* p)
 {
+	static char proc_name[MAX_PROC_NAME];
+	
 	lrmd_log(LOG_INFO, "on_ra_proc_query_name: start.");
+	lrmd_op_t* op = (lrmd_op_t*)(p->privatedata);
+	if (NULL == op) {
+		lrmd_log(LOG_INFO, "on_ra_proc_query_name: end.");
+		return "*unknown*";
+	}
+	const char* op_type = ha_msg_value(op->msg, F_LRM_OP);
+
+	snprintf(proc_name, MAX_PROC_NAME, "%s:%s", op->rsc->id, op_type);
 	lrmd_log(LOG_INFO, "on_ra_proc_query_name: end.");
-	return "no name yet;)";
+	return proc_name;
 }
 
 
