@@ -1,4 +1,4 @@
-/* $Id: expect.c,v 1.17 2005/03/29 22:05:11 alan Exp $ */
+/* $Id: expect.c,v 1.18 2005/03/29 22:17:08 alan Exp $ */
 /*
  * Simple expect module for the STONITH library
  *
@@ -321,7 +321,7 @@ stonith_copy_hostlist(const char** hostlist)
 	for (here = hostlist; *here; ++here,++hret) {
 		*hret = strdup(*here);
 		if (*hret == NULL) {
-			stonith_free_hostlist(hret);
+			stonith_free_hostlist(ret);
 			return NULL; 
 		}
 	}
