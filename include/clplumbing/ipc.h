@@ -187,12 +187,15 @@ struct OCF_IPC_OPS{
   */
   int (* recv) (struct OCF_IPC_CHANNEL* ch, struct OCF_IPC_MESSAGE** msg);
   /*! 
-    \brief check the recv_queue to see if ther is any messages available. 
+    \brief check the recv_queue to see if there is any messages available. 
     \param ch \b (IN) the pointer to the channel. 
     \retval TRUE there are messages pending in the rece_queue.
     \return FALSE there is no message pending in the rece_queue.
   */
   gboolean (* is_message_pending) (struct OCF_IPC_CHANNEL * ch);
+  
+  /* check the send_queue to see if there is any message blocking. */
+  gboolean (* is_sending_block) (struct OCF_IPC_CHANNEL *ch);
   /*! 
     \brief resume all possible IO operations through the inner connection . 
     \param the pointer to the channel.
