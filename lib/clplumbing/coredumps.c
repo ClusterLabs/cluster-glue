@@ -118,7 +118,7 @@ cl_enable_coredumps(int doenable)
 		,	"Not possible to enable core dumps (rlim_max is 0)");
 	}
 
-	if ((rc = getrlimit(RLIMIT_CORE, &rlim)) < 0) {
+	if ((rc = setrlimit(RLIMIT_CORE, &rlim)) < 0) {
 		int errsave = errno;
 		cl_perror("Unable to %s core dumps"
 		,	 doenable ? "enable" : "disable");
