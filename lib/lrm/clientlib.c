@@ -1209,8 +1209,12 @@ msg_to_op(struct ha_msg* msg)
 	/* op->user_data */
 	user_data = cl_get_binary(msg, F_LRM_USERDATA,&userdata_len);
 	
-	if (NULL != user_data && sizeof(gpointer)==userdata_len ) {
-		memcpy(&op->user_data,user_data,sizeof(gpointer));
+	if (NULL != user_data && 0 < userdata_len ) {
+		op->user_data = ha_malloc(userdata_len);
+		if ( NULL != op->user_data ) {
+			memcpy(op->user_data,user_data,userdata_len);
+			op->user_data_len = userdata_len;
+		}
 	}
 	
 	op->rsc_id = g_strdup(rsc_id);
@@ -1242,13 +1246,15 @@ op_to_msg (lrm_op_t* op)
 		client_log(LOG_ERR, "op_to_msg: can not add field.");
 		return NULL;
 	}
-	if (NULL != op->user_data) {
-		if (HA_OK != ha_msg_addbin(msg,F_LRM_USERDATA,&op->user_data,sizeof(gpointer))){
+	if (NULL != op->user_data && 0 != op->user_data_len) {
+		if (HA_OK != ha_msg_addbin(msg,F_LRM_USERDATA,
+					op->user_data, op->user_data_len)){
 			ha_msg_del(msg);
 			client_log(LOG_ERR, "op_to_msg: can not add field.");
 			return NULL;
 		}
 	}
+
 	if (NULL != op->params) {
 		if (HA_OK != ha_msg_add_str_table(msg,F_LRM_PARAM,op->params)){
 			ha_msg_del(msg);

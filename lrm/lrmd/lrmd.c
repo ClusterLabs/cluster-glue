@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.47 2004/10/22 02:47:16 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.48 2004/11/23 20:58:18 andrew Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -185,7 +185,7 @@ struct msg_map msg_maps[] = {
 	{REGISTER,	TRUE,	on_msg_register},
 	{GETRSCCLASSES,	FALSE,	on_msg_get_rsc_classes},
 	{GETRSCTYPES,	FALSE,	on_msg_get_rsc_types},
-	{GETPROVIDERS,	FALSE, on_msg_get_rsc_providers},
+	{GETPROVIDERS,	FALSE,  on_msg_get_rsc_providers},
 	{ADDRSC,	TRUE,	on_msg_add_rsc},
 	{GETRSC,	FALSE,	on_msg_get_rsc},
 	{GETALLRCSES,	FALSE,	on_msg_get_all},
@@ -203,7 +203,7 @@ GList* rsc_list 		= NULL;
 static int call_id 		= 1;
 const char* lrm_system_name 	= "lrmd";
 GHashTable * RAExecFuncs 	= NULL;
-GList* ra_class_list			= NULL;
+GList* ra_class_list		= NULL;
 
 /*
  * Daemon functions
@@ -1288,8 +1288,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			flush_op(op);
 		}
 	}
-	else
-	if (0 == strncmp(type, CANCELOP, strlen(CANCELOP))) {
+	else if (0 == strncmp(type, CANCELOP, strlen(CANCELOP))) {
 		int cancel_op_id;
 		ha_msg_value_int(msg, F_LRM_CALLID, &cancel_op_id);
 		
@@ -1635,8 +1634,6 @@ perform_op(lrmd_rsc_t* rsc)
 			break;
 		}
 	}
-
-
 
 	lrmd_log(LOG_DEBUG, "perform_op: end.");
 	return HA_OK;
@@ -2043,6 +2040,10 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.48  2004/11/23 20:58:18  andrew
+ * Commit zhenh's patch for preserving user data across connections
+ * Only supports flat objects (ie. char* or structs without pointers in them)
+ *
  * Revision 1.47  2004/10/22 02:47:16  zhenh
  * rename the stop_op() to cancel_op()
  *
