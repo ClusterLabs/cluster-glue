@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.128 2005/03/15 18:40:06 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.129 2005/03/18 20:48:14 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -142,7 +142,7 @@ struct IPC_Stats {
 struct IPC_Stats	SocketIPCStats = {0,0,0,0};
 
 /* unix domain socket implementations of IPC functions. */
-
+static int	socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg);
 static void socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn);
 
 static int socket_wait_selectfd(struct IPC_WAIT_CONNECTION *wait_conn);
@@ -571,8 +571,9 @@ static void
 socket_destroy_channel(struct IPC_CHANNEL * ch)
 {
 	while (ch->ch_status == IPC_CONNECT
-	&&	ch->send_queue->current_qlen > 0){
-		if (socket_resume_io(ch) != IPC_OK){
+	       &&	ch->send_queue->current_qlen > 0){
+		int  nmsg = 0;
+		if (socket_resume_io_write(ch, &nmsg) != IPC_OK){
 			break;
 		}
 	}
@@ -1067,9 +1068,10 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 					retcode = IPC_BROKEN;
 				}
 				break;
-						
+				
 			case ECONNREFUSED:
-			case ECONNRESET:
+			case ECONNRESET:				
+				ch->ch_status = IPC_DISC_PENDING;
 				retcode= socket_check_disc_pending(ch);
 				break;
 				
@@ -1082,8 +1084,8 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 			}
 			
 		}else if (msg_len == 0) {
-			if (ch->ch_status == IPC_DISC_PENDING
-			    &&	ch->recv_queue->current_qlen <= 0) {
+			ch->ch_status = IPC_DISC_PENDING;
+			if(ch->recv_queue->current_qlen <= 0) {
 				ch->ch_status = IPC_DISCONNECT;
 				retcode = IPC_FAIL;
 			}
@@ -1224,6 +1226,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 				retcode = IPC_OK;
 				break;
 			case EPIPE:
+				ch->ch_status = IPC_DISC_PENDING;
 				socket_check_disc_pending(ch);
 				retcode = IPC_BROKEN;
 				break;
