@@ -61,6 +61,7 @@ plugin_LTLIBRARIES =	apcmaster.la		\
 			meatware.la		\
 			null.la			\
 			nw_rpc100s.la		\
+			rcd_serial.la		\
 			rps10.la		\
 			ssh.la			\
 			$(vacm_LIB)		\
@@ -102,3 +103,6 @@ vacm_la_LIBADD		= $(top_builddir)/replace/libreplace.la
 wti_nps_la_SOURCES	= wti_nps.c stonith_signal.h
 wti_nps_la_LDFLAGS	= -export-dynamic -module -avoid-version
 wti_nps_la_LIBADD	= $(top_builddir)/replace/libreplace.la
+
+rcd_serial_la_SOURCES	= rcd_serial.c
+rcd_serial_la_LDFLAGS	= -export-dynamic -module -avoid-version
