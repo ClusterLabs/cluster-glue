@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.118 2005/02/07 19:10:48 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.119 2005/02/09 01:45:05 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -986,7 +986,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 	int				debug_loopcount = 0;
 	int				debug_bytecount = 0;
 	int				maxqlen = ch->recv_queue->max_qlen;
-	static struct ipc_bufpool*	pool = NULL;
+	struct ipc_bufpool*		pool = ch->pool;
 	int				nmsgs = 0;
 	int				spaceneeded;
 	*nbytes = 0;
@@ -995,7 +995,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 	
 	if (pool == NULL){
-		pool = ipc_bufpool_new(0);
+		ch->pool = pool = ipc_bufpool_new(0);
 		if (pool == NULL){			
 			cl_log(LOG_ERR, "socket_resume_io_read: "
 			       "memory allocation for ipc pool failed");
@@ -1016,7 +1016,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 		
 		ipc_bufpool_partial_copy(newpool, pool);
 		ipc_bufpool_unref(pool);
-		pool = newpool;
+		ch->pool = pool = newpool;
 	}
 	
 	
@@ -1079,7 +1079,6 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 			/* Note that all previous cases break out of the loop */
 			debug_bytecount += msg_len;
 			*nbytes = msg_len;
-			
 			nmsgs = ipc_bufpool_update(pool, ch, msg_len, ch->recv_queue) ;
 			
 			SocketIPCStats.ninqueued += nmsgs;
@@ -1142,7 +1141,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 			break;
 		}
 		msg = (struct IPC_MESSAGE *) (element->data);
-
+		
 		diff = 0;
 		if (msg->msg_buf ){
 			diff = (char*)msg->msg_body - (char*)msg->msg_buf;				
@@ -1165,10 +1164,11 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
                 	oldmsg = msg;
 			msg = newmsg;
 		}
-	
+		
 		head = (struct SOCKET_MSG_HEAD*) msg->msg_buf;
                 head->msg_len = msg->msg_len;
-
+		head->magic = HEADMAGIC;
+		
 		if (ch->bytes_remaining == 0){
 			bytes_remaining = msg->msg_len + ch->msgpad;
 			p = msg->msg_buf;
@@ -1178,7 +1178,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 				- bytes_remaining;
 			
 		}
-
+		
 		sendrc = 0;
 		
                 do {
@@ -1190,7 +1190,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
                         SocketIPCStats.last_send_rc = sendrc;
                         SocketIPCStats.last_send_errno = errno;
                         ++SocketIPCStats.send_count;
-
+			
 			if (sendrc <= 0){
 				break;
 			}else {				
@@ -1200,7 +1200,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 
                 } while(bytes_remaining > 0 );
 
-		
+
 		ch->bytes_remaining = bytes_remaining;
 		
 		if (sendrc < 0) {
@@ -1231,17 +1231,18 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
                         	}
 				msg=oldmsg;
 			}
-	
-			ch->send_queue->queue = g_list_remove(
-					ch->send_queue->queue,	msg);
-
-			if (msg->msg_done != NULL) {
-				msg->msg_done(msg);
+			
+			if(ch->bytes_remaining ==0){
+				ch->send_queue->queue = g_list_remove(ch->send_queue->queue,	msg);				
+				if (msg->msg_done != NULL) {
+					msg->msg_done(msg);
+				}
+				
+				SocketIPCStats.nsent++;
+				orig_qlen = ch->send_queue->current_qlen--;
+				socket_check_flow_control(ch, orig_qlen, orig_qlen -1 );
+				(*nmsg)++;
 			}
-			SocketIPCStats.nsent++;
-			orig_qlen = ch->send_queue->current_qlen--;
-			socket_check_flow_control(ch, orig_qlen, orig_qlen -1 );
-			(*nmsg)++;
 		}
 	}
 	CHANAUDIT(ch);
@@ -1704,6 +1705,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   temp_ch->should_send_blocking = FALSE;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
+  temp_ch->pool = NULL;
   temp_ch->high_flow_mark = temp_ch->send_queue->max_qlen;
   temp_ch->low_flow_mark = -1;
   
@@ -1760,6 +1762,7 @@ socket_server_channel_new(int sockfd){
   temp_ch->should_send_blocking = FALSE;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
+  temp_ch->pool = NULL;
   temp_ch->high_flow_mark = temp_ch->send_queue->max_qlen;
   temp_ch->low_flow_mark = -1;
      

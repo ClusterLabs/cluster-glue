@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.45 2005/02/08 08:10:27 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.46 2005/02/09 01:45:05 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -472,9 +472,10 @@ cl_msg_remove_offset(struct ha_msg* msg, int offset)
 		return HA_FAIL;
 	}
 	
-	tmplen = msg->stringlen;
+
 	
 	if (msg->types[j] != FT_STRUCT){
+		tmplen = msg->stringlen;
 		msg->stringlen -=  fieldtypefuncs[msg->types[j]].stringlen(msg->nlens[j],
 									   msg->vlens[j],
 									   msg->values[j]);
@@ -2139,6 +2140,12 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.46  2005/02/09 01:45:05  gshi
+ * 1.add a magic number in strut SOCKET_MSG_HEAD. On IPC receive side, it checks that magic
+ * number and abort if not correct
+ *
+ * 2. fixed a bug in IPC: there must be one pool per channel, not one pool per program
+ *
  * Revision 1.45  2005/02/08 08:10:27  gshi
  * change the way stringlen and netstringlen is computed.
  *
