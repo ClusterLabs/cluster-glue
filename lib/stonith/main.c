@@ -63,18 +63,21 @@ confhelp(const char * cmd, FILE* stream)
 
 	fprintf(stream
 	,	"\nSTONITH -t device types and"
-		" associated configuration details:");
+		" associated configuration details:\n");
 
 	typelist = stonith_types();
-
-	for(this=typelist; *this; ++this) {
+	
+	if (typelist == NULL) {
+		fprintf(stderr, 
+			"Failed to retrieve list of STONITH modules!\n");
+		return;
 	}
 	for(this=typelist; *this; ++this) {
 		const char *    SwitchType = *this;
 		const char *	cres;
 
 		if ((s = stonith_new(SwitchType)) == NULL) {
-			fprintf(stderr, "Invalid STONITH type %s(!)"
+			fprintf(stderr, "Invalid STONITH type %s(!)\n"
 			,	SwitchType);
 			continue;
 		}
