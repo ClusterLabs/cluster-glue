@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.21 2004/10/24 13:00:14 lge Exp $ */
+/* $Id: rcd_serial.c,v 1.22 2004/11/11 15:36:31 davidlee Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -41,6 +41,7 @@
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
 
 static void *		rcd_serial_new(void);
 static void		rcd_serial_destroy(Stonith *);
