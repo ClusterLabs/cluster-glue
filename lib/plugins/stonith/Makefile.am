@@ -72,7 +72,7 @@ apcmaster_la_SOURCES	= apcmaster.c stonith_signal.h
 apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version
 
 apcmastersnmp_la_SOURCES= apcmastersnmp.c
-apcmastersnmp_la_LDFLAGS= -export-dynamic -module -avoid-version -lsnmp -lcrypto
+apcmastersnmp_la_LDFLAGS= -export-dynamic -module -avoid-version @SNMPLIB@ -lcrypto
 
 apcsmart_la_SOURCES	= apcsmart.c stonith_signal.h
 apcsmart_la_LDFLAGS	= -export-dynamic -module -avoid-version
