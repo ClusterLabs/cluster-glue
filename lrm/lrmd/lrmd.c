@@ -387,7 +387,7 @@ init_start ()
 
 	dir = opendir(RA_PLUGIN_DIR);
 	if (NULL == dir) {
-		lrmd_log(LOG_ERR, "main: can not open RA plugin dir.");
+		lrmd_log(LOG_ERR, "main: can not open RA plugin dir "RA_PLUGIN_DIR);
 		exit(100);
 	}
 
