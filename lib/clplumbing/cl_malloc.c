@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.6 2005/02/06 01:01:53 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.7 2005/02/07 02:09:21 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -33,6 +33,13 @@ static volatile cl_mem_stats_t *	memstats = NULL;
 #define	MARK_PRISTINE	1	/* Expensive in CPU time */
 #define	MAKE_GUARD	1	/* Adds 'n' bytes memory - cheap in CPU*/
 #define	USE_ASSERTS	1
+#define	DUMPONERR	1
+
+#ifndef DUMPONERR
+#	define	DUMPIFASKED()	/* nothing */
+#else
+#	define	DUMPIFASKED() 	{abort();}
+#endif
 
 
 /*
@@ -213,6 +220,7 @@ cl_malloc(size_t size)
 				,	"attempt to allocate memory"
 				" which is not pristine.");
 				cl_dump_item(buckptr);
+				DUMPIFASKED();
 			}
 		}
 #endif
@@ -229,6 +237,7 @@ cl_malloc(size_t size)
 				" already allocated at 0x%lx"
 				,	(unsigned long)ret);
 				cl_dump_item(buckptr);
+				DUMPIFASKED();
 				ret=NULL;
 				break;
 
@@ -237,6 +246,7 @@ cl_malloc(size_t size)
 				, "corrupt malloc buffer at 0x%lx"
 				,	(unsigned long)ret);
 				cl_dump_item(buckptr);
+				DUMPIFASKED();
 				ret=NULL;
 				break;
 		}
@@ -289,6 +299,7 @@ cl_free(void *ptr)
 
 	if (ptr == NULL) {
 		cl_log(LOG_ERR, "attempt to free NULL pointer in cl_free()");
+		DUMPIFASKED();
 		return;
 	}
 
@@ -307,6 +318,7 @@ cl_free(void *ptr)
 			" object at 0x%lx"
 			,	(unsigned long)ptr);
 			cl_dump_item(bhdr);
+			DUMPIFASKED();
 			return;
 			break;
 		default:
@@ -314,6 +326,7 @@ cl_free(void *ptr)
 			" in object at 0x%lx"
 			,	(unsigned long)ptr);
 			cl_dump_item(bhdr);
+			DUMPIFASKED();
 			return;
 			break;
 	}
@@ -323,6 +336,7 @@ cl_free(void *ptr)
 		,	"cl_free: attempt to free guard-corrupted"
 		" object at 0x%lx", (unsigned long)ptr);
 		cl_dump_item(bhdr);
+		DUMPIFASKED();
 		return;
 	}
 	bucket = bhdr->hdr.bucket;
@@ -400,6 +414,7 @@ cl_realloc(void *ptr, size_t newsize)
 			" object at 0x%lx"
 			,	(unsigned long)ptr);
 			cl_dump_item(bhdr);
+			DUMPIFASKED();
 			return NULL;
 			break;
 		default:
@@ -407,6 +422,7 @@ cl_realloc(void *ptr, size_t newsize)
 			" in object at 0x%lx"
 			,	(unsigned long)ptr);
 			cl_dump_item(bhdr);
+			DUMPIFASKED();
 			return NULL;
 			break;
 	}
@@ -416,6 +432,7 @@ cl_realloc(void *ptr, size_t newsize)
 		,	"cl_realloc: realloc()ing guard-corrupted"
 		" object at 0x%lx (!)", (unsigned long)ptr);
 		cl_dump_item(bhdr);
+		DUMPIFASKED();
 	}
 	bucket = bhdr->hdr.bucket;
 
