@@ -121,7 +121,7 @@ update_cpu_interval(void)
 		timesecs = rlim.rlim_max;
 	}
 	cl_log(LOG_DEBUG
-	,	"Setting max CPU limit to %d seconds", cpusecs);
+	,	"Setting max CPU limit to %ld seconds", timesecs);
 
 	/* Update the OS-level soft CPU limit */
 	rlim.rlim_cur = timesecs;
