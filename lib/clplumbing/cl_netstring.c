@@ -40,6 +40,12 @@
  */
 
 
+int msg2netstring_buf(const struct ha_msg*, char*, size_t, size_t*);
+int compose_netstring(char*, const char*, const char*, size_t, int*);
+int is_auth_netstring(const char*, size_t, const char*, size_t);
+char* msg2netstring(const struct ha_msg*, size_t*);
+struct ha_msg* netstring2msg(const char *, size_t, int);
+
 extern const char *	FT_strings[];
 
 static int (*authmethod)(int whichauth
@@ -59,7 +65,7 @@ cl_set_authentication_computation_method(int (*method)(int whichauth
 }
 
 
-static int
+int
 compose_netstring(char * s, const char * smax, const char* data,
 		  size_t len, int* comlen)
 {
@@ -88,7 +94,7 @@ compose_netstring(char * s, const char * smax, const char* data,
 
 /* Converts a message into a netstring */
 
-static int
+int
 msg2netstring_buf(const struct ha_msg *m, char *s,
 		  size_t buflen, size_t * slen)
 {
@@ -101,7 +107,6 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 	char	authtoken[MAXLINE];
 	char	authstring[MAXLINE];
 	int	authnum;
-	char	buf[MAXLENGTH];
 	sp = s;
 	smax = s + buflen;
 
@@ -131,85 +136,37 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 				      &comlen) != HA_OK) {
 			cl_log(LOG_ERR
 			, "compose_netstring fails for"
-			" type(msg2netstring_buf)");
+			       " type(msg2netstring_buf)");
 			return(HA_FAIL);
 		}
-
+		
 		sp += comlen;
 		datalen +=comlen;
-
+		
 		llen = (size_t)m->nlens[i];
-
-		if (m->types[i] == FT_STRUCT) {
-			size_t	tmplen;
-			char	*sp_save = sp;
-
-			llen =  get_netstringlen((struct ha_msg *)m->values[i]
-			,	0);
-			sp += sprintf(sp, "%ld:", (long)llen);
-
-			if (msg2netstring_buf((struct ha_msg * )m->values[i]
-			,	sp, llen, &tmplen) != HA_OK){
-				cl_log(LOG_ERR
-				,	"msg2netstring_buf()"
-				": msg2netstring_buf() failed");
-				return(HA_FAIL);
-			}
-
-			sp +=llen;
-
-			*sp++ = ',';
-			comlen = sp - sp_save;
-			datalen += comlen;
-
-		}else if (m->types[i]== FT_LIST) {
-			size_t tmplen;
-			GList* list = (GList*) m->values[i];
-			
-			tmplen = string_list_pack_length(list);
-			if (tmplen >= MAXLENGTH){
-				cl_log(LOG_ERR,
-				       "string list length exceeds limit");
-				return(HA_FAIL);
+		
+		if(m->types[i] < sizeof(fieldtypefuncs) 
+		   / sizeof(fieldtypefuncs[0])){					
+			int (*tonetstring)(char*, char*, void*, size_t, size_t*);			
+			tonetstring = fieldtypefuncs[m->types[i]].tonetstring;
+			if (!tonetstring || tonetstring(sp, smax, m->values[i], m->vlens[i], &comlen) != HA_OK){
+				cl_log(LOG_ERR, "msg2netstring_buf: "
+				       "tonetstring() failed, type=%d", m->types[i]);
+				return HA_FAIL;
 			}
 			
-			if (string_list_pack(list, buf, buf + MAXLENGTH) 
-			    != tmplen ){
-				cl_log(LOG_ERR, 
-				       "packing string list return wrong length");
-				return(HA_FAIL);
-			}
-			
-			if (compose_netstring(sp, smax, buf, tmplen, &comlen)
-			    != HA_OK){
-				cl_log(LOG_ERR,
-				       "compose_netstring fails for"
-				       " value(msg2netstring_buf)");
-				return(HA_FAIL);
-			}
-			sp += comlen;
-			datalen += comlen;
-			
-			
-		}else if (compose_netstring(sp, smax, m->values[i], 
-					    m->vlens[i], &comlen) != HA_OK){
-			cl_log(LOG_ERR 
-			       ,	"compose_netstring fails for"
-			       " value(msg2netstring_buf)");
-			return(HA_FAIL);
-		} else{
 			sp += comlen;
 			datalen +=comlen;
 		}
 	}
-
+	
 
 	/* Add authentication */
-
+	
 	if ((authnum=authmethod(-1, datap, datalen, authtoken
-	,		sizeof(authtoken))) < 0) {
+				,		sizeof(authtoken))) < 0) {
 		cl_log(LOG_WARNING
-		,	"Cannot compute message authentication!");
+		       ,	"Cannot compute message authentication!");
 		return(HA_FAIL);
 	}
 	sprintf(authstring, "%d %s", authnum, authtoken);
@@ -236,7 +193,7 @@ msg2netstring(const struct ha_msg *m, size_t * slen)
 	int	len;
 	void	*s;
 
-	len= get_netstringlen(m, 0) + 1;
+	len= get_netstringlen(m) + 1;
 	s = ha_calloc(1, len);
 	if (!s){
 		cl_log(LOG_ERR, "msg2netstring: no memory for netstring");
@@ -307,7 +264,9 @@ netstring2msg(const char *s, size_t length, int need_auth)
 	int		endlen;
 	const char *	datap;
 	int		datalen = 0;
-
+	int (*netstringtofield)(const void*, size_t, void**, size_t*);			
+	void (*memfree)(void*);
+	
 	if ((ret = ha_msg_new(0)) == NULL){
 		return(NULL);
 	}
@@ -340,9 +299,8 @@ netstring2msg(const char *s, size_t length, int need_auth)
 		int		tlen;
 		const char *	type;
 		int		fieldtype;
-		struct ha_msg	*tmpmsg = NULL;
-		GList		*tmplist = NULL;
-			
+		void*		ret_value;
+		size_t		ret_vlen;
 
 		tmp = datalen;
 		if (peel_netstring(sp , smax, &nlen, &name,&parselen) != HA_OK){
@@ -366,7 +324,8 @@ netstring2msg(const char *s, size_t length, int need_auth)
 				ha_msg_del(ret);
 				return(NULL);
 			}
-			return(ret);
+
+			goto happyexit;
 		}
 
 
@@ -390,48 +349,52 @@ netstring2msg(const char *s, size_t length, int need_auth)
 		sp +=  parselen;
 		datalen += parselen;
 		
-		fieldtype = atoi(type);
+		fieldtype = atoi(type);		
 		
-		if (fieldtype == FT_STRUCT){
-			
-			tmpmsg = netstring2msg(value, vlen, 1);
-			value = (char *)tmpmsg;
-			vlen = sizeof(struct ha_msg);
-			
-		} else if (fieldtype == FT_LIST){
-			tmplist = string_list_unpack(value, vlen);
-			if (tmplist == NULL){
-				cl_log(LOG_ERR, "unpacking string list failed");
-				cl_log(LOG_INFO, "thisbuf=%s", value);
-				cl_log(LOG_INFO, "the whole buf=%s",s);
-				return(NULL);
+		if (fieldtype < sizeof(fieldtypefuncs) 
+		    / sizeof(fieldtypefuncs[0])){					
+			netstringtofield = fieldtypefuncs[fieldtype].netstringtofield;
+			memfree = fieldtypefuncs[fieldtype].memfree;
+			if (!netstringtofield || netstringtofield(value, vlen,
+								  &ret_value, &ret_vlen) != HA_OK){
+				cl_log(LOG_ERR, "netstring2msg: "
+				       "tonetstring() failed, type=%d", fieldtype);
+				return NULL;
 			}
-			value = (const char*) tmplist;
+		}else {
+			cl_log(LOG_ERR, "netstring2msg: wrong type(%d)", fieldtype);
+			return NULL;
 		}
 		
-		if (ha_msg_nadd_type(ret, name, nlen, value, vlen, fieldtype)
+		
+		if (ha_msg_nadd_type(ret, name, nlen, ret_value, ret_vlen, fieldtype)
 		    != HA_OK) {
 			cl_log(LOG_ERR, "ha_msg_nadd fails(netstring2msg)");
 			
-			if (fieldtype == FT_STRUCT && tmpmsg){
-				ha_msg_del(tmpmsg);
-			}else if (fieldtype == FT_LIST && tmplist){
-				list_cleanup(tmplist);
+			if (memfree && ret_value){
+				memfree(ret_value);
+			} else{
+				cl_log(LOG_ERR, "netstring2msg:"
+				       "memfree or ret_value is NULL");
 			}
 			
 			ha_msg_del(ret);
 			return(NULL);
 		}
 		
-		if (fieldtype == FT_STRUCT && tmpmsg){
-			ha_msg_del(tmpmsg);
-		}else if (fieldtype == FT_LIST && tmplist){
-			list_cleanup(tmplist);
-		}			
 		
-		
+		if (memfree && ret_value){
+			memfree(ret_value);
+		} else{
+			cl_log(LOG_ERR, "netstring2msg:"
+			       "memfree or ret_value is NULL");
+		}
 	}
 	
+	/* if program runs here,
+	   the message is generated but
+	   no authentication found*/
+	  
 	if (!need_auth){
 		return(ret);
 	}else {
@@ -442,6 +405,10 @@ netstring2msg(const char *s, size_t length, int need_auth)
 		return(NULL);
 	}
 	
+
+
+ happyexit:
+	return(ret);
 	
 }
 
@@ -490,7 +457,7 @@ is_auth_netstring(const char * datap, size_t datalen,
 	if (!cl_msg_quiet_fmterr) {
 		cl_log(LOG_ERR
 		,	"authtoken does not match, authtoken=%s, authstr=%s"
-		,	authtoken, authstr);
+		       ,	authtoken, authstr);
 	}
 	return(FALSE);
 }
