@@ -1,4 +1,4 @@
-/* $Id: loggingdaemon.h,v 1.3 2004/11/08 20:48:36 gshi Exp $ */
+/* $Id: loggingdaemon.h,v 1.4 2004/11/18 02:27:18 gshi Exp $ */
 /* Messages sent to the logging daemon */
 #define	LD_LOGIT	2
 struct LogDaemonMsg_s {
@@ -7,6 +7,6 @@ struct LogDaemonMsg_s {
 	int		priority;
 	int		msglen;
 	gboolean	use_pri_str;
-	char		message[1]; /* Actually much bigger ;-) */
+	char		message[0]; /* Actually much bigger ;-) */
 };
 typedef	struct LogDaemonMsg_s	LogDaemonMsg;
