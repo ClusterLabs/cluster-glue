@@ -1,9 +1,8 @@
-/*!
- \file
- \brief IPC abstraction implementation.
- \author Xiaoxiang Liu <xiliu@ncsa.uiuc.edu>
-*/
 /*
+ *
+ * ocf_ipc.c: IPC abstraction implementation.
+ *
+ *
  * Copyright (c) 2002 Xiaoxiang Liu <xiliu@ncsa.uiuc.edu>
  *
  * This library is free software; you can redistribute it and/or
