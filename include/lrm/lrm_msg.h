@@ -107,25 +107,7 @@ int ha_msg_add_int(struct ha_msg * msg, const char * name, int value);
 int ha_msg_value_int(struct ha_msg * msg, const char * name, int* value);
 int ha_msg_mod_int(struct ha_msg * msg, const char * name, int value);
 
-/*
-int ha_msg_add_uuid(struct ha_msg * msg, const char * name, const uuid_t id);
-int ha_msg_value_uuid(struct ha_msg * msg, const char * name, uuid_t id);
-*/
-GList* ha_msg_value_str_list(struct ha_msg * msg, const char * name);
-int ha_msg_add_str_list(struct ha_msg * msg, const char * name, GList* list);
-
-GHashTable* ha_msg_value_str_table(struct ha_msg * msg, const char * name);
-int ha_msg_add_str_table(struct ha_msg * msg, const char * name,
-							GHashTable* hash_table);
 							
-GHashTable* msg_to_str_table(struct ha_msg * msg);
-struct ha_msg* str_table_to_msg(GHashTable* hash_table);
-
-#ifdef LRM_MSG_UUID_SUPPORT
-char* hash_table_to_string(GHashTable* hash_table);
-GHashTable* string_to_hash_table(const char* data);
-#endif
-
 GHashTable* copy_str_table(GHashTable* hash_table);
 GHashTable* merge_str_tables(GHashTable* old, GHashTable* new);
 void free_str_table(GHashTable* hash_table);

@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.34 2004/11/22 20:06:42 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.35 2004/12/05 04:32:50 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -37,6 +37,7 @@
 #include <clplumbing/base64.h>
 #include <clplumbing/netstring.h>
 #include <glib.h>
+#include <uuid/uuid.h>
 
 #define		MAXMSGLINE	MAXMSG
 #define		MINFIELDS	30
@@ -46,7 +47,9 @@
 
 #define		NEEDAUTH	1
 #define		NOAUTH		0
-
+#define		MAX_INT_LEN 	10
+#define		MAX_NAME_LEN 	255
+#define		UUID_SLEN	64
 static enum cl_msgfmt msgfmt = MSGFMT_NVPAIR;
 
 
@@ -547,6 +550,213 @@ ha_msg_addstruct(struct ha_msg * msg, const char * name, void * value)
 	return ha_msg_addraw(msg, name, strlen(name), value, 
 			     sizeof(struct ha_msg), FT_STRUCT, 0);
 }
+
+
+int
+ha_msg_add_int(struct ha_msg * msg, const char * name, int value)
+{
+	char buf[MAX_INT_LEN];
+	snprintf(buf, MAX_INT_LEN, "%d", value);
+	return (ha_msg_add(msg, name, buf));	
+}
+
+int
+ha_msg_mod_int(struct ha_msg * msg, const char * name, int value)
+{
+	char buf[MAX_INT_LEN];
+	snprintf(buf, MAX_INT_LEN, "%d", value);
+	return (cl_msg_modstring(msg, name, buf));	
+}
+
+int
+ha_msg_value_int(struct ha_msg * msg, const char * name, int* value)
+{
+	const char* svalue = ha_msg_value(msg, name);
+	if(NULL == svalue) {
+		return HA_FAIL;
+	}
+	*value = atoi(svalue);
+	return HA_OK;
+}
+
+int
+ha_msg_add_uuid(struct ha_msg * msg, const char * name, const uuid_t id)
+{
+	char buf[UUID_SLEN];
+	uuid_unparse(id, buf);
+	return (ha_msg_nadd(msg, name, strlen(name), buf, strlen(buf)));
+}
+
+int
+ha_msg_value_uuid(struct ha_msg * msg, const char * name, uuid_t id)
+{
+	const char* value = ha_msg_value(msg, name);
+	char buf[UUID_SLEN];
+
+	if (NULL == value) {
+		return HA_FAIL;
+	}
+	strncpy(buf,value,UUID_SLEN);
+	if( 0 != uuid_parse(value, id)) {
+		return HA_FAIL;
+	}
+
+	return HA_OK;
+}
+
+
+
+/*
+ * ha_msg_value_str_list()/ha_msg_add_str_list():
+ * transform a string list suitable for putting into an ha_msg is by a convention
+ * of naming the fields into the following format:
+ *	listname1=foo
+ *	listname2=bar
+ *	listname3=stuff
+ *	etc.
+ */
+
+GList* 
+ha_msg_value_str_list(struct ha_msg * msg, const char * name)
+{
+	
+	int i = 1;
+	int len = 0;
+	const char* value;
+	char* element;
+	GList* list = NULL;
+	
+	
+	if( NULL==msg||NULL==name||strnlen(name, MAX_NAME_LEN)>=MAX_NAME_LEN ){
+		return NULL;
+	}	
+	len = cl_msg_list_length(msg,name);
+	for(i=0; i<len; i++) {
+		value = cl_msg_list_nth_data(msg,name,i);
+		if (NULL == value) {
+			break;
+		}
+		element = g_strdup(value);
+		list = g_list_append(list, element);
+	}
+	return list;
+}
+
+int
+ha_msg_add_str_list(struct ha_msg * msg, const char * name, GList* list)
+{
+	int i = 1;
+	if( NULL==msg||NULL==name||strnlen(name, MAX_NAME_LEN)>=MAX_NAME_LEN ){
+		return HA_FAIL;
+	}
+	
+	if (NULL != list) {
+		GList* element = g_list_first(list);
+		while (NULL != element) {
+			char* value = (char*)element->data;
+			if( HA_OK != cl_msg_list_add_string(msg,name,value)) {
+				cl_log(LOG_ERR,
+				"cl_msg_list_add_string failed");
+				return HA_FAIL;
+			}
+			element = g_list_next(element);
+			i++;
+		}
+	}
+	return HA_OK;
+}
+
+
+
+static void
+pair_to_msg(gpointer key, gpointer value, gpointer user_data)
+{
+	struct ha_msg* msg = (struct ha_msg*)user_data;
+	if( HA_OK != ha_msg_add(msg, key, value)) {
+		cl_log(LOG_ERR, "ha_msg_add in pair_to_msg failed");
+	}
+}
+
+
+static struct ha_msg*
+str_table_to_msg(GHashTable* hash_table)
+{
+	struct ha_msg* hash_msg;
+
+	if ( NULL == hash_table) {
+		return NULL;
+	}
+
+	hash_msg = ha_msg_new(5);
+	g_hash_table_foreach(hash_table, pair_to_msg, hash_msg);
+	return hash_msg;
+}
+
+
+static GHashTable*
+msg_to_str_table(struct ha_msg * msg)
+{
+	int i;
+	GHashTable* hash_table;
+
+	if ( NULL == msg) {
+		return NULL;
+	}
+
+	hash_table = g_hash_table_new(g_str_hash, g_str_equal);
+
+	for (i = 0; i < msg->nfields; i++) {
+		if( FT_STRING != msg->types[i] ) {
+			continue;
+		}
+		g_hash_table_insert(hash_table,
+				    strndup(msg->names[i],msg->nlens[i]),
+				    strndup(msg->values[i],msg->vlens[i]));
+	}
+	return hash_table;
+}
+
+GHashTable*
+ha_msg_value_str_table(struct ha_msg * msg, const char * name)
+{
+	struct ha_msg* hash_msg;
+	GHashTable * hash_table = NULL;
+
+	if (NULL == msg || NULL == name) {
+		return NULL;
+	}
+
+	hash_msg = cl_get_struct(msg, name);
+	if (NULL == hash_msg) {
+		return NULL;
+	}
+	hash_table = msg_to_str_table(hash_msg);
+	return hash_table;
+}
+
+int
+ha_msg_add_str_table(struct ha_msg * msg, const char * name,
+			GHashTable* hash_table)
+{
+	struct ha_msg* hash_msg;
+	if (NULL == msg || NULL == name || NULL == hash_table) {
+		return HA_FAIL;
+	}
+
+	hash_msg = str_table_to_msg(hash_table);
+	if( HA_OK != ha_msg_addstruct(msg, name, hash_msg)) {
+		ha_msg_del(hash_msg);
+		cl_log(LOG_ERR, "ha_msg_add in ha_msg_add_str_table failed");
+		return HA_FAIL;
+	}
+	ha_msg_del(hash_msg);
+	return HA_OK;
+}
+
+
+
+
+
 
 int
 cl_msg_list_add_string(struct ha_msg* msg, const char* name, const char* value)
@@ -1770,6 +1980,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.35  2004/12/05 04:32:50  gshi
+ * Moved some message-related functions from lrm_msg.c to cl_msg.c
+ * These functions are general and shall be available to other subsystems
+ *
  * Revision 1.34  2004/11/22 20:06:42  gshi
  * new IPC message should be memset-ed to 0
  * to avoid errors caused by adding a new field (void*) msg_buf
