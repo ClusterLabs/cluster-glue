@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.64 2005/03/18 23:22:16 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.65 2005/03/24 16:36:18 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1896,8 +1896,12 @@ msg2ipcchan(struct ha_msg*m, IPC_Channel*ch)
 
 	if (ch->ops->send(ch, imsg) != IPC_OK) {
 		if (ch->ch_status == IPC_CONNECT) {
-			cl_log(LOG_ERR
-			,	"msg2ipcchan: ch->ops->send() failure");
+			cl_log(LOG_ERR,
+			       "msg2ipcchan: ch->ops->send() failure");
+			cl_log(LOG_INFO, "ch->farside_pid=%d, send_queue length is %d(max is %d)",
+			       ch->farside_pid, ch->send_queue->current_qlen, 
+			       ch->send_queue->max_qlen);
+			
 		}
 		imsg->msg_done(imsg);
 		return HA_FAIL;
@@ -2287,6 +2291,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.65  2005/03/24 16:36:18  gshi
+ * add more log messages in case of send failure
+ *
  * Revision 1.64  2005/03/18 23:22:16  gshi
  * add a parameter (int flag) to msgfromIPC()
  * flag can have the following bit set
