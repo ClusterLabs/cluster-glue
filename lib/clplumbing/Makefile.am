@@ -58,7 +58,7 @@ libplumb_la_LIBADD      = $(top_builddir)/replace/libreplace.la
 testdir = $(libdir)/@HB_PKG@
 test_PROGRAMS = ipctest ipctransientclient ipctransientserver
 
-libplumb_la_LDFLAGS	= -version-info 0:0:0
+libplumb_la_LDFLAGS	= -version-info 1:0:0
 
 ipctest_SOURCES = ipctest.c
 ipctest_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB)
