@@ -20,6 +20,7 @@
  *
  */
 
+#include <portability.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/poll.h>
@@ -39,6 +40,12 @@ void get_cur_state(lrm_rsc_t* rsc);
 int main (int argc, char* argv[])
 {
 	ll_lrm_t* lrm;
+	lrm_rsc_t* rsc = NULL;
+	lrm_op_t* op = NULL;
+	rsc_id_t rid;
+	GList * class, * type, * classes, * types;
+	GHashTable* param = NULL;
+
 	lrm = ll_lrm_new("lrm");	
 	if(NULL == lrm)
 	{
@@ -49,12 +56,10 @@ int main (int argc, char* argv[])
 	lrm->lrm_ops->signon(lrm,"apitest");
 
 	puts("get_rsc_class_supported...");
-	GList* classes = lrm->lrm_ops->get_rsc_class_supported(lrm);
-	GList* class;
+	classes = lrm->lrm_ops->get_rsc_class_supported(lrm);
 	for(class = g_list_first(classes); NULL!=class; class = g_list_next(class)) {
 		printf("class:%s\n", (char*)class->data);
-		GList* types = lrm->lrm_ops->get_rsc_type_supported(lrm, class->data);
-		GList* type;
+		types = lrm->lrm_ops->get_rsc_type_supported(lrm, class->data);
 		for(type = g_list_first(types); NULL!=type; type = g_list_next(type)) {
 			printf("\ntype:%s\n", (char*)type->data);
 		}
@@ -64,8 +69,7 @@ int main (int argc, char* argv[])
 	lrm->lrm_ops->set_lrm_callback(lrm, lrm_op_done_callback,
 					lrm_monitor_callback);
 	
-	rsc_id_t rid;
-	GHashTable* param = g_hash_table_new(g_str_hash,g_str_equal);
+	param = g_hash_table_new(g_str_hash,g_str_equal);
 	g_hash_table_insert(param, strdup("1"), strdup("first"));
 	g_hash_table_insert(param, strdup("2"), strdup("second"));
 	g_hash_table_insert(param, strdup("3"), strdup("third"));
@@ -74,11 +78,11 @@ int main (int argc, char* argv[])
 	lrm->lrm_ops->add_rsc(lrm, rid, "ocf", "/home/zhenh/linux-ha/lrm/test/ocf_script_sim.sh", param);
 
 	puts("get_rsc...");
-	lrm_rsc_t* rsc = lrm->lrm_ops->get_rsc(lrm, rid);
+	rsc = lrm->lrm_ops->get_rsc(lrm, rid);
 	printf_rsc(rsc);
 
 	puts("perform_op...");
-	lrm_op_t* op = g_new(lrm_op_t, 1);
+	op = g_new(lrm_op_t, 1);
 	op->op_type = "start";
 	op->params = param;
 	op->timeout = 0;
@@ -108,13 +112,14 @@ void lrm_monitor_callback(lrm_mon_t* monitor)
 
 void printf_rsc(lrm_rsc_t* rsc)
 {
+	char buf[37];
+
 	printf("print resource\n");
 	if (NULL == rsc) {
 		printf("resource is null\n");
 		printf("print end\n");
 		return;
 	}
-	char buf[37];
 	uuid_unparse(rsc->id, buf);
 	printf("\tresource of id:%s\n", buf);
 	printf("\ttype:%s\n", rsc->type);
@@ -126,7 +131,9 @@ void printf_rsc(lrm_rsc_t* rsc)
 
 void printf_op(lrm_op_t* op)
 {
+	char buf[37];
 	printf("print op\n");
+
 	if (NULL == op) {
 		printf("op is null\n");
 		printf("print end\n");
@@ -135,7 +142,6 @@ void printf_op(lrm_op_t* op)
 	if (NULL == op->rsc) {
 		printf("\tresource is null\n");
 	} else {
-		char buf[37];
 		uuid_unparse(op->rsc->id, buf);
 		printf("\trsc->id:%s\n", buf);
 	}
@@ -156,6 +162,7 @@ void printf_op(lrm_op_t* op)
 void printf_mon(lrm_mon_t* mon)
 {
 	
+	char buf[37];
 	printf("print mon\n");
 	if (NULL == mon) {
 		printf("mon is null\n");
@@ -165,7 +172,6 @@ void printf_mon(lrm_mon_t* mon)
 	if (NULL == mon->rsc) {
 		printf("\tresource is null\n");
 	} else {
-		char buf[37];
 		uuid_unparse(mon->rsc->id, buf);
 		printf("\trsc->id:%s\n", buf);
 	}
@@ -214,12 +220,14 @@ printf_hash_table(GHashTable* hash_table)
 void
 get_all_rsc(ll_lrm_t* lrm)
 {
+	char buf[37];
+	rsc_id_t rid;
+	GList* element = NULL, * rid_list = NULL;
+
 	puts("get_all_rscs...");
-	GList* rid_list = lrm->lrm_ops->get_all_rscs(lrm);
+	rid_list = lrm->lrm_ops->get_all_rscs(lrm);
 	if (NULL != rid_list) {
-		char buf[37];
-		rsc_id_t rid;
-		GList* element = g_list_first(rid_list);
+		element = g_list_first(rid_list);
 		while (NULL != element) {
 			uuid_copy(rid,element->data);
 			uuid_unparse(rid, buf);
@@ -233,14 +241,17 @@ get_all_rsc(ll_lrm_t* lrm)
 void
 get_cur_state(lrm_rsc_t* rsc)
 {
-	puts("get_cur_state...");
 	state_flag_t state;
-	GList* op_list = rsc->ops->get_cur_state(rsc, &state);
+	GList* node = NULL, * op_list = NULL;
+	lrm_op_t* op = NULL;
+
+	puts("get_cur_state...");
 	printf("\tcurrent state:%s\n",state==LRM_RSC_IDLE?"Idel":"Busy");
 
-	GList* node;
+	op_list = rsc->ops->get_cur_state(rsc, &state);
+
 	for(node = g_list_first(op_list); NULL != node; node = g_list_next(node)) {
-		lrm_op_t* op = (lrm_op_t*)node->data;
+		op = (lrm_op_t*)node->data;
 		printf_op(op);
 	}
 
