@@ -177,6 +177,7 @@ static struct IPC_OPS socket_ops = {
 };
 
 
+
 #define	MAXDATASIZE	65535
 
 
@@ -260,6 +261,106 @@ socket_chan_audit(const struct IPC_CHANNEL* ch)
 }
 
 #endif
+
+#ifdef CHEAT_CHECKS
+
+static long
+cheat_get_sequence(IPC_Message* msg)
+{
+	const char header [] = "String-";;
+	size_t header_len = sizeof(header)-1;
+	char *	body;
+
+	if (msg == NULL || msg->msg_len < sizeof(header)
+	||	msg->msg_len > sizeof(header) + 10
+	||	strncmp(msg->msg_body, header, sizeof(header)) != 0) {
+		return -1L;
+	}
+	body = msg->msg_body;
+	return atol(body+header_len);
+}
+static char SavedReadBody[32];
+static char SavedReceivedBody[32];
+static char SavedQueuedBody[32];
+static char SavedSentBody[32];
+#ifndef MIN
+#	define MIN(a,b)	(a < b ? a : b)
+#endif
+
+
+static void
+save_body(struct IPC_MESSAGE *msg, char * savearea, size_t length)
+{
+	int mlen = strnlen(msg->msg_body, MIN(length, msg->msg_len));
+	memcpy(savearea, msg->msg_body, mlen);
+	savearea[mlen] = EOS;
+}
+
+static void 
+saveandcheck(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg, char * savearea
+,	size_t savesize, long* lastseq, const char * text)
+{
+	long	cheatseq = cheat_get_sequence(msg);
+
+	save_body(msg, savearea, savesize);
+	if (*lastseq != -1L) {
+		if (cheatseq != *lastseq +1) {
+			cl_log(LOG_ERR
+			,	"%s packets out of sequence! %ld versus %ld"
+			,	text, cheatseq, *lastseq);
+			dump_ipc_info(ch);
+		}
+	}
+	if (cheatseq != -1L) {
+		*lastseq = cheatseq;
+	}
+}
+
+#	define	CHECKFOO(ch, msg, area, text)	{				\
+		static long savefoo = -1L;					\
+		saveandcheck(ch, msg, area, sizeof(area), &savefoo, text);	\
+	}
+#else
+#	define	CHECKFOO(ch, msg, area, text)	/* Nothing */
+#endif
+
+static void
+dump_msg(struct IPC_MESSAGE *msg, const char * label)
+{
+#ifdef CHEAT_CHECKS
+	cl_log(LOG_DEBUG, "%s length %d [%s] %ld"
+	,	label,	msg->msg_len, (char*)msg->msg_body
+	,	cheat_get_sequence(msg));
+#else
+	cl_log(LOG_DEBUG, "%s length %d [%s]"
+	,	label,	msg->msg_len, (char*)msg->msg_body);
+#endif
+}
+
+static void
+dump_msgq_msg(gpointer data, gpointer user_data)
+{
+	dump_msg(data, user_data);
+}
+
+
+
+void dump_ipc_info(IPC_Channel* chan);
+void
+dump_ipc_info(IPC_Channel* chan)
+{
+	char squeue[] = "Send queue";
+	char rqueue[] = "Receive queue";
+#ifdef CHEAT_CHECKS
+	cl_log(LOG_DEBUG, "Saved Last Body read[%s]", SavedReadBody);
+	cl_log(LOG_DEBUG, "Saved Last Body received[%s]", SavedReceivedBody);
+	cl_log(LOG_DEBUG, "Saved Last Body Queued[%s]", SavedQueuedBody);
+	cl_log(LOG_DEBUG, "Saved Last Body Sent[%s]", SavedSentBody);
+#endif
+	g_list_foreach(chan->send_queue->queue, dump_msgq_msg, squeue);
+	g_list_foreach(chan->recv_queue->queue, dump_msgq_msg, rqueue);
+	CHANAUDIT(chan);
+}
 
 /* destroy socket wait channel */ 
 static void 
@@ -445,6 +546,7 @@ socket_initiate_connection(struct IPC_CHANNEL * ch)
   return IPC_OK;
 }
 
+
 static int 
 socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 {
@@ -455,6 +557,7 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
   
 	if (ch->ch_status == IPC_CONNECT
 	&&	ch->send_queue->current_qlen < ch->send_queue->max_qlen) {
+		CHECKFOO(ch, msg, SavedQueuedBody, "queued message");
 		/* add the meesage into the send queue */
 		ch->send_queue->queue = g_list_append(ch->send_queue->queue
 		,	msg);
@@ -491,6 +594,7 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 	}
 	*message = (struct IPC_MESSAGE *) (element->data);
 
+	CHECKFOO(ch, *message, SavedReadBody, "read message");
 	ch->recv_queue->queue =	g_list_remove(ch->recv_queue->queue
 	,	element->data);
 	ch->recv_queue->current_qlen--;
@@ -787,6 +891,8 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 			ch->recv_queue->queue =	g_list_append
 			(	ch->recv_queue->queue, conn_info->buf_msg);
 			ch->recv_queue->current_qlen++;
+			CHECKFOO(ch, conn_info->buf_msg, SavedReceivedBody
+			,	"received message");
 			conn_info->buf_msg = NULL;
 		}
 	}
@@ -924,8 +1030,9 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 			}
 			break;
 		}else{
+			CHECKFOO(ch, msg, SavedSentBody, "sent message")
 			ch->send_queue->queue = g_list_remove(
-					ch->send_queue->queue ,	msg);
+					ch->send_queue->queue,	msg);
 			if (msg->msg_done != NULL) {
 				msg->msg_done(msg);
 			}
@@ -1355,11 +1462,11 @@ socket_message_new(struct IPC_CHANNEL *ch, int msg_len)
 void
 socket_free_message(struct IPC_MESSAGE * msg) {
 
-#if 1
+#if 0
 	memset(msg->msg_body, 0xff, msg->msg_len);
 #endif
 	g_free(msg->msg_body);
-#if 1
+#if 0
 	memset(msg, 0xff, sizeof(*msg));
 #endif
 	g_free((void *)msg);
