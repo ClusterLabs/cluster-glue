@@ -42,7 +42,11 @@ int main(void)
 {
 	PILPluginUniv * PluginLoadingSystem = NULL;
 	GHashTable * RAExecFuncs = NULL;
+	GList * ratype_list;
 	struct RAExecOps * RAExec;
+	/*
+	GHashTable * cmd_params;
+	*/
 	int ret;
 
 	PILGenericIfMgmtRqst RegisterRqsts[]= { 
@@ -55,7 +59,6 @@ int main(void)
 
 	PILLoadPlugin(PluginLoadingSystem , "RAExec", "ocf", NULL);
 	RAExec = g_hash_table_lookup(RAExecFuncs,"ocf");
-	GList * ratype_list;
 	ret = RAExec->get_resource_list(&ratype_list);
 	printf("length=%d\n", g_list_length(ratype_list));
 	if (ret >= 0) {
@@ -65,7 +68,6 @@ int main(void)
 	/*
 	PILLoadPlugin(PluginLoadingSystem , "RAExec", "lsb", NULL);
 	RAExec = g_hash_table_lookup(RAExecFuncs,"lsb");
-	GHashTable * cmd_params;
 	cmd_params = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(cmd_params, g_strdup("1"), g_strdup("par1"));
 	g_hash_table_insert(cmd_params, g_strdup("2"), g_strdup("par2"));

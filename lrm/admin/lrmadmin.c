@@ -683,6 +683,7 @@ add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	rsc_id_t rsc_id;
 	const char * class = argv[optind+1];
 	const char * type = argv[optind+2];
+	GHashTable * params_ht = NULL;
 	int tmp_ret;
 
 	if ((argc - optind) < 3) {
@@ -692,7 +693,6 @@ add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 
 	uuid_parse(argv[optind], rsc_id);
 
-	GHashTable * params_ht = NULL;
 	/* delete Hashtable */
 	if ((argc - optind) > 3) {
 		if ( 0 > transfer_cmd_params(argc, optind+3, argv, class,
@@ -717,17 +717,18 @@ static int
 transfer_cmd_params(int amount, int start, char * argv[], const char * class, 
 GHashTable ** params_ht)
 {
+	int i, len_tmp;
+	char * delimit, * key, * value;
+	char buffer[21];
+
 	if (amount < start) {
 		return -1;
 	}
 
 	if (strncmp("ocf", class, 4)==0) {
-		int i;
-		char * delimit, * key, * value;
 		*params_ht = g_hash_table_new(g_str_hash, g_str_equal);
 
 		for (i=start; i<amount; i++) {
-			int len_tmp;
 			delimit = strchr(argv[i], '=');
 			if (!delimit) {
 				cl_log(LOG_ERR, "parameter %s is invalid for " \
@@ -749,8 +750,6 @@ GHashTable ** params_ht)
 		}
 	} else if ( strncmp("lsb", class, 4) == 0 || 
 		    strncmp("heartbeat", class, 10) == 0 ) {
-		int i;
-		char buffer[21];
 
 		/* Pay attention: for parameter ordring issue */
 		*params_ht = g_hash_table_new(g_str_hash, g_str_equal);
@@ -781,8 +780,10 @@ error_return:
 static char * 
 params_hashtable_to_str(const char * class, GHashTable * ht)
 {
+	int i,ht_size;
 	gchar * params_str = NULL;
 	GString * gstr_tmp;
+	gchar * tmp_str;
 
 	if (!ht) {
 		 return NULL;
@@ -796,9 +797,8 @@ params_hashtable_to_str(const char * class, GHashTable * ht)
 		g_string_free(gstr_tmp, TRUE);
 	} else if ( strncmp("lsb", class, 4) == 0 || 
 		    strncmp("heartbeat", class, 10) == 0 ) {
-		int i;
-		int ht_size = g_hash_table_size(ht);
-		gchar * tmp_str = g_new(gchar, ht_size*ARGVI_MAX_LEN); 	
+		ht_size = g_hash_table_size(ht);
+		tmp_str = g_new(gchar, ht_size*ARGVI_MAX_LEN); 	
 		memset(tmp_str, '\0', ht_size*ARGVI_MAX_LEN);
 		g_hash_table_foreach(ht, normal_params_hash_to_str, &tmp_str);
 		gstr_tmp = g_string_new("");

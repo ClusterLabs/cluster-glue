@@ -220,10 +220,12 @@ copy_pair(gpointer key, gpointer value, gpointer user_data)
 GHashTable*
 copy_hash_table(GHashTable* src_table)
 {
+	GHashTable* target_table = NULL;
+
 	if ( NULL == src_table) {
 		return NULL;
 	}
-	GHashTable* target_table = g_hash_table_new(g_str_hash, g_str_equal);
+	target_table = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_foreach(src_table, copy_pair, target_table);
 	return target_table;
 }

@@ -240,12 +240,14 @@ ibmhmc_closeintf(PILInterface* pi, void* pd)
 static int
 ibmhmc_status(Stonith  *s)
 {
+	struct HMCDevice* dev = NULL;
+
 	if (!ISHMCDEV(s)) {
 		PILCallLog(LOG, PIL_CRIT, "invalid argument to ibmhmc_status");
 		return(S_OOPS);
 	}
 
-	struct HMCDevice* dev = (struct HMCDevice*) s->pinfo;
+	dev = (struct HMCDevice*) s->pinfo;
 	
 	return check_hmc_status(dev->hmc);
 }
@@ -314,8 +316,14 @@ ibmhmc_free_hostlist (char** hlist)
 static int
 ibmhmc_parse_config_info(struct HMCDevice* dev, const char* info)
 {
-	int status;
+	int i, j, status;
 	char* output = NULL;
+	char get_syslist[MAX_CMD_LEN];
+	char host[MAX_HOST_NAME_LEN];
+	gchar** syslist = NULL;
+	gchar** name_mode = NULL;
+	char get_lpar[MAX_CMD_LEN];
+	gchar** lparlist = NULL;
 
 	if (NULL == info || 0 == strlen(info)) 	{
 		return S_BADCONFIG;
@@ -326,21 +334,18 @@ ibmhmc_parse_config_info(struct HMCDevice* dev, const char* info)
 		return S_BADCONFIG;
 	}		
 	//get the managed system's names of the hmc
-	char get_syslist[MAX_CMD_LEN];
 	snprintf(get_syslist, MAX_CMD_LEN,
 		 SSH_CMD " -l " HMCROOT
 		 " %s lssyscfg -r sys -F name:mode --all", info);
 	output = do_shell_cmd(get_syslist, &status);
-	gchar** syslist = g_strsplit(output, "\n", MAX_SYS_NUM);
+	syslist = g_strsplit(output, "\n", MAX_SYS_NUM);
 	FREE(output);
-	int i;
-	char host[MAX_HOST_NAME_LEN];
 	//for each managed system
 	for (i=0; i<MAX_SYS_NUM; i++) {
 		if (NULL==syslist[i]) {
 			break;
 		}
-		gchar** name_mode = g_strsplit(syslist[i],":",2);
+		name_mode = g_strsplit(syslist[i],":",2);
 		//if it is in fullsystempartition
 		if (NULL!=name_mode[1] && 0==strncmp(name_mode[1],"0",1)) {
 			//add the FullSystemPartition
@@ -352,15 +357,13 @@ ibmhmc_parse_config_info(struct HMCDevice* dev, const char* info)
 		//if it is in lpar
 		if (NULL!=name_mode[1] && 0==strncmp(name_mode[1],"255",3)) {
 			//get its lpars
-			char get_lpar[MAX_CMD_LEN];
 			snprintf(get_lpar, MAX_CMD_LEN,
 				 SSH_CMD " -l " HMCROOT
 				 " %s lssyscfg -m %s -r lpar -F name --all",
 				 info, name_mode[0]);
 			output = do_shell_cmd(get_lpar,&status);
-			gchar** lparlist = g_strsplit(output, "\n",MAX_LPAR_NUM);
+			lparlist = g_strsplit(output, "\n",MAX_LPAR_NUM);
 			FREE(output);
-			int j;
 			//for each lpar
 			for (j=0; j<MAX_LPAR_NUM; j++) {
 				if (NULL==lparlist[j]) {
@@ -666,18 +669,21 @@ ibmhmc_new(void)
 static char*
 do_shell_cmd(const char* cmd, int* status)
 {
+	const int BUFF_LEN=4096;
+	int read_len = NULL;
+	char buff[BUFF_LEN];
+	char* data = NULL;
+	GString* g_str_tmp = NULL;
+
 	FILE* file = popen(cmd, "r");
 	if (NULL==file) {
 		return NULL;
 	}
 
-	const int BUFF_LEN=4096;
-	char buff[BUFF_LEN];
-
-	GString* g_str_tmp = g_string_new("");
+	g_str_tmp = g_string_new("");
 	while(!feof(file)) {
 		memset(buff, 0, BUFF_LEN);
-		int read_len = fread(buff, 1, BUFF_LEN, file);
+		read_len = fread(buff, 1, BUFF_LEN, file);
 		if (0<read_len) {
 			g_string_append(g_str_tmp, buff);
 		}
@@ -685,7 +691,7 @@ do_shell_cmd(const char* cmd, int* status)
 			sleep(1);
 		}
 	}
-	char* data = (char*)MALLOC(g_str_tmp->len+1);
+	data = (char*)MALLOC(g_str_tmp->len+1);
 	data[0] = data[g_str_tmp->len] = 0;
 	strncpy(data, g_str_tmp->str, g_str_tmp->len);
 	g_string_free(g_str_tmp, TRUE);
@@ -697,11 +703,13 @@ do_shell_cmd(const char* cmd, int* status)
 static int
 check_hmc_status(const char* hmc)
 {
+	int status;
 	char check_status[MAX_CMD_LEN];
+	char* output = NULL;
+
 	snprintf(check_status, MAX_CMD_LEN,
 		 SSH_CMD " -l " HMCROOT " %s lshmc -r -F ssh", hmc);
-	int status;
-	char* output = do_shell_cmd(check_status, &status);
+	output = do_shell_cmd(check_status, &status);
 	if (NULL==output || strncmp(output, "enable", 6)!= 0) {
 		return S_BADCONFIG;
 	}

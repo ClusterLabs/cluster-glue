@@ -634,8 +634,10 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 void
 on_remove_client (gpointer user_data)
 {
+	lrmd_client_t* client = NULL; 
+
 	cl_log(LOG_INFO, "on_remove_client: start.");
-	lrmd_client_t* client = (lrmd_client_t*) user_data;
+	client = (lrmd_client_t*) user_data;
 	if (NULL != lookup_client(client->pid)) {
 		on_msg_unregister(client,NULL);
 	}
@@ -681,6 +683,7 @@ on_timeout_monitor(gpointer data)
 	cl_log(LOG_INFO, "on_timeout_monitor: start.");
 	mon = (lrmd_mon_t*)data;
 	mon->pending_op++;
+
 	//create a op
 	op = g_new(lrmd_op_t, 1);
 	op->call_id = mon->call_id;
@@ -846,10 +849,11 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 	GList* typeinfos = NULL;
 	GList* types = NULL;
 	GList* typeinfo;
+	const char* rclass = NULL;
 
 	cl_log(LOG_INFO, "on_msg_get_rsc_types: start.");
 
-	const char* rclass = ha_msg_value(msg, F_LRM_RCLASS);
+	rclass = ha_msg_value(msg, F_LRM_RCLASS);
 
 	ret = create_lrm_ret(HA_OK, 4);
 	if (NULL == ret) {
@@ -869,8 +873,7 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 				typeinfo = g_list_next(typeinfo)) {
 				rsc_info_t* info = typeinfo->data;
 				types = g_list_append(types, info->rsc_type);
-cl_log(LOG_INFO,"TYPE:%s\n",info->rsc_type);			
-				
+				cl_log(LOG_INFO,"TYPE:%s\n",info->rsc_type);			
 			}
 		}
 		ha_msg_add_list(ret, F_LRM_RTYPES, types);
