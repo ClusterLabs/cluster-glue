@@ -32,6 +32,7 @@
 #define	UNREGISTER	"unreg"
 #define	HEARTBEAT	"hb"
 #define	SETINTERVAL	"setint"
+#define	SETWARNTIME	"setwarn"
 
 /*
  * These messages are really primitive.
@@ -56,7 +57,7 @@ struct apphb_signupmsg {
 	gid_t	gid;
 };
 
-/* App heartbeat setinterval message */
+/* App heartbeat setinterval / setwarn message */
 struct apphb_msmsg {
 	char	msgtype [APPHB_TLEN];
 	int	ms;
