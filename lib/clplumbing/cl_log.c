@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.49 2005/04/06 14:39:49 andrew Exp $ */
+/* $Id: cl_log.c,v 1.50 2005/04/06 17:20:58 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -641,9 +641,9 @@ send_dropped_message(gboolean use_pri_str, IPC_Channel *chan)
 
 	if(sendrc == IPC_OK) {
 		drop_msg_num = 0;
+	}else{
+		FreeChildLogIPCMessage(drop_msg);
 	}
-
-	FreeChildLogIPCMessage(drop_msg);
 	return sendrc == IPC_OK;
 }
 
