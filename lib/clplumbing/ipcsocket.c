@@ -350,14 +350,15 @@ socket_assert_auth(struct OCF_IPC_CHANNEL *ch, GHashTable *auth)
 }
 
 //verify the authentication information
+#ifdef SO_PEERCRED
 static int 
 socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
 {
   struct SOCKET_CH_PRIVATE *conn_info;
-  struct ucred *cred;
   struct OCF_IPC_AUTH *auth_info;
   ssize_t n;
   int ret = AUTH_OK;
+  struct ucred *cred;
   
   
   auth_info = (struct OCF_IPC_AUTH *) ch->auth_info;
@@ -394,6 +395,27 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
   free(cred);
   return ret;
 }
+
+#elif defined(SCM_CREDS)
+
+/* FIXME!  Need to implement SCM_CREDS mechanism for BSD-based systems
+ * Hint: * Postgresql does both types of authentication...
+ * see src/backend/libpq/auth.c
+ * Not clear its SO_PEERCRED implementation works though ;-) 
+ */
+
+
+static int 
+socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
+{
+    return AUTH_FAIL;
+}
+
+#else
+
+#error "Need either SO_PEERCRED or SCM_CREDS authentication mechanisms!"
+
+#endif
 
 static int
 socket_resume_io(struct OCF_IPC_CHANNEL *ch)
