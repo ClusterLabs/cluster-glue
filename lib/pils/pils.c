@@ -165,11 +165,15 @@ static const char *	PIL_PILPluginVersion(void);
 static void		PIL_PILPluginClose (PILPlugin*);
 void			PILpisysSetDebugLevel (int level);
 int			PILpisysGetDebugLevel(void);
+static const char * PIL_PILPluginLicense (void);
+static const char * PIL_PILPluginLicenseUrl (void);
 
 static const PILPluginOps PluginExports =
 {	PIL_PILPluginVersion
 ,	PILpisysGetDebugLevel
 ,	PILpisysSetDebugLevel
+,	PIL_PILPluginLicense
+,	PIL_PILPluginLicenseUrl
 ,	PIL_PILPluginClose
 };
 
@@ -206,6 +210,8 @@ static PILPluginImports PILPluginImportSet =
 ,	RemoveAPILInterface /* unregister_interface */
 ,	PILLoadPlugin		/* load_plugin */
 ,	PILLog			/* Logging function */
+,	g_malloc		/* Malloc function */
+,	g_free			/* free function */
 };
 
 static PIL_rc	ifmgr_register_interface(PILInterface* newif
@@ -680,6 +686,16 @@ PILGetDebugLevel(PILPluginUniv* u, const char * pitype, const char * piname)
 static void
 PIL_PILPluginClose (PILPlugin* plugin)
 {
+}
+static const char *
+PIL_PILPluginLicense (void)
+{
+	return LICENSE_LGPL;
+}
+static const char *
+PIL_PILPluginLicenseUrl (void)
+{
+	return URL_LGPL;
 }
 
 /*****************************************************************************
