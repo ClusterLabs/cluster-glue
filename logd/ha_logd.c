@@ -38,7 +38,7 @@
 #include <string.h>
 #include <portability.h>
 #include <stdarg.h>
-#include <heartbeat/apphb.h>
+#include <apphb.h>
 #include <clplumbing/Gmain_timeout.h>
 
 #define	LOGD_PIDFILE		VAR_RUN_D "/ha_logd.pid"
