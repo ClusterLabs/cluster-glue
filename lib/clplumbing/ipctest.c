@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.32 2004/12/14 22:15:17 gshi Exp $ */
+/* $Id: ipctest.c,v 1.33 2005/02/12 17:15:16 alan Exp $ */
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -15,6 +15,7 @@
 #include <clplumbing/cl_poll.h>
 #include <clplumbing/GSource.h>
 #include <clplumbing/ipc.h>
+#include <clplumbing/cl_malloc.h>
 
 #define	MAXERRORS	1000
 
@@ -164,6 +165,7 @@ main(int argc, char ** argv)
 {
 	int	rc = 0;
 
+	cl_malloc_forced_for_glib();
 
 	cl_log_set_entity("ipctest");
 	cl_log_enable_stderr(TRUE);
