@@ -25,7 +25,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <uuid/uuid.h>
 #include <clplumbing/cl_log.h>
 #include <ha_msg.h>
 #include <heartbeat.h>
@@ -151,11 +150,18 @@ pair_to_msg(gpointer key, gpointer value, gpointer user_data)
 GHashTable*
 ha_msg_value_hash_table(struct ha_msg * msg, const char * name)
 {
-	struct ha_msg* hash_msg = cl_get_struct(msg, name);
+	struct ha_msg* hash_msg;
+	GHashTable * hash_table = NULL;
+
+	if (NULL == msg || NULL == name) {
+		return NULL;
+	}
+
+	hash_msg = cl_get_struct(msg, name);
 	if (NULL == hash_msg) {
 		return NULL;
 	}
-	GHashTable* hash_table = msg_to_hash_table(hash_msg);
+	hash_table = msg_to_hash_table(hash_msg);
 	return hash_table;
 }
 
@@ -163,10 +169,12 @@ int
 ha_msg_add_hash_table(struct ha_msg * msg, const char * name,
 							GHashTable* hash_table)
 {
+	struct ha_msg* hash_msg;
 	if (NULL == msg || NULL == name || NULL == hash_table) {
 		return HA_FAIL;
 	}
-	struct ha_msg* hash_msg = hash_table_to_msg(hash_table);
+
+	hash_msg = hash_table_to_msg(hash_table);
 	ha_msg_addstruct(msg, name, hash_msg);
 	return HA_OK;
 }
@@ -174,7 +182,14 @@ GHashTable*
 msg_to_hash_table(struct ha_msg * msg)
 {
 	int i;
-	GHashTable* hash_table = g_hash_table_new(g_str_hash, g_str_equal);
+	GHashTable* hash_table;
+
+	if ( NULL == msg) {
+		return NULL;
+	}
+
+	hash_table = g_hash_table_new(g_str_hash, g_str_equal);
+
 	for (i = 0; i < msg->nfields; i++) {
 		g_hash_table_insert(hash_table, msg->names[i],msg->values[i]);
 	}
@@ -183,7 +198,13 @@ msg_to_hash_table(struct ha_msg * msg)
 struct ha_msg*
 hash_table_to_msg(GHashTable* hash_table)
 {
-	struct ha_msg* hash_msg = g_new(struct ha_msg, 1);
+	struct ha_msg* hash_msg;
+
+	if ( NULL == hash_table) {
+		return NULL;
+	}
+
+	hash_msg = g_new(struct ha_msg, 1);
 	g_hash_table_foreach(hash_table, pair_to_msg, hash_msg);
 	return hash_msg;
 }
@@ -201,10 +222,17 @@ pair_to_string(gpointer key, gpointer value, gpointer user_data)
 char*
 hash_table_to_string(GHashTable* hash_table)
 {
+	char* ret = NULL;
 	char* param = g_new(char, MAX_PARAM_LEN);
 	param[0]=EOS;
+
+	if ( NULL == hash_table) {
+		return NULL;
+	}
+
 	g_hash_table_foreach(hash_table, pair_to_string, param);
-	char* ret = g_strdup(param);
+
+	ret = g_strdup(param);
 	g_free(param);
 	return ret;
 }
@@ -219,7 +247,13 @@ string_to_hash_table(const char* data)
 	char* temp;
 	char* key;
 	char* value;
-	GHashTable* hash_table = g_hash_table_new(g_str_hash, g_str_equal);
+	GHashTable* hash_table;
+
+	if ( NULL == data ) {
+		return NULL;
+	}
+
+	hash_table = g_hash_table_new(g_str_hash, g_str_equal);
 	while(name_start<strlen(data)) {
 		temp = strchr(data+name_start,'=');
 		name_end = temp - data ;
@@ -253,11 +287,12 @@ free_hash_table(GHashTable* hash_table)
 struct ha_msg*
 create_lrm_msg (const char* msg)
 {
+	struct ha_msg* ret;
 	if ((NULL == msg) || (0 == strlen(msg))) {
 		return NULL;
 	}
 
-	struct ha_msg* ret = ha_msg_new(1);
+	ret = ha_msg_new(1);
 	if (HA_FAIL == ha_msg_add(ret, F_LRM_TYPE, msg)) {
 		return NULL;
 	}
@@ -268,11 +303,12 @@ create_lrm_msg (const char* msg)
 struct ha_msg*
 create_lrm_reg_msg(const char* app_name)
 {
+	struct ha_msg* ret;
 	if ((NULL == app_name) || (0 == strlen(app_name))) {
 		return NULL;
 	}
 
-	struct ha_msg* ret = ha_msg_new(5);
+	ret = ha_msg_new(5);
 
 	if (HA_FAIL == ha_msg_add(ret, F_LRM_TYPE, REGISTER)) {
 		return NULL;
@@ -302,6 +338,8 @@ create_lrm_addrsc_msg(rsc_id_t rid, const char* rname,
 					  const char* rtype, GHashTable* params)
 {
 	struct ha_msg* msg = ha_msg_new(5);
+	char* param_str;
+
 	if (HA_FAIL == ha_msg_add(msg, F_LRM_TYPE, ADDRSC)) {
 		return NULL;
 	}
@@ -318,7 +356,7 @@ create_lrm_addrsc_msg(rsc_id_t rid, const char* rname,
 		return NULL;
 	}
 	if (NULL != params) {
-		char* param_str = hash_table_to_string(params);
+		param_str = hash_table_to_string(params);
 		if (HA_FAIL == ha_msg_add(msg, F_LRM_PARAM, param_str))	{
 			return NULL;
 		}
@@ -332,11 +370,12 @@ create_lrm_addrsc_msg(rsc_id_t rid, const char* rname,
 struct ha_msg*
 create_lrm_rsc_msg(rsc_id_t rid, const char* msg)
 {
+	struct ha_msg* ret;
 	if ((NULL == msg) || (0 == strlen(msg))) {
 		return NULL;
 	}
 
-	struct ha_msg* ret = ha_msg_new(1);
+	ret = ha_msg_new(1);
 	if (HA_FAIL == ha_msg_add(ret, F_LRM_TYPE, msg)) {
 		return NULL;
 	}
@@ -367,6 +406,7 @@ struct ha_msg*
 create_rsc_perform_op_msg (rsc_id_t rid, lrm_op_t* op)
 {
 	struct ha_msg* msg = ha_msg_new(5);
+	char *param_str;
 	if (HA_FAIL == ha_msg_add(msg, F_LRM_TYPE, PERFORMOP)) {
 		return NULL;
 	}
@@ -383,7 +423,7 @@ create_rsc_perform_op_msg (rsc_id_t rid, lrm_op_t* op)
 		return NULL;
 	}
 	if (NULL != op->params) {
-		char* param_str = hash_table_to_string(op->params);
+		param_str = hash_table_to_string(op->params);
 		if (HA_FAIL == ha_msg_add(msg, F_LRM_PARAM, param_str))	{
 			return NULL;
 		}
@@ -395,6 +435,7 @@ struct ha_msg*
 create_rsc_set_monitor_msg (rsc_id_t rid, lrm_mon_t* monitor)
 {
 	struct ha_msg* msg = ha_msg_new(5);
+	char * param_str;
 	if (HA_FAIL == ha_msg_add(msg, F_LRM_TYPE, SETMONITOR)) {
 		return NULL;
 	}
@@ -420,7 +461,7 @@ create_rsc_set_monitor_msg (rsc_id_t rid, lrm_mon_t* monitor)
 		return NULL;
 	}
 	if (NULL != monitor->params) {
-		char* param_str = hash_table_to_string(monitor->params);
+		param_str = hash_table_to_string(monitor->params);
 		if (HA_FAIL == ha_msg_add(msg, F_LRM_PARAM, param_str))	{
 			return NULL;
 		}
