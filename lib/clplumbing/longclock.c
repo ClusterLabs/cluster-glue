@@ -1,4 +1,4 @@
-/* $Id: longclock.c,v 1.12 2004/03/25 08:05:23 alan Exp $ */
+/* $Id: longclock.c,v 1.13 2004/08/16 00:02:20 horms Exp $ */
 /*
  * Longclock operations
  *
@@ -88,10 +88,17 @@ time_longclock(void)
 	/* times really returns an unsigned value ... */
 	timesval = (unsigned long) times(&longclock_dummy_tms_struct);
 
+	if (!lasttimes) {
+		lasttimes = timesval;
+	}
+
+
 	if (timesval < lasttimes) {
 		++wrapcount;
 		lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
 	}
+	
+	lasttimes = timesval;
 	return (lc_wrapcount | (longclock_t)timesval);
 }
 #endif	/* ! CLOCK_T_IS_LONG_ENOUGH */
