@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.39 2005/03/14 22:56:19 gshi Exp $ */
+/* $Id: cl_log.c,v 1.40 2005/03/14 23:41:28 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,6 +16,8 @@
 #include <clplumbing/cl_malloc.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #ifndef MAXLINE
 #	define MAXLINE	512
@@ -189,6 +191,8 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 	}
 	
 	if (debugfile_name != NULL) {
+		mode_t oldmask = umask(000);
+
 		fp = fopen(debugfile_name, "a");
 		if (fp != NULL) {
 			if (pristr){
@@ -213,9 +217,13 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 			syslog(LOG_ERR, "Cannot open %s: %s\n",
 				debugfile_name, strerror(errno));
 		}
+
+		umask(oldmask);
 	}
 	
 	if (priority != LOG_DEBUG && logfile_name != NULL) { 
+		mode_t oldmask = umask(000);
+		
 		fp = fopen(logfile_name, "a");
 		if (fp != NULL) {
 			if (pristr){
@@ -239,6 +247,7 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 			syslog(LOG_ERR, "Cannot open %s: %s\n",
 				logfile_name, strerror(errno));
 		}
+		umask(oldmask);
 	}
 	
 	if (needprivs) {
