@@ -52,6 +52,7 @@
 #define IPC_OK 0
 #define IPC_FAIL 1
 #define IPC_BROKEN 2
+#define IPC_INTR 3
 
 /*
  *	IPC:  Sockets-like Interprocess Communication Abstraction
@@ -88,10 +89,6 @@
  *  On the client side, everything starts up with a call to
  *	ipc_wait_conn_constructor() which we use to talk to the server.
  *	The client is much easier ;-)
- *
- *  For things that want to use IPC for pipe-like things, you can
- *	use ipc_channel_pair(), which returns a pair of already-connected
- *	IPC_Channels.
  */
 
 
@@ -218,7 +215,7 @@ struct IPC_OPS{
  *   brief destory the channel object.
  *
  * Parameters:
- *   ch  (IN) : the pointer to the channel which will be destroied.
+ *   ch  (IN) : the pointer to the channel which will be destroyed.
  *
  */
 	void  (*destroy) (IPC_Channel * ch);
@@ -317,6 +314,25 @@ struct IPC_OPS{
 	int (* recv) (IPC_Channel * ch, IPC_Message** msg);
 
 /*
+ * IPC_OPS::waitin
+ *   Wait for input to become available
+ *
+ * Parameters:
+ *   ch  (IN) : the channel which contains the connection.
+ *
+ * Side effects:
+ *	If output becomes unblocked while waiting, it will automatically
+ *	be resumed without comment.
+ *
+ * Return values:
+ *   IPC_OK	: a message is pending or output has become unblocked.
+ *   IPC_FAIL	: operation failed.
+ *   IPC_BROKEN	: the channel is broken (disconnected)
+ *   IPC_INTR	: waiting was interrupted by a signal
+ */
+	int (* waitin) (IPC_Channel * ch);
+
+/*
  * IPC_OPS::is_message_pending
  *   check to see if there is any messages ready to read, or hangup has
  *   occurred.
@@ -332,14 +348,14 @@ struct IPC_OPS{
 
 /*
  * IPC_OPS::is_sending_blocked
- *   check the send_queue to see if there is any messages blocked. 
+ *   check the send_queue to see if there are any messages blocked. 
  *
  * Parameters:
  *   ch (IN) : the pointer to the channel.
  *
  * Return values:
  *   TRUE : there are messages blocked (waiting) in the send_queue.
- *   FALSE: there is no message blocked (waiting) in the send_queue.
+ *   FALSE: there are no message blocked (waiting) in the send_queue.
  *
  *  See also:
  *	get_send_select_fd()

@@ -53,7 +53,6 @@ const longclock_t	zero_longclock = 0UL;
 #	undef	cmp_longclock
 #endif
 
-struct tms	longclock_dummy_tms_struct;
 
 unsigned
 hz_longclock(void)
@@ -74,6 +73,7 @@ hz_longclock(void)
 longclock_t
 time_longclock(void)
 {
+	struct tms	longclock_dummy_tms_struct;
 	return (longclock_t)times(&longclock_dummy_tms_struct);
 }
 
@@ -82,7 +82,8 @@ time_longclock(void)
 longclock_t
 time_longclock(void)
 {
-	clock_t	timesval;
+	struct tms	longclock_dummy_tms_struct;
+	clock_t		timesval;
 	
 	
 	timesval = times(&longclock_dummy_tms_struct);

@@ -148,6 +148,10 @@ struct IPC_CHANNEL* socket_server_channel_new(int sockfd);
 
 pid_t socket_get_farside_pid(int sockfd);
 
+
+
+static int (*ourpollfunc) (struct pollfd *, nfds_t, int) = poll;
+
 /* destroy socket wait channel */ 
 static void 
 socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn)
@@ -332,14 +336,77 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
   result = IPC_FAIL;
   *message = NULL;
 
-  if ((sockpoll.fd = socket_get_recv_fd(ch)) != -1) {
+  if ((sockpoll.fd = socket_get_recv_fd(ch)) >= 0) {
     	/* check if the server still exists */
   	sockpoll.events = POLLHUP;
-	if ((poll(&sockpoll, 1, 0)) && sockpoll.revents) {
+	if ((ourpollfunc(&sockpoll, 1, 0)) && sockpoll.revents) {
+  		ch->ch_status = IPC_DISCONNECT;
 		return IPC_BROKEN;
 	 }
   }
+  errno = EAGAIN;
   return result;
+}
+
+static int
+socket_waitin(struct IPC_CHANNEL * ch)
+{
+	struct pollfd sockpoll[2];
+
+ 	if (ch->ch_status == IPC_DISCONNECT) {
+ 		return IPC_BROKEN;
+	}
+	sockpoll[0].fd = ch->ops->get_recv_select_fd(ch);
+	sockpoll[1].fd = ch->ops->get_send_select_fd(ch);
+	sockpoll[1].events = POLLHUP|POLLNVAL|POLLERR|POLLOUT;
+
+	do {
+		int	rc;
+		int	nfd = 1;
+
+		sockpoll[0].events = POLLHUP|POLLNVAL|POLLERR|POLLIN;
+
+		if (ch->ops->is_sending_blocked(ch)) {
+			if (sockpoll[0].fd == sockpoll[1].fd) {
+				sockpoll[0].events |= POLLOUT;
+			}else{
+				nfd=2;
+			}
+		}
+
+		rc = ourpollfunc(sockpoll, nfd, -1);
+
+		if (rc < 0) {
+			return (errno == EINTR ? IPC_INTR : IPC_FAIL);
+		}
+		if (sockpoll[0].revents & POLLHUP) {
+ 			ch->ch_status = IPC_DISCONNECT;
+ 			return IPC_BROKEN;
+		}
+		if (sockpoll[0].revents & (POLLNVAL|POLLERR)) {
+			cl_log(LOG_ERR
+			,	"revents[0] failure: fd %d, flags 0x%x"
+			,	sockpoll[0].fd, sockpoll[0].revents);
+			errno = EINVAL;
+ 			return IPC_FAIL;
+		}
+		if (nfd == 2) {
+			if (sockpoll[1].revents & POLLHUP) {
+				ch->ch_status = IPC_DISCONNECT;
+				return IPC_BROKEN;
+			}
+			if (sockpoll[1].revents & (POLLNVAL|POLLERR)) {
+				cl_log(LOG_ERR
+				,	"revents[1] failure: fd %d, flags 0x%x"
+				,	sockpoll[1].fd, sockpoll[1].revents);
+				errno = EINVAL;
+				return IPC_FAIL;
+			}
+		}
+		ch->ops->resume_io(ch);
+	} while (!ch->ops->is_message_pending(ch));
+
+	return IPC_OK;
 }
 
 static gboolean
@@ -354,7 +421,7 @@ socket_is_message_pending(struct IPC_CHANNEL * ch)
 
   if((sockpoll.fd = socket_get_recv_fd(ch)) != -1) {
   	sockpoll.events = POLLIN|POLLHUP;
-	if ((poll(&sockpoll, 1, 0)) && sockpoll.revents) {
+	if ((ourpollfunc(&sockpoll, 1, 0)) && sockpoll.revents) {
 		if (sockpoll.revents & POLLHUP) {
  			ch->ch_status = IPC_DISCONNECT;
 		}
@@ -586,6 +653,7 @@ static struct IPC_OPS socket_ops = {
   socket_assert_auth,
   socket_send,
   socket_recv,
+  socket_waitin,
   socket_is_message_pending,
   socket_is_sending_blocked,
   socket_resume_io,
