@@ -2079,3 +2079,21 @@ PILLogMemStats(void)
 	PRSTAT(interfacetype);
 	PRSTAT(interfaceuniv);
 }
+
+/*
+ * Function for logging with the given logging function
+ * The reason why it's here is so we can get printf arg checking
+ * You can't get that when you call a function pointer directly.
+ */
+void
+PILCallLog(PILLogFun logfun, PILLogLevel priority, const char * fmt, ...)
+{
+	va_list		args;
+	char *		str;
+
+	va_start (args, fmt);
+	str = g_strdup_vprintf(fmt, args);
+	va_end (args);
+	logfun(priority, "%s", args);
+	g_free(str);
+}
