@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.100 2004/10/09 01:49:42 lge Exp $ */
+/* $Id: ipcsocket.c,v 1.101 2004/11/08 20:48:36 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -670,7 +670,7 @@ socket_initiate_connection(struct IPC_CHANNEL * ch)
 	/* Send connection request */
 	if (connect(conn_info->s, (struct sockaddr *)&peer_addr
 	, 	sizeof(struct sockaddr_un)) == -1) {
-		cl_perror("initiate_connection: connect failure");
+		cl_log(LOG_WARNING, "initiate_connection: connect failure: %s", strerror(errno) );
 		return IPC_FAIL;
 	}
 
