@@ -48,77 +48,87 @@
 #define MAX_LISTEN_NUM 10
 
 
-/* channel and wait connection private data. */
-struct SOCKET_CH_PRIVATE{
+/* wait connection private data. */
+struct SOCKET_WAIT_CONN_PRIVATE{
   /* the path name wich the connection will be built on. */
   char path_name[UNIX_PATH_MAX];
   /* the domain socket. */
   int s;
 };
 
+/* channel private data. */
+struct SOCKET_CH_PRIVATE{
+  /* the path name wich the connection will be built on. */
+  char path_name[UNIX_PATH_MAX];
+  /* the domain socket. */
+  int s;
+  /* the buf used to save unfinished message */
+  char *msg_buf;
+};
+
 /* unix domain socket implementations of IPC functions. */
 
-static void socket_destroy_wait_conn(struct OCF_IPC_WAIT_CONNECTION * wait_conn);
+static void socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn);
 
-static int socket_wait_selectfd(struct OCF_IPC_WAIT_CONNECTION *wait_conn);
+static int socket_wait_selectfd(struct IPC_WAIT_CONNECTION *wait_conn);
 
 
-static struct OCF_IPC_CHANNEL * socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn, struct OCF_IPC_AUTH *auth_info);
+static struct IPC_CHANNEL * socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn, struct IPC_AUTH *auth_info);
 
-static void socket_destroy_channel(struct OCF_IPC_CHANNEL * ch);
+static void socket_destroy_channel(struct IPC_CHANNEL * ch);
 
-static int socket_initiate_connection(struct OCF_IPC_CHANNEL * ch);
+static int socket_initiate_connection(struct IPC_CHANNEL * ch);
 
-static int socket_send(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE* message);
+static int socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* message);
 
-static int socket_recv(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE** message);
+static int socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message);
 
-static int socket_resume_io(struct OCF_IPC_CHANNEL *ch);
+static int socket_resume_io(struct IPC_CHANNEL *ch);
 
-static gboolean socket_is_message_pending(struct OCF_IPC_CHANNEL *ch);
+static gboolean socket_is_message_pending(struct IPC_CHANNEL *ch);
 
-static gboolean socket_is_sending_blocked(struct OCF_IPC_CHANNEL *ch);
+static gboolean socket_is_sending_blocked(struct IPC_CHANNEL *ch);
 
-static int socket_assert_auth(struct OCF_IPC_CHANNEL *ch, GHashTable *auth);
+static int socket_assert_auth(struct IPC_CHANNEL *ch, GHashTable *auth);
 
-static int socket_verify_auth(struct OCF_IPC_CHANNEL* ch);
+static int socket_verify_auth(struct IPC_CHANNEL* ch);
 
 /* for domain socket, reve_fd = send_fd. */
 
-static int socket_get_recv_fd(struct OCF_IPC_CHANNEL *ch);
+static int socket_get_recv_fd(struct IPC_CHANNEL *ch);
 
-static int socket_get_send_fd(struct OCF_IPC_CHANNEL *ch);
+static int socket_get_send_fd(struct IPC_CHANNEL *ch);
 
-static int socket_set_send_qlen (struct OCF_IPC_CHANNEL* ch, int q_len);
+static int socket_set_send_qlen (struct IPC_CHANNEL* ch, int q_len);
 
-static int socket_set_recv_qlen (struct OCF_IPC_CHANNEL* ch, int q_len);
+static int socket_set_recv_qlen (struct IPC_CHANNEL* ch, int q_len);
 
 
 /* helper functions. */
 
-int socket_disconnect(struct OCF_IPC_CHANNEL* ch);
+int socket_disconnect(struct IPC_CHANNEL* ch);
 
-struct OCF_IPC_QUEUE* socket_queue_new(void);
+struct IPC_QUEUE* socket_queue_new(void);
 
-void socket_destroy_queue(struct OCF_IPC_QUEUE * q);
+void socket_destroy_queue(struct IPC_QUEUE * q);
 
-struct OCF_IPC_MESSAGE* socket_message_new(struct OCF_IPC_CHANNEL *ch, int msg_len);
+struct IPC_MESSAGE* socket_message_new(struct IPC_CHANNEL *ch, int msg_len);
 
-void socket_free_message(struct OCF_IPC_MESSAGE * msg);
+void socket_free_message(struct IPC_MESSAGE * msg);
 
-struct OCF_IPC_WAIT_CONNECTION *socket_wait_conn_new(GHashTable* ch_attrs);
+struct IPC_WAIT_CONNECTION *socket_wait_conn_new(GHashTable* ch_attrs);
 
-struct OCF_IPC_CHANNEL* socket_client_channel_new(GHashTable *attrs);
+struct IPC_CHANNEL* socket_client_channel_new(GHashTable *attrs);
 
-struct OCF_IPC_CHANNEL* socket_server_channel_new(int sockfd);
+struct IPC_CHANNEL* socket_server_channel_new(int sockfd);
 
 pid_t socket_get_farside_pid(int sockfd);
 
 /* destroy socket wait channel */ 
 static void 
-socket_destroy_wait_conn(struct OCF_IPC_WAIT_CONNECTION * wait_conn)
+socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn)
 {
-  struct SOCKET_CH_PRIVATE * wc = wait_conn->ch_private;
+  struct SOCKET_WAIT_CONN_PRIVATE * wc = wait_conn->ch_private;
 
   if (wc != NULL) {
     close(wc->s);
@@ -130,24 +140,24 @@ socket_destroy_wait_conn(struct OCF_IPC_WAIT_CONNECTION * wait_conn)
 
 /* return a fd which can be listened on for new connections. */
 static int 
-socket_wait_selectfd(struct OCF_IPC_WAIT_CONNECTION *wait_conn)
+socket_wait_selectfd(struct IPC_WAIT_CONNECTION *wait_conn)
 {
-  struct SOCKET_CH_PRIVATE * wc = wait_conn->ch_private;
+  struct SOCKET_WAIT_CONN_PRIVATE * wc = wait_conn->ch_private;
 
   return (wc == NULL ? -1 : wc->s);
 
 }
 
 /* socket accept connection. */
-static struct OCF_IPC_CHANNEL* 
-socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
-,	struct OCF_IPC_AUTH *auth_info)
+static struct IPC_CHANNEL* 
+socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
+,	struct IPC_AUTH *auth_info)
 {
   struct sockaddr_un peer_addr;
-  struct OCF_IPC_CHANNEL *ch;
+  struct IPC_CHANNEL *ch;
   int sin_size;
   int s, new_sock;
-  struct SOCKET_CH_PRIVATE *conn_private;
+  struct SOCKET_WAIT_CONN_PRIVATE *conn_private;
   struct SOCKET_CH_PRIVATE *ch_private ;
   
   /* get select fd */
@@ -167,7 +177,7 @@ socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
       printf("socket_accept_connection: Can't create new channel\n");
       return NULL;
     }else{
-      conn_private = (struct SOCKET_CH_PRIVATE *)(wait_conn->ch_private);
+      conn_private = (struct SOCKET_WAIT_CONN_PRIVATE *)(wait_conn->ch_private);
       ch_private = (struct SOCKET_CH_PRIVATE *)(ch->ch_private);
       strncpy(ch_private->path_name,conn_private->path_name,sizeof(conn_private->path_name));
     }
@@ -186,7 +196,7 @@ socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
 
 
 static void
-socket_destroy_channel(struct OCF_IPC_CHANNEL * ch)
+socket_destroy_channel(struct IPC_CHANNEL * ch)
 {
   socket_disconnect(ch);
   socket_destroy_queue(ch->send_queue);
@@ -211,7 +221,7 @@ socket_destroy_channel(struct OCF_IPC_CHANNEL * ch)
 */
 
 int
-socket_disconnect(struct OCF_IPC_CHANNEL* ch)
+socket_disconnect(struct IPC_CHANNEL* ch)
 {
   struct SOCKET_CH_PRIVATE* conn_info;
 
@@ -223,7 +233,7 @@ socket_disconnect(struct OCF_IPC_CHANNEL* ch)
 
 
 static int 
-socket_initiate_connection(struct OCF_IPC_CHANNEL * ch)
+socket_initiate_connection(struct IPC_CHANNEL * ch)
 {
   struct SOCKET_CH_PRIVATE* conn_info;  
   struct sockaddr_un peer_addr; /* connector's address information */
@@ -252,7 +262,7 @@ socket_initiate_connection(struct OCF_IPC_CHANNEL * ch)
 }
 
 static int 
-socket_send(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE* message)
+socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* message)
 {
   
   
@@ -271,7 +281,7 @@ socket_send(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE* message)
 }
 
 static int 
-socket_recv(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE** message)
+socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 {
   GList *element;  
   int result;
@@ -284,7 +294,7 @@ socket_recv(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE** message)
     if (ch->recv_queue->current_qlen != 0) {
       element = g_list_first(ch->recv_queue->queue);
       if (element != NULL) {
-	*message = (struct OCF_IPC_MESSAGE *) (element->data);
+	*message = (struct IPC_MESSAGE *) (element->data);
 	      
 	ch->recv_queue->queue = g_list_remove_link(ch->recv_queue->queue, element);
 	ch->recv_queue->current_qlen--;
@@ -300,24 +310,27 @@ socket_recv(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE** message)
 }
 
 static gboolean
-socket_is_message_pending(struct OCF_IPC_CHANNEL * ch)
+socket_is_message_pending(struct IPC_CHANNEL * ch)
 {
+  
   int	rc;
   int	len;
   struct SOCKET_CH_PRIVATE * conn_info = ch->ch_private;
 
   if (ch->recv_queue->current_qlen > 0) {
-	return TRUE;
+    return TRUE;
   }
+
   rc=ioctl(conn_info->s, FIONREAD,&len);
   if (rc == 0 && len > 0) {
 	return TRUE;
   }
+  
   return FALSE;
 }
 
 static gboolean
-socket_is_sending_blocked(struct OCF_IPC_CHANNEL * ch)
+socket_is_sending_blocked(struct IPC_CHANNEL * ch)
 {
 
   socket_resume_io(ch);
@@ -327,7 +340,7 @@ socket_is_sending_blocked(struct OCF_IPC_CHANNEL * ch)
 
 
 static int 
-socket_assert_auth(struct OCF_IPC_CHANNEL *ch, GHashTable *auth)
+socket_assert_auth(struct IPC_CHANNEL *ch, GHashTable *auth)
 {
   printf("the assert_auth function for domain socket is not implemented\n");
   return IPC_FAIL;
@@ -336,16 +349,16 @@ socket_assert_auth(struct OCF_IPC_CHANNEL *ch, GHashTable *auth)
 /* verify the authentication information. */
 #ifdef SO_PEERCRED
 static int 
-socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
+socket_verify_auth(struct IPC_CHANNEL* ch)
 {
   struct SOCKET_CH_PRIVATE *conn_info;
-  struct OCF_IPC_AUTH *auth_info;
+  struct IPC_AUTH *auth_info;
   ssize_t n;
   int ret = IPC_OK;
   struct ucred *cred;
   
   
-  auth_info = (struct OCF_IPC_AUTH *) ch->auth_info;
+  auth_info = (struct IPC_AUTH *) ch->auth_info;
 
   if (auth_info == NULL) { /* no restriction for authentication */
     return IPC_OK;
@@ -388,7 +401,7 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
 
 /* Done.... Haven't tested yet. */
 static int 
-socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
+socket_verify_auth(struct IPC_CHANNEL* ch)
 {
   struct msghdr msg;
   /* Credentials structure */
@@ -410,7 +423,7 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
 #endif
   Cred	   *cred;
   struct SOCKET_CH_PRIVATE *conn_info;
-  struct OCF_IPC_AUTH *auth_info;
+  struct IPC_AUTH *auth_info;
   int ret = IPC_OK;
   char         buf;
   
@@ -420,7 +433,7 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
   /* Point to start of first structure */
   struct cmsghdr *cmsg = (struct cmsghdr *) cmsgmem;
   
-  auth_info = (struct OCF_IPC_AUTH *) ch->auth_info;
+  auth_info = (struct IPC_AUTH *) ch->auth_info;
 
   if (auth_info == NULL) { /* no restriction for authentication */
     return IPC_OK;
@@ -474,10 +487,10 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
 #endif
 
 static int
-socket_resume_io(struct OCF_IPC_CHANNEL *ch)
+socket_resume_io(struct IPC_CHANNEL *ch)
 {
   int len,msg_len;
-  struct OCF_IPC_MESSAGE *msg;
+  struct IPC_MESSAGE *msg;
   struct SOCKET_CH_PRIVATE* conn_info;
   GList *element;
 
@@ -511,7 +524,7 @@ socket_resume_io(struct OCF_IPC_CHANNEL *ch)
 
     if (msg_len > 0) {
       msg->msg_done = socket_free_message;
-      msg->ch = ch;
+      msg->msg_ch = ch;
       msg->msg_len = msg_len;
       ch->recv_queue->queue = g_list_append(ch->recv_queue->queue, msg);
       ch->recv_queue->current_qlen++;
@@ -527,7 +540,7 @@ socket_resume_io(struct OCF_IPC_CHANNEL *ch)
   while (len >=0 && ch->send_queue->current_qlen >0) {
     element = g_list_first(ch->send_queue->queue);
     if (element != NULL) {
-      msg = (struct OCF_IPC_MESSAGE *) (element->data);
+      msg = (struct IPC_MESSAGE *) (element->data);
       len=send(conn_info->s, msg->msg_body, msg->msg_len, MSG_DONTWAIT);
       if (len < 0){
 	if(errno == EAGAIN) {
@@ -559,7 +572,7 @@ socket_resume_io(struct OCF_IPC_CHANNEL *ch)
 
 
 static int
-socket_get_recv_fd(struct OCF_IPC_CHANNEL *ch)
+socket_get_recv_fd(struct IPC_CHANNEL *ch)
 {
 	struct SOCKET_CH_PRIVATE* chp = ch ->ch_private;
 
@@ -567,13 +580,13 @@ socket_get_recv_fd(struct OCF_IPC_CHANNEL *ch)
 }
 
 static int
-socket_get_send_fd(struct OCF_IPC_CHANNEL *ch)
+socket_get_send_fd(struct IPC_CHANNEL *ch)
 {
 	return socket_get_recv_fd(ch);
 }
 
 static int
-socket_set_send_qlen (struct OCF_IPC_CHANNEL* ch, int q_len)
+socket_set_send_qlen (struct IPC_CHANNEL* ch, int q_len)
 {
   /* This seems more like an assertion failure than a normal error */
   if (ch->send_queue == NULL) {
@@ -585,7 +598,7 @@ socket_set_send_qlen (struct OCF_IPC_CHANNEL* ch, int q_len)
 }
 
 static int
-socket_set_recv_qlen (struct OCF_IPC_CHANNEL* ch, int q_len)
+socket_set_recv_qlen (struct IPC_CHANNEL* ch, int q_len)
 {
   /* This seems more like an assertion failure than a normal error */
   if (ch->recv_queue == NULL) {
@@ -597,7 +610,7 @@ socket_set_recv_qlen (struct OCF_IPC_CHANNEL* ch, int q_len)
 }
 
 /* socket object of the function table */
-static struct OCF_IPC_WAIT_OPS socket_wait_ops = {
+static struct IPC_WAIT_OPS socket_wait_ops = {
   socket_destroy_wait_conn,
   socket_wait_selectfd,
   socket_accept_connection,
@@ -605,7 +618,7 @@ static struct OCF_IPC_WAIT_OPS socket_wait_ops = {
 
 
 /* socket object of the function table */
-static struct OCF_IPC_OPS socket_ops = {
+static struct IPC_OPS socket_ops = {
   socket_destroy_channel,
   socket_initiate_connection,
   socket_verify_auth,
@@ -627,13 +640,13 @@ static struct OCF_IPC_OPS socket_ops = {
  * return the pointer to a new ipc queue or NULL is the queue can't be created.
  */
 
-struct OCF_IPC_QUEUE*
+struct IPC_QUEUE*
 socket_queue_new(void)
 {
-  struct OCF_IPC_QUEUE *temp_queue;
+  struct IPC_QUEUE *temp_queue;
   
   /* temp queue with length = 0 and inner queue = NULL. */
-  temp_queue = (struct OCF_IPC_QUEUE *) malloc(sizeof(struct OCF_IPC_QUEUE));
+  temp_queue = (struct IPC_QUEUE *) malloc(sizeof(struct IPC_QUEUE));
   temp_queue->current_qlen = 0;
   temp_queue->max_qlen = DEFAULT_MAX_QLEN;
   temp_queue->queue = NULL;
@@ -648,7 +661,7 @@ socket_queue_new(void)
  */ 
 
 void
-socket_destroy_queue(struct OCF_IPC_QUEUE * q)
+socket_destroy_queue(struct IPC_QUEUE * q)
 {
   g_list_free(q->queue);
   free((void *) q);
@@ -679,14 +692,14 @@ socket_destroy_queue(struct OCF_IPC_QUEUE * q)
  *     g_hash_table_insert(attrs, PATH_ATTR, path_name);   
  *     here PATH_ATTR is defined as "path". 
  */
-struct OCF_IPC_WAIT_CONNECTION *
+struct IPC_WAIT_CONNECTION *
 socket_wait_conn_new(GHashTable *ch_attrs)
 {
-  struct OCF_IPC_WAIT_CONNECTION * temp_ch;
+  struct IPC_WAIT_CONNECTION * temp_ch;
   char *path_name;
   struct sockaddr_un my_addr;
   int s;
-  struct SOCKET_CH_PRIVATE *wait_private;
+  struct SOCKET_WAIT_CONN_PRIVATE *wait_private;
 
   
   
@@ -725,13 +738,13 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     return NULL;
   }
   
-  wait_private = (struct SOCKET_CH_PRIVATE* ) malloc(sizeof(struct SOCKET_CH_PRIVATE));
+  wait_private = (struct SOCKET_WAIT_CONN_PRIVATE* ) malloc(sizeof(struct SOCKET_WAIT_CONN_PRIVATE));
   wait_private->s = s;
   strncpy(wait_private->path_name, path_name, sizeof(wait_private->path_name));
-  temp_ch = g_new(struct OCF_IPC_WAIT_CONNECTION, 1);
+  temp_ch = g_new(struct IPC_WAIT_CONNECTION, 1);
   temp_ch->ch_private = (void *) wait_private;
   temp_ch->ch_status = IPC_WAIT;
-  temp_ch->ops = (struct OCF_IPC_WAIT_OPS *)&socket_wait_ops;  
+  temp_ch->ops = (struct IPC_WAIT_OPS *)&socket_wait_ops;  
 
   return temp_ch;
 }
@@ -747,9 +760,9 @@ socket_wait_conn_new(GHashTable *ch_attrs)
  *      the pointer to the new waiting channel or NULL if the channel can't be created.
 */
 
-struct OCF_IPC_CHANNEL * 
+struct IPC_CHANNEL * 
 socket_client_channel_new(GHashTable *ch_attrs) {
-  struct OCF_IPC_CHANNEL * temp_ch;
+  struct IPC_CHANNEL * temp_ch;
   struct SOCKET_CH_PRIVATE* conn_info;
   char *path_name;
   int sockfd;
@@ -791,7 +804,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
     return NULL;
   }
 
-  temp_ch = g_new(struct OCF_IPC_CHANNEL, 1);
+  temp_ch = g_new(struct IPC_CHANNEL, 1);
   conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
 
 
@@ -802,7 +815,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   temp_ch->ch_status = IPC_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
   temp_ch->auth_info = NULL;
-  temp_ch->ops = (struct OCF_IPC_OPS *)&socket_ops;
+  temp_ch->ops = (struct IPC_OPS *)&socket_ops;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
    
@@ -810,13 +823,13 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   
 }
 
-struct OCF_IPC_CHANNEL * 
+struct IPC_CHANNEL * 
 socket_server_channel_new(int sockfd){
-  struct OCF_IPC_CHANNEL * temp_ch;
+  struct IPC_CHANNEL * temp_ch;
   struct SOCKET_CH_PRIVATE* conn_info;
   
   
-  temp_ch = g_new(struct OCF_IPC_CHANNEL, 1);
+  temp_ch = g_new(struct IPC_CHANNEL, 1);
   conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
 
 
@@ -825,7 +838,7 @@ socket_server_channel_new(int sockfd){
   temp_ch->ch_status = IPC_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
   temp_ch->auth_info = NULL;
-  temp_ch->ops = (struct OCF_IPC_OPS *)&socket_ops;
+  temp_ch->ops = (struct IPC_OPS *)&socket_ops;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
    
@@ -844,16 +857,16 @@ socket_server_channel_new(int sockfd){
  */
 
 
-struct OCF_IPC_MESSAGE*
-socket_message_new(struct OCF_IPC_CHANNEL *ch, int msg_len)
+struct IPC_MESSAGE*
+socket_message_new(struct IPC_CHANNEL *ch, int msg_len)
 {
-  struct OCF_IPC_MESSAGE * temp_msg;
+  struct IPC_MESSAGE * temp_msg;
 
-  temp_msg = g_new(struct OCF_IPC_MESSAGE, 1);
+  temp_msg = g_new(struct IPC_MESSAGE, 1);
   temp_msg->msg_body = g_malloc(msg_len);
   temp_msg->msg_len = msg_len;
   temp_msg->msg_private = NULL;
-  temp_msg->ch = ch;
+  temp_msg->msg_ch = ch;
   temp_msg->msg_done = socket_free_message;
 
   return temp_msg;
@@ -863,7 +876,7 @@ socket_message_new(struct OCF_IPC_CHANNEL *ch, int msg_len)
 /* brief free the memory space allocated to msg and destroy msg. */
 
 void
-socket_free_message(struct OCF_IPC_MESSAGE * msg) {
+socket_free_message(struct IPC_MESSAGE * msg) {
 
   free(msg->msg_body);
   free((void *)msg);
