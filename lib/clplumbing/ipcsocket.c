@@ -57,7 +57,7 @@
 #include <fcntl.h>
 
 #ifndef UNIX_PATH_MAX
-#define UNIX_PATH_MAX 108
+#	define UNIX_PATH_MAX 108
 #endif
 #define MAX_LISTEN_NUM 10
 
@@ -196,6 +196,7 @@ static struct IPC_OPS socket_ops = {
 
 #define	MAXDATASIZE	65535
 
+void dump_ipc_info(const IPC_Channel* chan);
 
 #undef AUDIT_CHANNELS
 
@@ -245,15 +246,19 @@ socket_chan_audit(const struct IPC_CHANNEL* ch)
 		badch = TRUE;
 	}
 	if (chp->remaining_data < 0 || chp->remaining_data > MAXDATASIZE) {
-		cl_log(LOG_CRIT, "Excessive remaining_data");
+		cl_log(LOG_CRIT, "Excessive/bad remaining_data");
 		badch = TRUE;
 	}
 	if (chp->remaining_data && chp->buf_msg == NULL) {
-		cl_log(LOG_CRIT, "inconsistent remaining_data/buf_msg");
+		cl_log(LOG_CRIT
+		,	"inconsistent remaining_data [%ld]/buf_msg[0x%lx]"
+		,	(long)chp->remaining_data, (unsigned long)chp->buf_msg);
 		badch = TRUE;
 	}
 	if (chp->remaining_data == 0 && chp->buf_msg != NULL) {
-		cl_log(LOG_CRIT, "inconsistent remaining_data/buf_msg(2)");
+		cl_log(LOG_CRIT
+		,	"inconsistent remaining_data [%ld]/buf_msg[0x%lx] (2)"
+		,	(long)chp->remaining_data, (unsigned long)chp->buf_msg);
 		badch = TRUE;
 	}
 	if (ch->send_queue == NULL || ch->recv_queue == NULL) {
@@ -272,13 +277,13 @@ socket_chan_audit(const struct IPC_CHANNEL* ch)
 	}
 	if (badch) {
 		cl_log(LOG_CRIT, "Bad channel @ 0x%lx", (unsigned long)ch);
+		dump_ipc_info(ch);
 		abort();
 	}
 }
 
 #endif
 
-void dump_ipc_info(IPC_Channel* chan);
 
 #ifdef CHEAT_CHECKS
 long	SeqNums[32];
@@ -399,7 +404,7 @@ dump_msgq_msg(gpointer data, gpointer user_data)
 
 
 void
-dump_ipc_info(IPC_Channel* chan)
+dump_ipc_info(const IPC_Channel* chan)
 {
 	char squeue[] = "Send queue";
 	char rqueue[] = "Receive queue";
@@ -418,23 +423,23 @@ dump_ipc_info(IPC_Channel* chan)
 static void 
 socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn)
 {
-  struct SOCKET_WAIT_CONN_PRIVATE * wc = wait_conn->ch_private;
+	struct SOCKET_WAIT_CONN_PRIVATE * wc = wait_conn->ch_private;
 
-  if (wc != NULL) {
-    close(wc->s);
-    unlink(wc->path_name);
-    g_free(wc);
-  }
-  g_free((void*) wait_conn);
+	if (wc != NULL) {
+		close(wc->s);
+		unlink(wc->path_name);
+		g_free(wc);
+	}
+	g_free((void*) wait_conn);
 }
 
 /* return a fd which can be listened on for new connections. */
 static int 
 socket_wait_selectfd(struct IPC_WAIT_CONNECTION *wait_conn)
 {
-  struct SOCKET_WAIT_CONN_PRIVATE * wc = wait_conn->ch_private;
+	struct SOCKET_WAIT_CONN_PRIVATE * wc = wait_conn->ch_private;
 
-  return (wc == NULL ? -1 : wc->s);
+	return (wc == NULL ? -1 : wc->s);
 
 }
 
@@ -443,46 +448,52 @@ static struct IPC_CHANNEL*
 socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 ,	struct IPC_AUTH *auth_info)
 {
-  struct sockaddr_un peer_addr;
-  struct IPC_CHANNEL *ch;
-  int sin_size;
-  int s, new_sock;
-  struct SOCKET_WAIT_CONN_PRIVATE *conn_private;
-  struct SOCKET_CH_PRIVATE *ch_private ;
-  
-  /* get select fd */
-  s = wait_conn->ops->get_select_fd(wait_conn); 
-  if (s < 0) {
-    cl_log(LOG_ERR, "get_select_fd: invalid fd");
-    return NULL;
-  }
+	struct sockaddr_un			peer_addr;
+	struct IPC_CHANNEL *			ch;
+	int					sin_size;
+	int					s;
+	int					new_sock;
+	struct SOCKET_WAIT_CONN_PRIVATE*	conn_private;
+	struct SOCKET_CH_PRIVATE *		ch_private ;
 
-  /* get client connection. */
-  sin_size = sizeof(struct sockaddr_un);
-  if ((new_sock = accept(s, (struct sockaddr *)&peer_addr, &sin_size)) == -1){
-    if (errno != EAGAIN && errno != EWOULDBLOCK) {
-        cl_perror("socket_accept_connection: accept");
-    }
-    return NULL;
-  }else{
-    if ((ch = socket_server_channel_new(new_sock)) == NULL) {
-      cl_log(LOG_ERR, "socket_accept_connection: Can't create new channel");
-      return NULL;
-    }else{
-      conn_private=(struct SOCKET_WAIT_CONN_PRIVATE*)(wait_conn->ch_private);
-      ch_private = (struct SOCKET_CH_PRIVATE *)(ch->ch_private);
-      strncpy(ch_private->path_name,conn_private->path_name
-      ,		sizeof(conn_private->path_name));
-    }
-  }
-  /* verify the client authentication information. */
-  if (ch->ops->verify_auth(ch, auth_info) == IPC_OK) {
-    ch->ch_status = IPC_CONNECT;
-    ch->farside_pid = socket_get_farside_pid(new_sock);
-    return ch;
-  }
+	/* get select fd */
+
+	s = wait_conn->ops->get_select_fd(wait_conn); 
+	if (s < 0) {
+		cl_log(LOG_ERR, "get_select_fd: invalid fd");
+		return NULL;
+	}
+
+	/* Get client connection. */
+	sin_size = sizeof(struct sockaddr_un);
+	if ((new_sock = accept(s, (struct sockaddr *)&peer_addr, &sin_size)) == -1){
+		if (errno != EAGAIN && errno != EWOULDBLOCK) {
+			cl_perror("socket_accept_connection: accept");
+		}
+		return NULL;
+	}else{
+		if ((ch = socket_server_channel_new(new_sock)) == NULL) {
+			cl_log(LOG_ERR
+			,	"socket_accept_connection: Can't create new channel");
+			return NULL;
+		}else{
+			conn_private=(struct SOCKET_WAIT_CONN_PRIVATE*)
+			(	wait_conn->ch_private);
+			ch_private = (struct SOCKET_CH_PRIVATE *)(ch->ch_private);
+			strncpy(ch_private->path_name,conn_private->path_name
+			,		sizeof(conn_private->path_name));
+		}
+	}
+
+	/* Verify the client authorization information. */
+
+	if (ch->ops->verify_auth(ch, auth_info) == IPC_OK) {
+		ch->ch_status = IPC_CONNECT;
+		ch->farside_pid = socket_get_farside_pid(new_sock);
+		return ch;
+	}
   
-  return NULL;
+	return NULL;
 
 }
 
@@ -490,14 +501,14 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 static void
 socket_destroy_channel(struct IPC_CHANNEL * ch)
 {
-  socket_disconnect(ch);
-  socket_destroy_queue(ch->send_queue);
-  socket_destroy_queue(ch->recv_queue);
-  if(ch->ch_private != NULL) {
-    g_free((void*)(ch->ch_private));
-  }
-  memset(ch, 0xff, sizeof(*ch));
-  g_free((void*) ch);
+	socket_disconnect(ch);
+	socket_destroy_queue(ch->send_queue);
+	socket_destroy_queue(ch->recv_queue);
+	if (ch->ch_private != NULL) {
+    		g_free((void*)(ch->ch_private));
+	}
+	memset(ch, 0xff, sizeof(*ch));
+	g_free((void*)ch);
 }
 
 /* 
@@ -515,15 +526,18 @@ socket_destroy_channel(struct IPC_CHANNEL * ch)
 static int
 socket_disconnect(struct IPC_CHANNEL* ch)
 {
-  struct SOCKET_CH_PRIVATE* conn_info;
+	struct SOCKET_CH_PRIVATE* conn_info;
 
-  conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
+	conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
 #if 0
-  cl_log(LOG_INFO, "forced disconnect for fd %d", conn_info->s);
+	if (ch->ch_status != IPC_DISCONNECT) {
+  		cl_log(LOG_INFO, "forced disconnect for fd %d", conn_info->s);
+	}
 #endif
-  close(conn_info->s);
-  ch->ch_status = IPC_DISCONNECT;
-  return IPC_OK;
+	close(conn_info->s);
+	conn_info->s = -1;
+	ch->ch_status = IPC_DISCONNECT;
+	return IPC_OK;
 }
 
 static int
@@ -576,29 +590,30 @@ socket_check_disc_pending(struct IPC_CHANNEL* ch)
 static int 
 socket_initiate_connection(struct IPC_CHANNEL * ch)
 {
-  struct SOCKET_CH_PRIVATE* conn_info;  
-  struct sockaddr_un peer_addr; /* connector's address information */
+	struct SOCKET_CH_PRIVATE* conn_info;  
+	struct sockaddr_un peer_addr; /* connector's address information */
   
-  conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
+	conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
   
-  /* prepare the socket */
-  memset(&peer_addr, 0, sizeof(peer_addr));
-  peer_addr.sun_family = AF_LOCAL;    /* host byte order */ 
+	/* Prepare the socket */
+	memset(&peer_addr, 0, sizeof(peer_addr));
+	peer_addr.sun_family = AF_LOCAL;    /* host byte order */ 
 
-  if (strlen(conn_info->path_name) >= sizeof(peer_addr.sun_path)) {
-    return IPC_FAIL;
-  }
-  strncpy(peer_addr.sun_path, conn_info->path_name, sizeof(peer_addr.sun_path));
-  /* send connection request */
-  if (connect(conn_info->s, (struct sockaddr *)&peer_addr
-  , 	sizeof(struct sockaddr_un)) == -1) {
-    cl_perror("initiate_connection: connect failure");
-    return IPC_FAIL;
-  }
-  
-  ch->ch_status = IPC_CONNECT;
-  ch->farside_pid = socket_get_farside_pid(conn_info->s);
-  return IPC_OK;
+	if (strlen(conn_info->path_name) >= sizeof(peer_addr.sun_path)) {
+		return IPC_FAIL;
+	}
+	strncpy(peer_addr.sun_path, conn_info->path_name, sizeof(peer_addr.sun_path));
+
+	/* Send connection request */
+	if (connect(conn_info->s, (struct sockaddr *)&peer_addr
+	, 	sizeof(struct sockaddr_un)) == -1) {
+		cl_perror("initiate_connection: connect failure");
+		return IPC_FAIL;
+	}
+
+	ch->ch_status = IPC_CONNECT;
+	ch->farside_pid = socket_get_farside_pid(conn_info->s);
+	return IPC_OK;
 }
 
 
@@ -673,7 +688,7 @@ socket_check_poll(struct IPC_CHANNEL * ch
 			ch->ch_status = IPC_DISC_PENDING;
 			return IPC_OK;
 		}
-#if 0
+#if 1
 		cl_log(LOG_INFO, "socket_check_poll(): HUP without input");
 #endif
 		ch->ch_status = IPC_DISCONNECT;
@@ -798,9 +813,9 @@ socket_is_output_pending(struct IPC_CHANNEL * ch)
 static int 
 socket_assert_auth(struct IPC_CHANNEL *ch, GHashTable *auth)
 {
-  cl_log(LOG_ERR
-  , "the assert_auth function for domain socket is not implemented");
-  return IPC_FAIL;
+	cl_log(LOG_ERR
+	, "the assert_auth function for domain socket is not implemented");
+	return IPC_FAIL;
 }
 
 
@@ -844,10 +859,10 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 		}
 
 		if (len <= 0 || len > MAXDATASIZE) {
-			ch->ch_status = IPC_DISCONNECT;
 			cl_log(LOG_ERR
 			,	"socket_resume_io_read()"
 			": bad packet length [%d]", len);
+			ch->ch_status = IPC_DISCONNECT;
 			retcode = IPC_BROKEN;
 			break;
 		}
@@ -969,8 +984,10 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 	}
 
 	/* Check for errors uncaught by recv() */
+	/* NOTE: It doesn't seem right we have to do this every time */
+	/* FIXME?? */
 	if ((retcode == IPC_OK) 
-	&&	(sockpoll.fd = conn_info->s) != -1) {
+	&&	(sockpoll.fd = conn_info->s) >= 0) {
 		/* Just check for errors, not for data */
 		sockpoll.events = 0;
 		ipc_pollfunc_ptr(&sockpoll, 1, 0);
@@ -1139,6 +1156,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	if (!IPC_ISRCONN(ch)) {
 		return IPC_BROKEN;
 	}
+
 	do {
 		rc1 = socket_resume_io_read(ch, &rstarted);
 		CHANAUDIT(ch);
@@ -1160,7 +1178,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 			,	rstarted, wstarted, count);
 		}
 #endif
-	}while (rc1 == IPC_OK && rc2 == IPC_OK && (rstarted||wstarted));
+	} while ((rstarted||wstarted) && IPC_ISRCONN(ch));
 
 	if (IPC_ISRCONN(ch)) {
 		if (rc1 != IPC_OK) {
