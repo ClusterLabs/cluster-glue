@@ -1,4 +1,4 @@
-/* $Id: main.c,v 1.17 2005/02/04 20:45:37 alan Exp $ */
+/* $Id: main.c,v 1.18 2005/02/10 06:47:25 alan Exp $ */
 /*
  * Stonith: simple test program for exercising the Stonith API code
  *
@@ -97,6 +97,7 @@ confhelp(const char * cmd, FILE* stream)
 	for(this=typelist; *this; ++this) {
 		const char *    SwitchType = *this;
 		const char *	cres;
+		const char **	pnames;
 
 		if ((s = stonith_new(SwitchType)) == NULL) {
 			fprintf(stderr, "Invalid STONITH type %s(!)\n"
@@ -116,14 +117,34 @@ confhelp(const char * cmd, FILE* stream)
 			,	"For more information see %s\n"
 			,	cres);
 		}
+		if (NULL == (pnames = stonith_get_confignames(s))) {
+			continue;
+		}
+		fprintf(stream
+		,	"List of valid parameter names for %s STONITH device:\n"
+		,	SwitchType);
+		for (;*pnames; ++pnames) {
+			fprintf(stream
+			,	"\t%s\n", *pnames);
+		}
 
 #ifdef ST_CONFI_INFO_SYNTAX
 		fprintf(stream, "\nConfig info [-p] syntax for %s:\n\t%s\n"
 		,    SwitchType, stonith_get_info(s, ST_CONF_INFO_SYNTAX));
+#else
+		fprintf(stream, "For Config info [-p] syntax"
+		", give each of the above parameters in order as the"
+		" -p value.\n"
+		"Arguments are separated by white space.");
 #endif
 #ifdef ST_CONFI_FILE_SYNTAX
 		fprintf(stream, "\nConfig file [-F] syntax for %s:\n\t%s\n"
 		,    SwitchType, stonith->get_info(s, ST_CONF_FILE_SYNTAX));
+#else
+		fprintf(stream
+		,	"\nConfig file [-F] syntax is the same as -p"
+		", except # at the start of a line"
+		"\ndenotes a comment\n");
 #endif
 
 		stonith_delete(s); s = NULL;
