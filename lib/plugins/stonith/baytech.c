@@ -1,4 +1,4 @@
-/* $Id: baytech.c,v 1.22 2005/01/08 06:01:17 alan Exp $ */
+/* $Id: baytech.c,v 1.23 2005/01/25 19:54:05 gshi Exp $ */
 /*
  *	Stonith module for BayTech Remote Power Controllers (RPC-x devices)
  *
@@ -143,7 +143,7 @@ static struct Etoken GTSign[] =		{ {">", 0, 0} ,{NULL,0,0}};
 static struct Etoken Menu[] =		{ {"Menu:", 0, 0} ,{NULL,0,0}};
 static struct Etoken Temp[] =		{ {"emperature: ", 0, 0}
 					,	{NULL,0,0}};
-static struct Etoken Break[] =		{ {"reaker: ", 0, 0}
+static struct Etoken Break[] =		{ {"Status", 0, 0}
 					,	{NULL,0,0}};
 static struct Etoken PowerApplied[] =	{ {"ower applied to outlet", 0, 0}
 					,	{NULL,0,0}};
@@ -161,9 +161,9 @@ static struct Etoken TurningOnOff[] =	{ {"RPC", 0, 0}
 
 
 static struct BayTechModelInfo ModelInfo [] = {
-	{"RPC-5",	18, Temp},/* This first model will be the default */
-	{"RPC-3",	10, Break},	
-	{"RPC-3A",	10, Break},
+	{"BayTech RPC-5",	18, Temp},/* This first model will be the default */
+	{"BayTech RPC-3",	10, Break},	
+	{"BayTech RPC-3A",	10, Break},
 	{NULL,		0,  NULL},
 };
 
@@ -221,7 +221,7 @@ RPCLogin(struct pluginDevice * bt)
 		 * TIMXXX - 
 		 * Look at device ID as this really describes the model.
 		 */
-		if (strcasecmp(ModelInfo[j].type, idptr) == 0) {
+		if (strcasecmp(ModelInfo[j].type, IDbuf) == 0) {
 			bt->modelinfo = &ModelInfo[j];
 			break;
 		}
@@ -479,8 +479,8 @@ RPCNametoOutletList(struct pluginDevice* bt, const char * name
 	SEND(bt->wrfd, "STATUS\r");
 
 	/* Expect: "emperature:" so we can skip over it... */
-/*  	EXPECT(bt->rdfd, bt->modelinfo->expect, 5); */
-/*  	EXPECT(bt->rdfd, CRNL, 5); */
+ 	EXPECT(bt->rdfd, bt->modelinfo->expect, 5);
+ 	EXPECT(bt->rdfd, CRNL, 5);
 
 	/* Looks Good!  Parse the status output */
 
