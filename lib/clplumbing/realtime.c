@@ -1,8 +1,12 @@
 #include <portability.h>
 #include <sys/types.h>
 #include <stdlib.h>
+/* The BSD's do not use malloc.h directly. */
+/* They use stdlib.h instead */
+#ifndef BSD
 #ifdef HAVE_MALLOC_H
 #	include <malloc.h>
+#endif
 #endif
 #include <unistd.h>
 #ifdef _POSIX_MEMLOCK
@@ -19,7 +23,6 @@
 
 static gboolean	cl_realtimepermitted = TRUE;
 static void cl_rtmalloc_setup(void);
-
 
 #if defined(SCHED_RR) && defined(_POSIX_PRIORITY_SCHEDULING)
 #	define DEFAULT_REALTIME	SCHED_RR
@@ -111,6 +114,7 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 		cl_malloc_hogger(heapgrowK);
 	}
 
+#ifdef _POSIX_MEMLOCK
 	if (stackgrowK > 0) {
 		int	ret;
 		if ((ret=cl_stack_hogger(NULL, stackgrowK)) != HOGRET) {
@@ -118,6 +122,7 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 			,	ret);
 		}
 	}
+#endif
 	cl_rtmalloc_setup();
 
 	if (!cl_realtimepermitted) {
