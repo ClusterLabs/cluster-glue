@@ -1,4 +1,4 @@
-/* $Id: ipmilan_command.c,v 1.6 2004/09/27 17:41:33 yixiong Exp $ */
+/* $Id: ipmilan_command.c,v 1.7 2004/10/09 01:49:42 lge Exp $ */
 /*
  * This program is largely based on the ipmicmd.c program that's part of OpenIPMI package.
  * 
@@ -8,10 +8,10 @@
 
 #include <stdio.h>
 
-#include <stdlib.h> // malloc()
-#include <unistd.h> // getopt()
-#include <string.h> // strerror()
-#include <netdb.h> // gethostbyname()
+#include <stdlib.h> /* malloc() */
+#include <unistd.h> /* getopt() */
+#include <string.h> /* strerror() */
+#include <netdb.h> /* gethostbyname() */
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -30,7 +30,7 @@
 #include <pils/plugin.h>
 extern const PILPluginImports*  PluginImports;
 
-// #define DUMP_MSG 0
+/* #define DUMP_MSG 0 */
 #define OPERATION_TIME_OUT 10
 
 os_handler_t *os_hnd;
@@ -176,7 +176,7 @@ send_ipmi_cmd(ipmi_con_t *con, int request)
 	struct ipmi_system_interface_addr *si;
 	int rv;
 	int * data1;
-	// chassis control command request is only 1 byte long
+	/* chassis control command request is only 1 byte long */
 	unsigned char cc_data = POWER_CYCLE; 
 
 	si = (void *) &addr;

@@ -1,4 +1,4 @@
-/* $Id: ipmilan.c,v 1.11 2004/10/06 10:55:18 lars Exp $ */
+/* $Id: ipmilan.c,v 1.12 2004/10/09 01:49:42 lge Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
@@ -331,7 +331,7 @@ ipmilan_parse_config_info(struct pluginDevice* nd, const char * info)
 			hostinfo->next = NULL;
 
 			head = nd->hostlist;
-			// find the last one in the list
+			/* find the last one in the list */
 			if (head) {
 				tail = head->prev;
 				tail->next = hostinfo;
@@ -344,7 +344,7 @@ ipmilan_parse_config_info(struct pluginDevice* nd, const char * info)
 				hostinfo->prev = hostinfo;
 			}
 
-			// increment the host counter
+			/* increment the host counter */
 			nd->hostcount++;
 
 			return (S_OK);
@@ -353,7 +353,7 @@ ipmilan_parse_config_info(struct pluginDevice* nd, const char * info)
 			break;
 		}
 
-	} while (0); // using this do loop here so we can have 'break' statement.
+	} while (0); /* using this do loop here so we can have 'break' statement. */
 
 	if (hostinfo) {
 		FREE(hostinfo);

@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.19 2004/10/06 10:55:18 lars Exp $ */
+/* $Id: rcd_serial.c,v 1.20 2004/10/09 01:49:42 lge Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -166,9 +166,9 @@ RCD_alarm_handler(int sig) {
 	struct sigaction sa;
 	sigset_t sigmask;
 
-	// Maybe a bit naughty but it works and it saves duplicating all
-	// this setup code - if handler called with 0 for sig, we install
-	// ourself as handler.
+	/* Maybe a bit naughty but it works and it saves duplicating all */
+	/* this setup code - if handler called with 0 for sig, we install */
+	/* ourself as handler. */
 	if (sig) sa.sa_handler = (void (*)(int))SIG_DFL;
 	else     sa.sa_handler = RCD_alarm_handler;
 
