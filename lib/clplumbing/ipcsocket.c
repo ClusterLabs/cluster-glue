@@ -173,7 +173,7 @@ socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
   }
   /* verify the client authentication information. */
   ch->auth_info = auth_info;
-  if (ch->ops->verify_auth(ch) == AUTH_OK) {
+  if (ch->ops->verify_auth(ch) == IPC_OK) {
     ch->ch_status = CH_CONNECT;
     return ch;
   }
@@ -204,8 +204,8 @@ socket_destroy_channel(struct OCF_IPC_CHANNEL * ch)
  *     ch (IN) the pointer to the channel.
  *
  * return values : 
- *     CH_SUCCESS   the connection is disconnected successfully.
- *      CH_FAIL     operation fails.
+ *     IPC_OK   the connection is disconnected successfully.
+ *      IPC_FAIL     operation fails.
 */
 
 int
@@ -216,7 +216,7 @@ socket_disconnect(struct OCF_IPC_CHANNEL* ch)
   conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
   close(conn_info->s);
   ch->ch_status = CH_DISCONNECT;
-  return CH_SUCCESS;
+  return IPC_OK;
 }
 
 
@@ -234,19 +234,19 @@ socket_initiate_connection(struct OCF_IPC_CHANNEL * ch)
 
   if (strlen(conn_info->path_name) >= sizeof(peer_addr.sun_path)) {
     fprintf(stderr,"the max path length is %d\n", sizeof(peer_addr.sun_path));
-    return CH_FAIL;
+    return IPC_FAIL;
   }
   strncpy(peer_addr.sun_path, conn_info->path_name, sizeof(peer_addr.sun_path));
   /* send connection request */
   if (connect(conn_info->s, (struct sockaddr *)&peer_addr
   , 	sizeof(struct sockaddr_un)) == -1) {
     perror("connect");
-    return CH_FAIL;
+    return IPC_FAIL;
   }
   
   ch->ch_status = CH_CONNECT;
 
-  return CH_SUCCESS;
+  return IPC_OK;
 }
 
 static int 
@@ -264,7 +264,7 @@ socket_send(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE* message)
   }
   
   
-  return CH_FAIL;
+  return IPC_FAIL;
   
 }
 
@@ -276,7 +276,7 @@ socket_recv(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE** message)
   
   result = ch->ops->resume_io(ch);
   
-  if (result != CH_SUCCESS) {
+  if (result != IPC_OK) {
     return result;
   }else{
     if (ch->recv_queue->current_qlen != 0) {
@@ -287,13 +287,13 @@ socket_recv(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE** message)
 	ch->recv_queue->queue = g_list_remove_link(ch->recv_queue->queue, element);
 	ch->recv_queue->current_qlen--;
       
-	return CH_SUCCESS;
+	return IPC_OK;
       }else {
 	*message = NULL;
       }
     }
   }
-  return CH_FAIL;
+  return IPC_FAIL;
   
 }
 
@@ -326,7 +326,7 @@ static int
 socket_assert_auth(struct OCF_IPC_CHANNEL *ch, GHashTable *auth)
 {
   printf("the assert_auth function for domain socket is not implemented\n");
-  return CH_FAIL;
+  return IPC_FAIL;
 }
 
 /* verify the authentication information. */
@@ -337,18 +337,18 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
   struct SOCKET_CH_PRIVATE *conn_info;
   struct OCF_IPC_AUTH *auth_info;
   ssize_t n;
-  int ret = AUTH_OK;
+  int ret = IPC_OK;
   struct ucred *cred;
   
   
   auth_info = (struct OCF_IPC_AUTH *) ch->auth_info;
 
   if (auth_info == NULL) { /* no restriction for authentication */
-    return AUTH_OK;
+    return IPC_OK;
   }
   
   if (auth_info->uid == NULL && auth_info->gid == NULL) {
-    return AUTH_OK;    /* no restriction for authentication */
+    return IPC_OK;    /* no restriction for authentication */
   }
 
   /* get the credential information for peer */
@@ -357,17 +357,17 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
   cred = g_new(struct ucred, 1); 
   if (getsockopt(conn_info->s, SOL_SOCKET, SO_PEERCRED, cred, &n) != 0) {
     free(cred);
-    return AUTH_FAIL;
+    return IPC_FAIL;
   }
   
   /* verify the credential information. */
   if (	auth_info->uid
   &&	g_hash_table_lookup(auth_info->uid, &(cred->uid)) == NULL) {
-		ret = AUTH_FAIL;
+		ret = IPC_FAIL;
   }
   if (	auth_info->gid
   &&	g_hash_table_lookup(auth_info->gid, &(cred->gid)) == NULL) {
-		ret = AUTH_FAIL;
+		ret = IPC_FAIL;
   }
   free(cred);
   return ret;
@@ -407,7 +407,7 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
   Cred	   *cred;
   struct SOCKET_CH_PRIVATE *conn_info;
   struct OCF_IPC_AUTH *auth_info;
-  int ret = AUTH_OK;
+  int ret = IPC_OK;
   char         buf;
   
   /* Compute size without padding */
@@ -419,11 +419,11 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
   auth_info = (struct OCF_IPC_AUTH *) ch->auth_info;
 
   if (auth_info == NULL) { /* no restriction for authentication */
-    return AUTH_OK;
+    return IPC_OK;
   }
   
   if (auth_info->uid == FALSE && auth_info->gid == FALSE) {
-    return AUTH_OK;    /* no restriction for authentication */
+    return IPC_OK;    /* no restriction for authentication */
   }
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 
@@ -447,17 +447,17 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
       || cmsg->cmsg_type != SCM_CREDS)
     {
       fprintf(stderr,"can't get credential information from peer\n");
-      return AUTH_FAIL;
+      return IPC_FAIL;
     }
 
   cred = (Cred *) CMSG_DATA(cmsg);
   if (	auth_info->uid
   &&	g_hash_table_lookup(auth_info->uid, &(cred->cr_uid)) == NULL) {
-		ret = AUTH_FAIL;
+		ret = IPC_FAIL;
   }
   if (	auth_info->gid
   &&	g_hash_table_lookup(auth_info->gid, &(cred->cr_groups)) == NULL) {
-		ret = AUTH_FAIL;
+		ret = IPC_FAIL;
   }
 
   return ret;
@@ -483,7 +483,7 @@ socket_resume_io(struct OCF_IPC_CHANNEL *ch)
     /* check how much data queued. */
     if(ioctl(conn_info->s, FIONREAD,&len) < 0){
       perror("ioctl");
-      return CH_FAIL;
+      return IPC_FAIL;
     }
     if(len > 0){
       msg = socket_message_new(ch, len + 1);
@@ -534,7 +534,7 @@ socket_resume_io(struct OCF_IPC_CHANNEL *ch)
     }
   }
 
-  return CH_SUCCESS;
+  return IPC_OK;
 }
 
 
@@ -557,10 +557,10 @@ socket_set_send_qlen (struct OCF_IPC_CHANNEL* ch, int q_len)
 {
   /* This seems more like an assertion failure than a normal error */
   if (ch->send_queue == NULL) {
-    return CH_FAIL;
+    return IPC_FAIL;
   }
   ch->send_queue->max_qlen = q_len;
-  return CH_SUCCESS;  
+  return IPC_OK;  
  
 }
 
@@ -569,11 +569,11 @@ socket_set_recv_qlen (struct OCF_IPC_CHANNEL* ch, int q_len)
 {
   /* This seems more like an assertion failure than a normal error */
   if (ch->recv_queue == NULL) {
-    return CH_FAIL;
+    return IPC_FAIL;
   }
   
   ch->recv_queue->max_qlen = q_len;
-  return CH_SUCCESS;
+  return IPC_OK;
 }
 
 /* socket object of the function table */
