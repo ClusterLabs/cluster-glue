@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.36 2004/12/05 19:20:56 andrew Exp $ */
+/* $Id: cl_msg.c,v 1.37 2005/01/18 20:33:04 andrew Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -793,6 +793,9 @@ cl_msg_list_add_string(struct ha_msg* msg, const char* name, const char* value)
 int
 ha_msg_add(struct ha_msg * msg, const char * name, const char * value)
 {
+	if(name == NULL || value == NULL) {
+		return HA_FAIL;
+	}
 	return(ha_msg_nadd(msg, name, strlen(name), value, strlen(value)));
 }
 
@@ -909,7 +912,7 @@ cl_get_binary(const struct ha_msg *msg,
 	}
 	if ( type != FT_BINARY){
 		cl_log(LOG_WARNING, "field %s is not binary", name);
-		cl_log_message(msg);
+		cl_log_message(LOG_WARNING, msg);
 		return(NULL);
 	}
 
@@ -1272,7 +1275,7 @@ msgfromstream_netstring(FILE * f)
 					": netstring authentication"
 					" failed msgfromstream_netstring()");
 				}
-				cl_log_message(ret);
+				cl_log_message(LOG_INFO, ret);
 				ha_msg_del(ret);
 				return(NULL);
 			}
@@ -1831,7 +1834,7 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 		", bp=%p, buf + len=%p, len=%ld"
 		,	bp, buf + len, (long)len);
 
-		cl_log_message(m);
+		cl_log_message(LOG_ERR, m);
 
 		return(HA_FAIL);
 
@@ -1939,18 +1942,23 @@ wirefmt2msg(const char* s, size_t length)
 }
 
 void
-cl_log_message (const struct ha_msg *m)
+cl_log_message (int log_level, const struct ha_msg *m)
 {
 	int	j;
 
+	if(m == NULL) {
+		cl_log(log_level, "MSG: No message to dump");
+		return;
+	}
+	
 	AUDITMSG(m);
-	cl_log(LOG_INFO, "MSG: Dumping message with %d fields", m->nfields);
+	cl_log(log_level, "MSG: Dumping message with %d fields", m->nfields);
 	
 	for (j=0; j < m->nfields; ++j) {
 		
 		if(m->types[j] < sizeof(fieldtypefuncs) 
 		   / sizeof(fieldtypefuncs[0])){					
-			fieldtypefuncs[m->types[j]].display(j, 
+			fieldtypefuncs[m->types[j]].display(log_level, j, 
 							    m->names[j],
 							    m->values[j]);
 		}
@@ -1980,6 +1988,24 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.37  2005/01/18 20:33:04  andrew
+ * Appologies for the top-level commit, one change necessitated another which
+ *   exposed some bugs... etc etc
+ *
+ * Remove redundant usage of XML in the CRM
+ * - switch to "struct ha_msg" aka. HA_Message for everything except data
+ * Make sure the expected type of all FSA input data is verified before processing
+ * Fix a number of bugs including
+ * - looking in the wrong place for the API result data in the CIB API
+ *   (hideous that this actually worked).
+ * - not overwriting error codes when sending the result to the client in the CIB API
+ *   (this lead to some error cases being treated as successes later in the code)
+ * Add PID to log messages sent to files (not to syslog)
+ * Add a log level to calls for cl_log_message()
+ * - convert existing calls, sorry if I got the level wrong
+ * Add some checks in cl_msg.c code to prevent NULL pointer exceptions
+ * - usually when NULL is passed to strlen() or similar
+ *
  * Revision 1.36  2004/12/05 19:20:56  andrew
  * ha_msg_value_int() calls cl_get_value() which takes a const msg and ha_msg_value_int()
  *   doesnt modify anything so I think this is correct.  Its also helpful since
