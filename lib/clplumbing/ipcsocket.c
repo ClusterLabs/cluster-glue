@@ -148,9 +148,7 @@ struct IPC_CHANNEL* socket_server_channel_new(int sockfd);
 
 pid_t socket_get_farside_pid(int sockfd);
 
-
-
-static int (*ourpollfunc) (struct pollfd *, nfds_t, int) = poll;
+static int (*ourpollfunc)(struct pollfd *, unsigned int, int) = poll;
 
 /* destroy socket wait channel */ 
 static void 
