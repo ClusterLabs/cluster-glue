@@ -57,8 +57,8 @@
 #define PID_FILE 	"/var/run/lrmd.pid"
 #define DAEMON_LOG   	"/var/log/lrmd.log"
 #define DAEMON_DEBUG 	"/var/log/lrmd.debug"
-#define PLUGIN_DIR	"/usr/lib/heartbeat/plugins"
-#define RA_PLUGIN_DIR	"/usr/lib/heartbeat/plugins/RAExec"
+//#define PLUGIN_DIR	"/usr/lib/pils/plugins"
+//#define RA_PLUGIN_DIR	"/usr/lib/heartbeat/plugins/RAExec"
 
 typedef struct
 {
@@ -380,7 +380,6 @@ init_start ()
 	cl_log_set_debugfile(DAEMON_DEBUG);
 
 	/* load RA plugins   */
-
 	PluginLoadingSystem = NewPILPluginUniv (PLUGIN_DIR);
 	PILLoadPlugin(PluginLoadingSystem, "InterfaceMgr", "generic",
 				  &RegisterRqsts);
