@@ -1,4 +1,4 @@
-/* $Id: main.c,v 1.15 2005/01/08 06:01:17 alan Exp $ */
+/* $Id: main.c,v 1.16 2005/02/01 20:22:51 gshi Exp $ */
 /*
  * Stonith: simple test program for exercising the Stonith API code
  *
@@ -294,26 +294,21 @@ main(int argc, char** argv)
 		stonith_set_debug(s, debug);
 	}
 
-#if 0
 	/* Old STONITH version 1 stuff... */
 	if (optfile) {
 		/* Configure the Stonith object from a file */
-		if ((rc=s->s_ops->set_config_file(s, optfile)) != S_OK) {
-			syslog(LOG_ERR
-			,	"Invalid config file for %s device."
-			,	SwitchType);
-			syslog(LOG_INFO, "Config file syntax: %s"
-			,	s->s_ops->getinfo(s, ST_CONF_FILE_SYNTAX));
+		if (stonith_set_config_file(s, optfile) != S_OK) {
+			syslog(LOG_ERR,
+			       "Invalid config file for %s device.",
+			       SwitchType);
 			stonith_delete(s); s=NULL;
-			exit(rc);
+			exit(S_BADCONFIG);
 		}
-	}else{
-#else
-	if (parameters) {
+	}else if (parameters) {
 		/* Configure Stonith object from the -p argument */
 		StonithNVpair *		pairs;
 		if ((pairs = stonith1_compat_string_to_NVpair
-		(	s, parameters)) == NULL) {
+		     (	s, parameters)) == NULL) {
 			fprintf(stderr
 			,	"Invalid STONITH -p parameter [%s]\n"
 			,	parameters);
@@ -346,9 +341,7 @@ main(int argc, char** argv)
 			exit(rc);
 		}
 	}
-
-#endif
-
+	
 	rc = stonith_get_status(s);
 
 	if ((SwitchType = stonith_get_info(s, ST_DEVICEID)) == NULL) {
