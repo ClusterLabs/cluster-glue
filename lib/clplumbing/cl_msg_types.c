@@ -67,8 +67,9 @@ int msg2netstring_buf(const struct ha_msg*, char*, size_t, size_t*);
 int struct_display_print_spaces(char *buffer, int depth);
 int struct_display_as_xml(int log_level, int depth, struct ha_msg *data,
 			  const char *prefix, gboolean formatted);
-
-
+int struct_stringlen(size_t namlen, size_t vallen, const void* value);
+int struct_netstringlen(size_t namlen, size_t vallen, const void* value);
+ 
 static int
 intlen(int x)
 {
@@ -713,7 +714,7 @@ binary_netstringlen(size_t namlen, size_t vallen, const void* value)
 
 
 
-static int
+int
 struct_stringlen(size_t namlen, size_t vallen, const void* value)
 {
 	const struct ha_msg* childmsg;
@@ -723,40 +724,36 @@ struct_stringlen(size_t namlen, size_t vallen, const void* value)
 	(void)vallen;
 	childmsg = (const struct ha_msg*)value;
 	
-	return namlen +2 + 3 + childmsg->stringlen; 
+	return namlen +2 + 3 + get_stringlen(childmsg); 
 	/*overhead 3 is for type*/
 }
 
-static int
+int
 struct_netstringlen(size_t namlen, size_t vallen, const void* value)
 {
 
 	int ret;
 	const struct ha_msg* childmsg;
-	
+	int len;
+
 	HA_MSG_ASSERT(value);	
 
 	(void)vallen;
 	childmsg = (const struct ha_msg*)value;
 	
+	len = get_netstringlen(childmsg);
+
 	ret = intlen(namlen) + namlen + 2;
 	/*for name*/
 	ret += 4;
 	/*for type*/
-	ret += intlen(childmsg->netstringlen) + childmsg->netstringlen + 2;
+	ret += intlen(len) + len + 2;
 	/*for child msg*/
 
 	return ret;
 	
 }
 
-
-/*  static int */
-/*  struct_netstringlen(size_t namelen, size_t vallen, const void* value) */
-
-	
-/*  	return 0; */
-/*  } */
 
 static int
 list_stringlen(size_t namlen, size_t vallen, const void* value)
@@ -838,23 +835,23 @@ add_struct_field(struct ha_msg* msg, char* name, size_t namelen,
 	stringlen_add = struct_stringlen(namelen, vallen, value);	
 	netstringlen_add =  struct_netstringlen(namelen, vallen, value);
 	
-	if (msg->stringlen + stringlen_add >= MAXMSG || 
-	    msg->netstringlen + netstringlen_add >= MAXMSG){
+	if (get_stringlen(msg) + stringlen_add >= MAXMSG || 
+	    get_netstringlen(msg) + netstringlen_add >= MAXMSG){
 		cl_log(LOG_ERR, "add_struct_field"
 		       "msg too largge");
 		return HA_FAIL;
 	}
 	
-
+	
 	next = msg->nfields;
 	msg->names[next] = name;
 	msg->nlens[next] = namelen;
 	msg->values[next] = value;
 	msg->vlens[next] = vallen;
 	
-	msg->stringlen += stringlen_add;
-	msg->netstringlen +=  netstringlen_add;
-	
+/* 	msg->stringlen += stringlen_add; */
+/* 	msg->netstringlen +=  netstringlen_add; */
+		
 	msg->types[next] = FT_STRUCT;
 	
 	msg->nfields++;	
@@ -903,8 +900,8 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 						     listlen, 
 						     value);
 		
-		if (msg->stringlen + stringlen_add >= MAXMSG || 
-		    msg->netstringlen + netstringlen_add >= MAXMSG){
+		if (get_stringlen(msg) + stringlen_add >= MAXMSG || 
+		    get_netstringlen(msg) + netstringlen_add >= MAXMSG){
 			cl_log(LOG_ERR, "add_list_field"
 			       "msg too large");
 			return HA_FAIL;
@@ -942,8 +939,8 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 		netstringlen_add = intlen(newlistlen) + newlistlen
 			- intlen(oldlistlen) - oldlistlen;		
 		
-		if (msg->stringlen+ stringlen_add >= MAXMSG 
-		    || msg->netstringlen + netstringlen_add >= MAXMSG){
+		if (get_stringlen(msg)+ stringlen_add >= MAXMSG 
+		    || get_netstringlen(msg) + netstringlen_add >= MAXMSG){
 			cl_log(LOG_ERR, "ha_msg too big");
 			list = g_list_remove(list, value);
 			msg->values[j]=list;
@@ -1462,13 +1459,13 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 	}
 	
 	
-	if (msg->stringlen + stringlen_add >= MAXMSG ||
-	    msg->netstringlen + netstringlen_add >= MAXMSG) {
-
+	if (get_stringlen(msg) + stringlen_add >= MAXMSG ||
+	    get_netstringlen(msg) + netstringlen_add >= MAXMSG) {
+		
 		cl_log(LOG_ERR, "add_string_field()"
-		": cannot add name/value to ha_msg (value too big: %ld bytes)"
-		,	(long)MAX(msg->stringlen + stringlen_add
-		,	msg->netstringlen + netstringlen_add));
+		       ": cannot add name/value to ha_msg (value too big: %ld bytes)"
+		       ,	(long)MAX(get_stringlen(msg) + stringlen_add
+					  ,	get_netstringlen(msg) + netstringlen_add));
 
 		if (cp_value) {   
 			if(internal_type  < sizeof(fieldtypefuncs) 
@@ -1490,8 +1487,10 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 	msg->names[next] = cp_name;
 	msg->nlens[next] = cp_namelen;
 	
-	msg->stringlen += stringlen_add;	
-	msg->netstringlen += netstringlen_add;
+	if (internal_type != FT_STRUCT){
+		msg->stringlen += stringlen_add;	
+		msg->netstringlen += netstringlen_add;
+	}
 	
 	msg->types[next] = internal_type;
 	msg->nfields++;

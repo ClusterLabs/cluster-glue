@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.44 2005/02/07 21:32:38 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.45 2005/02/08 08:10:27 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -92,6 +92,8 @@ static struct ha_msg* wirefmt2msg_ll(const char* s, size_t length, int need_auth
 
 struct ha_msg* string2msg_ll(const char * s, size_t length, int need_auth, int depth);
 
+extern int struct_stringlen(size_t namlen, size_t vallen, const void* value);
+extern int struct_netstringlen(size_t namlen, size_t vallen, const void* value);
 
 
 void
@@ -300,16 +302,16 @@ ha_msg_audit(const struct ha_msg* msg)
 		,	(unsigned) msg, msg->nalloc);
 		doabort = TRUE;
 	}
-	if (msg->stringlen < 0) {
+	if (get_stringlen(msg) < 0) {
 		cl_log(LOG_CRIT
 		,	"Message @ 0x%x has negative stringlen (%d)"
-		,	(unsigned) msg, msg->stringlen);
+		       ,	(unsigned) msg, get_stringlen(msg));
 		doabort = TRUE;
 	}
-	if (msg->stringlen < 4 * msg->nfields) {
+	if (get_stringlen(msg) < 4 * msg->nfields) {
 		cl_log(LOG_CRIT
 		,	"Message @ 0x%x has too small stringlen (%d)"
-		,	(unsigned) msg, msg->stringlen);
+		       ,	(unsigned) msg, get_stringlen(msg));
 		doabort = TRUE;
 	}
 	if (!ha_is_allocated(msg->names)) {
@@ -469,28 +471,32 @@ cl_msg_remove_offset(struct ha_msg* msg, int offset)
 		cl_log(LOG_ERR, "cl_msg_remove: field %d not found", j);
 		return HA_FAIL;
 	}
-
+	
 	tmplen = msg->stringlen;
-	msg->stringlen -=  fieldtypefuncs[msg->types[j]].stringlen(msg->nlens[j],
-								   msg->vlens[j],
-								   msg->values[j]);
-	if (msg->stringlen <=0){
-		cl_log(LOG_ERR, "cl_msg_remove: stringlen <= 0 after removing"
-		       "field %s. Return failure", msg->names[j]);
-		msg->stringlen =tmplen;
-		return HA_FAIL;
+	
+	if (msg->types[j] != FT_STRUCT){
+		msg->stringlen -=  fieldtypefuncs[msg->types[j]].stringlen(msg->nlens[j],
+									   msg->vlens[j],
+									   msg->values[j]);
+		if (msg->stringlen <=0){
+			cl_log(LOG_ERR, "cl_msg_remove: stringlen <= 0 after removing"
+			       "field %s. Return failure", msg->names[j]);
+			msg->stringlen =tmplen;
+			return HA_FAIL;
+		}
+		
+		tmplen = msg->netstringlen;
+		msg->netstringlen -=  fieldtypefuncs[msg->types[j]].netstringlen(msg->nlens[j],
+										 msg->vlens[j],       
+										 msg->values[j]);	
+		if (msg->netstringlen <=0){
+			cl_log(LOG_ERR, "cl_msg_remove: netstringlen <= 0 after removing"
+			       "field %s. return failure", msg->names[j]);
+			msg->netstringlen =tmplen;
+			return HA_FAIL;
+		}
 	}
 
-	tmplen = msg->netstringlen;
-	msg->netstringlen -=  fieldtypefuncs[msg->types[j]].netstringlen(msg->nlens[j],
-									 msg->vlens[j],       
-									 msg->values[j]);	
-	if (msg->netstringlen <=0){
-		cl_log(LOG_ERR, "cl_msg_remove: netstringlen <= 0 after removing"
-		       "field %s. return failure", msg->names[j]);
-		msg->netstringlen =tmplen;
-		return HA_FAIL;
-	}
 	
 	ha_free(msg->names[j]);
 	fieldtypefuncs[msg->types[j]].memfree(msg->values[j]);
@@ -1159,14 +1165,16 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 				return HA_FAIL;
 			}
 			
-			string_sizediff = fieldtypefuncs[type].stringlen(strlen(name), vlen, value)
-				- fieldtypefuncs[type].stringlen(strlen(name), 
-								 msg->vlens[j], msg->values[j]);
-			netstring_sizediff = fieldtypefuncs[type].netstringlen(strlen(name), vlen, value)
-				- fieldtypefuncs[type].netstringlen(strlen(name), 
-								 msg->vlens[j], msg->values[j]);
-			msg->stringlen += string_sizediff;
-			msg->netstringlen += netstring_sizediff;
+			if (type != FT_STRUCT){
+				string_sizediff = fieldtypefuncs[type].stringlen(strlen(name), vlen, value)
+					- fieldtypefuncs[type].stringlen(strlen(name), 
+									 msg->vlens[j], msg->values[j]);
+				netstring_sizediff = fieldtypefuncs[type].netstringlen(strlen(name), vlen, value)
+					- fieldtypefuncs[type].netstringlen(strlen(name), 
+									    msg->vlens[j], msg->values[j]);
+				msg->stringlen += string_sizediff;
+				msg->netstringlen += netstring_sizediff;
+			}
 			
 			
 			fieldtypefuncs[type].memfree(msg->values[j]);
@@ -1984,14 +1992,52 @@ msg2string(const struct ha_msg *m)
 int
 get_stringlen(const struct ha_msg *m)
 {
-	return(m->stringlen);
+	int i;
+	int total_len =0 ;
+
+	if (m == NULL){
+		cl_log(LOG_ERR, "get_stringlen:"
+		       "asking stringlen of a NULL message");
+		return 0;
+	}
+	
+	for (i = 0; i < m->nfields; i++){		
+		if (m->types[i] == FT_STRUCT){			
+			total_len += struct_stringlen(m->nlens[i], 
+						      m->vlens[i],
+						      m->values[i]);
+		}
+	}
+	
+	total_len += m->stringlen;
+	
+	return total_len;
 }
 
 int
 get_netstringlen(const struct ha_msg *m)
 {
+	int i;
+	int total_len =0 ;
 	
-	return(m->netstringlen);
+	if (m == NULL){
+		cl_log(LOG_ERR, "get_netstringlen:"
+		       "asking netstringlen of a NULL message");
+		return 0;
+	}
+	
+	for (i = 0; i < m->nfields; i++){		
+		if (m->types[i] == FT_STRUCT){			
+			total_len += struct_netstringlen(m->nlens[i],
+							 m->vlens[i],
+							 m->values[i]);
+		}
+	}
+	
+	total_len += m->netstringlen;
+	
+	return total_len;	
+
 
 }
 
@@ -2093,6 +2139,12 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.45  2005/02/08 08:10:27  gshi
+ * change the way stringlen and netstringlen is computed.
+ *
+ * Now it is computed resursively in child messages in get_stringlen() and get_netstringlen()
+ * so it allows changing child messages dynamically.
+ *
  * Revision 1.44  2005/02/07 21:32:38  gshi
  * move the free from the calling function in wirefmt2ipcmsg() to the caller
  *
