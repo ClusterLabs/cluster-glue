@@ -26,6 +26,7 @@ static uid_t	nobodyuid=-1;
 static gid_t	nobodygid=-1;
 static uid_t	poweruid=-1;
 static gid_t	powergid=-1;
+static int	privileged_state = 1;
 
 /*	WARNING: uids are unsigned! */
 #define	WANT_NOBODY(uid)	((uid) == 0)
@@ -61,6 +62,7 @@ drop_privs(uid_t uid, gid_t gid)
 		anysaveduid = 1;
 		nobodyuid=uid;
 		nobodygid=gid;
+		privileged_state = 0;
 	}else{
 		/* Attempt to recover original privileges */
 		int	err = errno;
@@ -79,6 +81,7 @@ return_to_orig_privs()
 	if (seteuid(poweruid) < 0) {
 		return -1;
 	}
+	privileged_state = 1;
 	return setegid(powergid);
 }
 
@@ -89,6 +92,14 @@ return_to_dropped_privs(void)
 		return 0;
 	}
 	setegid(nobodygid);
+	privileged_state = 0;
 	return seteuid(nobodyuid);
+}
+
+/* Return TRUE if we have full privileges at the moment */
+int
+cl_have_full_privs(void)
+{
+	return privileged_state != 0;
 }
 #endif

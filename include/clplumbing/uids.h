@@ -10,4 +10,7 @@ int return_to_orig_privs(void);
 
 /* Drop down to (probably nobody) privileges again */
 int return_to_dropped_privs(void);
+
+/* Return TRUE if we have full privileges at the moment */
+int cl_have_full_privs(void);
 #endif
