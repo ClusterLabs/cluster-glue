@@ -19,6 +19,8 @@
  *
  */
 
+#include <portability.h>
+
 #include <clplumbing/ipc.h>
 #include <clplumbing/cl_log.h>
 
@@ -51,17 +53,13 @@
 #include <errno.h>
 #include <fcntl.h>
 
-#include <portability.h>
-
 #ifndef UNIX_PATH_MAX
 #define UNIX_PATH_MAX 108
 #endif
 #define MAX_LISTEN_NUM 10
 
-#ifdef MSG_NOSIGNAL
-#define HA_MSG_DONTWAIT_NOSIGNAL      (MSG_DONTWAIT|MSG_NOSIGNAL)
-#else
-#define HA_MSG_DONTWAIT_NOSIGNAL      (MSG_DONTWAIT)
+#ifndef MSG_NOSIGNAL
+#define		MSG_NOSIGNAL	0
 #endif
 
 #ifndef AF_LOCAL
@@ -419,7 +417,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
     }
 
     if(new_msg){
-      msg_len = recv(conn_info->s, (char *)&head , sizeof(struct SOCKET_MSG_HEAD) , MSG_DONTWAIT);
+      msg_len = recv(conn_info->s, (char *)&head , sizeof(struct SOCKET_MSG_HEAD) ,MSG_DONTWAIT );
     }else{
       msg_len = recv(conn_info->s, msg_begin, len , MSG_DONTWAIT);
     }
@@ -476,7 +474,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 
       len=send(conn_info->s, (char *)&head
       ,			sizeof(struct SOCKET_MSG_HEAD)
-      ,			HA_MSG_DONTWAIT_NOSIGNAL);
+      ,			(MSG_DONTWAIT|MSG_NOSIGNAL));
 
       if (len < 0){
 	if(errno == EAGAIN) {
@@ -495,7 +493,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
       }
 
       len=send(conn_info->s, msg->msg_body, msg->msg_len
-      ,			HA_MSG_DONTWAIT_NOSIGNAL);
+      ,			(MSG_DONTWAIT|MSG_NOSIGNAL));
       if (len < 0){
 	if (errno == EAGAIN) {
 	  break;
