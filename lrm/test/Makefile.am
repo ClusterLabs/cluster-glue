@@ -42,3 +42,11 @@ callbacktest_SOURCES	=	callbacktest.c
 callbacktest_LDFLAGS 	= 	$(COMMONLIBS)
 callbacktest_LDADD 	= 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 callbacktest_DEPENDENCIES    = 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
+
+testdir			= 	$(libdir)/heartbeat/lrmtest
+test_SCRIPTS		=	LRMBasicSanityCheck
+
+#install-exec-local:
+#	$(mkinstalldirs) $(DESTDIR)/$(testdir)
+#	-chgrp $(HA_APIGROUP) $(DESTDIR)/$(testdir)
+#	-chmod g+w $(DESTDIR)/$(testdir)
