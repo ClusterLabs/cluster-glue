@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.17 2004/09/14 09:17:35 sunjd Exp $ */
+/* $Id: lrmadmin.c,v 1.18 2004/09/16 06:16:45 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -825,8 +825,8 @@ print_rsc_inf(lrm_rsc_t * lrm_rsc)
 		tmp = params_hashtable_to_str(lrm_rsc->class, 
 				lrm_rsc->params);
 		printf("Resource agency parameters:%s\n", tmp);
+		g_free(tmp);
 	}
-	g_free(tmp);
 }
 
 static void
@@ -878,6 +878,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.18  2004/09/16 06:16:45  sunjd
+ * BEAM bug fix: passing NULL to argument 1 of g_free
+ *
  * Revision 1.17  2004/09/14 09:17:35  sunjd
  * fix two pointer bugs found by BEAM
  *
