@@ -105,10 +105,27 @@ dsecsto_longclock(double v)
 	
 }
 
+unsigned long
+longclock_to_ms(longclock_t t)
+{
+	(void)(Hz == 0 && hz_longclock());
+
+	if (t == 0) {
+		return 0UL;
+	}
+	return (unsigned long) ((t*1000UL)/Lc_Hz);
+}
+
 longclock_t
 add_longclock(longclock_t l, longclock_t r)
 {
 	return l + r;
+}
+
+longclock_t
+sub_longclock(longclock_t l, longclock_t r)
+{
+	return l - r;
 }
 
 int
