@@ -1,4 +1,4 @@
-/* $Id: ssh.c,v 1.10 2004/03/25 11:58:22 lars Exp $ */
+/* $Id: ssh.c,v 1.11 2004/09/13 20:32:31 gshi Exp $ */
 /*
  * Stonith module for SSH Stonith device
  *
@@ -28,7 +28,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
 #include <glib.h>
@@ -179,7 +178,7 @@ static int
 ssh_status(Stonith  *s)
 {
   if (!ISSSHDEV(s)) {
-    syslog(LOG_ERR, "invalid argument to SSH_status");
+    PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to SSH_status");
     return(S_OOPS);
   }
 
@@ -200,12 +199,12 @@ ssh_hostlist(Stonith  *s)
   int		j;
 
   if (!ISSSHDEV(s)) {
-    syslog(LOG_ERR, "invalid argument to SSH_list_hosts");
+    PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to SSH_list_hosts");
     return(NULL);
   }
   sd = (struct sshDevice*) s->pinfo;
   if (sd->hostcount < 0) {
-    syslog(LOG_ERR
+    PILCallLog(PluginImports->log,PIL_CRIT
 	   ,	"unconfigured stonith object in SSH_list_hosts");
     return(NULL);
   }
@@ -213,7 +212,7 @@ ssh_hostlist(Stonith  *s)
 
   ret = (char **)MALLOC(numnames*sizeof(char*));
   if (ret == NULL) {
-    syslog(LOG_ERR, "out of memory");
+    PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
     return ret;
   }
 
@@ -287,7 +286,7 @@ ssh_parse_config_info(struct sshDevice* sd, const char * info)
 
   ret = (char **)MALLOC(numnames*sizeof(char*));
   if (ret == NULL) {
-    syslog(LOG_ERR, "out of memory");
+    PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
     return S_OOPS;
   }
 
@@ -323,17 +322,17 @@ ssh_reset_req(Stonith * s, int request, const char * host)
   char cmd[4096];
 
   if (!ISSSHDEV(s)) {
-    syslog(LOG_ERR, "invalid argument to %s", __FUNCTION__);
+    PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to %s", __FUNCTION__);
     return(S_OOPS);
   }
-  syslog(LOG_INFO, _("Host %s ssh-reset initiating"), host);
+  PILCallLog(PluginImports->log,PIL_INFO, _("Host %s ssh-reset initiating"), host);
 
   snprintf(cmd, 4096, "%s \"%s\" \"%s\"", SSH_COMMAND, host, REBOOT_COMMAND);
   
   if (system(cmd) == 0) 
     return S_OK;
   else {
-    syslog(LOG_ERR, "command %s failed", cmd);
+    PILCallLog(PluginImports->log,PIL_CRIT, "command %s failed", cmd);
     return(S_RESETFAIL);
   }
 }
@@ -350,13 +349,13 @@ ssh_set_config_file(Stonith* s, const char * configname)
   struct sshDevice*	sd;
 
   if (!ISSSHDEV(s)) {
-    syslog(LOG_ERR, "invalid argument to SSH_set_configfile");
+    PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to SSH_set_configfile");
     return(S_OOPS);
   }
   sd = (struct sshDevice*) s->pinfo;
 
   if ((cfgfile = fopen(configname, "r")) == NULL)  {
-    syslog(LOG_ERR, "Cannot open %s", configname);
+    PILCallLog(PluginImports->log,PIL_CRIT, "Cannot open %s", configname);
     return(S_BADCONFIG);
   }
   while (fgets(line, sizeof(line), cfgfile) != NULL){
@@ -377,7 +376,7 @@ ssh_set_config_info(Stonith* s, const char * info)
   struct sshDevice* sd;
 
   if (!ISSSHDEV(s)) {
-    syslog(LOG_ERR, "%s: invalid argument", __FUNCTION__);
+    PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
     return(S_OOPS);
   }
   sd = (struct sshDevice *)s->pinfo;
@@ -392,7 +391,7 @@ ssh_getinfo(Stonith * s, int reqtype)
   char *		ret;
 
   if (!ISSSHDEV(s)) {
-    syslog(LOG_ERR, "SSH_idinfo: invalid argument");
+    PILCallLog(PluginImports->log,PIL_CRIT, "SSH_idinfo: invalid argument");
     return NULL;
   }
   /*
@@ -439,7 +438,7 @@ ssh_destroy(Stonith *s)
   struct sshDevice* sd;
 
   if (!ISSSHDEV(s)) {
-    syslog(LOG_ERR, "%s: invalid argument", __FUNCTION__);
+    PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
     return;
   }
   sd = (struct sshDevice *)s->pinfo;
@@ -460,7 +459,7 @@ ssh_new(void)
   struct sshDevice*	sd = MALLOCT(struct sshDevice);
 
   if (sd == NULL) {
-    syslog(LOG_ERR, "out of memory");
+    PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
     return(NULL);
   }
   memset(sd, 0, sizeof(*sd));

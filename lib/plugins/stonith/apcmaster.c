@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.12 2004/03/25 11:58:21 lars Exp $ */
+/* $Id: apcmaster.c,v 1.13 2004/09/13 20:32:31 gshi Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -50,7 +50,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.12 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.13 $"; 
 
 #include <portability.h>
 #include <stdio.h>
@@ -58,7 +58,6 @@ static const char *version __attribute__ ((unused)) = "$Revision: 1.12 $";
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
 #include <glib.h>
@@ -203,7 +202,7 @@ static const char * NOTmsid = "Hey dummy, this has been destroyed (APCMS)";
 			}					\
 			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
-				syslog(LOG_ERR, _("out of memory"));\
+				PILCallLog(PluginImports->log,PIL_CRIT, _("out of memory"));\
 			} 					\
 			}
 
@@ -284,7 +283,7 @@ MSLookFor(struct APCMS* ms, struct Etoken * tlist, int timeout)
 {
 	int	rc;
 	if ((rc = EXPECT_TOK(ms->rdfd, tlist, timeout, NULL, 0)) < 0) {
-		syslog(LOG_ERR, _("Did not find string: '%s' from" DEVICE ".")
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Did not find string: '%s' from" DEVICE ".")
 		,	tlist[0].string);
 		MSkillcomm(ms);
 	}
@@ -297,7 +296,7 @@ static int
 MSScanLine(struct APCMS* ms, int timeout, char * buf, int max)
 {
 	if (EXPECT_TOK(ms->rdfd, CRNL, timeout, buf, max) < 0) {
-		syslog(LOG_ERR, ("Could not read line from " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, ("Could not read line from " DEVICE "."));
 		MSkillcomm(ms);
 		return(S_OOPS);
 	}
@@ -331,11 +330,11 @@ MSLogin(struct APCMS * ms)
 	switch (MSLookFor(ms, LoginOK, 30)) {
 
 		case 0:	/* Good! */
-			syslog(LOG_INFO, _("Successful login to " DEVICE "."));
+			PILCallLog(PluginImports->log,PIL_INFO, _("Successful login to " DEVICE "."));
 			break;
 
 		case 1:	/* Uh-oh - bad password */
-			syslog(LOG_ERR, _("Invalid password for " DEVICE "."));
+			PILCallLog(PluginImports->log,PIL_CRIT, _("Invalid password for " DEVICE "."));
 			return(S_ACCESS);
 
 		default:
@@ -468,7 +467,7 @@ MSReset(struct APCMS* ms, int outletNum, const char *host)
 		default: 
 			return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
-	syslog(LOG_INFO, _("Host %s being rebooted."), host);
+	PILCallLog(PluginImports->log,PIL_INFO, _("Host %s being rebooted."), host);
 
 	/* Expect ">" */
 	if (MSLookFor(ms, Prompt, 10) < 0) {
@@ -477,7 +476,7 @@ MSReset(struct APCMS* ms, int outletNum, const char *host)
 
 	/* All Right!  Power is back on.  Life is Good! */
 
-	syslog(LOG_INFO, _("Power restored to host %s."), host);
+	PILCallLog(PluginImports->log,PIL_INFO, _("Power restored to host %s."), host);
 
 	/* Return to top level menu */
 	SEND("\033");
@@ -505,7 +504,7 @@ apcmaster_onoff(struct APCMS* ms, int outletNum, const char * unitid, int req)
 	int	rc;
 
 	if ((rc = MSRobustLogin(ms) != S_OK)) {
-		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
 	
@@ -554,7 +553,7 @@ apcmaster_onoff(struct APCMS* ms, int outletNum, const char * unitid, int req)
 	EXPECT(Prompt, 10);
 
 	/* All Right!  Command done. Life is Good! */
-	syslog(LOG_NOTICE, _("Power to MS outlet(s) %d turned %s."), outletNum, onoff);
+	PILCallLog(PluginImports->log,PIL_INFO, _("Power to MS outlet(s) %d turned %s."), outletNum, onoff);
 	/* Pop back to main menu */
 	SEND("\033\033\033\033\033\033\033\r");
 	return(S_OK);
@@ -642,18 +641,18 @@ apcmaster_status(Stonith  *s)
 	int	rc;
 
 	if (!ISAPCMS(s)) {
-		syslog(LOG_ERR, "invalid argument to apcmaster_status");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to apcmaster_status");
 		return(S_OOPS);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in apcmaster_status");
 		return(S_OOPS);
 	}
 	ms = (struct APCMS*) s->pinfo;
 
 	if ((rc = MSRobustLogin(ms) != S_OK)) {
-		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
 		return(rc);
 	}
 
@@ -680,12 +679,12 @@ apcmaster_hostlist(Stonith  *s)
 
 
 	if (!ISAPCMS(s)) {
-		syslog(LOG_ERR, "invalid argument to apcmaster_list_hosts");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to apcmaster_list_hosts");
 		return(NULL);
 	}
 	
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in apcmaster_list_hosts");
 		return(NULL);
 	}
@@ -693,7 +692,7 @@ apcmaster_hostlist(Stonith  *s)
 	ms = (struct APCMS*) s->pinfo;
 		
 	if (MSRobustLogin(ms) != S_OK) {
-		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
 		return(NULL);
 	}
 
@@ -736,7 +735,7 @@ apcmaster_hostlist(Stonith  *s)
 				break;
 			}
 			if ((nm = (char*)STRDUP(sockname)) == NULL) {
-				syslog(LOG_ERR, "out of memory");
+				PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 				return(NULL);
 			}
 			g_strdown(nm);
@@ -760,7 +759,7 @@ apcmaster_hostlist(Stonith  *s)
 	if (numnames >= 1) {
 		ret = (char **)MALLOC((numnames+1)*sizeof(char*));
 		if (ret == NULL) {
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		}else{
 			memcpy(ret, NameList, (numnames+1)*sizeof(char*));
 		}
@@ -805,13 +804,13 @@ apcmaster_parse_config_info(struct APCMS* ms, const char * info)
 	&&	strlen(passwd) > 1) {
 
 		if ((ms->device = STRDUP(dev)) == NULL) {
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 			return(S_OOPS);
 		}
 		if ((ms->user = STRDUP(user)) == NULL) {
 			FREE(ms->device);
 			ms->device=NULL;
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 			return(S_OOPS);
 		}
 		if ((ms->passwd = STRDUP(passwd)) == NULL) {
@@ -819,7 +818,7 @@ apcmaster_parse_config_info(struct APCMS* ms, const char * info)
 			ms->device=NULL;
 			FREE(ms->user);
 			ms->user=NULL;
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 			return(S_OOPS);
 		}
 		ms->config = 1;
@@ -858,24 +857,24 @@ apcmaster_reset_req(Stonith * s, int request, const char * host)
 	struct APCMS*	ms;
 
 	if (!ISAPCMS(s)) {
-		syslog(LOG_ERR, "invalid argument to apcmaster_reset_req");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to apcmaster_reset_req");
 		return(S_OOPS);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in apc_master_reset_req");
 		return(S_OOPS);
 	}
 	ms = (struct APCMS*) s->pinfo;
 
 	if ((rc = MSRobustLogin(ms)) != S_OK) {
-		syslog(LOG_ERR, _("Cannot log into " DEVICE "."));
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot log into " DEVICE "."));
 		return(rc);
 	}else{
 		int noutlet; 
 		noutlet = MSNametoOutlet(ms, host);
 		if (noutlet < 1) {
-			syslog(LOG_WARNING, _("%s %s "
+			PILCallLog(PluginImports->log,PIL_WARN, _("%s %s "
 			"doesn't control host [%s]."), ms->idinfo
 			,	ms->unitid, host);
 			MSkillcomm(ms);
@@ -918,13 +917,13 @@ apcmaster_set_config_file(Stonith* s, const char * configname)
 	struct APCMS*	ms;
 
 	if (!ISAPCMS(s)) {
-		syslog(LOG_ERR, "invalid argument to apcmaster_set_config_file");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to apcmaster_set_config_file");
 		return(S_OOPS);
 	}
 	ms = (struct APCMS*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		syslog(LOG_ERR, _("Cannot open %s"), configname);
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot open %s"), configname);
 		return(S_BADCONFIG);
 	}
 	while (fgets(APCMSid, sizeof(APCMSid), cfgfile) != NULL){
@@ -945,7 +944,7 @@ apcmaster_set_config_info(Stonith* s, const char * info)
 	struct APCMS* ms;
 
 	if (!ISAPCMS(s)) {
-		syslog(LOG_ERR, "apcmaster_set_config_info: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "apcmaster_set_config_info: invalid argument");
 		return(S_OOPS);
 	}
 	ms = (struct APCMS *)s->pinfo;
@@ -959,7 +958,7 @@ apcmaster_getinfo(Stonith * s, int reqtype)
 	const char *		ret;
 
 	if (!ISAPCMS(s)) {
-		syslog(LOG_ERR, "MS_idinfo: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "MS_idinfo: invalid argument");
 		return NULL;
 	}
 	/*
@@ -1012,7 +1011,7 @@ apcmaster_destroy(Stonith *s)
 	struct APCMS* ms;
 
 	if (!ISAPCMS(s)) {
-		syslog(LOG_ERR, "apcms_del: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "apcms_del: invalid argument");
 		return;
 	}
 	ms = (struct APCMS *)s->pinfo;
@@ -1049,7 +1048,7 @@ apcmaster_new(void)
 	struct APCMS*	ms = MALLOCT(struct APCMS);
 
 	if (ms == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(ms, 0, sizeof(*ms));

@@ -1,4 +1,4 @@
-/* $Id: ipmilan_command.c,v 1.4 2004/08/19 22:23:30 yixiong Exp $ */
+/* $Id: ipmilan_command.c,v 1.5 2004/09/13 20:32:31 gshi Exp $ */
 /*
  * This program is largely based on the ipmicmd.c program that's part of OpenIPMI package.
  * 
@@ -14,7 +14,6 @@
 #include <netdb.h> // gethostbyname()
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <syslog.h>
 
 #include <OpenIPMI/selector.h>
 #include <OpenIPMI/ipmi_conn.h>
@@ -74,7 +73,7 @@ void timed_out(selector_t *sel, sel_timer_t *timer, void *data);
 void 
 timed_out(selector_t  *sel, sel_timer_t *timer, void *data)
 {
-	syslog(LOG_ERR, "IPMI operation timed out... :(\n");
+	PILCallLog(PluginImports->log,PIL_CRIT, "IPMI operation timed out... :(\n");
 	gstatus = S_TIMEOUT;
 }
 
@@ -219,7 +218,7 @@ send_ipmi_cmd(ipmi_con_t *con, int request)
 	rv = con->send_command(con, &addr, addr_len, &msg, rsp_handler, 
 				data1, NULL, NULL, NULL);
 	if (rv == -1) {
-		syslog(LOG_ERR, "Error sending IPMI command: %x\n", rv);
+		PILCallLog(PluginImports->log,PIL_CRIT, "Error sending IPMI command: %x\n", rv);
 		gstatus = S_ACCESS;
 	}
 
@@ -235,7 +234,7 @@ con_changed_handler(ipmi_con_t *ipmi,
 {
 	int * request;
 	if (err) {
-		syslog(LOG_ERR, "Unable to setup connection: %x\n", err);
+		PILCallLog(PluginImports->log,PIL_CRIT, "Unable to setup connection: %x\n", err);
 		return;
 	}
 
@@ -265,13 +264,13 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 
 	os_hnd = ipmi_posix_get_os_handler();
 	if (!os_hnd) {
-	    	syslog(LOG_ERR, "ipmi_smi_setup_con: Unable to allocate os handler");
+	    	PILCallLog(PluginImports->log,PIL_CRIT, "ipmi_smi_setup_con: Unable to allocate os handler");
 		return 1;
 	}
 
 	rv = sel_alloc_selector(os_hnd, &os_sel);
 	if (rv) {
-		syslog(LOG_ERR, "Could not alloctate selector\n");
+		PILCallLog(PluginImports->log,PIL_CRIT, "Could not alloctate selector\n");
 		return rv;
 	}
 
@@ -279,13 +278,13 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 
 	rv = ipmi_init(os_hnd);
 	if (rv) {
-		syslog(LOG_ERR, "ipmi_init erro: %d ", rv);
+		PILCallLog(PluginImports->log,PIL_CRIT, "ipmi_init erro: %d ", rv);
 		return rv;
 	}
 
 	ent = gethostbyname(host->ipaddr);
 	if (!ent) {
-		syslog(LOG_ERR, "gethostbyname failed: %s\n", strerror(h_errno));
+		PILCallLog(PluginImports->log,PIL_CRIT, "gethostbyname failed: %s\n", strerror(h_errno));
 		return 1;
 	}
 
@@ -307,7 +306,7 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 				&con);
 
 	if (rv) {
-		syslog(LOG_ERR, "ipmi_lan_setup_con: %s\n", strerror(rv));
+		PILCallLog(PluginImports->log,PIL_CRIT, "ipmi_lan_setup_con: %s\n", strerror(rv));
 		return S_ACCESS;
 	}
 
@@ -317,7 +316,7 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 
 	rv = con->start_con(con);
 	if (rv) {
-		syslog(LOG_ERR, "Could not start IPMI connection: %x\n", rv);
+		PILCallLog(PluginImports->log,PIL_CRIT, "Could not start IPMI connection: %x\n", rv);
 		gstatus = S_BADCONFIG;
 		return rv;
 	}
@@ -357,30 +356,30 @@ posix_vlog(char *format, enum ipmi_log_type_e log_type, va_list ap)
     switch(log_type)
     {
         case IPMI_LOG_INFO:
-            syslog(LOG_INFO, "INFO: ");
+            PILCallLog(PluginImports->log,PIL_INFO, "INFO: ");
             break;
                                                                                                                                                              
         case IPMI_LOG_WARNING:
-            syslog(LOG_INFO, "WARN: ");
+            PILCallLog(PluginImports->log,PIL_INFO, "WARN: ");
             break;
                                                                                                                                                              
         case IPMI_LOG_SEVERE:
-            syslog(LOG_INFO, "SEVR: ");
+            PILCallLog(PluginImports->log,PIL_INFO, "SEVR: ");
             break;
                                                                                                                                                              
         case IPMI_LOG_FATAL:
-            syslog(LOG_INFO, "FATL: ");
+            PILCallLog(PluginImports->log,PIL_INFO, "FATL: ");
             break;
                                                                                                                                                              
         case IPMI_LOG_ERR_INFO:
-            syslog(LOG_INFO, "EINF: ");
+            PILCallLog(PluginImports->log,PIL_INFO, "EINF: ");
             break;
                                                                                                                                                              
         case IPMI_LOG_DEBUG_START:
             do_nl = 0;
             /* FALLTHROUGH */
         case IPMI_LOG_DEBUG:
-            syslog(LOG_INFO, "DEBG: ");
+            PILCallLog(PluginImports->log,PIL_INFO, "DEBG: ");
             break;
                                                                                                                                                              
         case IPMI_LOG_DEBUG_CONT:

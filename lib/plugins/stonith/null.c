@@ -1,4 +1,4 @@
-/* $Id: null.c,v 1.10 2004/03/25 11:58:22 lars Exp $ */
+/* $Id: null.c,v 1.11 2004/09/13 20:32:31 gshi Exp $ */
 /*
  * Stonith module for NULL Stonith device
  *
@@ -26,7 +26,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
 #include <glib.h>
@@ -160,7 +159,7 @@ null_status(Stonith  *s)
 {
 
 	if (!ISNULLDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to NULL_status");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to NULL_status");
 		return(S_OOPS);
 	}
 	return S_OK;
@@ -180,12 +179,12 @@ null_hostlist(Stonith  *s)
 	int		j;
 
 	if (!ISNULLDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to NULL_list_hosts");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to NULL_list_hosts");
 		return(NULL);
 	}
 	nd = (struct NullDevice*) s->pinfo;
 	if (nd->hostcount < 0) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in NULL_list_hosts");
 		return(NULL);
 	}
@@ -193,7 +192,7 @@ null_hostlist(Stonith  *s)
 
 	ret = (char **)MALLOC(numnames*sizeof(char*));
 	if (ret == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return ret;
 	}
 
@@ -267,7 +266,7 @@ NULL_parse_config_info(struct NullDevice* nd, const char * info)
 
 	ret = (char **)MALLOC(numnames*sizeof(char*));
 	if (ret == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return S_OOPS;
 	}
 
@@ -303,14 +302,14 @@ null_reset_req(Stonith * s, int request, const char * host)
 {
 
 	if (!ISNULLDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to %s", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to %s", __FUNCTION__);
 		return(S_OOPS);
 	}
 
 	/* Real devices need to pay attention to the "request" */
 	/* (but we don't care ;-)) */
 
-	syslog(LOG_INFO, _("Host %s null-reset."), host);
+	PILCallLog(PluginImports->log,PIL_INFO, _("Host %s null-reset."), host);
 	return S_OK;
 }
 
@@ -328,13 +327,13 @@ null_set_config_file(Stonith* s, const char * configname)
 	struct NullDevice*	nd;
 
 	if (!ISNULLDEV(s)) {
-		syslog(LOG_ERR, "invalid argument to NULL_set_configfile");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to NULL_set_configfile");
 		return(S_OOPS);
 	}
 	nd = (struct NullDevice*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		syslog(LOG_ERR, "Cannot open %s", configname);
+		PILCallLog(PluginImports->log,PIL_CRIT, "Cannot open %s", configname);
 		return(S_BADCONFIG);
 	}
 	while (fgets(NULLline, sizeof(NULLline), cfgfile) != NULL){
@@ -355,7 +354,7 @@ null_set_config_info(Stonith* s, const char * info)
 	struct NullDevice* nd;
 
 	if (!ISNULLDEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
 		return(S_OOPS);
 	}
 	nd = (struct NullDevice *)s->pinfo;
@@ -370,7 +369,7 @@ null_getinfo(Stonith * s, int reqtype)
 	char *		ret;
 
 	if (!ISNULLDEV(s)) {
-		syslog(LOG_ERR, "NULL_idinfo: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "NULL_idinfo: invalid argument");
 		return NULL;
 	}
 	/*
@@ -416,7 +415,7 @@ null_destroy(Stonith *s)
 	struct NullDevice* nd;
 
 	if (!ISNULLDEV(s)) {
-		syslog(LOG_ERR, "%s: invalid argument", __FUNCTION__);
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: invalid argument", __FUNCTION__);
 		return;
 	}
 	nd = (struct NullDevice *)s->pinfo;
@@ -437,7 +436,7 @@ null_new(void)
 	struct NullDevice*	nd = MALLOCT(struct NullDevice);
 
 	if (nd == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(nd, 0, sizeof(*nd));

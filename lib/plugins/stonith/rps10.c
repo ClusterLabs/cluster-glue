@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.11 2004/09/10 01:37:41 alan Exp $ */
+/* $Id: rps10.c,v 1.12 2004/09/13 20:32:31 gshi Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -31,7 +31,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <syslog.h>
 #include <libintl.h>
 #include <sys/wait.h>
 #include <termios.h>
@@ -259,7 +258,7 @@ static int gbl_debug = DEBUG;
 			}					\
 			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
-				syslog(LOG_ERR, _("out of memory"));\
+				PILCallLog(PluginImports->log,PIL_CRIT, _("out of memory"));\
 			}					\
 			}
 
@@ -351,7 +350,7 @@ RPSLookFor(struct WTI_RPS10* ctx, struct Etoken * tlist, int timeout)
 {
 	int	rc;
 	if ((rc = EXPECT_TOK(ctx->fd, tlist, timeout, NULL, 0)) < 0) {
-		syslog(LOG_ERR, _("Did not find string: '%s' from " DEVICE ".")
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Did not find string: '%s' from " DEVICE ".")
 		,	tlist[0].string);
 		RPSDisconnect(ctx);
 		return(-1);
@@ -391,12 +390,12 @@ RPSSendCommand (struct WTI_RPS10 *ctx, char outlet, char command, int timeout)
 	return_val = select(ctx->fd+1, NULL, &wfds,&xfds, &tv);
 	if (return_val == 0) {
 		/* timeout waiting on serial port */
-		syslog (LOG_ERR, "%s: Timeout writing to %s",
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Timeout writing to %s",
 			WTIid, ctx->device);
 		return S_TIMEOUT;
 	} else if ((return_val == -1) || FD_ISSET(ctx->fd, &xfds)) {
 		/* an error occured */
-		syslog (LOG_ERR, "%s: Error before writing to %s: %s",
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Error before writing to %s: %s",
 			WTIid, ctx->device, strerror(errno));		
 		return S_OOPS;
 	}
@@ -404,7 +403,7 @@ RPSSendCommand (struct WTI_RPS10 *ctx, char outlet, char command, int timeout)
 	/* send the command */
 	if (write(ctx->fd, writebuf, strlen(writebuf)) != 
 			(int)strlen(writebuf)) {
-		syslog (LOG_ERR, "%s: Error writing to  %s : %s",
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Error writing to  %s : %s",
 			WTIid, ctx->device, strerror(errno));
 		return S_OOPS;
 	}
@@ -424,7 +423,7 @@ RPSReset(struct WTI_RPS10* ctx, char unit_id, const char * rebootid)
 	if (gbl_debug) printf ("Calling RPSReset (%s)\n", WTIid);
 	
 	if (ctx->fd < 0) {
-		syslog(LOG_ERR, "%s: device %s is not open!", WTIid, 
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device %s is not open!", WTIid, 
 		       ctx->device);
 		return S_OOPS;
 	}
@@ -444,7 +443,7 @@ RPSReset(struct WTI_RPS10* ctx, char unit_id, const char * rebootid)
 	EXPECT(WTItokOff, 2);
 	if (gbl_debug) printf ("Got Off\n");	
 	EXPECT(WTItokCRNL, 2);
-	syslog(LOG_INFO, _("Host %s being rebooted."), rebootid);
+	PILCallLog(PluginImports->log,PIL_INFO, _("Host %s being rebooted."), rebootid);
 	
 	/* Expect "Complete" */
 	EXPECT(WTItokComplete, 14);
@@ -466,7 +465,7 @@ RPSOn(struct WTI_RPS10* ctx, char unit_id, const char * host)
 {
 
 	if (ctx->fd < 0) {
-		syslog(LOG_ERR, "%s: device %s is not open!", WTIid, 
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device %s is not open!", WTIid, 
 		       ctx->device);
 		return S_OOPS;
 	}
@@ -479,7 +478,7 @@ RPSOn(struct WTI_RPS10* ctx, char unit_id, const char * host)
 	EXPECT(WTItokOutlet, 2);
 	EXPECT(WTItokOn, 2);
 	EXPECT(WTItokCRNL, 2);
-	syslog(LOG_INFO, _("Host %s being turned on."), host);
+	PILCallLog(PluginImports->log,PIL_INFO, _("Host %s being turned on."), host);
 	
 	/* Expect "Complete" */
 	EXPECT(WTItokComplete, 5);
@@ -500,7 +499,7 @@ RPSOff(struct WTI_RPS10* ctx, char unit_id, const char * host)
 {
 
 	if (ctx->fd < 0) {
-		syslog(LOG_ERR, "%s: device %s is not open!", WTIid, 
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: device %s is not open!", WTIid, 
 		       ctx->device);
 		return S_OOPS;
 	}
@@ -513,7 +512,7 @@ RPSOff(struct WTI_RPS10* ctx, char unit_id, const char * host)
 	EXPECT(WTItokOutlet, 2);
 	EXPECT(WTItokOff, 2);
 	EXPECT(WTItokCRNL, 2);
-	syslog(LOG_INFO, _("Host %s being turned on."), host);
+	PILCallLog(PluginImports->log,PIL_INFO, _("Host %s being turned on."), host);
 	
 	/* Expect "Complete" */
 	EXPECT(WTItokComplete, 5);
@@ -542,11 +541,11 @@ rps10_status(Stonith  *s)
 	if (gbl_debug) printf ("Calling rps10_status (%s)\n", WTIid);
 	
 	if (!ISWTIRPS10(s)) {
-		syslog(LOG_ERR, "invalid argument to RPS_status");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RPS_status");
 		return(S_OOPS);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in RPS_status");
 		return(S_OOPS);
 	}
@@ -586,11 +585,11 @@ rps10_hostlist(Stonith  *s)
 	if (gbl_debug) printf ("Calling rps10_hostlist (%s)\n", WTIid);
 	
 	if (!ISWTIRPS10(s)) {
-		syslog(LOG_ERR, "invalid argument to RPS_list_hosts");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RPS_list_hosts");
 		return(NULL);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in RPS_list_hosts");
 		return(NULL);
 	}
@@ -600,7 +599,7 @@ rps10_hostlist(Stonith  *s)
 	if (ctx->unit_count >= 1) {
 		ret = (char **)MALLOC((ctx->unit_count+1)*sizeof(char*));
 		if (ret == NULL) {
-			syslog(LOG_ERR, "out of memory");
+			PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 			return ret;
 		}
 		ret[ctx->unit_count]=NULL; /* null terminate the array */
@@ -694,7 +693,7 @@ RPS_parse_config_info(struct WTI_RPS10* ctx, const char * info)
 
 	copy = STRDUP(info);
 	if (!copy) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return S_OOPS;
 	}
 
@@ -702,14 +701,14 @@ RPS_parse_config_info(struct WTI_RPS10* ctx, const char * info)
 	token = strtok (copy, " \t");
 
 	if (!token) {
-		syslog(LOG_ERR, "%s: Can't find serial device on config line '%s'",
+		PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't find serial device on config line '%s'",
 		       WTIid, info);
 		goto token_error;		
 	}
 
 	ctx->device = STRDUP(token);
 	if (!ctx->device) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		goto token_error;
 	}
 
@@ -724,7 +723,7 @@ RPS_parse_config_info(struct WTI_RPS10* ctx, const char * info)
 		    || !( ((outlet_id >= '0') && (outlet_id <= '9'))
 			|| (outlet_id == '*') || (outlet_id == 'A') )
 		   ) {
-			syslog(LOG_ERR
+			PILCallLog(PluginImports->log,PIL_CRIT
 			, "%s: the outlet_id %s must be between"
 			" 0 and 9 or '*' / 'A'",
 			       WTIid, outlet);
@@ -739,7 +738,7 @@ RPS_parse_config_info(struct WTI_RPS10* ctx, const char * info)
 		}
 		
 		if (ctx->unit_count >= WTI_NUM_CONTROLLERS) {
-			syslog(LOG_ERR, 
+			PILCallLog(PluginImports->log,PIL_CRIT, 
 				"%s: Tried to configure too many controllers",
 				WTIid);
 			goto token_error;
@@ -815,7 +814,7 @@ RPSConnect(struct WTI_RPS10 * ctx)
 
 		ctx->fd = open (ctx->device, O_RDWR);
 		if (ctx->fd <0) {
-			syslog (LOG_ERR, "%s: Can't open %s : %s",
+			PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't open %s : %s",
 				WTIid, ctx->device, strerror(errno));
 			return S_OOPS;
 		}
@@ -835,7 +834,7 @@ RPSConnect(struct WTI_RPS10 * ctx)
 		tio.c_lflag = ICANON;
 
 		if (tcsetattr (ctx->fd, TCSANOW, &tio) < 0) {
-			syslog (LOG_ERR, "%s: Can't set attributes %s : %s",
+			PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't set attributes %s : %s",
 				WTIid, ctx->device, strerror(errno));
 			close (ctx->fd);
 			ctx->fd=-1;
@@ -843,7 +842,7 @@ RPSConnect(struct WTI_RPS10 * ctx)
 		}
 		/* flush all data to and fro the serial port before we start */
 		if (tcflush (ctx->fd, TCIOFLUSH) < 0) {
-			syslog (LOG_ERR, "%s: Can't flush %s : %s",
+			PILCallLog(PluginImports->log,PIL_CRIT, "%s: Can't flush %s : %s",
 				WTIid, ctx->device, strerror(errno));
 			close (ctx->fd);
 			ctx->fd=-1;
@@ -903,7 +902,7 @@ RPSNametoOutlet ( struct WTI_RPS10 * ctx, const char * host )
 	char *shost;
 
 	if ( (shost = STRDUP(host)) == NULL) {
-		syslog(LOG_ERR, "strdup failed in RPSNametoOutlet");
+		PILCallLog(PluginImports->log,PIL_CRIT, "strdup failed in RPSNametoOutlet");
 		return -1;
 	}
 	g_strdown(shost);
@@ -944,11 +943,11 @@ rps10_reset_req(Stonith * s, int request, const char * host)
 	if (gbl_debug) printf ("Calling rps10_reset (%s)\n", WTIid);
 	
 	if (!ISWTIRPS10(s)) {
-		syslog(LOG_ERR, "invalid argument to RPS_reset_host");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RPS_reset_host");
 		return(S_OOPS);
 	}
 	if (!ISCONFIGED(s)) {
-		syslog(LOG_ERR
+		PILCallLog(PluginImports->log,PIL_CRIT
 		,	"unconfigured stonith object in RPS_reset_host");
 		return(S_OOPS);
 	}
@@ -961,7 +960,7 @@ rps10_reset_req(Stonith * s, int request, const char * host)
 	outlet_id = RPSNametoOutlet(ctx, host);
 
 	if (outlet_id < 0) {
-		syslog(LOG_WARNING, _("%s %s "
+		PILCallLog(PluginImports->log,PIL_WARN, _("%s %s "
 				      "doesn't control host [%s]."), 
 		       ctx->idinfo, ctx->unitid, host);
 		RPSDisconnect(ctx);
@@ -1007,13 +1006,13 @@ rps10_set_config_file(Stonith* s, const char * configname)
 	struct WTI_RPS10*	ctx;
 
 	if (!ISWTIRPS10(s)) {
-		syslog(LOG_ERR, "invalid argument to RPS_set_configfile");
+		PILCallLog(PluginImports->log,PIL_CRIT, "invalid argument to RPS_set_configfile");
 		return(S_OOPS);
 	}
 	ctx = (struct WTI_RPS10*) s->pinfo;
 
 	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		syslog(LOG_ERR, _("Cannot open %s"), configname);
+		PILCallLog(PluginImports->log,PIL_CRIT, _("Cannot open %s"), configname);
 		return(S_BADCONFIG);
 	}
 
@@ -1043,7 +1042,7 @@ rps10_set_config_info(Stonith* s, const char * info)
 	struct WTI_RPS10* ctx;
 
 	if (!ISWTIRPS10(s)) {
-		syslog(LOG_ERR, "RPS_provide_config_info: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "RPS_provide_config_info: invalid argument");
 		return(S_OOPS);
 	}
 	ctx = (struct WTI_RPS10 *)s->pinfo;
@@ -1061,7 +1060,7 @@ rps10_getinfo(Stonith * s, int reqtype)
 	const char *	ret;
 
 	if (!ISWTIRPS10(s)) {
-		syslog(LOG_ERR, "RPS_idinfo: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "RPS_idinfo: invalid argument");
 		return NULL;
 	}
 	/*
@@ -1113,7 +1112,7 @@ rps10_destroy(Stonith *s)
 	struct WTI_RPS10* ctx;
 
 	if (!ISWTIRPS10(s)) {
-		syslog(LOG_ERR, "wti_rps10_del: invalid argument");
+		PILCallLog(PluginImports->log,PIL_CRIT, "wti_rps10_del: invalid argument");
 		return;
 	}
 	ctx = (struct WTI_RPS10 *)s->pinfo;
@@ -1147,7 +1146,7 @@ rps10_new(void)
 	struct WTI_RPS10*	ctx = MALLOCT(struct WTI_RPS10);
 
 	if (ctx == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		PILCallLog(PluginImports->log,PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(ctx, 0, sizeof(*ctx));
