@@ -542,8 +542,7 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 
 		/* Bad poll? */
 		if (rc <= 0) {
-			cl_log(LOG_ERR
-			,	"Async echoclient: bad poll rc."
+			cl_perror("Async echoclient: bad poll rc."
 			" %d rc iter %d", rc, rdcount);
 			++errcount;
 			continue;
