@@ -85,7 +85,7 @@ intlen(int x)
 size_t
 string_list_pack_length(const GList* _list)
 {
-	int i;
+	size_t i;
 	GList* list = NULL;
 	size_t total_length = 0;
 	
@@ -131,7 +131,7 @@ string_list_pack_length(const GList* _list)
 int
 string_list_pack(GList* list, char* buf, char* maxp)
 {
-	int i;
+	size_t i;
 	char* p =  buf;
 
 	for (i = 0; i < g_list_length(list) ; i++){
@@ -285,13 +285,8 @@ binary_dup(const void* value, size_t len)
 	
 	char* dupvalue;
 	
-	/* 0 byte binary field should be allowed*/
-	if (len < 0 ){
-		cl_log(LOG_ERR,"binary_dup:"
-		       "len < 0");
-		return NULL ;
-	}	
-	
+	/* 0 byte binary field is allowed*/
+
 	if (value == NULL && len > 0){
 		cl_log(LOG_ERR, "binary_dup:"
 		       "NULL value with non-zero len=%d", 
@@ -327,9 +322,11 @@ struct_dup(const void* value, size_t len)
 {	
 	char* dupvalue;
 	
-	if (!value || len < 0 ){
+	(void)len;
+
+	if (!value){
 		cl_log(LOG_ERR,"struct_dup:"
-		       "value is NULL or len < 0");
+		       "value is NULL");
 		return NULL ;
 	}
 	
@@ -347,7 +344,7 @@ struct_dup(const void* value, size_t len)
 static GList* 
 list_copy(const GList* _list)
 {
-	int i;
+	size_t i;
 	GList* newlist = NULL;
 	GList* list;
 
@@ -383,9 +380,10 @@ list_dup( const void* value, size_t len)
 {
 	char* dupvalue;
 
-	if (!value || len < 0 ){
+	(void)len;
+	if (!value){
 		cl_log(LOG_ERR,"struct_dup:"
-		       "value is NULL or len < 0");
+		       "value is NULL");
 		return NULL ;
 	}	
 	
@@ -547,7 +545,7 @@ liststring(GList* list, char* buf, int maxlen)
 {
 	char* p = buf;
 	char* maxp = buf + maxlen;
-	int i;
+	size_t i;
 	
 	for ( i = 0; i < g_list_length(list); i++){
 		char* element = g_list_nth_data(list, i);
@@ -691,8 +689,7 @@ static int
 binary_stringlen(size_t namlen, size_t vallen, const void* value)
 {
 	HA_MSG_ASSERT(value);
-	HA_MSG_ASSERT(vallen >=0  && namlen >= 0);
-	
+
 	return namlen + B64_stringlen(vallen)  + 2 + 3;
 	/*overhead 3 is for type*/	
 }
@@ -703,8 +700,7 @@ binary_netstringlen(size_t namlen, size_t vallen, const void* value)
 	int length;
 	
 	HA_MSG_ASSERT(value);
-	HA_MSG_ASSERT(vallen >=0  && namlen >= 0);
-	
+
 	length = intlen(namlen) + (namlen)
 		+	intlen(vallen) + vallen + 4 ;
 	length  += 4; /* for type*/
@@ -721,6 +717,7 @@ struct_stringlen(size_t namlen, size_t vallen, const void* value)
 	
 	HA_MSG_ASSERT(value);
 	
+	(void)vallen;
 	childmsg = (const struct ha_msg*)value;
 	
 	return namlen +2 + 3 + childmsg->stringlen; 
@@ -736,6 +733,7 @@ struct_netstringlen(size_t namlen, size_t vallen, const void* value)
 	
 	HA_MSG_ASSERT(value);	
 
+	(void)vallen;
 	childmsg = (const struct ha_msg*)value;
 	
 	ret = intlen(namlen) + namlen + 2;
@@ -760,6 +758,7 @@ struct_netstringlen(size_t namlen, size_t vallen, const void* value)
 static int
 list_stringlen(size_t namlen, size_t vallen, const void* value)
 {
+	(void)value;
 	return namlen + vallen + 2 + 3;	
 	/*overhead 3 is for type (FT_STRUCT)*/
 }
@@ -768,7 +767,8 @@ static int
 list_netstringlen(size_t namlen, size_t vallen, const void* value)
 {
 	int ret;
-
+	
+	(void)value;
 	ret =  intlen(namlen) + (namlen)
 		+ intlen(vallen) 
 		+ vallen +  4 ;
@@ -787,8 +787,6 @@ add_binary_field(struct ha_msg* msg, char* name, size_t namelen,
 	int next;
 
 	if ( !msg || !name || !value
-	     || namelen <= 0 
-	     || vallen < 0
 	     || depth < 0){
 		cl_log(LOG_ERR, "add_binary_field:"
 		       " invalid input argument");
@@ -823,8 +821,6 @@ add_struct_field(struct ha_msg* msg, char* name, size_t namelen,
 	int netstringlen_add;
 
 	if ( !msg || !name || !value
-	     || namelen <= 0 
-	     || vallen < 0
 	     || depth < 0){
 		cl_log(LOG_ERR, "add_struct_field:"
 		       " invalid input argument");
@@ -926,7 +922,7 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 		GList* oldlist = (GList*) msg->values[j];
 		int oldlistlen = string_list_pack_length(oldlist);
 		int newlistlen;
-		int i; 
+		size_t i; 
 		
 		for ( i =0; i < g_list_length((GList*)value); i++){
 			list = g_list_append(oldlist, g_list_nth_data((GList*)value, i));
@@ -978,6 +974,8 @@ str2string(char* buf, char* maxp, void* value, size_t len, int depth)
 {
 	char* s =  value;
 	
+	(void)maxp;
+	(void)depth;
 	if ( strlen(s) != len){
 		cl_log(LOG_ERR, "str2string:"
 		       "the input len != string length");
@@ -999,6 +997,7 @@ binary2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	int baselen;
 	int truelen = 0;
 	
+	(void)depth;
 	baselen = B64_stringlen(len) + 1;
 	
 	if ( buf + baselen >= maxp){
@@ -1022,6 +1021,7 @@ struct2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	struct ha_msg* msg = value;
 	int	baselen = get_stringlen(msg);
 	
+	(void)len;
 
 	if ( buf + baselen > maxp){
 		cl_log(LOG_ERR, "struct2string: not enough buffer"
@@ -1059,6 +1059,8 @@ list2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	int listlen;
 	GList* list = (GList*) value;
 
+	(void)len;
+	(void)depth;
 	listlen = string_list_pack(list , buf, maxp);			
 	if (listlen == 0){
 		cl_log(LOG_ERR, "list2string():"
@@ -1074,7 +1076,7 @@ list2string(char* buf, char* maxp, void* value, size_t len, int depth)
 static int
 string2str(void* value, size_t len, int depth, void** nv, size_t* nlen )
 {
-	if (!value  || len <0 || !nv || !nlen || depth < 0){
+	if (!value  || !nv || !nlen || depth < 0){
 		cl_log(LOG_ERR, "string2str:invalid input");
 		return HA_FAIL;
 	}
@@ -1096,18 +1098,13 @@ string2binary(void* value, size_t len, int depth, void** nv, size_t* nlen)
 		return HA_OK;
 	}
 
-	if ( !value || len <0 || !nv || !nlen || depth < 0){
+	if ( !value || !nv || depth < 0){
 		cl_log(LOG_ERR, "string2binary:invalid input");
 		return HA_FAIL;
 	}
 	
 	memcpy(tmpbuf, value, len);
 	*nlen = base64_to_binary(tmpbuf, len, value, len);				
-
-	if (*nlen < 0){ /* FIXME! always false (BEAM) */
-		cl_log(LOG_ERR, "base64_to_binary() failed");
-		return HA_FAIL;
-	}
 	
 	*nv = value;
 	
@@ -1120,7 +1117,7 @@ string2struct(void* value, size_t vallen, int depth, void** nv, size_t* nlen)
 	
 	struct ha_msg	*tmpmsg;
 
-	if (!value  || vallen <0 || !nv || !nlen || depth < 0){
+	if (!value || !nv || depth < 0){
 		cl_log(LOG_ERR, "string2struct:invalid input");
 		return HA_FAIL;
 	}
@@ -1152,7 +1149,7 @@ string2list(void* value, size_t vallen, int depth, void** nv, size_t* nlen)
 {
 	GList*	list;
 	
-	if (!value  || vallen <0 || !nv || !nlen || depth < 0){
+	if (!value  || !nv || !nlen || depth < 0){
 		cl_log(LOG_ERR, "string2struct:invalid input");
 		return HA_FAIL;
 	}	
@@ -1179,7 +1176,7 @@ string2netstring(char* sp, char* smax, void* value,
 {
 	
 	if ( !sp || !smax || !value
-	     || vallen < 0 || !comlen ){
+	     || !comlen ){
 		cl_log(LOG_ERR, "string2netstring:"
 		       "invalid input arguments");
 		return HA_FAIL;
@@ -1208,8 +1205,8 @@ struct2netstring(char* sp, char* smax, void* value,
 	struct ha_msg* msg;
 	int llen;
 
-	
-	if ( !sp || !smax || !value || vallen < 0 || !comlen ){
+	(void)vallen;
+	if ( !sp || !smax || !value || !comlen ){
 		cl_log(LOG_ERR, "struct2netstring:"
 		       "invalid input arguments");
 		return HA_FAIL;
@@ -1240,11 +1237,12 @@ static int
 list2netstring(char* sp, char* smax, void* value, 
 	       size_t vallen, size_t* comlen)
 {	
-	size_t tmplen;
+	int tmplen;
 	GList* list = NULL;
 	char buf[MAXLENGTH];
 	
-	if ( !sp || !smax || !value || vallen < 0 || !comlen ){
+	(void)vallen;
+	if ( !sp || !smax || !value || !comlen ){
 		cl_log(LOG_ERR, "list2netstring:"
 		       "invalid input arguments");
 		return HA_FAIL;
@@ -1289,7 +1287,7 @@ netstring2string(const void* value, size_t vlen, void** retvalue, size_t* ret_vl
 		return HA_OK;
 	}
 
-	if ( !value || vlen < 0 || !retvalue || !ret_vlen){
+	if ( !value || !retvalue || !ret_vlen){
 		cl_log(LOG_ERR, " netstring2string:"
 		       "invalid input arguments");
 		return HA_FAIL;
@@ -1320,7 +1318,7 @@ netstring2struct(const void* value, size_t vlen, void** retvalue, size_t* ret_vl
 {
 	struct ha_msg* msg;
 	
-	if ( !value || vlen < 0 || !retvalue || !ret_vlen){
+	if ( !value || !retvalue || !ret_vlen){
 		cl_log(LOG_ERR, " netstring2struct:"
 		       "invalid input arguments");
 		return HA_FAIL;
@@ -1345,7 +1343,7 @@ netstring2list(const void* value, size_t vlen, void** retvalue, size_t* ret_vlen
 {	
 	GList* list;
 	
-	if ( !value || vlen < 0 || !retvalue || !ret_vlen){
+	if ( !value || !retvalue || !ret_vlen){
 		cl_log(LOG_ERR, " netstring2struct:"
 		       "invalid input arguments");
 		return HA_FAIL;
@@ -1375,7 +1373,7 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 		 void* value, size_t vallen, int depth)
 {
 	
-	int	internal_type;
+	size_t	internal_type;
 	char	*cp_name = NULL;
 	size_t	cp_namelen;
 	size_t	cp_vallen;
@@ -1387,7 +1385,6 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 
 	if ( !msg || !name || !value
 	     || namelen <= 0 
-	     || vallen < 0
 	     || depth < 0){
 		cl_log(LOG_ERR, "add_string_field:"
 		       " invalid input argument");
