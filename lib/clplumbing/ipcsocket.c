@@ -128,7 +128,6 @@ socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
   struct OCF_IPC_CHANNEL *ch;
   int sin_size;
   int s, new_sock;
-  int val;
   GHashTable* attrs;
   static char SockATTR []= SOCKET_ATTR;
 
@@ -204,7 +203,6 @@ static int
 socket_initiate_connection(struct OCF_IPC_CHANNEL * ch)
 {
   struct SOCKET_CH_PRIVATE* conn_info;  
-  int val;
   struct sockaddr_un peer_addr; /* connector's address information */
   
   conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;

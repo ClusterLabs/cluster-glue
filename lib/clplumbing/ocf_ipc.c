@@ -27,24 +27,30 @@ struct OCF_IPC_WAIT_CONNECTION * socket_wait_conn_new(GHashTable* ch_attrs);
 struct OCF_IPC_CHANNEL * socket_channel_new(GHashTable* ch_attrs);
 
 struct OCF_IPC_WAIT_CONNECTION * 
-ipc_wait_conn_constructor(char * ch_type, GHashTable* ch_attrs) {
-  if (strcmp(ch_type, "domain_socket") == 0) {
+ipc_wait_conn_constructor(const char * ch_type, GHashTable* ch_attrs)
+{
+  if (strcmp(ch_type, "domain_socket") == 0
+  ||	strcmp(ch_type, IPC_DOMAIN_SOCKET) == 0) {
     return socket_wait_conn_new(ch_attrs);
   }
   return NULL;
 }
 
 struct OCF_IPC_CHANNEL * 
-ipc_channel_constructor(char * ch_type, GHashTable* ch_attrs) {
-  if (strcmp(ch_type, "domain_socket") == 0) {    
-    return socket_channel_new(ch_attrs);
+ipc_channel_constructor(const char * ch_type, GHashTable* ch_attrs)
+{
+  if	(strcmp(ch_type, "domain_socket") == 0
+  ||	strcmp(ch_type, IPC_DOMAIN_SOCKET) == 0) {
+
+	return socket_channel_new(ch_attrs);
   }
-    return NULL;
+  return NULL;
 }
 
 
 struct OCF_IPC_AUTH * 
-ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid) {
+ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid)
+{
   struct OCF_IPC_AUTH *temp_auth;
   int i, v;
 
@@ -55,22 +61,21 @@ ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid) {
 
   if (num_uid > 0) {
     temp_auth->check_uid = TRUE;
-    for(i=0;i<num_uid;i++)
+    for (i=0; i<num_uid; i++) {
       g_hash_table_insert(temp_auth->uid, &a_uid[i], &v);
+    }
   }else{
     temp_auth->uid = FALSE;
   }
 
   if (num_gid > 0) {
     temp_auth->check_gid = TRUE;
-    for(i=0;i<num_gid;i++)
+    for (i=0; i<num_gid; i++) {
       g_hash_table_insert(temp_auth->gid, &a_gid[i], &v);
+    }
   }else{
     temp_auth->gid = FALSE;
   }
 
   return temp_auth;
 }
-
-    
-  
