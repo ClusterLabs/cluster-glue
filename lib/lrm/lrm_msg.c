@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.11 2004/08/29 03:01:13 msoffen Exp $ */
+/* $Id: lrm_msg.c,v 1.12 2004/08/29 04:38:08 msoffen Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -406,3 +406,10 @@ ha_msg_print(struct ha_msg * msg)
 	printf("print end\n");
 
 }
+
+/* 
+ * $Log: lrm_msg.c,v $
+ * Revision 1.12  2004/08/29 04:38:08  msoffen
+ * Added log for history to end of file.
+ *
+ */
