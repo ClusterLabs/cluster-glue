@@ -1,4 +1,4 @@
-/* $Id: ssh.c,v 1.18 2005/03/11 03:22:29 sunjd Exp $ */
+/* $Id: ssh.c,v 1.19 2005/03/17 07:30:52 sunjd Exp $ */
 /*
  * Stonith module for SSH Stonith device
  *
@@ -88,7 +88,11 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 #define SSH_COMMAND "ssh -q -x -o PasswordAuthentication=no StrictHostKeyChecking=no" 
 */
 /* use this if you have the (broken) OpenSSH 2.1.1 */
-#define SSH_COMMAND "ssh -q -x -n -l root"
+/* sunjd@cn.ibm.com added the option -f to temporily work around the block issue
+ * in which the child process always stay in 'system' call. Please FIX this.
+ * Additonally, this issue seems related to both of 2.6 kernel and stonithd.
+ */
+#define SSH_COMMAND "ssh -f -q -x -n -l root"
 
 /* We need to do a real hard reboot without syncing anything to simulate a
  * power cut. 
