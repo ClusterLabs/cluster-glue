@@ -28,8 +28,8 @@ COMMONLIBS			=	$(top_builddir)/lib/clplumbing/libplumb.la   \
 					$(top_builddir)/lib/hbclient/libhbclient.la  \
 					$(top_builddir)/lib/apphb/libapphb.la \
                         		$(GLIBLIB)
-
-lrmdir				=	 $(HA_VARLIBDIR)/$(HB_PKG)/@LRM_DIR@
+LRM_DIR 			=	lrm
+lrmdir				=	$(HA_VARLIBDIR)/$(HB_PKG)/$(LRM_DIR)
 
 
 lib_LTLIBRARIES = liblrm.la
