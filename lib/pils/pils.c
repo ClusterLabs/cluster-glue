@@ -1293,7 +1293,7 @@ PILPluginPath(PILPluginUniv* universe, const char * plugintype
 		,	plugintype
 		,	G_DIR_SEPARATOR_S
 		,	pluginname
-		,	LTDL_SHLIB_EXT);
+		,	PLUGINSUFFIX);
 		if (DEBUGPLUGIN) {
 			PILLog(PIL_DEBUG
 			,	"PILS: Looking for %s/%s => [%s]"
