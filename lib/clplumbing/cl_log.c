@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.43 2005/03/15 19:52:24 gshi Exp $ */
+/* $Id: cl_log.c,v 1.44 2005/04/04 18:15:07 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -377,8 +377,8 @@ cl_log(int priority, const char * fmt, ...)
 	}
 	
 	if ( use_logging_daemon && 
-	     cl_log_depth <= 1 &&
-	     LogToLoggingDaemon(priority, buf, nbytes + 1, TRUE) == HA_OK){
+	     cl_log_depth <= 1){
+		LogToLoggingDaemon(priority, buf, nbytes + 1, TRUE);
 		goto LogDone;
 	}else {
 		cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);
@@ -492,7 +492,8 @@ LogToLoggingDaemon(int priority, const char * buf,
 	IPC_Message*		msg;
 	int			sendrc;
 	int			intval = conn_logd_intval;
-
+	static int		drop_msg_num = 0;
+	
 	if (chan == NULL) {
 		longclock_t	lnow = time_longclock();
 		
@@ -518,18 +519,43 @@ LogToLoggingDaemon(int priority, const char * buf,
 	if (chan->ch_status != IPC_CONNECT){		
 		cl_log(LOG_ERR, "channel is not connected");
 		chan->ops->destroy(chan);
+		
+		if (drop_msg_num > 0){
+			cl_log(LOG_ERR, "%d message are dropped ", drop_msg_num);
+			drop_msg_num = 0;
+		}
+		
 		logging_daemon_chan = NULL;
 		return HA_FAIL;
 	}
 	/* Logging_channel is all set up */
 	
 	sendrc =  chan->ops->send(chan, msg);
-	if (sendrc == IPC_OK) {
+	if (sendrc == IPC_OK) {		
+		
+		if (drop_msg_num > 0){
+			cl_log(LOG_ERR, "%d message are dropped ", drop_msg_num);
+			drop_msg_num = 0;
+		}
+		
 		return HA_OK;
-	}else {
-		chan->ops->destroy(chan);
-		logging_daemon_chan = NULL;
+		
+	}else{
+		drop_msg_num++;
+		
+		if (chan->ops->get_chan_status(chan) != IPC_CONNECT) {
+			chan->ops->destroy(chan);
+			logging_daemon_chan = NULL;
+			
+			if (drop_msg_num > 0){
+				cl_log(LOG_ERR, "channel destroyed: %d message are dropped ", drop_msg_num);
+			}
+			
+			drop_msg_num=0;
+		}
+		
 	}
+	
 	FreeChildLogIPCMessage(msg);
 	return HA_FAIL;
 }
