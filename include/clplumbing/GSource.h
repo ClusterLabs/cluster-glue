@@ -1,4 +1,4 @@
-/* $Id: GSource.h,v 1.8 2005/02/17 16:43:56 andrew Exp $ */
+/* $Id: GSource.h,v 1.9 2005/02/17 17:49:57 alan Exp $ */
 #ifndef _CLPLUMBING_GSOURCE_H
 #	define _CLPLUMBING_GSOURCE_H
 #	include <clplumbing/ipc.h>
@@ -114,13 +114,6 @@ GSIGSource* G_main_add_SignalHandler(
 	int priority, int signal,
 	gboolean (*dispatch)(int nsig, gpointer user_data),
 	gpointer userdata, GDestroyNotify notify);
-
-/*
- *	the events in this source is paused/resumed
- */
-
-void	G_main_SignalHandler_pause(GSIGSource* chp);
-void	G_main_SignalHandler_resume(GSIGSource* chp);
 
 /*
  *	Delete an signal from the gmainloop world...
