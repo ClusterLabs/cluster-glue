@@ -106,7 +106,8 @@ plugin_LTLIBRARIES =	apcmaster.la		\
 			wti_nps.la		\
 			riloe.la
 
-plugin_LTLIBRARIES =	baytech.la		\
+plugin_LTLIBRARIES =	apcsmart.la		\
+			baytech.la		\
 			null.la			\
 			ssh.la
 
