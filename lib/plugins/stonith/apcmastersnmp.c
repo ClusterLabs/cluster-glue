@@ -1,4 +1,4 @@
-/* $Id: apcmastersnmp.c,v 1.15 2004/10/05 19:49:09 alan Exp $ */
+/* $Id: apcmastersnmp.c,v 1.16 2004/10/06 10:55:18 lars Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
@@ -75,7 +75,7 @@ static struct stonith_ops apcmastersnmpOps ={
 	apcmastersnmp_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;

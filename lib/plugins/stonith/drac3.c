@@ -1,4 +1,4 @@
-/* $Id: drac3.c,v 1.8 2004/10/05 14:26:16 lars Exp $ */
+/* $Id: drac3.c,v 1.9 2004/10/06 10:55:18 lars Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -56,7 +56,7 @@ static struct stonith_ops drac3Ops ={
 	drac3_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;

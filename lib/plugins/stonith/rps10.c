@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.14 2004/10/05 14:26:17 lars Exp $ */
+/* $Id: rps10.c,v 1.15 2004/10/06 10:55:18 lars Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -55,7 +55,7 @@ static struct stonith_ops rps10Ops ={
 	rps10_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;

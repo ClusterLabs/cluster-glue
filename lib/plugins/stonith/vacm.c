@@ -1,6 +1,6 @@
 #error "This looks like it hasn't been compiled nor working for a while. Please review before using."
 
-/* $Id: vacm.c,v 1.8 2004/10/05 14:26:17 lars Exp $ */
+/* $Id: vacm.c,v 1.9 2004/10/06 10:55:18 lars Exp $ */
 /******************************************************************************
 *
 *    Copyright 2000 Sistina Software, Inc.
@@ -58,7 +58,7 @@ static struct stonith_ops vacmOps ={
 	vacm_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
