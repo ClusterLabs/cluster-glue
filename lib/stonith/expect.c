@@ -1,4 +1,4 @@
-/* $Id: expect.c,v 1.15 2005/01/08 06:01:17 alan Exp $ */
+/* $Id: expect.c,v 1.16 2005/02/03 20:07:07 msoffen Exp $ */
 /*
  * Simple expect module for the STONITH library
  *
@@ -39,12 +39,13 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/times.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #define ENABLE_PIL_DEFS_PRIVATE
 #include <pils/plugin.h>
+
 #ifdef _POSIX_PRIORITY_SCHEDULING
 #	include <sched.h>
 #endif
