@@ -63,6 +63,7 @@
 #define F_LRM_MONINTVL		"lrm_monintvl"
 #define F_LRM_MONTGT		"lrm_montgt"
 #define F_LRM_STATUS		"lrm_status"
+#define F_LRM_METADATA		"lrm_metadata"
 
 #define	PRINT 	printf("file:%s,line:%d\n",__FILE__,__LINE__);
 
@@ -72,6 +73,7 @@
 #define UNREGISTER		"unreg"
 #define GETRSCCLASSES		"rclasses"
 #define GETRSCTYPES		"rtypes"
+#define GETRSCMETA		"rmetadata"
 #define GETALLRCSES		"getall"
 #define GETRSC			"getrsc"
 #define GETRSCSTATE		"getstate"
