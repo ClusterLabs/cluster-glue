@@ -994,7 +994,7 @@ rsc_flush_ops (lrm_rsc_t* rsc)
 
 	client_log(LOG_INFO, "rsc_flush_ops: end.");
 
-	return rc;
+	return rc>0?HA_OK:HA_FAIL;
 }
 
 static GList*
