@@ -120,9 +120,9 @@ ReportProcHasDied(int pid, int status)
 		case PT_LOGVERBOSE:	doreport=1;
 					break;
 
+		case PT_LOGNORMAL:
 		case PT_LOGNONE:	doreport = 0;
 					break;
-		default:
 	}
 
 	if (!LoggingIsEnabled) {
