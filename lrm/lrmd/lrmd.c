@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.59 2005/01/31 06:26:22 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.60 2005/02/16 05:28:09 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -776,9 +776,6 @@ on_timeout_op_done(gpointer data)
 	if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_TIMEOUT)) {
 		lrmd_log(LOG_ERR,
 			"on_timeout_op_done: can not add opstatus to msg");
-	}
-	if (-1 != op->exec_pid ) {
-		kill(op->exec_pid, 9);
 	}
 
 	rsc = op->rsc;
@@ -1612,10 +1609,6 @@ flush_op(lrmd_op_t* op)
 		return HA_FAIL;
 	}
 
-		
-	if (-1 != op->exec_pid ) {
-		kill(op->exec_pid, 9);
-	}
 	on_op_done(op);
 
 	lrmd_log(LOG_DEBUG, "flush_op: end.");
@@ -1824,13 +1817,15 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
         int ret;
 
 	lrmd_log(LOG_DEBUG, "on_ra_proc_finished: start.");
+	op = p->privatedata;
+	op->exec_pid = -1;
 	if (9 == signo) {
+		free_op(op);
 		p->privatedata = NULL;
 		lrmd_log(LOG_DEBUG, "on_ra_proc_finished: this op is killed.");
 		return;
 	}
 
-	op = p->privatedata;
 	rsc = op->rsc;
 	RAExec = g_hash_table_lookup(RAExecFuncs,op->rsc->class);
 	if (NULL == RAExec) {
@@ -2011,6 +2006,7 @@ free_op(lrmd_op_t* op)
 {
 	if (-1 != op->exec_pid ) {
 		kill(op->exec_pid, 9);
+		return;
 	}
 
 	if (-1 != op->repeat_timeout_tag) {
@@ -2082,6 +2078,12 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.60  2005/02/16 05:28:09  zhenh
+ * Fix a bug.
+ * Free operation data in on_ra_proc_finished() instead of free_op()
+ * if the child process of the operation is running.
+ * So on_ra_proc_query_name() has chance to get some information of the operation.
+ *
  * Revision 1.59  2005/01/31 06:26:22  sunjd
  * Change its coredump rootdir to HA_COREDIR and try to make user specific subdir
  *
