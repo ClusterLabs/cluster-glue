@@ -56,8 +56,8 @@
 
 typedef struct stonith {
 	struct stonith_ops *	s_ops;
+	char *			stype;
 	void *			pinfo;
-	void *			dlhandle;
 }Stonith;
 
 /*
@@ -80,6 +80,8 @@ struct stonith_ops {
 #define	ST_CONF_INFO_SYNTAX	2	/* Config string (info) syntax help */
 #define	ST_DEVICEID		3	/* Device Type Identification */
 #define	ST_DEVICENAME		4	/* Unique Device Identification */
+#define	ST_DEVICEDESCR		5	/* Device Description text */
+#define	ST_DEVICEURL		6	/* Manufacturer/Device URL */
 
 	/* Getinfo() calls return text in the current locale */
 	const char* (*getinfo)		(Stonith*, int infotype);
@@ -94,6 +96,8 @@ struct stonith_ops {
  *	Operation requested by reset_req()
  */
 #define	ST_GENERIC_RESET	1	/* Reset the machine any way you can */
+#define	ST_POWERON		2	/* Power the node on */
+#define	ST_POWEROFF		3	/* Power the node off */
 
 	int (*reset_req)		(Stonith * s, int op, const char* node);
 
@@ -104,7 +108,9 @@ struct stonith_ops {
 };
 
 extern Stonith *	stonith_new(const char * type);
-extern char **	stonith_types(void);	/* NULL-terminated list */
+extern void		stonith_delete(Stonith *);
+extern char **		stonith_types(void);	/* NULL-terminated list */
+			/* valid until next call of stonith_types() */
 
 /*
  * It is intended that the ST_CONF_FILE_SYNTAX info call return a string
@@ -118,6 +124,14 @@ extern char **	stonith_types(void);	/* NULL-terminated list */
  * The ST_DEVICEID info call is intended to return the type of the Stonith
  * device.  Note that it may return a different result once it has attempted
  * to talk to the device (like after a status() call).
+ *
+ * The ST_DEVICEDESCR info call is intended to return information identifying
+ * the type of STONITH device supported by this STONITH object.  This is so
+ * users can tell if they have this kind of device or not.
+ *
+ * The ST_DEVICEURL info call is intended to return the URL of a web site
+ * related to the device in question.  This might be the manufacturer,
+ * a pointer to the product line, or the individual product itself.
  *
  * A good way for a GUI to work which configures STONITH devices would be to
  * use the result of the stonith_types() call in a pulldown menu.
@@ -146,4 +160,18 @@ extern char **	stonith_types(void);	/* NULL-terminated list */
  * able to satisfy international customers as well.
  *
  */
+#define STONITH_TYPE	stonith
+#define STONITH_TYPE_S	"stonith"
+typedef struct StonithImports_s StonithImports;
+
+struct Etoken {
+	const char *	string;		/* The token to look for */
+	int		toktype;	/* The type to return on match */
+	int		matchto;	/* Modified during matches */
+};
+struct StonithImports_s {
+	int (*ExpectToken)(int fd, struct Etoken * toklist, int to_secs
+	,	char * buf, int maxline);
+	int (*StartProcess)(const char * cmd, int * readfd, int * writefd);
+};
 #endif /*__STONITH_H*/

@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#include <errno.h>
+#include <sys/stat.h>
 
 /* Dumbness... */
 #define time FooTimeParameter
@@ -1665,10 +1667,15 @@ static PILInterfaceUniv*
 NewPILInterfaceUniv(PILPluginUniv* piuniv)
 {
 	PILInterfaceUniv*	ret = NEW(PILInterfaceUniv);
+	static int		ltinityet = 0;
 
 	if (DEBUGPLUGIN) {
 		PILLog(PIL_DEBUG, "NewPILInterfaceUniv(0x%x)"
 		,	(unsigned long)ret);
+	}
+	if (!ltinityet) {
+		ltinityet=1;
+		lt_dlinit();
 	}
 	STATNEW(interfaceuniv);
 	ret->MagicNum = PIL_MAGIC_INTERFACEUNIV;
@@ -1869,6 +1876,7 @@ PILPluginTypeListPlugins(PILPluginType* pitype
 		int		dircount;
 		struct dirent**	files;
 
+
 		path = g_string_new(*pelem);
 		g_assert(piclass != NULL);
 		if (piclass) {
@@ -1879,9 +1887,11 @@ PILPluginTypeListPlugins(PILPluginType* pitype
 			}
 		}
 
+
 		files = NULL;
+		errno = 0;
 		dircount = scandir(path->str, &files
-		,	SCANSEL_CAST &so_select, NULL);
+		,	SCANSEL_CAST so_select, alphasort);
 		g_string_free(path, 1); path=NULL;
 
 		if (dircount <= 0) {
@@ -1935,7 +1945,10 @@ PILListPlugins(PILPluginUniv* u, const char * pitype
 		if (picount) {
 			*picount = 0;
 		}
-		return NULL;
+		t = NewPILPluginType(u, pitype);
+		if (!t) {
+			return NULL;
+		}
 	}
 	return PILPluginTypeListPlugins(t, picount);
 }

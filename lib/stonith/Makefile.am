@@ -24,13 +24,13 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 
 
 CFLAGS			= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
-			-DSTONITH_MODULES='"$(stonithlibdir)"' \
+			-DSTONITH_MODULES='"@stonith_plugindir@"' \
 			-DLOCALEDIR='"@LOCALE@"' $(INCLUDES)
 
 ## include files
 
 ## binaries
-sbin_PROGRAMS		= stonith
+sbin_PROGRAMS		= stonith meatclient
 
 
 stonith_SOURCES		= main.c
@@ -38,6 +38,8 @@ stonith_SOURCES		= main.c
 stonith_LDADD		= $(top_builddir)/libltdl/libltdlc.la \
 			libstonith.la
 stonith_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self
+
+meatclient_SOURCES	= meatclient.c 
 
 ## libraries
 
