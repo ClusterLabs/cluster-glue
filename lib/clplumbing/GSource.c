@@ -216,7 +216,8 @@ static GSourceFuncs G_CH_SourceFuncs = {
 /*
  *	Add an IPC_channel to the gmainloop world...
  */
-GCHSource* G_main_add_IPC_Channel(int priority, IPC_Channel* ch
+GCHSource*
+G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 ,	gboolean can_recurse
 ,	gboolean (*dispatch)(IPC_Channel* source_data
 ,		gpointer        user_data)
@@ -401,7 +402,8 @@ static GSourceFuncs G_WC_SourceFuncs = {
 /*
  *	Add an IPC_WaitConnection to the gmainloop world...
  */
-GWCSource* G_main_add_IPC_WaitConnection(int priority
+GWCSource*
+G_main_add_IPC_WaitConnection(int priority
 ,	IPC_WaitConnection* wch
 ,	IPC_Auth* auth_info
 ,	gboolean can_recurse
