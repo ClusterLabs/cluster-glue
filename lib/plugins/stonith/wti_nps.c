@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.19 2005/01/31 10:06:33 sunjd Exp $ */
+/* $Id: wti_nps.c,v 1.20 2005/02/03 20:08:21 msoffen Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -326,12 +326,12 @@ NPS_onoff(struct pluginDevice* nps, const char * outlets, const char * unitid, i
 {
 	char		unum[32];
 
+	const char *	onoff = (req == ST_POWERON ? "/On" : "/Off");
+	int	rc;
+
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
-
-	const char *	onoff = (req == ST_POWERON ? "/On" : "/Off");
-	int	rc;
 
 	if ((rc = NPSRobustLogin(nps) != S_OK)) {
 		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));

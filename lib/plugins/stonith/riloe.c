@@ -268,10 +268,6 @@ riloe_set_config(StonithPlugin* s, StonithNVpair *list)
 {
 	const char*	RILOEline;
 
-	if (Debug) {
-		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
-	}
-
 	struct pluginDevice*	nd;
 
 	if (Debug) {
@@ -294,11 +290,12 @@ riloe_set_config(StonithPlugin* s, StonithNVpair *list)
 static const char**
 riloe_get_confignames(StonithPlugin* p)
 {
+	static const char *	RiloeParams[] = {ST_HOSTLIST, NULL };
+
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
 
-	static const char *	RiloeParams[] = {ST_HOSTLIST, NULL };
 	return RiloeParams;
 }
 
@@ -366,11 +363,11 @@ riloe_destroy(StonithPlugin *s)
 static StonithPlugin *
 riloe_new(void)
 {
+	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
+
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
-
-	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
 
 	if (nd == NULL) {
 		LOG(PIL_CRIT, "out of memory");
