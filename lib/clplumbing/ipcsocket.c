@@ -1268,9 +1268,8 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 {
   struct SOCKET_CH_PRIVATE *conn_info;
   socklen_t n;
-  int ret = IPC_OK;
+  int ret = IPC_FAIL;
   struct ucred *cred;
-  
   
 
   if (auth_info == NULL
@@ -1289,12 +1288,13 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
   
   /* verify the credential information. */
   if (	auth_info->uid
-  &&	g_hash_table_lookup(auth_info->uid, &(cred->uid)) == NULL) {
-		ret = IPC_FAIL;
-  }
-  if (	auth_info->gid
-  &&	g_hash_table_lookup(auth_info->gid, &(cred->gid)) == NULL) {
-		ret = IPC_FAIL;
+  &&	g_hash_table_lookup(auth_info->uid
+	,	GUINT_TO_POINTER((guint)cred->uid)) != NULL) {
+		ret = IPC_OK;
+  }else if (auth_info->gid
+  &&	g_hash_table_lookup(auth_info->gid
+	,	GUINT_TO_POINTER((guint)cred->gid)) != NULL) {
+		ret = IPC_OK;
   }
   g_free(cred);
   return ret;
