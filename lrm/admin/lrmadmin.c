@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.12 2004/08/30 03:17:40 msoffen Exp $ */
+/* $Id: lrmadmin.c,v 1.13 2004/09/03 01:29:44 zhenh Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -44,7 +44,7 @@
 #include <lrm/raexec.h>
 #include <clplumbing/lsb_exitcodes.h>
 
-const char * optstring = "AD:dEF:d:sg:M:c:S:LI:CT:h";
+const char * optstring = "AD:dEF:d:sg:M:P:c:S:LI:CT:h";
 
 static struct option long_options[] = {
 	{"daemon", 0, 0, 'd'},
@@ -59,6 +59,7 @@ static struct option long_options[] = {
 	{"raclass_supported",1,0,'C'},
 	{"ratype_supported",1,0,'T'},
 	{"metadata",1,0,'M'},
+	{"provider",1,0,'P'},
 	{"help",0,0,'h'},
 	{0,0,0,0}
 };
@@ -82,6 +83,7 @@ typedef enum {
 	RACLASS_SUPPORTED,
 	RATYPE_SUPPORTED,
 	RA_METADATA,
+	RA_PROVIDER,
 	HELP
 } lrmadmin_cmd_t;
 
@@ -100,7 +102,7 @@ static int call_id = 0;
 
 const char * simple_help_screen =
 "lrmadmin {-d|--deamon}\n"
-"         {-A|--add} <rscid> <raclass> <ratype> [<rsc_params_list>]\n"
+"         {-A|--add} <rscid> <raclass> <ratype> <provider|NULL>[<rsc_params_list>]\n"
 "         {-D|--delete} <rscid>\n"
 "         {-F|--flush} <rscid>\n"
 "         {-E|--execute} <rscid> <operator> <timeout> <interval> <target_rc> [<operator_parameters_"
@@ -111,7 +113,8 @@ const char * simple_help_screen =
 "         {-I|--information} <rsc_id>\n"
 "         {-C|--raclass_supported}\n"
 "         {-T|--ratype_supported} <raclss>\n"
-"         {-M|--metadata} <raclss> <ratype>\n"
+"         {-M|--metadata} <raclss> <ratype> <provider|NULL>\n"
+"         {-p|--provider} <raclss> <ratype>\n"
 "         {-h|--help}\n";
 
 #define OPTION_OBSCURE_CHECK \
@@ -139,8 +142,11 @@ static void ocf_params_hash_to_str(gpointer key, gpointer value,
 static void normal_params_hash_to_str(gpointer key, gpointer value, 
 				      gpointer user_data);
 static lrm_rsc_t * get_lrm_rsc(ll_lrm_t * lrmd, char * rscid);
-/* the end of the internal used function list */
+
 static int ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
+static int ra_provider(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
+
+/* the end of the internal used function list */
 
 static void lrm_op_done_callback(lrm_op_t* op);
 
@@ -227,6 +233,11 @@ int main(int argc, char **argv)
 			case 'M':
 				OPTION_OBSCURE_CHECK
 				lrmadmin_cmd = RA_METADATA;
+				break;
+				
+			case 'P':
+				OPTION_OBSCURE_CHECK
+				lrmadmin_cmd = RA_PROVIDER;
 				break;
 
 			case 'S':
@@ -330,6 +341,10 @@ int main(int argc, char **argv)
 
 		case RA_METADATA:
 			ra_metadata(lrmd, argc, optind, argv);
+			ASYN_OPS = FALSE;
+			break;
+		case RA_PROVIDER:
+			ra_provider(lrmd, argc, optind, argv);
 			ASYN_OPS = FALSE;
 			break;
 
@@ -551,11 +566,46 @@ ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 {
 	const char * class = argv[optind-1];
 	const char * type = argv[optind];
-	char* metadata = lrmd->lrm_ops->get_rsc_type_metadata(lrmd, class, type);
+	const char * provider = argv[optind+1];
+
+	if(argc < 5) {
+		cl_log(LOG_ERR,"No enough parameters.");
+		return -2;
+	}
+
+	if (0==strncmp(provider,"NULL",4)) {
+		provider=NULL;
+	}
+	
+	char* metadata = lrmd->lrm_ops->get_rsc_type_metadata(lrmd, class, type, provider);
 	printf ("metadata of %s(%s) is: %s\n",type,class,metadata);
 	g_free (metadata);
 		
 	return 0; 
+}
+
+static int
+ra_provider(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
+{
+	const char * class = argv[optind-1];
+	const char * type = argv[optind];
+	GList* providers = NULL;
+	GList* provider = NULL;
+	
+	if(argc < 4) {
+		cl_log(LOG_ERR,"No enough parameters.");
+		return -2;
+	}
+
+	providers = lrmd->lrm_ops->get_rsc_provider_supported(lrmd,class,type);
+	
+	while (NULL != (provider = g_list_first(providers))) {
+		printf("%s\n",(char*)provider->data);
+		providers = g_list_remove(providers, provider->data);
+		g_free(provider->data);
+	}
+	g_list_free(providers);
+	return 0;
 }
 
 static int 
@@ -564,26 +614,32 @@ add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	char rsc_id[RID_LEN];
 	const char * class = argv[optind+1];
 	const char * type = argv[optind+2];
+	const char * provider = argv[optind+3];
 	GHashTable * params_ht = NULL;
 	int tmp_ret;
 
-	if ((argc - optind) < 3) {
+	if ((argc - optind) < 4) {
 		cl_log(LOG_ERR,"No enough parameters.");
 		return -2;
 	}
-
+	
 	rsc_id[RID_LEN-1]='\0';
 	strncpy(rsc_id, argv[optind], RID_LEN-1);
+
+	if (0==strncmp(provider,"NULL",4)) {
+		provider=NULL;
+	}
+	
 	/* delete Hashtable */
-	if ((argc - optind) > 3) {
-		if ( 0 > transfer_cmd_params(argc, optind+3, argv, class,
+	if ((argc - optind) > 4) {
+		if ( 0 > transfer_cmd_params(argc, optind+4, argv, class,
 					&params_ht) ) {
 			return -1;
 		}
 	}
 
 	tmp_ret = lrmd->lrm_ops->add_rsc(lrmd, rsc_id, class, 
-						type, params_ht);
+						type, provider, params_ht);
 
 	/*delete params_ht*/
 	if (params_ht) {
@@ -765,6 +821,7 @@ print_rsc_inf(lrm_rsc_t * lrm_rsc)
 	printf("\nResource ID:%s\n", rscid_str_tmp);
 	printf("Resource agency class:%s\n", lrm_rsc->class);
 	printf("Resource agency type:%s\n", lrm_rsc->type);
+	printf("Resource agency provider:%s\n", lrm_rsc->provider?lrm_rsc->provider:"default");
 
 	if (lrm_rsc->params) {
 		tmp = params_hashtable_to_str(lrm_rsc->class, 
@@ -824,6 +881,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.13  2004/09/03 01:29:44  zhenh
+ * add provider for resource
+ *
  * Revision 1.12  2004/08/30 03:17:40  msoffen
  * Fixed more comments from // to standard C comments
  *
