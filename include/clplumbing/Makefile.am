@@ -24,5 +24,6 @@ MAINTAINERCLEANFILES    = Makefile.in
 
 SOURCES	= 		\
 	Gmain_timeout.h	\
+	ipc.h		\
 	longclock.h	\
 	proctrack.h
