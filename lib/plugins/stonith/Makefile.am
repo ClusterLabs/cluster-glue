@@ -134,7 +134,7 @@ ibmhmc_la_SOURCES		= ibmhmc.c
 ibmhmc_la_LDFLAGS		= -export-dynamic -module -avoid-version
 ibmhmc_la_LIBADD		= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
-ipmilan_la_SOURCES		= ipmilan.c ipmilan.h ipmilan_command.c ipmi_os_handler.c
+ipmilan_la_SOURCES		= ipmilan.c ipmilan.h ipmilan_command.c 
 ipmilan_la_LDFLAGS		= -export-dynamic -module -avoid-version
 ipmilan_la_LIBADD		= $(top_builddir)/replace/libreplace.la $(OPENIPMI_LIB) $(GLIBLIB)
 
