@@ -53,7 +53,7 @@
 #define	MAX_PID_LEN 256
 #define	MAX_PROC_NAME 256
 
-#define OPTARGS		"dh"
+#define OPTARGS		"skrhV"
 #define PID_FILE 	"/var/run/lrmd.pid"
 #define DAEMON_LOG   	"/var/log/lrmd.log"
 #define DAEMON_DEBUG 	"/var/log/lrmd.debug"
@@ -217,6 +217,7 @@ void usage(const char* cmd, int exit_status);
 int init_start(void);
 void lrmd_shutdown(int nsig);
 int init_stop(const char *pid_file);
+int init_status(const char *pid_file, const char *client_name);
 long get_running_pid(const char *pid_file, gboolean* anypidfile);
 void register_pid(const char *pid_file, gboolean do_fork,
 			void (*shutdown)(int nsig));
@@ -224,6 +225,10 @@ void register_pid(const char *pid_file, gboolean do_fork,
 int
 main(int argc, char ** argv)
 {
+	int req_restart = FALSE;
+	int req_status  = FALSE;
+	int req_stop    = FALSE;
+	
 	int argerr = 0;
 	int flag;
 
@@ -237,8 +242,17 @@ main(int argc, char ** argv)
 			case 'h':		/* Help message */
 				usage(lrm_system_name, LSB_EXIT_OK);
 				break;
-			case 'd':
+			case 'V':		/* Debug mode, more logs*/
 				++debug_level;
+				break;
+			case 's':		/* Status */
+				req_status = TRUE;
+				break;
+			case 'k':		/* Stop (kill) */
+				req_stop = TRUE;
+				break;
+			case 'r':		/* Restart */
+				req_restart = TRUE;
 				break;
 			default:
 				++argerr;
@@ -253,9 +267,42 @@ main(int argc, char ** argv)
 	if (argerr) {
 		usage(lrm_system_name, LSB_EXIT_GENERIC);
 	}
+	
+	if (req_status){
+		return init_status(PID_FILE, lrm_system_name);
+	}
+
+	if (req_stop){
+		return init_stop(PID_FILE);
+	}
+
+	if (req_restart) {
+		init_stop(PID_FILE);
+	}
 
 	return init_start();
 }
+
+int
+init_status(const char *pid_file, const char *client_name)
+{
+	gboolean	anypidfile;
+	long	pid =	get_running_pid(pid_file, &anypidfile);
+
+	if (pid > 0) {
+		fprintf(stderr, "%s is running [pid: %ld]\n"
+			,	client_name, pid);
+		return LSB_STATUS_OK;
+	}
+	if (anypidfile) {
+		fprintf(stderr, "%s is stopped [pidfile exists]\n"
+			,	client_name);
+		return LSB_STATUS_VAR_PID;
+	}
+	fprintf(stderr, "%s is stopped.\n", client_name);
+	return LSB_STATUS_STOPPED;
+}
+
 
 long
 get_running_pid(const char *pid_file, gboolean* anypidfile)
@@ -280,6 +327,39 @@ get_running_pid(const char *pid_file, gboolean* anypidfile)
 	return(-1L);
 }
 
+int
+init_stop(const char *pid_file)
+{
+	long	pid;
+	int	rc = LSB_EXIT_OK;
+
+
+
+	if (pid_file == NULL) {
+		lrmd_log(LOG_ERR, "No pid file specified to kill process");
+		return LSB_EXIT_GENERIC;
+	}
+	pid =	get_running_pid(pid_file, NULL);
+
+	if (pid > 0) {
+		if (CL_KILL((pid_t)pid, SIGTERM) < 0) {
+			rc = (errno == EPERM
+			      ?	LSB_EXIT_EPERM : LSB_EXIT_GENERIC);
+			fprintf(stderr, "Cannot kill pid %ld\n", pid);
+		}else{
+			lrmd_log(LOG_INFO,
+			       "Signal sent to pid=%ld,"
+			       " waiting for process to exit",
+			       pid);
+
+			while (CL_PID_EXISTS(pid)) {
+				sleep(1);
+			}
+		}
+	}
+	return rc;
+}
+
 void
 usage(const char* cmd, int exit_status)
 {
@@ -287,7 +367,7 @@ usage(const char* cmd, int exit_status)
 
 	stream = exit_status ? stderr : stdout;
 
-	fprintf(stream, "usage: %s [-h]\n       %s [-d]\n", cmd, cmd);
+	fprintf(stream, "usage: %s [-srkhV]\n\ts:status\n\tr:restart\n\tk:kill\n\th:help\n\tV:debug\n", cmd);
 	fflush(stream);
 
 	exit(exit_status);
