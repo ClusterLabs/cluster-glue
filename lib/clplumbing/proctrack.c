@@ -22,7 +22,6 @@
 
 #include <portability.h>
 #include <sys/wait.h>
-#include <glib.h>
 #include <heartbeat.h>
 #include <clplumbing/proctrack.h>
 
