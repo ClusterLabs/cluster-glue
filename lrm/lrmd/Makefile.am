@@ -28,8 +28,8 @@ halibdir	=  $(libdir)/@HB_PKG@
 COMMONLIBS	=  $(top_builddir)/lib/clplumbing/libplumb.la   \
 		   $(top_builddir)/lib/hbclient/libhbclient.la  \
                	   $(GLIBLIB)
-
 halib_PROGRAMS 	=  lrmd
 
 lrmd_SOURCES 	=  lrmd.c
+lrmd_CFLAGS	=  -DPLUGIN_DIR='"@PLUGIN_DIR@"' -DRA_PLUGIN_DIR='"@RA_PLUGIN_DIR@"'
 lrmd_LDFLAGS 	=  $(top_builddir)/lib/lrm/liblrm_la-lrm_msg.lo $(COMMONLIBS) -luuid -L$(top_builddir)/lib/pils -lpils
