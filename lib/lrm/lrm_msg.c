@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.15 2004/09/10 10:09:43 sunjd Exp $ */
+/* $Id: lrm_msg.c,v 1.16 2004/09/13 07:10:30 zhenh Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -174,7 +174,6 @@ ha_msg_value_str_table(struct ha_msg * msg, const char * name)
 
 	hash_msg = cl_get_struct(msg, name);
 	if (NULL == hash_msg) {
-		cl_log(LOG_ERR, "cl_get_struct in ha_msg_value_str_table failed");
 		return NULL;
 	}
 	hash_table = msg_to_str_table(hash_msg);
@@ -420,6 +419,9 @@ create_lrm_ret(int rc, int fields)
 
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.16  2004/09/13 07:10:30  zhenh
+ * fix a bug: the msg does not contain the request field so returning NULL is correct. not an error. remove the wrong log
+ *
  * Revision 1.15  2004/09/10 10:09:43  sunjd
  * Fix a bug: duplicate keys in GHashtable, is not expected
  *
