@@ -336,6 +336,7 @@ G_CH_dispatch(gpointer source_data
 	}else if (chp->outfd.revents & OUTPUT_EVENTS) {
 		chp->outfd.events &= ~OUTPUT_EVENTS;
 	}
+#if 0
 	/* If we got a HUP then mark channel as disconnected */
 	if ((chp->infd.revents|chp->outfd.revents) & G_IO_HUP) {
 		/* CHEAT!! */
@@ -343,6 +344,9 @@ G_CH_dispatch(gpointer source_data
 	}else{
 		chp->ch->ops->resume_io(chp->ch);
 	}
+#else
+	chp->ch->ops->resume_io(chp->ch);
+#endif
 	if(chp->dispatch) {
 		return chp->dispatch(chp->ch, chp->udata);
 	}
