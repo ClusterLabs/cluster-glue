@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
- * 
+ *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -40,15 +40,15 @@ void get_cur_state(lrm_rsc_t* rsc);
 
 int main (int argc, char* argv[])
 {
-	set_debug_level(LOG_INFO);
+	set_debug_level(LOG_ERR);
 	ll_lrm_t* lrm;
 	lrm_rsc_t* rsc = NULL;
 	lrm_op_t* op = NULL;
-	const char* rid = "NEWID2";
-	GList * class, * type, * classes, * types;
+	const char* rid = "ip248";
 	GHashTable* param = NULL;
-
-	lrm = ll_lrm_new("lrm");	
+	GList * class, * type, * classes, * types;
+	
+	lrm = ll_lrm_new("lrm");
 	if(NULL == lrm)
 	{
 		printf("lrm==NULL\n");
@@ -56,33 +56,32 @@ int main (int argc, char* argv[])
 	}
 	puts("sigon...");
 	lrm->lrm_ops->signon(lrm,"apitest");
-
-	puts("get_rsc_class_supported...");
+ 	puts("get_rsc_class_supported...");
 	classes = lrm->lrm_ops->get_rsc_class_supported(lrm);
 	for(class = g_list_first(classes); NULL!=class; class = g_list_next(class)) {
 		printf("class:%s\n", (char*)class->data);
 		types = lrm->lrm_ops->get_rsc_type_supported(lrm, class->data);
 		for(type = g_list_first(types); NULL!=type; type = g_list_next(type)) {
-			printf("\ntype:%s\n", (char*)type->data);
+			char* meta = lrm->lrm_ops->get_rsc_type_metadata(lrm,(char*)class->data,(char*)type->data);
+			printf("\ntype:%s\nmetadata:%s\n", (char*)type->data, meta);
 		}
 	}
 
 	puts("set_lrm_callback...");
 	lrm->lrm_ops->set_lrm_callback(lrm, lrm_op_done_callback,
 					lrm_monitor_callback);
-	
+
 	param = g_hash_table_new(g_str_hash,g_str_equal);
-	g_hash_table_insert(param, strdup("1"), strdup("first"));
-	g_hash_table_insert(param, strdup("2"), strdup("second"));
-	g_hash_table_insert(param, strdup("3"), strdup("third"));
+	g_hash_table_insert(param, strdup("1"), strdup("3ffe:ffff:0:f101::3"));
+
 	puts("add_rsc...");
-	lrm->lrm_ops->add_rsc(lrm, rid, "heartbeat", "/home/zhenh/linux-ha/lrm/test/ocf_script_sim.sh", param);
+	lrm->lrm_ops->add_rsc(lrm, rid, "heartbeat", "IPv6addr", param);
 
 	puts("get_rsc...");
 	rsc = lrm->lrm_ops->get_rsc(lrm, rid);
 	printf_rsc(rsc);
 
-	puts("perform_op...");
+	puts("perform_op(start)...");
 	op = g_new(lrm_op_t, 1);
 	op->op_type = "start";
 	op->params = param;
@@ -90,10 +89,98 @@ int main (int argc, char* argv[])
 	op->user_data = strdup("It is a start op!");
 	rsc->ops->perform_op(rsc,op);
 	printf_op(op);
-	
+
+	puts("perform_op(status)...");
+	op = g_new(lrm_op_t, 1);
+	op->op_type = "status";
+	op->params = param;
+	op->timeout = 0;
+	op->user_data = strdup("It is a status op!");
+	rsc->ops->perform_op(rsc,op);
+	printf_op(op);
+
+	puts("perform_op(stop)...");
+	op = g_new(lrm_op_t, 1);
+	op->op_type = "stop";
+	op->params = param;
+	op->timeout = 0;
+	op->user_data = strdup("It is a stop op!");
+	rsc->ops->perform_op(rsc,op);
+	printf_op(op);
+
+	puts("perform_op(status)...");
+	op = g_new(lrm_op_t, 1);
+	op->op_type = "status";
+	op->params = param;
+	op->timeout = 0;
+	op->user_data = strdup("It is a status op!");
+	rsc->ops->perform_op(rsc,op);
+	printf_op(op);
+
+	puts("get_cur_state...");
+	state_flag_t state;
+	GList* ops = rsc->ops->get_cur_state(rsc,&state);
+	printf("resource state:%s\n", state==LRM_RSC_IDLE?"LRM_RSC_IDLE":"LRM_RSC_BUSY");
+	printf("resource op list:\n");
+	while (NULL!=ops) {
+		printf_op((lrm_op_t*)ops->data);
+		ops = g_list_next(ops);
+	}
+
 	puts("rcvmsg...");
 	lrm->lrm_ops->rcvmsg(lrm,TRUE);
+	lrm->lrm_ops->rcvmsg(lrm,TRUE);
+	lrm->lrm_ops->rcvmsg(lrm,TRUE);
+	lrm->lrm_ops->rcvmsg(lrm,TRUE);
 
+	puts("get_cur_state...");
+	ops = rsc->ops->get_cur_state(rsc,&state);
+	printf("resource state:%s\n", state==LRM_RSC_IDLE?"LRM_RSC_IDLE":"LRM_RSC_BUSY");
+	printf("resource op list:\n");
+	while (NULL!=ops) {
+		printf_op((lrm_op_t*)ops->data);
+		ops = g_list_next(ops);
+	}
+	lrm_mon_t setmon;
+	setmon.mode = LRM_MONITOR_SET;
+	setmon.interval = 2;
+	setmon.user_data = NULL;
+	setmon.target = 0;
+	setmon.op_type = "status";
+	setmon.params = param;
+	setmon.timeout = 0;
+	rsc->ops->set_monitor(rsc, &setmon);
+
+	lrm_mon_t chgmon;
+	chgmon.mode = LRM_MONITOR_CHANGE;
+	chgmon.interval = 2;
+	chgmon.user_data = NULL;
+	chgmon.target = 0;
+	chgmon.op_type = "status";
+	chgmon.params = param;
+	chgmon.timeout = 0;
+	rsc->ops->set_monitor(rsc, &chgmon);
+/*
+	lrm_mon_t clrmon;
+	clrmon.mode = LRM_MONITOR_CLEAR;
+	clrmon.interval = 2;
+	clrmon.user_data = NULL;
+	clrmon.target = 0;
+	clrmon.op_type = "status";
+	clrmon.params = param;
+	clrmon.timeout = 0;
+	rsc->ops->set_monitor(rsc, &clrmon);
+*/
+	puts("get_monitors...");
+	GList* mons = rsc->ops->get_monitors(rsc);
+	while (NULL!=mons) {
+		printf_mon((lrm_mon_t*)mons->data);
+		mons = g_list_next(mons);
+	}
+	
+	while(1) {
+		lrm->lrm_ops->rcvmsg(lrm,TRUE);
+	}	
 	puts("signoff...");
 	lrm->lrm_ops->signoff(lrm);
 	return 0;
@@ -157,7 +244,7 @@ void printf_op(lrm_op_t* op)
 
 void printf_mon(lrm_mon_t* mon)
 {
-	
+
 	printf("print mon\n");
 	if (NULL == mon) {
 		printf("mon is null\n");
@@ -174,7 +261,7 @@ void printf_mon(lrm_mon_t* mon)
 		case LRM_MONITOR_SET:
 			printf("\tmode:%s\n","LRM_MONITOR_SET");
 			break;
-			
+
 		case LRM_MONITOR_CHANGE:
 			printf("\tmode:%s\n","LRM_MONITOR_CHANGE");
 			break;
