@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.12 2004/06/24 20:49:49 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.13 2004/06/24 20:54:35 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1816,9 +1816,18 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.13  2004/06/24 20:54:35  gshi
+ * add version 1.11 log that I overwritten in the last commit
+ *
  * Revision 1.12  2004/06/24 20:49:49  gshi
  * remove commented code
+ * Revision 1.11  2004/06/24 20:44:29  gshi
+ * added cl_msg_modstring() cl_msg_modstruct() cl_msg_modbin()
+ * they call call cl_msg_mod()
  *
+ *
+ * fixed a bug in cl_msg_addstruct() that will cause memory getting freed twice
+ * if a parent and its child message is deleted. 
  * Revision 1.10  2004/06/18 03:04:33  alan
  * Changed a few checks for non-existent fields to return NULL
  * silently.  This is the right behavior (really!).
