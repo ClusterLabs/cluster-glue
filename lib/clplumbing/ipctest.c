@@ -36,9 +36,31 @@ static int
 channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
 {
 	IPC_Channel* channels[2];
-	int		rc;
+	int		rc  = 0;
 	int		waitstat = 0;
 
+	switch (fork()) {
+		case -1:
+			cl_perror("can't fork");
+			exit(1);
+			break;
+		default: /* Parent */
+			while (wait(&waitstat) > 0) {
+				if (WIFEXITED(waitstat)) {
+					rc += WEXITSTATUS(waitstat);
+				}else{
+					rc += 1;
+				}
+			}
+			if (rc > 127) {
+				rc = 127;
+			}
+			exit(rc);
+			break;
+		case 0:	/* Child */
+			break;
+	}
+	/* Child continues here... */
 	if (ipc_channel_pair(channels) != IPC_OK) {
 		cl_perror("Can't create ipc channel pair");
 		exit(1);
@@ -51,26 +73,26 @@ channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
 			exit(1);
 			break;
 
-		case 0:		/* Child */
+		case 0:		/* echo "client" Child */
 			channels[1]->ops->destroy(channels[1]);
 			channels[1] = NULL;
 			rc = clientfunc(channels[0], count);
 			exit (rc > 127 ? 127 : rc);
 			break;
 
-		default:	 /* Server */
-			channels[0]->ops->destroy(channels[0]);
-			channels[0] = NULL;
-			rc = serverfunc(channels[1], count);
-			wait(&waitstat);
-			if (WIFEXITED(waitstat)) {
-				rc += WEXITSTATUS(waitstat);
-			}else{
-				rc += 1;
-			}
-			return rc;
+		default:
+			break;
 	}
-	return -1; /* This can't happen ;-) */
+	channels[0]->ops->destroy(channels[0]);
+	channels[0] = NULL;
+	rc = serverfunc(channels[1], count);
+	wait(&waitstat);
+	if (WIFEXITED(waitstat)) {
+		rc += WEXITSTATUS(waitstat);
+	}else{
+		rc += 1;
+	}
+	return(rc);
 }
 
 #if 0
@@ -348,6 +370,7 @@ echoclient(IPC_Channel* rchan, int repcount)
 			,	rc, j, errno);
 			cl_perror("recv");
 			++errcount;
+			--j;
 			rmsg=NULL;
 			continue;
 		}
