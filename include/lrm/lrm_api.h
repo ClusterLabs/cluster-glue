@@ -118,6 +118,8 @@ typedef struct{
 	int			call_id;
 	char*			output;
 	char*			rsc_id;
+	/*please notice the client needs release the memory of rsc.*/
+	lrm_rsc_t*		rsc;
 	char*			app_name;
 }lrm_op_t;
 

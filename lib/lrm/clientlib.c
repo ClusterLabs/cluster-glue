@@ -223,8 +223,6 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 			"lrm_signon: can not initiate connection");
 		return HA_FAIL;
 	}
-
-
 	/*send the msg*/
 	if (HA_OK != msg2ipcchan(msg,ch_cbk)) {
 		lrm_signoff(lrm);
@@ -233,7 +231,6 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 		return HA_FAIL;
 	}
 	ha_msg_del(msg);
-
 	/*parse the return msg*/
 	if (HA_OK != get_rc_from_ch(ch_cbk)) {
 		lrm_signoff(lrm);
@@ -241,7 +238,6 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 			"lrm_signon: can not recv result from lrmd");
 		return HA_FAIL;
 	}
-
 	/*ok, we sign on sucessfully now*/
 	is_signed_on = TRUE;
 	client_log(LOG_INFO, "lrm_signon: end.");
@@ -288,12 +284,10 @@ lrm_signoff (ll_lrm_t* lrm)
  		ch_cmd->ops->destroy(ch_cmd);
 		ch_cmd = NULL;
 	}
-
 	if (NULL != ch_cbk) {
 		ch_cbk->ops->destroy(ch_cbk);
 		ch_cbk = NULL;
 	}
-
 	is_signed_on = FALSE;
 
 	client_log(LOG_INFO, "lrm_signoff: end.");
@@ -781,6 +775,7 @@ lrm_rcvmsg (ll_lrm_t* lrm, int blocking)
 		msg_count++;
 
 		lrm_op_t* op = msg_to_op(msg);
+		op->rsc = lrm_get_rsc( NULL, op->rsc_id );
 		if (NULL!=op && NULL!=op_done_callback) {
 			(*op_done_callback)(op);
 		}
