@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.41 2005/03/15 18:01:37 gshi Exp $ */
+/* $Id: cl_log.c,v 1.42 2005/03/15 19:28:41 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -71,6 +71,69 @@ void
 cl_log_send_to_logging_daemon(int truefalse)
 {
 	use_logging_daemon = truefalse;
+}
+
+static IPC_Channel* 
+create_logging_channel(void)
+{
+	GHashTable*	attrs;
+	char		path[] = IPC_PATH_ATTR;
+	char		sockpath[] = HA_LOGDAEMON_IPC;	
+	IPC_Channel*	chan;
+	
+	attrs = g_hash_table_new(g_str_hash, g_str_equal);
+	g_hash_table_insert(attrs, path, sockpath);	
+
+	chan =ipc_channel_constructor(IPC_ANYTYPE, attrs);       	
+	
+	g_hash_table_destroy(attrs);	
+	
+	if (chan == NULL) {
+		cl_log(LOG_ERR, "create_logging_channel:"
+		       "contructing ipc channel failed");
+		return NULL;
+	}
+			
+	if (chan->ops->initiate_connection(chan) != IPC_OK) {
+		cl_log(LOG_WARNING, "Initializing connection"
+		       " to logging daemon failed."
+		       " Logging daemon may not be running");
+		chan->ops->destroy(chan);
+		
+		return NULL;
+	}
+	
+	return chan;
+	
+}
+
+gboolean
+cl_log_test_logd(void)
+{
+	IPC_Channel*		chan = logging_daemon_chan;
+
+	if (chan && chan->ops->get_chan_status(chan) == IPC_CONNECT){
+		return TRUE;
+	}
+	if (chan ){
+		chan->ops->destroy(chan);
+		logging_daemon_chan = chan = NULL;
+	}
+	
+	logging_daemon_chan = chan = create_logging_channel();			
+	
+	if (chan == NULL){
+		return FALSE;
+	}
+		
+	if(chan->ops->get_chan_status(chan) != IPC_CONNECT){
+		chan->ops->destroy(chan);
+		logging_daemon_chan = chan = NULL;	
+		return FALSE;
+	}
+	
+	return TRUE;
+	
 }
 
 void
@@ -381,39 +444,6 @@ ha_timestamp(TIME_T t)
 	return(ts);
 }
 
-static IPC_Channel* 
-create_logging_channel(void)
-{
-	GHashTable*	attrs;
-	char		path[] = IPC_PATH_ATTR;
-	char		sockpath[] = HA_LOGDAEMON_IPC;	
-	IPC_Channel*	chan;
-	
-	attrs = g_hash_table_new(g_str_hash, g_str_equal);
-	g_hash_table_insert(attrs, path, sockpath);	
-
-	chan =ipc_channel_constructor(IPC_ANYTYPE, attrs);       	
-	
-	g_hash_table_destroy(attrs);	
-	
-	if (chan == NULL) {
-		cl_log(LOG_ERR, "create_logging_channel:"
-		       "contructing ipc channel failed");
-		return NULL;
-	}
-			
-	if (chan->ops->initiate_connection(chan) != IPC_OK) {
-		cl_log(LOG_WARNING, "Initializing connection"
-		       " to logging daemon failed."
-		       " Logging daemon may not be running");
-		chan->ops->destroy(chan);
-		
-		return NULL;
-	}
-	
-	return chan;
-	
-}
 
 int
 cl_set_logging_wqueue_maxlen(int qlen)
