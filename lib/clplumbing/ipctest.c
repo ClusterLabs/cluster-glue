@@ -1,4 +1,5 @@
-/* $Id: ipctest.c,v 1.25 2004/09/20 18:32:52 msoffen Exp $ */
+/* $Id: ipctest.c,v 1.26 2004/10/01 12:04:12 lge Exp $ */
+#undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
