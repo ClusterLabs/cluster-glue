@@ -82,8 +82,7 @@ struct RAExecOps {
 		const char * rsc_type,
 		const char * provider,
 		const char * op_type,
-		GHashTable * cmd_params,
-		GHashTable * env_params);
+		GHashTable * params);
 
 	/*
 	 * Description:

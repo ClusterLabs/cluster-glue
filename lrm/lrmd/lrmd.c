@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.29 2004/09/03 01:41:15 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.30 2004/09/06 04:36:18 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1682,8 +1682,7 @@ perform_ra_op(lrmd_op_t* op)
 			RAExec->execra (op->rsc->type,
 					op->rsc->provider,
 					op_type,
-					params,
-					NULL);
+					params);
 
 			free_hash_table(op_params);
 			free_hash_table(params);
@@ -2003,6 +2002,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.30  2004/09/06 04:36:18  zhenh
+ * fix a bug
+ *
  * Revision 1.29  2004/09/03 01:41:15  zhenh
  * add provider for resource
  *
