@@ -40,15 +40,22 @@ void get_cur_state(lrm_rsc_t* rsc);
 
 int main (int argc, char* argv[])
 {
-	set_debug_level(LOG_ERR);
 	ll_lrm_t* lrm;
 	lrm_rsc_t* rsc = NULL;
 	lrm_op_t* op = NULL;
 	const char* rid = "ip248";
-	GHashTable* param = NULL;
 	GList * class, * type, * classes, * types;
-	
+	GHashTable* param = NULL;
+	state_flag_t state;
+	lrm_mon_t setmon;
+	lrm_mon_t chgmon;
+	GList* ops = NULL;
+	GList* mons = NULL;
+
+	set_debug_level(LOG_INFO);
+
 	lrm = ll_lrm_new("lrm");
+
 	if(NULL == lrm)
 	{
 		printf("lrm==NULL\n");
@@ -118,8 +125,7 @@ int main (int argc, char* argv[])
 	printf_op(op);
 
 	puts("get_cur_state...");
-	state_flag_t state;
-	GList* ops = rsc->ops->get_cur_state(rsc,&state);
+	ops = rsc->ops->get_cur_state(rsc,&state);
 	printf("resource state:%s\n", state==LRM_RSC_IDLE?"LRM_RSC_IDLE":"LRM_RSC_BUSY");
 	printf("resource op list:\n");
 	while (NULL!=ops) {
@@ -141,7 +147,7 @@ int main (int argc, char* argv[])
 		printf_op((lrm_op_t*)ops->data);
 		ops = g_list_next(ops);
 	}
-	lrm_mon_t setmon;
+
 	setmon.mode = LRM_MONITOR_SET;
 	setmon.interval = 2;
 	setmon.user_data = NULL;
@@ -151,7 +157,6 @@ int main (int argc, char* argv[])
 	setmon.timeout = 0;
 	rsc->ops->set_monitor(rsc, &setmon);
 
-	lrm_mon_t chgmon;
 	chgmon.mode = LRM_MONITOR_CHANGE;
 	chgmon.interval = 2;
 	chgmon.user_data = NULL;
@@ -172,7 +177,7 @@ int main (int argc, char* argv[])
 	rsc->ops->set_monitor(rsc, &clrmon);
 */
 	puts("get_monitors...");
-	GList* mons = rsc->ops->get_monitors(rsc);
+	mons = rsc->ops->get_monitors(rsc);
 	while (NULL!=mons) {
 		printf_mon((lrm_mon_t*)mons->data);
 		mons = g_list_next(mons);
