@@ -1137,7 +1137,7 @@ msg_to_op(struct ha_msg* msg)
 	if (HA_OK !=
 		ha_msg_value_int(msg, F_LRM_OPSTATUS, (int*)&op->op_status)) {
 		client_log(LOG_INFO,
-			"on_op_done: can not get op status from msg.");
+			"msg_to_op: can not get op status from msg.");
                 op->op_status = -1;
 	}
 
@@ -1147,7 +1147,7 @@ msg_to_op(struct ha_msg* msg)
 		if (HA_OK != ha_msg_value_int(msg, F_LRM_RC, &op->rc)) {
 			free_op(op);
 			client_log(LOG_ERR,
-				"on_op_done: can not get op rc from msg.");
+				"msg_to_op: can not get op rc from msg.");
 			return NULL;
 		}
 		/* op->output */
@@ -1157,10 +1157,17 @@ msg_to_op(struct ha_msg* msg)
 			if (len != output_len) {
 				free_op(op);
 				client_log(LOG_ERR,
-				"on_op_done: can not get data from msg.");
+				"msg_to_op: can not get data from msg.");
 				return NULL;
 			}
 			op->output = ha_malloc(len+1);
+			if (NULL == op->output) {
+				free_op(op);
+				client_log(LOG_ERR,
+				"msg_to_op: can't alloc memory for output");
+				return NULL;
+			}
+			
 			memcpy(op->output, output,len);
 			op->output[len]=0;
 		}
@@ -1197,10 +1204,8 @@ msg_to_op(struct ha_msg* msg)
 		free_op(op);
 		return NULL;
 	}
-	op->rsc_id = g_strdup(rsc_id);
 
 	/* op->user_data */
-	
 	user_data = cl_get_binary(msg, F_LRM_USERDATA,&userdata_len);
 	
 	if (NULL != user_data && sizeof(gpointer)==userdata_len ) {
