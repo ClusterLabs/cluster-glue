@@ -1,0 +1,558 @@
+ /* $Id: cyclades.c,v 1.2 2005/03/22 17:39:45 blaschke Exp $ */
+/*
+ * Stonith module for Cyclades AlterPath PM
+ * Bases off the SSH plugin
+ *
+ * Copyright (c) 2004 Cyclades corp.
+ *
+ * Author: Jon Taylor <jon.taylor@cyclades.com>
+ *
+ * Rewritten from scratch using baytech.c structure and code 
+ * and currently maintained by
+ *       Marcelo Tosatti  <marcelo.tosatti@cyclades.com>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ */
+
+#define	DEVICE	"Cyclades PM"
+
+#include "stonith_plugin_common.h"
+
+#define PIL_PLUGIN              cyclades 
+#define PIL_PLUGIN_S            "cyclades"
+#define PIL_PLUGINLICENSE 	LICENSE_LGPL
+#define PIL_PLUGINLICENSEURL 	URL_LGPL
+#include <pils/plugin.h>
+
+#include "stonith_signal.h"
+
+static StonithPlugin *	cyclades_new(void);
+static void		cyclades_destroy(StonithPlugin *);
+static int		cyclades_set_config(StonithPlugin *, StonithNVpair *);
+static const char **	cyclades_get_confignames(StonithPlugin * s);
+static const char *	cyclades_get_info(StonithPlugin * s, int InfoType);
+static int		cyclades_status(StonithPlugin *);
+static int		cyclades_reset_req(StonithPlugin * s, int request, const char * host);
+static char **		cyclades_hostlist(StonithPlugin *);
+
+
+
+static struct stonith_ops cycladesOps ={
+	cyclades_new,			/* Create new STONITH object	*/
+	cyclades_destroy,		/* Destroy STONITH object	*/
+	cyclades_get_info,		/* Return STONITH info string	*/
+	cyclades_get_confignames,	/* Return STONITH config vars	*/
+	cyclades_set_config,		/* set configuration from vars	*/
+	cyclades_status,		/* Return STONITH device status	*/
+	cyclades_reset_req,		/* Request a reset */
+	cyclades_hostlist,		/* Return list of supported hosts */
+};
+
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
+static const PILPluginImports*  PluginImports;
+static PILPlugin*               OurPlugin;
+static PILInterface*		OurInterface;
+static StonithImports*		OurImports;
+static void*			interfprivate;
+
+#include "stonith_expect_helpers.h"
+
+PIL_rc
+PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
+
+PIL_rc
+PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
+{
+	/* Force the compiler to do a little type checking */
+	(void)(PILPluginInitFun)PIL_PLUGIN_INIT;
+
+	PluginImports = imports;
+	OurPlugin = us;
+
+	/* Register ourself as a plugin */
+	imports->register_plugin(us, &OurPIExports);  
+
+	/*  Register our interface implementation */
+ 	return imports->register_interface(us, PIL_PLUGINTYPE_S
+	,	PIL_PLUGIN_S
+	,	&cycladesOps
+	,	NULL		/*close */
+	,	&OurInterface
+	,	(void*)&OurImports
+	,	&interfprivate); 
+}
+
+/*
+ *    Cyclades STONITH device
+ *
+ */
+
+struct pluginDevice {
+	StonithPlugin	sp;
+	const char *	pluginid;
+	char *		device;
+	char *		user;
+
+	/* pid of ssh client process and its in/out file descriptors */
+	pid_t		pid; 
+	int 		rdfd, wrfd;		
+};
+
+static struct Etoken StatusOutput[] = { 
+	{ "Outlet\t\tName\t\tStatus\t\tUsers\t\tInterval (s)", 0, 0},
+	{ NULL, 0, 0} 
+};
+
+
+/* Commands of PM devices */
+static char status_all[] = "status all";
+static char cycle[] = "cycle";
+
+static int CYC_robust_cmd(struct pluginDevice *, char *);
+
+static const char * pluginid = "CycladesDevice-Stonith";
+static const char * NOTpluginID = "Cyclades device has been destroyed";
+
+#define NEGEXPECT(fd,p,t)	{					\
+                                if (StonithLookFor(fd, p, t) < 0)	\
+                                        return(-1);			\
+                        }
+
+#define RESETEXPECT(fd,p,t)	{					\
+                        	if (StonithLookFor(fd, p, t) < 0)	\
+                                	return(errno == ETIMEDOUT	\
+	                        ?       S_RESETFAIL : S_OOPS);		\
+                        }
+
+static int
+cyclades_status(StonithPlugin  *s)
+{
+	struct pluginDevice *sd;
+	char *cmd = status_all;
+
+	ERRIFNOTCONFIGED(s,S_OOPS);
+
+	sd = (struct pluginDevice*) s;
+
+	if (CYC_robust_cmd(sd, cmd) != S_OK) {
+		LOG(PIL_CRIT, "can't run status all command");
+		return(S_OOPS);
+	}
+
+	EXPECT(sd->rdfd, StatusOutput, 50);
+
+	return(S_OK);
+}
+
+static int CYC_run_command(struct pluginDevice *sd, char *cmd)
+{
+	char	SshCommand[256];
+
+	snprintf(SshCommand, sizeof(SshCommand),
+			"exec ssh -q %s@%s /root/pmcmd %s 2>/dev/null", 
+			sd->user, sd->device, cmd);
+
+	sd->pid = STARTPROC(SshCommand, &sd->rdfd, &sd->wrfd);
+
+	if (sd->pid <= 0) {
+		return(S_OOPS);
+	}
+
+	return(S_OK);
+}
+
+static int 
+CYC_robust_cmd(struct pluginDevice *sd, char *cmd)
+{
+	int rc = S_OOPS;
+	int i;
+
+	for (i=0; i < 20 && rc != S_OK; i++) {
+
+		if (sd->pid > 0) {
+			Stonithkillcomm(&sd->rdfd, &sd->wrfd, &sd->pid);
+		}
+
+		if (CYC_run_command(sd, cmd) != S_OK) {
+			Stonithkillcomm(&sd->rdfd, &sd->wrfd, &sd->pid);
+			continue;
+		} 
+		rc = S_OK;
+	}
+
+	return rc;
+}
+
+#define MAXSAVE 512
+static int CYCNametoOutlet(struct pluginDevice *sd, const char *host)
+{
+	char *cmd = status_all;
+	char    savebuf[MAXSAVE];
+	int err;
+	int ret = -1;
+	int outlet;
+	char name[10], locked[10], on[4];
+
+	memset(savebuf, 0, sizeof(savebuf));
+
+	if (CYC_robust_cmd(sd, cmd) != S_OK) {
+		LOG(PIL_CRIT, "can't run status all command");
+		return -1;
+	}
+
+	NEGEXPECT(sd->rdfd, StatusOutput, 50);
+
+	NEGEXPECT(sd->rdfd, CRNL, 50);
+
+	do {
+
+		memset(savebuf, 0, sizeof(savebuf));
+		memset(name, 0, sizeof(name));
+		memset(locked, 0, sizeof(locked));
+		memset(on, 0, sizeof(on));
+
+		err = StonithScanLine(sd->rdfd, 50, savebuf, sizeof(savebuf));
+		if (err != S_OK) {
+			Stonithkillcomm(&sd->rdfd, &sd->wrfd, &sd->pid);
+			return ret;
+		}
+
+		if (sscanf(savebuf,"%2d %10s %10s %3s", &outlet, 
+			name, locked, on) > 0) {
+			g_strdown(name);
+			if (strstr(locked, "ocked") && !strcmp(name, host)) {
+				ret = outlet;
+			}
+		}
+
+	} while (err == S_OK || ret < 0);
+
+	return (ret);
+}
+
+
+/*
+ *	Return the list of hosts configured for this Cyclades device
+ */
+
+static char **
+cyclades_hostlist(StonithPlugin  *s)
+{
+	struct pluginDevice*	sd;
+	char *cmd = status_all;
+	char    savebuf[MAXSAVE];
+	int err, i;
+	int outlet;
+	int numnames = 0;
+	char name[10], locked[10], on[4];
+	char *NameList[64];
+	char **ret = NULL;
+
+	ERRIFNOTCONFIGED(s,NULL);
+
+	sd = (struct pluginDevice*) s;
+
+	if (CYC_robust_cmd(sd, cmd) != S_OK) {
+		LOG(PIL_CRIT, "can't run status all command");
+		return (NULL);
+	}
+
+	memset(savebuf, 0, sizeof(savebuf));
+
+	NULLEXPECT(sd->rdfd, StatusOutput, 50);
+
+	NULLEXPECT(sd->rdfd, CRNL, 50);
+
+	do {
+		char *nm;
+
+		memset(savebuf, 0, sizeof(savebuf));
+		memset(name, 0, sizeof(name));
+		memset(locked, 0, sizeof(locked));
+		memset(on, 0, sizeof(on));
+
+		err = StonithScanLine(sd->rdfd, 50, savebuf, sizeof(savebuf));
+		if (err != S_OK) {
+			Stonithkillcomm(&sd->rdfd, &sd->wrfd, &sd->pid);
+			return ret;
+		}
+
+		if (sscanf(savebuf,"%2d %10s %10s %3s", &outlet, 
+			name, locked, on) > 0) {
+			if (strstr(locked, "ocked")) {
+				nm = (char *) STRDUP (name);
+				if (!nm) {
+					LOG(PIL_CRIT, "out of memory");
+					goto out_of_memory;
+				}
+				g_strdown(nm);
+				NameList[numnames] = nm;
+				numnames++;
+				NameList[numnames] = NULL;
+			}
+		}
+
+	} while (err == S_OK);
+
+	if (numnames) {
+
+		ret = (char **)MALLOC((numnames+1)*sizeof(char*));
+		if (ret == NULL) {
+			LOG(PIL_CRIT, "out of memory");
+			goto out_of_memory;
+		} else {
+			memcpy(ret, NameList, (numnames+1)*sizeof(char*));
+		}
+		return (ret);
+	}
+
+out_of_memory:
+	for (i=0; i<numnames; i++) {
+		free(NameList[i]);
+	}
+
+	return (NULL);
+}
+
+static int cyclades_onoff(struct pluginDevice *sd, int outlet, 
+		const char *unitid, int req)
+{
+	const char * onoff;
+	char cmd[64], expstring[64];
+	struct Etoken exp[] = {{NULL, 0, 0}, {NULL, 0, 0}};
+	
+	onoff = (req == ST_POWERON ? "on" : "off");
+
+	memset(cmd, 0, sizeof(cmd));
+	memset(expstring, 0, sizeof(expstring));
+
+	sprintf(cmd, "%s %d", onoff, outlet);
+
+	if (CYC_robust_cmd(sd, cmd) != S_OK) {
+		LOG(PIL_CRIT, "can't run %s command", onoff);
+		return(S_OOPS);
+	}
+
+	EXPECT(sd->rdfd, CRNL, 50);
+
+	snprintf(expstring, sizeof(expstring), "%d: Outlet turned %s.", outlet,
+			onoff);
+
+	exp[0].string = expstring;
+
+	// FIXME: should handle "already powered on/off" case and inform 
+	// to log
+
+	EXPECT(sd->rdfd, exp, 50); 
+	
+	LOG(PIL_DEBUG, "Power to host %s turned %s", unitid, onoff);
+
+	return (S_OK);
+}
+
+static int cyclades_reset(struct pluginDevice *sd, int outlet,
+		const char *unitid)
+{
+	char cmd[64], expstring[64];
+	struct Etoken exp[] = {{NULL, 0, 0}, {NULL, 0, 0}};
+
+	memset(cmd, 0, sizeof(cmd));
+	memset(expstring, 0, sizeof(expstring));
+
+	sprintf(cmd, "%s %d", cycle, outlet);
+
+	LOG(PIL_INFO, "Host %s being rebooted.", unitid);
+
+	if (CYC_robust_cmd(sd, cmd) != S_OK) {
+		LOG(PIL_CRIT, "can't run cycle command");
+		return(S_OOPS);
+	}
+
+	RESETEXPECT(sd->rdfd, CRNL, 50);
+
+	snprintf(expstring, sizeof(expstring)
+	,	"%d: Outlet turned off.", outlet);
+
+	exp[0].string = expstring;
+	RESETEXPECT(sd->rdfd, exp, 50); 
+
+	memset(expstring, 0, sizeof(expstring));
+	snprintf(expstring, sizeof(expstring)
+	,	"%d: Outlet turned on.", outlet);
+	RESETEXPECT(sd->rdfd, exp, 50); 
+
+	return (S_OK);
+}
+
+/*
+ *	Reset the given host on this Stonith device.
+ */
+static int
+cyclades_reset_req(StonithPlugin * s, int request, const char * host)
+{
+	struct pluginDevice *sd;
+	int rc = 0;
+	char cmd[512];
+	int outlet;
+
+	ERRIFNOTCONFIGED(s,S_OOPS);
+
+	sd = (struct pluginDevice*) s;
+
+	memset (cmd, 0, sizeof(cmd));
+
+	outlet = CYCNametoOutlet(sd, host);
+
+	if (!outlet) {
+		LOG(PIL_CRIT, "Unknown host %s to Cyclades PM", host);
+		return (S_OOPS);
+	}
+
+		
+	switch (request) {
+	case ST_POWERON:
+	case ST_POWEROFF:
+		rc = cyclades_onoff(sd, outlet, host, request);
+		break;
+
+	case ST_GENERIC_RESET:
+		rc = cyclades_reset(sd, outlet, host);
+		break;
+	default:
+		rc = S_INVAL;
+		break;
+	}
+
+	return rc;
+}
+
+static const char **
+cyclades_get_confignames(StonithPlugin * s)
+{
+	static const char * ret[] = {ST_IPADDR, ST_LOGIN, NULL};
+	return ret;
+}
+
+/*
+ *	Parse the config information in the given string, and stash it away...
+ */
+static int
+cyclades_set_config(StonithPlugin* s, StonithNVpair* list)
+{
+	struct pluginDevice* sd = (struct pluginDevice *)s;
+	int		rc;
+	StonithNamesToGet	namestoget[] =
+	{	{ST_IPADDR,	NULL}
+	,	{ST_LOGIN,	NULL}
+	,	{NULL,		NULL}
+	};
+
+	ERRIFWRONGDEV(s, S_OOPS);
+	if (sd->sp.isconfigured) {
+		return S_OOPS;
+	}
+
+	if ((rc = OurImports->GetAllValues(namestoget, list)) != S_OK) {
+		return rc;
+	}
+	sd->device = namestoget[0].s_value;
+	sd->user   = namestoget[1].s_value;
+
+	return(S_OK);
+}
+
+static const char *
+cyclades_get_info(StonithPlugin * s, int reqtype)
+{
+	struct pluginDevice * sd;
+	const char * ret;
+
+	ERRIFWRONGDEV(s, NULL);
+
+	sd = (struct pluginDevice*) s;
+
+	switch (reqtype) {
+		case ST_DEVICEID:		/* What type of device? */
+			// FIXME: could inform the exact PM model
+			ret = "Cyclades AlterPath PM";
+			break;
+
+		case ST_DEVICENAME:		/* What particular device? */
+			ret = sd->device;
+			break;
+
+		case ST_DEVICEDESCR:		/* Description of dev type */
+			ret = "Cyclades AlterPath PM "
+				"series power switches (via TS/ACS/KVM).";
+			break;
+
+		case ST_DEVICEURL:		/* Manufacturer's web site */
+			ret = "http://www.cyclades.com/";
+			break;
+
+		default:
+			ret = NULL;
+			break;
+	}
+	return ret;
+}
+
+/*
+ *	Cyclades Stonith destructor...
+ */
+static void
+cyclades_destroy(StonithPlugin *s)
+{
+	struct pluginDevice* sd;
+
+	VOIDERRIFWRONGDEV(s);
+
+	sd = (struct pluginDevice*) s;
+
+	sd->pluginid = NOTpluginID;
+	Stonithkillcomm(&sd->rdfd, &sd->wrfd, &sd->pid);
+	if (sd->device != NULL) {
+		FREE(sd->device);
+		sd->device = NULL;
+	}
+	if (sd->user != NULL) {
+		FREE(sd->user);
+		sd->user = NULL;
+	}
+
+	FREE(sd);
+}
+
+/* Create a new cyclades Stonith device */
+static StonithPlugin *
+cyclades_new(void)
+{
+	struct pluginDevice*	sd = MALLOCT(struct pluginDevice);
+
+	if (sd == NULL) {
+		LOG(PIL_CRIT, "out of memory");
+		return(NULL);
+	}
+
+	memset(sd, 0, sizeof(*sd));
+	sd->pluginid = pluginid;
+	sd->pid = -1;
+	sd->rdfd = -1;
+	sd->wrfd = -1;
+	sd->sp.s_ops = &cycladesOps;
+
+	return &(sd->sp);	/* same as sd */
+}
