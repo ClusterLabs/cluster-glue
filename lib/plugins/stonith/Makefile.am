@@ -124,5 +124,5 @@ rcd_serial_la_LDFLAGS	= -export-dynamic -module -avoid-version
 
 
 drac3_la_SOURCES	= drac3.c drac3_command.c drac3_command.h drac3_hash.c drac3_hash.h
-drac3_la_LDFLAGS	= -export-dynamic -module -avoid-version -lxml2 -lssl
-drac3_la_LIBADD		= /usr/lib/libcurl.la
+drac3_la_LDFLAGS	= -export-dynamic -module -avoid-version -lcurl -lxml2 -lssl
+#drac3_la_LIBADD		= /usr/lib/libcurl.la
