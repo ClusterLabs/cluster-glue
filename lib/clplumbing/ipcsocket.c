@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.119 2005/02/09 01:45:05 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.120 2005/02/10 01:34:09 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1090,6 +1090,8 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 	/* Check for errors uncaught by recv() */
 	/* NOTE: It doesn't seem right we have to do this every time */
 	/* FIXME?? */
+	
+	memset(&sockpoll,0, sizeof(struct pollfd));	
 	if ((retcode == IPC_OK) 
 	&&	(sockpoll.fd = conn_info->s) >= 0) {
 		/* Just check for errors, not for data */

@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.29 2005/02/07 11:45:47 andrew Exp $ */
+/* $Id: cl_log.c,v 1.30 2005/02/10 01:34:09 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -257,7 +257,7 @@ void
 cl_log(int priority, const char * fmt, ...)
 {
 	va_list		ap;
-	char		buf[MAXLINE];
+	char		buf[MAXMSG];
 	int		logpri = LOG_PRI(priority);
 	int		nbytes;
 	const char *	pristr;
@@ -485,7 +485,8 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 		return NULL;
 	}
 	
-	memset(bodybuf, 0, msglen + ch->msgpad);
+	memset(bodybuf, 0, msglen + ch->msgpad + 1);
+	memset(&logbuf, 0, sizeof(logbuf));
 	logbuf.msgtype = LD_LOGIT;
 	logbuf.facility = cl_log_facility;
 	logbuf.priority = priority;
@@ -496,13 +497,13 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	}else {
 		strncpy(logbuf.entity,DFLT_ENTITY,MAXENTITY);
 	}
-
+	       
 	logbuf.msglen = bufstrlen + 1;
 	memcpy(bodybuf + ch->msgpad, &logbuf, sizeof(logbuf));
 	memcpy(bodybuf + ch->msgpad + sizeof(logbuf),
-	       buf, 
-	       bufstrlen);
-	
+		buf, 
+		bufstrlen);
+	       
 	ret->msg_len = msglen;
 	ret->msg_buf = bodybuf;
 	ret->msg_body = bodybuf + ch->msgpad;
@@ -523,7 +524,7 @@ FreeChildLogIPCMessage(IPC_Message* msg)
 		cl_free(msg->msg_buf);
 	}
 	memset(msg, 0, sizeof (*msg));
-	free(msg);
+	cl_free(msg);
 }
 
 
