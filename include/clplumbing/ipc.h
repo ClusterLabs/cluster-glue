@@ -30,6 +30,7 @@
 #undef MIN
 #undef MAX
 #include <sys/types.h>
+#include <sys/poll.h>
 
 #ifdef HAVE_STRING_H
 #include <string.h>
@@ -549,6 +550,7 @@ extern IPC_Auth * ipc_set_auth(uid_t * a_uid, gid_t * a_gid
 /* Destroys an object constructed by ipc_set_auth */
 extern void ipc_destroy_auth(IPC_Auth * auth);
 
+extern void ipc_set_pollfunc(int (*)(struct pollfd*, unsigned int, int));
 
 #define	IPC_PATH_ATTR		"path"		/* pathname attribute */
 #define	IPC_DOMAIN_SOCKET	"uds"		/* Unix domain socket */

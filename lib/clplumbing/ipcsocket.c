@@ -113,7 +113,7 @@ static int socket_resume_io(struct IPC_CHANNEL *ch);
 
 static gboolean socket_is_message_pending(struct IPC_CHANNEL *ch);
 
-static gboolean socket_is_sending_blocked(struct IPC_CHANNEL *ch);
+static gboolean socket_is_output_pending(struct IPC_CHANNEL *ch);
 
 static int socket_assert_auth(struct IPC_CHANNEL *ch, GHashTable *auth);
 
@@ -151,7 +151,7 @@ struct IPC_CHANNEL* socket_server_channel_new(int sockfd);
 
 pid_t socket_get_farside_pid(int sockfd);
 
-static int (*ourpollfunc)(struct pollfd *, nfds_t, int) = poll;
+extern int (*ipc_pollfunc_ptr)(struct pollfd *, nfds_t, int);
 static int socket_waitin(struct IPC_CHANNEL * ch);
 
 static int socket_waitout(struct IPC_CHANNEL * ch);
@@ -167,13 +167,14 @@ static struct IPC_OPS socket_ops = {
   socket_waitin,
   socket_waitout,
   socket_is_message_pending,
-  socket_is_sending_blocked,
+  socket_is_output_pending,
   socket_resume_io,
   socket_get_send_fd,
   socket_get_recv_fd,
   socket_set_send_qlen,
   socket_set_recv_qlen,
 };
+
 
 #define	MAXDATASIZE	65535
 
@@ -486,13 +487,15 @@ socket_waitfor(struct IPC_CHANNEL * ch
 
 		sockpoll.events = POLLIN;
 		
-		/* Cannot call is_sending_blocked(), because it calls
-		 * resume_io! */
+		/* Cannot call is_output_pending(), because it calls
+		 * resume_io!  This will possibly bring in more input
+		 * with everyone unaware...
+		 */
 		if (ch->send_queue->current_qlen > 0) {
 			sockpoll.events |= POLLOUT;
 		}
 		
-		rc = ourpollfunc(&sockpoll, 1, -1);
+		rc = ipc_pollfunc_ptr(&sockpoll, 1, -1);
 
 		if (rc < 0) {
 			return (errno == EINTR ? IPC_INTR : IPC_FAIL);
@@ -551,7 +554,7 @@ socket_is_message_pending(struct IPC_CHANNEL * ch)
 }
 
 static gboolean
-socket_is_sending_blocked(struct IPC_CHANNEL * ch)
+socket_is_output_pending(struct IPC_CHANNEL * ch)
 {
 
   socket_resume_io(ch);
@@ -610,6 +613,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 
 		if (len <= 0 || len > MAXDATASIZE) {
 			ch->ch_status = IPC_DISCONNECT;
+			cl_log(LOG_ERR, "Illegal packet length [%d]", len);
 			retcode = IPC_BROKEN;
 			break;
 		}
@@ -680,6 +684,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 				retcode = IPC_FAIL;
 
 			}else if (conn_info->remaining_data == 0){
+				*started=TRUE;
 #if 0
 				cl_log(LOG_DEBUG, "channel: 0x%lx"
 				,	(unsigned long)ch);
@@ -707,8 +712,8 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 	  && (sockpoll.fd = conn_info->s) != -1) {
 		/* Just check for errors, not for data */
 		sockpoll.events = 0;
-		ourpollfunc(&sockpoll, 1, 0);
-		retcode = socket_check_poll(ch,&sockpoll);
+		ipc_pollfunc_ptr(&sockpoll, 1, 0);
+		retcode = socket_check_poll(ch, &sockpoll);
 	}
 	
 	CHANAUDIT(ch);
@@ -847,6 +852,15 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 		rc2 = socket_resume_io_write(ch, &wstarted);
 		CHANAUDIT(ch);
 	}while (rc1 == IPC_OK && rc2 == IPC_OK && (rstarted||wstarted));
+
+	if (ch->ch_status == IPC_CONNECT) {
+		if (rc1 != IPC_OK) {
+			cl_log(LOG_ERR, "resume_io_read() failure");
+		}
+		if (rc2 != IPC_OK) {
+			cl_log(LOG_ERR, "resume_io_write() failure");
+		}
+	}
 
 	return (rc1 != IPC_OK ? rc1 : rc2);
 }
