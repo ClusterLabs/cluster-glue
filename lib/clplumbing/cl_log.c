@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.28 2005/02/03 01:15:35 gshi Exp $ */
+/* $Id: cl_log.c,v 1.29 2005/02/07 11:45:47 andrew Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -57,7 +57,7 @@ static int		syslog_enabled = 0;
 static int		stderr_enabled = 0;
 static const char*	logfile_name = NULL;
 static const char*	debugfile_name = NULL;
-int process_pid = -1;
+int cl_process_pid = -1;
 
 void
 cl_log_enable_stderr(int truefalse)
@@ -123,7 +123,8 @@ cl_log_get_debugfile(void)
 
 /* Cluster logging function */
 void
-cl_direct_log(int priority, char* buf, gboolean use_priority_str, const char* entity)
+cl_direct_log(int priority, char* buf, gboolean use_priority_str,
+	      const char* entity, int entity_pid)
 {
 	FILE *		fp = NULL;
 	int		logpri;
@@ -168,28 +169,24 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str, const char* en
 			strncpy(log_entity, DFLT_ENTITY,MAXENTITY);
 		}
 		if (pristr){
-			syslog(priority, "%s: %s%c", pristr,  buf, 0);
+			syslog(priority, "[%d]: %s: %s%c",
+			       entity_pid, pristr,  buf, 0);
 		}else {
-			syslog(priority, "%s%c", buf, 0);
+			syslog(priority, "[%d]: %s%c", entity_pid, buf, 0);
 		}
-		
-	}
-
-	if(process_pid < 0) {
-		process_pid = (int)getpid();
 	}
 
 	if (stderr_enabled) {
 		if (pristr){
 			fprintf(stderr, "%s[%d]: %s %s: %s\n"
 				,	(entity ? entity : DFLT_ENTITY)
-				,       process_pid
+				,       entity_pid
 				,	ha_timestamp()
 				,	pristr,  buf);
 		}else {
 			fprintf(stderr, "%s[%d]: %s %s\n"
 				,	(entity ? entity : DFLT_ENTITY)
-				,       process_pid
+				,       entity_pid
 				,	ha_timestamp()
 				,	buf);
 			
@@ -203,13 +200,13 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str, const char* en
 			if (pristr){
 				fprintf(fp, "%s[%d]: %s %s: %s\n"
 					,	(entity ? entity : DFLT_ENTITY)
-					,       process_pid
+					,       entity_pid
 					,	ha_timestamp()
 					,	pristr,  buf);
 			}else{
 				fprintf(fp, "%s[%d]: %s %s\n"
 					,	(entity ? entity : DFLT_ENTITY)
-					,       process_pid
+					,       entity_pid
 					,	ha_timestamp()
 					,	buf);
 				
@@ -225,13 +222,13 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str, const char* en
 			if (pristr){
 				fprintf(fp, "%s[%d]: %s %s: %s\n"
 				,	(entity ? entity : DFLT_ENTITY)
-				,       process_pid
+				,       entity_pid
 				,	ha_timestamp()
 				,	pristr,  buf);
 			}else {
 				fprintf(fp, "%s[%d]: %s %s\n"
 					,	(entity ? entity : DFLT_ENTITY)
-					,       process_pid
+					,       entity_pid
 					,	ha_timestamp()
 					,	buf);	
 			}
@@ -278,6 +275,10 @@ cl_log(int priority, const char * fmt, ...)
 		"debug"
 	};
 
+	if(cl_process_pid < 0) {
+		cl_process_pid = (int)getpid();
+	}
+
 	cl_log_depth++;
 
 	buf[MAXLINE-1] = EOS;
@@ -300,7 +301,7 @@ cl_log(int priority, const char * fmt, ...)
 	     LogToLoggingDaemon(priority, buf, nbytes + 1, TRUE) == HA_OK){
 		goto LogDone;
 	}else {
-		cl_direct_log(priority, buf, TRUE, NULL);
+		cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid);
 	}
 	
  LogDone:
@@ -343,7 +344,7 @@ cl_glib_msg_handler(const gchar *log_domain,	GLogLevelFlags log_level
 	}
 
 
-	cl_log(ha_level, "%s", message);
+	cl_log(ha_level, "glib: %s", message);
 }
 static char *
 ha_timestamp(void)
@@ -489,6 +490,7 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	logbuf.facility = cl_log_facility;
 	logbuf.priority = priority;
 	logbuf.use_pri_str = use_prio_str;
+	logbuf.entity_pid = cl_process_pid;
 	if (cl_log_entity){
 		strncpy(logbuf.entity,cl_log_entity,MAXENTITY);
 	}else {
@@ -533,6 +535,6 @@ cl_opensyslog(void)
 		return;
 	}
 	syslog_enabled = 1;
-	openlog(log_entity, LOG_CONS|LOG_PID, cl_log_facility);
+	openlog(log_entity, LOG_CONS, cl_log_facility);
 
 }
