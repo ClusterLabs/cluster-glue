@@ -1,4 +1,4 @@
-/* $Id: meatware.c,v 1.13 2004/10/05 14:26:16 lars Exp $ */
+/* $Id: meatware.c,v 1.14 2004/10/06 10:55:18 lars Exp $ */
 /*
  * Stonith module for Human Operator Stonith device
  *
@@ -55,7 +55,7 @@ static struct stonith_ops meatwareOps ={
 };
 static int WordCount(const char * s);
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;

@@ -1,4 +1,4 @@
-/* $Id: apcsmart.c,v 1.16 2004/10/05 14:26:16 lars Exp $ */
+/* $Id: apcsmart.c,v 1.17 2004/10/06 10:55:18 lars Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>
@@ -116,7 +116,7 @@ static struct stonith_ops apcsmartOps ={
 	apcsmart_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;

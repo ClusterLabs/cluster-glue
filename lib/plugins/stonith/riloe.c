@@ -48,7 +48,7 @@ static struct stonith_ops riloeOps ={
 	riloe_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;

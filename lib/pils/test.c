@@ -1,4 +1,4 @@
-/* $Id: test.c,v 1.10 2004/10/05 14:26:16 lars Exp $ */
+/* $Id: test.c,v 1.11 2004/10/06 10:55:17 lars Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -34,11 +34,6 @@
 
 #include <pils/interface.h>
 
-static void
-Ourclose	(PILPlugin* us)
-{
-}
-
 PIL_PLUGIN_BOILERPLATE("1.0", DebugFlag, Ourclose)
 
 /*
@@ -48,6 +43,11 @@ static const PILPluginImports*	OurPIImports;	/* Imported plugin funs */
 static PILPlugin*		OurPlugin;	/* Our plugin info */
 static PILInterfaceImports*	OurIfImports;	/* Interface imported funs */
 static PILInterface*		OurIf;		/* Pointer to interface info */
+
+static void
+Ourclose	(PILPlugin* us)
+{
+}
 
 /*
  *	Our Interface Manager interfaces - exported to the universe!

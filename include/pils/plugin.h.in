@@ -514,29 +514,18 @@ void PILLogMemStats(void);
 /*
  *      These functions are standard exported functions for all plugins.
  */
-#define PIL_PLUGIN_BOILERPLATE(PluginVersion, DebugName, CloseName) \
+
+#define PIL_PLUGIN_BOILERPLATE_PROTOTYPES_GENERIC(PluginVersion, DebugName) \
 /*								\
  * Prototypes for boilerplate functions				\
  */								\
 static const char*      Ourpluginversion(void);			\
 static int              GetOurDebugLevel(void);			\
 static void             SetOurDebugLevel(int);			\
-/* static void             CloseName(PILPlugin*);	*/	\
 static const char *	ReturnOurLicense(void);			\
-static const char *	ReturnOurLicenseURL(void);		\
-								\
-								\
-/*								\
- * Initialize Plugin Exports structure				\
- */								\
-static PILPluginOps OurPIExports =				\
-{	Ourpluginversion					\
-,	GetOurDebugLevel					\
-,	SetOurDebugLevel					\
-,	ReturnOurLicense					\
-,	ReturnOurLicenseURL					\
-,	CloseName						\
-};								\
+static const char *	ReturnOurLicenseURL(void);
+
+#define	PIL_PLUGIN_BOILERPLATE_FUNCS(PluginVersion, DebugName)	\
 /*								\
  * Definitions of boilerplate functions				\
  */								\
@@ -561,6 +550,38 @@ ReturnOurLicense(void)						\
 static const char *						\
 ReturnOurLicenseURL(void)					\
 { return PIL_PLUGINLICENSEURL; }
+
+#define PIL_PLUGIN_BOILERPLATE(PluginVersion, DebugName, CloseName) \
+PIL_PLUGIN_BOILERPLATE_PROTOTYPES_GENERIC(PluginVersion, DebugName) \
+static void             CloseName(PILPlugin*);			\
+/*								\
+ * Initialize Plugin Exports structure				\
+ */								\
+static PILPluginOps OurPIExports =				\
+{	Ourpluginversion					\
+,	GetOurDebugLevel					\
+,	SetOurDebugLevel					\
+,	ReturnOurLicense					\
+,	ReturnOurLicenseURL					\
+,	CloseName						\
+};								\
+PIL_PLUGIN_BOILERPLATE_FUNCS(PluginVersion, DebugName)
+
+#define PIL_PLUGIN_BOILERPLATE2(PluginVersion, DebugName)	\
+PIL_PLUGIN_BOILERPLATE_PROTOTYPES_GENERIC(PluginVersion, DebugName) \
+/*								\
+ * Initialize Plugin Exports structure				\
+ */								\
+static PILPluginOps OurPIExports =				\
+{	Ourpluginversion					\
+,	GetOurDebugLevel					\
+,	SetOurDebugLevel					\
+,	ReturnOurLicense					\
+,	ReturnOurLicenseURL					\
+,	NULL							\
+};								\
+PIL_PLUGIN_BOILERPLATE_FUNCS(PluginVersion, DebugName)
+
 
 /* A few sample licenses and URLs.  We can easily add to this */
 

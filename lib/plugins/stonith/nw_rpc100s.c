@@ -1,4 +1,4 @@
-/* $Id: nw_rpc100s.c,v 1.15 2004/10/05 14:26:17 lars Exp $ */
+/* $Id: nw_rpc100s.c,v 1.16 2004/10/06 10:55:18 lars Exp $ */
 /*
  *	Stonith module for Night/Ware RPC100S 
  *
@@ -54,7 +54,7 @@ static struct stonith_ops nw_rpc100sOps ={
 	nw_rpc100s_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
 static const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;

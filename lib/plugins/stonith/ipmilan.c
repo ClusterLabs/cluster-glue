@@ -1,4 +1,4 @@
-/* $Id: ipmilan.c,v 1.10 2004/10/05 18:06:08 yixiong Exp $ */
+/* $Id: ipmilan.c,v 1.11 2004/10/06 10:55:18 lars Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
@@ -62,7 +62,7 @@ static struct stonith_ops ipmilanOps ={
 	ipmilan_hostlist,		/* Return list of supported hosts */
 };
 
-PIL_PLUGIN_BOILERPLATE("1.0", Debug, NULL);
+PIL_PLUGIN_BOILERPLATE2("1.0", Debug);
 const PILPluginImports*  PluginImports;
 static PILPlugin*               OurPlugin;
 static PILInterface*		OurInterface;
