@@ -281,7 +281,7 @@ binary_dup(const void* value, size_t len){
 	}	
 	
 	dupvalue = ha_malloc(len + 1);
-	if (dupvalue < 0){
+	if (dupvalue == NULL){
 		cl_log(LOG_ERR, "binary_dup:"
 		       "ha_malloc failed");
 		return NULL;
@@ -1315,13 +1315,17 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 			cl_log(LOG_ERR, "add_string_field: netstringlen failed");
 			return HA_FAIL;
 		}		
+	} else {
+		cl_log(LOG_ERR, "add_string_field():"
+		       " wrong type %d", internal_type);
+		return HA_FAIL;
 	}
 	
 	
 	if (msg->stringlen + stringlen_add >= MAXMSG ||
 	    msg->netstringlen + netstringlen_add >= MAXMSG) {
 
-		cl_log(LOG_ERR, "ha_msg_addraw_ll(): "
+		cl_log(LOG_ERR, "add_string_field(): "
 		       "cannot add name/value to ha_msg (value too big)");
 
 		if (cp_value) {   
