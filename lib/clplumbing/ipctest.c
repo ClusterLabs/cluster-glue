@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.29 2004/11/22 20:06:42 gshi Exp $ */
+/* $Id: ipctest.c,v 1.30 2004/12/01 22:04:42 gshi Exp $ */
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -413,44 +413,6 @@ echomsgbody(void * body, int niter, size_t * len)
 	*len = strlen(str)+1;
 }
 
-static void
-msg_free(IPC_Message* msg)
-{
-	
-#if 0
-	memset(msg->msg_body, 0xAA, msg->msg_len);
-#endif
-	free(msg->msg_body);
-#if 0
-	memset(msg, 0x55, sizeof(*msg));
-#endif
-	free(msg);
-
-}
-
-static IPC_Message*
-newmessage(IPC_Channel* chan, int niter)
-{
-	IPC_Message*	msg;
-
-	msg = malloc(sizeof(*msg));
-	if (msg == NULL){
-		cl_log(LOG_ERR, "newmessage:"
-		       " allocating memory for msg failed");
-		return NULL;
-	}
-	
-	memset(msg, 0, sizeof(*msg));
-	
-	msg->msg_private = NULL;
-	msg->msg_done = msg_free;
-	msg->msg_ch = chan;
-	msg->msg_buf = NULL;
-	msg->msg_body = malloc(32);
-	echomsgbody(msg->msg_body, niter, &msg->msg_len);
-	return msg;
-}
-
 void dump_ipc_info(IPC_Channel* chan);
 
 static int
@@ -534,8 +496,8 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 			if (wrcount > repcount) {
 				break;
 			}
-			wmsg = newmessage(wchan, wrcount);
-
+			wmsg = wchan->ops->new_ipcmsg(wchan, NULL, 32, NULL);
+			echomsgbody(wmsg->msg_body, wrcount, &wmsg->msg_len);
 			/*fprintf(stderr, "s"); */
 			if ((rc = wchan->ops->send(wchan, wmsg)) != IPC_OK) {
 				cl_log(LOG_ERR
@@ -798,7 +760,8 @@ s_send_msg(gpointer data)
 	}
 	++i->wcount;
 	
-	wmsg = newmessage(i->chan, i->wcount);
+	wmsg = i->chan->ops->new_ipcmsg(i->chan, NULL, 32, NULL);
+	echomsgbody(wmsg->msg_body, i->wcount, &wmsg->msg_len);
 	/*fprintf(stderr, "s");*/
 	if ((rc = i->chan->ops->send(i->chan, wmsg)) != IPC_OK) {
 		cl_log(LOG_ERR
