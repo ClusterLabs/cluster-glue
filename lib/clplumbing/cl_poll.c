@@ -1,4 +1,5 @@
 #include <portability.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #define	__USE_GNU	1
@@ -7,7 +8,6 @@
 
 #include <errno.h>
 #include <signal.h>
-#include <malloc.h>
 #include <string.h>
 #include <glib.h>
 #include <clplumbing/cl_log.h>
