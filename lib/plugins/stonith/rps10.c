@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.10 2004/03/25 11:58:22 lars Exp $ */
+/* $Id: rps10.c,v 1.11 2004/09/10 01:37:41 alan Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -601,21 +601,20 @@ rps10_hostlist(Stonith  *s)
 		ret = (char **)MALLOC((ctx->unit_count+1)*sizeof(char*));
 		if (ret == NULL) {
 			syslog(LOG_ERR, "out of memory");
-		} else {
-			ret[ctx->unit_count]=NULL; /* null terminate the array */
-			for (i=0;i<ctx->unit_count;i++) {
-				ret[i] = STRDUP(ctx->controllers[i].node);
-				if (ret[i] != NULL) {
-					break;
-				}
-				for(j=0;j<i;j++) {
+			return ret;
+		}
+		ret[ctx->unit_count]=NULL; /* null terminate the array */
+		for (i=0; i < ctx->unit_count; i++) {
+			ret[i] = STRDUP(ctx->controllers[i].node);
+			if (ret[i] == NULL) {
+				for(j=0; j<i; j++) {
 					FREE(ret[j]);
 				}
+				FREE(ret); ret = NULL;
 				break;
-			} /* end for each possible outlet */
-		} /* end if malloc() suceeded */
+			}
+		} /* end for each possible outlet */
 	} /* end if any outlets are configured */
-
 	return(ret);
 } /* end si_hostlist() */
 
