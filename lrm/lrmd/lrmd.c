@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.62 2005/02/17 16:19:17 alan Exp $ */
+/* $Id: lrmd.c,v 1.63 2005/02/18 05:43:09 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1447,7 +1447,6 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 			if (NULL == op_msg) {
 				lrmd_log(LOG_ERR,
 					"on_msg_get_state: can not add op.");
-				ha_msg_del(op_msg);
 				continue;
 			}
 			if (HA_OK != msg2ipcchan(op_msg, client->ch_cmd)) {
@@ -2081,6 +2080,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.63  2005/02/18 05:43:09  sunjd
+ * Fix the bugs BEAM found
+ *
  * Revision 1.62  2005/02/17 16:19:17  alan
  * BEAM found that lookup_rsc had a memory leak in it.  It was right.
  * But, the resource allocation was unnecessary, so I fixed the leak by
