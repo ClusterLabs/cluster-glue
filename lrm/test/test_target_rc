@@ -2,8 +2,8 @@
 echo "../admin/lrmadmin -A ip heartbeat IPaddr NULL 192.168.58.4"
 ../admin/lrmadmin -A ip heartbeat IPaddr NULL 192.168.58.4
 
-echo "../admin/lrmadmin -E ip status 0 0 3"
-../admin/lrmadmin -E ip status 0 0 3
+echo "../admin/lrmadmin -E ip status 0 0 13"
+../admin/lrmadmin -E ip status 0 0 13
 
 sleep 2
 
@@ -22,8 +22,8 @@ echo "../admin/lrmadmin -E ip status 0 0 0"
 
 sleep 2
 
-echo "../admin/lrmadmin -E ip status 0 1000 3 &"
-../admin/lrmadmin -E ip status 0 1000 3 &
+echo "../admin/lrmadmin -E ip status 0 1000 13 &"
+../admin/lrmadmin -E ip status 0 1000 13 &
 
 sleep 2
 
@@ -32,8 +32,8 @@ echo "../admin/lrmadmin -E ip stop   0 0 EVERYTIME"
 
 sleep 2
 
-echo "../admin/lrmadmin -E ip status 0 0 3"
-../admin/lrmadmin -E ip status 0 0 3
+echo "../admin/lrmadmin -E ip status 0 0 13"
+../admin/lrmadmin -E ip status 0 0 13
 
 sleep 2
 
