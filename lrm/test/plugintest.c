@@ -32,9 +32,7 @@
 static void
 g_print_item(gpointer data, gpointer user_data)
 {
-	rsc_info_t * tmp = (rsc_info_t *)data;
-	printf("%s\n", tmp->rsc_type);
-	g_free(data);  /*  ?  */
+	printf("%s\n", (char*)data);
 }
 
 
