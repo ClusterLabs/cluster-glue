@@ -179,6 +179,9 @@ static struct IPC_OPS socket_ops = {
 
 #define	MAXDATASIZE	65535
 
+
+#define AUDIT_CHANNELS 1
+
 #ifndef AUDIT_CHANNELS
 #	define	CHANAUDIT(ch)	/*NOTHING */
 #else
@@ -205,8 +208,8 @@ socket_chan_audit(const struct IPC_CHANNEL* ch)
 	if (ch->ch_status == IPC_DISCONNECT) {
 		return;
 	}
-	if (ch->ch_status != IPC_CONNECT) {
-		cl_log(LOG_CRIT, "Bad ch_status");
+	if (!IPC_ISRCONN(ch)) {
+		cl_log(LOG_CRIT, "Bad ch_status [%d]", ch->ch_status);
 		badch = TRUE;
 	}
 	if (ch->farside_pid < 0 || ch->farside_pid > MAXPID) {
@@ -340,11 +343,12 @@ socket_destroy_channel(struct IPC_CHANNEL * ch)
   if(ch->ch_private != NULL) {
     g_free((void*)(ch->ch_private));
   }
+  memset(ch, 0xff, sizeof(*ch));
   g_free((void*) ch);
 }
 
 /* 
- * will called by the socket_destory. Disconnec the connection 
+ * Called by socket_destory(). Disconnect the connection 
  * and set ch_status to IPC_DISCONNECT. 
  *
  * parameters :
@@ -361,9 +365,55 @@ socket_disconnect(struct IPC_CHANNEL* ch)
   struct SOCKET_CH_PRIVATE* conn_info;
 
   conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
+#if 0
+  cl_log(LOG_INFO, "forced disconnect for fd %d", conn_info->s);
+#endif
   close(conn_info->s);
   ch->ch_status = IPC_DISCONNECT;
   return IPC_OK;
+}
+
+static int
+socket_check_discon_pending(struct IPC_CHANNEL* ch)
+{
+	int		rc;
+	struct pollfd	sockpoll;
+
+	if (ch->ch_status == IPC_DISCONNECT) {
+		cl_log(LOG_ERR, "check_discon_pending() already disconnected");
+		return IPC_BROKEN;
+	}
+	sockpoll.fd = ch->ops->get_recv_select_fd(ch);
+	sockpoll.events = POLLIN;
+
+	rc = ipc_pollfunc_ptr(&sockpoll, 1, 0);
+
+ 	if (rc < 0) {
+		cl_log(LOG_INFO, "socket_check_discon_pending() bad poll call");
+		ch->ch_status = IPC_DISCONNECT;
+ 		return IPC_BROKEN;
+	}
+	
+	rc = ipc_pollfunc_ptr(&sockpoll, 1, 0);
+
+	if (rc < 0) {
+		cl_perror("check_discon_pending() bad poll");
+		return (errno == EINTR ? IPC_INTR : IPC_FAIL);
+	}
+
+	if (sockpoll.revents & POLLHUP) {
+		if (sockpoll.revents & POLLIN) {
+			ch->ch_status = IPC_DISC_PENDING;
+			return IPC_OK;
+		}
+#if 0
+		cl_log(LOG_INFO, "HUP without input");
+#endif
+		ch->ch_status = IPC_DISCONNECT;
+		return IPC_BROKEN;
+	}
+	return IPC_OK;
+
 }
 
 
@@ -403,7 +453,8 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 		return IPC_FAIL;
 	}
   
-	if (ch->send_queue->current_qlen < ch->send_queue->max_qlen) {
+	if (ch->ch_status == IPC_CONNECT
+	&&	ch->send_queue->current_qlen < ch->send_queue->max_qlen) {
 		/* add the meesage into the send queue */
 		ch->send_queue->queue = g_list_append(ch->send_queue->queue
 		,	msg);
@@ -454,14 +505,23 @@ socket_check_poll(struct IPC_CHANNEL * ch
 		return IPC_OK;
 	}
 	if (sockpoll->revents & POLLHUP) {
-		ch->ch_status = IPC_DISCONNECT;
-		if (sockpoll->revents & POLLIN) {
+		/* If input present, or this is an output-only poll... */
+		if (sockpoll->revents & POLLIN
+		|| (sockpoll-> events & POLLIN) == 0 ) {
+			ch->ch_status = IPC_DISC_PENDING;
 			return IPC_OK;
 		}
+#if 0
+		cl_log(LOG_INFO, "socket_check_poll(): HUP without input");
+#endif
+		ch->ch_status = IPC_DISCONNECT;
 		return IPC_BROKEN;
+
 	}else if (sockpoll->revents & (POLLNVAL|POLLERR)) {
 		/* Have we already closed the socket? */
 		if (fcntl(sockpoll->fd, F_GETFL) < 0) {
+			cl_perror("socket_check_poll(pid %d): bad fd [%d]"
+			,	(int) getpid(), sockpoll->fd);
 			ch->ch_status = IPC_DISCONNECT;
 			return IPC_OK;
 		}
@@ -491,7 +551,7 @@ socket_waitfor(struct IPC_CHANNEL * ch
 	}
 	sockpoll.fd = ch->ops->get_recv_select_fd(ch);
 	
-	while (!finished(ch) && ch->ch_status == IPC_CONNECT) {
+	while (!finished(ch) &&	IPC_ISRCONN(ch)) {
 		int	rc;
 
 		sockpoll.events = POLLIN;
@@ -559,7 +619,7 @@ socket_is_message_pending(struct IPC_CHANNEL * ch)
 		return TRUE;
 	}
 
-	return ch->ch_status != IPC_CONNECT;
+	return !IPC_ISRCONN(ch);
 }
 
 static gboolean
@@ -623,7 +683,9 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 
 		if (len <= 0 || len > MAXDATASIZE) {
 			ch->ch_status = IPC_DISCONNECT;
-			cl_log(LOG_ERR, "Illegal packet length [%d]", len);
+			cl_log(LOG_ERR
+			,	"socket_resume_io_read()"
+			": bad packet length [%d]", len);
 			retcode = IPC_BROKEN;
 			break;
 		}
@@ -649,12 +711,12 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 
 				case ECONNREFUSED:
 				case ECONNRESET:
-					ch->ch_status = IPC_DISCONNECT;
-					retcode = IPC_BROKEN;
+					retcode = socket_check_discon_pending(ch);
 					break;
 
 				default:
-					cl_perror("socket_resume_read: recv");
+					cl_perror("socket_resume_io_read"
+					": unknown recv error");
 					ch->ch_status = IPC_DISCONNECT;
 					retcode = IPC_FAIL;
 					break;
@@ -680,7 +742,8 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 			if (head.msg_len <= 0
 			||	head.msg_len > MAXDATASIZE) {
 				cl_log(LOG_CRIT
-				,	"invalid msg len [%d]"
+				,	"socket_resume_io_read()"
+				": Invalid msg len [%d]"
 				,	head.msg_len);
 				ch->ch_status = IPC_DISCONNECT;
 				retcode = IPC_FAIL;
@@ -730,7 +793,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 
 	/* Check for errors uncaught by recv() */
 	if ((retcode == IPC_OK) 
-	  && (sockpoll.fd = conn_info->s) != -1) {
+	&&	(sockpoll.fd = conn_info->s) != -1) {
 		/* Just check for errors, not for data */
 		sockpoll.events = 0;
 		ipc_pollfunc_ptr(&sockpoll, 1, 0);
@@ -742,7 +805,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 		return retcode;
 	}
 
-	return ch->ch_status == IPC_CONNECT ? IPC_OK : IPC_BROKEN;
+	return IPC_ISRCONN(ch) ? IPC_OK : IPC_BROKEN;
 }
 
 static int
@@ -802,12 +865,12 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 					cl_shortsleep();
 					continue;
 				case EPIPE:
-					ch->ch_status = IPC_DISCONNECT;
+					socket_check_discon_pending(ch);
 					retcode = IPC_BROKEN;
 					break;
 				default:
+					cl_perror("socket_resume_io_write: send1 bad errno");
 					ch->ch_status = IPC_DISCONNECT;
-					cl_perror("socket_resume_write: send1");
 					retcode = IPC_FAIL;
 					break;
 			}
@@ -849,12 +912,13 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 		if (sendrc < 0) {
 			switch (errno) {
 				case EPIPE:
-					ch->ch_status = IPC_DISCONNECT;
+					socket_check_discon_pending(ch);
 					retcode = IPC_BROKEN;
 					break;
 				default:
+					cl_perror("socket_resume_io_write"
+					": send2 bad errno");
 					ch->ch_status = IPC_DISCONNECT;
-					cl_perror("socket_resume_write: send2");
 					retcode = IPC_FAIL;
 					break;
 			}
@@ -872,7 +936,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 	if (retcode != IPC_OK) {
 		return retcode;
 	}
-	return ch->ch_status == IPC_CONNECT ? IPC_OK : IPC_BROKEN;
+	return IPC_ISRCONN(ch) ? IPC_OK : IPC_BROKEN;
 }
 
 static int
@@ -887,13 +951,18 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 #endif
 
 	CHANAUDIT(ch);
-	if (ch->ch_status != IPC_CONNECT) {
+	if (!IPC_ISRCONN(ch)) {
 		return IPC_BROKEN;
 	}
 	do {
 		rc1 = socket_resume_io_read(ch, &rstarted);
 		CHANAUDIT(ch);
-		rc2 = socket_resume_io_write(ch, &wstarted);
+		if (ch->ch_status == IPC_DISC_PENDING) {
+			rc2 = IPC_OK;
+			wstarted = FALSE;
+		}else{
+			rc2 = socket_resume_io_write(ch, &wstarted);
+		}
 		CHANAUDIT(ch);
 		if (rc1 == IPC_OK || rc2 == IPC_OK) {
 			OKonce = TRUE;
@@ -908,7 +977,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 #endif
 	}while (rc1 == IPC_OK && rc2 == IPC_OK && (rstarted||wstarted));
 
-	if (ch->ch_status == IPC_CONNECT) {
+	if (IPC_ISRCONN(ch)) {
 		if (rc1 != IPC_OK) {
 			cl_log(LOG_ERR
 			,	"socket_resume_io_read() failure");
@@ -1176,6 +1245,9 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   
   strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
   temp_ch->ch_status = IPC_DISCONNECT;
+#if 0
+  cl_log(LOG_INFO, "Initializing client socket %d to DISCONNECT", sockfd);
+#endif
   temp_ch->ch_private = (void*) conn_info;
   temp_ch->ops = (struct IPC_OPS *)&socket_ops;
   temp_ch->send_queue = socket_queue_new();
@@ -1200,6 +1272,9 @@ socket_server_channel_new(int sockfd){
   conn_info->buf_msg = NULL;
   strcpy(conn_info->path_name, "?");
 
+#if 0
+  cl_log(LOG_INFO, "Initializing server socket %d to DISCONNECT", sockfd);
+#endif
   temp_ch->ch_status = IPC_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
   temp_ch->ops = (struct IPC_OPS *)&socket_ops;
@@ -1231,9 +1306,9 @@ ipc_channel_pair(IPC_Channel* channels[2])
 		return IPC_FAIL;
 	}
 	if ((channels[1] = socket_server_channel_new(sockets[1])) == NULL) {
-		channels[0]->ops->destroy(channels[0]);
 		close(sockets[0]);
 		close(sockets[1]);
+		channels[0]->ops->destroy(channels[0]);
 		return IPC_FAIL;
 	}
 	for (j=0; j < 2; ++j) {
@@ -1280,8 +1355,14 @@ socket_message_new(struct IPC_CHANNEL *ch, int msg_len)
 void
 socket_free_message(struct IPC_MESSAGE * msg) {
 
-  g_free(msg->msg_body);
-  g_free((void *)msg);
+#if 1
+	memset(msg->msg_body, 0xff, msg->msg_len);
+#endif
+	g_free(msg->msg_body);
+#if 1
+	memset(msg, 0xff, sizeof(*msg));
+#endif
+	g_free((void *)msg);
 }
 
 
