@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.15 2004/04/17 07:54:50 alan Exp $ */
+/* $Id: cl_log.c,v 1.16 2004/09/29 07:08:35 andrew Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -115,7 +115,6 @@ cl_log(int priority, const char * fmt, ...)
 {
 	va_list		ap;
 	FILE *		fp = NULL;
-	const char *	fn = NULL;
 	char		buf[MAXLINE];
 	int		logpri = LOG_PRI(priority);
 	int		nbytes;
@@ -164,10 +163,8 @@ cl_log(int priority, const char * fmt, ...)
 		,	pristr,  buf);
 	}
 
-	fn = (priority == LOG_DEBUG ? debugfile_name : logfile_name);
-
-	if (fn) { 
-		fp = fopen(fn, "a");
+	if (debugfile_name != NULL) {
+		fp = fopen(debugfile_name, "a");
 		if (fp != NULL) {
 			fprintf(fp, "%s: %s %s: %s\n"
 			,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
@@ -177,6 +174,17 @@ cl_log(int priority, const char * fmt, ...)
 		}
 	}
 
+	if (priority != LOG_DEBUG && logfile_name != NULL) { 
+		fp = fopen(logfile_name, "a");
+		if (fp != NULL) {
+			fprintf(fp, "%s: %s %s: %s\n"
+			,	(cl_log_entity ? cl_log_entity : DFLT_ENTITY)
+			,	ha_timestamp()
+			,	pristr,  buf);
+			fclose(fp);
+		}
+	}
+	
 LogDone:
 	if (needprivs) {
 		return_to_dropped_privs();
