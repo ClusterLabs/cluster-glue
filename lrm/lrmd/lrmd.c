@@ -1,4 +1,4 @@
-
+/* $Id: lrmd.c,v 1.26 2004/08/29 04:40:02 msoffen Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1934,3 +1934,10 @@ lrmd_log(int priority, const char * fmt, ...)
 	va_end(ap);
 	cl_log(priority,"%s",buf);
 }
+
+/*
+ * $Log: lrmd.c,v $
+ * Revision 1.26  2004/08/29 04:40:02  msoffen
+ * Added missing Id and Log
+ *
+ */
