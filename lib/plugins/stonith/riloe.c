@@ -221,7 +221,7 @@ riloe_reset_req(Stonith * s, int request, const char * host)
 	char cmd[4096];
 
 	ERRIFWRONGDEV(s,S_OOPS);
-	LOG(PIL_INFO, _("Host %s riloe-reset."), host);
+	LOG(PIL_INFO, "Host %s riloe-reset.", host);
 
 	sprintf(cmd, "%s %s reset", RILOE_COMMAND, host);
 
