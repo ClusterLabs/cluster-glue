@@ -45,8 +45,6 @@ int main (int argc, char* argv[])
 	GHashTable* param = NULL;
 	int call_id;
 
-	set_debug_level(0);
-
 	lrm = ll_lrm_new("lrm");
 
 	if(NULL == lrm)
