@@ -343,6 +343,9 @@ socket_check_poll(struct IPC_CHANNEL * ch
 {
 	if (sockpoll->revents & POLLHUP) {
 		ch->ch_status = IPC_DISCONNECT;
+		if (sockpoll->revents & POLLIN) {
+			return IPC_OK;
+		}
 		return IPC_BROKEN;
 	}else if (sockpoll->revents & (POLLNVAL|POLLERR)) {
 		cl_log(LOG_ERR
@@ -388,7 +391,7 @@ socket_waitfor(struct IPC_CHANNEL * ch
 		}
 
 		rc = socket_check_poll(ch, &sockpoll);
-		if (rc) {
+		if (rc != IPC_OK) {
 			return rc;
 		}
 	}
@@ -465,8 +468,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 	*started = FALSE;
  
-	while (ch->ch_status == IPC_CONNECT
-	&&	ch->recv_queue->current_qlen < ch->recv_queue->max_qlen
+	while (ch->recv_queue->current_qlen < ch->recv_queue->max_qlen
 	&&	retcode == IPC_OK) {
 
 		gboolean			new_msg;
@@ -564,7 +566,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 	}
 
 	/* Check for errors uncaught by recv() */
-	if((retcode == IPC_OK) 
+	if ((retcode == IPC_OK) 
 	  && (sockpoll.fd = conn_info->s) != -1) {
 		/* Just check for errors, not for data */
 		sockpoll.events = 0;
