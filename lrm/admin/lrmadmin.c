@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.15 2004/09/10 00:28:17 zhenh Exp $ */
+/* $Id: lrmadmin.c,v 1.16 2004/09/10 10:25:50 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -102,7 +102,7 @@ static int call_id = 0;
 
 const char * simple_help_screen =
 "lrmadmin {-d|--deamon}\n"
-"         {-A|--add} <rscid> <raclass> <ratype> <provider|NULL>[<rsc_params_list>]\n"
+"         {-A|--add} <rscid> <raclass> <ratype> <provider|NULL> [<rsc_params_list>]\n"
 "         {-D|--delete} <rscid>\n"
 "         {-F|--flush} <rscid>\n"
 "         {-E|--execute} <rscid> <operator> <timeout> <interval> <target_rc|EVERYTIME|CHANGED> [<operator_parameters_list>]\n"
@@ -879,6 +879,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.16  2004/09/10 10:25:50  sunjd
+ * Minor polish to message format
+ *
  * Revision 1.15  2004/09/10 00:28:17  zhenh
  * change the usage information
  *
