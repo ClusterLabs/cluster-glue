@@ -28,7 +28,7 @@ AM_CFLAGS			= @CFLAGS@  -DALIGNFUNC=@ALIGN@ -DMSGHDR_TYPE=@MSGHDR_TYPE@
 
 ## libraries
 
-lib_LTLIBRARIES		= libplumb.la $(top_builddir)/replace/libreplace.la
+lib_LTLIBRARIES		= libplumb.la
 
 libplumb_la_SOURCES	= 		\
 			Gmain_timeout.c	\
