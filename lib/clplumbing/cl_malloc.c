@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.8 2005/02/07 03:07:23 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.9 2005/02/08 18:27:35 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -138,7 +138,7 @@ static void*	cl_new_mem(size_t size, int numbuck);
 void*		cl_calloc(size_t nmemb, size_t size);
 void		cl_free(void *ptr);
 static void	cl_malloc_init(void);
-static void	cl_dump_item(struct cl_bucket*b);
+static void	cl_dump_item(const struct cl_bucket*b);
 
 #ifdef MARK_PRISTINE
 #	define	PRISTVALUE	0xff
@@ -165,7 +165,7 @@ static void	cl_dump_item(struct cl_bucket*b);
 #endif
 #	define GUARDSIZE	sizeof(cl_malloc_guard)
 #	define	ADD_GUARD(cp)	(memcpy((((char*)cp)+MEMORYSIZE(cp)), cl_malloc_guard, sizeof(cl_malloc_guard)))
-#	define	GUARD_IS_OK(cp)	(memcmp((((char*)cp)+MEMORYSIZE(cp)), cl_malloc_guard, sizeof(cl_malloc_guard)) == 0)
+#	define	GUARD_IS_OK(cp)	(memcmp((((const char*)cp)+MEMORYSIZE(cp)), cl_malloc_guard, sizeof(cl_malloc_guard)) == 0)
 #else
 #	define GUARDSIZE	0
 #	define ADD_GUARD(cp)	/* */
@@ -277,7 +277,17 @@ cl_is_allocated(const void *ptr)
 {
 
 #ifdef HA_MALLOC_MAGIC
-	return (ptr && CBHDR(ptr)->hdr.magic == HA_MALLOC_MAGIC);
+	if (NULL == ptr || CBHDR(ptr)->hdr.magic != HA_MALLOC_MAGIC) {
+		return FALSE;
+	}else if (GUARD_IS_OK(ptr)) {
+		return TRUE;
+	}
+	cl_log(LOG_ERR
+	,	"cl_is_allocated: storage is guard-corrupted  at 0x%lx"
+	,	(unsigned long)ptr);
+	cl_dump_item(CBHDR(ptr));
+	DUMPIFASKED();
+	return FALSE;
 #else
 	return (ptr != NULL);
 #endif
@@ -451,8 +461,16 @@ cl_realloc(void *ptr, size_t newsize)
 			memstats->nbytes_alloc += newsize;
 			memstats->mallocbytes  += newsize;
 		}
-		/* Not from our bucket-area... Just call realloc... */
-		return realloc(bhdr, newsize);
+		/* Not from our bucket-area... Call realloc... */
+		bhdr = realloc(bhdr, newsize + cl_malloc_hdr_offset + GUARDSIZE);
+		if (!bhdr) {
+			return NULL;
+		}
+		bhdr->hdr.reqsize = newsize;
+		ptr = (((char*)bhdr)+cl_malloc_hdr_offset);
+		ADD_GUARD(ptr);
+		/* Not really a  memory leak...  BEAM thinks so though... */
+		return ptr; /*memory leak*/
 	}
 	bucksize = cl_bucket_sizes[bucket];
 #if defined(USE_ASSERTS)
@@ -476,6 +494,7 @@ cl_realloc(void *ptr, size_t newsize)
 		}
 		memstats->nbytes_req  += newsize;
 	}
+	ADD_GUARD(ptr);
 	return ptr;
 }
 
@@ -587,11 +606,11 @@ void cl_malloc_setstats(volatile cl_mem_stats_t *stats)
 }
 
 static void
-cl_dump_item(struct cl_bucket*b)
+cl_dump_item(const struct cl_bucket*b)
 {
-	unsigned char *	cbeg;
-	unsigned char *	cend;
-	unsigned char *	cp;
+	const unsigned char *	cbeg;
+	const unsigned char *	cend;
+	const unsigned char *	cp;
 	cl_log(LOG_INFO, "Dumping cl_malloc item @ 0x%lx, bucket address: 0x%lx"
 	,	((unsigned long)b)+cl_malloc_hdr_offset, (unsigned long)b);
 #ifdef HA_MALLOC_MAGIC
@@ -608,7 +627,7 @@ cl_dump_item(struct cl_bucket*b)
 	,	(long)(b->hdr.bucket >= NUMBUCKS ? 0 
 	:	cl_bucket_sizes[b->hdr.bucket]));
 #endif
-	cbeg = ((char *)b)+cl_malloc_hdr_offset;
+	cbeg = ((const char *)b)+cl_malloc_hdr_offset;
 	cend = cbeg+b->hdr.reqsize+GUARDSIZE;
 
 	for (cp=cbeg; cp < cend; cp+= sizeof(unsigned)) {
