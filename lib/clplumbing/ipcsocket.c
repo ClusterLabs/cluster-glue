@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <sched.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/param.h>
@@ -512,54 +513,53 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 					break;
 			}
 			break; /* out of loop */
-    		}
-		*started=TRUE;
+    		} else {
 
 #if 0
 		cl_log(LOG_DEBUG, "Got %d byte message", msg_len);
 		cl_log(LOG_DEBUG, "Contents: %s", (char*)msg_begin);
 #endif
+			if (new_msg){
+				conn_info->buf_msg
+				= socket_message_new(ch, head.msg_len);
+				conn_info->remaining_data = head.msg_len;
+				*started=TRUE;
+				/* Next time we'll read the message body */
+				continue;
+			}
 
 
-		if (new_msg){
-			conn_info->buf_msg
-			= socket_message_new(ch, head.msg_len);
-			conn_info->remaining_data = head.msg_len;
-			/* Next time we'll read the message body */
-			continue;
-		}
+			/* We received (more) data from an old message */
 
+			conn_info->remaining_data = conn_info->remaining_data
+			-	msg_len;
 
-		/* We received (more) data from an old message */
+			if (conn_info->remaining_data < 0){
+				cl_log(LOG_CRIT, "received more data than expected");
+				conn_info->remaining_data = 0;
+				retcode = IPC_FAIL;
 
-		conn_info->remaining_data = conn_info->remaining_data
-		-	msg_len;
-
-		if (conn_info->remaining_data < 0){
-			cl_log(LOG_CRIT, "received more data than expected");
-			conn_info->remaining_data = 0;
-			retcode = IPC_FAIL;
-
-		}else if (conn_info->remaining_data == 0){
+			}else if (conn_info->remaining_data == 0){
 #if 0
-			cl_log(LOG_DEBUG, "channel: 0x%lx"
-			,	(unsigned long)ch);
-			cl_log(LOG_DEBUG, "New recv_queue = 0x%lx"
-			,	(unsigned long)ch->recv_queue);
-			cl_log(LOG_DEBUG, "buf_msg: len = %ld, body =  0x%lx"
-			,	(unsigned long)conn_info->buf_msg->msg_len
-			,	(unsigned long)conn_info->buf_msg->msg_body);
-			cl_log(LOG_DEBUG, "buf_msg: contents: %s"
-			,	(char *)conn_info->buf_msg->msg_body);
+				cl_log(LOG_DEBUG, "channel: 0x%lx"
+				,	(unsigned long)ch);
+				cl_log(LOG_DEBUG, "New recv_queue = 0x%lx"
+				,	(unsigned long)ch->recv_queue);
+				cl_log(LOG_DEBUG, "buf_msg: len = %ld, body =  0x%lx"
+				,	(unsigned long)conn_info->buf_msg->msg_len
+				,	(unsigned long)conn_info->buf_msg->msg_body);
+				cl_log(LOG_DEBUG, "buf_msg: contents: %s"
+				,	(char *)conn_info->buf_msg->msg_body);
 #endif
 
-			/* Got the last of the message! */
+				/* Got the last of the message! */
 
-			/* Append gotten message to receive queue */
-	  		ch->recv_queue->queue =	g_list_append
-			(	ch->recv_queue->queue, conn_info->buf_msg);
-			ch->recv_queue->current_qlen++;
-			conn_info->buf_msg = NULL;
+				/* Append gotten message to receive queue */
+				ch->recv_queue->queue =	g_list_append
+				(	ch->recv_queue->queue, conn_info->buf_msg);
+				ch->recv_queue->current_qlen++;
+				conn_info->buf_msg = NULL;
+			}
 		}
 	}
 
@@ -621,7 +621,10 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 		if (sendrc < 0) {
 			switch (errno) {
 				case EAGAIN:
-					break;
+					cl_log(LOG_DEBUG,
+						"socket send returned EAGAIN");
+					sched_yield();
+					continue;
 				case EPIPE:
 					ch->ch_status = IPC_DISCONNECT;
 					retcode = IPC_BROKEN;
@@ -636,9 +639,14 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
     		}
 		*started=TRUE;
 
-		/* Send message body */
-		sendrc=send(conn_info->s, msg->msg_body, msg->msg_len
-		,	(MSG_DONTWAIT|MSG_NOSIGNAL));
+		do {
+			sendrc=send(conn_info->s, msg->msg_body, msg->msg_len
+			,	(MSG_DONTWAIT|MSG_NOSIGNAL));
+
+			/* if send failed with EAGAIN, delay and try again */
+		} while(sendrc < 0 && 
+			(errno == EAGAIN ?sched_yield(),TRUE: FALSE));
+
 
 #if 0
 		cl_log(LOG_DEBUG, "Sent %d byte message body"
@@ -648,8 +656,6 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 
 		if (sendrc < 0) {
 			switch (errno) {
-				case EAGAIN:
-					break;
 				case EPIPE:
 					ch->ch_status = IPC_DISCONNECT;
 					retcode = IPC_BROKEN;
@@ -661,14 +667,14 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 					break;
 			}
 			break;
+		} else {
+			ch->send_queue->queue = g_list_remove(
+					ch->send_queue->queue ,	msg);
+			if (msg->msg_done != NULL) {
+				msg->msg_done(msg);
+			}
+			ch->send_queue->current_qlen--;
 		}
-    
-		ch->send_queue->queue = g_list_remove(ch->send_queue->queue
-		,	msg);
-		if (msg->msg_done != NULL) {
-			msg->msg_done(msg);
-		}
-		ch->send_queue->current_qlen--;
 	}
 	if (retcode != IPC_OK) {
 		return retcode;
