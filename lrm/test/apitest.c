@@ -159,7 +159,7 @@ void printf_op(lrm_op_t* op)
 	printf("\tapp_name:%s\n",op->app_name?op->app_name:"null");
 	printf("\toutput:%s\n",op->output?op->output:"null");
 	printf("\trc:%d\n",op->rc);
-//	printf("\tcall_id:%d\n",op->call_id);
+/*	printf("\tcall_id:%d\n",op->call_id); */
 	printf("print end\n");
 }
 
