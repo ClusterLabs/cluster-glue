@@ -103,6 +103,7 @@ static void*			interfprivate;
 
 #define LOG		PluginImports->log
 #define MALLOC		PluginImports->alloc
+#define STRDUP  	PluginImports->mstrdup
 #define FREE		PluginImports->mfree
 #define EXPECT_TOK	OurImports->ExpectToken
 #define STARTPROC	OurImports->StartProcess
@@ -151,12 +152,6 @@ static const char * NOTMeatID = "Hey, dummy this has been destroyed (MeatwareDev
 	&& ((struct MeatDevice *)(i->pinfo))->Meatid == Meatid)
 
 
-#ifndef MALLOC
-#	define	MALLOC	malloc
-#endif
-#ifndef FREE
-#	define	FREE	free
-#endif
 #ifndef MALLOCT
 #	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
 #endif
@@ -210,13 +205,12 @@ meatware_hostlist(Stonith  *s)
 	memset(ret, 0, numnames*sizeof(char*));
 
 	for (j=0; j < numnames-1; ++j) {
-		ret[j] = MALLOC(strlen(nd->hostlist[j])+1);
+		ret[j] = STRDUP(nd->hostlist[j]);
 		if (ret[j] == NULL) {
 			meatware_free_hostlist(ret);
 			ret = NULL;
 			return ret;
 		}
-		strcpy(ret[j], nd->hostlist[j]);
 	}
 	return(ret);
 }

@@ -180,6 +180,7 @@ static void*			interfprivate;
 
 #define LOG		PluginImports->log
 #define MALLOC		PluginImports->alloc
+#define STRDUP  	PluginImports->mstrdup
 #define FREE		PluginImports->mfree
 #define EXPECT_TOK	OurImports->ExpectToken
 #define STARTPROC	OurImports->StartProcess
@@ -669,12 +670,11 @@ APC_parse_config_info(struct APCDevice *ad, const char *info )
 
   if (sscanf(info, "%s %s", devicename, hostname) == 2) {
 
-    if(( hl[0] = MALLOC(((strlen(hostname)+1)*sizeof(char)))) == NULL ) {
+    if(( hl[0] = STRDUP(hostname)) == NULL ) {
       apcsmart_free_hostlist(hl);
       hl = NULL;
       return( S_OOPS );
     }
-    strcpy( hl[0], hostname );
 
     ad->hostlist = hl;
     ad->hostcount = MAX_DEVICES+1;
@@ -768,14 +768,11 @@ apcsmart_hostlist(Stonith * s)
     memset(hl, 0, numhosts * sizeof(char *));
 
     for (j = 0; j < numhosts -1; ++j) {
-    
-	if ((hl[j] = MALLOC(strlen(ad->hostlist[j]) + 1)) == NULL) {
+	if ((hl[j] = STRDUP(ad->hostlist[j])) == NULL) {
 	    apcsmart_free_hostlist(hl);
 	    hl = NULL;
 	    return (hl);
 	}
-
-	strcpy(hl[j], ad->hostlist[j]);
     }
     return (hl);
 }

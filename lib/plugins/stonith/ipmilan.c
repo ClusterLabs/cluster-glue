@@ -107,6 +107,7 @@ static void*			interfprivate;
 
 #define LOG		PluginImports->log
 #define MALLOC		PluginImports->alloc
+#define STRDUP  	PluginImports->mstrdup
 #define FREE		PluginImports->mfree
 #define EXPECT_TOK	OurImports->ExpectToken
 #define STARTPROC	OurImports->StartProcess
@@ -230,7 +231,7 @@ static char *
 get_config_string(struct ipmilanDevice * nd, int index)
 {
 	struct ipmilanHostInfo * host;
-	int i, size;
+	int i;
 
 	char * buf, *p;
 
@@ -243,43 +244,10 @@ get_config_string(struct ipmilanDevice * nd, int index)
 		host = host->next;
 	}
 
-	size = strlen(host->hostname) + 1;
-
-#if 0
-	// 4 strings, 3 numbers, 6 blanks, 1 last trailing char.
-	size = strlen(host->hostname) + strlen(host->ipaddr) + 
-		16 + 16 + 8 + 1 + 1 + 6 + 1;
-#endif
-
-	buf = (char * )MALLOC(size);
+	buf = STRDUP(host->hostname);
 	if (!buf) {
 		return (NULL);
 	}
-
-	p = buf;
-	strncpy(p, host->hostname, strlen(host->hostname));
-	p += strlen(host->hostname);
-
-#if 0
-	strncpy(p, " ", 1);
-	p ++;
-	strncpy(p, host->ipaddr, strlen(host->ipaddr));
-	p += strlen(host->ipaddr); 
-	strncpy(p, " ", 1);
-	p ++;
-
-	strncpy(p, host->username, strlen(host->username));
-	p += strlen(host->username);
-	strncpy(p, " ", 1);
-	p ++;
-
-	strncpy(p, host->password, strlen(host->password));
-	p += strlen(host->password);
-	strncpy(p, " ", 1);
-	p ++;
-#endif
-
-	*p = '\0';
 
 	return buf;
 }
@@ -420,17 +388,14 @@ ipmilan_parse_config_info(struct ipmilanDevice* nd, const char * info)
 				break;
 			}
 
-			if ((hostinfo->hostname = (char *) MALLOC(strlen(name)+1)) == NULL) {
+			if ((hostinfo->hostname = STRDUP(name)) == NULL) {
 				break;
 			}
 
-			if ((hostinfo->ipaddr = (char *) MALLOC(strlen(ip)+1)) == NULL) {
+			if ((hostinfo->ipaddr = STRDUP(ip)) == NULL) {
 				FREE(hostinfo->hostname);
 				break;
 			}
-
-			strncpy(hostinfo->hostname, name, strlen(name)+1);
-			strncpy(hostinfo->ipaddr, ip, strlen(ip)+1);
 
 			if (strncmp(user, "\"\"", 2)==0) {
 				memset(hostinfo->username, 0, sizeof(hostinfo->username));

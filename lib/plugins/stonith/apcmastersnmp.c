@@ -114,6 +114,7 @@ static StonithImports*		OurImports;
 static void*			interfprivate;
 
 #define APC_MALLOC		PluginImports->alloc
+#define APC_STRDUP  		PluginImports->mstrdup
 #define APC_FREE		PluginImports->mfree
 
 PIL_rc
@@ -193,14 +194,6 @@ static const char *NOTapcID = "destroyed (APCMasterswitch)";
 #define ISCONFIGED(i) (((struct APCDevice *)(i->pinfo))->sptr != NULL )
 
 #define _(text) dgettext(ST_TEXTDOMAIN, text)
-
-#ifndef APC_MALLOC
-#  define APC_MALLOC malloc
-#endif
-
-#ifndef APC_FREE
-#  define APC_FREE free
-#endif
 
 #ifndef APC_MALLOCT
 #  define APC_MALLOCT(t) ((t *)(APC_MALLOC(sizeof(t))))
@@ -552,14 +545,12 @@ apcmastersnmp_hostlist(Stonith * s)
 				outlet_name);
 #endif
 		
-		if ((hl[num_outlets] = 
-				APC_MALLOC(strlen(outlet_name) + 1)) == NULL) {
+		if ((hl[num_outlets] = APC_STRDUP(outlet_name)) == NULL) {
 		    syslog(LOG_ERR, "%s: out of memory.", __FUNCTION__);
 		    apcmastersnmp_free_hostlist(hl);
 		    hl = NULL;
 		    return (hl);
 		}
-		strcpy(hl[num_outlets], outlet_name);
 		num_outlets++;
 	}
     }

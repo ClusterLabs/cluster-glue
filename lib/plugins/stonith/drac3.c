@@ -86,8 +86,9 @@ static PILInterface*		OurInterface;
 static StonithImports*		OurImports;
 static void*			interfprivate;
 
-#define LOG			PluginImports->log
+#define LOG		PluginImports->log
 #define MALLOC		PluginImports->alloc
+#define STRDUP  	PluginImports->mstrdup
 #define FREE		PluginImports->mfree
 #define EXPECT_TOK	OurImports->ExpectToken
 #define STARTPROC	OurImports->StartProcess
@@ -139,12 +140,6 @@ static const char *NOTdrac3ID = "destroyed (Dell DRAC III Card)";
 #define ISCONFIGED(i) (((struct DRAC3Device *)(i->pinfo))->curl != NULL )
 
 
-#ifndef MALLOC
-#  define MALLOC malloc
-#endif
-#ifndef FREE
-#  define FREE free
-#endif
 #ifndef MALLOCT
 #  define MALLOCT(t) ((t *)(MALLOC(sizeof(t))))
 #endif
@@ -404,8 +399,13 @@ drac3_hostlist(Stonith * s)
 	if (hl == NULL) {
 		syslog(LOG_ERR, "%s: out of memory", __FUNCTION__);
 	} else {
-		hl[0]=strdup(drac3d->host);
 		hl[1]=NULL;
+		hl[0]=STRDUP(drac3d->host);
+		if (hl[0]) {
+			syslog(LOG_ERR, "%s: out of memory", __FUNCTION__);
+			FREE(hl);
+			hl = NULL;
+		}
 	}
 
 	return(hl);
@@ -444,28 +444,32 @@ DRAC3_parse_config_info(struct DRAC3Device * drac3d, const char * info)
 	/* TODO: check strings length in conffile */
 	if (sscanf(info, "%s %s %s", host, user, pass) == 3) {
 
-			if ((drac3d->host = (char *)MALLOC(strlen(host)+1)) == NULL) {
-					syslog(LOG_ERR, "%s: out of memory", __FUNCTION__);
+			if ((drac3d->host = STRDUP(host)) == NULL) {
+					syslog(LOG_ERR, "%s: out of memory", 
+							__FUNCTION__);
 					return(S_OOPS);
-			} else {
-					strcpy(drac3d->host, host);
 			}
-			if ((drac3d->user = (char *)MALLOC(strlen(user)+1)) == NULL) {
-					syslog(LOG_ERR, "%s: out of memory", __FUNCTION__);
+			if ((drac3d->user = STRDUP(user)) == NULL) {
+					syslog(LOG_ERR, "%s: out of memory", 
+							__FUNCTION__);
+					FREE(drac3d->host);
 					return(S_OOPS);
-			} else {
-					strcpy(drac3d->user, user);
 			}
-			if ((drac3d->pass = (char *)MALLOC(strlen(pass)+1)) == NULL) {
-					syslog(LOG_ERR, "%s: out of memory", __FUNCTION__);
+			if ((drac3d->pass = STRDUP(pass)) == NULL) {
+					syslog(LOG_ERR, "%s: out of memory", 
+							__FUNCTION__);
+					FREE(drac3d->host);
+					FREE(drac3d->user);
 					return(S_OOPS);
-			} else {
-					strcpy(drac3d->pass, pass);
 			}
 
 			curl = curl_easy_init();
 			if ((drac3d->curl = curl_easy_init()) == NULL) { 
-					syslog(LOG_ERR, "%s: cannot init curl", __FUNCTION__);
+					syslog(LOG_ERR, "%s: cannot init curl", 
+							__FUNCTION__);
+					FREE(drac3d->host);
+					FREE(drac3d->user);
+					FREE(drac3d->pass);
 					return(S_OOPS);
 			}
 

@@ -237,7 +237,8 @@ static PILPluginImports PILPluginImportSet =
 ,	PILLoadPlugin		/* load_plugin */
 ,	PILLog			/* Logging function */
 ,	g_malloc		/* Malloc function */
-,	g_free			/* free function */
+,	g_free			/* Free function */
+,	g_strdup		/* Strdup function */
 };
 
 static PIL_rc	ifmgr_register_interface(PILInterface* newif

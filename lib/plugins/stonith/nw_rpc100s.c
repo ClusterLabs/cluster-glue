@@ -104,6 +104,7 @@ static void*			interfprivate;
 
 #define LOG		PluginImports->log
 #define MALLOC		PluginImports->alloc
+#define STRDUP  	PluginImports->mstrdup
 #define FREE		PluginImports->mfree
 #define EXPECT_TOK	OurImports->ExpectToken
 #define STARTPROC	OurImports->StartProcess
@@ -223,12 +224,6 @@ static int gbl_debug = DEBUG;
 
 #define	ISCONFIGED(i)	(ISNWRPC100S(i) && ((struct NW_RPC100S *)(i->pinfo))->config)
 
-#ifndef MALLOC
-#	define	MALLOC	malloc
-#endif
-#ifndef FREE
-#	define	FREE	free
-#endif
 #ifndef MALLOCT
 #	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
 #endif
@@ -240,11 +235,9 @@ static int gbl_debug = DEBUG;
 				FREE(s);			\
 				(s)=NULL;			\
 			}					\
-			(s) = MALLOC(strlen(v)+1);		\
+			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
 				syslog(LOG_ERR, _("out of memory"));\
-			}else{					\
-				strcpy((s),(v));		\
 			}					\
 			}
 
@@ -537,8 +530,13 @@ nw_rpc100s_hostlist(Stonith  *s)
 	if (ret == NULL) {
 		syslog(LOG_ERR, "out of memory");
 	} else {
-		ret[0]=strdup(ctx->node);
 		ret[1]=NULL;
+		ret[0]=STRDUP(ctx->node);
+		if (ret[0] == NULL) {
+			syslog(LOG_ERR, "out of memory");
+			FREE(ret);
+			ret = NULL;
+		}
 	}
 
 	return(ret);
@@ -604,7 +602,7 @@ RPC_parse_config_info(struct NW_RPC100S* ctx, const char * info)
 	   duration of this function.
 	*/
 
-	copy = strdup(info);
+	copy = STRDUP(info);
 	if (!copy) {
 		syslog(LOG_ERR, "out of memory");
 		return S_OOPS;
@@ -618,7 +616,7 @@ RPC_parse_config_info(struct NW_RPC100S* ctx, const char * info)
 		goto token_error;		
 	}
 
-	ctx->device = strdup(token);
+	ctx->device = STRDUP(token);
 	if (!ctx->device) {
 		syslog(LOG_ERR, "out of memory");
 		goto token_error;
@@ -633,7 +631,7 @@ RPC_parse_config_info(struct NW_RPC100S* ctx, const char * info)
 		goto token_error;		
 	}
 
-	ctx->node = strdup(token);
+	ctx->node = STRDUP(token);
 	if (!ctx->node) {
 		syslog(LOG_ERR, "out of memory");
 		goto token_error;
@@ -643,12 +641,12 @@ RPC_parse_config_info(struct NW_RPC100S* ctx, const char * info)
 	/* free our private copy of the string we've been destructively 
 	   parsing with strtok()
 	*/
-	free(copy);
+	FREE(copy);
 	ctx->config = 1;
 	return S_OK;
 
 token_error:
-	free(copy);
+	FREE(copy);
 	return(S_BADCONFIG);
 }
 
