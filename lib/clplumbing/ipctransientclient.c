@@ -151,8 +151,12 @@ transient_client_callback(IPC_Channel* server, void* private_data)
 
     GMainLoop *mainloop = (GMainLoop*)private_data;
 
-    while( server->ch_status != IPC_DISCONNECT && server->ops->is_message_pending(server) == TRUE)
-    {
+    while(server->ops->is_message_pending(server) == TRUE) {
+		if (server->ch_status == IPC_DISCONNECT) {
+			/* The message which was pending for us is the
+			 * new status of IPC_DISCONNECT */
+			break;
+		}
 		if(server->ops->recv(server, &msg) != IPC_OK) {
 			cl_log(LOG_ERR, "[Client] Error while invoking recv()");
 			perror("[Client] Receive failure:");
