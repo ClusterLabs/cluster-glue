@@ -34,4 +34,10 @@ void cl_enable_realtime(void);
 /* Sleep a really short (the shortest) time */
 int cl_shortsleep(void);
 
+/* Print messages if we've done (more) non-realtime mallocs */
+void cl_realtime_malloc_check(void);
+
+/* Number of times we "go to the well" for memory after becoming realtime */
+int cl_nonrealtime_malloc_count(void);
+
 #endif
