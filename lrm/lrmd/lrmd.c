@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.45 2004/10/10 02:42:03 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.46 2004/10/21 03:13:07 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1176,8 +1176,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		}
 		/* free the last_op */
 		if ( NULL!=rsc->last_op) {
-			ha_msg_del(rsc->last_op->msg);
-			g_free(rsc->last_op);
+			free_op(rsc->last_op);
 		}
 		
 		/* free the memeroy of rsc */
@@ -1280,6 +1279,14 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			rsc->op_list = g_list_remove(rsc->op_list, op);
 			flush_op(op);
 		}
+		node = g_list_first(rsc->repeat_op_list);
+		while (NULL != node ) {
+			op = (lrmd_op_t*)node->data;
+			node = g_list_next(node);
+			rsc->repeat_op_list =
+					g_list_remove(rsc->repeat_op_list, op);
+			flush_op(op);
+		}
 	}
 	else
 	if (0 == strncmp(type, STOPOP, strlen(STOPOP))) {
@@ -1292,7 +1299,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			node = g_list_next(node);
 			if ( op->call_id == call_id) {
 				rsc->op_list = g_list_remove(rsc->op_list, op);
-				free_op(op);
+				flush_op(op);
 				break;
 			}
 		}
@@ -1303,7 +1310,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			if ( op->call_id == call_id) {
 				rsc->repeat_op_list =
 					g_list_remove(rsc->repeat_op_list, op);
-				free_op(op);
+				flush_op(op);
 				break;
 			}
 		}
@@ -1454,8 +1461,7 @@ on_op_done(lrmd_op_t* op)
 			g_source_remove(op->timeout_tag);
 		}
 		/* delete the op */
-		ha_msg_del(op->msg);
-		g_free(op);
+		free_op(op);
 
 		lrmd_log(LOG_DEBUG,
 			"on_op_done: the resource of this op does not exists");
@@ -1529,8 +1535,7 @@ on_op_done(lrmd_op_t* op)
 	}
 	/* release the old last_op */
 	if ( NULL!=op->rsc->last_op) {
-		ha_msg_del(op->rsc->last_op->msg);
-		g_free(op->rsc->last_op);
+		free_op(op->rsc->last_op);
 	}
 	/* remove the op from op_list and copy to last_op */
 	op->rsc->op_list = g_list_remove(op->rsc->op_list,op);
@@ -1549,15 +1554,14 @@ on_op_done(lrmd_op_t* op)
 	if( op->timeout_tag > 0 ) {
 		g_source_remove(op->timeout_tag);
 	}
-
-	if ( 0!=op->interval && NULL != g_list_find(client_list, op->client)) {
+	if ( 0!=op->interval && NULL != g_list_find(client_list, op->client)
+	&&   LRM_OP_CANCELLED != op_status) {
 		op->repeat_timeout_tag = g_timeout_add(op->interval,
 					on_repeat_op_done, op);
 		op->rsc->repeat_op_list = g_list_append (op->rsc->repeat_op_list, op);
 	}
 	else {
-		ha_msg_del(op->msg);
-		g_free(op);
+		free_op(op);
 	}
 
 	lrmd_log(LOG_DEBUG, "on_op_done: end.");
@@ -1573,10 +1577,12 @@ flush_op(lrmd_op_t* op)
 		return HA_FAIL;
 	}
 
-	if (HA_OK != ha_msg_add_int(op->msg,F_LRM_OPSTATUS,LRM_OP_CANCELLED)){
+	if (HA_OK != ha_msg_mod_int(op->msg,F_LRM_OPSTATUS,(int)LRM_OP_CANCELLED)){
 		lrmd_log(LOG_ERR,"flush_op: can not add op status");
 		return HA_FAIL;
 	}
+
+		
 	if (-1 != op->exec_pid ) {
 		kill(op->exec_pid, 9);
 	}
@@ -2034,6 +2040,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.46  2004/10/21 03:13:07  zhenh
+ * call callback function with op_status==LRM_OP_CANCELLED when we stop an operation
+ *
  * Revision 1.45  2004/10/10 02:42:03  zhenh
  * remove the call to enable log deamon
  *
