@@ -68,7 +68,7 @@ function do_test {
     rm $output
 }
 
-create_mode="false"
+create_mode="true"
 
 #the returns of ra_info will be different based on your computer.
 #so if you want to run it, you need run in create_mode="true" first

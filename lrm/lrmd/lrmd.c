@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.28 2004/08/30 15:04:47 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.29 2004/09/03 01:41:15 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -95,6 +95,7 @@ struct lrmd_rsc
 	char*		id;
 	char*		type;
 	char*		class;
+	char*		provider;
 	GHashTable* 	params;
 
 	GList*		op_list;
@@ -115,6 +116,7 @@ static int on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_register(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg);
+static int on_msg_get_rsc_providers(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg);
@@ -190,6 +192,7 @@ struct msg_map msg_maps[] = {
 	{REGISTER,	TRUE,	on_msg_register},
 	{GETRSCCLASSES,	FALSE,	on_msg_get_rsc_classes},
 	{GETRSCTYPES,	FALSE,	on_msg_get_rsc_types},
+	{GETPROVIDERS,	FALSE, on_msg_get_rsc_providers},
 	{ADDRSC,	TRUE,	on_msg_add_rsc},
 	{GETRSC,	FALSE,	on_msg_get_rsc},
 	{GETALLRCSES,	FALSE,	on_msg_get_all},
@@ -207,7 +210,7 @@ GList* rsc_list 		= NULL;
 static int call_id 		= 1;
 const char* lrm_system_name 	= "lrmd";
 GHashTable * RAExecFuncs 	= NULL;
-GList* ra_list			= NULL;
+GList* ra_class_list			= NULL;
 
 /*
  * Daemon functions
@@ -490,7 +493,7 @@ init_start ()
 			ra_name = g_strdup(subdir->d_name);
 		}
 		PILLoadPlugin(PluginLoadingSystem , "RAExec", ra_name, NULL);
-		ra_list = g_list_append(ra_list,ra_name);
+		ra_class_list = g_list_append(ra_class_list,ra_name);
 	}
 
 	/*
@@ -883,7 +886,7 @@ on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg)
 		return HA_FAIL;
 	}
 
-	ha_msg_add_list(ret,F_LRM_RCLASS,ra_list);
+	ha_msg_add_list(ret,F_LRM_RCLASS,ra_class_list);
 	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
 		lrmd_log(LOG_ERR,
 			"on_msg_get_rsc_classes: can not send the ret msg");
@@ -950,6 +953,49 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 	lrmd_log(LOG_INFO, "on_msg_get_rsc_types: end.");
 	return HA_OK;
 }
+int
+on_msg_get_rsc_providers(lrmd_client_t* client, struct ha_msg* msg)
+{
+	struct ha_msg* ret = NULL;
+	struct RAExecOps * RAExec = NULL;
+	GList* providers = NULL;
+	GList* provider = NULL;
+	const char* rclass = NULL;
+	const char* rtype = NULL;
+
+	lrmd_log(LOG_INFO, "on_msg_get_rsc_providers: start.");
+
+	ret = create_lrm_ret(HA_OK,5);
+
+	rclass = ha_msg_value(msg, F_LRM_RCLASS);
+	rtype = ha_msg_value(msg, F_LRM_RTYPE);
+
+	RAExec = g_hash_table_lookup(RAExecFuncs,rclass);
+
+	if (NULL == RAExec) {
+		lrmd_log(LOG_INFO,"on_msg_get_rsc_providers: can not find class");
+	}
+	else {
+		if (0 <= RAExec->get_provider_list(rtype, &providers)) {
+			ha_msg_add_list(ret, F_LRM_RPROVIDERS, providers);
+			while (NULL != (provider = g_list_first(providers))) {
+				providers = g_list_remove(providers, provider->data);
+				g_free(provider->data);
+			}
+			g_list_free(providers);
+		}
+	}
+
+
+	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
+		lrmd_log(LOG_ERR,
+			"on_msg_get_rsc_providers: can not send the ret msg");
+	}
+	ha_msg_del(ret);
+
+	lrmd_log(LOG_INFO, "on_msg_get_rsc_providers: end.");
+	return HA_OK;
+}
 
 int
 on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
@@ -958,11 +1004,13 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 	struct RAExecOps * RAExec = NULL;
 	const char* rtype = NULL;
 	const char* rclass = NULL;
+	const char* provider = NULL;
 
 	lrmd_log(LOG_INFO, "on_msg_get_metadata: start.");
 
 	rtype = ha_msg_value(msg, F_LRM_RTYPE);
 	rclass = ha_msg_value(msg, F_LRM_RCLASS);
+	provider = ha_msg_value(msg, F_LRM_RPROVIDER);
 
 
 	ret = create_lrm_ret(HA_OK, 5);
@@ -976,7 +1024,7 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 		lrmd_log(LOG_INFO,"on_msg_get_metadata: can not find class");
 	}
 	else {
-		char* meta = RAExec->get_resource_meta(rtype);
+		char* meta = RAExec->get_resource_meta(rtype,provider);
 		if (NULL != meta) {
 			ha_msg_addbin(ret,F_LRM_METADATA,meta, strlen(meta));
 			g_free(meta);
@@ -1058,6 +1106,13 @@ on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		if (HA_FAIL == ha_msg_add(ret, F_LRM_RCLASS, rsc->class)) {
 			return HA_FAIL;
 		}
+		if( rsc->provider ) {
+			if (HA_FAIL == ha_msg_add(ret, F_LRM_RPROVIDER,
+							rsc->provider)) {
+				return HA_FAIL;
+			}
+		}
+		
 		ha_msg_add_hash_table(ret, F_LRM_PARAM, rsc->params);
 
 	}
@@ -1112,6 +1167,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		g_free(rsc->id);
 		g_free(rsc->type);
 		g_free(rsc->class);
+		g_free(rsc->provider);
 		if (NULL != rsc->params) {
 			free_hash_table(rsc->params);
 		}
@@ -1127,7 +1183,7 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 {
 	GList* node;
 	gboolean ra_type_exist = FALSE;
-	char* type = NULL;
+	char* class = NULL;
 	lrmd_rsc_t* rsc = NULL;
 	char* id = NULL;
 
@@ -1148,18 +1204,23 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	rsc->id = id;
 	rsc->type = g_strdup(ha_msg_value(msg, F_LRM_RTYPE));
 	rsc->class = g_strdup(ha_msg_value(msg, F_LRM_RCLASS));
+	rsc->provider = g_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
 	ra_type_exist = FALSE;
-	for(node=g_list_first(ra_list); NULL!=node; node=g_list_next(node)){
-		type = (char*)node->data;
-		if (0 == strcmp(type, rsc->class)) {
+	for(node=g_list_first(ra_class_list); NULL!=node; node=g_list_next(node)){
+		class = (char*)node->data;
+		if (0 == strcmp(class, rsc->class)) {
 			ra_type_exist = TRUE;
 			break;
 		}
 	}
 	if (!ra_type_exist) {
+		g_free(rsc->id);
+		g_free(rsc->type);
+		g_free(rsc->class);
+		g_free(rsc->provider);
 		g_free(rsc);
 		lrmd_log(LOG_ERR,
-				"on_msg_add_rsc: ra type does not exist.");
+				"on_msg_add_rsc: ra class does not exist.");
 		return HA_FAIL;
 	}
 
@@ -1618,7 +1679,11 @@ perform_ra_op(lrmd_op_t* op)
 			op_params = ha_msg_value_hash_table(op->msg, F_LRM_PARAM);
 			params = merge_hash_tables(op->rsc->params,op_params);
 			
-			RAExec->execra(op->rsc->type,op_type,params, NULL);
+			RAExec->execra (op->rsc->type,
+					op->rsc->provider,
+					op_type,
+					params,
+					NULL);
 
 			free_hash_table(op_params);
 			free_hash_table(params);
@@ -1701,7 +1766,6 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	}
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
 	rc = RAExec->map_ra_retvalue(exitcode, op_type);
-
 	if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
 		if (HA_FAIL == ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_ERROR)) {
 			lrmd_log(LOG_ERR,	"on_ra_proc_finished: can not add opstatus to msg");
@@ -1939,6 +2003,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.29  2004/09/03 01:41:15  zhenh
+ * add provider for resource
+ *
  * Revision 1.28  2004/08/30 15:04:47  sunjd
  * polish/fix as Lars' reminding
  *

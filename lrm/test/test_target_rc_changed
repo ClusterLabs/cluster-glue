@@ -1,6 +1,6 @@
 #!/bin/bash
-echo "../admin/lrmadmin -A ip heartbeat IPaddr 192.168.58.4"
-../admin/lrmadmin -A ip heartbeat IPaddr 192.168.58.4
+echo "../admin/lrmadmin -A ip heartbeat NULL IPaddr 192.168.58.4"
+../admin/lrmadmin -A ip heartbeat IPaddr NULL 192.168.58.4
 
 echo "../admin/lrmadmin -E ip status 0 1000 CHANGED &"
 ../admin/lrmadmin -E ip status 0 1000 CHANGED &

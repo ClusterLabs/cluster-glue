@@ -1,7 +1,7 @@
 #!/bin/bash
 ../admin/lrmadmin -L
-../admin/lrmadmin -A ip heartbeat IPaddr 192.168.58.4
-../admin/lrmadmin -A ip heartbeat IPaddr 192.168.58.4
+../admin/lrmadmin -A ip heartbeat IPaddr NULL 192.168.58.4
+../admin/lrmadmin -A ip heartbeat IPaddr NULL 192.168.58.4
 ../admin/lrmadmin -L
 ../admin/lrmadmin -D ip
 ../admin/lrmadmin -L
