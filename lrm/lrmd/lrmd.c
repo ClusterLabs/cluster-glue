@@ -853,12 +853,6 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 
 	rclass = ha_msg_value(msg, F_LRM_RCLASS);
 
-	ret = create_lrm_ret(HA_OK, 4);
-	if (NULL == ret) {
-		cl_log(LOG_ERR,
-			"on_msg_get_rsc_types: can not create msg.");
-		return HA_FAIL;
-	}
 
 	RAExec = g_hash_table_lookup(RAExecFuncs,rclass);
 	if (NULL == RAExec) {
@@ -873,6 +867,12 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 				types = g_list_append(types, info->rsc_type);
 				cl_log(LOG_INFO,"TYPE:%s\n",info->rsc_type);			
 			}
+		}
+		ret = create_lrm_ret(HA_OK, g_list_length(types)+2);
+		if (NULL == ret) {
+			cl_log(LOG_ERR,
+				"on_msg_get_rsc_types: can not create msg.");
+			return HA_FAIL;
 		}
 		ha_msg_add_list(ret, F_LRM_RTYPES, types);
 	}
