@@ -1,4 +1,4 @@
-/* $Id: ipmilan_command.c,v 1.5 2004/09/13 20:32:31 gshi Exp $ */
+/* $Id: ipmilan_command.c,v 1.6 2004/09/27 17:41:33 yixiong Exp $ */
 /*
  * This program is largely based on the ipmicmd.c program that's part of OpenIPMI package.
  * 
@@ -26,6 +26,9 @@
 #include "ipmilan.h"
 #include <stonith/stonith.h>
 #include <clplumbing/cl_log.h>
+
+#include <pils/plugin.h>
+extern const PILPluginImports*  PluginImports;
 
 // #define DUMP_MSG 0
 #define OPERATION_TIME_OUT 10
