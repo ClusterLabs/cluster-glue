@@ -653,8 +653,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 			break; /* out of loop */
     		}
 		if (msg_len == 0) {
-			/* We don't think this should happen */
-			cl_log(LOG_ERR, "zero length recv return!");
+			/* We don't know why this happens... */
 			break;
 		}
 		/* How about that!  We read something! */
