@@ -1,4 +1,4 @@
- /* $Id: cyclades.c,v 1.2 2005/03/22 17:39:45 blaschke Exp $ */
+ /* $Id: cyclades.c,v 1.3 2005/03/22 20:05:30 blaschke Exp $ */
 /*
  * Stonith module for Cyclades AlterPath PM
  * Bases off the SSH plugin
@@ -353,8 +353,8 @@ static int cyclades_onoff(struct pluginDevice *sd, int outlet,
 
 	exp[0].string = expstring;
 
-	// FIXME: should handle "already powered on/off" case and inform 
-	// to log
+	/* FIXME: should handle "already powered on/off" case and inform 
+	   to log */
 
 	EXPECT(sd->rdfd, exp, 50); 
 	
@@ -486,7 +486,7 @@ cyclades_get_info(StonithPlugin * s, int reqtype)
 
 	switch (reqtype) {
 		case ST_DEVICEID:		/* What type of device? */
-			// FIXME: could inform the exact PM model
+			/* FIXME: could inform the exact PM model */
 			ret = "Cyclades AlterPath PM";
 			break;
 
