@@ -7,11 +7,11 @@
 #undef	__USE_GNU
 
 #include <errno.h>
-#include <signal.h>
 #include <string.h>
 #include <glib.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/cl_poll.h>
+#include <clplumbing/cl_signal.h>
 #define	TIME_CALLS	1
 #ifdef	TIME_CALLS
 #	include <clplumbing/longclock.h>
@@ -115,29 +115,26 @@ cl_poll_setsig(int nsig)
 static
 int cl_poll_prepsig(int nsig)
 {
-	struct sigaction	a;
 	sigset_t		singlemask;
 	
-	if (siginterrupt(nsig, FALSE) < 0) {
+	if (CL_SIGINTERRUPT(nsig, FALSE) < 0) {
 		return -1;
 	}
-	if (sigemptyset(&singlemask) < 0) {
+	if (CL_SIGEMPTYSET(&singlemask) < 0) {
 		return -1;
 	}
-	if (sigaddset(&singlemask, nsig) < 0) {
+	if (CL_SIGADDSET(&singlemask, nsig) < 0) {
 		return -1;
 	}
-	if (sigaddset(&SignalSet, nsig) < 0) {
+	if (CL_SIGADDSET(&SignalSet, nsig) < 0) {
 		return -1;
 	}
-	if (sigprocmask(SIG_BLOCK, &singlemask, NULL) < 0) {
+	if (CL_SIGPROCMASK(SIG_BLOCK, &singlemask, NULL) < 0) {
 		return -1;
 	}
-	a.sa_sigaction = cl_poll_sigaction;
-	a.sa_mask = SignalSet;
-	a.sa_flags = SA_SIGINFO;
 
-	if (sigaction(nsig, &a, NULL) < 0) {
+	if (cl_signal_set_action(nsig, cl_poll_sigaction, &SignalSet,
+				SA_SIGINFO, NULL) < 0) {
 		return -1;
 	}
 	return 0;
@@ -281,7 +278,7 @@ cl_poll_assignsig(int fd)
 
 
 	if (!setinityet) {
-		sigemptyset(&SignalSet);
+		CL_SIGEMPTYSET(&SignalSet);
 		if (cl_nsig == 0) {
 			cl_nsig = ((SIGRTMIN+SIGRTMAX)/2);
 			cl_poll_prepsig(cl_nsig);
@@ -348,10 +345,15 @@ cl_poll_sigaction(int nsig, siginfo_t* info, void* v)
 	if (fd >= max_allocated || !is_monitored[fd]) {
 		return;
 	}
+
+	/* We should not call logging functions within signal handlers */
+	/*
 	if (nsig != monitorinfo[fd].nsig) {
 		cl_log(LOG_ERR, "cl_poll_sigaction called with signal %d/%d\n"
 		,	nsig, monitorinfo[fd].nsig);
 	}
+	*/
+
 	/* Record everything as a pending event. */
 	RECORDFDEVENT(fd, info->si_band);
 }

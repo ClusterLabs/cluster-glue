@@ -89,6 +89,10 @@
  *  On the client side, everything starts up with a call to
  *	ipc_wait_conn_constructor() which we use to talk to the server.
  *	The client is much easier ;-)
+ *
+ *  For things that want to use IPC for pipe-like things, you can
+ *	use ipc_channel_pair(), which returns a pair of already-connected
+ *	IPC_Channels.
  */
 
 

@@ -15,15 +15,19 @@
  * can easily hang the machine.
  */
 
-void make_realtime
+void cl_make_realtime
 (	int spolicy,	/* SCHED_RR or SCHED_FIFO */
 	int priority,	/* typically 1-99 */
 	int heapgrowK	/* Amount to grow heap by */
 );
 
-void make_normaltime(void);
+void cl_make_normaltime(void);
 
 /* Cause calls to make_realtime() to be ignored */
-void disable_realtime(void);
+void cl_disable_realtime(void);
+
+/* Cause calls to make_realtime() to be accepted.
+ * This is the default behaviour */
+void cl_enable_realtime(void);
 
 #endif
