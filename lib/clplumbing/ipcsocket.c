@@ -309,19 +309,18 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* message)
 static int 
 socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 {
-  GList *element;  
   int result;
   struct pollfd sockpoll;
   
   result = ch->ops->resume_io(ch);
   
   if ((result == IPC_OK) && (ch->recv_queue->current_qlen != 0)) {
-      element = g_list_first(ch->recv_queue->queue);
+      GList *element = g_list_first(ch->recv_queue->queue);
       if (element != NULL) {
 	*message = (struct IPC_MESSAGE *) (element->data);
 	      
-	ch->recv_queue->queue = g_list_remove_link(ch->recv_queue->queue
-	,	element);
+	ch->recv_queue->queue = g_list_remove(ch->recv_queue->queue
+	,	element->data);
 	ch->recv_queue->current_qlen--;
       
 	return IPC_OK;
@@ -511,6 +510,14 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	if(msg_len == conn_info->remaining_data){
 	  ch->recv_queue->queue
           =	g_list_append(ch->recv_queue->queue, conn_info->buf_msg);
+#if 0
+          cl_log(LOG_DEBUG, "channel: 0x%lx", (unsigned long)ch);
+          cl_log(LOG_DEBUG, "New recv_queue = 0x%lx"
+	  ,	(unsigned long)ch->recv_queue);
+          cl_log(LOG_DEBUG, "buf_msg: len = %ld, body =  0x%lx"
+	  ,	conn_info->buf_msg->msg_len
+	  ,	(unsigned long)conn_info->buf_msg->msg_body);
+#endif
 	  ch->recv_queue->current_qlen++;
 	  conn_info->buf_msg = NULL;
 	  conn_info->remaining_data = 0;
