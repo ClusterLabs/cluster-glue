@@ -273,7 +273,8 @@ list_memfree(void* value)
 
 
 static void* 
-binary_dup(const void* value, size_t len){
+binary_dup(const void* value, size_t len)
+{
 	
 	char* dupvalue;
 	
@@ -284,9 +285,9 @@ binary_dup(const void* value, size_t len){
 		return NULL ;
 	}	
 	
-	if ( value == NULL && len > 0){
+	if (value == NULL && len > 0){
 		cl_log(LOG_ERR, "binary_dup:"
-		       "NULL vlaue with len =%d", 
+		       "NULL value with non-zero len=%d", 
 		       (int)len);
 		return NULL;
 	}
@@ -298,13 +299,13 @@ binary_dup(const void* value, size_t len){
 		return NULL;
 	}
 	
-	memcpy(dupvalue, value, len);
+	if (value != NULL) {
+		memcpy(dupvalue, value, len);
+	}
 
 	dupvalue[len] =0;
 	
 	return dupvalue;
-	
-	
 }
 
 static void*
@@ -970,7 +971,7 @@ string2str(void* value, size_t len, int depth, void** nv, size_t* nlen )
 }
 
 static int
-string2binary(void* value, size_t len, int depth, void** nv, size_t* nlen )
+string2binary(void* value, size_t len, int depth, void** nv, size_t* nlen)
 {
 	char	tmpbuf[MAXMSG];
 
@@ -985,10 +986,10 @@ string2binary(void* value, size_t len, int depth, void** nv, size_t* nlen )
 		return HA_FAIL;
 	}
 	
-	memcpy(tmpbuf, value,len);
+	memcpy(tmpbuf, value, len);
 	*nlen = base64_to_binary(tmpbuf, len, value, len);				
 
-	if (*nlen < 0){
+	if (*nlen < 0){ /* FIXME! always false (BEAM) */
 		cl_log(LOG_ERR, "base64_to_binary() failed");
 		return HA_FAIL;
 	}
