@@ -103,7 +103,8 @@ string_list_pack_length(const GList* _list)
 		char * element = g_list_nth_data(list, i);
 		if (element == NULL){
 			cl_log(LOG_ERR, "string_list_pack_length: "
-			       "%dth element of the string list is NULL", i);
+			       "%luth element of the string list is NULL"
+				, (unsigned long)i);
 			return 0;
 		}
 		total_length += intlen(strlen(element)) + strlen(element) + 2;
@@ -140,7 +141,8 @@ string_list_pack(GList* list, char* buf, char* maxp)
 		int element_len = strlen(element);
 		if (element == NULL){
 			cl_log(LOG_ERR, "string_list_pack: "
-			       "%dth element of the string list is NULL", i);
+			       "%luth element of the string list is NULL"
+				, (unsigned long)i);
 			return 0;
 		}
 		p += sprintf(p, "%d:%s,", element_len,element);
@@ -549,8 +551,9 @@ liststring(GList* list, char* buf, int maxlen)
 	
 	for ( i = 0; i < g_list_length(list); i++){
 		char* element = g_list_nth_data(list, i);
-		if (element == NULL){
-			cl_log(LOG_ERR, "%dth element is NULL ", i);
+		if (element == NULL) {
+			cl_log(LOG_ERR, "%luth element is NULL "
+			,	(unsigned long)i);
 			return HA_FAIL;
 		} else{
 			if (i == 0){
@@ -1374,6 +1377,7 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 {
 	
 	size_t	internal_type;
+	unsigned long	tmptype;
 	char	*cp_name = NULL;
 	size_t	cp_namelen;
 	size_t	cp_vallen;
@@ -1404,7 +1408,8 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 			}
 			return(HA_FAIL);
 		}
-		sscanf(name + 1, "%d", &internal_type);
+		sscanf(name + 1, "%lu", &tmptype);
+		internal_type = tmptype;
 		
 		if (internal_type ==  FT_STRING){
 			cl_log(LOG_ERR
@@ -1452,7 +1457,7 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 		}		
 	} else {
 		cl_log(LOG_ERR, "add_string_field():"
-		       " wrong type %d", internal_type);
+		       " wrong type %lu", (unsigned long)internal_type);
 		return HA_FAIL;
 	}
 	
