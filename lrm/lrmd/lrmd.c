@@ -544,7 +544,8 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 		send_rc_msg(ch, HA_FAIL);
 		return TRUE;
 	}
-
+	ha_msg_del(msg);
+	
 	/*get the client in the client list*/
 	client = lookup_client(pid);
 	if (NULL == client) {
@@ -1122,14 +1123,12 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		ha_msg_value_int(msg, F_LRM_CALLID, &call_id);
 		
 		node = g_list_first(rsc->op_list);
-lrmd_log(LOG_ERR, "on_msg_perform_op: op_list:%p",rsc->op_list);
 		while (NULL != node ) {
 			op = (lrmd_op_t*)node->data;
 			node = g_list_next(node);
 			if ( op->call_id == call_id) {
 				rsc->op_list = g_list_remove(rsc->op_list, op);
 				free_op(op);
-lrmd_log(LOG_ERR, "on_msg_perform_op: free op %d from op_list.",call_id);
 				break;
 			}
 		}
@@ -1140,7 +1139,6 @@ lrmd_log(LOG_ERR, "on_msg_perform_op: free op %d from op_list.",call_id);
 			if ( op->call_id == call_id) {
 				rsc->repeat_op_list =
 					g_list_remove(rsc->repeat_op_list, op);
-lrmd_log(LOG_ERR, "on_msg_perform_op: free op %d from repeat_op_list.",call_id);
 				free_op(op);
 				break;
 			}
@@ -1198,7 +1196,6 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 		send_rc_msg(client->ch_cmd, HA_FAIL);
 		return HA_FAIL;
 	}
-lrmd_log(LOG_ERR, "on_msg_get_state: op_list:%p",rsc->op_list);
 	if ( NULL == rsc->op_list )
 	{
 		ret = NULL;
