@@ -20,4 +20,6 @@
 #
 MAINTAINERCLEANFILES    = Makefile.in
 
+includedir=$(stonith_includedir)
+
 include_HEADERS	        = expect.h stonith.h
