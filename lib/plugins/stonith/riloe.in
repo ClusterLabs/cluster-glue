@@ -40,8 +40,8 @@ except IndexError:
 
 try:
         password = os.environ['RIPASSWORD']
-        anypass=1
         os.environ['RIPASSWORD'] = "********"
+        anypass=1
 except KeyError:
         password = ""
         anypass=0
