@@ -331,6 +331,24 @@ struct IPC_OPS{
  *   IPC_INTR	: waiting was interrupted by a signal
  */
 	int (* waitin) (IPC_Channel * ch);
+/*
+ * IPC_OPS::waitout
+ *   Wait for output to finish
+ *
+ * Parameters:
+ *   ch  (IN) : the channel which contains the connection.
+ *
+ * Side effects:
+ *	If input becomes available while waiting, it will automatically
+ *	be read into the channel queue without comment.
+ *
+ * Return values:
+ *   IPC_OK	: output no longer blocked
+ *   IPC_FAIL	: operation failed.
+ *   IPC_BROKEN	: the channel is broken (disconnected)
+ *   IPC_INTR	: waiting was interrupted by a signal
+ */
+	int (* waitout) (IPC_Channel * ch);
 
 /*
  * IPC_OPS::is_message_pending
