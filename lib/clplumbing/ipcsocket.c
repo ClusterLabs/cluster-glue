@@ -97,8 +97,14 @@ struct SOCKET_MSG_HEAD{
 struct IPC_Stats {
 	long	nsent;
 	long	noutqueued;
+	long	send_count;
 	long	nreceived;
 	long	ninqueued;
+	long	recv_count;
+	int	last_recv_errno;
+	int	last_recv_rc;
+	int	last_send_errno;
+	int	last_send_rc;
 };
 
 struct IPC_Stats	SocketIPCStats = {0,0,0,0};
@@ -521,14 +527,17 @@ socket_disconnect(struct IPC_CHANNEL* ch)
 }
 
 static int
-socket_check_discon_pending(struct IPC_CHANNEL* ch)
+socket_check_disc_pending(struct IPC_CHANNEL* ch)
 {
 	int		rc;
 	struct pollfd	sockpoll;
 
 	if (ch->ch_status == IPC_DISCONNECT) {
-		cl_log(LOG_ERR, "check_discon_pending() already disconnected");
+		cl_log(LOG_ERR, "check_disc_pending() already disconnected");
 		return IPC_BROKEN;
+	}
+	if (ch->recv_queue->current_qlen > 0) {
+		return IPC_OK;
 	}
 	sockpoll.fd = ch->ops->get_recv_select_fd(ch);
 	sockpoll.events = POLLIN;
@@ -536,7 +545,7 @@ socket_check_discon_pending(struct IPC_CHANNEL* ch)
 	rc = ipc_pollfunc_ptr(&sockpoll, 1, 0);
 
  	if (rc < 0) {
-		cl_log(LOG_INFO, "socket_check_discon_pending() bad poll call");
+		cl_log(LOG_INFO, "socket_check_disc_pending() bad poll call");
 		ch->ch_status = IPC_DISCONNECT;
  		return IPC_BROKEN;
 	}
@@ -544,7 +553,7 @@ socket_check_discon_pending(struct IPC_CHANNEL* ch)
 	rc = ipc_pollfunc_ptr(&sockpoll, 1, 0);
 
 	if (rc < 0) {
-		cl_perror("check_discon_pending() bad poll");
+		cl_perror("check_disc_pending() bad poll");
 		return (errno == EINTR ? IPC_INTR : IPC_FAIL);
 	}
 
@@ -847,6 +856,9 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 		/* Now try to receive some data */
 
 		msg_len = recv(conn_info->s, msg_begin, len, MSG_DONTWAIT);
+		SocketIPCStats.last_recv_rc = msg_len;
+		SocketIPCStats.last_recv_errno = errno;
+		++SocketIPCStats.recv_count;
 #ifdef DEBUG
 		cl_perror("recv() => %d, errno = %d loopcount = %d, %s"
 		,	msg_len, errno, debug_loopcount
@@ -860,11 +872,16 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 			/* What kind of error did we get? */
 			switch (errno) {
 				case EAGAIN:
+					if (ch->ch_status==IPC_DISC_PENDING){
+						ch->ch_status =IPC_DISCONNECT;
+						retcode = IPC_BROKEN;
+					}
 					break;
-
+						
 				case ECONNREFUSED:
 				case ECONNRESET:
-					retcode = socket_check_discon_pending(ch);
+					retcode
+					= socket_check_disc_pending(ch);
 					break;
 
 				default:
@@ -877,7 +894,11 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 			break; /* out of loop */
     		}
 		if (msg_len == 0) {
-			/* We don't know why this happens... */
+			if (ch->ch_status == IPC_DISC_PENDING
+			&&	ch->recv_queue->current_qlen <= 0) {
+				ch->ch_status = IPC_DISCONNECT;
+				retcode = IPC_FAIL;
+			}
 			break;
 		}
 		/* How about that!  We read something! */
@@ -996,9 +1017,12 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 		head.msg_len = msg->msg_len;
 
 		/* Send message header */
-		sendrc=send(conn_info->s, (char *)&head
+		sendrc = send(conn_info->s, (char *)&head
 		,	sizeof(struct SOCKET_MSG_HEAD)
 		,	(MSG_DONTWAIT|MSG_NOSIGNAL));
+		SocketIPCStats.last_send_rc = sendrc;
+		SocketIPCStats.last_send_errno = errno;
+		++SocketIPCStats.send_count;
 #ifdef DEBUG
 		cl_log(LOG_DEBUG, "Sent %d byte message header"
 		,	sizeof(struct SOCKET_MSG_HEAD));
@@ -1021,7 +1045,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 					cl_shortsleep();
 					continue;
 				case EPIPE:
-					socket_check_discon_pending(ch);
+					socket_check_disc_pending(ch);
 					retcode = IPC_BROKEN;
 					break;
 				default:
@@ -1037,8 +1061,11 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 
 		do {
 			CHANAUDIT(ch);
-			sendrc=send(conn_info->s, msg->msg_body, msg->msg_len
-			,	(MSG_DONTWAIT|MSG_NOSIGNAL));
+			sendrc = send(conn_info->s, msg->msg_body
+			,	msg->msg_len, (MSG_DONTWAIT|MSG_NOSIGNAL));
+			SocketIPCStats.last_send_rc = sendrc;
+			SocketIPCStats.last_send_errno = errno;
+			++SocketIPCStats.send_count;
 #ifdef DEBUG
 			cl_log(LOG_DEBUG, "send(%d bytes)  => %d errno=%d"
 			,	msg->msg_len, sendrc, errno);
@@ -1068,7 +1095,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 		if (sendrc < 0) {
 			switch (errno) {
 				case EPIPE:
-					socket_check_discon_pending(ch);
+					socket_check_disc_pending(ch);
 					retcode = IPC_BROKEN;
 					break;
 				default:
