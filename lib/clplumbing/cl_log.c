@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.40 2005/03/14 23:41:28 gshi Exp $ */
+/* $Id: cl_log.c,v 1.41 2005/03/15 18:01:37 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -191,7 +191,6 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 	}
 	
 	if (debugfile_name != NULL) {
-		mode_t oldmask = umask(000);
 
 		fp = fopen(debugfile_name, "a");
 		if (fp != NULL) {
@@ -218,11 +217,9 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 				debugfile_name, strerror(errno));
 		}
 
-		umask(oldmask);
 	}
 	
 	if (priority != LOG_DEBUG && logfile_name != NULL) { 
-		mode_t oldmask = umask(000);
 		
 		fp = fopen(logfile_name, "a");
 		if (fp != NULL) {
@@ -247,7 +244,6 @@ cl_direct_log(int priority, char* buf, gboolean use_priority_str,
 			syslog(LOG_ERR, "Cannot open %s: %s\n",
 				logfile_name, strerror(errno));
 		}
-		umask(oldmask);
 	}
 	
 	if (needprivs) {
