@@ -1,2 +1,76 @@
-# Place holder ;-)
+#
+# External STONITH module for ssh.
+#
+# Copyright (c) 2004 SUSE LINUX AG - Lars Marowsky-Bree <lmb@suse.de>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+#
+
+# This all still pretty much sucks
+action="$1"
+
+#SSH_COMMAND "ssh -q -x -o PasswordAuthentication=no StrictHostKeyChecking=no" 
+SSH_COMMAND="ssh -q -x -n -l root"
+REBOOT_COMMAND="echo 'sleep 1; /sbin/reboot -nf' | at now"
+# Warning: If you select this poweroff command, it'll physically
+# power-off the machine, and quite a number of systems won't be remotely
+# revivable.
+# TODO: Probably should touch a file on the server instead to just
+# prevent heartbeat et al from being started after the reboot.
+# POWEROFF_COMMAND="echo 'sleep 1; /sbin/poweroff -nf' | at now"
+POWEROFF_COMMAND="echo 'sleep 1; /sbin/reboot -nf' | at now"
+
+case $action in
+hostlist)
+	# This one so sucks ;-)
+	echo "$ST_OPTS_1"
+	;;
+poweron)
+	# TODO: Can't really be implemented, unless with the above hack
+	# where this one would be used to start heartbeat remotely
+	# again.
+	exit 0
+	;;
+poweroff)
+	$SSH_COMMAND $ST_HOST $POWEROFF_COMMAND
+	exit $?
+	;;
+reset)
+	$SSH_COMMAND $ST_HOST $REBOOT_COMMAND
+	exit $?
+	;;
+status)
+	# Just check whether we can actually login to every node in our
+	# hostlist, if any.
+	for h in $ST_OPTS_1 ; do
+		$SSH_COMMAND $h /bin/true
+		if [ $rc -ne 0 ]; then
+			exit 1
+		fi
+	done
+	exit 0
+	;;
+*)
+	exit 1
+	;;
+esac
+
 
