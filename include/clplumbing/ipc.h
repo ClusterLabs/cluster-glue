@@ -57,7 +57,7 @@
 /*
  *	IPC:  Sockets-like Interprocess Communication Abstraction
  *
- *	We have two fundmental abstractions which we maintain.
+ *	We have two fundamental abstractions which we maintain.
  *	Everything else is in support of these two abstractions.
  *
  *	These two main abstractions are:
@@ -117,7 +117,7 @@ struct IPC_CHANNEL{
 					/* (may contain conn. info.) */
 	IPC_Ops*	ops;		/* IPC_Channel function table.*/
 /*
- *  There two queues in channel. One is for sending and the other
+ *  There are two queues in channel. One is for sending and the other
  *  is for receiving. 
  *  Those two queues are channel's internal queues. They should not be 
  *  accessed directly.
@@ -159,13 +159,13 @@ struct IPC_MESSAGE{
 				/* Belongs to message creator	*/
 				/* May be used by callback function. */
 	IPC_Channel * msg_ch;	/* Channel the */
-				/* the message is from/in */
+				/* message is from/in */
 };
 
 struct IPC_WAIT_OPS{
 /*
  * IPC_WAIT_OPS::destroy
- *   detroy the wait connection and free the memory space used by
+ *   destroy the wait connection and free the memory space used by
  *	this wait connection.
  * 
  * Parameters:
@@ -212,7 +212,7 @@ struct IPC_WAIT_OPS{
 struct IPC_OPS{
 /*
  * IPC_OPS::destroy
- *   brief destory the channel object.
+ *   brief destroy the channel object.
  *
  * Parameters:
  *   ch  (IN) : the pointer to the channel which will be destroyed.
@@ -227,7 +227,7 @@ struct IPC_OPS{
  *   ch (IN) : the pointer to channel used to initiate the connection. 
  *
  * Return values:
- *   IPC_OK  : the channel set up the connection succesully.
+ *   IPC_OK  : the channel set up the connection successfully.
  *   IPC_FAIL     : the connection initiation fails.
  *
  */
@@ -250,7 +250,7 @@ struct IPC_OPS{
  *
  * Parameters:
  *   ch    (IN):  the active channel.
- *   auth  (IN):  the hash table contain the asserting information.
+ *   auth  (IN):  the hash table which contains the asserting information.
  *
  * Return values:
  *   IPC_OK :  assert the authentication successfully.
@@ -518,7 +518,7 @@ extern IPC_Channel  * ipc_channel_constructor(const char * ch_type
 
 /*
  * ipc_channel_pair:
- *   Construct a pair of connected IPC channels in a fashion analagous
+ *   Construct a pair of connected IPC channels in a fashion analogous
  *	to pipe(2) or socketpair(2).
  *
  * Parameters:
