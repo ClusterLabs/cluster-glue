@@ -55,6 +55,7 @@ struct IPC_CHANNEL *
 ipc_channel_constructor(const char * ch_type, GHashTable* ch_attrs)
 {
   if	(strcmp(ch_type, "domain_socket") == 0
+  ||	strcmp(ch_type, IPC_ANYTYPE) == 0
   ||	strcmp(ch_type, IPC_DOMAIN_SOCKET) == 0) {
 
 	return socket_client_channel_new(ch_attrs);
