@@ -45,7 +45,11 @@
 #define	ZAP(obj)	memset(obj, 0, sizeof(*obj))
 #define DELETE(obj)	{g_free(obj); obj = NULL;}
 
-#define PLUGINSUFFIX	LTDL_SHLIB_EXT
+#ifdef LTDL_SHLIB_EXT
+#	define PLUGINSUFFIX	LTDL_SHLIB_EXT
+#else
+#	define PLUGINSUFFIX	".so"
+#endif
 
 static int	PluginDebugLevel = 0;
 
