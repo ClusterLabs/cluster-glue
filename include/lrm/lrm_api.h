@@ -66,10 +66,10 @@
 /*lrm's client uses this structure to access the resource*/
 typedef struct 
 {
-	const char*	id;
-	const char*	type;
-	const char*	class;
-	const char*	provider;
+	char*	id;
+	char*	type;
+	char*	class;
+	char*	provider;
 	GHashTable* 	params;
 	struct rsc_ops*	ops;
 }lrm_rsc_t;
@@ -117,11 +117,11 @@ typedef struct{
 	op_status_t		op_status;
 	int			rc;
 	int			call_id;
-	char*			output;
-	char*			rsc_id;
+	const char*		output;
+	const char*		rsc_id;
 	/*please notice the client needs release the memory of rsc.*/
 	lrm_rsc_t*		rsc;
-	char*			app_name;
+	const char*		app_name;
 }lrm_op_t;
 
 /*this enum is used in get_cur_state*/
