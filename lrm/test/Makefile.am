@@ -27,7 +27,7 @@ COMMONLIBS			=	$(top_builddir)/lib/clplumbing/libplumb.la   \
 					$(top_builddir)/lib/apphb/libapphb.la \
                         		$(GLIBLIB)
 LRM_DIR			=	lrm
-noinst_PROGRAMS 	= 	apitest plugintest 
+noinst_PROGRAMS 	= 	apitest plugintest callbacktest
 
 apitest_SOURCES  	= 	apitest.c
 apitest_LDFLAGS 	= 	$(COMMONLIBS)
@@ -37,3 +37,8 @@ apitest_DEPENDENCIES    = 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 plugintest_SOURCES 	= 	plugintest.c
 plugintest_LDADD 	= 	$(top_builddir)/lib/clplumbing/libplumb.la $(GLIBLIB)
 plugintest_LDFLAGS 	= 	-L$(top_builddir)/lib/pils -lpils
+
+callbacktest_SOURCES	=	callbacktest.c
+callbacktest_LDFLAGS 	= 	$(COMMONLIBS)
+callbacktest_LDADD 	= 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
+callbacktest_DEPENDENCIES    = 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
