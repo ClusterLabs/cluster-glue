@@ -41,6 +41,7 @@
 #include <sys/ucred.h>
 #endif
 #include <sys/socket.h>
+#include <sys/poll.h>
 #include <netinet/in.h>
 #include <sys/un.h>
 #include <sys/ioctl.h>
@@ -297,14 +298,11 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 {
   GList *element;  
   int result;
+  struct pollfd sockpoll;
   
   result = ch->ops->resume_io(ch);
   
-  if (result != IPC_OK) {
-    *message = NULL;
-    return result;
-  }else{
-    if (ch->recv_queue->current_qlen != 0) {
+  if ((result == IPC_OK) && (ch->recv_queue->current_qlen != 0)) {
       element = g_list_first(ch->recv_queue->queue);
       if (element != NULL) {
 	*message = (struct IPC_MESSAGE *) (element->data);
@@ -313,32 +311,37 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 	ch->recv_queue->current_qlen--;
       
 	return IPC_OK;
-      }else {
-	*message = NULL;
       }
-    }
   }
-  return IPC_FAIL;
-  
+  result = IPC_FAIL;
+  *message = NULL;
+
+  if((sockpoll.fd = socket_get_recv_fd(ch)) != -1) {
+    	/* check if the server still exists */
+  	sockpoll.events = POLLHUP;
+	if ((poll(&sockpoll, 1, 0)) && sockpoll.revents) {
+		return IPC_BROKEN;
+	 }
+  }
+  return result;
 }
 
 static gboolean
 socket_is_message_pending(struct IPC_CHANNEL * ch)
 {
-  
-  int	rc;
-  int	len;
   struct SOCKET_CH_PRIVATE * conn_info = ch->ch_private;
+  struct pollfd sockpoll;
 
   if (ch->recv_queue->current_qlen > 0 || conn_info->buf_msg != NULL) {
     return TRUE;
   }
 
-  rc=ioctl(conn_info->s, FIONREAD,&len);
-  if (rc == 0 && len > 0) {
-	return TRUE;
+  if((sockpoll.fd = socket_get_recv_fd(ch)) != -1) {
+  	sockpoll.events = POLLIN|POLLHUP;
+	if ((poll(&sockpoll, 1, 0)) && sockpoll.revents) {
+		return TRUE;
+	 }
   }
-  
   return FALSE;
 }
 
@@ -381,18 +384,15 @@ socket_resume_io(struct IPC_CHANNEL *ch)
       return IPC_FAIL;
     }
 
-    if(len > 0){
-      if(conn_info->remaining_data != 0){
+    if(len <= 0) break;
+    if(conn_info->remaining_data != 0){
 	new_msg = FALSE;
 	len = conn_info->remaining_data;
 	msg = conn_info->buf_msg;
 	msg_begin = (char *) msg->msg_body + (msg->msg_len - len); 
-      }else{
+    }else{
 	msg_begin = (char *)&head;
 	new_msg = TRUE;
-      }
-    }else{
-      break;
     }
 
     if(new_msg){
@@ -476,7 +476,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 	if(len < msg->msg_len){
 	  /* 
 	   * FIXME! for stream domain socket, if the message is too big, it 
-	   * may cause part of the message cutted instead of being sent out.
+	   * may cause part of the message cut instead of being sent out.
 	   * We may need to implement the fragmentaion for sending. 
 	   * 
 	   */
@@ -627,8 +627,6 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   struct sockaddr_un my_addr;
   int s;
   struct SOCKET_WAIT_CONN_PRIVATE *wait_private;
-
-  
   
   path_name = (char *) g_hash_table_lookup(ch_attrs, PATH_ATTR);
   if (path_name == NULL) {
@@ -641,7 +639,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     perror("socket_wait_conn_new: socket");
     return NULL;
   }
-  
+
   if (unlink(path_name) < 0 && errno != ENOENT) {
     perror("socket_wait_conn_new: unlink");
   }
