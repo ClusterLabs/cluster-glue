@@ -134,7 +134,7 @@ static gboolean		RmAPILInterface
 ,	gpointer plugin		/* PILInterface* */
 ,	gpointer notused
 );
-static void RemoveAPILInterface(PILInterface*);
+static PIL_rc RemoveAPILInterface(PILInterface*);
 static void DelPILPluginType(PILPluginType*);
 
 static PILInterface*	NewPILInterface
@@ -199,7 +199,7 @@ static PILPluginImports PILPluginImportSet =
 {	PILregister_plugin	/* register_plugin */
 ,	PILunregister_plugin	/* unregister_plugin */
 ,	PILRegisterInterface	/* register_interface */
-,	PILunregister_interface	/* unregister_interface */
+,	RemoveAPILInterface /* unregister_interface */
 ,	PILLoadPlugin		/* load_plugin */
 ,	PILLog			/* Logging function */
 };
@@ -387,11 +387,18 @@ RemoveAPILPlugin(PILPlugin*Plugin)
 {
 	PILPluginType*	Pitype = Plugin->plugintype;
 	gpointer	key;
+	if (DEBUGPLUGIN) {
+		PILLog(PIL_DEBUG, "RemoveAPILPlugin(%s/%s)"
+		,	Pitype->plugintype
+		,	Plugin->plugin_name);
+	}
 	if (g_hash_table_lookup_extended(Pitype->Plugins
 	,	Plugin->plugin_name, &key, (void**)&Plugin)) {
 
 		g_hash_table_remove(Pitype->Plugins, key);
 		RmAPILPlugin(key, Plugin, NULL);
+		key = NULL;
+		Plugin = NULL;
 
 	}else{
 		g_assert_not_reached();
@@ -399,6 +406,7 @@ RemoveAPILPlugin(PILPlugin*Plugin)
 	if (g_hash_table_size(Pitype->Plugins) == 0) {
 		RemoveAPILPluginType(Pitype);
 		/* Pitype is now invalid */
+		Pitype = NULL;
 	}
 }
 
@@ -825,7 +833,6 @@ RmAPILInterface
 {
 	PILInterface*	If = intf;
 	PILInterfaceType*	Iftype = If->interfacetype;
-	gpointer	key;
 
 	if (DEBUGPLUGIN) {
 		PILLog(PIL_DEBUG, "RmAPILInterface(0x%lx/%s)"
@@ -848,34 +855,34 @@ RmAPILInterface
 	 * g_hash_table_foreach_remove()
 	 */
 
-	if (g_hash_table_lookup_extended(Iftype->interfaces
-	,	ifname, &key, &intf)) {
-		g_assert(intf == If);
-		g_assert(strcmp(key, (char*)ifname) == 0);
-		PILunregister_interface(If);
-		DELETE(key);
-		DelPILInterface(If);
-	}else{
-		g_assert_not_reached();
-	}
+	PILunregister_interface(If);
+	DELETE(ifname);
+	DelPILInterface(If);
 	return TRUE;
 }
-static void
+static PIL_rc
 RemoveAPILInterface(PILInterface* pif)
 {
 	PILInterfaceType*	Iftype = pif->interfacetype;
 	gpointer		key;
 
+	if (DEBUGPLUGIN) {
+		PILLog(PIL_DEBUG, "RemoveAPILInterface(0x%lx/%s)"
+		,	(unsigned long)pif, pif->interfacename);
+	}
 	if (g_hash_table_lookup_extended(Iftype->interfaces
 	,	pif->interfacename, &key, (void*)&pif)) {
+		g_assert(IS_PILINTERFACE(pif));
+		RmAPILInterface(key, pif, NULL);
 		g_hash_table_remove(Iftype->interfaces, key);
-		RmAPILInterface(Iftype->interfaces, key, NULL);
 	}else{
 		g_assert_not_reached();
 	}
+
 	if (g_hash_table_size(Iftype->interfaces) == 0) {
 		RemoveAPILInterfaceType(Iftype);
 	}
+	return PIL_OK;
 }
 
 
@@ -963,15 +970,17 @@ IfRefCount(PILInterface * eifinfo)
 	return eifinfo->refcnt;
 }
  
-/* Return the reference count for this interface */
+/* Modify the reference count for this interface */
 static int
 IfIncrRefCount(PILInterface*eifinfo, int plusminus)
 {
+	PILLog(PIL_DEBUG, "IfIncrRefCount(%d + %d )"
+	,	eifinfo->refcnt, plusminus);
 	eifinfo->refcnt += plusminus;
 	if (eifinfo->refcnt <= 0) {
 		eifinfo->refcnt = 0;
 		/* Unregister this interface. */
-		PILunregister_interface(eifinfo);
+		RemoveAPILInterface(eifinfo);
 		return 0;
 	}
 	return eifinfo->refcnt;
@@ -988,6 +997,8 @@ PluginRefCount(PILPlugin * pi)
 static int
 PluginIncrRefCount(PILPlugin*pi, int plusminus)
 {
+	PILLog(PIL_DEBUG, "PluginIncrRefCount(%d + %d )"
+	,	pi->refcnt, plusminus);
 	pi->refcnt += plusminus;
 	if (pi->refcnt <= 0) {
 		pi->refcnt = 0;
@@ -1016,13 +1027,14 @@ PILIncrIFRefCount(PILPluginUniv* mu
 ,		const char *	interfacename
 ,		int	plusminus)
 {
-		PILInterface*	intf = FindIF(mu, interfacetype, interfacename);
+	PILInterface*	intf = FindIF(mu, interfacetype, interfacename);
 
-		if (intf) {
-			IfIncrRefCount(intf, plusminus);
-			return PIL_OK;
-		}
-		return PIL_NOPLUGIN;
+	if (intf) {
+		g_assert(IS_PILINTERFACE(intf));
+		IfIncrRefCount(intf, plusminus);
+		return PIL_OK;
+	}
+	return PIL_NOPLUGIN;
 }
 
 int
@@ -1030,9 +1042,9 @@ PILGetIFRefCount(PILPluginUniv*	mu
 ,		const char *	interfacetype
 ,		const char *	interfacename)
 {
-		PILInterface*	intf = FindIF(mu, interfacetype, interfacename);
+	PILInterface*	intf = FindIF(mu, interfacetype, interfacename);
 
-		return IfRefCount(intf);
+	return IfRefCount(intf);
 }
 
 static void
@@ -1429,7 +1441,7 @@ PILRegisterInterface(PILPlugin* piinfo
 	PluginIncrRefCount(piinfo, 1);
 
 	if (rc != PIL_OK) {
-		PILunregister_interface(ifinfo);
+		RemoveAPILInterface(ifinfo);
 	}
 	return rc;
 }
@@ -1452,9 +1464,8 @@ static PIL_rc
 PILunregister_interface(PILInterface* id)
 {
 	PILInterfaceType*	t;
-	PILPlugin*		loadingpi;
 	PILInterfaceUniv*	u;
-	PIL_rc		rc;
+	PIL_rc			rc;
 	PILInterface*	ifmgr_info;	/* Pointer to our interface handler */
 	const PILInterfaceOps* exports;	/* InterfaceManager operations  for the
 					 * type of interface we are
@@ -1491,22 +1502,16 @@ PILunregister_interface(PILInterface* id)
 
 	g_assert(exports != NULL && exports->UnRegisterInterface != NULL);
 
-	loadingpi = id->loadingpi;	/* id will become invalid */
 	/* Call the interface manager unregister function */
 	exports->UnRegisterInterface(id);
-	/* This makes "id" invalid */
 
 	/* Decrement reference count of interface manager */
 	IfIncrRefCount(ifmgr_info, -1);
 	/* This may make ifmgr_info invalid */
+	ifmgr_info = NULL;
 
 	/* Decrement the reference count of the plugin that loaded us */
-	PluginIncrRefCount(loadingpi, -1);
-
-	/* FIXME!! We need to delete this outside this function... */
-#if 0
-	RemoveAPILInterface(id->interfacename, id, NULL);
-#endif
+	PluginIncrRefCount(id->loadingpi, -1);
 
 	return rc;
 }
@@ -1564,7 +1569,6 @@ RmAPILInterfaceType
 ,	gpointer notused
 )
 {
-	gpointer	key;
 	PILInterfaceType*	Iftype = iftype;
 	PILInterfaceUniv*	Ifuniv = Iftype->universe;
 
@@ -1579,17 +1583,10 @@ RmAPILInterfaceType
 		,	(char*)typename);
 	}
 
-	if (g_hash_table_lookup_extended(Ifuniv->iftypes
-	,	typename, &key, &iftype)) {
+	PILValidateInterfaceUniv(NULL, Ifuniv, NULL);
+	DelPILInterfaceType(iftype);
+	DELETE(typename);
 
-		PILValidateInterfaceUniv(NULL, Ifuniv, NULL);
-		g_assert(iftype == Iftype);
-		g_assert(strcmp(key, (char*)typename) == 0);
-		DelPILInterfaceType(iftype);
-		DELETE(key);
-	}else{
-		g_assert_not_reached();
-	}
 	return TRUE;
 }
 
