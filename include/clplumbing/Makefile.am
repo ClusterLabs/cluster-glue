@@ -29,6 +29,7 @@ include_HEADERS	= 		\
 	base64.h	\
 	cl_log.h	\
 	cl_poll.h	\
+	cl_signal.h     \
 	ipc.h		\
 	lsb_exitcodes.h	\
 	loggingdaemon.h	\

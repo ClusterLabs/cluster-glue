@@ -1,6 +1,6 @@
 #include <portability.h>
 #include <sys/time.h>
-#include <signal.h>
+#include <clplumbing/cl_signal.h>
 #include <clplumbing/timers.h>
 #include <clplumbing/cl_log.h>
 
@@ -17,7 +17,7 @@ setmsrepeattimer(long	ms)
 	cl_log(LOG_DEBUG, "Setting repeating timer for %ld ms"
 	,	ms);
 
-	IGNORESIG(SIGALRM);
+	CL_IGNORE_SIG(SIGALRM);
 	return setitimer(ITIMER_REAL, &nexttime, NULL);
 }
 
@@ -30,9 +30,6 @@ setmsalarm(long	ms)
 	{	{0L, 0L}	/* Repeat Interval */
 	,	{secs, usecs}	/* Timer Value */
 	};
-
-	cl_log(LOG_DEBUG, "Setting ms alarm for %ld ms"
-	,	ms);
 
 	return setitimer(ITIMER_REAL, &nexttime, NULL);
 }

@@ -36,6 +36,7 @@ libplumb_la_SOURCES	= 		\
 			base64.c	\
 			ipcsocket.c	\
 			cl_log.c	\
+			cl_signal.c	\
 			cl_poll.c	\
 			longclock.c	\
 			mkstemp_mode.c	\

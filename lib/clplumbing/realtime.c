@@ -10,7 +10,7 @@
 #include <clplumbing/cl_log.h>
 #include <clplumbing/realtime.h>
 
-static gboolean	realtimepermitted = TRUE;
+static gboolean	__cl_realtimepermitted = TRUE;
 
 #if defined(SCHED_RR) && defined(_POSIX_PRIORITY_SCHEDULING)
 #	define DEFAULT_REALTIME	SCHED_RR
@@ -23,7 +23,7 @@ static gboolean	realtimepermitted = TRUE;
  *	before locking you into memory ;-).
  */
 void
-make_realtime(int spolicy, int priority,  int heapgrowK)
+cl_make_realtime(int spolicy, int priority,  int heapgrowK)
 {
 
 
@@ -31,7 +31,7 @@ make_realtime(int spolicy, int priority,  int heapgrowK)
 	struct sched_param	sp;
 	int			staticp;
 
-	if (!realtimepermitted) {
+	if (!__cl_realtimepermitted) {
 		cl_log(LOG_INFO
 		,	"Request to set pid %ld to realtime ignored."
 		,	(long)getpid());
@@ -99,7 +99,7 @@ make_realtime(int spolicy, int priority,  int heapgrowK)
 }
 
 void
-make_normaltime()
+cl_make_normaltime()
 {
 #ifdef DEFAULT_REALTIME
 	struct sched_param	sp;
@@ -117,7 +117,13 @@ make_normaltime()
 }
 
 void
-disable_realtime(void)
+cl_disable_realtime(void)
 {
-	realtimepermitted = FALSE;
+	__cl_realtimepermitted = FALSE;
+}
+
+void
+cl_enable_realtime(void)
+{
+	__cl_realtimepermitted = TRUE;
 }

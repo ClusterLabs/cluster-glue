@@ -169,9 +169,9 @@ struct APCDevice {
 static const char *APCid = DEVICE;
 static const char *NOTapcID = "destroyed (APCMasterswitch)";
 
-#ifndef MAX
+#ifndef MIN
 // some macros
-#	define MAX( i, j ) ( i > j ? j : i )
+#	define MIN( i, j ) ( i > j ? j : i )
 #endif
 
 #define	ISAPCDEV(i) (((i)!= NULL && (i)->pinfo != NULL)	&& \
@@ -357,7 +357,7 @@ void *APC_read(struct snmp_session *sptr, const char *objname, int type)
 		    if ((vars->type == type) && (type == ASN_OCTET_STR)) {
 			memset(response_str, 0, MAX_STRING);
 			strncpy(response_str, vars->val.string,
-				MAX(vars->val_len, MAX_STRING));
+				MIN(vars->val_len, MAX_STRING));
 			snmp_free_pdu(resp);
 			return ((void *) response_str);
 		    }

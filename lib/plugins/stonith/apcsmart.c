@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <signal.h>
+#include <clplumbing/cl_signal.h>
 #include <string.h>
 #include <errno.h>
 #include <syslog.h>
@@ -290,18 +290,11 @@ file_unlock(int fd)
 void
 APC_sh_serial_timeout(int sig)
 {
-    struct sigaction sa;
-    sigset_t sigmask;
-
 #ifdef APC_DEBUG
     syslog(LOG_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    sa.sa_handler = (void (*)(int))SIG_DFL;
-    sigemptyset(&sigmask);
-    sa.sa_mask = sigmask;
-    sa.sa_flags = 0;
-    sigaction(SIGALRM, &sa, NULL);
+    CL_IGNORE_SIG(SIGALRM);
 
 #ifdef APC_DEBUG
     syslog(LOG_DEBUG, "%s: serial port timed out.", __FUNCTION__);
@@ -319,8 +312,6 @@ APC_sh_serial_timeout(int sig)
 int
 APC_open_serialport(const char *port, speed_t speed)
 {
-    struct sigaction sa;
-    sigset_t sigmask;
     struct termios tio;
     int fd;
 
@@ -328,11 +319,7 @@ APC_open_serialport(const char *port, speed_t speed)
     syslog(LOG_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    sa.sa_handler = APC_sh_serial_timeout;
-    sigemptyset(&sigmask);
-    sa.sa_mask = sigmask;
-    sa.sa_flags = 0;
-    sigaction(SIGALRM, &sa, NULL);
+    CL_SIGNAL(SIGALRM, APC_sh_serial_timeout);
 
     alarm(SERIAL_TIMEOUT);
 
@@ -341,7 +328,7 @@ APC_open_serialport(const char *port, speed_t speed)
     fd = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK | O_EXCL);
 
     alarm(0);
-    IGNORESIG(SIGALRM);
+    CL_IGNORE_SIG(SIGALRM);
 
     if (fd < 0) {
 
@@ -377,13 +364,13 @@ APC_open_serialport(const char *port, speed_t speed)
     tcsetattr(fd, TCSANOW, &tio);
     close(fd);
 
-    signal(SIGALRM, APC_sh_serial_timeout);
+    CL_SIGNAL(SIGALRM, APC_sh_serial_timeout);
     alarm(SERIAL_TIMEOUT);
 
     fd = open(port, O_RDWR | O_NOCTTY | O_EXCL);
 
     alarm(0);
-    IGNORESIG(SIGALRM);
+    CL_IGNORE_SIG(SIGALRM);
 
     if (fd < 0) {
 
@@ -474,8 +461,6 @@ APC_recv_rsp(int upsfd, char *rsp)
     char *p = rsp;
     char inp;
     int num = 0;
-    struct sigaction sa;
-    sigset_t sigmask;
 
 #ifdef APC_DEBUG
     syslog(LOG_DEBUG, "%s: called.", __FUNCTION__);
@@ -483,11 +468,7 @@ APC_recv_rsp(int upsfd, char *rsp)
 
     *p = '\0';
 
-    sa.sa_handler = APC_sh_serial_timeout;
-    sigemptyset(&sigmask);
-    sa.sa_mask = sigmask;
-    sa.sa_flags = 0;
-    sigaction(SIGALRM, &sa, NULL);
+    CL_SIGNAL(SIGALRM, APC_sh_serial_timeout);
 
     alarm(SERIAL_TIMEOUT);
 
@@ -504,7 +485,7 @@ APC_recv_rsp(int upsfd, char *rsp)
 
 	    if (inp == ENDCHAR) {
 		alarm(0);
-		IGNORESIG(SIGALRM);
+		CL_IGNORE_SIG(SIGALRM);
 
 		*p = '\0';
 		return (S_OK);
@@ -517,7 +498,7 @@ APC_recv_rsp(int upsfd, char *rsp)
 
 	} else {
 	    alarm(0);
-	    IGNORESIG(SIGALRM);
+	    CL_IGNORE_SIG(SIGALRM);
 	    *p = '\0';
 	    return (f_serialtimeout ? S_TIMEOUT : S_ACCESS);
 	}
