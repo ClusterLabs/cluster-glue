@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.28 2005/02/17 20:11:51 andrew Exp $ */
+/* $Id: GSource.c,v 1.29 2005/04/01 23:16:39 gshi Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -23,6 +23,7 @@
 #endif
 
 struct GFDSource_s {
+	GSource source;
 	unsigned	magno;	/* MAG_GFDSOURCE */
 	void*		udata;
 	gboolean	(*dispatch)(int fd, gpointer user_data);
@@ -49,6 +50,7 @@ struct GCHSource_s {
 };
 
 struct GWCSource_s {
+	GSource source;
 	unsigned		magno;	/* MAG_GWCSOURCE */
 	void*			udata;
 	GPollFD			gpfd;
@@ -114,7 +116,6 @@ G_main_add_input(int priority,
  *	Add the given file descriptor to the gmainloop world.
  */
 
-#define GET_FD_SOURCE(src) (GFDSource*)((GSource*)(src)+1)
 
 GFDSource*
 G_main_add_fd(int priority, int fd, gboolean can_recurse
@@ -124,11 +125,9 @@ G_main_add_fd(int priority, int fd, gboolean can_recurse
 {
 
 	GSource* source = g_source_new(&G_fd_SourceFuncs, 
-				      sizeof(GSource)
-				      + sizeof(GFDSource));
-	GFDSource* ret = GET_FD_SOURCE(source);
+				       sizeof(GFDSource));
+	GFDSource* ret = (GFDSource*)source;
 	
-	memset(ret, 0, sizeof(GFDSource));
 	ret->magno = MAG_GFDSOURCE;
 	ret->udata = userdata;
 	ret->dispatch = dispatch;
@@ -198,7 +197,7 @@ static gboolean
 G_fd_prepare(GSource* source,
 	     gint* timeout)
 {
-	GFDSource*	fdp = GET_FD_SOURCE(source);
+	GFDSource*	fdp =  (GFDSource*)source;
 	g_assert(IS_FDSOURCE(fdp));
 	return FALSE;
 }
@@ -211,7 +210,7 @@ static gboolean
 G_fd_check(GSource* source)
      
 {
-	GFDSource*	fdp = GET_FD_SOURCE(source);
+	GFDSource*	fdp =  (GFDSource*)source;
 	g_assert(IS_FDSOURCE(fdp));
 	return fdp->gpfd.revents != 0;
 }
@@ -224,8 +223,8 @@ G_fd_dispatch(GSource* source,
 	      GSourceFunc callback,
 	      gpointer user_data)
 {
-	GFDSource*	fdp = GET_FD_SOURCE(source);
 
+	GFDSource*	fdp =  (GFDSource*)source;
 	g_assert(IS_FDSOURCE(fdp));
 	
 
@@ -255,9 +254,7 @@ G_fd_dispatch(GSource* source,
 static void
 G_fd_destroy(GSource* source)
 {
-
-	GFDSource*	fdp = GET_FD_SOURCE(source);
-	
+	GFDSource*	fdp =  (GFDSource*)source;	
 	g_assert(IS_FDSOURCE(fdp));
 	if (fdp->dnotify) {
 		fdp->dnotify(fdp->udata);
@@ -551,7 +548,6 @@ static GSourceFuncs G_WC_SourceFuncs = {
 	G_WC_destroy,
 };
 
-#define GET_WC_SOURCE(src)	(GWCSource*)(src +1)
 
 /*
  *	Add an IPC_WaitConnection to the gmainloop world...
@@ -569,12 +565,10 @@ G_main_add_IPC_WaitConnection(int priority
 
 	GWCSource* wcp;
 	GSource * source = g_source_new(&G_WC_SourceFuncs, 
-					sizeof(GSource)
-					+ sizeof(GWCSource));
+					sizeof(GWCSource));
 	
-	wcp = GET_WC_SOURCE(source);
+	wcp = (GWCSource*)source;
 	
-	memset(wcp, 0, sizeof(GWCSource));
 	wcp->magno = MAG_GWCSOURCE;
 	wcp->udata = userdata;
 	wcp->gpfd.fd = wch->ops->get_select_fd(wch);
@@ -632,8 +626,7 @@ static gboolean
 G_WC_prepare(GSource* source,
 	     gint* timeout)
 {
-	GWCSource*  wcp = GET_WC_SOURCE(source);
-	
+	GWCSource* wcp = (GWCSource*)source;
 	g_assert(IS_WCSOURCE(wcp));
 	return FALSE;
 }
@@ -645,8 +638,7 @@ G_WC_prepare(GSource* source,
 static gboolean
 G_WC_check(GSource * source)
 {
-	GWCSource*  wcp = GET_WC_SOURCE(source);
-	
+	GWCSource* wcp = (GWCSource*)source;
 	g_assert(IS_WCSOURCE(wcp));
 
 	return wcp->gpfd.revents != 0;
@@ -661,7 +653,7 @@ G_WC_dispatch(GSource* source,
 	      GSourceFunc callback,
 	      gpointer user_data)
 {
-	GWCSource*  wcp = GET_WC_SOURCE(source);
+	GWCSource* wcp = (GWCSource*)source;
 	IPC_Channel*	ch;
 	gboolean	rc = TRUE;
 	int		count = 0;
@@ -696,7 +688,7 @@ static void
 G_WC_destroy(GSource* source)
 {
 	
-	GWCSource*  wcp = GET_WC_SOURCE(source);
+	GWCSource* wcp = (GWCSource*)source;
 	
 	g_assert(IS_WCSOURCE(wcp));
 	wcp->wch->ops->destroy(wcp->wch);

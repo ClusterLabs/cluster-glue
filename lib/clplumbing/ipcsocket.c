@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.134 2005/04/01 22:55:40 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.135 2005/04/01 23:16:39 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -302,7 +302,8 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 					cl_log_message(LOG_INFO, hamsg);
 					ha_msg_del(hamsg);
 				}			
-			}	
+			}
+			break;
 		default:
 			cl_log(LOG_ERR, "wrong position value in IPC:%d", whichpos);
 			return;
