@@ -18,8 +18,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#ifndef _HA_SIGNAL_H
-#define _HA_SIGNAL_H
+#ifndef _CL_SIGNAL_H
+#define _CL_SIGNAL_H
 
 
 #define __USE_UNIX98
@@ -83,4 +83,4 @@ int
 cl_signal_set_handler_mode(const cl_signal_mode_t *mode, sigset_t *set);
 
 
-#endif /* _HA_SIGNAL_H */
+#endif /* _CL_SIGNAL_H */

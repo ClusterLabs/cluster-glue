@@ -24,7 +24,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <clplumbing/cl_signal.h>
 #include <string.h>
 #include <errno.h>
 #include <syslog.h>
@@ -37,6 +36,8 @@
 #include <sys/file.h>
 
 #include <stonith/stonith.h>
+
+#include "stonith_signal.h"
 
 /*
  * APCSmart (tested with 2 old 900XLI)
@@ -294,7 +295,7 @@ APC_sh_serial_timeout(int sig)
     syslog(LOG_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    CL_IGNORE_SIG(SIGALRM);
+    STONITH_IGNORE_SIG(SIGALRM);
 
 #ifdef APC_DEBUG
     syslog(LOG_DEBUG, "%s: serial port timed out.", __FUNCTION__);
@@ -319,7 +320,7 @@ APC_open_serialport(const char *port, speed_t speed)
     syslog(LOG_DEBUG, "%s: called.", __FUNCTION__);
 #endif
 
-    CL_SIGNAL(SIGALRM, APC_sh_serial_timeout);
+    STONITH_SIGNAL(SIGALRM, APC_sh_serial_timeout);
 
     alarm(SERIAL_TIMEOUT);
 
@@ -328,7 +329,7 @@ APC_open_serialport(const char *port, speed_t speed)
     fd = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK | O_EXCL);
 
     alarm(0);
-    CL_IGNORE_SIG(SIGALRM);
+    STONITH_IGNORE_SIG(SIGALRM);
 
     if (fd < 0) {
 
@@ -364,13 +365,13 @@ APC_open_serialport(const char *port, speed_t speed)
     tcsetattr(fd, TCSANOW, &tio);
     close(fd);
 
-    CL_SIGNAL(SIGALRM, APC_sh_serial_timeout);
+    STONITH_SIGNAL(SIGALRM, APC_sh_serial_timeout);
     alarm(SERIAL_TIMEOUT);
 
     fd = open(port, O_RDWR | O_NOCTTY | O_EXCL);
 
     alarm(0);
-    CL_IGNORE_SIG(SIGALRM);
+    STONITH_IGNORE_SIG(SIGALRM);
 
     if (fd < 0) {
 
@@ -468,7 +469,7 @@ APC_recv_rsp(int upsfd, char *rsp)
 
     *p = '\0';
 
-    CL_SIGNAL(SIGALRM, APC_sh_serial_timeout);
+    STONITH_SIGNAL(SIGALRM, APC_sh_serial_timeout);
 
     alarm(SERIAL_TIMEOUT);
 
@@ -485,7 +486,7 @@ APC_recv_rsp(int upsfd, char *rsp)
 
 	    if (inp == ENDCHAR) {
 		alarm(0);
-		CL_IGNORE_SIG(SIGALRM);
+		STONITH_IGNORE_SIG(SIGALRM);
 
 		*p = '\0';
 		return (S_OK);
@@ -498,7 +499,7 @@ APC_recv_rsp(int upsfd, char *rsp)
 
 	} else {
 	    alarm(0);
-	    CL_IGNORE_SIG(SIGALRM);
+	    STONITH_IGNORE_SIG(SIGALRM);
 	    *p = '\0';
 	    return (f_serialtimeout ? S_TIMEOUT : S_ACCESS);
 	}
