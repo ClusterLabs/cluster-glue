@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.33 2004/11/18 00:34:37 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.34 2004/11/22 20:06:42 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1352,6 +1352,8 @@ wirefmt2ipcmsg(void* p, size_t len, IPC_Channel* ch)
 		return(NULL);
 	}
 	
+	memset(ret, 0, sizeof(IPC_Message));
+	
 	ret->msg_buf = cl_malloc(len + ch->msgpad);
 	ret->msg_body = (char*)ret->msg_buf + ch->msgpad;
 	memcpy(ret->msg_body, p, len);
@@ -1384,6 +1386,8 @@ hamsg2ipcmsg(struct ha_msg* m, IPC_Channel* ch)
 		return ret;
 	}
 	
+	memset(ret, 0, sizeof(IPC_Message));
+
 	ret->msg_buf = cl_malloc(len + ch->msgpad);
 	ret->msg_body = (char*)ret->msg_buf + ch->msgpad;
 	memcpy(ret->msg_body, s, len);
@@ -1766,6 +1770,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.34  2004/11/22 20:06:42  gshi
+ * new IPC message should be memset-ed to 0
+ * to avoid errors caused by adding a new field (void*) msg_buf
+ *
  * Revision 1.33  2004/11/18 00:34:37  gshi
  * 1. use one system call send() instead of two for each message in IPC.
  * 2. fixed a bug: heartbeat could crash if IPC pipe beween heartbeat and a client
