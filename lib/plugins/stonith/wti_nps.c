@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.22 2005/03/16 18:31:11 blaschke Exp $ */
+/* $Id: wti_nps.c,v 1.23 2005/03/16 21:59:25 blaschke Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -809,6 +809,7 @@ wti_nps_destroy(StonithPlugin *s)
 		FREE(nps->unitid);
 		nps->unitid = NULL;
 	}
+	FREE(nps);
 }
 
 /* Create a new BayTech Stonith device. */

@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.19 2005/02/18 07:29:47 zhaokai Exp $ */
+/* $Id: rps10.c,v 1.20 2005/03/16 21:59:25 blaschke Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -1032,6 +1032,7 @@ rps10_destroy(StonithPlugin *s)
 		FREE(ctx->unitid);
 		ctx->unitid = NULL;
 	}
+	FREE(ctx);
 }
 
 /* 

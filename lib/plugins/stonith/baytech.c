@@ -1,4 +1,4 @@
-/* $Id: baytech.c,v 1.23 2005/01/25 19:54:05 gshi Exp $ */
+/* $Id: baytech.c,v 1.24 2005/03/16 21:59:25 blaschke Exp $ */
 /*
  *	Stonith module for BayTech Remote Power Controllers (RPC-x devices)
  *
@@ -845,6 +845,7 @@ baytech_destroy(StonithPlugin *s)
 		FREE(bt->unitid);
 		bt->unitid = NULL;
 	}
+	FREE(bt);
 }
 
 /* Create a new BayTech Stonith device. */
