@@ -91,8 +91,8 @@ update_cpu_interval(void)
 {
 	struct rusage	ru;
 	struct rlimit	rlim;
-	long	timesecs;
-	long	microsec;
+	unsigned long	timesecs;
+	unsigned long	microsec;
 
 	/* Compute how much CPU we've used so far... */
 
