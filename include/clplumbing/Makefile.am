@@ -38,6 +38,7 @@ include_HEADERS	= 		\
 	loggingdaemon.h	\
 	longclock.h	\
 	mkstemp_mode.h	\
+	netstring.h	\
 	proctrack.h	\
 	realtime.h	\
 	recoverymgr_cs.h \
