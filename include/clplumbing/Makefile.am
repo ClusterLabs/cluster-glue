@@ -24,6 +24,7 @@ MAINTAINERCLEANFILES    = Makefile.in
 
 include_HEADERS	= 		\
 	Gmain_timeout.h	\
+	GSource.h	\
 	apphb_cs.h	\
 	base64.h	\
 	cl_log.h	\
