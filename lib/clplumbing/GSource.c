@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.22 2005/02/08 08:43:46 gshi Exp $ */
+/* $Id: GSource.c,v 1.23 2005/02/12 17:15:16 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -485,7 +485,7 @@ G_CH_dispatch(GSource * source,
 			g_source_remove_poll(source, &chp->infd);
 			if (!chp->fd_fdx) {
 				g_source_remove_poll(source, &chp->outfd);
-	}
+			}
 			g_source_unref(source);
 			return FALSE;
 		}
