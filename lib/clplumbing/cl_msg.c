@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.27 2004/10/03 07:25:44 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.28 2004/10/18 21:13:25 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -531,12 +531,19 @@ ha_msg_addbin(struct ha_msg * msg, const char * name,
 
 }
 
+int 
+ha_msg_adduuid(struct ha_msg* msg, const char *name, uuid_t u)
+{
+	return(ha_msg_addraw(msg, name, strlen(name)
+	,	u, sizeof(u), FT_BINARY, 0));
+}
+
 /*Add a null-terminated name and struct value to a message*/
 int
 ha_msg_addstruct(struct ha_msg * msg, const char * name, void * value)
 {
 	
-	/* size is 0 because size is useless in this case*/
+	/* size is 0 because size is useless/meaningless in this case*/
 	return ha_msg_addraw(msg, name, strlen(name), value, 0, FT_STRUCT, 0);
 }
 
@@ -693,6 +700,25 @@ cl_get_binary(const struct ha_msg *msg,
 	}
 
 	return(ret);
+}
+
+/* UUIDs are stored with a machine-independent byte ordering (even though it's binary) */
+int
+cl_get_uuid(const struct ha_msg *msg, const char * name, uuid_t retval)
+{
+	const void *	vret;
+	size_t		vretsize;
+
+	if ((vret = cl_get_binary(msg, name, &vretsize)) == NULL) {
+		/*discouraged function*/ /* But perfectly portable in this case */
+		return HA_FAIL;
+	}
+	if (vretsize != sizeof(uuid_t)) {
+		cl_log(LOG_WARNING, "Binary field %s is not a uuid.", name);
+		return HA_FAIL;
+	}
+	memcpy(retval, vret, sizeof(uuid_t));
+	return HA_OK;
 }
 
 const char *
@@ -854,6 +880,13 @@ cl_msg_modbin(struct ha_msg * msg, const char* name,
 	return cl_msg_mod(msg, name, value, vlen, FT_BINARY);
 	
 }
+int
+cl_msg_moduuid(struct ha_msg * msg, const char* name, 
+	      uuid_t uuid)
+{
+	return cl_msg_mod(msg, name, uuid, sizeof(uuid), FT_BINARY);
+}
+	
 
 
 /* Modify the value associated with a particular name */
@@ -1717,6 +1750,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.28  2004/10/18 21:13:25  alan
+ * Added functions to get/put/modify uuid fileds in our msgs...
+ *
  * Revision 1.27  2004/10/03 07:25:44  gshi
  * BEAM fix:
  * fixed some memory leak problems
