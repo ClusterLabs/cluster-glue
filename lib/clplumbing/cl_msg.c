@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.17 2004/08/29 03:01:13 msoffen Exp $ */
+/* $Id: cl_msg.c,v 1.18 2004/08/29 04:04:10 msoffen Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1869,8 +1869,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.18  2004/08/29 04:04:10  msoffen
+ * Fixed end comment in previous log.
+ *
  * Revision 1.17  2004/08/29 03:01:13  msoffen
- * Replaced all // COMMENTs with /* COMMENT */
+ * Replaced all // COMMENTs with /* COMMENT \*/
  *
  * Revision 1.16  2004/08/03 06:01:19  zhenh
  * fix a memory leak
