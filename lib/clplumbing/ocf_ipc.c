@@ -95,6 +95,13 @@ ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid)
 void
 ipc_destroy_auth(struct IPC_AUTH *auth)
 {
-  if(auth != NULL)
-    free((void *)auth);
+	if (auth != NULL) {
+		if (auth->uid) {
+			g_hash_table_destroy(auth->uid);
+		}
+		if (auth->gid) {
+			g_hash_table_destroy(auth->gid);
+		}
+		free((void *)auth);
+	}
 }
