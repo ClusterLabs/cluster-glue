@@ -86,7 +86,7 @@ cl_make_realtime(int spolicy, int priority,  int heapgrowK)
 			,	heapgrowK);
 		}
 	}
-	if (mlockall(MCL_FUTURE) < 0) {
+	if (mlockall(MCL_PRESENT|MCL_FUTURE) < 0) {
 		cl_perror("Unable to lock pid %d in memory", (int) getpid());
 	}else{
 		cl_log(LOG_INFO, "pid %d locked in memory.", (int) getpid());
