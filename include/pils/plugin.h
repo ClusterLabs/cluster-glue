@@ -444,8 +444,8 @@ PIL_rc		PILLoadPlugin(PILPluginUniv* piuniv
 ,		void *		pi_private);
 
 /* Either or both of pitype and piname may be NULL */
-void		PILSetDebugLevel(PILPluginUniv*u, char * pitype
-,		char * piname
+void		PILSetDebugLevel(PILPluginUniv*u, const char * pitype
+,		const char * piname
 ,		int level);
 
 /* Neither pitype nor piname may be NULL */

@@ -292,6 +292,10 @@ DelPILPlugin(PILPlugin*pi)
 		PILLog(PIL_INFO, "DelPILPlugin: Non-zero refcnt");
 	}
 
+	if (DEBUGPLUGIN) {
+		PILLog(PIL_DEBUG, "Closing dlhandle for (%s/%s)"
+		, pi->plugintype->plugintype,  pi->plugin_name);
+	}
 	lt_dlclose(pi->dlhandle);
 	ZAP(pi);
 	DELETE(pi);
@@ -602,7 +606,7 @@ PILSetDebugLeveltoPlugin(gpointer key, gpointer plugin, gpointer Helper)
 }
 
 static void
-PILSetDebugLevelbyType(gpointer key, gpointer plugintype, gpointer Helper)
+PILSetDebugLevelbyType(const void * key, gpointer plugintype, gpointer Helper)
 {
 	struct set_debug_helper* helper = Helper;
 	
@@ -622,13 +626,19 @@ PILSetDebugLevelbyType(gpointer key, gpointer plugintype, gpointer Helper)
 }
 
 void
-PILSetDebugLevel(PILPluginUniv* u, char * pitype, char * piname
+PILSetDebugLevel(PILPluginUniv* u, const char * pitype, const char * piname
 ,	int level)
 {
 	struct set_debug_helper helper = {pitype, piname, level};
 
 	if (pitype == NULL) {
-		g_hash_table_foreach(u->PluginTypes, PILSetDebugLevelbyType
+		g_hash_table_foreach(u->PluginTypes
+			/*
+			 * Reason for this next cast:
+			 * SetDebugLevelbyType takes const gpointer
+			 * arguments, unlike a GHFunc which doesn't.
+			 */
+		,	(GHFunc)PILSetDebugLevelbyType
 		,	&helper);
 	}else{
 		PILPluginType*	t = g_hash_table_lookup(u->PluginTypes
