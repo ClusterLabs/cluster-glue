@@ -32,7 +32,7 @@
 #define ENABLE_PLUGIN_MANAGER_PRIVATE
 
 #include <pils/interface.h>
- 
+
 PIL_PLUGIN_BOILERPLATE("1.0", DebugFlag, Ourclose)
 
 static void

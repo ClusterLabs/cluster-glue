@@ -22,6 +22,8 @@
 #
 MAINTAINERCLEANFILES    = Makefile.in
 
+includedir=$(base_includedir)/clplumbing
+
 include_HEADERS	= 		\
 	Gmain_timeout.h	\
 	GSource.h	\

@@ -1,7 +1,8 @@
 #include <string.h>
 
-#include <portability.h>
 #include <clplumbing/GSource.h>
+
+#include <portability.h>
 
 #define	MAG_GFDSOURCE	0xfeed0001U
 #define	MAG_GCHSOURCE	0xfeed0002U
