@@ -1,4 +1,4 @@
-/* $Id: ipctransientclient.c,v 1.13 2004/10/01 21:30:39 gshi Exp $ */
+/* $Id: ipctransientclient.c,v 1.14 2004/11/22 19:03:01 gshi Exp $ */
 /* 
  * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
  * 
@@ -263,6 +263,8 @@ create_simple_message(const char *text, IPC_Channel *ch)
 		       "allocating memory for IPC_Message failed");		
 		return NULL;
 	}
+	
+	memset(ack_msg, 0, sizeof(IPC_Message));
 	copy_text = strdup(text);
 	
 	ack_msg->msg_private = NULL;
