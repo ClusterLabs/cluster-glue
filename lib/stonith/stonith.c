@@ -1,4 +1,4 @@
-/* $Id: stonith.c,v 1.14 2005/01/10 08:35:43 alan Exp $ */
+/* $Id: stonith.c,v 1.15 2005/01/11 04:57:59 alan Exp $ */
 /*
  * Stonith API infrastructure.
  *
@@ -33,6 +33,7 @@
 #include <dlfcn.h>
 #include <dirent.h>
 #include <glib.h>
+#define ENABLE_PIL_DEFS_PRIVATE
 #include <pils/plugin.h>
 #include <pils/generic.h>
 #include <stonith/stonith.h>
@@ -42,6 +43,8 @@
 #define	MALLOC(n)	malloc(n)
 #define MALLOCT(t)	(t*)(malloc(sizeof(t)))
 #define FREE(p)		{free(p); (p) = NULL;}
+
+#define	LOG(args...) PILCallLog(StonithPIsys->imports->log, args)
 
 PILPluginUniv*		StonithPIsys = NULL;
 static GHashTable*	Splugins = NULL;
@@ -211,6 +214,45 @@ stonith_set_config(Stonith* s, StonithNVpair* list)
 		return rc;
 	}
 	return S_INVAL;
+}
+
+/*
+ * FIXME: We really ought to support files with name=value type syntax
+ * on each line...
+ *
+ */
+int
+stonith_set_config_file(Stonith* s, const char * configname)
+{
+	FILE *		cfgfile;
+
+	char		line[1024];
+
+	if ((cfgfile = fopen(configname, "r")) == NULL)  {
+		LOG(PIL_CRIT, "Cannot open %s", configname);
+		return(S_BADCONFIG);
+	}
+	while (fgets(line, sizeof(line), cfgfile) != NULL){
+		if (*line == '#' || *line == '\n' || *line == EOS) {
+			continue;
+		}
+		return stonith_set_config_info(s, line);
+	}
+	return S_BADCONFIG;
+}
+
+int
+stonith_set_config_info(Stonith* s, const char * info)
+{
+	StonithNVpair*	cinfo;
+	int		rc;
+	cinfo = stonith1_compat_string_to_NVpair(s, info);
+	if (cinfo == NULL) {
+		return S_BADCONFIG;
+	}
+	rc = stonith_set_config(s, cinfo);
+	free_NVpair(cinfo); cinfo = NULL;
+	return rc;
 }
 
 char**
