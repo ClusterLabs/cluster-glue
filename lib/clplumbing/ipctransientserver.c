@@ -14,7 +14,6 @@
 #include <clplumbing/realtime.h>
 #include <clplumbing/lsb_exitcodes.h>
 #include <ha_config.h>
-#include <heartbeat.h>
 #include <errno.h>
 
 #define	MAXERRORS	1000
@@ -133,9 +132,6 @@ EOFcheck(IPC_Channel* chan)
 int
 main(int argc, char ** argv)
 {
-    (void)_heartbeat_h_Id;
-    (void)_ha_msg_h_Id;
-    
     int	iteration = 0;
     
     cl_log_set_entity("ipc_transient_server_test");
@@ -305,7 +301,6 @@ echoserver_connect(IPC_Channel *client_channel, gpointer user_data)
     return TRUE;
 }
 
-
 IPC_Message *
 create_simple_message(char *text, IPC_Channel *ch)
 {
@@ -314,15 +309,19 @@ create_simple_message(char *text, IPC_Channel *ch)
     //    char	       str[256];
     IPC_Message        *ack_msg = NULL;
 
-    ack_msg = (IPC_Message *)ha_malloc(sizeof(IPC_Message));
+    ack_msg = (IPC_Message *)malloc(sizeof(IPC_Message));
+
+    int text_len = strlen(text) + 1;
+    char *copy_text = (char *)malloc(sizeof(char)*text_len);
+    strcpy(copy_text, text);
+    copy_text[text_len-1] = '\0';
     
     ack_msg->msg_private = NULL;
     ack_msg->msg_done    = NULL;
-    ack_msg->msg_body    = text;
+    ack_msg->msg_body    = copy_text;
     ack_msg->msg_ch      = ch;
 
     ack_msg->msg_len = strlen(text)+1;
     
     return ack_msg;
 }
-
