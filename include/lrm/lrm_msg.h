@@ -87,7 +87,6 @@
 #define RETURN			"return"
 #define FLUSHOPS		"flushops"
 
-#define UUID_SLEN 		37
 #define MAX_INT_LEN 		10
 #define MAX_NAME_LEN 		255
 #define MAX_VALUE_LEN 		255
@@ -99,10 +98,10 @@
  */
 int ha_msg_add_int(struct ha_msg * msg, const char * name, int value);
 int ha_msg_value_int(struct ha_msg * msg, const char * name, int* value);
-
+/*
 int ha_msg_add_uuid(struct ha_msg * msg, const char * name, const uuid_t id);
 int ha_msg_value_uuid(struct ha_msg * msg, const char * name, uuid_t id);
-
+*/
 GList* ha_msg_value_list(struct ha_msg * msg, const char * name);
 int ha_msg_add_list(struct ha_msg * msg, const char * name, GList* list);
 
@@ -130,7 +129,7 @@ struct ha_msg* create_lrm_msg(const char*  msg);
  * message for only one parameter - resource id,
  * like getrsc,delrsc,flush,getstate,getmons
  */
-struct ha_msg* create_lrm_rsc_msg(rsc_id_t rid, const char* msg);
+struct ha_msg* create_lrm_rsc_msg(const char* rid, const char* msg);
 
 /* register client message */ 
 struct ha_msg* create_lrm_reg_msg(const char* app_name);
@@ -140,7 +139,7 @@ struct ha_msg* create_lrm_reg_msg(const char* app_name);
  * according to the opinion of Lars, it is awkward that we combine all
  * parameters in to one string. I think so too. So this call may changed soon
  */ 
-struct ha_msg* create_lrm_addrsc_msg(rsc_id_t rid, const char* rname,
+struct ha_msg* create_lrm_addrsc_msg(const char* rid, const char* rname,
 				const char* rtype, GHashTable* parameter);
 
 /*  
@@ -156,8 +155,8 @@ struct ha_msg* create_lrm_ret(int rc, int fields);
  * the return message for a status change monitoring. 
  */ 
 
-struct ha_msg* create_rsc_perform_op_msg (rsc_id_t rid, lrm_op_t* op);
+struct ha_msg* create_rsc_perform_op_msg (const char* rid, lrm_op_t* op);
 
-struct ha_msg* create_rsc_set_monitor_msg(rsc_id_t rid,	lrm_mon_t* monitor);
+struct ha_msg* create_rsc_set_monitor_msg(const char* rid, lrm_mon_t* monitor);
 				
 #endif /* __LRM_MSG_H */

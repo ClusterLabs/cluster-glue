@@ -47,10 +47,10 @@ static int lrm_set_lrm_callback (ll_lrm_t* lrm,
 static GList* lrm_get_rsc_class_supported (ll_lrm_t* lrm);
 static GList* lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rsc_class);
 static GList* lrm_get_all_rscs (ll_lrm_t* lrm);
-static lrm_rsc_t* lrm_get_rsc (ll_lrm_t* lrm, rsc_id_t rsc_id);
-static int lrm_add_rsc (ll_lrm_t*, rsc_id_t rsc_id, const char* rsc_class
+static lrm_rsc_t* lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id);
+static int lrm_add_rsc (ll_lrm_t*, const char* rsc_id, const char* rsc_class
 			,const char* rsc_type, GHashTable* parameter);
-static int lrm_delete_rsc (ll_lrm_t*, rsc_id_t rsc_id);
+static int lrm_delete_rsc (ll_lrm_t*, const char* rsc_id);
 static int lrm_inputfd (ll_lrm_t*);
 static int lrm_msgready (ll_lrm_t*);
 static int lrm_rcvmsg (ll_lrm_t*, int blocking);
@@ -442,10 +442,7 @@ lrm_get_all_rscs (ll_lrm_t* lrm)
 {
 	struct ha_msg* msg = NULL;
 	struct ha_msg* ret = NULL;
-	GList* rid_str_list = NULL;
 	GList* rid_list = NULL;
-	rsc_id_t* rid = NULL;
-	GList* element = NULL;
 	
 	client_log(LOG_INFO, "lrm_get_all_rscs: start.");
 
@@ -483,36 +480,30 @@ lrm_get_all_rscs (ll_lrm_t* lrm)
 			"lrm_get_all_rscs: rc from msg is fail");
 		return NULL;
 	}
-	//get the rsc_id(in string)list from msg
-	rid_str_list = ha_msg_value_list(ret,F_LRM_RID);
+	//get the rsc_id list from msg
+	rid_list = ha_msg_value_list(ret,F_LRM_RID);
 
-	//convert the string id to uuid format
-	if (NULL != rid_str_list) {
-		element = g_list_first(rid_str_list);
-		while (NULL != element) {
-			rid = g_new(rsc_id_t, 1);
-			uuid_parse(element->data, *rid);
-			g_free(element->data);
-			rid_list = g_list_append(rid_list, *rid);
-			element = g_list_next(element);
-		}
-	}
-	g_list_free(rid_str_list);
 	ha_msg_del(ret);
 	client_log(LOG_INFO, "lrm_get_all_rscs: end.");
-	//return the uuid list
+	//return the id list
 	return rid_list;
 
 }
 
 lrm_rsc_t*
-lrm_get_rsc (ll_lrm_t* lrm, rsc_id_t rsc_id)
+lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 {
 	struct ha_msg* msg = NULL;
 	struct ha_msg* ret = NULL;
 	lrm_rsc_t* rsc     = NULL;
 
 	client_log(LOG_INFO, "lrm_get_rsc: start.");
+
+	//check whether the rsc_id is available
+	if (RID_LEN <= strlen(rsc_id))	{
+		client_log(LOG_ERR, "lrm_get_rsc: rsc_id is too long.");
+		return NULL;
+	}
 
 	//check whether the channel to lrmd is available
 	if (NULL == ch_cmd)	{
@@ -548,7 +539,7 @@ lrm_get_rsc (ll_lrm_t* lrm, rsc_id_t rsc_id)
 	rsc = g_new(lrm_rsc_t, 1);
 
 	//fill the field of resource with the data from msg
-	ha_msg_value_uuid(msg,F_LRM_RID, rsc->id);
+	rsc->id = g_strdup(ha_msg_value(msg, F_LRM_RID));
 	rsc->type = g_strdup(ha_msg_value(msg, F_LRM_RTYPE));
 	rsc->class = g_strdup(ha_msg_value(msg, F_LRM_RCLASS));
 	rsc->params = ha_msg_value_hash_table(msg,F_LRM_PARAM);
@@ -561,11 +552,18 @@ lrm_get_rsc (ll_lrm_t* lrm, rsc_id_t rsc_id)
 }
 
 int
-lrm_add_rsc (ll_lrm_t* lrm, rsc_id_t rsc_id, const char* class
+lrm_add_rsc (ll_lrm_t* lrm, const char* rsc_id, const char* class
 , 			 const char* type, GHashTable* parameter)
 {
 	struct ha_msg* msg;
 	client_log(LOG_INFO, "lrm_add_rsc: start.");
+
+	//check whether the rsc_id is available
+	if (RID_LEN <= strlen(rsc_id))	{
+		client_log(LOG_ERR, "lrm_add_rsc: rsc_id is too long.");
+		return HA_FAIL;
+	}
+	
 	//check whether the channel to lrmd is available
 	if (NULL == ch_cmd)	{
 		client_log(LOG_ERR, "lrm_add_rsc: ch_mod is null.");
@@ -596,7 +594,7 @@ lrm_add_rsc (ll_lrm_t* lrm, rsc_id_t rsc_id, const char* class
 }
 
 int
-lrm_delete_rsc (ll_lrm_t* lrm, rsc_id_t rsc_id)
+lrm_delete_rsc (ll_lrm_t* lrm, const char* rsc_id)
 {
 	struct ha_msg* msg = NULL;
 	GList* op_node     = NULL;
@@ -605,6 +603,13 @@ lrm_delete_rsc (ll_lrm_t* lrm, rsc_id_t rsc_id)
 	lrm_mon_t* mon     = NULL;
 
 	client_log(LOG_INFO, "lrm_delete_rsc: start.");
+
+	//check whether the rsc_id is available
+	if (RID_LEN <= strlen(rsc_id))	{
+		client_log(LOG_ERR, "lrm_delete_rsc: rsc_id is too long.");
+		return HA_FAIL;
+	}
+
 
 	//check whether the channel to lrmd is available
 	if (NULL == ch_cmd)	{
@@ -636,7 +641,7 @@ lrm_delete_rsc (ll_lrm_t* lrm, rsc_id_t rsc_id)
 	op_node = g_list_first(op_list);
 	while (NULL != op_node) {
 		op = (lrm_op_t*)op_node->data;
-		if (0 == uuid_compare(op->rsc->id, rsc_id)) {
+		if (0 == strncmp(op->rsc->id, rsc_id, RID_LEN)) {
 			op_node = g_list_next(op_node);
 			op_list = g_list_remove(op_list, op);
 			free_op(op);
@@ -649,7 +654,7 @@ lrm_delete_rsc (ll_lrm_t* lrm, rsc_id_t rsc_id)
 	mon_node = g_list_first(mon_list);
 	while (NULL != mon_node) {
 		mon = (lrm_mon_t*)mon_node->data;
-		if (0 == uuid_compare(mon->rsc->id, rsc_id)) {
+		if (0 == strncmp(mon->rsc->id, rsc_id, RID_LEN)) {
 			mon_node = g_list_next(mon_node);
 			mon_list = g_list_remove(mon_list, mon);
 			free_mon(mon);
@@ -971,7 +976,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 			"rsc_get_cur_state: can not recieve ret msg");
 		return NULL;
 	}
-//	ha_msg_print(ret);
+
 	//get the state of the resource from the message
 	if (HA_FAIL == ha_msg_value_int(ret, F_LRM_STATE, &state)) {
 		ha_msg_del(ret);
