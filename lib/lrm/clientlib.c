@@ -1038,7 +1038,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 	ret = msgfromIPC_noauth(ch_cmd);
 	if (NULL == ret) {
 		client_log(LOG_ERR,
-			"rsc_get_cur_state: can not recieve ret msg");
+			"rsc_get_cur_state: can not receive ret msg");
 		return NULL;
 	}
 
@@ -1099,6 +1099,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 		return pending_op_list;
 	}
 	client_log(LOG_ERR, "rsc_get_cur_state: unkown state from msg");
+	ha_msg_del(ret);
 	return NULL;
 }
 /* 
