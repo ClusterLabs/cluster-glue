@@ -34,6 +34,7 @@ libplumb_la_SOURCES	= 		\
 			Gmain_timeout.c	\
 			base64.c	\
 			ipcsocket.c	\
+			cl_log.c	\
 			longclock.c	\
 			mkstemp_mode.c	\
 			ocf_ipc.c	\
