@@ -159,7 +159,7 @@ echoserver(IPC_Channel* wchan, int repcount)
 		//fprintf(stderr, "s");
 		if (rmsg->msg_len != wmsg.msg_len) {
 			fprintf(stderr
-			,	"echotest: length mismatch [%d,%d] iter %d\n"
+			,	"echotest: length mismatch [%zd,%zd] iter %d\n"
 			,	rmsg->msg_len, wmsg.msg_len, j);
 			++errcount;
 			continue;
