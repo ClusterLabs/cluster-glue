@@ -35,10 +35,11 @@ libplumb_la_SOURCES	= 		\
 			base64.c	\
 			ipcsocket.c	\
 			cl_log.c	\
+			cl_poll.c	\
 			longclock.c	\
 			mkstemp_mode.c	\
 			ocf_ipc.c	\
-			proctrack.c
+			proctrack.c	\
+			timers.c
 
 libplumb_la_LDFLAGS	= -version-info 0:0:0
-

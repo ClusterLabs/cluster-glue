@@ -27,9 +27,11 @@ include_HEADERS	= 		\
 	apphb_cs.h	\
 	base64.h	\
 	cl_log.h	\
+	cl_poll.h	\
 	ipc.h		\
 	lsb_exitcodes.h	\
 	loggingdaemon.h	\
 	longclock.h	\
 	mkstemp_mode.h	\
-	proctrack.h
+	proctrack.h	\
+	timers.h
