@@ -40,7 +40,6 @@
 #include <clplumbing/cl_log.h>
 #include <clplumbing/ipc.h>
 #include <clplumbing/GSource.h>
-#include <clplumbing/cl_poll.h>
 #include <clplumbing/lsb_exitcodes.h>
 #include <clplumbing/cl_signal.h>
 
@@ -466,7 +465,6 @@ init_start ()
 	                               on_connect_cbk, conn_cbk, NULL);
 	g_idle_add(on_idle,NULL);
 //	g_timeout_add(5, on_idle,NULL);
-	g_main_set_poll_func(cl_glibpoll);
 
 	/*Create the mainloop and run it*/
 	mainloop = g_main_new(FALSE);
