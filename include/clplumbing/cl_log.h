@@ -1,6 +1,7 @@
 #ifndef _CLPLUMBING_CL_LOG_H
 #	define _CLPLUMBING_CL_LOG_H
 #	include <glib.h>
+#	include <syslog.h>
 void            cl_log(int priority, const char * fmt, ...) G_GNUC_PRINTF(2,3);
 void            cl_perror(const char * fmt, ...) G_GNUC_PRINTF(1,2);
 void		cl_log_enable_stderr(int truefalse);
