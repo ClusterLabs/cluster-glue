@@ -124,7 +124,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 
 struct DRAC3Device {
 	const char *DRAC3id;
-	CURL *curl;	
+	CURL *curl;
 	char *host;
 	char *user;
 	char *pass;
@@ -188,7 +188,7 @@ drac3_destroy(Stonith * s)
 	drac3d = (struct DRAC3Device *) s->pinfo;
 
 	drac3d->DRAC3id = NOTdrac3ID;
-	
+
 	/* release curl connection */
 	if (drac3d->curl != NULL) {
 		drac3Logout(drac3d->curl, drac3d->host);
@@ -296,8 +296,8 @@ drac3_getinfo(Stonith * s, int reqtype)
 	}
 
 	return(ret);
-}		
-	
+}
+
 /* ------------------------------------------------------------------ */
 int
 drac3_status(Stonith  *s)
@@ -313,12 +313,12 @@ drac3_status(Stonith  *s)
 		syslog(LOG_ERR, "%s: device is UNCONFIGURED!", __FUNCTION__);
 		return (S_OOPS);
 	}
-	
+
 	drac3d = (struct DRAC3Device *) s->pinfo;
 
 	if (drac3VerifyLogin(drac3d->curl, drac3d->host)) {
 		if (drac3Login(drac3d->curl, drac3d->host,
-		                drac3d->user, drac3d->pass)) {	
+		                drac3d->user, drac3d->pass)) {
 		 	syslog(LOG_ERR, "%s: cannot log into %s at %s", 
 							__FUNCTION__,
 							DEVICE,
@@ -326,11 +326,11 @@ drac3_status(Stonith  *s)
 		 	return(S_ACCESS);
 		}
 	}
-	
+
 	if (drac3GetSysInfo(drac3d->curl, drac3d->host)) 
 		return(S_ACCESS);
 	else
-		return(S_OK);	
+		return(S_OK);
 }
 
 /* ------------------------------------------------------------------ */
@@ -349,12 +349,12 @@ drac3_reset_req(Stonith * s, int request, const char *host)
 		syslog(LOG_ERR, "%s: device is UNCONFIGURED!", __FUNCTION__);
 		return (S_OOPS);
 	}
-	
+
 	drac3d = (struct DRAC3Device *) s->pinfo;
 
 	if (drac3VerifyLogin(drac3d->curl, drac3d->host)) {
 		if (drac3Login(drac3d->curl, drac3d->host,
-		                drac3d->user, drac3d->pass)) {	
+		                drac3d->user, drac3d->pass)) {
 		 	syslog(LOG_ERR, "%s: cannot log into %s at %s", 
 							__FUNCTION__,
 							DEVICE,
@@ -397,7 +397,7 @@ drac3_hostlist(Stonith * s)
 		syslog(LOG_ERR, "%s: device is UNCONFIGURED!", __FUNCTION__);
 		return (NULL);
 	}
-	
+
 	drac3d = (struct DRAC3Device *) s->pinfo;
 
 	hl = (char **)MALLOC(2*sizeof(char*));
@@ -407,16 +407,16 @@ drac3_hostlist(Stonith * s)
 		hl[0]=strdup(drac3d->host);
 		hl[1]=NULL;
 	}
-	
+
 	return(hl);
 }
-	
+
 /* ------------------------------------------------------------------ */
 void
 drac3_free_hostlist (char ** hlist)
 {
 	char ** hl = hlist;
-	
+
         if (hl == NULL) {
                 return;
         }
@@ -455,22 +455,22 @@ DRAC3_parse_config_info(struct DRAC3Device * drac3d, const char * info)
 					return(S_OOPS);
 			} else {
 					strcpy(drac3d->user, user);
-			}	
+			}
 			if ((drac3d->pass = (char *)MALLOC(strlen(pass)+1)) == NULL) {
 					syslog(LOG_ERR, "%s: out of memory", __FUNCTION__);
 					return(S_OOPS);
 			} else {
 					strcpy(drac3d->pass, pass);
-			}	
-		
+			}
+
 			curl = curl_easy_init();
 			if ((drac3d->curl = curl_easy_init()) == NULL) { 
 					syslog(LOG_ERR, "%s: cannot init curl", __FUNCTION__);
 					return(S_OOPS);
 			}
-					
+
 			drac3InitCurl(drac3d->curl);
-	
+
 			return(S_OK);
 	} else {
 			return(S_BADCONFIG);
