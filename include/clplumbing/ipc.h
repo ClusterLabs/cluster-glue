@@ -195,7 +195,7 @@ struct OCF_IPC_OPS{
   gboolean (* is_message_pending) (struct OCF_IPC_CHANNEL * ch);
   
   /* check the send_queue to see if there is any message blocking. */
-  gboolean (* is_sending_block) (struct OCF_IPC_CHANNEL *ch);
+  gboolean (* is_sending_blocked) (struct OCF_IPC_CHANNEL *ch);
   /*! 
     \brief resume all possible IO operations through the inner connection . 
     \param the pointer to the channel.

@@ -69,7 +69,7 @@ static int socket_resume_io(struct OCF_IPC_CHANNEL *ch);
 
 static gboolean socket_is_message_pending(struct OCF_IPC_CHANNEL *ch);
 
-static gboolean socket_is_sending_block(struct OCF_IPC_CHANNEL *ch);
+static gboolean socket_is_sending_blocked(struct OCF_IPC_CHANNEL *ch);
 
 static int socket_assert_auth(struct OCF_IPC_CHANNEL *ch, GHashTable *auth);
 
@@ -287,12 +287,22 @@ socket_recv(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE** message)
 static gboolean
 socket_is_message_pending(struct OCF_IPC_CHANNEL * ch)
 {
+  int	rc;
+  int	len;
+  struct SOCKET_CH_PRIVATE * conn_info = ch->ch_private;
 
-  return ch->recv_queue->current_qlen > 0;
+  if (ch->recv_queue->current_qlen > 0) {
+	return TRUE;
+  }
+  rc=ioctl(conn_info->s, FIONREAD,&len);
+  if (rc == 0 && len > 0) {
+	return TRUE;
+  }
+  return FALSE;
 }
 
 static gboolean
-socket_is_sending_block(struct OCF_IPC_CHANNEL * ch)
+socket_is_sending_blocked(struct OCF_IPC_CHANNEL * ch)
 {
 
   return ch->send_queue->current_qlen > 0;
@@ -423,7 +433,7 @@ socket_verify_auth(struct OCF_IPC_CHANNEL* ch)
       || cmsg->cmsg_len < sizeof(cmsgmem) 
       || cmsg->cmsg_type != SCM_CREDS)
     {
-      fprintf(stderr,"can't get credentical information from peer\n");
+      fprintf(stderr,"can't get credential information from peer\n");
       return AUTH_FAIL;
     }
 
@@ -475,8 +485,6 @@ socket_resume_io(struct OCF_IPC_CHANNEL *ch)
     }
 
     if (msg_len > 0) {
-      /* Copying messages is slow... Sigh... :-( */
-      /* removed memcpy. */
       msg->msg_done = socket_free_message;
       msg->ch = ch;
       msg->msg_len = msg_len;
@@ -572,7 +580,7 @@ static struct OCF_IPC_OPS socket_ops = {
   socket_send,
   socket_recv,
   socket_is_message_pending,
-  socket_is_sending_block,
+  socket_is_sending_blocked,
   socket_resume_io,
   socket_get_send_fd,
   socket_get_recv_fd,
@@ -666,7 +674,6 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   my_addr.sun_family = AF_LOCAL;         /* host byte order */
 
   if (strlen(path_name) >= sizeof(my_addr.sun_path)) {
-    fprintf(stderr,"the max path length is %d\n", sizeof(my_addr.sun_path));
     return NULL;
   }
     
