@@ -844,7 +844,7 @@ add_struct_field(struct ha_msg* msg, char* name, size_t namelen,
 	if (new_stringlen >= MAXMSG || 
 	    new_netstringlen >= MAXMSG){
 		cl_log(LOG_ERR, "add_struct_field"
-		       "msg too largge: max length allowed=%d"
+		       "msg too large: max length allowed=%d"
 		       "requested stringlen=%d"
 		       "requested netstringlen =%d",
 		       MAXMSG,
