@@ -19,6 +19,7 @@
 	int drop_privs(uid_t uid, gid_t gid)	{	return 0;	}
 	int return_to_orig_privs(void)		{	return 0;	}
 	int return_to_dropped_privs(void)	{	return 0;	}
+	int cl_have_full_privs(void)		{	return 0;	}
 #else
 
 static int	anysaveduid = 0;
@@ -98,7 +99,7 @@ return_to_dropped_privs(void)
 
 /* Return TRUE if we have full privileges at the moment */
 int
-cl_have_full_privs(void)
+Cl_have_full_privs(void)
 {
 	return privileged_state != 0;
 }
