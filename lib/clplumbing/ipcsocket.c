@@ -25,7 +25,6 @@
 #include <clplumbing/cl_log.h>
 #include <clplumbing/realtime.h>
 
-/* #define CHEAT_CHECKS */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -94,6 +93,16 @@ struct SOCKET_CH_PRIVATE{
 struct SOCKET_MSG_HEAD{
   int msg_len;
 };
+
+struct IPC_Stats {
+	long	nsent;
+	long	noutqueued;
+	long	nreceived;
+	long	ninqueued;
+};
+
+struct IPC_Stats	SocketIPCStats = {0,0,0,0};
+
 /* unix domain socket implementations of IPC functions. */
 
 static void socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn);
@@ -265,10 +274,8 @@ socket_chan_audit(const struct IPC_CHANNEL* ch)
 
 void dump_ipc_info(IPC_Channel* chan);
 
-#define CHEAT_CHECKS 1
-long	SeqNums[32];
 #ifdef CHEAT_CHECKS
-
+long	SeqNums[32];
 
 static long
 cheat_get_sequence(IPC_Message* msg)
@@ -302,6 +309,19 @@ save_body(struct IPC_MESSAGE *msg, char * savearea, size_t length)
 	savearea[mlen] = EOS;
 }
 
+static void
+audit_readmsgq_msg(gpointer msg, gpointer user_data)
+{
+	long	cheatseq = cheat_get_sequence(msg);
+
+	if (cheatseq < SeqNums[1] || cheatseq > SeqNums[2]) {
+		cl_log(LOG_ERR
+		,	"Read Q Message %ld not in range [%ld:%ld]"
+		,	cheatseq, SeqNums[1], SeqNums[2]);
+	}
+}
+
+
 static void 
 saveandcheck(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg, char * savearea
 ,	size_t savesize, long* lastseq, const char * text)
@@ -311,16 +331,38 @@ saveandcheck(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg, char * savearea
 	save_body(msg, savearea, savesize);
 	if (*lastseq != 0 ) {
 		if (cheatseq != *lastseq +1) {
+			int	j;
 			cl_log(LOG_ERR
 			,	"%s packets out of sequence! %ld versus %ld [pid %d]"
 			,	text, cheatseq, *lastseq, (int)getpid());
 			dump_ipc_info(ch);
+			for (j=0; j < 4; ++j) {
+				cl_log(LOG_DEBUG
+				,	"SeqNums[%d] = %ld"
+				,	j, SeqNums[j]);
+			}
+			cl_log(LOG_ERR
+			,	"SocketIPCStats.nsent = %ld"
+			,	SocketIPCStats.nsent);
+			cl_log(LOG_ERR
+			,	"SocketIPCStats.noutqueued = %ld"
+			,	SocketIPCStats.noutqueued);
+			cl_log(LOG_ERR
+			,	"SocketIPCStats.nreceived = %ld"
+			,	SocketIPCStats.nreceived);
+			cl_log(LOG_ERR
+			,	"SocketIPCStats.ninqueued = %ld"
+			,	SocketIPCStats.ninqueued);
 		}
+		
 	}
+	g_list_foreach(ch->recv_queue->queue, audit_readmsgq_msg, NULL);
 	if (cheatseq > 0) {
 		*lastseq = cheatseq;
 	}
 }
+
+
 
 #	define	CHECKFOO(which, ch, msg, area, text)	{			\
 		saveandcheck(ch,msg,area,sizeof(area),SeqNums+which,text);	\
@@ -348,7 +390,6 @@ dump_msgq_msg(gpointer data, gpointer user_data)
 {
 	dump_msg(data, user_data);
 }
-
 
 
 void
@@ -562,8 +603,9 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
   
 	if (ch->ch_status == IPC_CONNECT
 	&&	ch->send_queue->current_qlen < ch->send_queue->max_qlen) {
+		/* add the message into the send queue */
 		CHECKFOO(0,ch, msg, SavedQueuedBody, "queued message");
-		/* add the meesage into the send queue */
+		SocketIPCStats.noutqueued++;
 		ch->send_queue->queue = g_list_append(ch->send_queue->queue
 		,	msg);
 		ch->send_queue->current_qlen++;
@@ -601,6 +643,7 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 	*message = (struct IPC_MESSAGE *) (element->data);
 
 	CHECKFOO(1,ch, *message, SavedReadBody, "read message");
+	SocketIPCStats.nreceived++;
 	ch->recv_queue->queue =	g_list_remove(ch->recv_queue->queue
 	,	element->data);
 	ch->recv_queue->current_qlen--;
@@ -894,11 +937,12 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, gboolean* started)
 			/* Got the last of the message! */
 
 			/* Append gotten message to receive queue */
+			CHECKFOO(2,ch, conn_info->buf_msg, SavedReceivedBody
+			,	"received message");
 			ch->recv_queue->queue =	g_list_append
 			(	ch->recv_queue->queue, conn_info->buf_msg);
 			ch->recv_queue->current_qlen++;
-			CHECKFOO(2,ch, conn_info->buf_msg, SavedReceivedBody
-			,	"received message");
+			SocketIPCStats.ninqueued++;
 			conn_info->buf_msg = NULL;
 		}
 	}
@@ -1015,10 +1059,10 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 			,	(int)msg->msg_len, sendrc);
 		}
 
-#if 0
+#ifdef DEBUG
 		cl_log(LOG_DEBUG, "Sent %d byte message body"
 		,	msg->msg_len);
-		cl_log(LOG_DEBUG, "Contents sent: %s", (char*)msg->msg_body);
+		cl_log(LOG_DEBUG, "Contents sent: %s",(char*)msg->msg_body);
 #endif
 
 		if (sendrc < 0) {
@@ -1042,6 +1086,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, gboolean* started)
 			if (msg->msg_done != NULL) {
 				msg->msg_done(msg);
 			}
+			SocketIPCStats.nsent++;
 			ch->send_queue->current_qlen--;
 		}
 	}
@@ -1358,7 +1403,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   
   strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
   temp_ch->ch_status = IPC_DISCONNECT;
-#if 0
+#ifdef DEBUG
   cl_log(LOG_INFO, "Initializing client socket %d to DISCONNECT", sockfd);
 #endif
   temp_ch->ch_private = (void*) conn_info;
@@ -1385,7 +1430,7 @@ socket_server_channel_new(int sockfd){
   conn_info->buf_msg = NULL;
   strcpy(conn_info->path_name, "?");
 
-#if 0
+#ifdef DEBUG
   cl_log(LOG_INFO, "Initializing server socket %d to DISCONNECT", sockfd);
 #endif
   temp_ch->ch_status = IPC_DISCONNECT;

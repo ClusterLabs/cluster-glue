@@ -102,23 +102,28 @@ checkifblocked(IPC_Channel* chan)
 	}
 }
 
+#ifdef CHEAT_CHECKS
 extern long	SeqNums[32];
+#endif
 
 static int
 transport_tests(int iterations)
 {
 	int	rc = 0;
 
-#if 1
+#ifdef CHEAT_CHECKS
 	memset(SeqNums, 0, sizeof(SeqNums));
-	rc += channelpair(echoclient, echoserver, iterations/100);
-	memset(SeqNums, 0, sizeof(SeqNums));
-	rc += channelpair(asyn_echoclient, asyn_echoserver, iterations/100);
-#else
-	(void)echoclient; (void)echoserver;
-	(void)asyn_echoclient;(void)asyn_echoserver;
 #endif
+	rc += channelpair(echoclient, echoserver, iterations);
+
+#ifdef CHEAT_CHECKS
 	memset(SeqNums, 0, sizeof(SeqNums));
+#endif
+	rc += channelpair(asyn_echoclient, asyn_echoserver, iterations);
+
+#ifdef CHEAT_CHECKS
+	memset(SeqNums, 0, sizeof(SeqNums));
+#endif
 	rc += channelpair(mainloop_client, mainloop_server, iterations);
 
 	return rc;
@@ -134,15 +139,13 @@ main(int argc, char ** argv)
 	cl_log_enable_stderr(TRUE);
 
 
-#if 0
-	rc += transport_tests(1000);
-#endif
+	rc += transport_tests(10000);
 
 	cl_log(LOG_INFO, "NOTE: Enabling poll(2) replacement code.");
 	PollFunc = cl_poll;
 	g_main_set_poll_func(cl_glibpoll);
 
-	rc += transport_tests(10000000);
+	rc += transport_tests(50000);
 	
 	cl_log(LOG_INFO, "TOTAL errors: %d", rc);
 
@@ -851,8 +854,6 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 	int			rc;
 	IPC_Message*		rmsg;
 
-	cl_log(LOG_INFO, "Starting s_echo_msg in pid %d"
-	,	(int)getpid());
 	while (chan->ops->is_message_pending(chan)) {
 		if (chan->ch_status == IPC_DISCONNECT) {
 			break;
