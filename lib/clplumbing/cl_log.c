@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.31 2005/02/10 18:36:40 gshi Exp $ */
+/* $Id: cl_log.c,v 1.32 2005/02/10 21:10:56 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -286,8 +286,8 @@ cl_log(int priority, const char * fmt, ...)
 	nbytes=vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 	
-	if (nbytes > sizeof(buf)){
-		nbytes =  sizeof(buf);
+	if (nbytes >= sizeof(buf)){
+		nbytes =  sizeof(buf) -1 ;
 	}
 	
 	if (logpri < 0 || logpri >= DIMOF(log_prio)) {
@@ -302,7 +302,7 @@ cl_log(int priority, const char * fmt, ...)
 	
 	if ( use_logging_daemon && 
 	     cl_log_depth <= 1 &&
-	     LogToLoggingDaemon(priority, buf, nbytes, TRUE) == HA_OK){
+	     LogToLoggingDaemon(priority, buf, nbytes + 1, TRUE) == HA_OK){
 		goto LogDone;
 	}else {
 		cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid);
