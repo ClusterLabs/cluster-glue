@@ -23,7 +23,10 @@
 
 /* Internal client-server messages for APP heartbeat service */
 
-#define APPHBSOCKPATH		"/var/lib/heartbeat/apphb.comm"
+#ifndef VARLIBDIR
+#define VARLIBDIR "/var/lib"
+#endif
+#define APPHBSOCKPATH		VARLIBDIR "/heartbeat/apphb.comm"
 
 #define APPHB_TLEN	8
 #define APPHB_OLEN	256
