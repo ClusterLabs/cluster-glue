@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.16 2004/09/13 07:10:30 zhenh Exp $ */
+/* $Id: lrm_msg.c,v 1.17 2004/09/17 03:33:24 zhenh Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -53,7 +53,7 @@ ha_msg_mod_int(struct ha_msg * msg, const char * name, int value)
 int
 ha_msg_value_int(struct ha_msg * msg, const char * name, int* value)
 {
-	int size;
+	size_t size;
 	const void* data = cl_get_binary(msg, name, &size);
 	if (NULL == data || NULL == value || sizeof(int) != size) {
 		return HA_FAIL;
@@ -419,6 +419,9 @@ create_lrm_ret(int rc, int fields)
 
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.17  2004/09/17 03:33:24  zhenh
+ * in some platform(maybe 64bits), using int as size_t causes warning.
+ *
  * Revision 1.16  2004/09/13 07:10:30  zhenh
  * fix a bug: the msg does not contain the request field so returning NULL is correct. not an error. remove the wrong log
  *
