@@ -19,18 +19,32 @@ static gboolean	cl_realtimepermitted = TRUE;
 #	define DEFAULT_REALTIME	SCHED_RR
 #endif
 
-/* Dummy function to touch "a lot" of stack so we have it pre-allocated
- * inside our realtime code as per suggestion from mlockall(2) */
-int
-cl_stack_hogger()
+#define HOGRET	0xff
+/*
+ * Slightly wacko recursive function to touch requested amount
+ * of stack so we have it pre-allocated inside our realtime code
+ * as per suggestion from mlockall(2)
+ */
+static int
+cl_stack_hogger(volatile char * outbuf, int kbytes)
 {
-#ifdef MCL_FUTURE
+#ifdef _POSIX_MEMLOCK
 	/* Needs to be volatile so it really can't be optimised away */
-	volatile char	buf[64*1024];
+	volatile char	buf[1024];
 	
-	memset(&buf,0xff,sizeof(buf));
+	if (outbuf == NULL) {
+		memset(&buf, HOGRET, sizeof(buf));
+	}else{
+		memcpy(&buf, &outbuf, sizeof(buf));
+	}
 
-	return buf[sizeof(buf)-1];
+	if (kbytes > 0) {
+		return cl_stack_hogger(buf, kbytes-1);
+	}else{
+		return buf[sizeof(buf)-1];
+	}
+#else
+	return HOGRET
 #endif
 }
 
@@ -41,7 +55,7 @@ cl_stack_hogger()
  *	before locking you into memory ;-).
  */
 void
-cl_make_realtime(int spolicy, int priority,  int heapgrowK)
+cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 {
 
 
@@ -85,12 +99,7 @@ cl_make_realtime(int spolicy, int priority,  int heapgrowK)
 	}
 #endif
 
-#ifdef MCL_FUTURE
-	if (mlockall(MCL_PRESENT|MCL_FUTURE) < 0) {
-		cl_perror("Unable to lock pid %d in memory", (int) getpid());
-	}else{
-		cl_log(LOG_INFO, "pid %d locked in memory.", (int) getpid());
-	}
+#ifdef _POSIX_MEMLOCK
 	
 	if (heapgrowK > 0) {
 	/*
@@ -100,15 +109,21 @@ cl_make_realtime(int spolicy, int priority,  int heapgrowK)
 		void*	mval = malloc(heapgrowK*1024);
 
 		if (mval != NULL) {
-			memset(mval,0, heapgrowK*1024);
+			memset(mval, 0, heapgrowK*1024);
 			free(mval);
 		}else{
 			cl_log(LOG_INFO, "Could not preallocate (%d) bytes" 
 			,	heapgrowK);
 		}
-		if (cl_stack_hogger() != 0xff) {
+		if (cl_stack_hogger(NULL, stackgrowK) != HOGRET) {
 			cl_log(LOG_INFO, "Stack hogger failed");
 		}
+	}
+
+	if (mlockall(MCL_CURRENT|MCL_FUTURE) < 0) {
+		cl_perror("Unable to lock pid %d in memory", (int) getpid());
+	}else{
+		cl_log(LOG_INFO, "pid %d locked in memory.", (int) getpid());
 	}
 #endif
 }
