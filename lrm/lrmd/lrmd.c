@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.69 2005/03/01 08:41:29 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.70 2005/03/04 15:59:09 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2095,11 +2095,11 @@ free_op(lrmd_op_t* op)
 		return;
 	}
 
-	if (-1 != op->repeat_timeout_tag) {
+	if (-1 != (int)op->repeat_timeout_tag) {
 		g_source_remove(op->repeat_timeout_tag);
 	}
 
-	if (-1 != op->timeout_tag) {
+	if (-1 != (int)op->timeout_tag) {
 		g_source_remove(op->timeout_tag);
 	}
 
@@ -2164,6 +2164,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.70  2005/03/04 15:59:09  alan
+ * Put in a largish number of signed/unsigned fixes
+ *
  * Revision 1.69  2005/03/01 08:41:29  zhenh
  * make lrmd and the scripts started by lrmd log to log daemon if the daemon is running
  *
