@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.113 2005/01/03 19:34:22 msoffen Exp $ */
+/* $Id: ipcsocket.c,v 1.114 2005/01/04 19:58:23 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1178,7 +1178,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 		}
 
 		sendrc = 0;
-
+		
                 do {
                         CHANAUDIT(ch);
 
@@ -1198,12 +1198,9 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 
                 } while(bytes_remaining > 0 );
 
-
-		if (sendrc > 0 && sendrc != (int)msg->msg_len + ch->msgpad) {
-			cl_perror("Sent %d byte message body: rc = %d"
-			,	(int)msg->msg_len, sendrc);
-		}
-
+		
+		ch->bytes_remaining = bytes_remaining;
+		
 		if (sendrc < 0) {
 			switch (errno) {
 			case EAGAIN:
