@@ -83,6 +83,7 @@ plugin_LTLIBRARIES =	apcmaster.la		\
 			apcsmart.la		\
 			baytech.la		\
 			$(drac3_LIB)		\
+			ibmhmc.la		\
 			$(ipmilan_LIB)		\
 			meatware.la		\
 			null.la			\
@@ -128,7 +129,10 @@ rps10_la_LIBADD		= $(GLIBLIB)
 
 ssh_la_SOURCES		= ssh.c
 ssh_la_LDFLAGS		= -export-dynamic -module -avoid-version
-ssh_la_LIBADD		= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
+
+ibmhmc_la_SOURCES		= ibmhmc.c
+ibmhmc_la_LDFLAGS		= -export-dynamic -module -avoid-version
+ibmhmc_la_LIBADD		= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
 ipmilan_la_SOURCES		= ipmilan.c ipmilan.h ipmilan_command.c ipmi_os_handler.c
 ipmilan_la_LDFLAGS		= -export-dynamic -module -avoid-version
