@@ -159,11 +159,13 @@ static PIL_rc	close_ifmgr_interface(PILInterface*, void*);
  */
 static const char *	PIL_PILPluginVersion(void);
 static void		PIL_PILPluginClose (PILPlugin*);
+void			PILpisysSetDebugLevel (int level);
+int			PILpisysGetDebugLevel(void);
 
 static const PILPluginOps PluginExports =
 {	PIL_PILPluginVersion
-,	PILGetDebugLevel		/* also directly exported */
-,	PILSetDebugLevel		/* also directly exported */
+,	PILpisysGetDebugLevel
+,	PILpisysSetDebugLevel
 ,	PIL_PILPluginClose
 };
 
@@ -573,16 +575,83 @@ PIL_PILPluginVersion(void)
 
 /* Return current IfIf debug level */
 int
-PILGetDebugLevel(void)
+PILpisysGetDebugLevel(void)
 {
 	return(PluginDebugLevel);
 }
 
 /* Set current IfIf debug level */
 void
-PILSetDebugLevel (int level)
+PILpisysSetDebugLevel (int level)
 {
 	PluginDebugLevel = level;
+}
+struct set_debug_helper {
+	const char *	pitype;
+	const char *	piname;
+	int		level;
+};
+
+static void
+PILSetDebugLeveltoPlugin(gpointer key, gpointer plugin, gpointer Helper)
+{
+	PILPlugin*			p = plugin;
+	struct set_debug_helper*	helper = Helper;
+
+	p->pluginops->setdebuglevel(helper->level);  
+}
+
+static void
+PILSetDebugLevelbyType(gpointer key, gpointer plugintype, gpointer Helper)
+{
+	struct set_debug_helper* helper = Helper;
+	
+	
+	PILPluginType*	t = plugintype;
+
+	if (helper->piname == NULL) {
+		g_hash_table_foreach(t->Plugins, PILSetDebugLeveltoPlugin
+		,	helper);
+	}else{
+		PILPlugin*	p = g_hash_table_lookup(t->Plugins
+		,	helper->piname);
+		if (p != NULL) {
+			p->pluginops->setdebuglevel(helper->level);  
+		}
+	}
+}
+
+void
+PILSetDebugLevel(PILPluginUniv* u, char * pitype, char * piname
+,	int level)
+{
+	struct set_debug_helper helper = {pitype, piname, level};
+
+	if (pitype == NULL) {
+		g_hash_table_foreach(u->PluginTypes, PILSetDebugLevelbyType
+		,	&helper);
+	}else{
+		PILPluginType*	t = g_hash_table_lookup(u->PluginTypes
+		,		pitype);
+		if (t != NULL) {
+			PILSetDebugLevelbyType(pitype, t, &helper);
+		}
+	}
+}
+
+
+int
+PILGetDebugLevel(PILPluginUniv* u, const char * pitype, const char * piname)
+{
+	PILPluginType*	t;
+	PILPlugin*	p;
+	if (	u == NULL
+	||	pitype == NULL
+	||	(t = g_hash_table_lookup(u->PluginTypes, pitype)) == NULL
+	||	(p = g_hash_table_lookup(t->Plugins, piname)) == NULL) {
+		return -1;
+	}
+	return p->pluginops->getdebuglevel();
 }
 
 /* Close/shutdown our PILPlugin (the interface manager interface plugin) */
