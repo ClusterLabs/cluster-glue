@@ -825,10 +825,11 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 
 	lrmd_log(LOG_INFO, "on_msg_get_rsc_types: start.");
 
+	ret = create_lrm_ret(HA_OK,5);
+
 	rclass = ha_msg_value(msg, F_LRM_RCLASS);
-
-
 	RAExec = g_hash_table_lookup(RAExecFuncs,rclass);
+
 	if (NULL == RAExec) {
 		lrmd_log(LOG_INFO,"on_msg_get_rsc_types: can not find class");
 	}
@@ -841,13 +842,21 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 				types = g_list_append(types, info->rsc_type);
 			}
 		}
-		ret = create_lrm_ret(HA_OK, g_list_length(types)+2);
 		if (NULL == ret) {
 			lrmd_log(LOG_ERR,
 				"on_msg_get_rsc_types: can not create msg.");
 			return HA_FAIL;
 		}
 		ha_msg_add_list(ret, F_LRM_RTYPES, types);
+		g_list_free(types);
+		while (NULL != (typeinfo = g_list_first(typeinfos))) {
+			rsc_info_t* info = typeinfo->data;
+			typeinfos = g_list_remove(typeinfos, typeinfo->data);
+			g_free(info->rsc_type);
+			g_free(info->version);
+			g_free(info);
+		}
+		
 	}
 
 
@@ -875,34 +884,23 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 	rclass = ha_msg_value(msg, F_LRM_RCLASS);
 
 
+	ret = create_lrm_ret(HA_OK, 5);
+	if (NULL == ret) {
+		lrmd_log(LOG_ERR,
+			"on_msg_get_metadata: can not create msg.");
+		return HA_FAIL;
+	}
 	RAExec = g_hash_table_lookup(RAExecFuncs,rclass);
 	if (NULL == RAExec) {
 		lrmd_log(LOG_INFO,"on_msg_get_metadata: can not find class");
 	}
 	else {
-		const char* meta = RAExec->get_resource_meta(rtype);
+		char* meta = RAExec->get_resource_meta(rtype);
 		if (NULL != meta) {
-			lrmd_log(LOG_INFO,"TYPE:%s;META:%s\n",rtype,meta);
-
-			ret = create_lrm_ret(HA_OK, 5);
-			if (NULL == ret) {
-				lrmd_log(LOG_ERR,
-					"on_msg_get_metadata: can not create msg.");
-				return HA_FAIL;
-			}
 			ha_msg_addbin(ret,F_LRM_METADATA,meta, strlen(meta));
-		}
-		else {
-			ret = create_lrm_ret(HA_FAIL, 5);
-			if (NULL == ret) {
-				lrmd_log(LOG_ERR,
-					"on_msg_get_metadata: can not create msg.");
-				return HA_FAIL;
-			}
-
+			g_free(meta);
 		}
 	}
-
 
 	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
 		lrmd_log(LOG_ERR,
@@ -1023,6 +1021,12 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
 			free_op(op);
 		}
+		//free the last_op
+		if ( NULL!=rsc->last_op) {
+			ha_msg_del(rsc->last_op->msg);
+			g_free(rsc->last_op);
+		}
+		
 		//free the memeroy of rsc
 		g_free(rsc->id);
 		g_free(rsc->type);
@@ -1154,7 +1158,6 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			lrmd_log(LOG_ERR,
 				"on_msg_perform_op: can not add app_name.");
 		}
-		lrmd_log(LOG_INFO,"app_name:%s", client->app_name);
 
 		op = g_new(lrmd_op_t, 1);
 		op->call_id = call_id;
@@ -1335,7 +1338,6 @@ on_op_done(lrmd_op_t* op)
 		}
 	}
 	else {
-		lrmd_log(LOG_ERR,"on_op_done: op_rc:%d, target_rc:%d",op_rc,target_rc);
 		if ( op_rc==target_rc ) {
 			need_notify = 1;
 		}
@@ -1360,18 +1362,14 @@ on_op_done(lrmd_op_t* op)
 		}
 
 	}
-
-	lrmd_log(LOG_INFO, "on_op_done: release the old last_op");
 	//release the old last_op
 	if ( NULL!=op->rsc->last_op) {
 		ha_msg_del(op->rsc->last_op->msg);
 		g_free(op->rsc->last_op);
 	}
-	
-	lrmd_log(LOG_INFO, "on_op_done: remove the op from op_list and copy to last_op");
 	//remove the op from op_list and copy to last_op
 	op->rsc->op_list = g_list_remove(op->rsc->op_list,op);
-
+	
 	op->rsc->last_op = g_new(lrmd_op_t, 1);
 	op->rsc->last_op->rsc = op->rsc;
 	op->rsc->last_op->client = op->client;
@@ -1509,7 +1507,7 @@ perform_ra_op(lrmd_op_t* op)
 
 	switch(pid=fork()) {
 		case -1:
-			lrmd_log(LOG_ERR,	"start_a_child_client: Cannot fork.");
+			lrmd_log(LOG_ERR,"start_a_child_client: Cannot fork.");
 			return HA_FAIL;
 
 		default:	/* Parent */
