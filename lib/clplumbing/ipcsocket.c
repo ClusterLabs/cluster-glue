@@ -140,8 +140,8 @@ static void socket_free_message(struct OCF_IPC_MESSAGE * msg);
   \note for domain socket implementation, the only attribute needed is path name. so the user should 
   create the hash table like this: 
   \note   GHashTable * attrs; 
-  \note   attrs = g_hash_table_new(g_str_hash,g_str_equal); 
-  \note   g_hash_table_insert(attrs,PATH_ATTR,path_name);   
+  \note   attrs = g_hash_table_new(g_str_hash, g_str_equal); 
+  \note   g_hash_table_insert(attrs, PATH_ATTR, path_name);   
   \note   here PATH_ATTR is defined as "path_name" in ipc_socket.h 
 */
 struct OCF_IPC_WAIT_CONNECTION *socket_wait_conn_new(GHashTable* ch_attrs);
@@ -155,12 +155,12 @@ struct OCF_IPC_WAIT_CONNECTION *socket_wait_conn_new(GHashTable* ch_attrs);
   only attribute needed by clients is path name. so the user should create the hash table like this: 
   \note \< server side \>
   \note --   GHashTable * attrs; 
-  \note --   attrs = g_hash_table_new(g_str_hash,g_str_equal);
+  \note --   attrs = g_hash_table_new(g_str_hash, g_str_equal);
   \note --   g_hash_table_insert(attrs, SOCKET_ATTR, &socket);  
   \note \< client side \>
   \note --   GHashTable * attrs; 
-  \note --   attrs = g_hash_table_new(g_str_hash,g_str_equal);
-  \note --   g_hash_table_insert(attrs,PATH_ATTR,path_name);  
+  \note --   attrs = g_hash_table_new(g_str_hash, g_str_equal);
+  \note --   g_hash_table_insert(attrs, PATH_ATTR, path_name);  
   \note here PATH_ATTR is defined as "path_name" and SOCKET_ATTR is defined as "socket" in ipc_socket.h 
 */ 
 struct OCF_IPC_CHANNEL* socket_channel_new(GHashTable *attrs);
@@ -192,7 +192,7 @@ socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
   struct sockaddr_un peer_addr;
   struct OCF_IPC_CHANNEL *ch;
   int sin_size;
-  int s,new_sock;
+  int s, new_sock;
   int val;
   GHashTable* attrs;
   static char SockATTR []= SOCKET_ATTR;
@@ -206,16 +206,16 @@ socket_accept_connection(struct OCF_IPC_WAIT_CONNECTION * wait_conn
 
   //get client connection
   sin_size = sizeof(struct sockaddr_un);
-  if ((new_sock = accept(s, (struct sockaddr *)&peer_addr,&sin_size)) == -1) {
+  if ((new_sock = accept(s, (struct sockaddr *)&peer_addr, &sin_size)) == -1) {
     perror("accept");
     return NULL;
   }else{
     //set the socket as non-blocking socket
-    val = fcntl(new_sock,F_GETFL,0);
-    fcntl(new_sock,F_SETFL,val | O_NONBLOCK);
+    val = fcntl(new_sock, F_GETFL, 0);
+    fcntl(new_sock, F_SETFL, val | O_NONBLOCK);
     
     //get new hash table containing the socket attribute
-    attrs = g_hash_table_new(g_str_hash,g_str_equal);
+    attrs = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(attrs, SockATTR, &new_sock);
     if ((ch = socket_channel_new(attrs)) == NULL) {
       printf("socket_accept_connection: Can't create new channel\n");
@@ -267,19 +267,20 @@ socket_initiate_connection(struct OCF_IPC_CHANNEL * ch)
   conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
   
   //prepare the socket
-  bzero(&peer_addr,sizeof(peer_addr));
+  bzero(&peer_addr, sizeof(peer_addr));
   peer_addr.sun_family = AF_LOCAL;    // host byte order 
-  strncpy(peer_addr.sun_path,conn_info->path_name, sizeof(peer_addr.sun_path)-1);
+  /* FIXME!  string truncation! */
+  strncpy(peer_addr.sun_path, conn_info->path_name, sizeof(peer_addr.sun_path)-1);
   //send connection request
   if (connect(conn_info->s, (struct sockaddr *)&peer_addr
-  ,	sizeof(struct sockaddr_un)) == -1) {
+  , 	sizeof(struct sockaddr_un)) == -1) {
     perror("connect");
     return CH_FAIL;
   }
   
   //set the socket as non-blocking socket
-  val = fcntl(conn_info->s,F_GETFL,0);
-  fcntl(conn_info->s,F_SETFL,val | O_NONBLOCK);
+  val = fcntl(conn_info->s, F_GETFL, 0);
+  fcntl(conn_info->s, F_SETFL, val | O_NONBLOCK);
   ch->ch_status = CH_CONNECT;
 
   return CH_SUCCESS;
@@ -292,7 +293,7 @@ socket_send(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE* message)
   
   if (ch->send_queue->current_qlen < ch->send_queue->max_qlen) {
     //add the meesage into the send queue
-    ch->send_queue->queue = g_list_append(ch->send_queue->queue,message);
+    ch->send_queue->queue = g_list_append(ch->send_queue->queue, message);
     ch->send_queue->current_qlen++;
     //resume io
     return ch->ops->resume_io(ch);
@@ -320,7 +321,7 @@ socket_recv(struct OCF_IPC_CHANNEL * ch, struct OCF_IPC_MESSAGE** message)
       if (element != NULL) {
 	*message = (struct OCF_IPC_MESSAGE *) (element->data);
 	      
-	ch->recv_queue->queue = g_list_remove_link(ch->recv_queue->queue,element);
+	ch->recv_queue->queue = g_list_remove_link(ch->recv_queue->queue, element);
 	ch->recv_queue->current_qlen--;
       
 	return CH_SUCCESS;
@@ -556,22 +557,23 @@ socket_wait_conn_new(GHashTable *ch_attrs)
 
   
   
-  path_name = (char *) g_hash_table_lookup(ch_attrs,"path_name");
+  path_name = (char *) g_hash_table_lookup(ch_attrs, "path_name");
   if (path_name == NULL) {
     printf("GHash look up : Can't get the path_name from the hash table\n");
     return NULL;
   }
 
   //prepare the unix domain socket
-  if ((s = socket(AF_LOCAL,SOCK_STREAM,0)) == -1) {
+  if ((s = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
     perror("socket");
     return NULL;
   }
   
   unlink(path_name);
-  bzero(&my_addr,sizeof(my_addr));
+  bzero(&my_addr, sizeof(my_addr));
   my_addr.sun_family = AF_LOCAL;         // host byte order
-  strncpy(my_addr.sun_path, path_name,sizeof(my_addr.sun_path)-1);
+  /* FIXME!  string truncation! */
+  strncpy(my_addr.sun_path, path_name, sizeof(my_addr.sun_path)-1);
     
   if (bind(s, (struct sockaddr *)&my_addr, sizeof(my_addr)) == -1) {
     perror("bind");
@@ -621,7 +623,7 @@ socket_channel_new(GHashTable *ch_attrs) {
   }
 
   temp_ch = g_new(struct OCF_IPC_CHANNEL, 1);
-  conn_info = g_new(struct SOCKET_CH_PRIVATE,1);
+  conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
 
 
   conn_info->s = sockfd;
