@@ -33,6 +33,7 @@ include_HEADERS	= 		\
 	cl_malloc.h	\
 	cl_poll.h	\
 	cl_signal.h     \
+	coredumps.h     \
 	cpulimits.h     \
 	ipc.h		\
 	lsb_exitcodes.h	\
