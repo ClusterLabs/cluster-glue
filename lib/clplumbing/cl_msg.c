@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.1 2004/03/24 17:04:08 alan Exp $ */
+/* $Id: cl_msg.c,v 1.2 2004/03/25 08:05:23 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -441,13 +441,13 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 {
 
 	int	next;
-	int	startlen = sizeof(MSG_START)-1;
-	int	startlen_netstring = sizeof(MSG_START_NETSTRING) -1 ;
-	int	newstringlen ;
+	size_t	startlen = sizeof(MSG_START)-1;
+	size_t	startlen_netstring = sizeof(MSG_START_NETSTRING) -1 ;
+	size_t	newstringlen;
 
 	char	*cp_name;
-	int	cp_namelen;
-	int	cp_vallen;
+	size_t	cp_namelen;
+	size_t	cp_vallen;
 	char	*cp_value;
 	int	internal_type;
 
@@ -1374,11 +1374,11 @@ msg2ipcchan(struct ha_msg*m, IPC_Channel*ch)
 	return HA_OK;
 }
 
-static gboolean (*msg_authentication_method)(struct ha_msg* ret) = NULL;
+static gboolean (*msg_authentication_method)(const struct ha_msg* ret) = NULL;
 
 
 void
-cl_set_oldmsgauthfunc(gboolean (*authfunc)(struct ha_msg*))
+cl_set_oldmsgauthfunc(gboolean (*authfunc)(const struct ha_msg*))
 {
 	msg_authentication_method = authfunc;
 }
@@ -1786,6 +1786,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.2  2004/03/25 08:05:23  alan
+ * Moved libraries from heartbeat to lib directory
+ * also fixed numerous signed/unsigned problems...
+ *
  * Revision 1.1  2004/03/24 17:04:08  alan
  * Moved ha_msg.c and netstring.c to the lib/clplumbing directory.
  *
