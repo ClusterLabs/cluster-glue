@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.123 2005/02/11 21:39:35 alan Exp $ */
+/* $Id: ipcsocket.c,v 1.124 2005/02/23 18:05:29 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -767,6 +767,11 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 	}
 	
 	while (ch->send_queue->current_qlen >= ch->send_queue->max_qlen){
+		if (ch->ch_status != IPC_CONNECT){
+		 	cl_log(LOG_ERR, "socket_send:"
+			" message queue exceeded and IPC not connected");
+			return IPC_FAIL;
+		}
 		cl_shortsleep();
 		ch->ops->resume_io(ch);
 	}
