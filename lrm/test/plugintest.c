@@ -58,7 +58,7 @@ int main(void)
 	RAExec->execra("/tmp/test.sh",
 			"start",cmd_params,NULL, TRUE, &key);
 	sleep(1);
-	printf("meta_data is %x\n", (int)meta_data);
+	printf("meta_data is %lx\n", (long)meta_data);
 	do {
 		ret = RAExec->post_query_result(key, &result, &meta_data); 
 	} while (ret == 0);
@@ -66,7 +66,7 @@ int main(void)
 	if ( ret > 0 ) {
 		printf("ret: %d\n", ret);
 		printf("exit status: %d\n", result);
-		printf("meta_data is %x\n", (int)meta_data);
+		printf("meta_data is %lx\n", (long)meta_data);
 		printf("Metadata is as below\n%s\n", meta_data);
 	}
 
@@ -80,7 +80,7 @@ int main(void)
 		return -1;
 	}
 	sleep(1);
-	printf("meta_data is %x\n", (int)meta_data);
+	printf("meta_data is %lx\n", (long)meta_data);
 	do {
 		ret = RAExec->post_query_result(key, &result, &meta_data); 
 	} while (ret == 0);
@@ -88,7 +88,7 @@ int main(void)
 	if ( ret > 0 ) {
 		printf("ret: %d\n", ret);
 		printf("exit status: %d\n", result);
-		printf("meta_data is %x\n", (int)meta_data);
+		printf("meta_data is %lx\n", (long)meta_data);
 		printf("Metadata is as below\n%s\n", meta_data);
 	}
 
