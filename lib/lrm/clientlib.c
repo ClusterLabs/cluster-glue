@@ -528,7 +528,7 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype,
 	struct ha_msg* ret;
 	const char* tmp = NULL;
 	char* metadata = NULL;
-	size_t len;
+	
 	/* check whether the channel to lrmd is available */
 	client_log(LOG_INFO, "lrm_get_rsc_type_metadata: start.");
 	if (NULL == ch_cmd)
@@ -586,9 +586,9 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype,
 	}
 
 	/* get the metadata from message */
-	tmp = cl_get_binary(ret, F_LRM_METADATA, &len);
+	tmp = cl_get_string(ret, F_LRM_METADATA);
 	if (NULL!=tmp) {
-		metadata = g_strndup(tmp, len);
+		metadata = g_strdup(tmp);
 	}
 	ha_msg_del(ret);
 
@@ -1116,8 +1116,6 @@ msg_to_op(struct ha_msg* msg)
 	const char* rsc_id;
 	const char* output;
 	const void* user_data;
-	size_t userdata_len=0;
-	size_t output_len = 0;
 
 	client_log(LOG_INFO, "msg_to_op: start.");
 	op = g_new0(lrm_op_t, 1);
@@ -1152,25 +1150,9 @@ msg_to_op(struct ha_msg* msg)
 			return NULL;
 		}
 		/* op->output */
-		output = cl_get_binary(msg, F_LRM_DATA,&output_len);
+		output = cl_get_string(msg, F_LRM_DATA);
 		if (NULL != output){
-			int len = strnlen(output, output_len);
-			if (len != output_len) {
-				free_op(op);
-				client_log(LOG_ERR,
-				"msg_to_op: can not get data from msg.");
-				return NULL;
-			}
-			op->output = ha_malloc(len+1);
-			if (NULL == op->output) {
-				free_op(op);
-				client_log(LOG_ERR,
-				"msg_to_op: can't alloc memory for output");
-				return NULL;
-			}
-			
-			memcpy(op->output, output,len);
-			op->output[len]=0;
+			op->output = g_strdup(output);
 		}
 		else {
 			op->output = NULL;
@@ -1207,14 +1189,10 @@ msg_to_op(struct ha_msg* msg)
 	}
 
 	/* op->user_data */
-	user_data = cl_get_binary(msg, F_LRM_USERDATA,&userdata_len);
+	user_data = cl_get_string(msg, F_LRM_USERDATA);
 	
-	if (NULL != user_data && 0 < userdata_len ) {
-		op->user_data = ha_malloc(userdata_len);
-		if ( NULL != op->user_data ) {
-			memcpy(op->user_data,user_data,userdata_len);
-			op->user_data_len = userdata_len;
-		}
+	if (NULL != user_data) {
+		op->user_data = g_strdup(user_data);
 	}
 	
 	op->rsc_id = g_strdup(rsc_id);
@@ -1246,9 +1224,8 @@ op_to_msg (lrm_op_t* op)
 		client_log(LOG_ERR, "op_to_msg: can not add field.");
 		return NULL;
 	}
-	if (NULL != op->user_data && 0 != op->user_data_len) {
-		if (HA_OK != ha_msg_addbin(msg,F_LRM_USERDATA,
-					op->user_data, op->user_data_len)){
+	if (NULL != op->user_data) {
+		if (HA_OK != ha_msg_add(msg,F_LRM_USERDATA,op->user_data)){
 			ha_msg_del(msg);
 			client_log(LOG_ERR, "op_to_msg: can not add field.");
 			return NULL;
