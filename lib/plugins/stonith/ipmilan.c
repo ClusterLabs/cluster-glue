@@ -1,4 +1,4 @@
-/* $Id: ipmilan.c,v 1.9 2004/10/05 14:26:16 lars Exp $ */
+/* $Id: ipmilan.c,v 1.10 2004/10/05 18:06:08 yixiong Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
@@ -461,7 +461,7 @@ ipmilan_getinfo(Stonith * s, int reqtype)
 	struct pluginDevice* nd;
 	char *		ret;
 
-	ERRIFWRONGDEV(s,S_OOPS);
+	ERRIFWRONGDEV(s,NULL);
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
@@ -506,7 +506,8 @@ ipmilan_destroy(Stonith *s)
 	struct ipmilanHostInfo * host;
 	int i;
 
-	ERRIFWRONGDEV(s,S_OOPS);
+	VOIDERRIFWRONGDEV(s);
+
 	nd = (struct pluginDevice *)s->pinfo;
 
 	nd->pluginid = NOTpluginid;
