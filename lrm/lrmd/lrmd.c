@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.51 2004/12/01 02:20:30 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.52 2004/12/01 09:09:55 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1995,7 +1995,7 @@ read_pipe(int fd, char ** data)
 		if ( readlen > 0 ) {
 			g_string_append(gstr_tmp, buffer);
 		}
-	} while (readlen == BUFFLEN - 1);
+	} while (readlen == BUFFLEN - 1 || errno != EINTR);
 	close(fd);
 
 	if (readlen < 0) {
@@ -2036,6 +2036,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.52  2004/12/01 09:09:55  zhenh
+ * make the lrmd continue read from pipe after interupted by signal
+ *
  * Revision 1.51  2004/12/01 02:20:30  zhenh
  * set RA to different process group with lrmd to avoid being interupted by heartbeat
  *
