@@ -6,3 +6,6 @@ Makefile
 .libs
 *.lo
 *.la
+*.beam
+parser-messages
+MISC_ERRORS
