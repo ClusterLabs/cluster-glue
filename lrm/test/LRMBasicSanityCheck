@@ -1,0 +1,88 @@
+#!/bin/bash
+
+ # Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
+ # 
+ # This program is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU General Public
+ # License as published by the Free Software Foundation; either
+ # version 2.1 of the License, or (at your option) any later version.
+ # 
+ # This software is distributed in the hope that it will be useful,
+ # but WITHOUT ANY WARRANTY; without even the implied warranty of
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ # General Public License for more details.
+ # 
+ # You should have received a copy of the GNU General Public
+ # License along with this library; if not, write to the Free Software
+ # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ #
+LRMD=../lrmd/lrmd
+LRMADMIN=../admin/lrmadmin
+
+if [ $# -gt 0 ]; then
+	LRMD=$1/lrmd
+	LRMADMIN=$1/lrmadmin
+fi
+
+if [ ! -f $LRMD ]; then
+	echo $LRMD does not exist
+	exit 1
+fi
+
+if [ ! -f $LRMADMIN ]; then
+	echo $LRMADMIN does not exist
+	exit 1
+fi
+	
+#kill the previous instance lrm
+$LRMD -k
+
+#start the new instance of lrm
+$LRMD -r &
+
+#check is the new instance running
+$LRMD -s
+if [ $? != 0 ]; then
+	echo Can not start lrmd
+	exit 1
+fi
+
+#check can we login
+$LRMADMIN -d
+if [ $? != 0 ]; then
+	echo Can not logon to lrmd
+	exit 1
+fi
+
+#list the classes support
+$LRMADMIN -C
+if [ $? != 0 ]; then
+	echo Can not get ra classes supported
+	exit 1
+fi
+
+#add a resource
+$LRMADMIN -A ip heartbeat IPaddr 192.168.58.4
+if [ $? != 0 ]; then
+	echo Can not add new resource
+	exit 1
+fi
+
+#get the resource added
+$LRMADMIN -I ip
+if [ $? != 0 ]; then
+	echo Can not get the resource added
+	exit 1
+fi
+
+#delete the resource
+$LRMADMIN -D ip
+if [ $? != 0 ]; then
+	echo Can not delete the resource
+	exit 1
+fi
+
+#kill the instance
+$LRMD -k
+
+exit 0
