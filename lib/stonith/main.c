@@ -1,4 +1,4 @@
-/* $Id: main.c,v 1.18 2005/02/10 06:47:25 alan Exp $ */
+/* $Id: main.c,v 1.19 2005/03/15 11:25:06 alan Exp $ */
 /*
  * Stonith: simple test program for exercising the Stonith API code
  *
@@ -402,10 +402,10 @@ main(int argc, char** argv)
 
 	if (optind < argc) {
 		char *nodename;
-		nodename = strdup(argv[optind]);
+		nodename = g_strdup(argv[optind]);
 		g_strdown(nodename);
 		rc = stonith_req_reset(s, reset_type, nodename);
-		free(nodename);
+		g_free(nodename);
 	}
 	stonith_delete(s); s = NULL;
 	return(rc);
