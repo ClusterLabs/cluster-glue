@@ -26,7 +26,7 @@
 * 
 */
 
-#include <linux-ha/portability.h>
+#include <portability.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>

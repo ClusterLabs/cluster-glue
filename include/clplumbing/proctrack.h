@@ -22,7 +22,6 @@
 
 #ifndef _PROCTRACK_H
 #	define _PROCTRACK_H
-#include <linux-ha/portability.h>
 #include <sys/types.h>
 #include <sys/times.h>
 #include <clplumbing/longclock.h>

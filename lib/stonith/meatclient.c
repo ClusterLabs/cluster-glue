@@ -23,7 +23,7 @@
  *
  */
 
-#include <linux-ha/portability.h>
+#include <portability.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>

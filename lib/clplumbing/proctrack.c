@@ -20,7 +20,7 @@
  *
  */
 
-#include <linux-ha/portability.h>
+#include <portability.h>
 #include <sys/wait.h>
 #include <heartbeat.h>
 #include <clplumbing/proctrack.h>
