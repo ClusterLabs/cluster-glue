@@ -263,7 +263,10 @@ echoserver(IPC_Channel* wchan, int repcount)
 		if (j == repcount) {
 			sleep(1);
 		}
-		if ((rc = wchan->ops->waitin(wchan)) != IPC_OK) {
+
+		while ((rc = wchan->ops->waitin(wchan)) == IPC_INTR);
+		
+		if (rc != IPC_OK) {
 			cl_log(LOG_ERR
 			,	"echotest server: waitin failed %d rc iter %d"
 			" errno=%d"
@@ -325,7 +328,9 @@ echoclient(IPC_Channel* rchan, int repcount)
 
 		int	rc;
 
-		if ((rc = rchan->ops->waitin(rchan)) != IPC_OK) {
+		while ((rc = rchan->ops->waitin(rchan)) == IPC_INTR);
+		
+		if (rc != IPC_OK) {
 			cl_log(LOG_ERR
 			,	"echotest client: waitin failed %d rc iter %d"
 			" errno=%d"
@@ -522,7 +527,9 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 		wchan->ops->waitout(wchan);
 		errcount += checkinput(wchan, w, &rdcount, repcount);
 		if (wrcount >= repcount && rdcount < repcount) {
-			if ((rc = wchan->ops->waitin(wchan)) != IPC_OK) {
+			while ((rc = wchan->ops->waitin(wchan)) == IPC_INTR);
+			
+			if (rc != IPC_OK) {
 				cl_log(LOG_ERR
 				,	"asyn_echoserver: waitin()"
 				" failed %d rc rdcount %d errno=%d"
