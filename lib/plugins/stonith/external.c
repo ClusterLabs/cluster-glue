@@ -10,6 +10,7 @@
  * Reviewed, tested, and config parsing: Sean Reifschneider <jafo@tummy.com>
  * And overhauled by Lars Marowsky-Bree <lmb@suse.de>, so the circle
  * closes...
+ * Mangled by Zhaokai <zhaokai@cn.ibm.com>, IBM, 2005
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -33,26 +34,29 @@
 #define PIL_PLUGIN_S            "external"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
+#define ST_COMMAND		"command options"
+#define MAX_EXTERNALLINE	256
+
 #include <pils/plugin.h>
 
-static void *		external_new(void);
-static void		external_destroy(Stonith *);
-static int		external_set_config_file(Stonith *, const char * cfgname);
-static int		external_set_config_info(Stonith *, const char * info);
-static const char *	external_getinfo(Stonith * s, int InfoType);
-static int		external_status(Stonith * );
-static int		external_reset_req(Stonith * s, int request, const char * host);
-static char **		external_hostlist(Stonith  *);
+static StonithPlugin *	external_new(void);
+static void		external_destroy(StonithPlugin *);
+static int		external_set_config(StonithPlugin *, StonithNVpair *);
+static const char**	external_get_confignames(StonithPlugin *);
+static const char *	external_getinfo(StonithPlugin * s, int InfoType);
+static int		external_status(StonithPlugin * );
+static int		external_reset_req(StonithPlugin * s, int request, const char * host);
+static char **		external_hostlist(StonithPlugin  *);
 
 static struct stonith_ops externalOps ={
-	external_new,		/* Create new STONITH object	*/
-	external_destroy,		/* Destroy STONITH object	*/
-	external_set_config_file,	/* set configuration from file	*/
-	external_set_config_info,	/* Get configuration from file	*/
-	external_getinfo,		/* Return STONITH info string	*/
-	external_status,		/* Return STONITH device status	*/
-	external_reset_req,		/* Request a reset */
-	external_hostlist,		/* Return list of supported hosts */
+	external_new,			/* Create new STONITH object		*/
+	external_destroy,		/* Destroy STONITH object		*/
+	external_getinfo,		/* Return STONITH info string		*/
+	external_get_confignames,	/* Return STONITH info string		*/
+	external_set_config,		/* Get configuration from NVpairs	*/
+	external_status,		/* Return STONITH device status		*/
+	external_reset_req,		/* Request a reset 			*/
+	external_hostlist,		/* Return list of supported hosts 	*/
 };
 
 PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
@@ -92,6 +96,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  */
 
 struct pluginDevice {
+  StonithPlugin	sp;
   const char *	pluginid;
   int		config;
   char *	command;
@@ -111,14 +116,14 @@ static int external_run_cmd(struct pluginDevice *sd, const char *op,
 static void external_unconfig(struct pluginDevice *sd);
 
 static int
-external_status(Stonith  *s)
+external_status(StonithPlugin  *s)
 {
 	int rc = 0;
 	struct pluginDevice *sd = NULL;
 	
 	ERRIFWRONGDEV(s,S_OOPS);
 
-	sd = (struct pluginDevice*) s->pinfo;
+	sd = (struct pluginDevice*) s;
 	
 	rc = external_run_cmd(sd, "status", NULL);
 	if (rc == 0) {
@@ -133,7 +138,7 @@ external_status(Stonith  *s)
 }
 
 static char **
-external_hostlist(Stonith  *s)
+external_hostlist(StonithPlugin  *s)
 {
 	char **	ret = NULL;
 	char *	output;
@@ -143,7 +148,7 @@ external_hostlist(Stonith  *s)
 
 	ERRIFNOTCONFIGED(s,NULL);
 
-	sd = (struct pluginDevice*) s->pinfo;
+	sd = (struct pluginDevice*) s;
 
 	rc = external_run_cmd(sd, "hostlist", &output);
 	if (rc == 0) {
@@ -208,7 +213,7 @@ external_hostlist(Stonith  *s)
 }
 
 static int
-external_reset_req(Stonith * s, int request, const char * host)
+external_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	struct pluginDevice *sd = NULL;
 	const char *op;
@@ -218,7 +223,7 @@ external_reset_req(Stonith * s, int request, const char * host)
 	
 	LOG(PIL_INFO, "%s %s", _("Host external-reset initiating on "), host);
 
-	sd = (struct pluginDevice*) s->pinfo;
+	sd = (struct pluginDevice*) s;
 
 	switch (request) {
 		case ST_GENERIC_RESET:
@@ -386,50 +391,59 @@ external_unconfig(struct pluginDevice *sd) {
 }
 
 /*
- *	Parse the information in the given configuration file,
+ *	Parse the information in the given string 
  *	and stash it away...
  */
 static int
-external_set_config_file(Stonith* s, const char * configname)
+external_set_config(StonithPlugin* s, StonithNVpair *list)
 {
-  FILE *	cfgfile;
-  char	line[256];
-  struct pluginDevice*	sd;
+	char	externalLine[MAX_EXTERNALLINE];
+	struct pluginDevice*	sd;
+	StonithNamesToGet	namestoget [] =
+	{	{ST_COMMAND,	NULL}
+	,	{NULL,		NULL}
+	};
+	int			rc;
+	
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+	}
 
-  ERRIFWRONGDEV(s,S_OOPS);
+	ERRIFWRONGDEV(s,S_OOPS);
 
-  sd = (struct pluginDevice*) s->pinfo;
+	sd = (struct pluginDevice*) s;
 
-  if ((cfgfile = fopen(configname, "r")) == NULL)  {
-    LOG(PIL_CRIT, "Cannot open %s", configname);
-    return(S_BADCONFIG);
-  }
-  while (fgets(line, sizeof(line), cfgfile) != NULL){
-    if (*line == '#' || *line == '\n' || *line == EOS) {
-      continue;
-    }
-    return(external_parse_config_info(sd, line));
-  }
-  return(S_BADCONFIG);
+
+	if ((rc = OurImports->GetAllValues(namestoget, list)) != S_OK){
+		LOG(PIL_INFO, "Can not get parameter from StonithNVpair");
+		return rc;
+	}
+	
+
+	if ((snprintf(externalLine, MAX_EXTERNALLINE,"%s",  namestoget[0].s_value)) <= 0) {
+
+		LOG(PIL_CRIT,"Can not copy parameter to externalLine");
+	}
+	
+	return (external_parse_config_info(sd,externalLine));
+
 }
 
 /*
- *	Parse the config information in the given string, and stash it away...
+ * Return STONITH config vars
  */
-static int
-external_set_config_info(Stonith* s, const char * info)
+static const char**
+external_get_confignames(StonithPlugin* p)
 {
-  struct pluginDevice* sd;
-
-  ERRIFWRONGDEV(s,S_OOPS);
-
-  sd = (struct pluginDevice *)s->pinfo;
-
-  return(external_parse_config_info(sd, info));
+	static const char *	ExternalParams[] = {ST_COMMAND, NULL };
+	return ExternalParams;
 }
 
+/*
+ * Return STONITH info string
+ */
 static const char *
-external_getinfo(Stonith * s, int reqtype)
+external_getinfo(StonithPlugin * s, int reqtype)
 {
   struct pluginDevice* sd;
   char *		ret;
@@ -441,27 +455,12 @@ external_getinfo(Stonith * s, int reqtype)
   /*
    *	We look in the ST_TEXTDOMAIN catalog for our messages
    */
-  sd = (struct pluginDevice *)s->pinfo;
+  sd = (struct pluginDevice *)s;
 
   switch (reqtype) {
   case ST_DEVICEID:
     ret = _("External STONITH plugin");
     break;
-
-  case ST_CONF_INFO_SYNTAX:
-    ret = _("<command> options...\n"
-	    "The command is the external command we will run.\n"
-	    "Any options will be passed on to it.\n");
-    break;
-
-  case ST_CONF_FILE_SYNTAX:
-    ret = _("<command> options...\n"
-	    "The command is the external command we will run.\n"
-	    "Any options will be passed on to it.\n"
-	    "All options must be on one line.\n"
-	    "Blank lines and lines beginning with # are ignored");
-    break;
-
     case ST_DEVICEDESCR:		/* Description of device type */
 	ret = _("EXTERNAL-program based STONITH plugin\n");
 	break;
@@ -477,13 +476,13 @@ external_getinfo(Stonith * s, int reqtype)
  *	EXTERNAL Stonith destructor...
  */
 static void
-external_destroy(Stonith *s)
+external_destroy(StonithPlugin *s)
 {
 	struct pluginDevice* sd;
 
 	VOIDERRIFWRONGDEV(s);
 
-	sd = (struct pluginDevice *)s->pinfo;
+	sd = (struct pluginDevice *)s;
 
 	sd->pluginid = NOTpluginID;
 	external_unconfig(sd);
@@ -491,7 +490,7 @@ external_destroy(Stonith *s)
 }
 
 /* Create a new external Stonith device */
-static void *
+static StonithPlugin *
 external_new(void)
 {
 	struct pluginDevice*	sd = MALLOCT(struct pluginDevice);
@@ -502,8 +501,9 @@ external_new(void)
 	}
 	memset(sd, 0, sizeof(*sd));
 	sd->pluginid = pluginid;
+	sd->sp.s_ops = &externalOps;
 	external_unconfig(sd);
-	return((void *)sd);
+	return &(sd->sp);
 }
 
 static void

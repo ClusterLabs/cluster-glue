@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.22 2004/11/11 15:36:31 davidlee Exp $ */
+/* $Id: rcd_serial.c,v 1.23 2005/01/31 10:06:33 sunjd Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -14,6 +14,8 @@
  *
  * Modifications for RC Delayed Serial Ciruit by 
  * Copyright (c) 2002 John Sutton <john@scl.co.uk>
+ *
+ * Mangled by Zhaokai <zhaokai@cn.ibm.com>, IBM, 2005
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -39,28 +41,33 @@
 #define PIL_PLUGIN_S            "rcd_serial"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
+
+#define	ST_DTRRTS		"dtr|rts"
+#define	ST_MSDURATION		"msduration"
+#define MAX_RCD_SERIALLINE	512
+
 #include <pils/plugin.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 
-static void *		rcd_serial_new(void);
-static void		rcd_serial_destroy(Stonith *);
-static int		rcd_serial_set_config_file(Stonith *, const char * cfgname);
-static int		rcd_serial_set_config_info(Stonith *, const char * info);
-static const char *	rcd_serial_getinfo(Stonith * s, int InfoType);
-static int		rcd_serial_status(Stonith * );
-static int		rcd_serial_reset_req(Stonith * s, int request, const char * host);
-static char **		rcd_serial_hostlist(Stonith  *);
+static StonithPlugin*	rcd_serial_new(void);
+static void		rcd_serial_destroy(StonithPlugin *);
+static int		rcd_serial_set_config(StonithPlugin *, StonithNVpair *);
+static const char **	rcd_serial_get_confignames(StonithPlugin *);
+static const char *	rcd_serial_getinfo(StonithPlugin * s, int InfoType);
+static int		rcd_serial_status(StonithPlugin * );
+static int		rcd_serial_reset_req(StonithPlugin * s, int request, const char * host);
+static char **		rcd_serial_hostlist(StonithPlugin  *);
 
 static struct stonith_ops rcd_serialOps ={
-	rcd_serial_new,			/* Create new STONITH object	*/
-	rcd_serial_destroy,		/* Destroy STONITH object	*/
-	rcd_serial_set_config_file,	/* set configuration from file	*/
-	rcd_serial_set_config_info,	/* Get configuration from file	*/
-	rcd_serial_getinfo,		/* Return STONITH info string	*/
-	rcd_serial_status,		/* Return STONITH device status	*/
-	rcd_serial_reset_req,		/* Request a reset */
-	rcd_serial_hostlist,		/* Return list of supported hosts */
+	rcd_serial_new,			/* Create new STONITH object		*/
+	rcd_serial_destroy,		/* Destroy STONITH object		*/
+	rcd_serial_getinfo,		/* Return STONITH info string		*/
+	rcd_serial_get_confignames,	/* Return STONITH info string		*/
+	rcd_serial_set_config,		/* Get configuration from NVpairs	*/
+	rcd_serial_status,		/* Return STONITH device status		*/
+	rcd_serial_reset_req,		/* Request a reset 			*/
+	rcd_serial_hostlist,		/* Return list of supported hosts 	*/
 };
 
 PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
@@ -218,6 +225,7 @@ RCD_close_serial_port(int fd) {
  *	RCD_Serial STONITH device.
  */
 struct pluginDevice {
+	StonithPlugin	sp;
 	const char *	pluginid;
 	char **		hostlist;	/* name of single host we can reset */
 	int		hostcount;	/* i.e. 1 after initialisation */
@@ -230,7 +238,7 @@ static const char * pluginid = "pluginDevice-Stonith";
 static const char * NOTrcd_serialID = "Hey, dummy this has been destroyed (RCD_SerialDev)";
 
 static int
-rcd_serial_status(Stonith  *s)
+rcd_serial_status(StonithPlugin  *s)
 {
 	struct pluginDevice*	rcd;
 	int fd;
@@ -238,7 +246,7 @@ rcd_serial_status(Stonith  *s)
 
 	ERRIFWRONGDEV(s,S_OOPS);
 
-	rcd = (struct pluginDevice*) s->pinfo;
+	rcd = (struct pluginDevice*) s;
 
 	/*
 	All we can do is make sure the serial device exists and
@@ -267,14 +275,14 @@ rcd_serial_status(Stonith  *s)
  *	Return the list of hosts configured for this RCD_SERIAL device
  */
 static char **
-rcd_serial_hostlist(Stonith  *s)
+rcd_serial_hostlist(StonithPlugin  *s)
 {
 	char **		ret = NULL;
 	struct pluginDevice*	rcd;
 	int		j;
 
 	ERRIFWRONGDEV(s,NULL);
-	rcd = (struct pluginDevice*) s->pinfo;
+	rcd = (struct pluginDevice*) s;
 	if (rcd->hostcount < 0) {
 		LOG(PIL_CRIT
 		,	"unconfigured stonith object in RCD_SERIAL_list_hosts");
@@ -434,7 +442,7 @@ token_error:
  *	is so am just ignoring it...
  */
 static int
-rcd_serial_reset_req(Stonith * s, int request, const char * host)
+rcd_serial_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	struct pluginDevice*	rcd;
 	int fd;
@@ -445,7 +453,7 @@ rcd_serial_reset_req(Stonith * s, int request, const char * host)
 	
 	ERRIFWRONGDEV(s,S_OOPS);
 
-	rcd = (struct pluginDevice *) s->pinfo;
+	rcd = (struct pluginDevice *) s;
 
 	/* check that host matches */
 	if ((shost = STRDUP(host)) == NULL) {
@@ -515,53 +523,58 @@ rcd_serial_reset_req(Stonith * s, int request, const char * host)
 }
 
 /*
- *	Parse the information in the given configuration file,
+ *	Parse the information in the given string 
  *	and stash it away...
  */
 static int
-rcd_serial_set_config_file(Stonith* s, const char * configname)
+rcd_serial_set_config(StonithPlugin* s, StonithNVpair *list)
 {
-	FILE *	cfgfile;
-
-	char	RCD_SERIALline[256];
+	char	RCD_SERIALline[MAX_RCD_SERIALLINE];
 
 	struct pluginDevice*	rcd;
+	StonithNamesToGet	namestoget [] =
+	{	{ST_HOSTLIST,	NULL}
+	,	{ST_TTYDEV,	NULL}
+	,	{ST_DTRRTS,	NULL}
+	,	{ST_MSDURATION,	NULL}
+	,	{NULL,		NULL}
+	};
+	int rc = 0;
 
 	ERRIFWRONGDEV(s,S_OOPS);
-	rcd = (struct pluginDevice*) s->pinfo;
+	rcd = (struct pluginDevice*) s;
 
-	if ((cfgfile = fopen(configname, "r")) == NULL)  {
-		LOG(PIL_CRIT, "Cannot open %s", configname);
-		return(S_BADCONFIG);
+	LOG(PIL_DEBUG, "%s:called", __FUNCTION__);
+	
+
+	if ((rc = OurImports->GetAllValues(namestoget, list)) != S_OK) {
+		LOG(PIL_DEBUG, "get all value failed");
+		return rc;
 	}
-	while (fgets(RCD_SERIALline, sizeof(RCD_SERIALline), cfgfile) != NULL){
-		if (	*RCD_SERIALline == '#'  || \
-			*RCD_SERIALline == '\n' || \
-			*RCD_SERIALline == EOS)
-		{
-			continue;
-		}
-		return(RCD_SERIAL_parse_config_info(rcd, RCD_SERIALline));
+
+	if ((snprintf(RCD_SERIALline, MAX_RCD_SERIALLINE, "%s %s %s %s", 
+		namestoget[0].s_value, namestoget[1].s_value, namestoget[2].s_value, namestoget[3].s_value)) <= 0) {
+		LOG(PIL_CRIT, "Copy parameter to RCD_SERIALline failed");
 	}
-	return(S_BADCONFIG);
+	
+	return (RCD_SERIAL_parse_config_info(rcd, RCD_SERIALline));
 }
 
 /*
- *	Parse the config information in the given string, and stash it away...
+ * Return STONITH config vars
  */
-static int
-rcd_serial_set_config_info(Stonith* s, const char * info)
+static const char**
+rcd_serial_get_confignames(StonithPlugin* p)
 {
-	struct pluginDevice* rcd;
-
-	ERRIFWRONGDEV(s,S_OOPS);
-	rcd = (struct pluginDevice *)s->pinfo;
-
-	return(RCD_SERIAL_parse_config_info(rcd, info));
+	static const char *	RcdParams[] = {ST_HOSTLIST, ST_TTYDEV, ST_DTRRTS, ST_MSDURATION,  NULL };
+	return RcdParams;
 }
 
+/*
+ * Return STONITH info string
+ */
 static const char *
-rcd_serial_getinfo(Stonith * s, int reqtype)
+rcd_serial_getinfo(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* rcd;
 	char *		ret;
@@ -570,26 +583,12 @@ rcd_serial_getinfo(Stonith * s, int reqtype)
 	/*
 	 *	We look in the ST_TEXTDOMAIN catalog for our messages
 	 */
-	rcd = (struct pluginDevice *)s->pinfo;
+	rcd = (struct pluginDevice *)s;
 
 	switch (reqtype) {
 		case ST_DEVICEID:
 			ret = _(DEVICE);
 			break;
-
-		case ST_CONF_INFO_SYNTAX:
-			ret = _("<hostname> <serial_device> <dtr|rts> "
-			"<msduration>\n"
-			"All tokens are white-space delimited.\n");
-			break;
-
-		case ST_CONF_FILE_SYNTAX:
-			ret = _("<hostname> <serial_device> <dtr|rts> "
-			"<msduration>\n"
-			"All tokens are white-space delimited.\n"
-			"Blank lines and lines beginning with # are ignored");
-			break;
-
 		case ST_DEVICEDESCR:
 			ret = _("RC Delayed Serial STONITH Device\n"
 			"This device can be constructed cheaply from"
@@ -597,11 +596,6 @@ rcd_serial_getinfo(Stonith * s, int reqtype)
 			"with sufficient expertise and testing.\n"
 			"See README.rcd_serial for circuit diagram.\n");
 			break;
-
-		case ST_DEVICEURL:
-			ret = _("http://www.scl.co.uk/rcd_serial/");
-			break;
-
 		default:
 			ret = NULL;
 			break;
@@ -613,13 +607,13 @@ rcd_serial_getinfo(Stonith * s, int reqtype)
  *	RCD_SERIAL Stonith destructor...
  */
 static void
-rcd_serial_destroy(Stonith *s)
+rcd_serial_destroy(StonithPlugin *s)
 {
 	struct pluginDevice* rcd;
 
 	VOIDERRIFWRONGDEV(s);
 
-	rcd = (struct pluginDevice *)s->pinfo;
+	rcd = (struct pluginDevice *)s;
 
 	rcd->pluginid = NOTrcd_serialID;
 	if (rcd->hostlist) {
@@ -636,7 +630,7 @@ rcd_serial_destroy(Stonith *s)
  * Create a new RCD_Serial Stonith device.
  * Too bad this function can't be static. (Hmm, weird, it _is_ static?)
  */
-static void *
+static StonithPlugin *
 rcd_serial_new(void)
 {
 	struct pluginDevice*	rcd = MALLOCT(struct pluginDevice);
@@ -653,6 +647,7 @@ rcd_serial_new(void)
 	rcd->device = NULL;
 	rcd->signal = NULL;
 	rcd->msduration = 0;
+	rcd->sp.s_ops = &rcd_serialOps;
 
-	return((void *)rcd);
+	return &(rcd->sp);
 }
