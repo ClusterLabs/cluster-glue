@@ -36,6 +36,8 @@
 #include <pils/generic.h>
 #include <stonith/stonith.h>
 
+#include <ltdl.h>
+
 #define MAX_FUNC_NAME 20
 
 #define	MALLOC(n)	malloc(n)

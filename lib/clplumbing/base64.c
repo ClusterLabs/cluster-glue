@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "clplumbing/base64.h"
+
 /*
  *
  * Base64 conversion functions.

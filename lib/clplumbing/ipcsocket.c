@@ -51,6 +51,8 @@
 #include <errno.h>
 #include <fcntl.h>
 
+#include <portability.h>
+
 #ifndef UNIX_PATH_MAX
 #define UNIX_PATH_MAX 108
 #endif

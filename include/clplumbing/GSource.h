@@ -1,6 +1,5 @@
 #ifndef _CLPLUMBING_GSOURCE_H
 #	define _CLPLUMBING_GSOURCE_H
-#	include <portability.h>
 #	include <clplumbing/ipc.h>
 
 typedef	struct GFDSource_s	GFDSource;
