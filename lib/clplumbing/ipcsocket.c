@@ -910,8 +910,6 @@ socket_get_farside_pid(int sockfd )
 static int 
 socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 {
-  struct SOCKET_CH_PRIVATE *conn_info;
-{
   struct msghdr msg;
   /* Credentials structure */
 #ifdef HAVE_STRUCT_CMSGCRED
