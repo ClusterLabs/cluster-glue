@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.26 2005/02/28 08:52:46 zhenh Exp $ */
+/* $Id: lrmadmin.c,v 1.27 2005/02/28 10:34:36 zhenh Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -293,7 +293,7 @@ int main(int argc, char **argv)
 		if (lrmadmin_cmd == DAEMON_OP) { 
 			return LSB_STATUS_STOPPED;
 		} else {
-			cl_log(LOG_ERR,"Can't connect to lrmd, quit!");
+			cl_log(LOG_WARNING,"Can't connect to lrmd, quit!");
 			return -2;
 		}
 	}
@@ -885,6 +885,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.27  2005/02/28 10:34:36  zhenh
+ * change the log from LOG_ERR TO LOG_WARNING
+ *
  * Revision 1.26  2005/02/28 08:52:46  zhenh
  * no such resource should be a warning instead of error
  *
