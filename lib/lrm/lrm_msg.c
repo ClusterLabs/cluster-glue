@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.20 2004/12/05 04:32:50 gshi Exp $ */
+/* $Id: lrm_msg.c,v 1.21 2005/04/07 07:34:50 sunjd Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -104,7 +104,7 @@ struct ha_msg*
 create_lrm_msg (const char* msg)
 {
 	struct ha_msg* ret;
-	if ((NULL == msg) || (0 == strlen(msg))) {
+	if ((NULL == msg) || (0 == STRLEN_CONST(msg))) {
 		return NULL;
 	}
 
@@ -122,7 +122,7 @@ struct ha_msg*
 create_lrm_reg_msg(const char* app_name)
 {
 	struct ha_msg* ret;
-	if ((NULL == app_name) || (0 == strlen(app_name))) {
+	if ((NULL == app_name) || (0 == STRLEN_CONST(app_name))) {
 		return NULL;
 	}
 
@@ -185,7 +185,7 @@ struct ha_msg*
 create_lrm_rsc_msg(const char* rid, const char* msg)
 {
 	struct ha_msg* ret;
-	if ((NULL == rid) ||(NULL == msg) || (0 == strlen(msg))) {
+	if ((NULL == rid) ||(NULL == msg) || (0 == STRLEN_CONST(msg))) {
 		return NULL;
 	}
 
@@ -216,6 +216,9 @@ create_lrm_ret(int rc, int fields)
 
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.21  2005/04/07 07:34:50  sunjd
+ * use STRLEN_CONST & STRNCMP_CONST instead
+ *
  * Revision 1.20  2004/12/05 04:32:50  gshi
  * Moved some message-related functions from lrm_msg.c to cl_msg.c
  * These functions are general and shall be available to other subsystems
