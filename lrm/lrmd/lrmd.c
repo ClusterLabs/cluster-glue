@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.77 2005/04/07 06:23:50 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.78 2005/04/07 07:07:17 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -558,8 +558,6 @@ init_start ()
 		auth->gid = NULL;
 	}
 
-	lrmd_log(LOG_DEBUG, "main: start.");
-
 	/*Create a waiting connection to accept command connect from client*/
 	conn_cmd_attrs = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(conn_cmd_attrs, path, cmd_path);
@@ -665,8 +663,6 @@ init_start ()
 		lrmd_log(LOG_DEBUG, "[%s] stopped", lrm_system_name);
 	}
 
-	lrmd_log(LOG_DEBUG, "main: end.");
-
 	return 0;
 }
 
@@ -678,7 +674,6 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 {
 	lrmd_client_t* client = NULL;
 
-	lrmd_log(LOG_DEBUG, "on_connect_cmd: start.");
 	/* check paremeters */
 	if (NULL == ch) {
 		lrmd_log(LOG_ERR, "on_connect_cmd: channel is null");
@@ -693,7 +688,6 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 				ch, FALSE, on_receive_cmd, (gpointer)client,
 				on_remove_client);
 
-	lrmd_log(LOG_DEBUG, "on_connect_cmd: end.");
 
 	return TRUE;
 }
@@ -722,7 +716,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 
 	/*check if it is a register message*/
 	type = ha_msg_value(msg, F_LRM_TYPE);
-	if (0 != strncmp(type, REGISTER, strlen(REGISTER))) {
+	if (0 != STRNCMP_CONST(type, REGISTER)) {
 		lrmd_log(LOG_ERR, "on_connect_cbk: msg is not register");
 		ha_msg_del(msg);
 		send_rc_msg(ch, HA_FAIL);
@@ -762,8 +756,6 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	struct ha_msg* msg = NULL;
 	const char* type = NULL;
 
-	lrmd_log(LOG_DEBUG, "on_receive_cmd: start.");
-
 	client = (lrmd_client_t*)user_data;
 	if (IPC_DISCONNECT == ch->ch_status) {
 		lrmd_log(LOG_DEBUG,
@@ -789,7 +781,6 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 		ha_msg_del(msg);
 		lrmd_log(LOG_DEBUG, "on_receive_cmd: return HA_FAIL because"\
 			 " lrmd is in shutdown.");
-		lrmd_log(LOG_DEBUG, "on_receive_cmd: end.");
 		return TRUE;
 	}	
 	
@@ -797,8 +788,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	type = ha_msg_value(msg, F_LRM_TYPE);
 
 	for (i=0; i<DIMOF(msg_maps); i++) {
-		if (0 == strncmp(type, msg_maps[i].msg_type,
-				 strlen(msg_maps[i].msg_type))) {
+		if (0 == STRNCMP_CONST(type, msg_maps[i].msg_type)) {
 
 			/*call the handler of the message*/
 			int rc = msg_maps[i].handler(client, msg);
@@ -817,8 +807,6 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	/*delete the msg*/
 	ha_msg_del(msg);
 
-	lrmd_log(LOG_DEBUG, "on_receive_cmd: end.");
-
 	return TRUE;
 }
 
@@ -827,7 +815,6 @@ on_remove_client (gpointer user_data)
 {
 	lrmd_client_t* client = NULL;
 
-	lrmd_log(LOG_DEBUG, "on_remove_client: start.");
 	client = (lrmd_client_t*) user_data;
 	if (NULL != lookup_client(client->pid)) {
 		on_msg_unregister(client,NULL);
@@ -835,8 +822,6 @@ on_remove_client (gpointer user_data)
 	client->ch_cbk->ops->destroy(client->ch_cbk);
 	g_free(client->app_name);
 	g_free(client);
-
-	lrmd_log(LOG_DEBUG, "on_remove_client: end.");
 }
 
 gboolean
@@ -845,7 +830,6 @@ on_timeout_op_done(gpointer data)
 	lrmd_op_t* op = NULL;
 	lrmd_rsc_t* rsc = NULL;
 
-	lrmd_log(LOG_DEBUG, "on_timeout_op_done: start.");
 	op = (lrmd_op_t*)data;
 	if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_TIMEOUT)) {
 		lrmd_log(LOG_ERR,
@@ -856,7 +840,6 @@ on_timeout_op_done(gpointer data)
 	on_op_done(op);
 	perform_op(rsc);
 
-	lrmd_log(LOG_DEBUG, "on_timeout_op_done: end.");
 	return TRUE;
 }
 gboolean
@@ -865,7 +848,6 @@ on_repeat_op_done(gpointer data)
 	lrmd_op_t* op = NULL;
 	int timeout = 0;
 
-	lrmd_log(LOG_DEBUG, "on_repeat_op_done: start.");
 	op = (lrmd_op_t*)data;
 	op->rsc->repeat_op_list = g_list_remove(op->rsc->repeat_op_list, op);
 	g_source_remove(op->repeat_timeout_tag);
@@ -888,7 +870,6 @@ on_repeat_op_done(gpointer data)
 
 	perform_op(op->rsc);
 
-	lrmd_log(LOG_DEBUG, "on_repeat_op_done: end.");
 	return TRUE;
 }
 
@@ -898,7 +879,6 @@ on_msg_register(lrmd_client_t* client, struct ha_msg* msg)
 {
 	lrmd_client_t* exist = NULL;
 	const char* app_name = NULL;
-	lrmd_log(LOG_DEBUG, "on_msg_register: start.");
 
 	app_name = ha_msg_value(msg, F_LRM_APP);
 	if (NULL == app_name) {
@@ -935,7 +915,6 @@ on_msg_register(lrmd_client_t* client, struct ha_msg* msg)
 	}
 
 	client_list = g_list_append (client_list, client);
-	lrmd_log(LOG_DEBUG, "on_msg_register: end.");
 	return HA_OK;
 }
 
@@ -946,8 +925,6 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 	GList* rsc_node = NULL;
 	GList* op_node = NULL;
 	lrmd_op_t* op = NULL;
-
-	lrmd_log(LOG_DEBUG, "on_msg_unregister: start.");
 
 	if (NULL == client_list || NULL == lookup_client(client->pid)) {
 		lrmd_log(LOG_ERR,
@@ -977,7 +954,6 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 
 		}
 	}
-	lrmd_log(LOG_DEBUG, "on_msg_unregister: end.");
 	return HA_OK;
 }
 
@@ -985,7 +961,6 @@ int
 on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg)
 {
 	struct ha_msg* ret = NULL;
-	lrmd_log(LOG_DEBUG, "on_msg_get_rsc_classes: start.");
 
 	ret = create_lrm_ret(HA_OK, 4);
 	if (NULL == ret) {
@@ -1001,7 +976,6 @@ on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	ha_msg_del(ret);
 
-	lrmd_log(LOG_DEBUG, "on_msg_get_rsc_classes: end.");
 	return HA_OK;
 }
 
@@ -1014,7 +988,6 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 	GList* type;
 	const char* rclass = NULL;
 
-	lrmd_log(LOG_DEBUG, "on_msg_get_rsc_types: start.");
 
 	ret = create_lrm_ret(HA_OK,5);
 
@@ -1048,7 +1021,6 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	ha_msg_del(ret);
 
-	lrmd_log(LOG_DEBUG, "on_msg_get_rsc_types: end.");
 	return HA_OK;
 }
 int
@@ -1060,8 +1032,6 @@ on_msg_get_rsc_providers(lrmd_client_t* client, struct ha_msg* msg)
 	GList* provider = NULL;
 	const char* rclass = NULL;
 	const char* rtype = NULL;
-
-	lrmd_log(LOG_DEBUG, "on_msg_get_rsc_providers: start.");
 
 	ret = create_lrm_ret(HA_OK,5);
 
@@ -1092,7 +1062,6 @@ on_msg_get_rsc_providers(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	ha_msg_del(ret);
 
-	lrmd_log(LOG_DEBUG, "on_msg_get_rsc_providers: end.");
 	return HA_OK;
 }
 
@@ -1104,8 +1073,6 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 	const char* rtype = NULL;
 	const char* rclass = NULL;
 	const char* provider = NULL;
-
-	lrmd_log(LOG_DEBUG, "on_msg_get_metadata: start.");
 
 	rtype = ha_msg_value(msg, F_LRM_RTYPE);
 	rclass = ha_msg_value(msg, F_LRM_RCLASS);
@@ -1140,7 +1107,6 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	ha_msg_del(ret);
 
-	lrmd_log(LOG_DEBUG, "on_msg_get_metadata: end.");
 	return HA_OK;
 }
 
@@ -1151,7 +1117,6 @@ on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg)
 	int i = 1;
 	struct ha_msg* ret = NULL;
 
-	lrmd_log(LOG_DEBUG, "on_msg_get_all: start.");
 	ret = create_lrm_ret(HA_OK, g_list_length(rsc_list) + 1);
 	if (NULL == ret) {
 		lrmd_log(LOG_ERR, "on_msg_get_all: can not create msg.");
@@ -1172,7 +1137,6 @@ on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	ha_msg_del(ret);
 
-	lrmd_log(LOG_DEBUG, "on_msg_get_all: end.");
 	return HA_OK;
 }
 int
@@ -1180,7 +1144,6 @@ on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 {
 	struct ha_msg* ret = NULL;
 	lrmd_rsc_t* rsc = NULL;
-	lrmd_log(LOG_DEBUG, "on_msg_get_rsc: start.");
 
 	rsc = lookup_rsc_by_msg(msg);
 	if (NULL == rsc) {
@@ -1230,7 +1193,6 @@ on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	ha_msg_del(ret);
 
-	lrmd_log(LOG_DEBUG, "on_msg_get_rsc: end.");
 	return HA_OK;
 }
 int
@@ -1239,8 +1201,6 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	lrmd_rsc_t* rsc = NULL;
 	GList* op_node = NULL;
 	lrmd_op_t* op = NULL;
-
-	lrmd_log(LOG_DEBUG, "on_msg_del_rsc: start.");
 
 	rsc = lookup_rsc_by_msg(msg);
 
@@ -1282,7 +1242,6 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		g_free(rsc);
 	}
 
-	lrmd_log(LOG_DEBUG, "on_msg_del_rsc: end.");
 	return HA_OK;
 }
 
@@ -1295,10 +1254,8 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	lrmd_rsc_t* rsc = NULL;
 	char* id = NULL;
 
-	lrmd_log(LOG_DEBUG, "on_msg_add_rsc: start.");
-
 	id = g_strdup(ha_msg_value(msg,F_LRM_RID));
-	if (RID_LEN <= strlen(id))	{
+	if (RID_LEN <= STRLEN_CONST(id))	{
 		lrmd_log(LOG_ERR, "on_msg_add_rsc: rsc_id is too long.");
 		return HA_FAIL;
 	}
@@ -1338,7 +1295,6 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	rsc->params = ha_msg_value_str_table(msg,F_LRM_PARAM);
 	rsc_list = g_list_append(rsc_list, rsc);
 
-	lrmd_log(LOG_DEBUG, "on_msg_add_rsc: end.");
 	return HA_OK;
 }
 
@@ -1351,8 +1307,6 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	lrmd_op_t* op = NULL;
 	int timeout = 0;
 
-	lrmd_log(LOG_DEBUG, "on_msg_perform_op: start.");
-
 	rsc = lookup_rsc_by_msg(msg);
 	if (NULL == rsc) {
 		lrmd_log(LOG_ERR,
@@ -1363,7 +1317,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	call_id++;
 	type = ha_msg_value(msg, F_LRM_TYPE);
 	/* when a flush request arrived, flush all pending ops */
-	if (0 == strncmp(type, FLUSHOPS, strlen(FLUSHOPS))) {
+	if (0 == STRNCMP_CONST(type, FLUSHOPS)) {
 		node = g_list_first(rsc->op_list);
 		while (NULL != node ) {
 			op = (lrmd_op_t*)node->data;
@@ -1381,7 +1335,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		}
 	}
 	else
-	if (0 == strncmp(type, CANCELOP, strlen(CANCELOP))) {
+	if (0 == STRNCMP_CONST(type, CANCELOP)) {
 		int cancel_op_id;
 		ha_msg_value_int(msg, F_LRM_CALLID, &cancel_op_id);
 		
@@ -1392,7 +1346,6 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			if ( op->call_id == cancel_op_id) {
 				rsc->op_list = g_list_remove(rsc->op_list, op);
 				flush_op(op);
-				lrmd_log(LOG_DEBUG, "on_msg_perform_op: end.");
 				return HA_OK;
 			}
 		}
@@ -1404,11 +1357,9 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 				rsc->repeat_op_list =
 					g_list_remove(rsc->repeat_op_list, op);
 				flush_op(op);
-				lrmd_log(LOG_DEBUG, "on_msg_perform_op: end.");
 				return HA_OK;
 			}
 		}
-		lrmd_log(LOG_DEBUG, "on_msg_perform_op: end.");
 		return HA_FAIL;		
 	}
 	else {
@@ -1448,7 +1399,6 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		perform_op(rsc);
 	}
 
-	lrmd_log(LOG_DEBUG, "on_msg_perform_op: end.");
 	return call_id;
 }
 int
@@ -1460,8 +1410,6 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	struct ha_msg* ret = NULL;
 	lrmd_op_t* op = NULL;
 	struct ha_msg* op_msg = NULL;
-
-	lrmd_log(LOG_DEBUG, "on_msg_get_state: start.");
 
 	rsc = lookup_rsc_by_msg(msg);
 	if (NULL == rsc) {
@@ -1529,7 +1477,6 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 			ha_msg_del(op_msg);
 		}
 	}
-	lrmd_log(LOG_DEBUG, "on_msg_get_state: end.");
 	return HA_OK;
 }
 /* /////////////////////op functions//////////////////////////////////////////// */
@@ -1548,8 +1495,6 @@ on_op_done(lrmd_op_t* op)
 	int op_status_int;
 	int need_notify = 0;
 
-
-	lrmd_log(LOG_DEBUG, "on_op_done: start.");
 	/*  we should check if the resource exists. */
 	if (NULL == g_list_find(rsc_list, op->rsc)) {
 		if( op->timeout_tag > 0 ) {
@@ -1663,14 +1608,12 @@ on_op_done(lrmd_op_t* op)
 		free_op(op);
 	}
 
-	lrmd_log(LOG_DEBUG, "on_op_done: end.");
 	return HA_OK;
 }
 /* this function flush one op */
 int
 flush_op(lrmd_op_t* op)
 {
-	lrmd_log(LOG_DEBUG, "flush_op: start.");
 	if (HA_OK != ha_msg_add_int(op->msg, F_LRM_RC, HA_FAIL)) {
 		lrmd_log(LOG_ERR,"flush_op: can not add rc ");
 		return HA_FAIL;
@@ -1683,7 +1626,6 @@ flush_op(lrmd_op_t* op)
 
 	on_op_done(op);
 
-	lrmd_log(LOG_DEBUG, "flush_op: end.");
 	return HA_OK;
 }
 
@@ -1694,10 +1636,8 @@ perform_op(lrmd_rsc_t* rsc)
 	GList* node = NULL;
 	lrmd_op_t* op = NULL;
 
-	lrmd_log(LOG_DEBUG, "perform_op: start.");
 	if (TRUE == shutdown_in_progress && can_shutdown()) {
 		lrm_shutdown(NULL);
-		lrmd_log(LOG_DEBUG, "perform_op: end.");
 	}
 	if (NULL == g_list_find(rsc_list, rsc)) {
 		lrmd_log(LOG_DEBUG,
@@ -1732,9 +1672,6 @@ perform_op(lrmd_rsc_t* rsc)
 		}
 	}
 
-
-
-	lrmd_log(LOG_DEBUG, "perform_op: end.");
 	return HA_OK;
 }
 
@@ -1743,7 +1680,6 @@ op_to_msg(lrmd_op_t* op)
 {
 	struct ha_msg* msg = NULL;
 
-	lrmd_log(LOG_DEBUG, "op_to_msg: start.");
 	msg = ha_msg_copy(op->msg);
 	if (NULL == msg) {
 		lrmd_log(LOG_ERR,"op_to_msg: can not copy the msg");
@@ -1754,7 +1690,6 @@ op_to_msg(lrmd_op_t* op)
 		lrmd_log(LOG_ERR,"op_to_msg: can not add call_id");
 		return NULL;
 	}
-	lrmd_log(LOG_DEBUG, "op_to_msg: end.");
 	return msg;
 }
 
@@ -1769,8 +1704,6 @@ perform_ra_op(lrmd_op_t* op)
 	const char* op_type = NULL;
         GHashTable* params = NULL;
         GHashTable* op_params = NULL;
-
-	lrmd_log(LOG_DEBUG, "perform_ra_op: start.");
 
 	if ( pipe(fd) < 0 ) {
 		lrmd_log(LOG_ERR,"pipe create error.");
@@ -1897,7 +1830,6 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
         int rc;
         int ret;
 
-	lrmd_log(LOG_DEBUG, "on_ra_proc_finished: start.");
 	op = p->privatedata;
 	op->exec_pid = -1;
 	if (9 == signo) {
@@ -1963,7 +1895,6 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	on_op_done(op);
 	perform_op(rsc);
 	p->privatedata = NULL;
-	lrmd_log(LOG_DEBUG, "on_ra_proc_finished: end.");
 }
 
 /* Handle the death of one of our managed child processes */
@@ -1974,16 +1905,13 @@ on_ra_proc_query_name(ProcTrack* p)
 	lrmd_op_t* op = NULL;
 	const char* op_type = NULL;
 
-	lrmd_log(LOG_DEBUG, "on_ra_proc_query_name: start.");
 	op = (lrmd_op_t*)(p->privatedata);
 	if (NULL == op) {
-		lrmd_log(LOG_DEBUG, "on_ra_proc_query_name: end.");
 		return "*unknown*";
 	}
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
 
 	snprintf(proc_name, MAX_PROC_NAME, "%s:%s", op->rsc->id, op_type);
-	lrmd_log(LOG_DEBUG, "on_ra_proc_query_name: end.");
 	return proc_name;
 }
 
@@ -2025,8 +1953,6 @@ send_rc_msg (IPC_Channel* ch, int rc)
 {
 	struct ha_msg* ret = NULL;
 
-	lrmd_log(LOG_DEBUG, "send_rc_msg: start.");
-
 	ret = create_lrm_ret(rc, 1);
 	if (NULL == ret) {
 		lrmd_log(LOG_ERR, "send_rc_msg: can not create ret msg");
@@ -2037,7 +1963,6 @@ send_rc_msg (IPC_Channel* ch, int rc)
 		lrmd_log(LOG_ERR, "send_rc_msg: can not send the ret msg");
 	}
 	ha_msg_del(ret);
-	lrmd_log(LOG_DEBUG, "send_rc_msg: end.");
 	return HA_OK;
 }
 
@@ -2046,17 +1971,14 @@ lookup_client (pid_t pid)
 {
 	GList* node;
 	lrmd_client_t* client;
-	lrmd_log(LOG_DEBUG, "lookup_client: start.");
 	for(node = g_list_first(client_list);
 		NULL != node; node = g_list_next(node)){
 		client = (lrmd_client_t*)node->data;
 		if (pid == client->pid) {
-			lrmd_log(LOG_DEBUG, "lookup_client: end.");
 			return client;
 		}
 	}
 
-	lrmd_log(LOG_DEBUG, "lookup_client: end.");
 	return NULL;
 }
 
@@ -2066,17 +1988,13 @@ lookup_rsc (const char* rid)
 	GList* node;
 	lrmd_rsc_t* rsc = NULL;
 
-	lrmd_log(LOG_DEBUG, "lookup_rsc: start.");
-
 	for(node=g_list_first(rsc_list); NULL!=node; node=g_list_next(node)){
 		rsc = (lrmd_rsc_t*)node->data;
-		if (0 == strncmp(rid,rsc->id, RID_LEN)) {
-			lrmd_log(LOG_DEBUG, "lookup_rsc: end.");
+		if (0 == strncmp(rid, rsc->id, RID_LEN)) {
 			return rsc;
 		}
 	}
 
-	lrmd_log(LOG_DEBUG, "lookup_rsc: end.");
 	return NULL;
 }
 
@@ -2091,7 +2009,7 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 		lrmd_log(LOG_ERR, "lookup_rsc_by_msg: NULL F_LRM_RID");
 		return NULL;
 	}
-	if (RID_LEN <= strlen(id))	{
+	if (RID_LEN <= STRLEN_CONST(id))	{
 		lrmd_log(LOG_ERR, "lookup_rsc_by_msg: rsc id is too long.");
 		return NULL;
 	}
@@ -2177,6 +2095,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.78  2005/04/07 07:07:17  sunjd
+ * replace with STRLEN_CONST&STRNCMP_CONST; remove some redundant logs
+ *
  * Revision 1.77  2005/04/07 06:23:50  sunjd
  * inherit the debuglevel from heartbeat
  *
