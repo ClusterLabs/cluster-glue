@@ -66,7 +66,7 @@ struct {
 	{
 		"/var/log/ha-debug",
 		"/var/log/ha-log",
-		"heartbeat",
+		"logd",
 		LOG_LOCAL7,
 		FALSE
 	};
@@ -280,7 +280,8 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 		
 		if (verbose){
 			logd_log("%s[%d]: %s %s\n", 
-				 logmsg->entity,
+				 logmsg->entity[0]=='\0'?
+				 "unknown": logmsg->entity,
 				 logmsg->entity_pid, 
 				 ha_timestamp(logmsg->timestamp),
 				 logmsg->message);
@@ -655,6 +656,7 @@ main(int argc, char** argv)
 		
 	}
 	
+
 	if (ask_status){
 		long pid;
 
@@ -681,6 +683,8 @@ main(int argc, char** argv)
 	cl_log_set_logfile(logd_config.logfile);
 	cl_log_set_entity(logd_config.entity);
 	cl_log_set_facility(logd_config.log_facility);
+	
+	cl_log(LOG_INFO, "Logging daemon started");
 	
 	logd_make_daemon(daemonize);
 
