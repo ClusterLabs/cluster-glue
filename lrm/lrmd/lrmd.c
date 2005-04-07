@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.76 2005/04/06 03:27:49 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.77 2005/04/07 06:23:50 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -65,7 +65,8 @@
  * dependency, but need to keep identical with them.
  */
 #define ENV_PREFIX "HA_"
-#define KEY_LOGDAEMON  "use_logd"
+#define KEY_LOGDAEMON   "use_logd"
+#define HADEBUGVAL	"HA_DEBUG"
 
 typedef struct
 {
@@ -239,6 +240,7 @@ main(int argc, char ** argv)
 	
 	int argerr = 0;
 	int flag;
+	char * inherit_debuglevel;
 
 	while ((flag = getopt(argc, argv, OPTARGS)) != EOF) {
 		switch(flag) {
@@ -269,6 +271,11 @@ main(int argc, char ** argv)
 
 	if (argerr) {
 		usage(lrm_system_name, LSB_EXIT_GENERIC);
+	}
+
+	inherit_debuglevel = getenv(HADEBUGVAL);
+	if (inherit_debuglevel != NULL &&  atoi(inherit_debuglevel) != 0 ) {
+		debug_level++;
 	}
 
 	cl_malloc_forced_for_glib();
@@ -2170,6 +2177,9 @@ lrmd_log(int priority, const char * fmt, ...)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.77  2005/04/07 06:23:50  sunjd
+ * inherit the debuglevel from heartbeat
+ *
  * Revision 1.76  2005/04/06 03:27:49  sunjd
  * use the new function cl_inherit_use_logd
  *
