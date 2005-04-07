@@ -113,7 +113,7 @@ ll_lrm_new (const char * llctype)
 	ll_lrm_t* lrm;
 
 	/* check the parameter*/
-	if (0 != strncmp(LRM_ID, llctype, strlen(LRM_ID))) {
+	if (0 != STRNCMP_CONST(LRM_ID, llctype)) {
 		cl_log(LOG_ERR, "ll_lrm_new: wrong parameter");
 		return NULL;
 	}
@@ -631,7 +631,7 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	lrm_rsc_t* rsc     = NULL;
 
 	/* check whether the rsc_id is available */
-	if (RID_LEN <= strlen(rsc_id))	{
+	if (RID_LEN <= STRLEN_CONST(rsc_id))	{
 		cl_log(LOG_ERR, "lrm_get_rsc: rsc_id is too long.");
 		return NULL;
 	}
@@ -689,7 +689,7 @@ lrm_add_rsc (ll_lrm_t* lrm, const char* rsc_id, const char* class
 	struct ha_msg* msg;
 
 	/* check whether the rsc_id is available */
-	if (NULL == rsc_id || RID_LEN <= strlen(rsc_id))	{
+	if (NULL == rsc_id || RID_LEN <= STRLEN_CONST(rsc_id))	{
 		cl_log(LOG_ERR, "lrm_add_rsc: parameter rsc_id wrong.");
 		return HA_FAIL;
 	}
@@ -728,7 +728,7 @@ lrm_delete_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	struct ha_msg* msg = NULL;
 
 	/* check whether the rsc_id is available */
-	if (NULL == rsc_id || RID_LEN <= strlen(rsc_id))	{
+	if (NULL == rsc_id || RID_LEN <= STRLEN_CONST(rsc_id))	{
 		cl_log(LOG_ERR, "lrm_delete_rsc: parameter rsc_id wrong.");
 		return HA_FAIL;
 	}
