@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.78 2005/04/07 07:07:17 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.79 2005/04/08 07:49:35 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -35,6 +35,9 @@
 #include <sys/wait.h>
 #include <dirent.h>
 #include <pwd.h>
+/* Should copy the facilitynames struct here? */
+#define SYSLOG_NAMES
+#include <syslog.h>
 
 #include <glib.h>
 #include <heartbeat.h>
@@ -57,7 +60,7 @@
 #define	MAX_PID_LEN 256
 #define	MAX_PROC_NAME 256
 
-#define OPTARGS		"skrhV"
+#define OPTARGS		"skrhv"
 #define PID_FILE 	HA_VARRUNDIR"/lrmd.pid"
 #define LRMD_COREDUMP_ROOT_DIR HA_COREDIR
 
@@ -67,6 +70,12 @@
 #define ENV_PREFIX "HA_"
 #define KEY_LOGDAEMON   "use_logd"
 #define HADEBUGVAL	"HA_DEBUG"
+#define lrmd_log(priority, fmt...); \
+        if ( debug_level == 0 && priority == LOG_DEBUG ) { \
+                ; \
+        } else { \
+                cl_log(priority, fmt); \
+        }
 
 typedef struct
 {
@@ -145,11 +154,12 @@ static lrmd_client_t* lookup_client (pid_t pid);
 static lrmd_rsc_t* lookup_rsc (const char* rid);
 static lrmd_rsc_t* lookup_rsc_by_msg (struct ha_msg* msg);
 static int read_pipe(int fd, char ** data);
-static void lrmd_log(int priority, const char * fmt, ...)G_GNUC_PRINTF(2,3);
 static struct ha_msg* op_to_msg(lrmd_op_t* op);
 static void free_op(lrmd_op_t* op);
 static gboolean lrm_shutdown(gpointer data);
 static gboolean can_shutdown(void);
+static void inherit_config_from_environment(void);
+static int facility_name_to_value(const char * name);
 
 /*
  * following functions are used to monitor the exit of ra proc
@@ -223,12 +233,12 @@ gboolean shutdown_in_progress	= FALSE;
  *
  * copy from the code of Andrew Beekhof <andrew@beekhof.net>
  */
-void usage(const char* cmd, int exit_status);
-int init_start(void);
-int init_stop(const char *pid_file);
-int init_status(const char *pid_file, const char *client_name);
-long get_running_pid(const char *pid_file, gboolean* anypidfile);
-void register_pid(const char *pid_file, gboolean do_fork,
+static void usage(const char* cmd, int exit_status);
+static int init_start(void);
+static int init_stop(const char *pid_file);
+static int init_status(const char *pid_file, const char *client_name);
+static long get_running_pid(const char *pid_file, gboolean* anypidfile);
+static void register_pid(const char *pid_file, gboolean do_fork,
 			void (*shutdown)(int nsig));
 
 int
@@ -247,7 +257,7 @@ main(int argc, char ** argv)
 			case 'h':		/* Help message */
 				usage(lrm_system_name, LSB_EXIT_OK);
 				break;
-			case 'V':		/* Debug mode, more logs*/
+			case 'v':		/* Debug mode, more logs*/
 				++debug_level;
 				break;
 			case 's':		/* Status */
@@ -285,6 +295,8 @@ main(int argc, char ** argv)
 
 	/* Use logd if it's enabled by heartbeat */
 	cl_inherit_use_logd(ENV_PREFIX""KEY_LOGDAEMON, 0);
+
+	inherit_config_from_environment();
 
 	if (req_status){
 		return init_status(PID_FILE, lrm_system_name);
@@ -2078,23 +2090,54 @@ read_pipe(int fd, char ** data)
 	g_string_free(gstr_tmp, TRUE);
 	return 0;
 }
-void
-lrmd_log(int priority, const char * fmt, ...)
+
+static void
+inherit_config_from_environment(void)
 {
-	va_list		ap;
-	char		buf[MAXLINE];
-	if ( 0==debug_level && LOG_DEBUG == priority) {
-		return;
+	char * inherit_env = NULL;
+
+	/* Donnot need to free the return pointer from getenv */
+	inherit_env = getenv(LOGFENV);
+	if (inherit_env != NULL) {
+		cl_log_set_logfile(inherit_env);
+		inherit_env = NULL;
 	}
-	
-	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf)-1, fmt, ap);
-	va_end(ap);
-	cl_log(priority,"%s",buf);
+
+	inherit_env = getenv(DEBUGFENV);
+	if (inherit_env != NULL) {
+		cl_log_set_debugfile(inherit_env);
+		inherit_env = NULL;
+	}
+
+	inherit_env = getenv(LOGFACILITY);
+	if (inherit_env != NULL) {
+		int facility = -1;
+		facility = facility_name_to_value(inherit_env);
+		if ( facility != -1 ) {
+			cl_log_set_facility(facility);
+		}
+		inherit_env = NULL;
+	}
+}
+
+static int
+facility_name_to_value(const char * name)
+{
+	int i;
+	for (i = 0; facilitynames[i].c_name != NULL; i++) {
+		if (strcmp(name, facilitynames[i].c_name) == 0) {
+			return facilitynames[i].c_val;
+		}
+	}
+	return -1;
 }
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.79  2005/04/08 07:49:35  sunjd
+ * Replace log function with macro to improve the running efficiency.
+ * Inherit configurations from environment variables set by heartbeat.
+ *
  * Revision 1.78  2005/04/07 07:07:17  sunjd
  * replace with STRLEN_CONST&STRNCMP_CONST; remove some redundant logs
  *
