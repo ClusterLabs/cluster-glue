@@ -41,8 +41,12 @@
 #include <apphb.h>
 #include <clplumbing/Gmain_timeout.h>
 
-#define DEFAULT_CFG_FILE	"/etc/logd.cf"
-#define	LOGD_PIDFILE		VAR_RUN_D "/ha_logd.pid"
+#ifndef DEFAULT_CFG_FILE
+#	define DEFAULT_CFG_FILE	"/etc/logd.cf"
+#endif
+#ifndef	LOGD_PIDFILE
+#	define	LOGD_PIDFILE	VAR_RUN_D "/logd.pid"
+#endif
 
 #define	FD_STDIN	0
 #define	FD_STDOUT	1
