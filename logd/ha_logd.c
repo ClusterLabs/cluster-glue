@@ -79,12 +79,14 @@ struct {
 		FALSE
 	};
 
-static void logd_log(const char * fmt, ...) G_GNUC_PRINTF(1,2);
-static int set_debugfile(const char* option);
-static int set_logfile(const char* option);
-static int set_facility(const char * value);
-static int set_entity(const char * option);
-static int set_useapphbd(const char* option);
+static void	logd_log(const char * fmt, ...) G_GNUC_PRINTF(1,2);
+static int	set_debugfile(const char* option);
+static int	set_logfile(const char* option);
+static int	set_facility(const char * value);
+static int	set_entity(const char * option);
+static int	set_useapphbd(const char* option);
+
+int		pidstatuscode = LSB_STATUS_UNKNOWN;
 
 GMainLoop* mainloop 		= NULL;
 static long			logd_pid_in_file = 0L;
@@ -359,8 +361,12 @@ get_running_logd_pid(void)
 		logd_pid_in_file = pid;
 		if (kill((pid_t)pid, 0) >= 0 || errno != ESRCH) {
 			fclose(lockfd);
+			pidstatuscode = LSB_STATUS_OK;
 			return pid;
 		}
+		pidstatuscode = LSB_STATUS_VAR_PID;
+	}else{
+		pidstatuscode = LSB_STATUS_STOPPED;
 	}
 	if (lockfd != NULL) {
 		fclose(lockfd);
@@ -480,9 +486,6 @@ parse_config(const char* cfgfile)
 	if ((f = fopen(cfgfile, "r")) == NULL){
 		if (cfgfile_is_set){
 			cl_perror("Cannot open config file [%s]", cfgfile);
-		}else{
-			cl_log(LOG_INFO, "Cannot open file %s ", cfgfile);
-			cl_log(LOG_INFO, "Default settting will be used");
 		}
 		return(FALSE);
 	}
@@ -586,11 +589,6 @@ init_logd_config(const char* cfgfile)
 	
 	/* Read configure file */
 	
-	if (cfgfile_is_set){
-		cl_log(LOG_INFO, "Using config file %s", cfgfile);
-	}else{
-		cl_log(LOG_INFO, "Using default config file %s", cfgfile);
-	}
 	if (!parse_config(cfgfile)) {
 		if (cfgfile_is_set){
 			cl_log(LOG_ERR, "init_logd_config: "
@@ -696,10 +694,15 @@ main(int argc, char** argv)
 
 		if( (pid = get_running_logd_pid()) > 0 ){
 			printf("logging daemon is running [pid = %ld].\n", pid);
-			exit(LSB_EXIT_OK);			
+			exit(LSB_STATUS_OK);
 		}else{
-			printf("logging daemon is stopped.\n");
-			exit(LSB_EXIT_GENERIC);
+			if (pidstatuscode ==  LSB_STATUS_VAR_PID) {
+				printf("logging daemon is stopped: %s exists.\n"
+				,	LOGD_PIDFILE);
+			}else{
+				printf("logging daemon is stopped.");
+			}
+			exit(pidstatuscode);
 		}
 		
 	}
@@ -718,7 +721,7 @@ main(int argc, char** argv)
 	cl_log_set_entity(logd_config.entity);
 	cl_log_set_facility(logd_config.log_facility);
 	
-	cl_log(LOG_INFO, "Logging daemon started");
+	cl_log(LOG_INFO, "%s started.", argv[0]);
 	
 	logd_make_daemon(daemonize);
 
