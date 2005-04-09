@@ -62,7 +62,6 @@ int	logd_warntime_ms = 5000;
 int	logd_deadtime_ms = 10000;
 gboolean RegisteredWithApphbd = FALSE;
 gboolean	verbose =FALSE;
-gboolean	cfgfile_is_set = FALSE;
 
 struct {
 	char		debugfile[MAXLINE];
@@ -72,8 +71,8 @@ struct {
 	gboolean	useapphbd;
 } logd_config =
 	{
-		"/var/log/ha-debug",
-		"/var/log/ha-log",
+		"",
+		"",
 		"logd",
 		LOG_LOCAL7,
 		FALSE
@@ -88,39 +87,45 @@ static int	set_useapphbd(const char* option);
 
 int		pidstatuscode = LSB_STATUS_UNKNOWN;
 
-GMainLoop* mainloop 		= NULL;
+GMainLoop*			mainloop 		= NULL;
 static long			logd_pid_in_file = 0L;
-static char*				cmdname = NULL;
+static char*			cmdname = NULL;
 
 
 struct directive{
 	const char* name;
 	int (*add_func)(const char*);
-} Directives[]=
-	{
-		{"debugfile", set_debugfile},
-		{"logfile", set_logfile},
-		{"logfacility", set_facility},
-		{"entity", set_entity},
-		{"useapphbd", set_useapphbd}
-	};
+} Directives[]= {
+	{"debugfile", set_debugfile},
+	{"logfile", set_logfile},
+	{"logfacility", set_facility},
+	{"entity", set_entity},
+	{"useapphbd", set_useapphbd}
+};
 
 struct _syslog_code {
         const char    *c_name;
         int     c_val;
 };
 
-struct _syslog_code facilitynames[] =
-	{
-	{ "syslog", LOG_SYSLOG },
-	{ "local0", LOG_LOCAL0 },
-	{ "local1", LOG_LOCAL1 },
-	{ "local2", LOG_LOCAL2 },
-	{ "local3", LOG_LOCAL3 },
-	{ "local4", LOG_LOCAL4 },
-	{ "local5", LOG_LOCAL5 },
-	{ "local6", LOG_LOCAL6 },
-	{ "local7", LOG_LOCAL7 },
+struct _syslog_code facilitynames[] = {
+	{ "user",	LOG_USER },
+	{ "mail",	LOG_MAIL },
+	{ "daemon",	LOG_DAEMON },
+	{ "auth",	LOG_AUTH },
+	{ "syslog",	LOG_SYSLOG },
+	{ "lpr",	LOG_LPR },
+	{ "news",	LOG_NEWS },
+	{ "uucp",	LOG_UUCP },
+	{ "cron",	LOG_CRON },
+	{ "local0",	LOG_LOCAL0 },
+	{ "local1",	LOG_LOCAL1 },
+	{ "local2",	LOG_LOCAL2 },
+	{ "local3",	LOG_LOCAL3 },
+	{ "local4",	LOG_LOCAL4 },
+	{ "local5",	LOG_LOCAL5 },
+	{ "local6",	LOG_LOCAL6 },
+	{ "local7",	LOG_LOCAL7 },
 	{ NULL, -1 }
 };
 
@@ -171,7 +176,7 @@ set_facility(const char * value)
 {
 	int		i;	 
 	for(i = 0; facilitynames[i].c_name != NULL; ++i) {
-		if(strcmp(value, facilitynames[i].c_name) == 0) {
+		if(strcasecmp(value, facilitynames[i].c_name) == 0) {
 			cl_log(LOG_INFO,  "setting log facility to %s", value);
 			logd_config.log_facility = facilitynames[i].c_val;
 			return(TRUE);
@@ -202,10 +207,10 @@ set_useapphbd(const char* option)
 	}
 	
 	cl_log(LOG_INFO, "setting useapphbd to %s", option);
-	if (strcmp(option, "yes") == 0){
+	if (0 == strcmp(option, "yes")){
 		logd_config.useapphbd = TRUE;
 		return TRUE;
-	} else if (strcmp(option, "no") == 0){
+	} else if (0 == strcmp(option, "no")){
 		logd_config.useapphbd = FALSE;
 		return TRUE;
 	} else {
@@ -215,8 +220,7 @@ set_useapphbd(const char* option)
 }
 
 
-typedef struct
-{
+typedef struct {
 	char*		app_name;
 	pid_t		pid;
 	gid_t		gid;
@@ -228,11 +232,13 @@ typedef struct
 }ha_logd_client_t;
 
 static IPC_Message*
-getIPCmsg(IPC_Channel* ch){
+getIPCmsg(IPC_Channel* ch)
+{
 	
 	int		rc;
 	IPC_Message*	ipcmsg;
 	
+	/* FIXME:  Should we block here?? */
 	rc = ch->ops->waitin(ch);
 	
 	switch(rc) {
@@ -261,6 +267,7 @@ getIPCmsg(IPC_Channel* ch){
 	return ipcmsg;
 
 }
+
 static gboolean
 on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 {
@@ -459,7 +466,7 @@ get_dir_index(const char* directive)
 {
 	int j;
 	for(j=0; j < DIMOF(Directives); j++){
-		if (strcmp(directive, Directives[j].name) == 0){
+		if (0 == strcasecmp(directive, Directives[j].name)){
 			return j;
 		}
 	}
@@ -484,9 +491,7 @@ parse_config(const char* cfgfile)
 	gboolean	ret = TRUE;
 
 	if ((f = fopen(cfgfile, "r")) == NULL){
-		if (cfgfile_is_set){
-			cl_perror("Cannot open config file [%s]", cfgfile);
-		}
+		cl_perror("Cannot open config file [%s]", cfgfile);
 		return(FALSE);
 	}
 
@@ -578,27 +583,6 @@ logd_reregister_with_apphbd(gpointer dummy)
 }
 
 
-static int
-init_logd_config(const char* cfgfile)
-{
-
-	if (cfgfile == NULL){
-		cl_log(LOG_ERR, "init_logd_config:cfgfile is NULL");
-		return FALSE;
-	}
-	
-	/* Read configure file */
-	
-	if (!parse_config(cfgfile)) {
-		if (cfgfile_is_set){
-			cl_log(LOG_ERR, "init_logd_config: "
-			       "parsing config file failed");
-			return FALSE;
-		}
-	}
-	return TRUE;
-}
-
 static gboolean
 logd_apphb_hb(gpointer dummy)
 {
@@ -648,7 +632,7 @@ main(int argc, char** argv)
 	gboolean		daemonize = FALSE;
 	gboolean		stop_logd = FALSE;
 	gboolean		ask_status= FALSE;
-	const char*		cfgfile = DEFAULT_CFG_FILE;
+	const char*		cfgfile = NULL;
 	
 
 	cmdname = argv[0];
@@ -666,7 +650,6 @@ main(int argc, char** argv)
 			ask_status = TRUE;
 			break;
 		case 'c':	/* config file*/
-			cfgfile_is_set = TRUE;
 			cfgfile = optarg;
 			break;
 		case 'v':
@@ -678,6 +661,10 @@ main(int argc, char** argv)
 			exit(1);
 		}
 		
+	}
+
+	if (!cfgfile && access(DEFAULT_CFG_FILE, F_OK)) {
+		cfgfile = DEFAULT_CFG_FILE;
 	}
 	
 
@@ -694,7 +681,6 @@ main(int argc, char** argv)
 
 		if( (pid = get_running_logd_pid()) > 0 ){
 			printf("logging daemon is running [pid = %ld].\n", pid);
-			exit(LSB_STATUS_OK);
 		}else{
 			if (pidstatuscode ==  LSB_STATUS_VAR_PID) {
 				printf("logging daemon is stopped: %s exists.\n"
@@ -702,8 +688,8 @@ main(int argc, char** argv)
 			}else{
 				printf("logging daemon is stopped.");
 			}
-			exit(pidstatuscode);
 		}
+		exit(pidstatuscode);
 		
 	}
 	if (stop_logd){
@@ -713,15 +699,23 @@ main(int argc, char** argv)
 	
 
 	
-	if (cfgfile && init_logd_config(cfgfile) == FALSE){
+	if (cfgfile && !parse_config(cfgfile)) {
+		cl_log(LOG_ERR, "Config file [%s] is incorrect."
+		,	cfgfile);
 		exit(LSB_EXIT_NOTCONFIGED);
 	}
-	cl_log_set_debugfile(logd_config.debugfile);
-	cl_log_set_logfile(logd_config.logfile);
+	
+	if (strlen(logd_config.debugfile) > 0) {
+		cl_log_set_debugfile(logd_config.debugfile);
+	}
+	if (strlen(logd_config.logfile) > 0) {
+		cl_log_set_logfile(logd_config.logfile);
+	}
 	cl_log_set_entity(logd_config.entity);
 	cl_log_set_facility(logd_config.log_facility);
 	
-	cl_log(LOG_INFO, "%s started.", argv[0]);
+	cl_log(LOG_INFO, "%s started with %s."
+	,	argv[0], cfgfile ? cfgfile : "default configuration");
 	
 	logd_make_daemon(daemonize);
 
