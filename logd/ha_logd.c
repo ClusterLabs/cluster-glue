@@ -41,11 +41,14 @@
 #include <apphb.h>
 #include <clplumbing/Gmain_timeout.h>
 
+#define DEFAULT_CFG_FILE	"/etc/logd.cf"
 #define	LOGD_PIDFILE		VAR_RUN_D "/ha_logd.pid"
 
 #define	FD_STDIN	0
 #define	FD_STDOUT	1
+
 #define	FD_STDERR	2
+
 
 #define MAXLINE 128
 #define EOS '\0'
@@ -55,6 +58,7 @@ int	logd_warntime_ms = 5000;
 int	logd_deadtime_ms = 10000;
 gboolean RegisteredWithApphbd = FALSE;
 gboolean	verbose =FALSE;
+gboolean	cfgfile_is_set = FALSE;
 
 struct {
 	char		debugfile[MAXLINE];
@@ -139,7 +143,7 @@ set_debugfile(const char* option)
 		return FALSE;
 	}
 	
-	logd_log("setting debug file to %s\n", option);
+	cl_log(LOG_INFO, "setting debug file to %s", option);
 	strncpy(logd_config.debugfile, option, MAXLINE);
 	return TRUE;
 }
@@ -150,7 +154,7 @@ set_logfile(const char* option)
 		logd_config.logfile[0] = EOS;
 		return FALSE;
 	}
-	logd_log("setting log file to %s\n", option);
+	cl_log(LOG_INFO, "setting log file to %s", option);
 	strncpy(logd_config.logfile, option, MAXLINE);
 	return TRUE;
 }
@@ -162,7 +166,7 @@ set_facility(const char * value)
 	int		i;	 
 	for(i = 0; facilitynames[i].c_name != NULL; ++i) {
 		if(strcmp(value, facilitynames[i].c_name) == 0) {
-			logd_log("setting log facility to %s\n", value);
+			cl_log(LOG_INFO,  "setting log facility to %s", value);
 			logd_config.log_facility = facilitynames[i].c_val;
 			return(TRUE);
 		}
@@ -177,7 +181,7 @@ set_entity(const char * option)
 		logd_config.entity[0] = EOS;
 		return FALSE;
 	}
-	logd_log("setting entity to %s\n", option);
+	cl_log(LOG_INFO, "setting entity to %s", option);
 	strncpy(logd_config.entity, option, MAXLINE);
 	return TRUE;
 
@@ -187,11 +191,11 @@ static int
 set_useapphbd(const char* option)
 {
 	if (!option){
-		logd_log("set_useapphbd: option is NULL\n");
+		cl_log(LOG_ERR,"set_useapphbd: option is NULL");
 		return FALSE;
 	}
 	
-	logd_log("setting useapphbd to %s\n", option);
+	cl_log(LOG_INFO, "setting useapphbd to %s", option);
 	if (strcmp(option, "yes") == 0){
 		logd_config.useapphbd = TRUE;
 		return TRUE;
@@ -199,7 +203,7 @@ set_useapphbd(const char* option)
 		logd_config.useapphbd = FALSE;
 		return TRUE;
 	} else {
-		logd_log("invalid useapphbd option\n");
+		cl_log(LOG_INFO,"invalid useapphbd option");
 		return FALSE;
 	}
 }
@@ -228,7 +232,7 @@ getIPCmsg(IPC_Channel* ch){
 	switch(rc) {
 	default:
 	case IPC_FAIL:
-		logd_log("ERROR: getIPCmsg: waitin failure\n");
+		cl_log(LOG_ERR, "getIPCmsg: waitin failure\n");
 		return NULL;
 		
 	case IPC_BROKEN:
@@ -291,8 +295,8 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 			ipcmsg->msg_done(ipcmsg);
 		}
 	}else {
-		logd_log("ERROR; on_receive_cmd:"
-			 " invalid ipcmsg\n");
+		cl_log(LOG_ERR, "on_receive_cmd:"
+		       " invalid ipcmsg\n");
 	}
 	
  getout:
@@ -321,7 +325,7 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 	
 	/* check paremeters */
 	if (NULL == ch) {
-		logd_log("on_connect_cmd: channel is null");
+		cl_log(LOG_ERR, "on_connect_cmd: channel is null");
 		return TRUE;
 	}
 	/* create new client */
@@ -431,8 +435,8 @@ logd_stop(void){
 		exit(LSB_EXIT_OK);
 	}
 	err = errno;
-	logd_log("ERROR: Could not kill pid %ld\n",
-		 running_logd_pid);
+	cl_log(LOG_ERR, "Could not kill pid %ld\n",
+	       running_logd_pid);
 	exit((err == EPERM || err == EACCES)
 		  ?	LSB_EXIT_EPERM
 		  :	LSB_EXIT_GENERIC);
@@ -470,7 +474,12 @@ parse_config(const char* cfgfile)
 	gboolean	ret = TRUE;
 
 	if ((f = fopen(cfgfile, "r")) == NULL){
-		fprintf(stderr, "Cannot open config file:[%s]\n", cfgfile);
+		if (cfgfile_is_set){
+			cl_perror("Cannot open config file [%s]", cfgfile);
+		}else{
+			cl_log(LOG_INFO, "Cannot open file %s ", cfgfile);
+			cl_log(LOG_INFO, "Default settting will be used");
+		}
 		return(FALSE);
 	}
 
@@ -487,7 +496,7 @@ parse_config(const char* cfgfile)
 		if (*bp == EOS){
 			continue;
 		}
-
+		
 		dirlength = strcspn(bp, " \t\n\f\r");
 		strncpy(directive, bp, dirlength);
 		directive[dirlength] = EOS;
@@ -529,20 +538,20 @@ logd_init_register_with_apphbd(void)
 	if (apphb_register(cmdname, APPLOGDINSTANCE) != 0) {
 		/* Log attempts once an hour or so... */
 		if ((failcount % 60) ==  0) {
-			logd_log("Unable to register with apphbd.\n");
-			logd_log("Continuing to try and register.\n");
+			cl_log(LOG_INFO, "Unable to register with apphbd."
+			       "Continuing to try and register.\n");
 		}
 		++failcount;
 		return;
 	}
 
 	RegisteredWithApphbd = TRUE;
-	logd_log("Registered with apphbd as %s/%s.\n",
+	cl_log(LOG_INFO, "Registered with apphbd as %s/%s.\n",
 		 cmdname, APPLOGDINSTANCE); 
 	
 	if (apphb_setinterval(logd_deadtime_ms) < 0
 	    ||	apphb_setwarn(logd_warntime_ms) < 0) {
-		logd_log("Unable to setup with apphbd.\n");
+		cl_log(LOG_ERR, "Unable to setup with apphbd.\n");
 		apphb_unregister();
 		RegisteredWithApphbd = FALSE;
 		++failcount;
@@ -562,17 +571,29 @@ logd_reregister_with_apphbd(gpointer dummy)
 }
 
 
-static void 
-init_config(const char* cfgfile)
+static int
+init_logd_config(const char* cfgfile)
 {
 
+	if (cfgfile == NULL){
+		cl_log(LOG_ERR, "init_logd_config:cfgfile is NULL");
+		return FALSE;
+	}
+	
 	/* Read configure file */
-	if (cfgfile) {
-		if (!parse_config(cfgfile)) {
-			exit(LSB_EXIT_NOTCONFIGED);
-		}
+	
+	if (cfgfile_is_set){
+		cl_log(LOG_INFO, "Use config file %s", cfgfile);
 	}else{
-		exit(LSB_EXIT_NOTCONFIGED);
+		cl_log(LOG_INFO, "Use default config file %s", cfgfile);
+	}
+	if (!parse_config(cfgfile)) {
+		if (cfgfile_is_set){
+			cl_log(LOG_ERR, "init_logd_config: "
+			       "parsing config file failed");
+			return FALSE;
+		}
+		return TRUE;
 	}
 }
 
@@ -583,7 +604,7 @@ logd_apphb_hb(gpointer dummy)
 		if (RegisteredWithApphbd) {
 			if (apphb_hb() < 0) {
 				/* apphb_hb() will fail if apphbd exits */
-				logd_log("apphb_hb() failed.\n");
+				cl_log(LOG_ERR, "apphb_hb() failed.\n");
 				apphb_unregister();
 				RegisteredWithApphbd = FALSE;
 			}
@@ -625,7 +646,7 @@ main(int argc, char** argv)
 	gboolean		daemonize = FALSE;
 	gboolean		stop_logd = FALSE;
 	gboolean		ask_status= FALSE;
-	const char*		cfgfile = NULL;
+	const char*		cfgfile = DEFAULT_CFG_FILE;
 	
 
 	cmdname = argv[0];
@@ -643,6 +664,7 @@ main(int argc, char** argv)
 			ask_status = TRUE;
 			break;
 		case 'c':	/* config file*/
+			cfgfile_is_set = TRUE;
 			cfgfile = optarg;
 			break;
 		case 'v':
@@ -657,6 +679,14 @@ main(int argc, char** argv)
 	}
 	
 
+	/* default one set to "logd"
+	 * by setting facility, we enable syslog
+	 */
+	cl_log_enable_stderr(TRUE);
+	cl_log_set_entity(logd_config.entity);
+	cl_log_set_facility(logd_config.log_facility);
+	
+	
 	if (ask_status){
 		long pid;
 
@@ -674,10 +704,10 @@ main(int argc, char** argv)
 		exit(LSB_EXIT_OK);
 	}
 	
-	(void)init_config;
-	(void)logd_make_daemon;
-	if (cfgfile){
-		init_config(cfgfile);
+
+	
+	if (cfgfile && init_logd_config(cfgfile) == FALSE){
+		exit(LSB_EXIT_NOTCONFIGED);
 	}
 	cl_log_set_debugfile(logd_config.debugfile);
 	cl_log_set_logfile(logd_config.logfile);
