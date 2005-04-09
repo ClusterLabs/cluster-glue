@@ -25,10 +25,12 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 
 hadir			= $(sysconfdir)/ha.d
+defaultconfig		= $(sysconfdir)/ha.d
 halibdir		= $(libdir)/@HB_PKG@
 commmoddir		= $(halibdir)/modules/comm
 havarlibdir		= $(localstatedir)/lib/@HB_PKG@
 havarrundir		= $(localstatedir)/run/
+pidfile			= $(havarrundir)/logd.pid
 apidir		       	= $(havarlibdir)/api
 apicasualdir		= $(havarlibdir)/casual
 # fifos with path
@@ -37,11 +39,13 @@ apigid			= @HA_APIGID@
 gliblib			= @GLIBLIB@
 
 LIBRT 			= @LIBRT@
-AM_CFLAGS			= @CFLAGS@ \
--DVAR_RUN_D='"$(havarrundir)"'	\
--DVAR_LIB_D='"$(havarlibdir)"'		\
--DHA_D='"$(hadir)"'			\
--DHALIB='"$(halibdir)"'
+AM_CFLAGS		= @CFLAGS@ 					\
+			-DVAR_RUN_D='"$(havarrundir)"'			\
+			-DVAR_LIB_D='"$(havarlibdir)"'			\
+			-DHA_D='"$(hadir)"'				\
+			-DHALIB='"$(halibdir)"'				\
+			-DDEFAULT_CFG_FILE='"$(defaultconfig)"'		\
+			-DLOGD_PIDFILE='"$(pidfile)"'
 
 ## binary progs
 halib_PROGRAMS		= ha_logd ha_logger
