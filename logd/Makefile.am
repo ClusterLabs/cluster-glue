@@ -25,7 +25,7 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 
 hadir			= $(sysconfdir)/ha.d
-defaultconfig		= $(sysconfdir)/ha.d
+defaultconfig		= $(sysconfdir)/logd.cf
 halibdir		= $(libdir)/@HB_PKG@
 commmoddir		= $(halibdir)/modules/comm
 havarlibdir		= $(localstatedir)/lib/@HB_PKG@
