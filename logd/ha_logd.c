@@ -663,7 +663,7 @@ main(int argc, char** argv)
 		
 	}
 
-	if (!cfgfile && access(DEFAULT_CFG_FILE, F_OK)) {
+	if (!cfgfile && access(DEFAULT_CFG_FILE, F_OK) == 0) {
 		cfgfile = DEFAULT_CFG_FILE;
 	}
 	
