@@ -583,9 +583,9 @@ init_logd_config(const char* cfgfile)
 	/* Read configure file */
 	
 	if (cfgfile_is_set){
-		cl_log(LOG_INFO, "Use config file %s", cfgfile);
+		cl_log(LOG_INFO, "Using config file %s", cfgfile);
 	}else{
-		cl_log(LOG_INFO, "Use default config file %s", cfgfile);
+		cl_log(LOG_INFO, "Using default config file %s", cfgfile);
 	}
 	if (!parse_config(cfgfile)) {
 		if (cfgfile_is_set){
@@ -593,8 +593,8 @@ init_logd_config(const char* cfgfile)
 			       "parsing config file failed");
 			return FALSE;
 		}
-		return TRUE;
 	}
+	return TRUE;
 }
 
 static gboolean
