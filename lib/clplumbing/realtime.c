@@ -1,4 +1,4 @@
-/* $Id: realtime.c,v 1.20 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: realtime.c,v 1.21 2005/04/10 19:52:21 lars Exp $ */
 #include <portability.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -39,7 +39,7 @@ static void cl_rtmalloc_setup(void);
 static int
 cl_stack_hogger(char * inbuf, int kbytes)
 {
-	unsigned char	buf[1024];
+	char	buf[1024];
 	
 	if (inbuf == NULL) {
 		memset(buf, HOGRET, sizeof(buf));
