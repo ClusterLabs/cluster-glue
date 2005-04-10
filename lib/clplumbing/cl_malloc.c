@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.12 2005/03/02 22:54:29 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.13 2005/04/10 19:51:25 lars Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -634,7 +634,7 @@ cl_dump_item(const struct cl_bucket*b)
 	,	(long)(b->hdr.bucket >= NUMBUCKS ? 0 
 	:	cl_bucket_sizes[b->hdr.bucket]));
 #endif
-	cbeg = ((const char *)b)+cl_malloc_hdr_offset;
+	cbeg = ((const unsigned char *)b)+cl_malloc_hdr_offset;
 	cend = cbeg+b->hdr.reqsize+GUARDSIZE;
 
 	for (cp=cbeg; cp < cend; cp+= sizeof(unsigned)) {
