@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.35 2005/03/16 17:11:15 lars Exp $ */
+/* $Id: ipctest.c,v 1.36 2005/04/10 20:30:08 lars Exp $ */
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -174,16 +174,12 @@ main(int argc, char ** argv)
 
 	rc += transport_tests(10000);
 
-#if 0
 	cl_log(LOG_INFO, "NOTE: Enabling poll(2) replacement code.");
 	PollFunc = cl_poll;
 	g_main_set_poll_func(cl_glibpoll);
 	ipc_set_pollfunc(cl_poll);
 
 	rc += transport_tests(50000);
-#else
-	cl_log(LOG_INFO, "NOTE: Not enabling poll(2) replacement code.");
-#endif
 	
 	cl_log(LOG_INFO, "TOTAL errors: %d", rc);
 
