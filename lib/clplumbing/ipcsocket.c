@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.139 2005/04/05 15:11:05 andrew Exp $ */
+/* $Id: ipcsocket.c,v 1.140 2005/04/10 20:08:01 lars Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -601,7 +601,7 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 	 */
 	struct sockaddr_un *			peer_addr;
 	struct IPC_CHANNEL *			ch = NULL;
-	int					sin_size;
+	socklen_t				sin_size;
 	int					s;
 	int					new_sock;
 	struct SOCKET_WAIT_CONN_PRIVATE*	conn_private;
