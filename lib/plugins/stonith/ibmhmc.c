@@ -112,9 +112,9 @@
 #define MAX_CMD_LEN		1024
 #define FULLSYSTEMPARTITION	"FullSystemPartition"
 #define MAX_POWERON_RETRY	10
-#define MAX_SYS_NUM		64
-#define MAX_LPAR_NUM		256
 #define MAX_HMC_NAME_LEN	256
+
+#define ST_MANSYSPAT		"managedsyspat"
 
 #define STATE_UNKNOWN		-1
 #define STATE_OFF		0
@@ -133,8 +133,13 @@ static int		ibmhmc_reset_req(StonithPlugin * s,int request,const char* host);
 static char **		ibmhmc_hostlist(StonithPlugin  *);
 static int		ibmhmc_set_config(StonithPlugin *, StonithNVpair*);
 
+struct pluginDevice;
+static int ibmhmc_parse_config_info(struct pluginDevice* dev);
+static void ibmhmc_free_config_info(struct pluginDevice* dev);
 static char* do_shell_cmd(const char* cmd, int* status);
 static int check_hmc_status(const char* hmc);
+static int get_num_tokens(char *str);
+static gboolean pattern_match(char **patterns, char *string);
 /* static char* do_shell_cmd_fake(const char* cmd, int* status); */
 
 static struct stonith_ops ibmhmcOps = {
@@ -188,6 +193,7 @@ struct pluginDevice {
 	char *			hmc;
 	GList*		 	hostlist;
 	int			hmcver;
+	char **			mansyspats;
 };
 
 static const char * pluginid = "HMCDevice-Stonith";
@@ -230,6 +236,15 @@ ibmhmc_hostlist(StonithPlugin  *s)
 	ERRIFWRONGDEV(s,NULL);
 
 	dev = (struct pluginDevice*) s;
+
+	/* refresh the hostlist */
+	ibmhmc_free_config_info(dev);
+	if (S_OK != ibmhmc_parse_config_info(dev)){
+		LOG(PIL_CRIT, "unable to obtain list of managed systems in %s"
+		,	__FUNCTION__);
+		return NULL;
+	}
+
 	numnames = g_list_length(dev->hostlist);
 	if (numnames < 0) {
 		LOG(PIL_CRIT, "unconfigured stonith object in %s"
@@ -247,17 +262,31 @@ ibmhmc_hostlist(StonithPlugin  *s)
 	for (node = g_list_first(dev->hostlist), j = 0
 	;	NULL != node
 	;	j++, node = g_list_next(node))	{
-		char* host = (char*)node->data;
-		ret[j] = STRDUP(host);
+		char* host = strchr((char*)node->data, '/');
+		ret[j] = STRDUP(++host);
 	}
 	return ret;
+}
+
+static void
+ibmhmc_free_config_info(struct pluginDevice* dev)
+{
+	if (dev->hostlist) {
+		GList* node;
+		while (NULL != (node=g_list_first(dev->hostlist))) {
+			dev->hostlist = g_list_remove_link(dev->hostlist, node);
+			FREE(node->data);
+			g_list_free(node);
+		}
+		dev->hostlist = NULL;
+	}
 }
 
 /*
  *	Parse the config information, and stash it away...
  */
 static int
-ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
+ibmhmc_parse_config_info(struct pluginDevice* dev)
 {
 	int i, j, status;
 	char* output = NULL;
@@ -267,61 +296,23 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 	gchar** name_mode = NULL;
 	char get_lpar[MAX_CMD_LEN];
 	gchar** lparlist = NULL;
-	char get_hmcver[MAX_CMD_LEN];
-	char firstchar;
-	int firstnum;
 
 	if(Debug){
-		LOG(PIL_DEBUG, "%s: called, info=%s\n", __FUNCTION__, info);
+		LOG(PIL_DEBUG, "%s: called, dev->hmc=%s\n", __FUNCTION__
+		,	dev->hmc);
 	}
 
-	if (info == NULL || *info == 0){
+	if (dev->hmc == NULL || *dev->hmc == 0){
 		return S_BADCONFIG;
 	}
 	
-	/* check whether the HMC has ssh command enabled */
-	if (check_hmc_status(info) != S_OK) {
-		return S_BADCONFIG;
-	}		
-
-	/* get the HMC's version info */
-	snprintf(get_hmcver, MAX_CMD_LEN
-	,	SSH_CMD " -l " HMCROOT " %s lshmc -v | grep RM", info);
-	if (Debug) {
-		LOG(PIL_DEBUG, "%s: get_hmcver=%s", __FUNCTION__, get_hmcver);
-	}
-
-	output = do_shell_cmd(get_hmcver, &status);
-	if (Debug) {
-		LOG(PIL_DEBUG, "%s: output=%s\n", __FUNCTION__, output);
-	}
-	if (output == NULL) {
-		return S_BADCONFIG;
-	}		
-
-	/* parse the HMC's version info (i.e. "*RM V4R2.1" or "*RM R3V2.6") */
-	if ((sscanf(output, "*RM %c%1d", &firstchar, &firstnum) == 2)
-	&& ((firstchar == 'V') || (firstchar == 'R'))) {
-		dev->hmcver = firstnum;
-		if(Debug){
-			LOG(PIL_DEBUG, "%s: HMC %s version is %d"
-			,	__FUNCTION__, info, dev->hmcver);
-		}
-	}else{
-		LOG(PIL_CRIT, "%s: unable to determine HMC %s version"
-		,	__FUNCTION__, info);
-		FREE(output);
-		return S_BADCONFIG;
-	}
-	FREE(output);
-
 	/* get the managed system's names of the hmc */
 	if (dev->hmcver < 4) {
 		snprintf(get_syslist, MAX_CMD_LEN, SSH_CMD " -l " HMCROOT
-			" %s lssyscfg -r sys -F name:mode --all", info);
+			" %s lssyscfg -r sys -F name:mode --all", dev->hmc);
 	}else{
 		snprintf(get_syslist, MAX_CMD_LEN, SSH_CMD 
-			" -l " HMCROOT " %s lssyscfg -r sys -F name", info);
+			" -l " HMCROOT " %s lssyscfg -r sys -F name", dev->hmc);
 	}
 	if(Debug){
 		LOG(PIL_DEBUG, "%s: get_syslist=%s", __FUNCTION__, get_syslist);
@@ -331,20 +322,21 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 	if (output == NULL) {
 		return S_BADCONFIG;
 	}		
-	syslist = g_strsplit(output, "\n", MAX_SYS_NUM);
+	syslist = g_strsplit(output, "\n", 0);
 	FREE(output);
 
 	/* for each managed system */
-	for (i = 0; i < MAX_SYS_NUM; i++) {
-		if (syslist[i] == NULL || syslist[i][0] == 0) {
-			break;
-		}
-
+	for (i = 0; syslist[i] != NULL && syslist[i][0] != 0; i++) {
 		if (dev->hmcver < 4) {
 			name_mode = g_strsplit(syslist[i], ":", 2);
 			if(Debug){
 			LOG(PIL_DEBUG, "%s: name_mode0=%s, name_mode1=%s\n"
 			,	__FUNCTION__, name_mode[0], name_mode[1]);
+			}
+
+			if (dev->mansyspats != NULL
+			&& !pattern_match(dev->mansyspats, name_mode[0])) {
+				continue;
 			}
 
 			/* if it is in fullsystempartition */
@@ -361,7 +353,7 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 				snprintf(get_lpar, MAX_CMD_LEN
 				,	SSH_CMD " -l " HMCROOT
 				" %s lssyscfg -m %s -r lpar -F name --all"
-				,	info, name_mode[0]);
+				,	dev->hmc, name_mode[0]);
 				if(Debug){
 					LOG(PIL_DEBUG, "%s: get_lpar=%s\n"
 					,	__FUNCTION__, get_lpar);
@@ -369,17 +361,17 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 
 				output = do_shell_cmd(get_lpar, &status);
 				if (output == NULL) {
+					g_strfreev(name_mode);
+					g_strfreev(syslist);
 					return S_BADCONFIG;
 				}		
-				lparlist = g_strsplit(output, "\n"
-				,	MAX_LPAR_NUM);
+				lparlist = g_strsplit(output, "\n", 0);
 				FREE(output);
 	
 				/* for each lpar */
-				for (j = 0; j < MAX_LPAR_NUM; j++) {
-					if (NULL == lparlist[j]) {
-						break;
-					}
+				for (j = 0
+				; NULL != lparlist[j] && 0 != lparlist[j][0]
+				; j++) {
 					/* skip the full system partition */
 					if (0 == strncmp(lparlist[j]
 					,	FULLSYSTEMPARTITION
@@ -396,12 +388,18 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 				}
 				g_strfreev(lparlist);
 			}
+			g_strfreev(name_mode);
 		}else{
+			if (dev->mansyspats != NULL
+			&& !pattern_match(dev->mansyspats, syslist[i])) {
+				continue;
+			}
+
 			/* get its lpars */
 			snprintf(get_lpar, MAX_CMD_LEN
 			,	SSH_CMD " -l " HMCROOT
 				 " %s lssyscfg -m %s -r lpar -F name"
-			,	info, syslist[i]);
+			,	dev->hmc, syslist[i]);
 			if(Debug){
 				LOG(PIL_DEBUG, "%s: get_lpar=%s\n"
 				,	__FUNCTION__, get_lpar);
@@ -409,16 +407,16 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 
 			output = do_shell_cmd(get_lpar, &status);
 			if (output == NULL) {
+				g_strfreev(syslist);
 				return S_BADCONFIG;
 			}		
-			lparlist = g_strsplit(output, "\n", MAX_LPAR_NUM);
+			lparlist = g_strsplit(output, "\n", 0);
 			FREE(output);
 
 			/* for each lpar */
-			for (j = 0; j < MAX_LPAR_NUM; j++) {
-				if (NULL == lparlist[j]) {
-					break;
-				}
+			for (j = 0
+			; NULL != lparlist[j] && 0 != lparlist[j][0]
+			; j++) {
 				/* add the lpar */
 				snprintf(host, MAX_HOST_NAME_LEN
 				,	"%s/%s", syslist[i],lparlist[j]);
@@ -427,10 +425,8 @@ ibmhmc_parse_config_info(struct pluginDevice* dev, const char* info)
 			}
 			g_strfreev(lparlist);
 		}
-		g_strfreev(name_mode);
 	}
 	g_strfreev(syslist);
-	dev->hmc = STRDUP(info);
 	
 	return S_OK;
 }
@@ -491,7 +487,8 @@ ibmhmc_reset_req(StonithPlugin * s, int request, const char * host)
 			,	__FUNCTION__, (char*)node->data);
 		}
 		
-		if (0 == strcasecmp((char*)node->data, host)) {
+		if ((pch = strchr((char*)node->data, '/')) != NULL
+		&&  0 == strcasecmp(++pch, host)) {
 			break;
 		}
 	}
@@ -717,7 +714,17 @@ static int
 ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 {
 	struct pluginDevice* dev = NULL;
-	const char * ipaddr;	
+	StonithNamesToGet	namestoget [] =
+	{	{ST_IPADDR,	NULL}
+	,	{NULL,		NULL}
+	};
+	int rc;
+	char get_hmcver[MAX_CMD_LEN];
+	char firstchar;
+	int firstnum;
+	char* output = NULL;
+	int status;
+	const char *mansyspats;
 	
 	ERRIFWRONGDEV(s,S_OOPS);
 
@@ -727,15 +734,106 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 	
 	dev = (struct pluginDevice*) s;
 
-	if((ipaddr = OurImports->GetValue(list, ST_IPADDR)) == NULL){
-		return S_OOPS;
+	if ((rc = OurImports->GetAllValues(namestoget, list)) != S_OK) {
+		return rc;
 	}
+	dev->hmc = namestoget[0].s_value;
 
 	if(Debug){
-		LOG(PIL_DEBUG, "%s: ipaddr=%s\n", __FUNCTION__, ipaddr);	
+		LOG(PIL_DEBUG, "%s: ipaddr=%s\n", __FUNCTION__, dev->hmc);	
+	}
+
+	/* obtain any managed system name patterns (i.e. "IBMOP_*") */
+	if ((mansyspats = OurImports->GetValue(list, ST_MANSYSPAT)) != NULL) {
+		char *patscopy;
+		int numpats;	
+		int i;
+		char *tmp;
+
+		patscopy = STRDUP(mansyspats);
+		if (patscopy == NULL) {
+			LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
+			return S_OOPS;
+		}
+
+		numpats = get_num_tokens(patscopy);	
+		if (numpats > 0) {
+			dev->mansyspats = MALLOC((numpats+1)*sizeof(char *));
+			if (dev->mansyspats == NULL) {
+				LOG(PIL_CRIT, "%s: out of memory"
+				,	__FUNCTION__);
+				FREE(patscopy);
+				return S_OOPS;
+			}
+
+			memset(dev->mansyspats, 0, (numpats+1)*sizeof(char *));
+
+			/* White-space split the output here */
+			i = 0;
+			tmp = strtok(patscopy, WHITESPACE);
+			while (tmp != NULL) {
+				dev->mansyspats[i] = STRDUP(tmp);
+				if (dev->mansyspats[i] == NULL) {
+					LOG(PIL_CRIT, "%s: out of memory"
+					,	__FUNCTION__);
+					stonith_free_hostlist(dev->mansyspats);
+					dev->mansyspats = NULL;
+					FREE(patscopy);
+					return S_OOPS;
+				}
+
+				/* no patterns necessary if all specified */
+				if (strcmp(dev->mansyspats[i], "*") == 0) {
+					stonith_free_hostlist(dev->mansyspats);
+					dev->mansyspats = NULL;
+					break;
+				}
+
+				i++;
+				tmp = strtok(NULL, WHITESPACE);
+			}
+		}
+		FREE(patscopy);
 	}
 	
-	if (S_OK != ibmhmc_parse_config_info(dev, ipaddr)){
+	/* check whether the HMC has ssh command enabled */
+	if (check_hmc_status(dev->hmc) != S_OK) {
+		return S_BADCONFIG;
+	}		
+
+	/* get the HMC's version info */
+	snprintf(get_hmcver, MAX_CMD_LEN
+	,	SSH_CMD " -l " HMCROOT " %s lshmc -v | grep RM", dev->hmc);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: get_hmcver=%s", __FUNCTION__, get_hmcver);
+	}
+
+	output = do_shell_cmd(get_hmcver, &status);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: output=%s\n", __FUNCTION__
+		, output ? output : "(nil)");
+	}
+	if (output == NULL) {
+		return S_BADCONFIG;
+	}		
+
+	/* parse the HMC's version info (i.e. "*RM V4R2.1" or "*RM R3V2.6") */
+	if ((sscanf(output, "*RM %c%1d", &firstchar, &firstnum) == 2)
+	&& ((firstchar == 'V') || (firstchar == 'R'))) {
+		dev->hmcver = firstnum;
+		if(Debug){
+			LOG(PIL_DEBUG, "%s: HMC %s version is %d"
+			,	__FUNCTION__, dev->hmc, dev->hmcver);
+		}
+	}else{
+		LOG(PIL_CRIT, "%s: unable to determine HMC %s version"
+		,	__FUNCTION__, dev->hmc);
+		FREE(output);
+		return S_BADCONFIG;
+	}
+	FREE(output);
+
+	if (S_OK != ibmhmc_parse_config_info(dev)){
 		return S_BADCONFIG;
 	}
 	
@@ -764,7 +862,11 @@ ibmhmc_getinfo(StonithPlugin* s, int reqtype)
 		case ST_DEVICEDESCR:
 			ret = "IBM Hardware Management Console (HMC)\n"
 			"Use for IBM i5, p5, pSeries and OpenPower systems "
-			"managed by HMC\n";
+			"managed by HMC\n"
+			"Optional patameter name " ST_MANSYSPAT " is "
+			"white-space delimited list of patterns used to match "
+			"managed system names; if last character is '*', all "
+			"names that begin with the pattern are matched\n";
 			break;
 
 		case ST_DEVICEURL:
@@ -799,14 +901,10 @@ ibmhmc_destroy(StonithPlugin *s)
 		FREE(dev->hmc);
 		dev->hmc = NULL;
 	}
-	if (dev->hostlist) {
-		GList* node;
-		while (NULL != (node=g_list_first(dev->hostlist))) {
-			dev->hostlist = g_list_remove_link(dev->hostlist, node);
-			FREE(node->data);
-			g_list_free(node);
-		}
-		dev->hostlist = NULL;
+	ibmhmc_free_config_info(dev);
+	if (dev->mansyspats) {
+		stonith_free_hostlist(dev->mansyspats);
+		dev->mansyspats = NULL;
 	}
 	
 	FREE(dev);
@@ -831,6 +929,7 @@ ibmhmc_new(const char *subplugin)
 	dev->pluginid = pluginid;
 	dev->hmc = NULL;
 	dev->hostlist = NULL;
+	dev->mansyspats = NULL;
 	dev->hmcver = -1;
 	dev->sp.s_ops = &ibmhmcOps;
 
@@ -872,7 +971,6 @@ do_shell_cmd(const char* cmd, int* status)
 	g_string_free(g_str_tmp, TRUE);
 
 	*status = pclose(file);
-fprintf(stderr, "$$$$ %s\n", data);
 	return data;
 }
 
@@ -882,6 +980,7 @@ check_hmc_status(const char* hmc)
 	int status;
 	char check_status[MAX_CMD_LEN];
 	char* output = NULL;
+	int rc = S_OK;
 
 	if(Debug){
 		LOG(PIL_DEBUG, "%s: called, hmc=%s\n", __FUNCTION__, hmc);
@@ -895,17 +994,61 @@ check_hmc_status(const char* hmc)
 	}
 
 	output = do_shell_cmd(check_status, &status);
-	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: status=%d, output=%s\n", __FUNCTION__
 		,	status, output ? output : "(nil)");
 	}
 
 	if (NULL == output || strncmp(output, "enable", 6) != 0) {
-		return S_BADCONFIG;
+		rc = S_BADCONFIG;
 	}
-	FREE(output);
-	return S_OK;
+	if (NULL != output) {
+		FREE(output);
+	}
+	return rc;
+}
+
+static int
+get_num_tokens(char *str)
+{
+	int namecount = 0;
+
+	while (*str != EOS) {
+		str += strspn(str, WHITESPACE);
+		if (*str == EOS)
+			break;
+		str += strcspn(str, WHITESPACE);
+		namecount++;
+	}
+	return namecount;
+}
+
+static gboolean
+pattern_match(char **patterns, char *string)
+{
+	char **pattern;
+
+	if(Debug){
+		LOG(PIL_DEBUG, "%s: called, string=%s\n", __FUNCTION__, string);
+	}
+
+	for (pattern = patterns; *pattern; pattern++) {
+		int patlen = strlen(*pattern);
+
+		if (pattern[0][patlen-1] == '*') {
+			/* prefix match */
+			if (strncmp(string, *pattern, patlen-1) == 0) {
+				return TRUE;
+			}
+		}else{
+			/* exact match */
+			if (strcmp(string, *pattern) == 0) {
+				return TRUE;
+			}
+		}
+	}
+
+	return FALSE;
 }
 
 /*
