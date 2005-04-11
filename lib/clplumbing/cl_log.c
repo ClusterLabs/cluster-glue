@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.50 2005/04/06 17:20:58 gshi Exp $ */
+/* $Id: cl_log.c,v 1.51 2005/04/11 19:41:14 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <clplumbing/GSource.h>
 
 #ifndef MAXLINE
 #	define MAXLINE	512
@@ -62,6 +63,19 @@ static int		stderr_enabled = 0;
 static const char*	logfile_name = NULL;
 static const char*	debugfile_name = NULL;
 int cl_process_pid = -1;
+static GDestroyNotify destroy_logging_channel_callback;
+static void (*create_logging_channel_callback)(IPC_Channel* chan);
+
+/***********************
+ *debug use only, do not use this function in your program
+ */
+IPC_Channel * get_log_chan(void);
+
+IPC_Channel* get_log_chan(void){
+	return logging_daemon_chan;
+}
+/*************************/
+
 
 void
 cl_log_enable_stderr(int truefalse)
@@ -107,7 +121,7 @@ cl_str_to_boolean(const char * s, int * ret)
 	return -1;
 }
 
-void
+gboolean
 cl_inherit_use_logd(const char* param_name, int sendq_length) 
 {
 	char*		param_val;
@@ -129,7 +143,36 @@ cl_inherit_use_logd(const char* param_name, int sendq_length)
 		cl_log(LOG_INFO, "Disable using logging daemon");
 	}
 	
+	return truefalse;
+	
 }     
+
+static void
+add_logging_channel_mainloop(IPC_Channel* chan)
+{
+	GCHSource* chp=
+		G_main_add_IPC_Channel(	G_PRIORITY_DEFAULT,
+					chan,
+					FALSE,
+					NULL,
+					NULL,
+					destroy_logging_channel_callback);
+	
+	if (chp == NULL){
+		cl_log(LOG_INFO, "adding logging channel to mainloop failed");
+	}	
+	
+	return;
+}
+
+static void
+remove_logging_channel_mainloop(gpointer userdata)
+{
+	/*do nothing*/
+	
+	return;
+}
+
 
 static IPC_Channel* 
 create_logging_channel(void)
@@ -160,6 +203,11 @@ create_logging_channel(void)
 		
 		return NULL;
 	}
+
+	if (create_logging_channel_callback){
+		create_logging_channel_callback(chan);
+	}		
+	
 	
 	return chan;
 	
@@ -230,6 +278,38 @@ void
 cl_log_set_debugfile(const char * path)
 {
 	debugfile_name = path;
+}
+
+
+/* This function set two callback functions.
+ * One for creating a channel and 
+ * the other for destroying a channel*
+ */
+
+int
+cl_log_set_logd_channel_source( void (*create_callback)(IPC_Channel* chan),
+				GDestroyNotify destroy_callback)
+{
+	IPC_Channel* chan = logging_daemon_chan ;
+	
+	if (destroy_callback == NULL){
+		destroy_logging_channel_callback = remove_logging_channel_mainloop;
+	}else {		
+		destroy_logging_channel_callback = destroy_callback;
+	}
+	
+	if (create_callback == NULL){
+		create_logging_channel_callback = add_logging_channel_mainloop;	
+	}else {
+		create_logging_channel_callback = create_callback;	
+	}
+	
+	if (chan != NULL 
+	    && chan->ops->get_chan_status(chan) ==  IPC_CONNECT){		
+		add_logging_channel_mainloop(chan);
+	}
+	
+	return 0;
 }
 
 /*
@@ -596,11 +676,11 @@ LogToLoggingDaemon(int priority, const char * buf,
 		return HA_OK;
 		
 	} else {
-		drop_msg_num++;
 		
 		if (chan->ops->get_chan_status(chan) != IPC_CONNECT) {
 			chan->ops->destroy(chan);
 			logging_daemon_chan = NULL;
+			cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);			
 			
 			if (drop_msg_num > 0){
 				/* Direct logging here is ok since we're
@@ -613,7 +693,12 @@ LogToLoggingDaemon(int priority, const char * buf,
 			}
 			
 			drop_msg_num=0;
+			
+			return HA_FAIL;
 		}
+
+		drop_msg_num++;
+
 	}
 	
 	FreeChildLogIPCMessage(msg);
