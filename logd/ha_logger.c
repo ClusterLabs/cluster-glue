@@ -44,7 +44,9 @@ static void
 usage(int argc, char** argv)
 {
 	printf("usage: "
-	       "%s: <destination> <message>\n\n"
+	       "%s: [option] <destination> <message>\n\n"
+	       "options:"
+	       "	-E <entity> The message will be printed with the given entity\n"
 	       "@destination  can be  either ha-log or ha-debug\n"
 	       "@message is the message you want to log into file\n\n",
 	       argv[0]);	
@@ -59,9 +61,6 @@ main(int argc, char** argv)
 	char*	msg;
 	char*	logtype;
 
-	if (argc != 5){
-		goto err_exit;
-	}
 	
 	while (( c =getopt(argc, argv,"E:h")) != -1){
 		switch(c){
@@ -78,11 +77,11 @@ main(int argc, char** argv)
 		
 	}
 	
-	if (optind != 3){
+	if ( argc - optind != 2){
 		cl_log(LOG_ERR, "Wrong argument");
 		goto err_exit;
 	}
-
+	
 	
 	logtype = argv[optind];
 	msg = argv[optind+1];
