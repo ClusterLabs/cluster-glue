@@ -565,6 +565,7 @@ ibmhmc_reset_req(StonithPlugin * s, int request, const char * host)
 		output = do_shell_cmd(on_cmd, &status);
 		if (output == NULL) {
 			LOG(PIL_CRIT, "command %s failed", on_cmd);
+			return (S_OOPS);
 		}
 		if ((pch = strchr(output, '\n')) != NULL) {
 			*pch = 0;
