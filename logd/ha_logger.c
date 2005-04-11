@@ -39,7 +39,7 @@
 #define EXIT_FAIL	1
 
 int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
-
+void            cl_log(int priority, const char * fmt, ...) G_GNUC_PRINTF(2,3);
 static void
 usage(int argc, char** argv)
 {
@@ -54,13 +54,46 @@ int
 main(int argc, char** argv)
 {
 	int	priority; 
+	char*	entity = NULL;
+	char	c;
+	char*	msg;
+	char*	logtype;
 
-	if (argc != 3 || argv[1] == NULL || argv[2] == NULL ){
+	if (argc != 5){
 		goto err_exit;
 	}
-	if (strcmp(argv[1], "ha-log") == 0){
+	
+	while (( c =getopt(argc, argv,"E:h")) != -1){
+		switch(c){
+			
+		case 'E':
+			entity = optarg;
+			break;
+		case 'h':
+			usage(argc, argv);
+			exit(1);		
+		default:
+			continue;
+		}
+		
+	}
+	
+	if (optind != 3){
+		cl_log(LOG_ERR, "Wrong argument");
+		goto err_exit;
+	}
+
+	
+	logtype = argv[optind];
+	msg = argv[optind+1];
+	
+	if (entity != NULL){
+		cl_log_set_entity(entity);		
+	}
+	
+	if (strcmp(logtype, "ha-log") == 0){
 		priority = LOG_INFO;
-	} else if (strcmp(argv[1], "ha-debug") == 0){
+	} else if (strcmp(logtype, "ha-debug") == 0){
 		priority = LOG_DEBUG;
 	}else{
 		goto err_exit;
@@ -70,7 +103,7 @@ main(int argc, char** argv)
 		return EXIT_FAIL;
 	}
 	
-	if (LogToLoggingDaemon(priority, argv[2],strlen(argv[2]), FALSE) == HA_OK){
+	if (LogToLoggingDaemon(priority, msg,strlen(msg), FALSE) == HA_OK){
 		return EXIT_OK;
 	}else {
 		return EXIT_FAIL;
