@@ -31,7 +31,7 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 			
 
-AM_CFLAGS			= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
+AM_CFLAGS		= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 			-DSTONITH_MODULES='"$(stonithlibdir)"' \
 			-DLOCALEDIR='"@LOCALE@"' 		
 
@@ -107,7 +107,8 @@ plugin_LTLIBRARIES =	apcmaster.la	\
 			ssh.la			\
 			$(vacm_LIB)		\
 			wti_nps.la		\
-			riloe.la
+			riloe.la		\
+			suicide.la
 
 apcmaster_la_SOURCES	= apcmaster.c $(INCFILES)
 apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version
@@ -176,10 +177,13 @@ wti_nps_la_SOURCES	= wti_nps.c $(INCFILES)
 wti_nps_la_LDFLAGS	= -export-dynamic -module -avoid-version
 wti_nps_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
-riloe_la_SOURCES         = riloe.c $(INCFILES)
-riloe_la_LDFLAGS         = -export-dynamic -module -avoid-version
-riloe_la_LIBADD          = $(GLIBLIB)
+riloe_la_SOURCES        = riloe.c $(INCFILES)
+riloe_la_LDFLAGS        = -export-dynamic -module -avoid-version
+riloe_la_LIBADD         = $(GLIBLIB)
 
-stonithscriptdir                =  $(stonith_plugindir)/stonith2
+suicide_la_SOURCES	= suicide.c $(INCFILES)
+suicide_la_LDFLAGS	= -export-dynamic -module -avoid-version
 
-stonithscript_SCRIPTS  		= ribcl.py 
+stonithscriptdir        =  $(stonith_plugindir)/stonith2
+
+stonithscript_SCRIPTS  	= ribcl.py 
