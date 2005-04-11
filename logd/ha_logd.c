@@ -714,8 +714,10 @@ main(int argc, char** argv)
 	cl_log_set_entity(logd_config.entity);
 	cl_log_set_facility(logd_config.log_facility);
 	
+	cl_log_enable_stderr(FALSE);
 	cl_log(LOG_INFO, "%s started with %s."
-	,	argv[0], cfgfile ? cfgfile : "default configuration");
+	       ,	argv[0], cfgfile ? cfgfile : "default configuration");
+	cl_log_enable_stderr(TRUE);
 	
 	logd_make_daemon(daemonize);
 
