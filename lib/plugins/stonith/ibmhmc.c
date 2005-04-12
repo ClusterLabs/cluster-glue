@@ -604,7 +604,8 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 		*pch = EOS;
 
 		/* skip over white-space up to next token */
-		pch += strspn(++pch, WHITESPACE);
+		pch++;
+		pch += strspn(pch, WHITESPACE);
 		if (get_hmc_mansyspats(dev, pch) != S_OK) {
 			return S_OOPS;
 		}
