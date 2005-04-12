@@ -1,4 +1,4 @@
-/* $Id: proctrack.c,v 1.17 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: proctrack.c,v 1.18 2005/04/12 14:18:42 alan Exp $ */
 /*
  * Process tracking object.
  *
@@ -116,13 +116,6 @@ ReportProcHasDied(int pid, int status)
 		signo = WTERMSIG(status);
 		doreport=1;
 	}
-#ifdef WCOREDUMP
-	if (WCOREDUMP(status)) {
-		/* Force a report on all core dumping processes */
-		didcoredump=1;
-		doreport=1;
-	}
-#endif
 	switch(level) {
 		case PT_LOGVERBOSE:	doreport=1;
 					break;
@@ -136,6 +129,13 @@ ReportProcHasDied(int pid, int status)
 	if (!LoggingIsEnabled) {
 		doreport = 0;
 	}
+#ifdef WCOREDUMP
+	if (WCOREDUMP(status)) {
+		/* Force a report on all core dumping processes */
+		didcoredump=1;
+		doreport=1;
+	}
+#endif
 	if (DEBUGPROCTRACK && !doreport) {
 		doreport = 1;
 		debugreporting = 1;
