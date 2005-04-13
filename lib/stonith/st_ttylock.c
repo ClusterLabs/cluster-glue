@@ -1,4 +1,4 @@
-/* $Id: ttylock.c,v 1.2 2005/01/05 06:54:27 alan Exp $ */
+/* $Id: st_ttylock.c,v 1.1 2005/04/13 23:21:47 alan Exp $ */
 #include <portability.h>
 
 #include <stdio.h>
@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <clplumbing/cl_signal.h>
-#include <clplumbing/ttylock.h>
+#include <stonith/st_ttylock.h>
 
 #ifndef TTY_LOCK_D
 #	define TTY_LOCK_D	"/var/lock"
@@ -80,7 +80,7 @@ raw_device (const char *serial_device, char *dest_name, size_t size)
 }
 
 int
-ttylock(const char *serial_device)
+st_ttylock(const char *serial_device)
 {
 	char rawname[64];
 
@@ -97,7 +97,7 @@ ttylock(const char *serial_device)
  */ 
 
 int
-ttyunlock(const char *serial_device)
+st_ttyunlock(const char *serial_device)
 {
 	char rawname[64];
 

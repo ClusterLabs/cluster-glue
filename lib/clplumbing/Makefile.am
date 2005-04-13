@@ -50,7 +50,6 @@ libplumb_la_SOURCES	= 		\
 			proctrack.c	\
 			realtime.c	\
 			timers.c	\
-			ttylock.c	\
 			uids.c
 
 libplumb_la_LIBADD      = $(top_builddir)/replace/libreplace.la

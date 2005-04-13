@@ -1,4 +1,4 @@
-/* $Id: stonith_plugin.h,v 1.5 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: stonith_plugin.h,v 1.6 2005/04/13 23:21:47 alan Exp $ */
 /*
  *	S hoot
  *	T he
@@ -107,6 +107,8 @@ struct StonithImports_s {
 	char **(*StringToHostList)(const char * hlstring);
 	char **(*CopyHostList)(const char ** hlstring);
 	void (*FreeHostList)(char** hostlist);
+	int (*TtyLock)(const char* tty);
+	int (*TtyUnlock)(const char* tty);
 };
 
 
