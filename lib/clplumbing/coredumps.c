@@ -34,6 +34,8 @@
 #include <clplumbing/cl_malloc.h>
 #include <clplumbing/coredumps.h>
 #include <clplumbing/cl_log.h>
+#include <clplumbing/uids.h>
+#include <clplumbing/cl_signal.h>
 
 static char *	coreroot = NULL;
 
@@ -78,10 +80,10 @@ cl_cdtocoredir(void)
 		errno = errsave;
 		return rc;
 	}
-	pwent = getpwuid(geteuid());
+	pwent = getpwuid(getuid());
 	if (pwent == NULL) {
 		int errsave = errno;
-		cl_perror("Cannot get name for uid [%d]", geteuid());
+		cl_perror("Cannot get name for uid [%d]", getuid());
 		errno = errsave;
 		return -1;
 	}
@@ -93,6 +95,7 @@ cl_cdtocoredir(void)
 	return rc;
 }
 
+static void cl_coredump_signal_handler(int nsig);
 
 /* Enable/disable core dumps for ourselves and our child processes */
 int
@@ -125,5 +128,34 @@ cl_enable_coredumps(int doenable)
 		errno = errsave;
 		return rc;
 	}
+ /*
+  *   SIGQUIT       3       Core    Quit from keyboard
+  *   SIGILL        4       Core    Illegal Instruction
+  *   SIGABRT       6       Core    Abort signal from abort(3)
+  *   SIGFPE        8       Core    Floating point exception
+  *   SIGSEGV      11       Core    Invalid memory reference
+  */
+	if (geteuid() != getuid()) {
+		int coresigs [] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV};
+		int	j;
+
+		for (j=0; j < DIMOF(coresigs); ++j) {
+			cl_set_coredump_signal_handler(coresigs[j]);
+		}
+	}
 	return 0;
+}
+
+static void
+cl_coredump_signal_handler(int nsig)
+{
+	return_to_dropped_privs();
+	CL_SIGNAL(nsig, SIG_DFL);
+	kill(getpid(), nsig);
+}
+
+void
+cl_set_coredump_signal_handler(int nsig)
+{
+	CL_SIGNAL(nsig, cl_coredump_signal_handler);
 }
