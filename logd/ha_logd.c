@@ -662,6 +662,8 @@ main(int argc, char** argv)
 		}
 		
 	}
+	
+	cl_log_set_uselogd(FALSE);
 
 	if (!cfgfile && access(DEFAULT_CFG_FILE, F_OK) == 0) {
 		cfgfile = DEFAULT_CFG_FILE;
