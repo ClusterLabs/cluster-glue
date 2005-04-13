@@ -50,7 +50,7 @@ send_log_msg(gpointer data)
 	char	msgstring[MAXMSGSIZE];
 	int	priority; 
 	static int	dropmsg = 0;
-	int	maxcount = (int) data;
+	long	maxcount = (long) data;
 	IPC_Channel* chan =  get_log_chan();
 	
 	
@@ -91,7 +91,7 @@ int
 main(int argc, char** argv)
 {
 
-	int maxcount;
+	long maxcount;
 	GMainLoop* loop;
 
 	if (argc < 2){
