@@ -1,4 +1,4 @@
-/* $Id: cl_log.h,v 1.15 2005/04/11 19:41:14 gshi Exp $ */
+/* $Id: cl_log.h,v 1.16 2005/04/13 18:04:46 gshi Exp $ */
 #ifndef _CLPLUMBING_CL_LOG_H
 #	define _CLPLUMBING_CL_LOG_H
 #	include <glib.h>
@@ -26,7 +26,8 @@ void		cl_log_set_debugfile(const char * path);
 gboolean	cl_inherit_use_logd(const char*, int);
 int		cl_log_set_logd_channel_source( void (*create_callback)(struct IPC_CHANNEL* chan),
 						GDestroyNotify destroy_callback);
-
+int		cl_log_get_logdtime(void);
+void		cl_log_set_logdtime(int logdintval);
 
 char *		ha_timestamp(TIME_T t);
 void		cl_glib_msg_handler(const gchar *log_domain
