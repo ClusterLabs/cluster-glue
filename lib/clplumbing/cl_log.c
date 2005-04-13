@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.52 2005/04/13 09:10:16 andrew Exp $ */
+/* $Id: cl_log.c,v 1.53 2005/04/13 18:04:47 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -43,7 +43,7 @@
 #define NULLTIME 	0
 #define QUEUE_SATURATION_FUZZ 10
 
-char	log_entity[MAXENTITY];
+static char	log_entity[MAXENTITY];
 static IPC_Channel*	logging_daemon_chan = NULL;
 
 int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
@@ -52,8 +52,8 @@ IPC_Message* ChildLogIPCMessage(int priority, const char *buf, int bstrlen,
 void	FreeChildLogIPCMessage(IPC_Message* msg);
 gboolean send_dropped_message(gboolean use_pri_str, IPC_Channel *chan);
 
-int			use_logging_daemon =  FALSE;
-int			conn_logd_intval = 0;
+static int		use_logging_daemon =  TRUE;
+static int		conn_logd_time = 0;
 static int		cl_log_facility = LOG_USER;
 static const char *	cl_log_entity = DFLT_ENTITY;
 
@@ -62,7 +62,7 @@ static int		syslog_enabled = 0;
 static int		stderr_enabled = 0;
 static const char*	logfile_name = NULL;
 static const char*	debugfile_name = NULL;
-int cl_process_pid = -1;
+static int cl_process_pid = -1;
 static GDestroyNotify destroy_logging_channel_callback;
 static void (*create_logging_channel_callback)(IPC_Channel* chan);
 
@@ -95,6 +95,20 @@ cl_log_get_uselogd(void)
 	return	use_logging_daemon;
 }
 
+
+int
+cl_log_get_logdtime(void)
+{
+	return conn_logd_time;
+	
+}
+
+void
+cl_log_set_logdtime(int logdtime)
+{	
+	conn_logd_time = logdtime;	
+	return;
+}
 
 static int
 cl_str_to_boolean(const char * s, int * ret)
@@ -625,7 +639,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 	static longclock_t	nexttime = 0;
 	IPC_Message*		msg;
 	int			sendrc = IPC_FAIL;
-	int			intval = conn_logd_intval;
+	int			intval = conn_logd_time;
 	
 	if (chan == NULL) {
 		longclock_t	lnow = time_longclock();
