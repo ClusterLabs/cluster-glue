@@ -1,4 +1,4 @@
-/* $Id: expect.c,v 1.18 2005/03/29 22:17:08 alan Exp $ */
+/* $Id: expect.c,v 1.19 2005/04/13 23:21:47 alan Exp $ */
 /*
  * Simple expect module for the STONITH library
  *
@@ -43,6 +43,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <stonith/st_ttylock.h>
 #define ENABLE_PIL_DEFS_PRIVATE
 #include <pils/plugin.h>
 
@@ -502,4 +503,6 @@ StonithImports		stonithimports = {
 	StringToHostList,
 	stonith_copy_hostlist,
 	stonith_free_hostlist,
+	st_ttylock,
+	st_ttyunlock
 };

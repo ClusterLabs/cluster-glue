@@ -45,5 +45,4 @@ include_HEADERS	= 		\
 	realtime.h	\
 	recoverymgr_cs.h \
 	timers.h	\
-	ttylock.h	\
 	uids.h
