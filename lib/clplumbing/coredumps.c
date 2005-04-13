@@ -128,6 +128,9 @@ cl_enable_coredumps(int doenable)
 		errno = errsave;
 		return rc;
 	}
+	return 0;
+}
+
  /*
   *   SIGQUIT       3       Core    Quit from keyboard
   *   SIGILL        4       Core    Illegal Instruction
@@ -135,21 +138,20 @@ cl_enable_coredumps(int doenable)
   *   SIGFPE        8       Core    Floating point exception
   *   SIGSEGV      11       Core    Invalid memory reference
   */
-	if (geteuid() != getuid()) {
-		int coresigs [] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV};
-		int	j;
+void
+cl_set_all_coredump_signal_handlers()
+{
+	static const int coresigs [] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV};
+	int	j;
 
-		for (j=0; j < DIMOF(coresigs); ++j) {
-			cl_set_coredump_signal_handler(coresigs[j]);
-		}
+	for (j=0; j < DIMOF(coresigs); ++j) {
+		cl_set_coredump_signal_handler(coresigs[j]);
 	}
-	return 0;
 }
-
 static void
 cl_coredump_signal_handler(int nsig)
 {
-	return_to_dropped_privs();
+	return_to_orig_privs();
 	CL_SIGNAL(nsig, SIG_DFL);
 	kill(getpid(), nsig);
 }
