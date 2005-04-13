@@ -29,5 +29,6 @@ int cl_set_corerootdir(const char * dir);
 int cl_cdtocoredir(void);
 	/* Enable/disable core dumps for ourselves and our child processes */
 int cl_enable_coredumps(int truefalse);
+void cl_set_coredump_signal_handler(int nsig);
 
 #endif
