@@ -1,4 +1,4 @@
-/* $Id: apcsmart.c,v 1.24 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: apcsmart.c,v 1.25 2005/04/14 15:33:00 blaschke Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>
@@ -28,14 +28,17 @@
 #include "stonith_plugin_common.h"
 
 /*
- * APCSmart (tested with 2 old 900XLI, and an APC SmartUPS 700)
+ * APCSmart (tested with old 900XLI, APC SmartUPS 700 and SmartUPS-1000)
  *
- * the reset is a combined reset (cmd: S@000).
- * that means if the ups is online, a scheduled reset (20s delay)
- * will be triggered. after the reset the ups will immediately
- * return  online. if the ups is on-battery, the reset will also be
- * a scheduled reset but the ups will remain offline until the power
- * is back. 
+ * The reset is a combined reset: "S" and "@000"
+ * The "S" command tells the ups that if it is on-battery, it should
+ * remain offline until the power is back. 
+ * If that command is not accepted, the "@000" command will be sent
+ * to tell the ups to turn off and back on right away.
+ * In both cases, if the UPS supports a 20 second shutdown grace
+ * period (such as on the 900XLI), the shutdown will delay that long,
+ * otherwise the shutdown will happen immediately (the code searches
+ * for the smallest possible delay).
  */
 
 #define CFG_FILE		"/etc/ha.d/apcsmart.cfg"
@@ -46,8 +49,7 @@
 #define SEND_DELAY		50000	/* in microseconds */
 #define ENDCHAR			10	/* use LF */
 #define MAX_STRING              512
-#define SHUTDOWN_DELAY		"020"
-#define WAKEUP_DELAY		"000"
+#define MAX_DELAY_STRING        16
 #define SWITCH_TO_NEXT_VAL	"-"	/* APC cmd for cycling through
 					 * the values
 					 */
@@ -56,9 +58,10 @@
 #define RSP_SMART_MODE		"SM"
 #define CMD_GET_STATUS		"Q"
 #define RSP_GET_STATUS		NULL
-#define CMD_RESET               "@000"
-#define RSP_RESET		"*"
-#define RSP_RESET2		"OK"
+#define CMD_RESET               "S"	/* turn off & stay off if on battery */
+#define CMD_RESET2              "@000"	/* turn off & immediately turn on */
+#define RSP_RESET		"*"	/* RESET response from older models */
+#define RSP_RESET2		"OK"	/* RESET response from newer models */
 #define	RSP_NA			"NA"
 #define	CMD_READREG1		"~"
 #define CMD_OFF			"Z"
@@ -76,13 +79,15 @@ struct pluginDevice {
 	char *		upsdev;   /*					*/
 	int		upsfd;    /* for serial port			*/
 	int		retries;
+	char		shutdown_delay[MAX_DELAY_STRING];
+	char		old_shutdown_delay[MAX_DELAY_STRING];
+	char		wakeup_delay[MAX_DELAY_STRING];
+	char		old_wakeup_delay[MAX_DELAY_STRING];
 };
 
 /* saving old settings */
 /* FIXME!  These should be part of pluginDevice struct above */
 static struct termios old_tio;
-static char old_shutdown_delay[MAX_STRING];
-static char old_wakeup_delay[MAX_STRING];
 
 static int f_serialtimeout;	/* flag for timeout */
 static const char *pluginid = DEVICE;
@@ -163,8 +168,9 @@ int APC_send_cmd(int upsfd, const char *cmd);
 int APC_recv_rsp(int upsfd, char *rsp);
 int APC_enter_smartmode(int upsfd);
 int APC_set_ups_var(int upsfd, const char *cmd, char *newval);
+int APC_get_smallest_delay(int upsfd, const char *cmd, char *smdelay);
 int APC_init( struct pluginDevice *ad );
-void APC_deinit( int upsfd );
+void APC_deinit( struct pluginDevice *ad );
 
 /*
  *
@@ -495,6 +501,11 @@ APC_set_ups_var(int upsfd, const char *cmd, char *newval)
 			return (rc);
 	}
 
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: var '%s' original val %s"
+		,	__FUNCTION__, cmd, orig);
+	}
+
 	if (strcmp(orig, newval) == 0) {
 		return (S_OK);		/* already set */
 	}
@@ -514,6 +525,11 @@ APC_set_ups_var(int upsfd, const char *cmd, char *newval)
 		}
 
 		if (strcmp(resp, newval) == 0) {
+			if (Debug) {
+				LOG(PIL_DEBUG, "%s: var '%s' set to %s"
+				,	__FUNCTION__, cmd, newval);
+			}
+
 			strcpy(newval, orig);	/* return the old value */
 			return (S_OK);		/* got it */
 		}
@@ -527,6 +543,58 @@ APC_set_ups_var(int upsfd, const char *cmd, char *newval)
 	return (S_OOPS);
 }
 
+/* 
+ * Query the smallest delay supported by the hardware using the 
+ * <cmdchar> '-' (repeat) approach and looping through all possible values,
+ * saving the smallest
+ */
+
+int
+APC_get_smallest_delay(int upsfd, const char *cmd, char *smdelay)
+{
+	char resp[MAX_DELAY_STRING];
+	char orig[MAX_DELAY_STRING];
+	int delay, smallest;
+	int rc;
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
+
+	if (((rc = APC_enter_smartmode(upsfd)) != S_OK)
+	||	((rc = APC_send_cmd(upsfd, cmd)) != S_OK)
+	||	((rc = APC_recv_rsp(upsfd, orig)) != S_OK)) {
+			return (rc);
+	}
+
+	smallest = atoi(orig);
+	strcpy(smdelay, orig);
+
+	*resp = '\0';
+
+	/* search for smallest delay; need to loop through all possible
+	 * values so that we leave delay the way we found it */
+	while (strcmp(resp, orig) != 0) {
+		if (((rc = APC_send_cmd(upsfd, SWITCH_TO_NEXT_VAL)) != S_OK)
+		||	((rc = APC_recv_rsp(upsfd, resp)) != S_OK)) {
+	    			return (rc);
+		}
+
+		if (((rc = APC_enter_smartmode(upsfd)) != S_OK)
+		||	((rc = APC_send_cmd(upsfd, cmd)) != S_OK)
+		||	((rc = APC_recv_rsp(upsfd, resp)) != S_OK)) {
+	    			return (rc);
+		}
+
+		if ((delay = atoi(resp)) < smallest) {
+			smallest = delay;
+			strcpy(smdelay, resp);
+		}
+	}
+
+	return (S_OK);
+}
+
 /*
  * Initialize the ups
  */
@@ -535,15 +603,20 @@ int
 APC_init(struct pluginDevice *ad)
 {
 	int upsfd;
-	char value[MAX_STRING];
+	char value[MAX_DELAY_STRING];
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 	}
 
-	/* if ad->upsfd == -1 -> dev configured! */
-	if(ad->upsfd >= 0 ) {
-		 return S_OK;
+	/* if ad->upsfd != -1 device has already been configured. */
+	/* Just enter smart mode again because otherwise a SmartUPS-1000 */
+	/*   has been observed to sometimes not respond. */
+	if(ad->upsfd >= 0) {
+		if(APC_enter_smartmode(ad->upsfd) != S_OK) {
+			return(-1);
+		}
+		return( S_OK );
 	}
 
 	/* open serial port and store the fd in ad->upsfd */
@@ -553,21 +626,39 @@ APC_init(struct pluginDevice *ad)
 
 	/* switch into smart mode */
 	if (APC_enter_smartmode(upsfd) != S_OK) {
+		APC_close_serialport(upsfd);
+		return -1;
+	}
+
+	/* get the smallest possible delays for this particular hardware */
+	if (APC_get_smallest_delay(upsfd, CMD_SHUTDOWN_DELAY
+		, ad->shutdown_delay) != S_OK
+	|| APC_get_smallest_delay(upsfd, CMD_WAKEUP_DELAY
+		, ad->wakeup_delay) != S_OK) {
+		LOG(PIL_CRIT, "%s: couldn't get smallest delay\n"
+		,	__FUNCTION__);
+		APC_close_serialport(upsfd);
 		return -1;
 	}
 
 	/* get the old settings and store them */
-	strcpy(value, SHUTDOWN_DELAY);
+	strcpy(value, ad->shutdown_delay);
 	if (APC_set_ups_var(upsfd, CMD_SHUTDOWN_DELAY, value) != S_OK) {
+		LOG(PIL_CRIT, "%s: couldn't set shutdown delay to %s\n"
+		,	__FUNCTION__, ad->shutdown_delay);
+		APC_close_serialport(upsfd);
 		return -1;
 	}
-	strcpy(old_shutdown_delay, value);
-	strcpy(value, WAKEUP_DELAY);
+	strcpy(ad->old_shutdown_delay, value);
+	strcpy(value, ad->wakeup_delay);
 	if (APC_set_ups_var(upsfd, CMD_WAKEUP_DELAY, value) != S_OK) {
-		return (-1);
+		LOG(PIL_CRIT, "%s: couldn't set wakeup delay to %s\n"
+		,	__FUNCTION__, ad->wakeup_delay);
+		APC_close_serialport(upsfd);
+		return -1;
 	}
+	strcpy(ad->old_wakeup_delay, value);
 
-	strcpy(old_wakeup_delay, value);
 	ad->upsfd = upsfd;
 	return S_OK;
 }
@@ -577,15 +668,15 @@ APC_init(struct pluginDevice *ad)
  */
 
 void
-APC_deinit( int upsfd )
+APC_deinit(struct pluginDevice *ad)
 {
-	APC_enter_smartmode( upsfd );
+	APC_enter_smartmode( ad->upsfd );
 
-	APC_set_ups_var(upsfd, CMD_SHUTDOWN_DELAY, old_shutdown_delay);
-	APC_set_ups_var(upsfd, CMD_WAKEUP_DELAY, old_wakeup_delay);
+	APC_set_ups_var(ad->upsfd, CMD_SHUTDOWN_DELAY, ad->old_shutdown_delay);
+	APC_set_ups_var(ad->upsfd, CMD_WAKEUP_DELAY, ad->old_wakeup_delay);
 
 	/* close serial port */
-	APC_close_serialport(upsfd);
+	APC_close_serialport(ad->upsfd);
 }
 static const char**
 apcsmart_get_confignames(StonithPlugin* sp)
@@ -658,13 +749,13 @@ apcsmart_status(StonithPlugin * s)
 
 
 	/* get status */
-	if (((rc = APC_init( ad ) == S_OK)
+	if (((rc = APC_init( ad )) == S_OK)
 	&&	((rc = APC_send_cmd(ad->upsfd, CMD_GET_STATUS)) == S_OK)
-	&&	((rc = APC_recv_rsp(ad->upsfd, resp)) == S_OK))) {
+	&&	((rc = APC_recv_rsp(ad->upsfd, resp)) == S_OK)) {
 		return (S_OK);		/* everything ok. */
 	}
 	if (Debug) {
-		LOG(PIL_DEBUG, "%s: failed.", __FUNCTION__);
+		LOG(PIL_DEBUG, "%s: failed, rc=%d.", __FUNCTION__, rc);
 	}
 	return (rc);
 }
@@ -765,13 +856,26 @@ apcsmart_ReqGenericReset(struct pluginDevice *ad)
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 	}
-	/* enter smartmode, send reset command */
+
+	/* send reset command(s) */
 	if (((rc = APC_init(ad)) == S_OK)
-		&& ((rc = APC_send_cmd(ad->upsfd, CMD_RESET)) == S_OK)
+	&& ((rc = APC_send_cmd(ad->upsfd, CMD_RESET)) == S_OK)) {
+		if (((rc = APC_recv_rsp(ad->upsfd, resp)) == S_OK)
+		&& (strcmp(resp, RSP_RESET) == 0
+		|| strcmp(resp, RSP_RESET2) == 0)) {
+			/* first kind of reset command was accepted */
+		} else if (((rc = APC_send_cmd(ad->upsfd, CMD_RESET2)) == S_OK)
 		&& ((rc = APC_recv_rsp(ad->upsfd, resp)) == S_OK)
-		&& (	strcmp(resp, RSP_RESET)  == 0
-		||	strcmp(resp, RSP_RESET2) == 0)) {
-		int	maxdelay = atoi(SHUTDOWN_DELAY)+5;
+		&& (strcmp(resp, RSP_RESET) == 0
+		|| strcmp(resp, RSP_RESET2) == 0)) {
+			/* second kind of command was accepted */
+		} else {
+			rc = S_RESETFAIL;
+		}
+	}
+	if (rc == S_OK) {
+		/* we wait grace period + up to 10 seconds after shutdown */
+		int	maxdelay = atoi(ad->shutdown_delay)+10;
 		int	j;
 
 		for (j=0; j < maxdelay; ++j) {
@@ -908,7 +1012,7 @@ apcsmart_destroy(StonithPlugin * s)
     	}
 	VOIDERRIFWRONGDEV(s);
 
-	APC_deinit( ad->upsfd );
+	APC_deinit( ad );
 
 	ad->pluginid = NOTpluginID;
 
