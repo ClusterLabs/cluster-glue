@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.53 2005/04/13 18:04:47 gshi Exp $ */
+/* $Id: cl_log.c,v 1.54 2005/04/14 05:56:44 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -52,7 +52,7 @@ IPC_Message* ChildLogIPCMessage(int priority, const char *buf, int bstrlen,
 void	FreeChildLogIPCMessage(IPC_Message* msg);
 gboolean send_dropped_message(gboolean use_pri_str, IPC_Channel *chan);
 
-static int		use_logging_daemon =  TRUE;
+static int		use_logging_daemon =  FALSE;
 static int		conn_logd_time = 0;
 static int		cl_log_facility = LOG_USER;
 static const char *	cl_log_entity = DFLT_ENTITY;
