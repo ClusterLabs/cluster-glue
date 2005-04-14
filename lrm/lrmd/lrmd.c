@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.79 2005/04/08 07:49:35 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.80 2005/04/14 01:23:11 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -653,7 +653,14 @@ init_start ()
     	}
 #endif
 
+#ifdef RUN_AS_NOBODY
+	/* I commented this out so that andrew can get a core dump for a
+	 * a current bug - so that it can be fixed.  I tried lots of other
+	 * things, then I read the kernel code.  This is the only way.
+	 * FIXME!!  -- Alan R.
+	 */
 	drop_privs(0, 0); /* become "nobody" */
+#endif
 	/*Create the mainloop and run it*/
 	mainloop = g_main_new(FALSE);
 	lrmd_log(LOG_DEBUG, "main: run the loop...");
@@ -2134,6 +2141,12 @@ facility_name_to_value(const char * name)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.80  2005/04/14 01:23:11  alan
+ * Put in a temporary, yucky workaround to help debug a problem which
+ * Andrew has been seeing.  It resulted in a process getting a segfault,
+ * but not dumping any core files.
+ * This fix is temporary.  I filed a bug reminding us to remove it.
+ *
  * Revision 1.79  2005/04/08 07:49:35  sunjd
  * Replace log function with macro to improve the running efficiency.
  * Inherit configurations from environment variables set by heartbeat.
