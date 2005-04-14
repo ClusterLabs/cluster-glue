@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.80 2005/04/14 01:23:11 alan Exp $ */
+/* $Id: lrmd.c,v 1.81 2005/04/14 18:00:38 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -51,6 +51,7 @@
 #include <clplumbing/proctrack.h>
 #include <clplumbing/coredumps.h>
 #include <clplumbing/uids.h>
+#include <clplumbing/Gmain_timeout.h>
 
 #include <ha_msg.h>
 #include <lrm/lrm_api.h>
@@ -76,6 +77,8 @@
         } else { \
                 cl_log(priority, fmt); \
         }
+
+#define	lrmd_nullcheck(p)	((p) ? (p) : "<null>")
 
 typedef struct
 {
@@ -441,7 +444,7 @@ sigterm_action(int nsig)
 	CL_SIGNAL(nsig, sigterm_action);
 	shutdown_in_progress = TRUE;		
 	if (can_shutdown()) {
-		 g_timeout_add(1, lrm_shutdown, NULL);
+		 Gmain_timeout_add(1, lrm_shutdown, NULL);
 	}
 }
 
@@ -848,6 +851,9 @@ on_timeout_op_done(gpointer data)
 {
 	lrmd_op_t* op = NULL;
 	lrmd_rsc_t* rsc = NULL;
+	int timeout = 0;
+	const char * op_type = ha_msg_value(op->msg, F_LRM_OP);
+	
 
 	op = (lrmd_op_t*)data;
 	if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_TIMEOUT)) {
@@ -856,6 +862,15 @@ on_timeout_op_done(gpointer data)
 	}
 
 	rsc = op->rsc;
+	lrmd_log(LOG_WARNING
+	,	"TIMEOUT for resource operation [%s] for client pid %d on"
+	" [%s] resource [%s]. [%d ms]"
+	,	lrmd_nullcheck(op_type)
+	,	op->client_id
+	,	lrmd_nullcheck(rsc->type)
+	,	lrmd_nullcheck(rsc->id)
+	,	timeout);
+
 	on_op_done(op);
 	perform_op(rsc);
 
@@ -883,7 +898,7 @@ on_repeat_op_done(gpointer data)
 		return FALSE;
 	}
 	if (0 < timeout ) {
-		op->timeout_tag = g_timeout_add(timeout,
+		op->timeout_tag = Gmain_timeout_add(timeout,
 			on_timeout_op_done, op);
 	}
 
@@ -1403,7 +1418,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			lrmd_log(LOG_ERR,
 				"on_msg_perform_op: can not get timeout.");
 		} else if (0 < timeout ) {
-			op->timeout_tag = g_timeout_add(timeout,
+			op->timeout_tag = Gmain_timeout_add(timeout,
 						on_timeout_op_done, op);
 		}
 		
@@ -1619,7 +1634,7 @@ on_op_done(lrmd_op_t* op)
 	}
 	if ( 0!=op->interval && NULL != lookup_client(op->client_id)
 	&&   LRM_OP_CANCELLED != op_status) {
-		op->repeat_timeout_tag = g_timeout_add(op->interval,
+		op->repeat_timeout_tag = Gmain_timeout_add(op->interval,
 					on_repeat_op_done, op);
 		op->rsc->repeat_op_list = g_list_append (op->rsc->repeat_op_list, op);
 	}
@@ -2141,6 +2156,9 @@ facility_name_to_value(const char * name)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.81  2005/04/14 18:00:38  alan
+ * Changed lrmd to use Gmain_timeout_add() instead of g_timeout_add().
+ *
  * Revision 1.80  2005/04/14 01:23:11  alan
  * Put in a temporary, yucky workaround to help debug a problem which
  * Andrew has been seeing.  It resulted in a process getting a segfault,
