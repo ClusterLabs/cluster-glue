@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.31 2005/04/04 09:05:39 andrew Exp $ */
+/* $Id: GSource.c,v 1.32 2005/04/14 18:25:46 gshi Exp $ */
 #include <portability.h>
 #include <string.h>
 
@@ -518,7 +518,10 @@ G_CH_dispatch(GSource * source,
 			return FALSE;
 		}
 	}
-	
+
+	if (chp->ch->ch_status == IPC_DISCONNECT){
+		return FALSE;
+	}
 	return TRUE;
 }
 
