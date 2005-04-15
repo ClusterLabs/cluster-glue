@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.82 2005/04/15 06:37:44 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.83 2005/04/15 07:29:38 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -852,10 +852,11 @@ on_timeout_op_done(gpointer data)
 	lrmd_op_t* op = NULL;
 	lrmd_rsc_t* rsc = NULL;
 	int timeout = 0;
-	const char * op_type = ha_msg_value(op->msg, F_LRM_OP);
+	const char * op_type;
 	
 
 	op = (lrmd_op_t*)data;
+	op_type = ha_msg_value(op->msg, F_LRM_OP);
 	if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_TIMEOUT)) {
 		lrmd_log(LOG_ERR,
 			"on_timeout_op_done: can not add opstatus to msg");
@@ -2165,6 +2166,9 @@ facility_name_to_value(const char * name)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.83  2005/04/15 07:29:38  zhenh
+ * we need assign value to op before we use it. BEAM
+ *
  * Revision 1.82  2005/04/15 06:37:44  sunjd
  * bug 467 LRM Segfault
  *
