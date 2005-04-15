@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.83 2005/04/15 07:29:38 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.84 2005/04/15 08:15:31 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -854,8 +854,16 @@ on_timeout_op_done(gpointer data)
 	int timeout = 0;
 	const char * op_type;
 	
-
 	op = (lrmd_op_t*)data;
+	if (op == NULL) {
+		lrmd_log(LOG_WARNING, "on_timeout_op_done: op==NULL.");
+		return FALSE;
+	}
+	if (op->exec_pid == 0) {
+		lrmd_log(LOG_WARNING, "on_timeout_op_done: op was freed.");
+		return FALSE;
+	}
+
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
 	if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_TIMEOUT)) {
 		lrmd_log(LOG_ERR,
@@ -884,6 +892,15 @@ on_repeat_op_done(gpointer data)
 	int timeout = 0;
 
 	op = (lrmd_op_t*)data;
+	if (op == NULL) {
+		lrmd_log(LOG_WARNING, "on_repeat_op_done: op==NULL.");
+		return FALSE;
+	}
+	if (op->exec_pid == 0) {
+		lrmd_log(LOG_WARNING, "on_repeat_op_done: op was freed.");
+		return FALSE;
+	}
+
 	op->rsc->repeat_op_list = g_list_remove(op->rsc->repeat_op_list, op);
 	g_source_remove(op->repeat_timeout_tag);
 
@@ -1531,6 +1548,15 @@ on_op_done(lrmd_op_t* op)
 	int op_status_int;
 	int need_notify = 0;
 
+	if (op == NULL) {
+		lrmd_log(LOG_WARNING, "on_op_done: op==NULL.");
+		return HA_FAIL;
+	}
+	if (op->exec_pid == 0) {
+		lrmd_log(LOG_WARNING, "on_op_done: op was freed.");
+		return HA_FAIL;
+	}
+
 	/*  we should check if the resource exists. */
 	if (NULL == g_list_find(rsc_list, op->rsc)) {
 		if( op->timeout_tag > 0 ) {
@@ -1650,6 +1676,15 @@ on_op_done(lrmd_op_t* op)
 int
 flush_op(lrmd_op_t* op)
 {
+	if (op == NULL) {
+		lrmd_log(LOG_WARNING, "flush_op: op==NULL.");
+		return HA_FAIL;
+	}
+	if (op->exec_pid == 0) {
+		lrmd_log(LOG_WARNING, "flush_op: op was freed.");
+		return HA_FAIL;
+	}
+
 	if (HA_OK != ha_msg_add_int(op->msg, F_LRM_RC, HA_FAIL)) {
 		lrmd_log(LOG_ERR,"flush_op: can not add rc ");
 		return HA_FAIL;
@@ -1716,6 +1751,15 @@ op_to_msg(lrmd_op_t* op)
 {
 	struct ha_msg* msg = NULL;
 
+	if (op == NULL) {
+		lrmd_log(LOG_WARNING, "op_to_msg: op==NULL.");
+		return HA_FAIL;
+	}
+	if (op->exec_pid == 0) {
+		lrmd_log(LOG_WARNING, "op_to_msg: op was freed.");
+		return HA_FAIL;
+	}
+
 	msg = ha_msg_copy(op->msg);
 	if (NULL == msg) {
 		lrmd_log(LOG_ERR,"op_to_msg: can not copy the msg");
@@ -1744,6 +1788,16 @@ perform_ra_op(lrmd_op_t* op)
 	if ( pipe(fd) < 0 ) {
 		lrmd_log(LOG_ERR,"pipe create error.");
 	}
+
+	if (op == NULL) {
+		lrmd_log(LOG_WARNING, "perform_ra_op: op==NULL.");
+		return HA_FAIL;
+	}
+	if (op->exec_pid == 0) {
+		lrmd_log(LOG_WARNING, "perform_ra_op: op was freed.");
+		return HA_FAIL;
+	}
+
 	op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
 	params = merge_str_tables(op->rsc->params,op_params);
 	free_str_table(op_params);
@@ -1867,6 +1921,15 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
         int ret;
 
 	op = p->privatedata;
+	if (op == NULL) {
+		lrmd_log(LOG_WARNING, "on_ra_proc_finished: op==NULL.");
+		return;
+	}
+	if (op->exec_pid == 0) {
+		lrmd_log(LOG_WARNING, "on_ra_proc_finished:: op was freed.");
+		return;
+	}
+
 	op->exec_pid = -1;
 	if (9 == signo) {
 		free_op(op);
@@ -1943,7 +2006,7 @@ on_ra_proc_query_name(ProcTrack* p)
 
 	op = (lrmd_op_t*)(p->privatedata);
 	lrmd_log(LOG_DEBUG, "on_ra_proc_query_name: op address: %p", op);
-	if (NULL == op || op->exec_pid==-1) {
+	if (NULL == op || op->exec_pid == 0) {
 		return "*unknown*";
 	}
 
@@ -2057,12 +2120,21 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 void
 free_op(lrmd_op_t* op)
 {
+	if (op == NULL) {
+		return;
+	}
+	
+	if ( 0 == op->exec_pid ) {
+		lrmd_log(LOG_DEBUG, "free_op: donnot need to free a "
+			"freed struct.");
+		lrmd_log(LOG_DEBUG, "free_op: op->msg address: %p", op->msg);
+		return;
+	}
+
 	if (-1 != op->exec_pid ) {
 		return_to_orig_privs();	
 		kill(op->exec_pid, 9);
 		return_to_dropped_privs();
-		op->exec_pid = -1;
-	} else {
 		return;
 	}
 
@@ -2078,6 +2150,7 @@ free_op(lrmd_op_t* op)
 
 	ha_msg_del(op->msg);
 	op->msg = NULL;
+	op->exec_pid = 0;
 	g_free(op);
 	lrmd_log(LOG_DEBUG, "free_op: op address: %p", op);
 }
@@ -2166,6 +2239,9 @@ facility_name_to_value(const char * name)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.84  2005/04/15 08:15:31  sunjd
+ * bug 467 LRM Segfault
+ *
  * Revision 1.83  2005/04/15 07:29:38  zhenh
  * we need assign value to op before we use it. BEAM
  *
