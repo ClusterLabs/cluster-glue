@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.81 2005/04/14 18:00:38 alan Exp $ */
+/* $Id: lrmd.c,v 1.82 2005/04/15 06:37:44 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -988,6 +988,7 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 
 		}
 	}
+	lrmd_log(LOG_DEBUG, "on_msg_unregister: end.");
 	return HA_OK;
 }
 
@@ -1940,9 +1941,11 @@ on_ra_proc_query_name(ProcTrack* p)
 	const char* op_type = NULL;
 
 	op = (lrmd_op_t*)(p->privatedata);
-	if (NULL == op) {
+	lrmd_log(LOG_DEBUG, "on_ra_proc_query_name: op address: %p", op);
+	if (NULL == op || op->exec_pid==-1) {
 		return "*unknown*";
 	}
+
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
 
 	snprintf(proc_name, MAX_PROC_NAME, "%s:%s", op->rsc->id, op_type);
@@ -2057,19 +2060,25 @@ free_op(lrmd_op_t* op)
 		return_to_orig_privs();	
 		kill(op->exec_pid, 9);
 		return_to_dropped_privs();
+		op->exec_pid = -1;
+	} else {
 		return;
 	}
 
 	if (-1 != (int)op->repeat_timeout_tag) {
 		g_source_remove(op->repeat_timeout_tag);
+		op->repeat_timeout_tag = -1;
 	}
 
 	if (-1 != (int)op->timeout_tag) {
 		g_source_remove(op->timeout_tag);
+		op->timeout_tag = -1;
 	}
 
 	ha_msg_del(op->msg);
+	op->msg = NULL;
 	g_free(op);
+	lrmd_log(LOG_DEBUG, "free_op: op address: %p", op);
 }
 int
 read_pipe(int fd, char ** data)
@@ -2156,6 +2165,9 @@ facility_name_to_value(const char * name)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.82  2005/04/15 06:37:44  sunjd
+ * bug 467 LRM Segfault
+ *
  * Revision 1.81  2005/04/14 18:00:38  alan
  * Changed lrmd to use Gmain_timeout_add() instead of g_timeout_add().
  *
