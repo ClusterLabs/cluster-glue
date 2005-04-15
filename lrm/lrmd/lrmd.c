@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.84 2005/04/15 08:15:31 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.85 2005/04/15 09:11:30 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1660,15 +1660,26 @@ on_op_done(lrmd_op_t* op)
 	if( op->timeout_tag > 0 ) {
 		g_source_remove(op->timeout_tag);
 	}
+	
 	if ( 0!=op->interval && NULL != lookup_client(op->client_id)
 	&&   LRM_OP_CANCELLED != op_status) {
-		op->repeat_timeout_tag = Gmain_timeout_add(op->interval,
-					on_repeat_op_done, op);
-		op->rsc->repeat_op_list = g_list_append (op->rsc->repeat_op_list, op);
+		lrmd_op_t* repeat_op = g_new(lrmd_op_t, 1);
+		repeat_op->rsc = op->rsc;
+		repeat_op->client_id = op->client_id;
+		repeat_op->call_id = op->call_id;
+		repeat_op->exec_pid = -1;
+		repeat_op->output_fd = -1;
+		repeat_op->timeout_tag = -1;
+		repeat_op->interval = op->interval;
+		repeat_op->msg = ha_msg_copy(op->msg);
+		
+		repeat_op->repeat_timeout_tag = 
+			Gmain_timeout_add(op->interval,	
+					on_repeat_op_done, repeat_op);
+		op->rsc->repeat_op_list = 
+			g_list_append (op->rsc->repeat_op_list, repeat_op);
 	}
-	else {
-		free_op(op);
-	}
+	free_op(op);
 
 	return HA_OK;
 }
@@ -2239,6 +2250,9 @@ facility_name_to_value(const char * name)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.85  2005/04/15 09:11:30  zhenh
+ * fix bug 467, LRM segfault. In the old code, the repeat operations share only one op structure. Now change to every repeat operation has its own op structure.
+ *
  * Revision 1.84  2005/04/15 08:15:31  sunjd
  * bug 467 LRM Segfault
  *
