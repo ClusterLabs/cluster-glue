@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.140 2005/04/10 20:08:01 lars Exp $ */
+/* $Id: ipcsocket.c,v 1.141 2005/04/18 18:03:14 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -144,55 +144,14 @@ struct IPC_Stats {
 struct IPC_Stats	SocketIPCStats = {0,0,0,0};
 
 /* unix domain socket implementations of IPC functions. */
-static int	socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg);
-static void socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn);
-
-static int socket_wait_selectfd(struct IPC_WAIT_CONNECTION *wait_conn);
 
 
-static struct IPC_CHANNEL * socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn, struct IPC_AUTH *auth_info);
-
-static void socket_destroy_channel(struct IPC_CHANNEL * ch);
-
-static int socket_initiate_connection(struct IPC_CHANNEL * ch);
-
-static int socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* message);
-
-static int socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message);
 
 static int socket_resume_io(struct IPC_CHANNEL *ch);
 
-static gboolean socket_is_message_pending(struct IPC_CHANNEL *ch);
-
-static gboolean socket_is_output_pending(struct IPC_CHANNEL *ch);
-
-static int socket_assert_auth(struct IPC_CHANNEL *ch, GHashTable *auth);
-
-static int socket_verify_auth(struct IPC_CHANNEL*ch, struct IPC_AUTH*auth_info);
-
-/* for domain socket, reve_fd = send_fd. */
-
-static int socket_get_recv_fd(struct IPC_CHANNEL *ch);
-
-static int socket_get_send_fd(struct IPC_CHANNEL *ch);
-
-static int socket_set_send_qlen (struct IPC_CHANNEL* ch, int q_len);
-
-static int socket_set_recv_qlen (struct IPC_CHANNEL* ch, int q_len);
-
-
-/* helper functions. */
-
-static int socket_disconnect(struct IPC_CHANNEL* ch);
-
-static struct IPC_QUEUE* socket_queue_new(void);
-
-static void socket_destroy_queue(struct IPC_QUEUE * q);
 
 static struct IPC_MESSAGE* socket_message_new(struct IPC_CHANNEL*ch
 ,	int msg_len);
-
-void socket_free_message(struct IPC_MESSAGE * msg);
 
 struct IPC_WAIT_CONNECTION *socket_wait_conn_new(GHashTable* ch_attrs);
 
@@ -200,54 +159,13 @@ struct IPC_CHANNEL* socket_client_channel_new(GHashTable *attrs);
 
 struct IPC_CHANNEL* socket_server_channel_new(int sockfd);
 
-pid_t socket_get_farside_pid(int sockfd);
+static pid_t socket_get_farside_pid(int sockfd);
 
 extern int (*ipc_pollfunc_ptr)(struct pollfd *, nfds_t, int);
-static int socket_waitin(struct IPC_CHANNEL * ch);
-
-static int socket_waitout(struct IPC_CHANNEL * ch);
 
 static int socket_resume_io_read(struct IPC_CHANNEL *ch, int*, gboolean read1anyway);
-static void socket_set_high_flow_callback(IPC_Channel* ch,
-					  flow_callback_t callback,
-					  void* userdata);
-static void socket_set_low_flow_callback(IPC_Channel* ch,
-					 flow_callback_t callback,
-					 void* userdata);
-static IPC_Message* socket_new_ipcmsg(IPC_Channel* ch, 
-				      const void* data,
-				      int len,
-				      void* private);
+static struct IPC_OPS socket_ops;
 
-static int	socket_get_chan_status(IPC_Channel* ch);
-static gboolean	socket_is_sendq_full(struct IPC_CHANNEL * ch);
-static gboolean	socket_is_recvq_full(struct IPC_CHANNEL * ch);
-
-
-/* socket object of the function table */
-static struct IPC_OPS socket_ops = {
-  socket_destroy_channel,
-  socket_initiate_connection,
-  socket_verify_auth,
-  socket_assert_auth,
-  socket_send,
-  socket_recv,
-  socket_waitin,
-  socket_waitout,
-  socket_is_message_pending,
-  socket_is_output_pending,
-  socket_resume_io,
-  socket_get_send_fd,
-  socket_get_recv_fd,
-  socket_set_send_qlen,
-  socket_set_recv_qlen,
-  socket_set_high_flow_callback,
-  socket_set_low_flow_callback,
-  socket_new_ipcmsg,
-  socket_get_chan_status,
-  socket_is_sendq_full,
-  socket_is_recvq_full,
-};
 
 
 #ifdef IPC_TIME_DEBUG
@@ -664,32 +582,6 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 }
 
 
-static void
-socket_destroy_channel(struct IPC_CHANNEL * ch)
-{
-	if (ch->ch_status == IPC_CONNECT){
-		socket_resume_io(ch);		
-	}
-	socket_disconnect(ch);
-	socket_destroy_queue(ch->send_queue);
-	socket_destroy_queue(ch->recv_queue);
-
-	if (ch->pool){
-		ipc_bufpool_unref(ch->pool);
-	}
-
-	if (ch->ch_private != NULL) {
-		struct SOCKET_CH_PRIVATE *priv = (struct SOCKET_CH_PRIVATE *)
-			ch->ch_private;
-		if(priv->peer_addr != NULL) {
-			unlink(priv->peer_addr->sun_path);
-			g_free((void*)(priv->peer_addr));
-		}
-    		g_free((void*)(ch->ch_private));		
-	}
-	memset(ch, 0xff, sizeof(*ch));
-	g_free((void*)ch);
-}
 
 /* 
  * Called by socket_destory(). Disconnect the connection 
@@ -719,6 +611,54 @@ socket_disconnect(struct IPC_CHANNEL* ch)
 	conn_info->s = -1;
 	ch->ch_status = IPC_DISCONNECT;
 	return IPC_OK;
+}
+
+
+
+/* 
+ * destory a ipc queue and clean all memory space assigned to this queue.
+ * parameters:
+ *      q  (IN) the pointer to the queue which should be destroied.
+ *
+ *	FIXME:  This function does not free up messages that might
+ *	be in the queue.
+ */ 
+
+static void
+socket_destroy_queue(struct IPC_QUEUE * q)
+{
+  g_list_free(q->queue);
+
+  g_free((void *) q);
+}
+
+
+
+static void
+socket_destroy_channel(struct IPC_CHANNEL * ch)
+{
+	if (ch->ch_status == IPC_CONNECT){
+		socket_resume_io(ch);		
+	}
+	socket_disconnect(ch);
+	socket_destroy_queue(ch->send_queue);
+	socket_destroy_queue(ch->recv_queue);
+
+	if (ch->pool){
+		ipc_bufpool_unref(ch->pool);
+	}
+
+	if (ch->ch_private != NULL) {
+		struct SOCKET_CH_PRIVATE *priv = (struct SOCKET_CH_PRIVATE *)
+			ch->ch_private;
+		if(priv->peer_addr != NULL) {
+			unlink(priv->peer_addr->sun_path);
+			g_free((void*)(priv->peer_addr));
+		}
+    		g_free((void*)(ch->ch_private));		
+	}
+	memset(ch, 0xff, sizeof(*ch));
+	g_free((void*)ch);
 }
 
 static int
@@ -1633,23 +1573,6 @@ socket_queue_new(void)
 }
 
 
-/* 
- * destory a ipc queue and clean all memory space assigned to this queue.
- * parameters:
- *      q  (IN) the pointer to the queue which should be destroied.
- *
- *	FIXME:  This function does not free up messages that might
- *	be in the queue.
- */ 
-
-void
-socket_destroy_queue(struct IPC_QUEUE * q)
-{
-  g_list_free(q->queue);
-
-  g_free((void *) q);
-}
-
 
 
 
@@ -1992,6 +1915,31 @@ ipc_channel_pair(IPC_Channel* channels[2])
 	
 }
 
+
+/* brief free the memory space allocated to msg and destroy msg. */
+
+
+static void
+socket_free_message(struct IPC_MESSAGE * msg) {
+	
+#if 0
+	memset(msg->msg_body, 0xff, msg->msg_len);
+#endif
+
+       if (msg->msg_buf){
+               g_free(msg->msg_buf);
+       }else {
+               g_free(msg->msg_body);
+       }
+
+#if 0
+	memset(msg, 0xff, sizeof(*msg));
+#endif
+	g_free((void *)msg);
+}
+
+
+
 /* 
  * create a new ipc message whose msg_body's length is msg_len. 
  * 
@@ -2026,26 +1974,6 @@ socket_message_new(struct IPC_CHANNEL *ch, int msg_len)
 }
 
 
-/* brief free the memory space allocated to msg and destroy msg. */
-
-void
-socket_free_message(struct IPC_MESSAGE * msg) {
-
-#if 0
-	memset(msg->msg_body, 0xff, msg->msg_len);
-#endif
-
-       if (msg->msg_buf){
-               g_free(msg->msg_buf);
-       }else {
-               g_free(msg->msg_body);
-       }
-
-#if 0
-	memset(msg, 0xff, sizeof(*msg));
-#endif
-	g_free((void *)msg);
-}
 
 
 /***********************************************************************
@@ -2451,3 +2379,30 @@ socket_get_farside_pid(int sock)
 	return -1;
 }
 #endif /* Dummy version */
+
+
+
+/* socket object of the function table */
+static struct IPC_OPS socket_ops = {
+	destroy:		socket_destroy_channel,
+	initiate_connection:	socket_initiate_connection,
+	verify_auth:		socket_verify_auth,
+	assert_auth:		socket_assert_auth,
+	send:			socket_send,
+	recv:			socket_recv,
+	waitin:			socket_waitin,
+	waitout:		socket_waitout,
+	is_message_pending:	socket_is_message_pending,
+	is_sending_blocked:	socket_is_output_pending,
+	resume_io:		socket_resume_io,
+	get_send_select_fd:	socket_get_send_fd,
+	get_recv_select_fd:	socket_get_recv_fd,
+	set_send_qlen:		socket_set_send_qlen,
+	set_recv_qlen:		socket_set_recv_qlen,
+	set_high_flow_callback:	socket_set_high_flow_callback,
+	set_low_flow_callback:	socket_set_low_flow_callback,
+	new_ipcmsg:		socket_new_ipcmsg,
+	get_chan_status:	socket_get_chan_status,
+	is_sendq_full:		socket_is_sendq_full,
+	is_recvq_full:		socket_is_recvq_full,
+};
