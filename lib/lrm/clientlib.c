@@ -804,6 +804,9 @@ lrm_rcvmsg (ll_lrm_t* lrm, int blocking)
 		ch_cbk->ops->waitin(ch_cbk);
 	}
 	while (lrm_msgready(lrm)) {
+		if (ch_cbk->ch_status == IPC_DISCONNECT) {
+			return msg_count;
+		}
 		/* get the message */
 		msg = msgfromIPC(ch_cbk, MSG_ALLOWINTR);
 		if (msg == NULL) {
