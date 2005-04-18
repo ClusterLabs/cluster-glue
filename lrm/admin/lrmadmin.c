@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.27 2005/02/28 10:34:36 zhenh Exp $ */
+/* $Id: lrmadmin.c,v 1.28 2005/04/18 09:42:20 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -43,6 +43,8 @@
 #include <lrm/lrm_api.h>
 #include <lrm/raexec.h>
 #include <clplumbing/lsb_exitcodes.h>
+#include <clplumbing/GSource.h>
+#include <clplumbing/Gmain_timeout.h>
 
 const char * optstring = "AD:dEF:d:sg:M:P:c:S:LI:CT:h";
 
@@ -99,6 +101,7 @@ static gboolean QUIT_GETOPT = FALSE;
 static lrmadmin_cmd_t lrmadmin_cmd = NULL_OP;
 static gboolean ASYN_OPS = FALSE; 
 static int call_id = 0;
+static int TIMEOUT = -1; /* the unit is ms */
 
 const char * simple_help_screen =
 "lrmadmin {-d|--deamon}\n"
@@ -143,16 +146,18 @@ static lrm_rsc_t * get_lrm_rsc(ll_lrm_t * lrmd, char * rscid);
 
 static int ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
 static int ra_provider(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
+static gboolean lrmd_output_dispatch(int fd, gpointer user_data);
+static gboolean lrm_op_timeout(gpointer data);
 
 /* the end of the internal used function list */
 
 static void lrm_op_done_callback(lrm_op_t* op);
 
+int ret_value = 0; 
 int main(int argc, char **argv)
 {
 	int option_char;
 	char rscid_arg_tmp[RID_LEN];
-	int ret_value = 0; 
         ll_lrm_t* lrmd;
 	lrm_rsc_t * lrm_rsc;
 	GList 	*raclass_list = 0, 
@@ -477,37 +482,64 @@ int main(int argc, char **argv)
 	}
 
 	if (ASYN_OPS) {
-		printf( "waiting for calling result from the lrmd.\n");
-		lrmd->lrm_ops->rcvmsg(lrmd,TRUE);
+        	G_main_add_fd(G_PRIORITY_LOW, lrmd->lrm_ops->inputfd(lrmd),
+			FALSE, lrmd_output_dispatch, lrmd, NULL);
+		if (TIMEOUT > 0) {
+			Gmain_timeout_add(TIMEOUT, lrm_op_timeout, &ret_value);
+		}
 
+		mainloop = g_main_new(FALSE);
+		printf( "waiting for calling result from the lrmd.\n");
+        	g_main_run(mainloop);
 	}
 
 	lrmd->lrm_ops->signoff(lrmd);
 	return ret_value;
 }
 
+static gboolean
+lrm_op_timeout(gpointer data)
+{
+	printf("This operation is timeout - no result from lrmd.\n");
+
+	(int *)data = -5;
+	g_main_quit(mainloop);
+	return FALSE;
+}
+
+static gboolean 
+lrmd_output_dispatch(int fd, gpointer user_data)
+{
+        ll_lrm_t *lrm = (ll_lrm_t*)user_data;
+        lrm->lrm_ops->rcvmsg(lrm, FALSE);
+
+	g_main_quit(mainloop);
+        return TRUE;
+}
 
 static void
 lrm_op_done_callback(lrm_op_t* op)
 {
 	if (!op) {
 		cl_log(LOG_ERR, "In callback function, op is NULL pointer.");
+		ret_value = -3;
 		return;
 	}
 
 	printf("----------------operation--------------\n");
 	printf("type:%s\n", op->op_type);
-	printf("operation status:%s\n", status_msg[op->op_status-LRM_OP_DONE]);
-	if ( op->op_status==LRM_OP_DONE ) {
-		printf("return code:%d\n", op->rc);
-		printf("output data:\n%s\n", op->output);
+	if ( (0 == STRNCMP_CONST(op->op_type, "status") 
+		|| 0 == STRNCMP_CONST(op->op_type, "monitor")) && (op->rc == 7) ) {
+		printf("operation status:%s\n", status_msg[LRM_OP_DONE]);
+	} else {
+		printf("operation status:%s\n", status_msg[(op->op_status 
+			- LRM_OP_DONE) % DIMOF(status_msg)]);
 	}
+	printf("op_status: %d\n", op->op_status);
+	printf("return code: %d\n", op->rc);
+	printf("output data: \n%s\n", op->output);
 	printf("---------------------------------------\n\n");
-
-	/* Don't need ?
-	 * g_free(op->rsc);  
-	 * g_free(op);
-	 */
+	ret_value = op->op_status;	
 }
 
 static int 
@@ -533,6 +565,10 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 
 	op.op_type = argv[optind+1];
 	op.timeout = atoi(argv[optind+2]);
+
+ 	/* Plus addtional 1s, make here the timeout normally takes place 
+	   after the lrmd's */
+	TIMEOUT = op.timeout + 1000;
 	op.interval = atoi(argv[optind+3]);
 	op.user_data = NULL;
 	op.user_data_len = 0;
@@ -885,6 +921,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.28  2005/04/18 09:42:20  sunjd
+ * have its own timeout watching, now lrmadmin should not be blocked when no result from LRMd
+ *
  * Revision 1.27  2005/02/28 10:34:36  zhenh
  * change the log from LOG_ERR TO LOG_WARNING
  *
