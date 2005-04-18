@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.141 2005/04/18 18:03:14 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.142 2005/04/18 18:24:05 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1069,6 +1069,14 @@ socket_is_recvq_full(struct IPC_CHANNEL * ch)
 }
 
 
+static int
+socket_get_conntype(struct IPC_CHANNEL* ch)
+{
+	return ch->conntype;
+	
+}
+
+
 
 static int 
 socket_assert_auth(struct IPC_CHANNEL *ch, GHashTable *auth)
@@ -1815,7 +1823,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   temp_ch->pool = NULL;
   temp_ch->high_flow_mark = temp_ch->send_queue->max_qlen;
   temp_ch->low_flow_mark = -1;
-  
+  temp_ch->conntype = IPC_CLIENT;
   return temp_ch;
   
 }
@@ -1872,7 +1880,7 @@ socket_server_channel_new(int sockfd){
   temp_ch->pool = NULL;
   temp_ch->high_flow_mark = temp_ch->send_queue->max_qlen;
   temp_ch->low_flow_mark = -1;
-     
+  temp_ch->conntype = IPC_SERVER;
   return temp_ch;
   
 }
@@ -1906,11 +1914,12 @@ ipc_channel_pair(IPC_Channel* channels[2])
 	for (j=0; j < 2; ++j) {
   		struct SOCKET_CH_PRIVATE* p = channels[j]->ch_private;
 		channels[j]->ch_status = IPC_CONNECT;
+		channels[j]->conntype = IPC_PEER;
 		/* Valid, but not terribly meaningful */
 		channels[j]->farside_pid = getpid();
   		strncpy(p->path_name, "[socketpair]", sizeof(p->path_name));
 	}
-
+	
 	return IPC_OK;
 	
 }
@@ -2405,4 +2414,5 @@ static struct IPC_OPS socket_ops = {
 	get_chan_status:	socket_get_chan_status,
 	is_sendq_full:		socket_is_sendq_full,
 	is_recvq_full:		socket_is_recvq_full,
+	get_conntype:		socket_get_conntype,
 };
