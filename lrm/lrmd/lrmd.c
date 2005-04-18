@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.85 2005/04/15 09:11:30 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.86 2005/04/18 01:44:36 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2163,7 +2163,6 @@ free_op(lrmd_op_t* op)
 	op->msg = NULL;
 	op->exec_pid = 0;
 	g_free(op);
-	lrmd_log(LOG_DEBUG, "free_op: op address: %p", op);
 }
 int
 read_pipe(int fd, char ** data)
@@ -2250,6 +2249,9 @@ facility_name_to_value(const char * name)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.86  2005/04/18 01:44:36  zhenh
+ * Fix a BEAM bug.
+ *
  * Revision 1.85  2005/04/15 09:11:30  zhenh
  * fix bug 467, LRM segfault. In the old code, the repeat operations share only one op structure. Now change to every repeat operation has its own op structure.
  *
