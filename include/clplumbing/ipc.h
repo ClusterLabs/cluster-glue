@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.43 2005/04/04 21:06:43 gshi Exp $ */
+/* $Id: ipc.h,v 1.44 2005/04/18 18:25:37 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -57,6 +57,10 @@
 #define IPC_DISCONNECT		3	/* Disconnected, can't read or write*/
 #define IPC_DISC_PENDING	4	/* Disconnected, can't write but    */
 					/* may be more data to read	    */
+
+#define IPC_SERVER		1
+#define IPC_CLIENT		2
+#define IPC_PEER		3
 
 #define IPC_ISRCONN(ch) ((ch)->ch_status == IPC_CONNECT		\
 	||	(ch)->ch_status == IPC_DISC_PENDING)
@@ -172,6 +176,7 @@ struct IPC_CHANNEL{
 	flow_callback_t	high_flow_callback;
 	flow_callback_t	low_flow_callback;
 	
+	int		conntype;
 };
 
 struct IPC_QUEUE{
@@ -573,6 +578,12 @@ struct IPC_OPS{
 	gboolean (*is_recvq_full)(struct IPC_CHANNEL * ch);
 
 
+	/* Get the connection type for the channel
+	 * it can be IPC_SERVER, IPC_CLIENT, IPC_PEER
+	 */
+	
+	int (*get_conntype)(struct IPC_CHANNEL* ch);
+	
 };
 
 
