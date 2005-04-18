@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.28 2005/04/18 09:42:20 sunjd Exp $ */
+/* $Id: lrmadmin.c,v 1.29 2005/04/18 15:47:41 alan Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -500,9 +500,11 @@ int main(int argc, char **argv)
 static gboolean
 lrm_op_timeout(gpointer data)
 {
-	printf("This operation is timeout - no result from lrmd.\n");
+	int *	idata = data;
 
-	(int *)data = -5;
+	printf("ERROR: This operation has timed out - no result from lrmd.\n");
+
+	*idata = -5;
 	g_main_quit(mainloop);
 	return FALSE;
 }
@@ -921,6 +923,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.29  2005/04/18 15:47:41  alan
+ * Fixed a compile error (warning) in lrmadmin.
+ *
  * Revision 1.28  2005/04/18 09:42:20  sunjd
  * have its own timeout watching, now lrmadmin should not be blocked when no result from LRMd
  *
