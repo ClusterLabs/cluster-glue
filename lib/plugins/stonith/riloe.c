@@ -21,7 +21,7 @@
  *
  */
 
-#define	DEVICE	"RILOE STONITH device"
+#define	DEVICE	"Compaq RILOE"
 #include "stonith_plugin_common.h"
 
 #define PIL_PLUGIN              riloe
@@ -91,12 +91,20 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {
 	StonithPlugin	sp;
 	const char *	pluginid;
+	const char *	idinfo;
 	char **		hostlist;
 	int		hostcount;
 };
 
-static const char * pluginid = "pluginDevice-Stonith";
-static const char * NOTriloeID = "Hey, dummy this has been destroyed (RiloeDev)";
+static const char * pluginid = "RiloeDevice-Stonith";
+static const char * NOTriloeID = "Riloe device has been destroyed";
+
+#include "stonith_config_xml.h"
+
+static const char *riloeXML = 
+  XML_PARAMETERS_BEGIN
+    XML_HOSTLIST_PARM
+  XML_PARAMETERS_END;
 
 static int
 riloe_status(StonithPlugin  *s)
@@ -118,10 +126,7 @@ riloe_status(StonithPlugin  *s)
 static char **
 riloe_hostlist(StonithPlugin  *s)
 {
-	int		numnames = 0;
-	char **		ret = NULL;
 	struct pluginDevice*	nd;
-	int		j;
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
@@ -131,47 +136,11 @@ riloe_hostlist(StonithPlugin  *s)
 	nd = (struct pluginDevice*) s;
 	if (nd->hostcount < 0) {
 		LOG(PIL_CRIT
-		,	"unconfigured stonith object in RILOE_list_hosts");
+		,	"unconfigured stonith object in %s", __FUNCTION__);
 		return(NULL);
 	}
-	numnames = nd->hostcount;
 
-	ret = (char **)MALLOC(numnames*sizeof(char*));
-	if (ret == NULL) {
-		LOG(PIL_CRIT, "out of memory");
-		return ret;
-	}
-
-	memset(ret, 0, numnames*sizeof(char*));
-
-	for (j=0; j < numnames-1; ++j) {
-		ret[j] = MALLOC(strlen(nd->hostlist[j])+1);
-		if (ret[j] == NULL) {
-			stonith_free_hostlist(ret);
-			ret = NULL;
-			return ret;
-		}
-		strcpy(ret[j], nd->hostlist[j]);
-	}
-	return(ret);
-}
-
-static int
-WordCount(const char * s)
-{
-	int	wc = 0;
-	if (!s) {
-		return wc;
-	}
-	do {
-		s += strspn(s, WHITESPACE);
-		if (*s)  {
-			++wc;
-			s += strcspn(s, WHITESPACE);
-		}
-	}while (*s);
-
-	return(wc);
+	return OurImports->CopyHostList((const char **)nd->hostlist);
 }
 
 /*
@@ -181,12 +150,6 @@ WordCount(const char * s)
 static int
 RILOE_parse_config_info(struct pluginDevice* nd, const char * info)
 {
-	char **			ret;
-	int			wc;
-	int			numnames;
-	const char *		s = info;
-	int			j;
-
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
@@ -195,33 +158,14 @@ RILOE_parse_config_info(struct pluginDevice* nd, const char * info)
 		return(S_OOPS);
 	}
 
-	wc = WordCount(info);
-	numnames = wc + 1;
-
-	ret = (char **)MALLOC(numnames*sizeof(char*));
-	if (ret == NULL) {
-		LOG(PIL_CRIT, "out of memory");
+	nd->hostlist = OurImports->StringToHostList(info);
+	if (nd->hostlist == NULL) {
+		LOG(PIL_CRIT,"StringToHostList() failed");
 		return S_OOPS;
 	}
-
-	memset(ret, 0, numnames*sizeof(char*));
-
-	for (j=0; j < wc; ++j) {
-		s += strspn(s, WHITESPACE);
-		if (*s)  {
-			const char *	start = s;
-			s += strcspn(s, WHITESPACE);
-			ret[j] = MALLOC((1+(s-start))*sizeof(char));
-			if (ret[j] == NULL) {
-				stonith_free_hostlist(ret);
-				ret = NULL;
-				return S_OOPS;
-			}
-			strncpy(ret[j], start, (s-start));
-		}
+	for (nd->hostcount = 0; nd->hostlist[nd->hostcount]; nd->hostcount++) {
+		/* Just count */
 	}
-	nd->hostlist = ret;
-	nd->hostcount = numnames;
 	return(S_OK);
 }
 
@@ -245,10 +189,10 @@ riloe_reset_req(StonithPlugin * s, int request, const char * host)
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
 	
-	sprintf(cmd, "%s %s reset", RILOE_COMMAND, host);
+	snprintf(cmd, sizeof(cmd), "%s %s reset", RILOE_COMMAND, host);
 	
 	if (Debug) {
-		LOG(PIL_DEBUG, "command %s  will be execute", cmd);
+		LOG(PIL_DEBUG, "command %s will be executed", cmd);
 	}
 
 	if (system(cmd) == 0)
@@ -266,9 +210,12 @@ riloe_reset_req(StonithPlugin * s, int request, const char * host)
 static int
 riloe_set_config(StonithPlugin* s, StonithNVpair *list)
 {
-	const char*	RILOEline;
-
+	StonithNamesToGet	namestocopy [] =
+	{	{ST_HOSTLIST,	NULL}
+	,	{NULL,		NULL}
+	};
 	struct pluginDevice*	nd;
+	int rc;
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
@@ -277,11 +224,13 @@ riloe_set_config(StonithPlugin* s, StonithNVpair *list)
 	ERRIFWRONGDEV(s,S_OOPS);
 	nd = (struct pluginDevice*) s;
 	
-	if ((RILOEline = OurImports->GetValue(list, ST_HOSTLIST)) == NULL) {
-		return S_OOPS;
+	if ((rc = OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
+		return rc;
 	}
 	
-	return (RILOE_parse_config_info(nd , RILOEline));
+	rc = RILOE_parse_config_info(nd , namestocopy[0].s_value);
+	FREE(namestocopy[0].s_value);
+	return rc;
 }
 
 /*
@@ -307,7 +256,7 @@ static const char *
 riloe_getinfo(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* nd;
-	char *		ret;
+	const char * ret;
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
@@ -321,13 +270,18 @@ riloe_getinfo(StonithPlugin * s, int reqtype)
 
 	switch (reqtype) {
 		case ST_DEVICEID:
-			ret = _("riloe STONITH device");
+			ret = nd->idinfo;
 			break;
 		case ST_DEVICEDESCR:
-			ret = _("Compaq RILOE STONITH device\n"
-			"Very early version!");
+			ret = "Compaq RILOE STONITH device\n"
+			"Very early version!";
 			break;
-
+		case ST_DEVICEURL:
+			ret = "http://www.hp.com/";
+			break;
+		case ST_CONF_XML:		/* XML metadata */
+			ret = riloeXML;
+			break;
 		default:
 			ret = NULL;
 			break;
@@ -377,6 +331,7 @@ riloe_new(const char *subplugin)
 	nd->pluginid = pluginid;
 	nd->hostlist = NULL;
 	nd->hostcount = -1;
+	nd->idinfo = DEVICE;
 	nd->sp.s_ops = &riloeOps;
 
 	return &(nd->sp);

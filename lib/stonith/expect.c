@@ -1,4 +1,4 @@
-/* $Id: expect.c,v 1.19 2005/04/13 23:21:47 alan Exp $ */
+/* $Id: expect.c,v 1.20 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * Simple expect module for the STONITH library
  *
@@ -56,10 +56,14 @@
 
 extern 	PILPluginUniv*	StonithPIsys;
 
-#define	LOG(args...) PILCallLog(StonithPIsys->imports->log, args)
+#define	LOG(args...)   PILCallLog(StonithPIsys->imports->log, args)
 #define DEBUG(args...) LOG(PIL_DEBUG, args)
 #undef DEBUG
 #define	DEBUG(args...) PILCallLog(StonithPIsys->imports->log, PIL_DEBUG, args)
+#define MALLOC	       StonithPIsys->imports->alloc
+#define REALLOC	       StonithPIsys->imports->mrealloc
+#define STRDUP         StonithPIsys->imports->mstrdup
+#define FREE(p)	       {StonithPIsys->imports->mfree(p); (p) = NULL;}
 
 /*
  *	Look for ('expect') any of a series of tokens in the input
@@ -313,14 +317,14 @@ stonith_copy_hostlist(const char** hostlist)
 	for (here = hostlist; *here; ++here) {
 		++hlleng;
 	}
-	ret = (char**)malloc(hlleng * sizeof(char *));
+	ret = (char**)MALLOC(hlleng * sizeof(char *));
 	if (ret == NULL) {
 		return ret;
 	}
 	
 	hret = ret;
 	for (here = hostlist; *here; ++here,++hret) {
-		*hret = strdup(*here);
+		*hret = STRDUP(*here);
 		if (*hret == NULL) {
 			stonith_free_hostlist(ret);
 			return NULL; 
@@ -354,7 +358,7 @@ StringToHostList(const char * s)
 
 
 	/* Malloc space for the result string pointers */
-	ret = (char**)malloc((hlleng+1) * sizeof(char *));
+	ret = (char**)MALLOC((hlleng+1) * sizeof(char *));
 	if (ret == NULL) {
 		return NULL;
 	}
@@ -373,7 +377,7 @@ StringToHostList(const char * s)
 		}
 		/* Compute substring length */
 		slen = strcspn(here, delims);
-		*hret = malloc((slen+1) * sizeof(char));
+		*hret = MALLOC((slen+1) * sizeof(char));
 		if (*hret == NULL) {
 			stonith_free_hostlist(hret);
 			return NULL; 
@@ -404,7 +408,7 @@ GetValue(StonithNVpair* parameters, const char * name)
 }
 
 static int
-GetAllValues(StonithNamesToGet* output, StonithNVpair * input)
+CopyAllValues(StonithNamesToGet* output, StonithNVpair * input)
 {
 	int	j;
 	int	rc;
@@ -416,7 +420,7 @@ GetAllValues(StonithNamesToGet* output, StonithNVpair * input)
 			output[j].s_value = NULL;
 			goto fail;
 		}
-		if ((output[j].s_value = strdup(value)) == NULL) {
+		if ((output[j].s_value = STRDUP(value)) == NULL) {
 			rc = S_OOPS;
 			goto fail;
 		}
@@ -425,8 +429,7 @@ GetAllValues(StonithNamesToGet* output, StonithNVpair * input)
 
 fail:
 	for (j=0; output[j].s_value; ++j) {
-		free(output[j].s_value);
-		output[j].s_value = NULL;
+		FREE(output[j].s_value);
 	}
 	return rc;
 }
@@ -499,7 +502,7 @@ StonithImports		stonithimports = {
 	StartProcess,
 	OpenStreamSocket,
 	GetValue,
-	GetAllValues,
+	CopyAllValues,
 	StringToHostList,
 	stonith_copy_hostlist,
 	stonith_free_hostlist,

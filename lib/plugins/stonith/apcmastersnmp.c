@@ -1,4 +1,4 @@
-/* $Id: apcmastersnmp.c,v 1.20 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: apcmastersnmp.c,v 1.21 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
@@ -21,7 +21,7 @@
  */
 
 /* device ID */
-#define	DEVICE				"APCMasterSNMP-Stonith"
+#define	DEVICE				"APC MasterSwitch (SNMP)"
 
 #include "stonith_plugin_common.h"
 #undef FREE	/* defined by snmp stuff */
@@ -135,21 +135,46 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {
 	StonithPlugin		sp;		/* StonithPlugin object */
 	const char*		pluginid;	/* id of object		*/
+	const char*		idinfo;		/* type of device	*/
 	struct snmp_session*	sptr;		/* != NULL->session created */
 	char *			hostname;	/* masterswitch's hostname  */
 						/* or  ip addr		*/
 	int			port;		/* snmp port		*/
 	char *			community;	/* snmp community (r/w)	*/
 	int			num_outlets;	/* number of outlets	*/
-	int			config;
 };
 
 /* for checking hardware (issue a warning if mismatch) */
 static const char* APC_tested_ident[] = {"AP9606","AP7920","AP_other_well_tested"};
 
 /* constant strings */
-static const char *pluginid = DEVICE;
-static const char *NOTpluginID = "destroyed (APCMasterswitch)";
+static const char *pluginid = "APCMS-SNMP-Stonith";
+static const char *NOTpluginID = "APCMS SNMP device has been destroyed";
+
+#include "stonith_config_xml.h"
+
+#define XML_PORT_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_PORT \
+	XML_PARM_SHORTDESC_END
+
+#define XML_PORT_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	"The port number on which the SNMP server is running on the STONITH device" \
+	XML_PARM_LONGDESC_END
+
+#define XML_PORT_PARM \
+	XML_PARAMETER_BEGIN(ST_PORT, "string") \
+	  XML_PORT_SHORTDESC \
+	  XML_PORT_LONGDESC \
+	XML_PARAMETER_END
+
+static const char *apcmastersnmpXML = 
+  XML_PARAMETERS_BEGIN
+    XML_IPADDR_PARM
+    XML_PORT_PARM
+    XML_COMMUNITY_PARM
+  XML_PARAMETERS_END;
 
 /*
  * own prototypes 
@@ -381,7 +406,7 @@ apcmastersnmp_hostlist(StonithPlugin * s)
     ad = (struct pluginDevice *) s;
 
     /* allocate memory for array of up to NUM_OUTLETS strings */
-    if ((hl = (char **) MALLOC(ad->num_outlets * sizeof(char *))) == NULL) {
+    if ((hl = (char **)MALLOC((ad->num_outlets+1) * sizeof(char *))) == NULL) {
 	LOG(PIL_CRIT, "%s: out of memory.", __FUNCTION__);
 	return (NULL);
     }
@@ -490,8 +515,7 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 		if ((state = APC_read(ad->sptr, objname, ASN_INTEGER)) == NULL) {
 			if (Debug) {
 				LOG(PIL_DEBUG
-				,	"%s: %s %d"
-				,	"cannot read outlet_state for outlet"
+				,	"%s: cannot read outlet_state for outlet %d"
 				,	__FUNCTION__, outlet);
 			}
 			return (S_ACCESS);
@@ -514,9 +538,8 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 		==	NULL) {
 			if (Debug) {
 				LOG(PIL_DEBUG
-				,	"%s: %s."
-		       		,	__FUNCTION__
-				,	"cannot read outlet's reboot duration");
+				,	"%s: cannot read outlet's reboot duration"
+		       		,	__FUNCTION__ );
 			}
 			return (S_ACCESS);
 	        }
@@ -653,7 +676,7 @@ apcmastersnmp_set_config(StonithPlugin * s, StonithNVpair * list)
 	struct pluginDevice* sd = (struct pluginDevice *)s;
 	int	rc;
 	int *	i;
-	StonithNamesToGet	namestoget [] =
+	StonithNamesToGet	namestocopy [] =
 	{	{ST_IPADDR,	NULL}
 	,	{ST_PORT,	NULL}
 	,	{ST_COMMUNITY,	NULL}
@@ -666,12 +689,13 @@ apcmastersnmp_set_config(StonithPlugin * s, StonithNVpair * list)
 		return S_OOPS;
 	}
 
-	if ((rc=OurImports->GetAllValues(namestoget, list)) != S_OK) {
+	if ((rc=OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
 		return rc;
 	}
-	sd->hostname = namestoget[0].s_value;
-	sd->port = atoi(namestoget[1].s_value);
-	sd->community = namestoget[2].s_value;
+	sd->hostname = namestocopy[0].s_value;
+	sd->port = atoi(namestocopy[1].s_value);
+	PluginImports->mfree(namestocopy[1].s_value);
+	sd->community = namestocopy[2].s_value;
 
         /* try to resolve the hostname/ip-address */
 	if (gethostbyname(sd->hostname) != NULL) {
@@ -697,7 +721,6 @@ apcmastersnmp_set_config(StonithPlugin * s, StonithNVpair * list)
 			}
 
 			/* Everything went well */
-			sd->config = TRUE;
 			return (S_OK);
 		}
 		if (Debug) {
@@ -731,16 +754,24 @@ apcmastersnmp_getinfo(StonithPlugin * s, int reqtype)
 
     switch (reqtype) {
 	    case ST_DEVICEID:
-		ret = ad->pluginid;
+		ret = ad->idinfo;
+		break;
+
+	    case ST_DEVICENAME:
+		ret = ad->hostname;
 		break;
 
 	    case ST_DEVICEDESCR:
-		ret = _("APC MasterSwitch (via SNMP)\n"
-			"The APC MasterSwitch can accept multiple simultaneous SNMP clients");
+		ret = "APC MasterSwitch (via SNMP)\n"
+		      "The APC MasterSwitch can accept multiple simultaneous SNMP clients";
 		break;
 
 	    case ST_DEVICEURL:
 		ret = "http://www.apc.com/";
+		break;
+
+	    case ST_CONF_XML:		/* XML metadata */
+		ret = apcmastersnmpXML;
 		break;
 
 	}
@@ -764,7 +795,6 @@ apcmastersnmp_destroy(StonithPlugin * s)
 	ad = (struct pluginDevice *) s;
 
 	ad->pluginid = NOTpluginID;
-	ad->config = FALSE;
 
 	/* release snmp session */
 	if (ad->sptr != NULL) {
@@ -773,12 +803,17 @@ apcmastersnmp_destroy(StonithPlugin * s)
 	}
 
 	/* reset defaults */
-	ad->hostname = NULL;
-	ad->community = NULL;
+	if (ad->hostname != NULL) {
+		PluginImports->mfree(ad->hostname);
+		ad->hostname = NULL;
+	}
+	if (ad->community != NULL) {
+		PluginImports->mfree(ad->community);
+		ad->community = NULL;
+	}
 	ad->num_outlets = 0;
 
 	PluginImports->mfree(ad);
-	/* Our caller will release the STONITH object itself */
 }
 
 /*
@@ -807,7 +842,7 @@ apcmastersnmp_new(const char *subplugin)
 	ad->sptr = NULL;
 	ad->hostname = NULL;
 	ad->community = NULL;
-	ad->num_outlets = 0;
+	ad->idinfo = DEVICE;
 	ad->sp.s_ops = &apcmastersnmpOps;
 
 	/* return the object */

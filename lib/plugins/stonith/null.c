@@ -1,4 +1,4 @@
-/* $Id: null.c,v 1.18 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: null.c,v 1.19 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * Stonith module for NULL Stonith device
  *
@@ -32,6 +32,7 @@
 struct pluginDevice {
 	StonithPlugin	sp;
 	const char *	pluginid;
+	const char *	idinfo;
 	char **		hostlist;
 	int		hostcount;
 };
@@ -95,8 +96,15 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  */
 
 
-static const char * pluginid = "pluginDevice-Stonith";
-static const char * NOTpluginID = "Hey, dummy this has been destroyed (NullDev)";
+static const char * pluginid = "nullDevice-Stonith";
+static const char * NOTpluginID = "Null device has been destroyed";
+
+#include "stonith_config_xml.h"
+
+static const char *nullXML = 
+  XML_PARAMETERS_BEGIN
+    XML_HOSTLIST_PARM
+  XML_PARAMETERS_END;
 
 static int
 null_status(StonithPlugin  *s)
@@ -134,7 +142,7 @@ null_reset_req(StonithPlugin * s, int request, const char * host)
 	/* Real devices need to pay attention to the "request" */
 	/* (but we don't care ;-)) */
 
-	LOG(PIL_INFO,"%s: %s",  _("Host null-reset"), host);
+	LOG(PIL_INFO, "Host null-reset: %s", host);
 	return S_OK;
 }
 
@@ -154,15 +162,19 @@ static int
 null_set_config(StonithPlugin* s, StonithNVpair* list)
 {
 	struct pluginDevice* nd = (struct pluginDevice*) s;
-	const char *	hlist;
+	StonithNamesToGet	namestocopy [] =
+	{	{ST_HOSTLIST,	NULL}
+	,	{NULL,		NULL}
+	};
+	int rc;
 
 	ERRIFWRONGDEV(s, S_OOPS);
 
-	if ((hlist = OurImports->GetValue(list, ST_HOSTLIST)) == NULL) {
-		LOG(PIL_CRIT,"GetValue(ST_HOSTLIST) failed");
-		return S_BADCONFIG;
+	if ((rc=OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
+		return rc;
 	}
-	nd->hostlist = OurImports->StringToHostList(hlist);
+	nd->hostlist = OurImports->StringToHostList(namestocopy[0].s_value);
+	FREE(namestocopy[0].s_value);
 	if (nd->hostlist == NULL) {
 		LOG(PIL_CRIT,"StringToHostList() failed");
 		return S_OOPS;
@@ -177,18 +189,27 @@ null_set_config(StonithPlugin* s, StonithNVpair* list)
 static const char *
 null_getinfo(StonithPlugin * s, int reqtype)
 {
+	struct pluginDevice* nd = (struct pluginDevice*) s;
 	const char *		ret;
 
 	ERRIFWRONGDEV(s, NULL);
 
 	switch (reqtype) {
 		case ST_DEVICEID:
-			ret = "null STONITH device";
+			ret = nd->idinfo;
+			break;
+	
+		case ST_DEVICENAME:
+			ret = "(nil)";
 			break;
 
 		case ST_DEVICEDESCR:
 			ret = "Dummy (do-nothing) STONITH device\n"
 			"FOR TESTING ONLY!";
+			break;
+
+		case ST_CONF_XML:		/* XML metadata */
+			ret = nullXML;
 			break;
 
 		default:
@@ -232,6 +253,7 @@ null_new(const char *subplugin)
 	}
 	memset(nd, 0, sizeof(*nd));
 	nd->pluginid = pluginid;
+	nd->idinfo = DEVICE;
 	nd->sp.s_ops = &nullOps;
 	return (StonithPlugin *)nd;
 }

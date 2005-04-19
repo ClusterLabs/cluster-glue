@@ -1,4 +1,4 @@
-/* $Id: ipmilan.c,v 1.14 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: ipmilan.c,v 1.15 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
@@ -26,11 +26,11 @@
 
 
 /*
- * See RADEME.ipmi for information regarding this plugin.
+ * See README.ipmi for information regarding this plugin.
  *
  */
 
-#define	DEVICE	"ipmilan STONITH device"
+#define	DEVICE	"IPMI Over LAN"
 
 #include "stonith_plugin_common.h"
 
@@ -108,17 +108,95 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {
 	StonithPlugin   sp;
 	const char *	pluginid;
+	const char *	idinfo;
 	int		hostcount;
 	struct ipmilanHostInfo * 	hostlist;
 };
 
-static const char * pluginid = "pluginDevice-Stonith";
-static const char * NOTpluginid = "Hey, dummy this has been destroyed (ipmilanDev)";
+static const char * pluginid = "IPMI-LANDevice-Stonith";
+static const char * NOTpluginid = "IPMI-LAN device has been destroyed";
 
 #define ST_HOSTNAME	"hostname"
 #define ST_PORT		"port"
 #define ST_AUTH		"auth"
 #define ST_PRIV		"priv"
+
+#include "stonith_config_xml.h"
+
+#define XML_HOSTNAME_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_HOSTNAME \
+	XML_PARM_SHORTDESC_END
+
+#define XML_HOSTNAME_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	"The hostname of the STONITH device" \
+	XML_PARM_LONGDESC_END
+
+#define XML_HOSTNAME_PARM \
+	XML_PARAMETER_BEGIN(ST_HOSTNAME, "string") \
+	  XML_HOSTNAME_SHORTDESC \
+	  XML_HOSTNAME_LONGDESC \
+	XML_PARAMETER_END
+
+#define XML_PORT_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_PORT \
+	XML_PARM_SHORTDESC_END
+
+#define XML_PORT_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	"The port number to where the IPMI message is sent" \
+	XML_PARM_LONGDESC_END
+
+#define XML_PORT_PARM \
+	XML_PARAMETER_BEGIN(ST_PORT, "string") \
+	  XML_PORT_SHORTDESC \
+	  XML_PORT_LONGDESC \
+	XML_PARAMETER_END
+
+#define XML_AUTH_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_AUTH \
+	XML_PARM_SHORTDESC_END
+
+#define XML_AUTH_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	"The authorization type of the IPMI session (\"none\", \"straight\", \"md2\", or \"md5\")" \
+	XML_PARM_LONGDESC_END
+
+#define XML_AUTH_PARM \
+	XML_PARAMETER_BEGIN(ST_AUTH, "string") \
+	  XML_AUTH_SHORTDESC \
+	  XML_AUTH_LONGDESC \
+	XML_PARAMETER_END
+
+#define XML_PRIV_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_PRIV \
+	XML_PARM_SHORTDESC_END
+
+#define XML_PRIV_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	"The privilege level of the user (\"operator\" or \"admin\")" \
+	XML_PARM_LONGDESC_END
+
+#define XML_PRIV_PARM \
+	XML_PARAMETER_BEGIN(ST_PRIV, "string") \
+	  XML_PRIV_SHORTDESC \
+	  XML_PRIV_LONGDESC \
+	XML_PARAMETER_END
+
+static const char *ipmilanXML = 
+  XML_PARAMETERS_BEGIN
+    XML_HOSTNAME_PARM
+    XML_IPADDR_PARM
+    XML_PORT_PARM
+    XML_AUTH_PARM
+    XML_PRIV_PARM
+    XML_LOGIN_PARM
+    XML_PASSWD_PARM
+  XML_PARAMETERS_END;
 
 /*
  * Check the status of the IPMI Lan STONITH device. 
@@ -152,10 +230,12 @@ ipmilan_status(StonithPlugin  *s)
 	do {
 		ret = send_ipmi_msg(node, ST_IPMI_STATUS);
 		if (ret) {
-			LOG(PIL_INFO, _("Host %s ipmilan status failure."), node->hostname);
+			LOG(PIL_INFO, "Host %s ipmilan status failure."
+			,	node->hostname);
 			ret = S_ACCESS;
 		} else {
-			LOG(PIL_INFO, _("Host %s ipmilan status OK."), node->hostname);
+			LOG(PIL_INFO, "Host %s ipmilan status OK."
+			,	node->hostname);
 		}
 		node = node->next;
 
@@ -267,31 +347,34 @@ ipmilan_reset_req(StonithPlugin * s, int request, const char * host)
 	
 	if ((shost = STRDUP(host)) == NULL) {
 		LOG(PIL_CRIT, "strdup failed in %s", __FUNCTION__);
+		return(S_OOPS);
 	}
 	g_strdown(shost);
 
 	nd = (struct pluginDevice *)s;
 	node = nd->hostlist;
 	do {
-		if (strcmp(node->hostname, host) == 0) {
+		if (strcmp(node->hostname, shost) == 0) {
 			break;
 		};
 
 		node = node->next;
 	} while (node);
 	
-	free(shost);
+	FREE(shost);
 	
 	if (!node) {
-		LOG(PIL_CRIT, _("host %s is not configured in this STONITH module. Please check you configuration file."), host);
+		LOG(PIL_CRIT, "Host %s is not configured in this STONITH "
+		" module. Please check your configuration file.", host);
 		return (S_OOPS);
 	}
 
 	rc = do_ipmi_cmd(node, request);
 	if (!rc) {
-		LOG(PIL_INFO, _("Host %s ipmilan-reset."), host);
+		LOG(PIL_INFO, "Host %s ipmilan-reset.", host);
 	} else {
-		LOG(PIL_INFO, _("Host %s ipmilan-reset error. Error = %d."), host, rc);
+		LOG(PIL_INFO, "Host %s ipmilan-reset error. Error = %d."
+		,	host, rc);
 	}
 	return rc;
 }
@@ -321,7 +404,7 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 	ERRIFWRONGDEV(s,S_OOPS);
 	nd = (struct pluginDevice *)s;
 
-	StonithNamesToGet	namestoget [] =
+	StonithNamesToGet	namestocopy [] =
 	{	{ST_HOSTNAME,	NULL}
 	,	{ST_IPADDR,	NULL}
 	,	{ST_PORT,	NULL}
@@ -337,18 +420,21 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 		return S_OOPS;
 	}
 
-	if ((rc=OurImports->GetAllValues(namestoget, list)) != S_OK) {
+	if ((rc=OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
 		return rc;
 	}
 
 	tmp = MALLOCT(struct ipmilanHostInfo);
-	tmp->hostname = namestoget[0].s_value;
-	tmp->ipaddr   = namestoget[1].s_value;
-	tmp->portnumber = atoi(namestoget[2].s_value);
-	tmp->authtype = atoi(namestoget[3].s_value);
-	tmp->privilege = atoi(namestoget[4].s_value);
-	tmp->username = namestoget[5].s_value;
-	tmp->password = namestoget[6].s_value;
+	tmp->hostname = namestocopy[0].s_value;
+	tmp->ipaddr   = namestocopy[1].s_value;
+	tmp->portnumber = atoi(namestocopy[2].s_value);
+	FREE(namestocopy[2].s_value);
+	tmp->authtype = atoi(namestocopy[3].s_value);
+	FREE(namestocopy[3].s_value);
+	tmp->privilege = atoi(namestocopy[4].s_value);
+	FREE(namestocopy[4].s_value);
+	tmp->username = namestocopy[5].s_value;
+	tmp->password = namestocopy[6].s_value;
 	
 	if (nd->hostlist == NULL ) {
 		nd->hostlist = tmp;
@@ -368,8 +454,8 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 static const char *
 ipmilan_getinfo(StonithPlugin * s, int reqtype)
 {
-	struct pluginDevice* nd;
-	char *		ret;
+	struct pluginDevice *	nd;
+	const char *		ret;
 
 	ERRIFWRONGDEV(s,NULL);
 	/*
@@ -379,11 +465,23 @@ ipmilan_getinfo(StonithPlugin * s, int reqtype)
 
 	switch (reqtype) {
 		case ST_DEVICEID:
-			ret = _("ipmilan STONITH device");
+			ret = nd->idinfo;
+			break;
+
+		case ST_DEVICENAME:
+			ret = nd->hostname;
 			break;
 
 		case ST_DEVICEDESCR:
-			ret = _("IPMI_LAN STONITH device\n");
+			ret = "IPMI LAN STONITH device\n";
+			break;
+
+		case ST_DEVICEURL:
+			ret = "http://www.intel.com/design/servers/ipmi/"
+			break;
+
+		case ST_CONF_XML:		/* XML metadata */
+			ret = ipmilanXML;
 			break;
 
 		default:
@@ -414,6 +512,7 @@ ipmilan_destroy(StonithPlugin *s)
 	if (nd->hostlist) {
 		host = nd->hostlist->prev;
 		for (i = 0; i < nd->hostcount; i++) {
+			struct ipmilanHostInfo * host_prev = host->prev;
 
 			FREE(host->hostname);
 			FREE(host->ipaddr);
@@ -421,7 +520,7 @@ ipmilan_destroy(StonithPlugin *s)
 			FREE(host->password);
 
 			FREE(host);
-			host = host->prev;
+			host = host_prev;
 		}
 	}
 
@@ -443,6 +542,7 @@ ipmilan_new(const char *subplugin)
 	nd->pluginid = pluginid;
 	nd->hostlist = NULL;
 	nd->hostcount = 0; 
+	nd->idinfo = DEVICE;
 	nd->sp.s_ops = &ipmilanOps;
 	return(&(nd->sp));
 }

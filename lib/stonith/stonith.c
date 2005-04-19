@@ -1,4 +1,4 @@
-/* $Id: stonith.c,v 1.19 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: stonith.c,v 1.20 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * Stonith API infrastructure.
  *
@@ -40,9 +40,11 @@
 #include <stonith/stonith_plugin.h>
 
 
-#define	MALLOC(n)	malloc(n)
-#define MALLOCT(t)	(t*)(malloc(sizeof(t)))
-#define FREE(p)		{free(p); (p) = NULL;}
+#define MALLOC		StonithPIsys->imports->alloc
+#define MALLOCT(t)	(t*)(MALLOC(sizeof(t)))
+#define REALLOC		StonithPIsys->imports->mrealloc
+#define STRDUP		StonithPIsys->imports->mstrdup
+#define FREE(p)		{StonithPIsys->imports->mfree(p); (p) = NULL;}
 
 #define	LOG(args...) PILCallLog(StonithPIsys->imports->log, args)
 
@@ -104,7 +106,7 @@ stonith_new(const char * type)
 		return NULL;
 	}
 	
-	if ((typecopy = strdup(type)) == NULL) {
+	if ((typecopy = STRDUP(type)) == NULL) {
 		return NULL;
 	}
 
@@ -123,7 +125,7 @@ stonith_new(const char * type)
 	}else{		/* No.  Try and load it... */
 		if (PILLoadPlugin(StonithPIsys, STONITH_TYPE_S, typecopy, NULL)
 		!=	PIL_OK) {
-			free(typecopy);
+			FREE(typecopy);
 			return NULL;
 		}
 
@@ -133,17 +135,19 @@ stonith_new(const char * type)
 			/* OOPS! didn't find it(!?!)... */
 			PILIncrIFRefCount(StonithPIsys, STONITH_TYPE_S
 			,	typecopy, -1);
-			free(typecopy);
+			FREE(typecopy);
 			return NULL;
 		}
 	}
 
 	if (ops != NULL) {
 		sp = ops->new((const char *)(subplugin));
-		sp->s.stype = strdup(typecopy);
+		if (sp != NULL) {
+			sp->s.stype = STRDUP(typecopy);
+		}
 	}
 
-	free(typecopy);
+	FREE(typecopy);
 	return sp ? (&sp->s) : NULL;
 }
 
@@ -162,69 +166,130 @@ stonith_types(void)
 {
 	int plugincount;
 	static char **	lasttypelist = NULL;
+	char **		newtypelist;
+	int		extplugin = -1;
+
 	if (!init_pluginsys()) {
 		return NULL;
 	}
 
 	if (lasttypelist) {
-		PILFreePluginList(lasttypelist);
-		lasttypelist=NULL;
+		stonith_free_hostlist(lasttypelist);
+		lasttypelist = NULL;
 	}
 
-	lasttypelist = PILListPlugins(StonithPIsys, STONITH_TYPE_S, NULL);
+	newtypelist = PILListPlugins(StonithPIsys, STONITH_TYPE_S, NULL);
+	if (newtypelist == NULL) {
+		return NULL;
+	}
 
-	/* Look for and handle any external plugins */
-	for (plugincount=0; lasttypelist[plugincount] != NULL; ++plugincount) {
-		if (strcmp(lasttypelist[plugincount], EXTPINAME_S) == 0) {
-			Stonith *ext;
-			const char **extPI, **p;
-			int numextPI = 0, i;
-
-			/* external exists, scoot the remaining list up */
-			g_free(lasttypelist[plugincount]);
-			while (lasttypelist[plugincount+1] != NULL) {
-				lasttypelist[plugincount] =
-					lasttypelist[plugincount+1];
-				plugincount++;
-			} 
-			lasttypelist[plugincount+1] = NULL;
-
-			/* let the external plugin return a list */
-			if ((ext = stonith_new(EXTPINAME_S)) == NULL) {
-				LOG(PIL_CRIT, "Cannot create new external "
-					"plugin object");
-				break;
-			}
-
-			if ((extPI = stonith_get_confignames(ext)) != NULL) {
-				for (p = extPI; *p; p++, numextPI++);
-				lasttypelist = g_realloc(lasttypelist,
-				    (plugincount+numextPI+1)*sizeof(char *));
-				lasttypelist[plugincount+numextPI] = NULL;
-				for (i = 0; i < numextPI; i++) {
-					int len = strlen(EXTPINAME_S) + 
-						strlen(extPI[i]) + 2;
-					lasttypelist[plugincount+i] = 
-						g_malloc(len);
-					snprintf(
-						lasttypelist[plugincount+i],
-						len, "%s/%s",
-						EXTPINAME_S, extPI[i]);
-				}
-
-				/* return them in sorted order... */
-				qsort(lasttypelist, plugincount+numextPI,
-					 sizeof(char *), qsort_string_cmp);
-			}else{
-				LOG(PIL_CRIT, "Cannot get external plugin "
-					"subplugins");
-			}
-
-			stonith_delete(ext);
-			break;
+	/* look for 'external' plugin */
+	for (plugincount=0; newtypelist[plugincount] != NULL; ++plugincount) {
+		if (strcmp(newtypelist[plugincount], EXTPINAME_S) == 0) {
+			extplugin = plugincount;
 		}
 	}
 
+	if (extplugin >= 0) {
+		/* 'external' plugin exists, adjust types list by replacing
+		 * 'external' with sorted list of 'external/subplugin' */
+		const char **extPI, **p;
+		int numextPI, i, index;
+		Stonith * ext;
+
+		/* let the external plugin return a list */
+		if ((ext = stonith_new(EXTPINAME_S)) == NULL) {
+			LOG(PIL_CRIT, "Cannot create new external "
+				"plugin object");
+			goto types_exit;
+		}
+		if ((extPI = stonith_get_confignames(ext)) == NULL) {
+			LOG(PIL_CRIT, "Cannot get external plugin subplugins");
+			stonith_delete(ext);
+			goto types_exit;
+		}
+
+		/* count the external plugins */
+		for (numextPI = 0, p = extPI; *p; p++, numextPI++);
+
+		/* sort the external plugins */
+		qsort(extPI, numextPI, sizeof(char *), qsort_string_cmp);
+
+		/* allocate types list (don't need numextPI+plugincount+1
+		 * because 'external' is being removed from list */
+		lasttypelist = (char **)
+			MALLOC((numextPI+plugincount) * sizeof(char *));
+		if (lasttypelist == NULL) {
+			LOG(PIL_CRIT, "Out of memory");
+			stonith_delete(ext);
+			goto types_exit;
+		}
+
+		memset(lasttypelist, 0, (numextPI+plugincount)*sizeof(char *)); 
+
+		/* copy plugins up to but not including 'external' */
+		for (index = 0, i = 0; i < extplugin; index++, i++) {
+			lasttypelist[index] = STRDUP(newtypelist[i]);
+			if (lasttypelist[index] == NULL) {
+				LOG(PIL_CRIT, "Out of memory");
+				stonith_delete(ext);
+				goto types_exit_mem;
+			}
+		}
+
+		/* copy external plugins */
+		for (i = 0; i < numextPI; index++, i++) {
+			int len = strlen(EXTPINAME_S) + 
+				strlen(extPI[i]) + 2;
+			lasttypelist[index] = MALLOC(len * sizeof(char *));
+			if (lasttypelist[index] == NULL) {
+				LOG(PIL_CRIT, "Out of memory");
+				stonith_delete(ext);
+				goto types_exit_mem;
+			}
+			snprintf(lasttypelist[index], len, "%s/%s"
+			,	EXTPINAME_S, extPI[i]);
+		}
+
+		/* copy plugins after 'external' */
+		for (i = extplugin+1; i < plugincount; index++, i++) {
+			lasttypelist[index] = STRDUP(newtypelist[i]);
+			if (lasttypelist[index] == NULL) {
+				LOG(PIL_CRIT, "Out of memory");
+				stonith_delete(ext);
+				goto types_exit_mem;
+			}
+		}
+
+		stonith_delete(ext);
+	}else{
+		/* 'external' plugin doesn't exist, copy types list */
+		char **from, **to;
+
+		lasttypelist = (char**)MALLOC((plugincount+1) * sizeof(char *));
+		if (lasttypelist == NULL) {
+			LOG(PIL_CRIT, "Out of memory");
+			goto types_exit;
+		}
+	
+		for (from = newtypelist, to = lasttypelist
+		; *from
+		; ++from, ++to) {
+			*to = STRDUP(*from);
+			if (*to == NULL) {
+				LOG(PIL_CRIT, "Out of memory");
+				goto types_exit_mem;
+			}
+		}
+		*to = NULL;
+	}
+	goto types_exit;
+
+types_exit_mem:
+	stonith_free_hostlist(lasttypelist);
+	lasttypelist = NULL;
+types_exit:
+	PILFreePluginList(newtypelist);
 	return lasttypelist;
 }
 
@@ -240,7 +305,7 @@ stonith_delete(Stonith *s)
 		sp->s_ops->destroy(sp);
 		PILIncrIFRefCount(StonithPIsys, STONITH_TYPE_S, st, -1);
 		/* destroy should not free it */
-		free(st);
+		FREE(st);
 	}
 }
 
@@ -376,7 +441,7 @@ stonith_req_reset(Stonith* s, int operation, const char* node)
 {
 	StonithPlugin*	sp = (StonithPlugin*)s;
 	if (sp && sp->s_ops && sp->isconfigured) {
-		char*		nodecopy = strdup(node);
+		char*		nodecopy = STRDUP(node);
 		int		rc;
 		if (nodecopy == NULL) {
 			return S_OOPS;
@@ -384,7 +449,7 @@ stonith_req_reset(Stonith* s, int operation, const char* node)
 		g_strdown(nodecopy);
 
 		rc = sp->s_ops->req_reset(sp, operation, node);
-		free(nodecopy);
+		FREE(nodecopy);
 		return rc;
 	}
 	return S_INVAL;
@@ -411,14 +476,14 @@ stonith1_compat_string_to_NVpair(Stonith* s, const char * str)
 	for (n_names=0; config_names[n_names] != NULL; ++n_names) {
 		/* Just count */;
 	}
-	ret = (StonithNVpair*) (malloc((n_names+1)*sizeof(StonithNVpair)));
+	ret = (StonithNVpair*) (MALLOC((n_names+1)*sizeof(StonithNVpair)));
 	if (ret == NULL) {
 		return NULL;
 	}
 	memset(ret, 0, (n_names+1)*sizeof(StonithNVpair));
 	for (j=0; j < n_names; ++j) {
 		size_t	len;
-		if ((ret[j].s_name = strdup(config_names[j])) == NULL) {
+		if ((ret[j].s_name = STRDUP(config_names[j])) == NULL) {
 			goto freeandexit;
 		}
 		ret[j].s_value = NULL;
@@ -431,7 +496,7 @@ stonith1_compat_string_to_NVpair(Stonith* s, const char * str)
 		}else{
 			len = strcspn(str, delims);
 		}
-		if ((ret[j].s_value = malloc((len+1)*sizeof(char))) == NULL) {
+		if ((ret[j].s_value = MALLOC((len+1)*sizeof(char))) == NULL) {
 			goto freeandexit;
 		}
 		memcpy(ret[j].s_value, str, len);
@@ -455,8 +520,8 @@ stonith_walk_ghash(gpointer key, gpointer value, gpointer user_data)
 	StonithNVpair*	u = user_data;
 	
 	if (NVcur <= NVmax && !NVerr) {
-		u[NVcur].s_name = strdup(key);
-		u[NVcur].s_value = strdup(value);
+		u[NVcur].s_name = STRDUP(key);
+		u[NVcur].s_value = STRDUP(value);
 		if (u[NVcur].s_name == NULL || u[NVcur].s_value == NULL) {
 			/* Memory allocation error */
 			NVerr = TRUE;
@@ -475,7 +540,7 @@ stonith_ghash_to_NVpair(GHashTable* stringtable)
 	int		hsize = g_hash_table_size(stringtable);
 	StonithNVpair*	ret;
 
-	if ((ret = (StonithNVpair*)malloc(sizeof(StonithNVpair)*(hsize+1))) == NULL) {
+	if ((ret = (StonithNVpair*)MALLOC(sizeof(StonithNVpair)*(hsize+1))) == NULL) {
 		return NULL;
 	}
 	NVmax = hsize;
@@ -500,10 +565,10 @@ free_NVpair(StonithNVpair* nv)
 		return;
 	}
 	for (this=nv; this->s_name; ++this) {
-		free(this->s_name);
+		FREE(this->s_name);
 		if (this->s_value) {
-			free(this->s_value);
+			FREE(this->s_value);
 		}
 	}
-	free(nv);
+	FREE(nv);
 }

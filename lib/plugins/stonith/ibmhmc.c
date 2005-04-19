@@ -92,7 +92,8 @@
  * and which ones aren't...
  */
 
-#define DEVICE "IBM HMC Device"
+#define DEVICE		"IBM HMC"
+
 #include "stonith_plugin_common.h"
 
 #ifndef	SSH_CMD
@@ -121,7 +122,7 @@
 #define STATE_ON		1
 #define STATE_INVALID		2
 
-#define HMCURL	"http://publib-b.boulder.ibm.com/Redbooks.nsf/RedbookAbstracts"\
+#define HMCURL	"http://publib-b.boulder.ibm.com/redbooks.nsf/RedbookAbstracts"\
 		"/SG247038.html"
 
 static StonithPlugin *	ibmhmc_new(const char *);
@@ -181,6 +182,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {	
 	StonithPlugin		sp;
 	const char *		pluginid;
+	char *			idinfo;
 	char *			hmc;
 	GList*		 	hostlist;
 	int			hmcver;
@@ -188,7 +190,14 @@ struct pluginDevice {
 };
 
 static const char * pluginid = "HMCDevice-Stonith";
-static const char * NOTpluginID = "HMC device has been destroyed";
+static const char * NOTpluginID = "IBM HMC device has been destroyed";
+
+#include "stonith_config_xml.h"
+
+static const char *ibmhmcXML = 
+  XML_PARAMETERS_BEGIN
+    XML_IPADDR_PARM
+  XML_PARAMETERS_END;
 
 static int get_hmc_hostlist(struct pluginDevice* dev);
 static void free_hmc_hostlist(struct pluginDevice* dev);
@@ -265,6 +274,11 @@ ibmhmc_hostlist(StonithPlugin  *s)
 	;	j++, node = g_list_next(node))	{
 		char* host = strchr((char*)node->data, '/');
 		ret[j] = STRDUP(++host);
+		if (ret[j] == NULL) {
+			LOG(PIL_CRIT, "out of memory");
+			stonith_free_hostlist(ret);
+			return NULL;
+		}
 	}
 	return ret;
 }
@@ -557,7 +571,7 @@ static int
 ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 {
 	struct pluginDevice* dev = NULL;
-	StonithNamesToGet	namestoget [] =
+	StonithNamesToGet	namestocopy [] =
 	{	{ST_IPADDR,	NULL}
 	,	{NULL,		NULL}
 	};
@@ -568,6 +582,7 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 	char* output = NULL;
 	int status;
 	const char *mansyspats;
+	int len;
 	
 	ERRIFWRONGDEV(s,S_OOPS);
 
@@ -577,27 +592,28 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 	
 	dev = (struct pluginDevice*) s;
 
-	if ((rc = OurImports->GetAllValues(namestoget, list)) != S_OK) {
+	if ((rc = OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
 		return rc;
 	}
 	if(Debug){
 		LOG(PIL_DEBUG, "%s: ipaddr=%s\n", __FUNCTION__
-		,	namestoget[0].s_value);	
+		,	namestocopy[0].s_value);	
 	}
 
-	if (get_num_tokens(namestoget[0].s_value) == 1) {
+	if (get_num_tokens(namestocopy[0].s_value) == 1) {
 		/* name=value pairs on command line, look for managedsyspat */
 		mansyspats = OurImports->GetValue(list, ST_MANSYSPAT);
 		if (mansyspats != NULL) {
 			if (get_hmc_mansyspats(dev, mansyspats) != S_OK) {
+				FREE(namestocopy[0].s_value);
 				return S_OOPS;
 			}
 		}
 
-		dev->hmc = namestoget[0].s_value;
+		dev->hmc = namestocopy[0].s_value;
 	}else{
 		/* -p or -F option with args "ipaddr [managedsyspat]..." */
-		char *pch = namestoget[0].s_value;
+		char *pch = namestocopy[0].s_value;
 
 		/* skip over ipaddr and null-terminate */
 		pch += strcspn(pch, WHITESPACE);
@@ -610,8 +626,8 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 			return S_OOPS;
 		}
 
-		dev->hmc = STRDUP(namestoget[0].s_value);
-		FREE(namestoget[0].s_value);
+		dev->hmc = STRDUP(namestocopy[0].s_value);
+		FREE(namestocopy[0].s_value);
 	}
 	
 	/* check whether the HMC has ssh command enabled */
@@ -651,6 +667,19 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 		FREE(output);
 		return S_BADCONFIG;
 	}
+
+	len = strlen(output+4) + sizeof(DEVICE) + 1;
+	if (dev->idinfo != NULL) {
+		FREE(dev->idinfo);
+		dev->idinfo = NULL;
+	}
+	dev->idinfo = MALLOC(len * sizeof(char));
+	if (dev->idinfo == NULL) {
+		LOG(PIL_CRIT, "out of memory");
+		FREE(output);
+		return S_OOPS;
+	}
+	snprintf(dev->idinfo, len, "%s %s", DEVICE, output+4);
 	FREE(output);
 
 	if (S_OK != get_hmc_hostlist(dev)){
@@ -675,7 +704,7 @@ ibmhmc_getinfo(StonithPlugin* s, int reqtype)
 
 	switch (reqtype) {
 		case ST_DEVICEID:
-			ret = DEVICE;
+			ret = dev->idinfo;
 			break;
 
 		case ST_DEVICENAME:
@@ -694,6 +723,10 @@ ibmhmc_getinfo(StonithPlugin* s, int reqtype)
 
 		case ST_DEVICEURL:
 			ret = HMCURL;
+			break;
+
+		case ST_CONF_XML:		/* XML metadata */
+			ret = ibmhmcXML;
 			break;
 
 		default:
@@ -726,6 +759,10 @@ ibmhmc_destroy(StonithPlugin *s)
 		FREE(dev->hmc);
 		dev->hmc = NULL;
 	}
+	if (dev->idinfo) {
+		FREE(dev->idinfo);
+		dev->idinfo = NULL;
+	}
 	free_hmc_hostlist(dev);
 	free_hmc_mansyspats(dev);
 	
@@ -754,6 +791,11 @@ ibmhmc_new(const char *subplugin)
 	dev->hostlist = NULL;
 	dev->mansyspats = NULL;
 	dev->hmcver = -1;
+	REPLSTR(dev->idinfo, DEVICE);
+	if (dev->idinfo == NULL) {
+		FREE(dev);
+		return(NULL);
+	}
 	dev->sp.s_ops = &ibmhmcOps;
 
 	if(Debug){
@@ -1022,8 +1064,10 @@ do_shell_cmd(const char* cmd, int* status)
 		}
 	}
 	data = (char*)MALLOC(g_str_tmp->len+1);
-	data[0] = data[g_str_tmp->len] = 0;
-	strncpy(data, g_str_tmp->str, g_str_tmp->len);
+	if (data != NULL) {
+		data[0] = data[g_str_tmp->len] = 0;
+		strncpy(data, g_str_tmp->str, g_str_tmp->len);
+	}
 	g_string_free(g_str_tmp, TRUE);
 
 	*status = pclose(file);

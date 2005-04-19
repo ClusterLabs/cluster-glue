@@ -1,4 +1,4 @@
- /* $Id: cyclades.c,v 1.6 2005/04/06 18:58:42 blaschke Exp $ */
+ /* $Id: cyclades.c,v 1.7 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * Stonith module for Cyclades AlterPath PM
  * Bases off the SSH plugin
@@ -27,7 +27,7 @@
  *
  */
 
-#define	DEVICE	"Cyclades PM"
+#define	DEVICE	"Cyclades AlterPath PM"
 
 #define DOESNT_USE_STONITHSCANLINE
 
@@ -105,6 +105,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {
 	StonithPlugin	sp;
 	const char *	pluginid;
+	const char *	idinfo;
 	char *		device;
 	char *		user;
 
@@ -144,6 +145,14 @@ static const char * NOTpluginID = "Cyclades device has been destroyed";
                                 	return(errno == ETIMEDOUT	\
 	                        ?       S_RESETFAIL : S_OOPS);		\
                         }
+
+#include "stonith_config_xml.h"
+
+static const char *cycladesXML = 
+  XML_PARAMETERS_BEGIN
+    XML_IPADDR_PARM
+    XML_LOGIN_PARM
+  XML_PARAMETERS_END;
 
 static int
 CYCScanLine(struct pluginDevice *sd, int timeout, char * buf, int max)
@@ -307,7 +316,6 @@ cyclades_hostlist(StonithPlugin  *s)
 			if (strstr(locked, "ocked")) {
 				nm = (char *) STRDUP (name);
 				if (!nm) {
-					LOG(PIL_CRIT, "out of memory");
 					goto out_of_memory;
 				}
 				g_strdown(nm);
@@ -323,17 +331,18 @@ cyclades_hostlist(StonithPlugin  *s)
 
 		ret = (char **)MALLOC((numnames+1)*sizeof(char*));
 		if (ret == NULL) {
-			LOG(PIL_CRIT, "out of memory");
 			goto out_of_memory;
 		} else {
 			memcpy(ret, NameList, (numnames+1)*sizeof(char*));
 		}
 		return (ret);
 	}
+	return(ret);
 
 out_of_memory:
+	LOG(PIL_CRIT, "out of memory");
 	for (i=0; i<numnames; i++) {
-		free(NameList[i]);
+		FREE(NameList[i]);
 	}
 
 	return (NULL);
@@ -351,7 +360,7 @@ static int cyclades_onoff(struct pluginDevice *sd, int outlet,
 	memset(cmd, 0, sizeof(cmd));
 	memset(expstring, 0, sizeof(expstring));
 
-	sprintf(cmd, "%s %d", onoff, outlet);
+	snprintf(cmd, sizeof(cmd), "%s %d", onoff, outlet);
 
 	if (CYC_robust_cmd(sd, cmd) != S_OK) {
 		LOG(PIL_CRIT, "can't run %s command", onoff);
@@ -384,7 +393,7 @@ static int cyclades_reset(struct pluginDevice *sd, int outlet,
 	memset(cmd, 0, sizeof(cmd));
 	memset(expstring, 0, sizeof(expstring));
 
-	sprintf(cmd, "%s %d", cycle, outlet);
+	snprintf(cmd, sizeof(cmd), "%s %d", cycle, outlet);
 
 	LOG(PIL_INFO, "Host %s being rebooted.", unitid);
 
@@ -466,7 +475,7 @@ cyclades_set_config(StonithPlugin* s, StonithNVpair* list)
 {
 	struct pluginDevice* sd = (struct pluginDevice *)s;
 	int		rc;
-	StonithNamesToGet	namestoget[] =
+	StonithNamesToGet	namestocopy[] =
 	{	{ST_IPADDR,	NULL}
 	,	{ST_LOGIN,	NULL}
 	,	{ST_SERIALPORT, NULL}
@@ -478,12 +487,13 @@ cyclades_set_config(StonithPlugin* s, StonithNVpair* list)
 		return S_OOPS;
 	}
 
-	if ((rc = OurImports->GetAllValues(namestoget, list)) != S_OK) {
+	if ((rc = OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
 		return rc;
 	}
-	sd->device 	= namestoget[0].s_value;
-	sd->user   	= namestoget[1].s_value;
-	sd->serial_port	= atoi(namestoget[2].s_value);
+	sd->device = namestocopy[0].s_value;
+	sd->user = namestocopy[1].s_value;
+	sd->serial_port	= atoi(namestocopy[2].s_value);
+	FREE(namestocopy[2].s_value);
 
 	return(S_OK);
 }
@@ -501,7 +511,7 @@ cyclades_get_info(StonithPlugin * s, int reqtype)
 	switch (reqtype) {
 		case ST_DEVICEID:		/* What type of device? */
 			/* FIXME: could inform the exact PM model */
-			ret = "Cyclades AlterPath PM";
+			ret = sd->idinfo;
 			break;
 
 		case ST_DEVICENAME:		/* What particular device? */
@@ -515,6 +525,10 @@ cyclades_get_info(StonithPlugin * s, int reqtype)
 
 		case ST_DEVICEURL:		/* Manufacturer's web site */
 			ret = "http://www.cyclades.com/";
+			break;
+
+		case ST_CONF_XML:		/* XML metadata */
+			ret = cycladesXML;
 			break;
 
 		default:
@@ -552,7 +566,7 @@ cyclades_destroy(StonithPlugin *s)
 
 /* Create a new cyclades Stonith device */
 static StonithPlugin *
-cyclades_new(const char *subplugin)
+cyclades_new(const char *plugin)
 {
 	struct pluginDevice*	sd = MALLOCT(struct pluginDevice);
 
@@ -566,6 +580,7 @@ cyclades_new(const char *subplugin)
 	sd->pid = -1;
 	sd->rdfd = -1;
 	sd->wrfd = -1;
+	sd->idinfo = DEVICE;
 	sd->sp.s_ops = &cycladesOps;
 
 	return &(sd->sp);	/* same as sd */

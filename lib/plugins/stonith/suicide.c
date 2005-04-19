@@ -90,10 +90,17 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {
 	StonithPlugin	sp;
 	const char *	pluginid;
+	const char *	idinfo;
 };
 
 static const char * pluginid = "SuicideDevice-Stonith";
 static const char * NOTpluginid = "Suicide device has been destroyed";
+
+#include "stonith_config_xml.h"
+
+static const char *suicideXML = 
+  XML_PARAMETERS_BEGIN
+  XML_PARAMETERS_END;
 
 static int
 suicide_status(StonithPlugin  *s)
@@ -175,12 +182,15 @@ suicide_get_info(StonithPlugin * s, int reqtype)
 
 	switch (reqtype) {
 	case ST_DEVICEID:
-		ret = "Sucide STONITH device";
+		ret = sd->idinfo;
 		break;
 
-
 	case ST_DEVICEDESCR:	/* Description of device type */
-		ret = "Virtaul device to reboot/powerdown itself.\n";
+		ret = "Virtual device to reboot/powerdown itself.\n";
+		break;
+
+	case ST_CONF_XML:		/* XML metadata */
+		ret = suicideXML;
 		break;
 
 	default:
@@ -218,6 +228,7 @@ suicide_new(const char * subplugin)
 	}
 	memset(sd, 0, sizeof(*sd));
 	sd->pluginid = pluginid;
+	sd->idinfo = DEVICE;
 	sd->sp.s_ops = &suicideOps;
 	return &(sd->sp);
 }

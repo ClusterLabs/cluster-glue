@@ -1,4 +1,4 @@
-/* $Id: ssh.c,v 1.23 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: ssh.c,v 1.24 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * Stonith module for SSH Stonith device
  *
@@ -114,12 +114,20 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {
 	StonithPlugin	sp;
 	const char *	pluginid;
+	const char *	idinfo;
 	char **		hostlist;
 	int		hostcount;
 };
 
 static const char * pluginid = "SSHDevice-Stonith";
 static const char * NOTpluginid = "SSH device has been destroyed";
+
+#include "stonith_config_xml.h"
+
+static const char *sshXML = 
+  XML_PARAMETERS_BEGIN
+    XML_HOSTLIST_PARM
+  XML_PARAMETERS_END;
 
 static int
 ssh_status(StonithPlugin  *s)
@@ -137,37 +145,17 @@ ssh_status(StonithPlugin  *s)
 static char **
 ssh_hostlist(StonithPlugin  *s)
 {
-	int		numnames = 0;
-	char **		ret = NULL;
 	struct pluginDevice*	sd;
-	int		j;
 
 	ERRIFWRONGDEV(s, NULL);
 	sd = (struct pluginDevice*) s;
 	if (sd->hostcount < 0) {
 		LOG(PIL_CRIT
-		,	"unconfigured stonith object in SSH_list_hosts");
+		,	"unconfigured stonith object in %s", __FUNCTION__);
 		return(NULL);
 	}
-	numnames = sd->hostcount;
 
-	ret = (char **)malloc((numnames+1)*sizeof(char*));
-	if (ret == NULL) {
-		LOG(PIL_CRIT, "out of memory");
-		return ret;
-	}
-
-	memset(ret, 0, (numnames+1)*sizeof(char*));
-
-	for (j=0; j < numnames; ++j) {
-		ret[j] = strdup(sd->hostlist[j]);
-		if (ret[j] == NULL) {
-			stonith_free_hostlist(ret);
-			ret = NULL;
-			return ret;
-		}
-	}
-	return(ret);
+	return OurImports->CopyHostList((const char **)sd->hostlist);
 }
 
 
@@ -180,7 +168,7 @@ ssh_reset_req(StonithPlugin * s, int request, const char * host)
 	char cmd[4096];
 
 	ERRIFWRONGDEV(s, S_OOPS);
-	LOG(PIL_INFO, "%s: %s", "Initiating ssh-reset on host", host);
+	LOG(PIL_INFO, "Initiating ssh-reset on host: %s", host);
 
 	snprintf(cmd, sizeof(cmd)-1, "%s \"%s\" \"%s\"", SSH_COMMAND
 	,	host, REBOOT_COMMAND);
@@ -215,9 +203,14 @@ ssh_set_config(StonithPlugin* s, StonithNVpair* list)
 		return S_OOPS;
 	}
 	sd->hostlist = OurImports->StringToHostList(hlist);
-	for (sd->hostcount = 0; sd->hostlist[sd->hostcount]
-	;	sd->hostcount++) {
-		/* Just count */
+	if (sd->hostlist == NULL) {
+		LOG(PIL_CRIT, "out of memory");
+		sd->hostcount = 0;
+	}else{
+		for (sd->hostcount = 0; sd->hostlist[sd->hostcount]
+		;	sd->hostcount++) {
+			/* Just count */
+		}
 	}
 	
 	return sd->hostcount ? S_OK : S_OOPS;
@@ -235,6 +228,11 @@ ssh_get_info(StonithPlugin * s, int reqtype)
 
 	switch (reqtype) {
 	case ST_DEVICEID:
+		ret = sd->idinfo;
+		break;
+
+
+	case ST_DEVICENAME:
 		ret = "ssh STONITH device";
 		break;
 
@@ -242,6 +240,16 @@ ssh_get_info(StonithPlugin * s, int reqtype)
 	case ST_DEVICEDESCR:	/* Description of device type */
 		ret = "SSH-based Linux host reset\n"
 		"Fine for testing, but not suitable for production!";
+		break;
+
+
+	case ST_DEVICEURL:
+		ret = "http://openssh.org";
+		break;
+
+
+	case ST_CONF_XML:		/* XML metadata */
+		ret = sshXML;
 		break;
 
 
@@ -287,6 +295,7 @@ ssh_new(const char *subplugin)
 	sd->pluginid = pluginid;
 	sd->hostlist = NULL;
 	sd->hostcount = -1;
+	sd->idinfo = DEVICE;
 	sd->sp.s_ops = &sshOps;
 	return &(sd->sp);
 }
