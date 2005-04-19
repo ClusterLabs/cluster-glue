@@ -86,13 +86,24 @@ on = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "Y"/>',
 
 todo = { 'reset':reset, 'on':on, 'off':off, 'status':status }
 
+xmlinfo = [ '<parameters>',
+          '<parameter name="hostlist" unique="1">',
+          '<content type="string" />',
+          '<shortdesc lang="en">',
+          'Hostlist',
+          '</shortdesc>',
+          '<longdesc lang="en">',
+          'The list of hosts that the STONITH device controls',
+          '</longdesc>',
+          '</parameter>',
+          '</parameters>' ]
 info = {
         'getinfo-devid':	'RILOE',
         'getinfo-devname':	'riloe ' + rihost,
         'getinfo-devdescr':	'COMPAQ RILOE STONITH device',
         'getinfo-devurl':	'http://www.hp.com/',
 	'gethosts':		host,
-        'getinfo-xml':		'<Something XMLish/>'
+        'getinfo-xml':		xmlinfo
 }
 
 try:

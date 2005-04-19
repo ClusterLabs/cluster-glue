@@ -1,4 +1,4 @@
-/* $Id: apcsmart.c,v 1.25 2005/04/14 15:33:00 blaschke Exp $ */
+/* $Id: apcsmart.c,v 1.26 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>
@@ -23,7 +23,7 @@
  *  Significantly mangled by Alan Robertson <alanr@unix.sh>
  */
 
-#define	DEVICE	                "APCSmart-Stonith"
+#define	DEVICE	                "APCSmart"
 
 #include "stonith_plugin_common.h"
 
@@ -74,6 +74,7 @@
 struct pluginDevice {
 	StonithPlugin	sp;
 	const char *	pluginid; /* of object				*/
+	const char *	idinfo;   /* type of device			*/
 	char **		hostlist; /* served by the device (only 1)	*/
 	int		hostcount;/* of hosts (1)			*/
 	char *		upsdev;   /*					*/
@@ -90,8 +91,8 @@ struct pluginDevice {
 static struct termios old_tio;
 
 static int f_serialtimeout;	/* flag for timeout */
-static const char *pluginid = DEVICE;
-static const char *NOTpluginID = "destroyed (APCSmart)";
+static const char *pluginid = "APCSmart-Stonith";
+static const char *NOTpluginID = "APCSmart device has been destroyed";
 
 /*
  * stonith prototypes 
@@ -156,6 +157,14 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 	,	(void*)&OurImports
 	,	&interfprivate); 
 }
+
+#include "stonith_config_xml.h"
+
+static const char *apcsmartXML = 
+  XML_PARAMETERS_BEGIN
+    XML_TTYDEV_PARM
+    XML_HOSTLIST_PARM
+  XML_PARAMETERS_END;
 
 /*
  * own prototypes 
@@ -696,7 +705,7 @@ static int
 apcsmart_set_config(StonithPlugin * s, StonithNVpair* list)
 {
 	struct pluginDevice *	ad = (struct pluginDevice*)s;
-	StonithNamesToGet	namestoget [] =
+	StonithNamesToGet	namestocopy [] =
 	{	{ST_TTYDEV,	NULL}
 	,	{ST_HOSTLIST,	NULL}
 	,	{NULL,		NULL}
@@ -708,11 +717,13 @@ apcsmart_set_config(StonithPlugin * s, StonithNVpair* list)
 	}
 	ERRIFWRONGDEV(s, S_OOPS);
 
-	if ((rc=OurImports->GetAllValues(namestoget, list)) != S_OK) {
+	if ((rc=OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
 		return rc;
 	}
+	ad->upsdev = namestocopy[0].s_value;
+	ad->hostlist =	OurImports->StringToHostList(namestocopy[1].s_value);
+	FREE(namestocopy[1].s_value);
 
-	ad->hostlist =	OurImports->StringToHostList(namestoget[1].s_value);
 	if (ad->hostlist == NULL) {
 		LOG(PIL_CRIT,"StringToHostList() failed");
 		return S_OOPS;
@@ -721,12 +732,11 @@ apcsmart_set_config(StonithPlugin * s, StonithNVpair* list)
 	;	ad->hostcount++) {
 		/* Just count */
 	}
-	if (access(namestoget[0].s_value, R_OK|W_OK|F_OK) < 0) {
-		LOG(PIL_CRIT,"Cannot access tty [%s]"
-		,	namestoget[0].s_value);
+	if (access(ad->upsdev, R_OK|W_OK|F_OK) < 0) {
+		LOG(PIL_CRIT,"Cannot access tty [%s]", ad->upsdev);
 		return S_BADCONFIG;
 	}
-	ad->upsdev = namestoget[0].s_value;
+
 	return ad->hostcount ? S_OK : S_BADCONFIG;
 }
 
@@ -974,7 +984,11 @@ apcsmart_get_info(StonithPlugin * s, int reqtype)
 
 	switch (reqtype) {
     		case ST_DEVICEID:
-		ret = ad->pluginid;
+		ret = ad->idinfo;
+		break;
+
+		case ST_DEVICENAME:
+		ret = ad->upsdev;
 		break;
 
 		case ST_DEVICEDESCR:
@@ -989,6 +1003,10 @@ apcsmart_get_info(StonithPlugin * s, int reqtype)
 
 		case ST_DEVICEURL:
 			ret = "http://www.apc.com/";
+			break;
+
+		case ST_CONF_XML:		/* XML metadata */
+			ret = apcsmartXML;
 			break;
 
 		default:
@@ -1019,6 +1037,10 @@ apcsmart_destroy(StonithPlugin * s)
 	if (ad->hostlist) {
 		stonith_free_hostlist(ad->hostlist);
 		ad->hostlist = NULL;
+	}
+	if (ad->upsdev != NULL) {
+		FREE(ad->upsdev);
+		ad->upsdev = NULL;
 	}
 
 	ad->hostcount = -1;
@@ -1052,6 +1074,7 @@ apcsmart_new(const char *subplugin)
 	ad->hostlist = NULL;
 	ad->hostcount = -1;
 	ad->upsfd = -1;
+	ad->idinfo = DEVICE;
 	ad->sp.s_ops = &apcsmartOps;
 
 	if (Debug) {

@@ -1,4 +1,4 @@
-/* $Id: meatware.c,v 1.17 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: meatware.c,v 1.18 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * Stonith module for Human Operator Stonith device
  *
@@ -46,16 +46,15 @@ static int		meatware_reset_req(StonithPlugin * s, int request, const char * host
 static char **		meatware_hostlist(StonithPlugin  *);
 
 static struct stonith_ops meatwareOps ={
-	meatware_new,			/* Create new STONITH object		*/
-	meatware_destroy,		/* Destroy STONITH object		*/
-	meatware_getinfo,		/* Return STONITH info string		*/
-	meatware_get_confignames,	/* Return STONITH info string		*/
-	meatware_set_config,		/* Get configuration from NVpairs	*/
-	meatware_status,		/* Return STONITH device status		*/
-	meatware_reset_req,		/* Request a reset 			*/
-	meatware_hostlist,		/* Return list of supported hosts 	*/
+	meatware_new,		/* Create new STONITH object		*/
+	meatware_destroy,	/* Destroy STONITH object		*/
+	meatware_getinfo,	/* Return STONITH info string		*/
+	meatware_get_confignames,/* Return STONITH info string		*/
+	meatware_set_config,	/* Get configuration from NVpairs	*/
+	meatware_status,	/* Return STONITH device status		*/
+	meatware_reset_req,	/* Request a reset 			*/
+	meatware_hostlist,	/* Return list of supported hosts 	*/
 };
-static int WordCount(const char * s);
 
 PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
 static const PILPluginImports*  PluginImports;
@@ -96,12 +95,20 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {
 	StonithPlugin   sp;
 	const char *	pluginid;
+	const char *	idinfo;
 	char **		hostlist;
 	int		hostcount;
 };
 
 static const char * pluginid = "MeatwareDevice-Stonith";
-static const char * NOTpluginID = "Hey, dummy this has been destroyed (MeatwareDev)";
+static const char * NOTpluginID = "Meatware device has been destroyed";
+
+#include "stonith_config_xml.h"
+
+static const char *meatwareXML = 
+  XML_PARAMETERS_BEGIN
+    XML_HOSTLIST_PARM
+  XML_PARAMETERS_END;
 
 static int
 meatware_status(StonithPlugin  *s)
@@ -118,10 +125,7 @@ meatware_status(StonithPlugin  *s)
 static char **
 meatware_hostlist(StonithPlugin  *s)
 {
-	int		numnames = 0;
-	char **		ret = NULL;
 	struct pluginDevice*	nd;
-	int		j;
 
 	ERRIFWRONGDEV(s,NULL);
 	nd = (struct pluginDevice*) s;
@@ -130,43 +134,8 @@ meatware_hostlist(StonithPlugin  *s)
 		,	"unconfigured stonith object in Meatware_list_hosts");
 		return(NULL);
 	}
-	numnames = nd->hostcount;
 
-	ret = (char **)MALLOC(numnames*sizeof(char*));
-	if (ret == NULL) {
-		LOG(PIL_CRIT, "out of memory");
-		return ret;
-	}
-
-	memset(ret, 0, numnames*sizeof(char*));
-
-	for (j=0; j < numnames-1; ++j) {
-		ret[j] = STRDUP(nd->hostlist[j]);
-		if (ret[j] == NULL) {
-			stonith_free_hostlist(ret);
-			ret = NULL;
-			return ret;
-		}
-	}
-	return(ret);
-}
-
-static int
-WordCount(const char * s)
-{
-	int	wc = 0;
-	if (!s) {
-		return wc;
-	}
-	do {
-		s += strspn(s, WHITESPACE);
-		if (*s)  {
-			++wc;
-			s += strcspn(s, WHITESPACE);
-		}
-	}while (*s);
-
-	return(wc);
+	return OurImports->CopyHostList((const char **)nd->hostlist);
 }
 
 /*
@@ -176,44 +145,19 @@ WordCount(const char * s)
 static int
 Meat_parse_config_info(struct pluginDevice* nd, const char * info)
 {
-	char **			ret;
-	int			wc;
-	int			numnames;
-	const char *		s = info;
-	int			j;
 	LOG(PIL_INFO , "parse config info info=%s",info);
 	if (nd->hostcount >= 0) {
 		return(S_OOPS);
 	}
 
-	wc = WordCount(info);
-	numnames = wc + 1;
-
-	ret = (char **)MALLOC(numnames*sizeof(char*));
-	if (ret == NULL) {
-		LOG(PIL_CRIT, "out of memory");
+	nd->hostlist = OurImports->StringToHostList(info);
+	if (nd->hostlist == NULL) {
+		LOG(PIL_CRIT,"StringToHostList() failed");
 		return S_OOPS;
 	}
-
-	memset(ret, 0, numnames*sizeof(char*));
-
-	for (j=0; j < wc; ++j) {
-		s += strspn(s, WHITESPACE);
-		if (*s)  {
-			const char *	start = s;
-			s += strcspn(s, WHITESPACE);
-			ret[j] = MALLOC((1+(s-start))*sizeof(char));
-			if (ret[j] == NULL) {
-				stonith_free_hostlist(ret);
-				ret = NULL;
-				return S_OOPS;
-			}
-			strncpy(ret[j], start, (s-start));
-			g_strdown(ret[j]);
-		}
+	for (nd->hostcount = 0; nd->hostlist[nd->hostcount]; nd->hostcount++) {
+		g_strdown(nd->hostlist[nd->hostcount]);
 	}
-	nd->hostlist = ret;
-	nd->hostcount = numnames;
 	return(S_OK);
 }
 
@@ -256,7 +200,7 @@ meatware_reset_req(StonithPlugin * s, int request, const char * host)
 		goto out;
 	}
 
-	LOG(PIL_CRIT, "OPERATOR INTERVENTION REQUIRED to reset %s.", host);
+	LOG(PIL_CRIT, "OPERATOR INTERVENTION REQUIRED to reset %s.", shost);
 	LOG(PIL_CRIT, "Run \"meatclient -c %s\" AFTER power-cycling the "
 	                 "machine.", shost);
 
@@ -292,11 +236,11 @@ meatware_reset_req(StonithPlugin * s, int request, const char * host)
 		goto out;
 	}
 	else {
-		LOG(PIL_INFO, "%s: %s", _("node Meatware-reset."), shost);
+		LOG(PIL_INFO, "node Meatware-reset: %s", shost);
 		unlink(meatpipe);
 		rc = S_OK;
 	}
-out:	free(shost);
+out:	FREE(shost);
 	return rc;
 }
 
@@ -308,17 +252,22 @@ static int
 meatware_set_config(StonithPlugin* s, StonithNVpair *list)
 {
 
-	const char*	hlist;
-
 	struct pluginDevice*	nd;
+	int	rc;
+	StonithNamesToGet	namestocopy [] =
+	{	{ST_HOSTLIST,	NULL}
+	,	{NULL,		NULL}
+	};
 
 	ERRIFWRONGDEV(s,S_OOPS);
 	nd = (struct pluginDevice*) s;
 	
-	if ((hlist = OurImports->GetValue(list, ST_HOSTLIST)) == NULL) {
-		return S_OOPS;
+	if ((rc = OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
+		return rc;
 	}
-	return (Meat_parse_config_info(nd, hlist));
+	rc = Meat_parse_config_info(nd, namestocopy[0].s_value);
+	FREE(namestocopy[0].s_value);
+	return rc;
 }
 
 /*
@@ -338,7 +287,7 @@ static const char *
 meatware_getinfo(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* nd;
-	char *		ret;
+	const char * ret;
 
 	ERRIFWRONGDEV(s,NULL);
 	/*
@@ -348,14 +297,19 @@ meatware_getinfo(StonithPlugin * s, int reqtype)
 
 	switch (reqtype) {
 		case ST_DEVICEID:
-			ret = _("Meatware STONITH device");
+			ret = nd->idinfo;
+			break;
+		case ST_DEVICENAME:
+			ret = "Your Name Here";
 			break;
 		case ST_DEVICEDESCR:
-			ret = _("Human (meatware) intervention STONITH device.\n"
+			ret = "Human (meatware) intervention STONITH device.\n"
 			"This STONITH agent prompts a human to reset a machine.\n"
-			"The human tells it when the reset was completed.");
+			"The human tells it when the reset was completed.";
 			break;
-
+		case ST_CONF_XML:		/* XML metadata */
+			ret = meatwareXML;
+			break;
 		default:
 			ret = NULL;
 			break;
@@ -398,6 +352,7 @@ meatware_new(const char *subplugin)
 	nd->pluginid = pluginid;
 	nd->hostlist = NULL;
 	nd->hostcount = -1;
+	nd->idinfo = DEVICE;
 	nd->sp.s_ops = &meatwareOps;
 
 	return &(nd->sp);

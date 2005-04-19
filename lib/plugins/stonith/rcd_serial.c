@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.25 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: rcd_serial.c,v 1.26 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -33,7 +33,7 @@
  *
  */
 
-#define	DEVICE	"RCD_SERIAL STONITH device"
+#define	DEVICE	"RC Delayed Serial"
 #include "stonith_plugin_common.h"
 #include "stonith_signal.h"
 
@@ -60,14 +60,14 @@ static int		rcd_serial_reset_req(StonithPlugin * s, int request, const char * ho
 static char **		rcd_serial_hostlist(StonithPlugin  *);
 
 static struct stonith_ops rcd_serialOps ={
-	rcd_serial_new,			/* Create new STONITH object		*/
-	rcd_serial_destroy,		/* Destroy STONITH object		*/
-	rcd_serial_getinfo,		/* Return STONITH info string		*/
-	rcd_serial_get_confignames,	/* Return STONITH info string		*/
-	rcd_serial_set_config,		/* Get configuration from NVpairs	*/
-	rcd_serial_status,		/* Return STONITH device status		*/
-	rcd_serial_reset_req,		/* Request a reset 			*/
-	rcd_serial_hostlist,		/* Return list of supported hosts 	*/
+	rcd_serial_new,		/* Create new STONITH object		*/
+	rcd_serial_destroy,	/* Destroy STONITH object		*/
+	rcd_serial_getinfo,	/* Return STONITH info string		*/
+	rcd_serial_get_confignames,/* Return STONITH info string	*/
+	rcd_serial_set_config,	/* Get configuration from NVpairs	*/
+	rcd_serial_status,	/* Return STONITH device status		*/
+	rcd_serial_reset_req,	/* Request a reset 			*/
+	rcd_serial_hostlist,	/* Return list of supported hosts 	*/
 };
 
 PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
@@ -167,9 +167,11 @@ static int RCD_close_serial_port(int fd);
 static void
 RCD_alarm_handler(int sig) {
 #if !defined(HAVE_POSIX_SIGNALS)
-        if (sig)
+        if (sig) {
 		signal(sig, SIG_DFL);
-	else    { signal(sig, RCD_alarm_handler); }
+	}else{
+		signal(sig, RCD_alarm_handler);
+	}
 #else
 	struct sigaction sa;
 	sigset_t sigmask;
@@ -177,8 +179,11 @@ RCD_alarm_handler(int sig) {
 	/* Maybe a bit naughty but it works and it saves duplicating all */
 	/* this setup code - if handler called with 0 for sig, we install */
 	/* ourself as handler. */
-	if (sig) sa.sa_handler = (void (*)(int))SIG_DFL;
-	else     sa.sa_handler = RCD_alarm_handler;
+	if (sig) { 
+		 sa.sa_handler = (void (*)(int))SIG_DFL;
+	}else{
+		sa.sa_handler = RCD_alarm_handler;
+	}
 
 	sigemptyset(&sigmask);
 	sa.sa_mask = sigmask;
@@ -207,7 +212,8 @@ RCD_open_serial_port(char *device) {
 			Clear them down immediately.
 		*/
 		status = ioctl(fd, TIOCMBIC, &bothbits);
-		/* If there was an error clearing bits, set the fd to -1 ( indicates error ) */
+		/* If there was an error clearing bits, set the fd to -1 
+		 * ( indicates error ) */
 		if (status != 0 ) { 
 			fd = -1;
 		}
@@ -227,6 +233,7 @@ RCD_close_serial_port(int fd) {
 struct pluginDevice {
 	StonithPlugin	sp;
 	const char *	pluginid;
+	const char *	idinfo;
 	char **		hostlist;	/* name of single host we can reset */
 	int		hostcount;	/* i.e. 1 after initialisation */
 	char *		device;		/* serial device name */
@@ -234,8 +241,50 @@ struct pluginDevice {
 	int		msduration;	/* how long (ms) to assert the signal */
 };
 
-static const char * pluginid = "pluginDevice-Stonith";
-static const char * NOTrcd_serialID = "Hey, dummy this has been destroyed (RCD_SerialDev)";
+static const char * pluginid = "RCD_SerialDevice-Stonith";
+static const char * NOTrcd_serialID = "RCD_Serial device has been destroyed";
+
+#include "stonith_config_xml.h"
+
+#define XML_DTRRTS_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_DTRRTS \
+	XML_PARM_SHORTDESC_END
+
+#define XML_DTRRTS_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	"The hardware handshaking technique to use with " ST_TTYDEV "(\"dtr\" or \"rts\")" \
+	XML_PARM_LONGDESC_END
+
+#define XML_DTRRTS_PARM \
+	XML_PARAMETER_BEGIN(ST_DTRRTS, "string") \
+	  XML_DTRRTS_SHORTDESC \
+	  XML_DTRRTS_LONGDESC \
+	XML_PARAMETER_END
+
+#define XML_MSDURATION_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_MSDURATION \
+	XML_PARM_SHORTDESC_END
+
+#define XML_MSDURATION_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	"The delay duration (in milliseconds) between the assertion of the control signal on " ST_TTYDEV " and the closing of the reset switch" \
+	XML_PARM_LONGDESC_END
+
+#define XML_MSDURATION_PARM \
+	XML_PARAMETER_BEGIN(ST_MSDURATION, "string") \
+	  XML_MSDURATION_SHORTDESC \
+	  XML_MSDURATION_LONGDESC \
+	XML_PARAMETER_END
+
+static const char *rcd_serialXML = 
+  XML_PARAMETERS_BEGIN
+    XML_HOSTLIST_PARM
+    XML_TTYDEV_PARM
+    XML_DTRRTS_PARM
+    XML_MSDURATION_PARM
+  XML_PARAMETERS_END;
 
 static int
 rcd_serial_status(StonithPlugin  *s)
@@ -277,9 +326,7 @@ rcd_serial_status(StonithPlugin  *s)
 static char **
 rcd_serial_hostlist(StonithPlugin  *s)
 {
-	char **		ret = NULL;
 	struct pluginDevice*	rcd;
-	int		j;
 
 	ERRIFWRONGDEV(s,NULL);
 	rcd = (struct pluginDevice*) s;
@@ -289,152 +336,7 @@ rcd_serial_hostlist(StonithPlugin  *s)
 		return(NULL);
 	}
 
-	ret = (char **)MALLOC((rcd->hostcount+1)*sizeof(char*));
-	if (ret == NULL) {
-		LOG(PIL_CRIT, "out of memory");
-		return ret;
-	}
-
-	memset(ret, 0, (rcd->hostcount+1)*sizeof(char*));
-
-	for (j=0; j < rcd->hostcount; ++j) {
-		ret[j] = STRDUP(rcd->hostlist[j]);
-		if (ret[j] == NULL) {
-			stonith_free_hostlist(ret);
-			ret = NULL;
-			return ret;
-		}
-	}
-	return(ret);
-}
-
-/*
- *	Parse the config information, and stash it away...
- */
-static int
-RCD_SERIAL_parse_config_info(struct pluginDevice* rcd, const char * info)
-{
-	char *copy;
-	char *token;
-	char *endptr;
-	int ret;
-
-	if (rcd->hostcount >= 0) {
-		return(S_OOPS);
-	}
-
-	/* strtok() is nice to use to parse a string with
-	   (other than it isn't threadsafe), but it is destructive, so
-	   we're going to alloc our own private little copy for the
-	   duration of this function.
-	*/
-
-	copy = STRDUP(info);
-	if (!copy) {
-		LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
-		return S_OOPS;
-	}
-
-	/* Grab the hostname */
-	token = strtok (copy, WHITESPACE);
-	if (!token) {
-		LOG(PIL_CRIT, "%s: Can't find hostname on config line '%s'",
-			pluginid, info);
-		ret = S_BADCONFIG;
-		goto token_error;
-	}
-
-	if ((rcd->hostlist = (char **)MALLOC(2*sizeof(char*))) == NULL) {
-		LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
-		ret = S_OOPS;
-		goto token_error;
-	}
-	memset(rcd->hostlist, 0, 2*sizeof(char*));
-	rcd->hostcount = 0;
-
-	rcd->hostlist[0] = STRDUP(token);
-	if (!rcd->hostlist[0]) {
-		LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
-		ret = S_OOPS;
-		goto token_error;
-	}
-	g_strdown(rcd->hostlist[0]);
-	rcd->hostcount = 1;
-
-	/* Grab the device name */
-	token = strtok (NULL, WHITESPACE);
-	if (!token) {
-		LOG(PIL_CRIT, "%s: Can't find device on config line '%s'",
-			pluginid, info);
-		ret = S_BADCONFIG;
-		goto token_error;
-	}
-
-	rcd->device = STRDUP(token);
-	if (!rcd->device) {
-		LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
-		ret = S_OOPS;
-		goto token_error;
-	}
-
-	/* Grab the signal name */
-	token = strtok (NULL, WHITESPACE);
-	if (!token) {
-		LOG(PIL_CRIT, "%s: Can't find signal on config line '%s'",
-			pluginid, info);
-		ret = S_BADCONFIG;
-		goto token_error;
-	}
-
-	rcd->signal = STRDUP(token);
-	if (!rcd->signal) {
-		LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
-		ret = S_OOPS;
-		goto token_error;
-	}
-
-        if (strcmp(rcd->signal, "rts") && strcmp(rcd->signal, "dtr")) {
-		LOG(PIL_CRIT, "%s: Invalid signal name on config line '%s'",
-			pluginid, info);
-		ret = S_BADCONFIG;
-		goto token_error;
-        }
-
-	/* Grab the duration in millisecs */
-	token = strtok (NULL, WHITESPACE);
-	if (!token) {
-		LOG(PIL_CRIT, "%s: Can't find msduration on config line '%s'",
-			pluginid, info);
-		ret = S_BADCONFIG;
-		goto token_error;
-	}
-
-	rcd->msduration = strtol(token, &endptr, 0);
-	if (*token == 0 || *endptr != 0 || rcd->msduration < 1) {
-		LOG(PIL_CRIT, "%s: Invalid msduration on config line '%s'",
-			pluginid, info);
-		ret = S_BADCONFIG;
-		goto token_error;
-	}
-
-	/* Make sure nothing extra provided */
-	token = strtok (NULL, WHITESPACE);
-	if (token) {
-		LOG(PIL_CRIT, "%s: Too many params on config line '%s'",
-			pluginid, info);
-		ret = S_BADCONFIG;
-		goto token_error;
-	}
-
-        /* free our private copy of the string we've been destructively
-           parsing with strtok()
-        */
-        FREE(copy);
-        return S_OK;
-
-token_error:
-        FREE(copy);
-        return(ret);
+	return OurImports->CopyHostList((const char **)rcd->hostlist);
 }
 
 /*
@@ -461,13 +363,13 @@ rcd_serial_reset_req(StonithPlugin * s, int request, const char * host)
 		return(S_OOPS);
 	}
 	g_strdown(shost);
-	if (strcmp(host, rcd->hostlist[0])) {
+	if (strcmp(shost, rcd->hostlist[0])) {
 		LOG(PIL_CRIT, "%s: host '%s' not in hostlist.",
 			__FUNCTION__, host);
-		free(shost);
+		FREE(shost);
 		return(S_BADHOST);
 	}
-	free(shost);
+	FREE(shost);
 
 	/* Set the appropriate bit for the signal */
 	sigbit = *(rcd->signal)=='r' ? TIOCM_RTS : TIOCM_DTR;
@@ -518,7 +420,7 @@ rcd_serial_reset_req(StonithPlugin * s, int request, const char * host)
 		return(S_OOPS);
 	}
 
-	LOG(PIL_INFO,"%s: %s", _("Host rcd_serial-reset"), host);
+	LOG(PIL_INFO,"Host rcd_serial-reset: %s", host);
 	return S_OK;
 }
 
@@ -529,35 +431,64 @@ rcd_serial_reset_req(StonithPlugin * s, int request, const char * host)
 static int
 rcd_serial_set_config(StonithPlugin* s, StonithNVpair *list)
 {
-	char	RCD_SERIALline[MAX_RCD_SERIALLINE];
-
 	struct pluginDevice*	rcd;
-	StonithNamesToGet	namestoget [] =
+	StonithNamesToGet	namestocopy [] =
 	{	{ST_HOSTLIST,	NULL}
 	,	{ST_TTYDEV,	NULL}
 	,	{ST_DTRRTS,	NULL}
 	,	{ST_MSDURATION,	NULL}
 	,	{NULL,		NULL}
 	};
+	char *endptr;
 	int rc = 0;
-
-	ERRIFWRONGDEV(s,S_OOPS);
-	rcd = (struct pluginDevice*) s;
 
 	LOG(PIL_DEBUG, "%s:called", __FUNCTION__);
 	
+	ERRIFWRONGDEV(s,S_OOPS);
+	if (s->isconfigured) {
+		return S_OOPS;
+	}
 
-	if ((rc = OurImports->GetAllValues(namestoget, list)) != S_OK) {
-		LOG(PIL_DEBUG, "get all value failed");
+	rcd = (struct pluginDevice*) s;
+
+	if ((rc = OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
 		return rc;
 	}
 
-	if ((snprintf(RCD_SERIALline, MAX_RCD_SERIALLINE, "%s %s %s %s", 
-		namestoget[0].s_value, namestoget[1].s_value, namestoget[2].s_value, namestoget[3].s_value)) <= 0) {
-		LOG(PIL_CRIT, "Copy parameter to RCD_SERIALline failed");
+	if ((rcd->hostlist = (char **)MALLOC(2*sizeof(char*))) == NULL) {
+		LOG(PIL_CRIT, "%s: out of memory!", __FUNCTION__);
+		FREE(namestocopy[0].s_value);
+		FREE(namestocopy[1].s_value);
+		FREE(namestocopy[2].s_value);
+		FREE(namestocopy[3].s_value);
+		return S_OOPS;
 	}
+	rcd->hostlist[0] = namestocopy[0].s_value;
+	g_strdown(rcd->hostlist[0]);
+	rcd->hostlist[1] = NULL;
+	rcd->hostcount = 1;
+	rcd->device = namestocopy[1].s_value;
+	rcd->signal = namestocopy[2].s_value;
+        if (strcmp(rcd->signal, "rts") && strcmp(rcd->signal, "dtr")) {
+		LOG(PIL_CRIT, "%s: Invalid signal name '%s'",
+			pluginid, rcd->signal);
+		FREE(namestocopy[3].s_value);
+		return S_BADCONFIG;
+        }
+
+	errno = 0;
+	rcd->msduration = strtol(namestocopy[3].s_value, &endptr, 0);
+	if (((errno == ERANGE)
+	&&   (rcd->msduration == LONG_MIN || rcd->msduration == LONG_MAX))
+	|| *endptr != 0 || rcd->msduration < 1) {
+		LOG(PIL_CRIT, "%s: Invalid msduration '%s'",
+			pluginid, namestocopy[3].s_value);
+		FREE(namestocopy[3].s_value);
+		return S_BADCONFIG;
+	}
+	FREE(namestocopy[3].s_value);
 	
-	return (RCD_SERIAL_parse_config_info(rcd, RCD_SERIALline));
+	return S_OK;
 }
 
 /*
@@ -566,7 +497,8 @@ rcd_serial_set_config(StonithPlugin* s, StonithNVpair *list)
 static const char**
 rcd_serial_get_confignames(StonithPlugin* p)
 {
-	static const char *	RcdParams[] = {ST_HOSTLIST, ST_TTYDEV, ST_DTRRTS, ST_MSDURATION,  NULL };
+	static const char *	RcdParams[] = {ST_HOSTLIST, ST_TTYDEV
+				, ST_DTRRTS, ST_MSDURATION,  NULL };
 	return RcdParams;
 }
 
@@ -577,7 +509,7 @@ static const char *
 rcd_serial_getinfo(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* rcd;
-	char *		ret;
+	const char * ret;
 
 	ERRIFWRONGDEV(s,NULL);
 	/*
@@ -587,14 +519,23 @@ rcd_serial_getinfo(StonithPlugin * s, int reqtype)
 
 	switch (reqtype) {
 		case ST_DEVICEID:
-			ret = _(DEVICE);
+			ret = rcd->idinfo;
+			break;
+		case ST_DEVICENAME:
+			ret = rcd->device;
 			break;
 		case ST_DEVICEDESCR:
-			ret = _("RC Delayed Serial STONITH Device\n"
+			ret = "RC Delayed Serial STONITH Device\n"
 			"This device can be constructed cheaply from"
 			" readily available components,\n"
 			"with sufficient expertise and testing.\n"
-			"See README.rcd_serial for circuit diagram.\n");
+			"See README.rcd_serial for circuit diagram.\n";
+			break;
+		case ST_DEVICEURL:
+			ret = "http://www.scl.co.uk/rcd_serial/";
+			break;
+		case ST_CONF_XML:		/* XML metadata */
+			ret = rcd_serialXML;
 			break;
 		default:
 			ret = NULL;
@@ -651,6 +592,7 @@ rcd_serial_new(const char *subplugin)
 	rcd->device = NULL;
 	rcd->signal = NULL;
 	rcd->msduration = 0;
+	rcd->idinfo = DEVICE;
 	rcd->sp.s_ops = &rcd_serialOps;
 
 	return &(rcd->sp);

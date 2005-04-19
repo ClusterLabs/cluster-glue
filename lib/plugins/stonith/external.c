@@ -100,15 +100,14 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {
 	StonithPlugin	sp;
 	const char *	pluginid;
-	int		config;
 	GHashTable *	cmd_opts;
 	char *		subplugin;
 	char **		confignames;
 	char *		outputbuf;
 };
 
-static const char * pluginid = "EXTERNALDevice-Stonith";
-static const char * NOTpluginID = "EXTERNAL device has been destroyed";
+static const char * pluginid = "ExternalDevice-Stonith";
+static const char * NOTpluginID = "External device has been destroyed";
 
 /* Prototypes */
 
@@ -191,7 +190,9 @@ external_hostlist(StonithPlugin  *s)
 	if (rc != 0) {
 		LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
 			__FUNCTION__, sd->subplugin, op, rc);
-		if (output) { FREE(output); }
+		if (output) {
+			FREE(output);
+		}
 		return NULL;
 	}
 
@@ -318,11 +319,6 @@ external_parse_config_info(struct pluginDevice* sd, StonithNVpair * info)
 	char *		value;
 	StonithNVpair *	nv;
 	
-	/*  make sure that command has not already been set  */
-	if (sd->config) {
-		return(S_OOPS);
-	}
-
 	sd->cmd_opts = g_hash_table_new(g_str_hash, g_str_equal);
 
 	/* TODO: Maybe treat "" as delimeters too so
@@ -340,8 +336,6 @@ external_parse_config_info(struct pluginDevice* sd, StonithNVpair * info)
 		g_hash_table_insert(sd->cmd_opts, key, value);
 	}
 		
-	sd->config = 1;
-	
 	return(S_OK);
 
 err_mem:
@@ -354,14 +348,17 @@ err_mem:
 static gboolean
 let_remove_eachitem(gpointer key, gpointer value, gpointer user_data)
 {
-	if (key) { FREE(key); }
-	if (value) { FREE(value); }
+	if (key) {
+		FREE(key);
+	}
+	if (value) {
+		FREE(value);
+	}
         return TRUE;
 }
 
 static void
 external_unconfig(struct pluginDevice *sd) {
-	sd->config = 0;
 	if (sd->cmd_opts) {
 		g_hash_table_foreach_remove(sd->cmd_opts, 
 				let_remove_eachitem, NULL);
@@ -385,6 +382,11 @@ external_set_config(StonithPlugin* s, StonithNVpair *list)
 	}
 
 	ERRIFWRONGDEV(s,S_OOPS);
+
+	/*  make sure that command has not already been set  */
+	if (s->isconfigured) {
+		return(S_OOPS);
+	}
 
 	sd = (struct pluginDevice*) s;
 	if (sd->subplugin == NULL) {
@@ -558,6 +560,10 @@ external_getinfo(StonithPlugin * s, int reqtype)
 			op = "getinfo-devurl";
 			break;
 
+		case ST_CONF_XML:
+			op = "getinfo-xml";
+			break;
+
 		default:
 			return NULL;
 	}
@@ -633,6 +639,10 @@ external_new(const char *subplugin)
 	sd->pluginid = pluginid;
 	if (subplugin != NULL) {
 		sd->subplugin = STRDUP(subplugin);
+		if (sd->subplugin == NULL) {
+			FREE(sd);
+			return(NULL);
+		}
 	}
 	sd->sp.s_ops = &externalOps;
 	return &(sd->sp);

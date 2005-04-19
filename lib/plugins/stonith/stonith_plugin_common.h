@@ -1,4 +1,4 @@
-/* $Id: stonith_plugin_common.h,v 1.2 2005/01/03 18:12:11 alan Exp $ */
+/* $Id: stonith_plugin_common.h,v 1.3 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * stonith_plugin_common.h: common macros easing the writing of STONITH
  * 			    plugins. Only a STONITH plugin should
@@ -52,6 +52,7 @@
 #define LOG(w...)	PILCallLog(PluginImports->log, w)
 
 #define MALLOC		PluginImports->alloc
+#define REALLOC		PluginImports->mrealloc
 #define STRDUP  	PluginImports->mstrdup
 #define FREE		PluginImports->mfree
 #define EXPECT_TOK	OurImports->ExpectToken
@@ -79,8 +80,7 @@
 			(s) = STRDUP(v);			\
 			if ((s) == NULL) {			\
 				PILCallLog(PluginImports->log,	\
-				PIL_CRIT, "%s",			\
-				_("out of memory"));		\
+				PIL_CRIT, "out of memory");	\
 			} 					\
 		     }
 

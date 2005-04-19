@@ -103,12 +103,12 @@ plugin_LTLIBRARIES =	apcmaster.la	\
 			null.la			\
 			nw_rpc100s.la		\
 			rcd_serial.la		\
+			riloe.la		\
 			rps10.la		\
 			ssh.la			\
+			suicide.la		\
 			$(vacm_LIB)		\
-			wti_nps.la		\
-			riloe.la		\
-			suicide.la
+			wti_nps.la
 
 apcmaster_la_SOURCES	= apcmaster.c $(INCFILES)
 apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version

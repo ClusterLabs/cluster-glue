@@ -1,4 +1,4 @@
-/* $Id: stonith_plugin.h,v 1.6 2005/04/13 23:21:47 alan Exp $ */
+/* $Id: stonith_plugin.h,v 1.7 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  *	S hoot
  *	T he
@@ -103,7 +103,7 @@ struct StonithImports_s {
 	,		const char * service);
 		/* Service can be NULL, port can be <= 0, but not both... */
 	const char* (*GetValue)(StonithNVpair*, const char * name);
-	int	(*GetAllValues) (StonithNamesToGet* out, StonithNVpair* in);
+	int	(*CopyAllValues) (StonithNamesToGet* out, StonithNVpair* in);
 	char **(*StringToHostList)(const char * hlstring);
 	char **(*CopyHostList)(const char ** hlstring);
 	void (*FreeHostList)(char** hostlist);

@@ -21,5 +21,5 @@ MAINTAINERCLEANFILES = Makefile.in
 
 extdir		     = $(stonith_ext_plugindir)
 
-ext_SCRIPTS	     = ssh
+ext_SCRIPTS	     = ssh riloe
 

@@ -1,4 +1,4 @@
-/* $Id: stonith_expect_helpers.h,v 1.2 2005/01/08 06:01:17 alan Exp $ */
+/* $Id: stonith_expect_helpers.h,v 1.3 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * stonith_expect_helpers.h: Some common expect defines.
  *
@@ -86,7 +86,7 @@ static int
 StonithScanLine(int fd, int timeout, char * buf, int max)
 {
 	if (EXPECT_TOK(fd, CRNL, timeout, buf, max, Debug) < 0) {
-		LOG(PIL_CRIT, "%s", _("Could not read line from" DEVICE "."));
+		LOG(PIL_CRIT, "Could not read line from" DEVICE ".");
 		return(S_OOPS);
 	}
 	return(S_OK);

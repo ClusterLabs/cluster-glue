@@ -1,5 +1,5 @@
 
-/* $Id: vacm.c,v 1.11 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: vacm.c,v 1.12 2005/04/19 18:13:36 blaschke Exp $ */
 /******************************************************************************
 *
 *    Copyright 2000 Sistina Software, Inc.
@@ -30,6 +30,8 @@
 *    looked at the other stonith source too)
 * 
 */
+
+#define DEVICE			"VA Linux Cluster Manager"
 
 #include "stonith_plugin_common.h"
 #include "vacmclient_api.h"
@@ -96,6 +98,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {
 	StonithPlugin sp; 
 	const char * pluginid;
+	const char * idinfo;
 	void *h; /* a handle to the nexxus. */
 	char *	nexxus;
 	char *	user;
@@ -106,6 +109,31 @@ struct pluginDevice {
 
 static const char * pluginid = "VACMDevice-Stonith";
 static const char * NOTpluginid = "VACM device has been destroyed";
+
+#include "stonith_config_xml.h"
+
+#define XML_NEXXUS_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_NEXXUS \
+	XML_PARM_SHORTDESC_END
+
+#define XML_NEXXUS_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	The Nexxus component of the VA Cluster Manager" \
+	XML_PARM_LONGDESC_END
+
+#define XML_NEXXUS_PARM \
+	XML_PARAMETER_BEGIN(ST_NEXXUS, "string") \
+	  XML_NEXXUS_SHORTDESC \
+	  XML_NEXXUS_LONGDESC \
+	XML_PARAMETER_END
+
+static const char *vacmXML = 
+  XML_PARAMETERS_BEGIN
+    XML_NEXXUS_PARM
+    XML_LOGIN_PARM
+    XML_PASSWD_PARM
+  XML_PARAMETERS_END;
 
 /*funcs*/
 int
@@ -119,7 +147,7 @@ vacm_status(StonithPlugin *s)
 	ERRIFWRONGDEV(s,S_OOPS);
 	sd = (struct pluginDevice*)s;
 
-	/* If grabbing the nexxus version works, then the stauts must be ok.
+	/* If grabbing the nexxus version works, then the status must be ok.
 	 * right?
 	 */
 
@@ -173,7 +201,11 @@ vacm_hostlist(StonithPlugin *s)
    ERRIFWRONGDEV(s, NULL);
    sd = (struct pluginDevice*)s;
 
-   hlst = (char **)malloc(MSTEP * sizeof(char*));
+   hlst = (char **)MALLOC(MSTEP * sizeof(char*));
+   if (hlst == NULL) {
+      LOG(PIL_CRIT, "out of memory");
+      return NULL;
+   }
    hacnt=MSTEP;
 
    api_nexxus_send_ipc(sd->h, snd, strlen(snd)+1);
@@ -201,12 +233,20 @@ vacm_hostlist(StonithPlugin *s)
             goto HL_cleanup;
          }else if((tk = strtok(NULL," \t\n\r"))) { /*Finally, a machine name.*/
             if( hrcnt >= (hacnt-1)) { /* grow array. */
-               hlst = (char **)realloc(hlst, (hacnt +MSTEP)*sizeof(char*));
-               if( !hlst ) return NULL; /* yeah, i know. possible leak */
+               char **oldhlst = hlst;
+               hlst = (char **)REALLOC(hlst, (hacnt +MSTEP)*sizeof(char*));
+               if( !hlst ) {
+                  stonith_free_hostlist(oldhlst);
+                  return NULL;
+               }
                hacnt += MSTEP;
             }
-            hlst[hrcnt++] = strdup(tk); /* stuff the name. */
+            hlst[hrcnt++] = STRDUP(tk); /* stuff the name. */
             hlst[hrcnt] = NULL; /* set next to NULL for looping */
+            if (hlst[hrcnt-1] == NULL) {
+               stonith_free_hostlist(hlst);
+               return NULL;
+	    }
          }
       }else {
          /* WTF?! */
@@ -300,6 +340,8 @@ vacm_set_config(StonithPlugin *s, StonithNVpair * list)
 	,	{ST_PASSWD,	NULL}
 	,	{NULL,		NULL}
 	};
+	char *rcv;
+	int rcvlen;
 
 	ERRIFWRONGDEV(s, S_OOPS);
 	if (sd->sp.isconfigured) {
@@ -313,6 +355,17 @@ vacm_set_config(StonithPlugin *s, StonithNVpair * list)
 	sd->user   = namestoget[1].s_value;
 	sd->passwd = namestoget[2].s_value;
 	/* When to initialize the sd->h */
+
+	if (api_nexxus_connect(sd->nexxus, sd->user, sd->passwd, &sd->h)<0){
+		return S_OOPS;
+	}
+	if (api_nexxus_wait_for_data(sd->h, &rcv, &rcvlen, 20)<0) {
+		return S_OOPS;
+	}
+	if (strcmp(rcv, "NEXXUS_READY")) {
+		return S_BADCONFIG;
+	}
+	free(rcv);
 
 	return(S_OK);
 }
@@ -328,13 +381,14 @@ vacm_set_config(StonithPlugin *s, StonithNVpair * list)
 const char *
 vacm_getinfo(StonithPlugin *s, int reqtype)
 {
+	struct pluginDevice* sd = (struct pluginDevice *)s;
 	const char *		ret;
 
    	ERRIFWRONGDEV(s, NULL);
 	switch (reqtype) {
 
 		case ST_DEVICEID:		/* What type of device? */
-			ret = dgettext(ST_TEXTDOMAIN, "VACM");
+			ret = sd->idinfo;
 			break;
 
 		case ST_DEVICENAME:		/* Which particular device? */
@@ -347,6 +401,10 @@ vacm_getinfo(StonithPlugin *s, int reqtype)
 
 		case ST_DEVICEURL:		/* VACM's web site */
 			ret = "http://vacm.sourceforge.net/";
+			break;
+
+		case ST_CONF_XML:		/* XML metadata */
+			ret = vacmXML;
 			break;
 
 		default:
@@ -383,7 +441,7 @@ vacm_destroy(StonithPlugin *s)
 		sd->passwd = NULL;
 	}
 
-	free(sd); sd = NULL;
+	FREE(sd);
 }
 
 static StonithPlugin *
@@ -391,9 +449,9 @@ vacm_new(const char *subplugin)
 {
 	struct pluginDevice *sd;
 
-	sd = malloc(sizeof(struct pluginDevice));
+	sd = MALLOC(sizeof(struct pluginDevice));
 	if (sd == NULL) {
-		LOG(PIL_CRIT,	"%s", "out of memory");
+		LOG(PIL_CRIT, "out of memory");
 		return(NULL);
 	}
 	memset(sd, 0, sizeof(*sd));
@@ -402,6 +460,7 @@ vacm_new(const char *subplugin)
 	sd->nexxus = NULL;
 	sd->user = NULL;
 	sd->passwd = NULL;
+	sd->idinfo = DEVICE;
 	sd->sp.s_ops = &vacmOps;
 	return &(sd->sp);	/* same as "sd" */
 }

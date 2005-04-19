@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.22 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: apcmaster.c,v 1.23 2005/04/19 18:13:36 blaschke Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -51,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.22 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.23 $"; 
 
 #define	DEVICE	"APC MasterSwitch"
 
@@ -129,19 +129,17 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {
 	StonithPlugin	sp;
 	const char *	pluginid;
-	char *		idinfo;
-	char *		unitid;
+	const char *	idinfo;
 	pid_t		pid;
 	int		rdfd;
 	int		wrfd;
-	int		config;
 	char *		device;
         char *		user;
 	char *		passwd;
 };
 
 static const char * pluginid = "APCMS-Stonith";
-static const char * NOTpluginID = "Hey dummy, this has been destroyed (APCMS)";
+static const char * NOTpluginID = "APCMS device has been destroyed";
 
 /*
  *	Different expect strings that we get from the APC MasterSwitch
@@ -162,6 +160,15 @@ static struct Etoken Separator[] =	{ {"-----", 0, 0} ,{NULL,0,0}};
 static struct Etoken Processing[] =	{ {"Press <ENTER> to continue", 0, 0}
 				,	{"Enter 'YES' to continue", 1, 0}
 				,	{NULL,0,0}};
+
+#include "stonith_config_xml.h"
+
+static const char *apcmasterXML = 
+  XML_PARAMETERS_BEGIN
+    XML_IPADDR_PARM
+    XML_LOGIN_PARM
+    XML_PASSWD_PARM
+  XML_PARAMETERS_END;
 
 static int	MS_connect_device(struct pluginDevice * ms);
 static int	MSLogin(struct pluginDevice * ms);
@@ -198,11 +205,11 @@ MSLogin(struct pluginDevice * ms)
 	switch (StonithLookFor(ms->rdfd, LoginOK, 30)) {
 
 		case 0:	/* Good! */
-			LOG(PIL_INFO, "%s", _("Successful login to " DEVICE ".")); 
+			LOG(PIL_INFO, "Successful login to %s.", ms->idinfo); 
 			break;
 
 		case 1:	/* Uh-oh - bad password */
-			LOG(PIL_CRIT,"%s", _("Invalid password for " DEVICE "."));
+			LOG(PIL_CRIT, "Invalid password for %s.", ms->idinfo);
 			return(S_ACCESS);
 
 		default:
@@ -320,7 +327,7 @@ MSReset(struct pluginDevice* ms, int outletNum, const char *host)
 	}
 
 	
-	LOG(PIL_INFO, "%s: %s", _("Host being rebooted"), host); 
+	LOG(PIL_INFO, "Host being rebooted: %s", host); 
 
 	/* Expect ">" */
 	if (StonithLookFor(ms->rdfd, Prompt, 10) < 0) {
@@ -329,7 +336,7 @@ MSReset(struct pluginDevice* ms, int outletNum, const char *host)
 
 	/* All Right!  Power is back on.  Life is Good! */
 
-	LOG(PIL_INFO, "%s: %s", _("Power restored to host"), host);
+	LOG(PIL_INFO, "Power restored to host: %s", host);
 
 	/* Return to top level menu */
 	SEND(ms->wrfd, "\033");
@@ -357,7 +364,7 @@ apcmaster_onoff(struct pluginDevice* ms, int outletNum, const char * unitid, int
 	int	rc;
 
 	if ((rc = MSRobustLogin(ms) != S_OK)) {
-		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "Cannot log into %s.", ms->idinfo);
 		return(rc);
 	}
 	
@@ -406,7 +413,7 @@ apcmaster_onoff(struct pluginDevice* ms, int outletNum, const char * unitid, int
 	EXPECT(ms->rdfd, Prompt, 10);
 
 	/* All Right!  Command done. Life is Good! */
-	LOG(PIL_INFO, "%s %d %s %s", _("Power to MS outlet(s)"), outletNum, _("turned"), onoff);
+	LOG(PIL_INFO, "Power to MS outlet(s) %d turned %s", outletNum, onoff);
 	/* Pop back to main menu */
 	SEND(ms->wrfd, "\033\033\033\033\033\033\033\r");
 	return(S_OK);
@@ -498,7 +505,7 @@ apcmaster_status(StonithPlugin  *s)
 	ms = (struct pluginDevice*) s;
 
 	if ((rc = MSRobustLogin(ms) != S_OK)) {
-		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "Cannot log into %s.", ms->idinfo);
 		return(rc);
 	}
 
@@ -521,13 +528,14 @@ apcmaster_hostlist(StonithPlugin  *s)
 	unsigned int	numnames = 0;
 	char **		ret = NULL;
 	struct pluginDevice*	ms;
+	int		i;
 
 	ERRIFNOTCONFIGED(s,NULL);
 
 	ms = (struct pluginDevice*) s;
 		
 	if (MSRobustLogin(ms) != S_OK) {
-		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "Cannot log into %s.", ms->idinfo);
 		return(NULL);
 	}
 
@@ -568,8 +576,7 @@ apcmaster_hostlist(StonithPlugin  *s)
 				break;
 			}
 			if ((nm = (char*)STRDUP(sockname)) == NULL) {
-				LOG(PIL_CRIT, "out of memory");
-				return(NULL);
+				goto out_of_memory;
 			}
 			g_strdown(nm);
 			NameList[numnames] = nm;
@@ -592,13 +599,20 @@ apcmaster_hostlist(StonithPlugin  *s)
 	if (numnames >= 1) {
 		ret = (char **)MALLOC((numnames+1)*sizeof(char*));
 		if (ret == NULL) {
-			LOG(PIL_CRIT, "out of memory");
+			goto out_of_memory;
 		}else{
 			memcpy(ret, NameList, (numnames+1)*sizeof(char*));
 		}
 	}
 	(void)MSLogout(ms);
 	return(ret);
+
+out_of_memory:
+	LOG(PIL_CRIT, "out of memory");
+	for (i=0; i<numnames; i++) {
+		FREE(NameList[i]);
+	}
+	return(NULL);
 }
 
 /*
@@ -633,14 +647,14 @@ apcmaster_reset_req(StonithPlugin * s, int request, const char * host)
 	ms = (struct pluginDevice*) s;
 
 	if ((rc = MSRobustLogin(ms)) != S_OK) {
-		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "Cannot log into %s.", ms->idinfo);
 		return(rc);
 	}else{
 		int noutlet; 
 		noutlet = MSNametoOutlet(ms, host);
 		if (noutlet < 1) {
-			LOG(PIL_WARN, "%s %s %s [%s]"
-			, ms->idinfo ,ms->unitid, _("doesn't control host"), host);
+			LOG(PIL_WARN, "%s doesn't control host [%s]"
+			,	ms->device, host);
 			return(S_BADHOST);
 		}
 		switch(request) {
@@ -684,7 +698,7 @@ apcmaster_set_config(StonithPlugin * s, StonithNVpair * list)
 {
 	struct pluginDevice* sd = (struct pluginDevice *)s;
 	int		rc;
-	StonithNamesToGet	namestoget [] =
+	StonithNamesToGet	namestocopy [] =
 	{	{ST_IPADDR,	NULL}
 	,	{ST_LOGIN,	NULL}
 	,	{ST_PASSWD,	NULL}
@@ -696,13 +710,12 @@ apcmaster_set_config(StonithPlugin * s, StonithNVpair * list)
 		return S_OOPS;
 	}
 
-	if ((rc=OurImports->GetAllValues(namestoget, list)) != S_OK) {
+	if ((rc=OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
 		return rc;
 	}
-	sd->device = namestoget[0].s_value;
-	sd->user = namestoget[1].s_value;
-	sd->passwd = namestoget[2].s_value;
-	sd->config = 1;
+	sd->device = namestocopy[0].s_value;
+	sd->user = namestocopy[1].s_value;
+	sd->passwd = namestocopy[2].s_value;
 
 	return(S_OK);
 }
@@ -725,16 +738,24 @@ apcmaster_getinfo(StonithPlugin * s, int reqtype)
 			ret = ms->idinfo;
 			break;
 
+		case ST_DEVICENAME:		/* Which particular device? */
+			ret = ms->device;
+			break;
+
 		case ST_DEVICEDESCR:
-			ret = _("APC MasterSwitch (via telnet)\n"
+			ret = "APC MasterSwitch (via telnet)\n"
  			"NOTE: The APC MasterSwitch accepts only one (telnet)\n"
 			"connection/session a time. When one session is active,\n"
-			"subsequent attempt to connect to the MasterSwitch"
-			" will fail.");
+			"subsequent attempts to connect to the MasterSwitch"
+			" will fail.";
 			break;
 
 		case ST_DEVICEURL:
 			ret = "http://www.apc.com/";
+			break;
+
+		case ST_CONF_XML:		/* XML metadata */
+			ret = apcmasterXML;
 			break;
 
 		default:
@@ -777,14 +798,6 @@ apcmaster_destroy(StonithPlugin *s)
 		FREE(ms->passwd);
 		ms->passwd = NULL;
 	}
-	if (ms->idinfo != NULL) {
-		FREE(ms->idinfo);
-		ms->idinfo = NULL;
-	}
-	if (ms->unitid != NULL) {
-		FREE(ms->unitid);
-		ms->unitid = NULL;
-	}
 	FREE(ms);
 }
 
@@ -804,14 +817,10 @@ apcmaster_new(const char *subplugin)
 	ms->pid = -1;
 	ms->rdfd = -1;
 	ms->wrfd = -1;
-	ms->config = 0;
 	ms->user = NULL;
 	ms->device = NULL;
 	ms->passwd = NULL;
-	ms->idinfo = NULL;
-	ms->unitid = NULL;
-	REPLSTR(ms->idinfo, DEVICE);
-	REPLSTR(ms->unitid, "unknown");
+	ms->idinfo = DEVICE;
 	ms->sp.s_ops = &apcmasterOps;
 
 	return(&(ms->sp));

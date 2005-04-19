@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.24 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: wti_nps.c,v 1.25 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -75,14 +75,14 @@ static int		wti_nps_reset_req(StonithPlugin * s, int request, const char * host)
 static char **		wti_nps_hostlist(StonithPlugin  *);
 
 static struct stonith_ops wti_npsOps ={
-	wti_nps_new,			/* Create new STONITH object		*/
-	wti_nps_destroy,		/* Destroy STONITH object		*/
-	wti_nps_get_info,		/* Return STONITH info string		*/
-	wti_nps_get_confignames,	/* Return configration parameters	*/
-	wti_nps_set_config,		/* set configration			*/
-	wti_nps_status,			/* Return STONITH device status		*/
-	wti_nps_reset_req,		/* Request a reset 			*/
-	wti_nps_hostlist,		/* Return list of supported hosts 	*/
+	wti_nps_new,		/* Create new STONITH object		*/
+	wti_nps_destroy,	/* Destroy STONITH object		*/
+	wti_nps_get_info,	/* Return STONITH info string		*/
+	wti_nps_get_confignames,/* Return configration parameters	*/
+	wti_nps_set_config,	/* set configration			*/
+	wti_nps_status,		/* Return STONITH device status		*/
+	wti_nps_reset_req,	/* Request a reset 			*/
+	wti_nps_hostlist,	/* Return list of supported hosts 	*/
 };
 
 PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
@@ -127,18 +127,24 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {
 	StonithPlugin	sp;
 	const char *	pluginid;
-	char *		idinfo;
-	char *		unitid;
+	const char *	idinfo;
 	pid_t		pid;
 	int		rdfd;
 	int		wrfd;
-	int		config;
 	char *		device;
 	char *		passwd;
 };
 
 static const char * pluginid = "WTINPS-Stonith";
-static const char * NOTnpsid = "Hey, dummy this has been destroyed (WTINPS)";
+static const char * NOTnpsid = "WTINPS device has been destroyed";
+
+#include "stonith_config_xml.h"
+
+static const char *wti_npsXML = 
+  XML_PARAMETERS_BEGIN
+    XML_IPADDR_PARM
+    XML_PASSWD_PARM
+  XML_PARAMETERS_END;
 
 
 /*
@@ -167,7 +173,6 @@ static int	NPSNametoOutlet(struct pluginDevice*, const char * name, char **outle
 static int	NPSReset(struct pluginDevice*, char * outlets, const char * rebootid);
 static int	NPSLogout(struct pluginDevice * nps);
 
-static int	NPS_parse_config_info(struct pluginDevice* nps, const char * info);
 #if defined(ST_POWERON) && defined(ST_POWEROFF)
 static int	NPS_onoff(struct pluginDevice*, const char * outlets, const char * unitid
 ,		int request);
@@ -221,7 +226,7 @@ NPSLogin(struct pluginDevice * nps)
 	/* Look for the unit type info */
 	if (EXPECT_TOK(nps->rdfd, password, 2, IDinfo
 	,	sizeof(IDinfo), Debug) < 0) {
-		LOG(PIL_CRIT, "%s", _("No initial response from " DEVICE "."));
+		LOG(PIL_CRIT, "No initial response from %s.", nps->idinfo);
  		return(errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
 	}
 	idptr += strspn(idptr, WHITESPACE);
@@ -237,11 +242,11 @@ NPSLogin(struct pluginDevice * nps)
 	switch (StonithLookFor(nps->rdfd, LoginOK, 5)) {
 
 		case 0:	/* Good! */
-			LOG(PIL_INFO, "%s", _("Successful login to " DEVICE "."));
+			LOG(PIL_INFO, "Successful login to %s.", nps->idinfo);
 			break;
 
 		case 1:	/* Uh-oh - bad password */
-			LOG(PIL_CRIT, "%s", _("Invalid password for " DEVICE "."));
+			LOG(PIL_CRIT, "Invalid password for %s.", nps->idinfo);
 			return(S_ACCESS);
 
 		default:
@@ -311,7 +316,7 @@ NPSReset(struct pluginDevice* nps, char * outlets, const char * rebootid)
 		default: 
 			return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
 	}
-	LOG(PIL_INFO, "%s: %s", _("Host is being rebooted"), rebootid);
+	LOG(PIL_INFO, "Host is being rebooted: %s", rebootid);
 
 	/* Expect "PS>" */
 	if (StonithLookFor(nps->rdfd, Prompt, 60) < 0) {
@@ -320,7 +325,7 @@ NPSReset(struct pluginDevice* nps, char * outlets, const char * rebootid)
 
 	/* All Right!  Power is back on.  Life is Good! */
 
-	LOG(PIL_INFO, "%s: %s", _("Power restored to host"), rebootid);
+	LOG(PIL_INFO, "Power restored to host: %s", rebootid);
 	SEND(nps->wrfd, "/h\r");
 	return(S_OK);
 }
@@ -339,7 +344,7 @@ NPS_onoff(struct pluginDevice* nps, const char * outlets, const char * unitid, i
 	}
 
 	if ((rc = NPSRobustLogin(nps) != S_OK)) {
-		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "Cannot log into %s.", nps->idinfo);
 		return(rc);
 	}
        
@@ -361,7 +366,7 @@ NPS_onoff(struct pluginDevice* nps, const char * outlets, const char * unitid, i
 	EXPECT(nps->rdfd, Prompt, 60);
 
 	/* All Right!  Command done. Life is Good! */
-	LOG(PIL_INFO, "%s %s %s %s", _("Power to NPS outlet(s)"), outlets, _("turned"), onoff);
+	LOG(PIL_INFO, "Power to NPS outlet(s) %s turned %s", outlets, onoff);
 	return(S_OK);
 }
 #endif /* defined(ST_POWERON) && defined(ST_POWEROFF) */
@@ -421,7 +426,7 @@ NPSNametoOutlet(struct pluginDevice* nps, const char * name, char **outlets)
 			g_strdown(sockname);
   			if (strcmp(name, sockname) == 0) {
   				ret = sockno;
-  				sprintf(buf, "%d ", sockno);
+  				snprintf(buf, sizeof(buf), "%d ", sockno);
   				strncat(*outlets, buf, left);
   				left = left - 2;
   			}
@@ -446,7 +451,7 @@ wti_nps_status(StonithPlugin  *s)
 	nps = (struct pluginDevice*) s;
 
        	if ((rc = NPSRobustLogin(nps) != S_OK)) {
-		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "Cannot log into %s.", nps->idinfo);
 		return(rc);
 	}
 
@@ -470,6 +475,7 @@ wti_nps_hostlist(StonithPlugin  *s)
 	unsigned int	numnames = 0;
 	char **		ret = NULL;
 	struct pluginDevice*	nps;
+	int		i;
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
@@ -483,7 +489,7 @@ wti_nps_hostlist(StonithPlugin  *s)
 	}
  
 	if (NPSRobustLogin(nps) != S_OK) {
-		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "Cannot log into %s.", nps->idinfo);
 		return(NULL);
 	}
 	
@@ -523,9 +529,8 @@ wti_nps_hostlist(StonithPlugin  *s)
 			if (numnames >= DIMOF(NameList)-1) {
 				break;
 			}
-			if ((nm = strdup(sockname)) == NULL) {
-				LOG(PIL_CRIT, "out of memory");
-				return(NULL);
+			if ((nm = STRDUP(sockname)) == NULL) {
+				goto out_of_memory;
 			}
 			g_strdown(nm);
 			NameList[numnames] = nm;
@@ -537,7 +542,7 @@ wti_nps_hostlist(StonithPlugin  *s)
 	if (numnames >= 1) {
 		ret = (char **)MALLOC((numnames+1)*sizeof(char*));
 		if (ret == NULL) {
-			LOG(PIL_CRIT, "out of memory");
+			goto out_of_memory;
 		}else{
 			memset(ret, 0, (numnames+1)*sizeof(char*));
 			memcpy(ret, NameList, (numnames+1)*sizeof(char*));
@@ -547,44 +552,13 @@ wti_nps_hostlist(StonithPlugin  *s)
 	
 	return(ret);
 	
-}
-
-/*
- *	Parse the given configuration information, and stash it away...
- */
-
-static int
-NPS_parse_config_info(struct pluginDevice* nps, const char * info)
-{
-	static char dev[1024];
-	static char passwd[1024];
-
-	if (Debug) {
-		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
+out_of_memory:
+	LOG(PIL_CRIT, "out of memory");
+	for (i=0; i<numnames; i++) {
+		FREE(NameList[i]);
 	}
 
-	if (nps->config) {
-		return(S_OOPS);
-	}
-
-
-	if (sscanf(info, "%s %[^\n\r\t]", dev, passwd) == 2
-	&&	strlen(passwd) > 1) {
-
-		if ((nps->device = strdup(dev)) == NULL) {
-			LOG(PIL_CRIT, "out of memory");
-			return(S_OOPS);
-		}
-		if ((nps->passwd = strdup(passwd)) == NULL) {
-			free(nps->device);
-			nps->device=NULL;
-			LOG(PIL_CRIT, "out of memory");
-			return(S_OOPS);
-		}
-		nps->config = 1;
-		return(S_OK);
-	}
-	return(S_BADCONFIG);
+	return (NULL);
 }
 
 /*
@@ -623,7 +597,7 @@ wti_nps_reset_req(StonithPlugin * s, int request, const char * host)
 	nps = (struct pluginDevice*) s;
 
         if ((rc = NPSRobustLogin(nps)) != S_OK) {
-		LOG(PIL_CRIT, "%s", _("Cannot log into " DEVICE "."));
+		LOG(PIL_CRIT, "Cannot log into %s.", nps->idinfo);
         }else{
 	        char *outlets;
 		char *shost;
@@ -634,13 +608,17 @@ wti_nps_reset_req(StonithPlugin * s, int request, const char * host)
 			return(S_OOPS);
 		}
 		g_strdown(shost);
-		noutlet = NPSNametoOutlet(nps, host, &outlets);
-		free(shost);
+		outlets = NULL;
+		noutlet = NPSNametoOutlet(nps, shost, &outlets);
+		FREE(shost);
 
 		if (noutlet < 1) {
-			LOG(PIL_WARN, "%s %s %s[%s]"
-			,	nps->idinfo,	nps->unitid
-			,	_("doesn't control host [%s]."),	host);
+			LOG(PIL_WARN, "%s doesn't control host [%s]"
+			,	nps->device, host);
+			if (outlets != NULL) {
+			  FREE(outlets);
+			  outlets = NULL;
+			}
 			return(S_BADHOST);
 		}
 		switch(request) {
@@ -650,22 +628,22 @@ wti_nps_reset_req(StonithPlugin * s, int request, const char * host)
 		case ST_POWEROFF:
 			rc = NPS_onoff(nps, outlets, host, request);
 			if (outlets != NULL) {
-			  free(outlets);
+			  FREE(outlets);
 			  outlets = NULL;
 			}
 			break;
 #endif
 		case ST_GENERIC_RESET:
 			rc = NPSReset(nps, outlets, host);
-			break;
 			if (outlets != NULL) {
-			  free(outlets);
+			  FREE(outlets);
 			  outlets = NULL;
 			}
+			break;
 		default:
 			rc = S_INVAL;			
 			if (outlets != NULL) {
-			  free(outlets);
+			  FREE(outlets);
 			  outlets = NULL;
 			}
 			break;
@@ -683,9 +661,8 @@ wti_nps_reset_req(StonithPlugin * s, int request, const char * host)
 static int
 wti_nps_set_config(StonithPlugin * s, StonithNVpair *list)
 {
-	char	WTIpluginid[MAX_WTIPLUGINID];
 	struct pluginDevice*	nps;
-	StonithNamesToGet	namestoget [] =
+	StonithNamesToGet	namestocopy [] =
 	{	{ST_IPADDR,	NULL}
 	,	{ST_PASSWD,	NULL}
 	,	{NULL,		NULL}
@@ -700,18 +677,12 @@ wti_nps_set_config(StonithPlugin * s, StonithNVpair *list)
 
 	nps = (struct pluginDevice*) s;
 
-	if ((rc = OurImports->GetAllValues(namestoget, list)) != S_OK) {
+	if ((rc = OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
 		return rc;
 	}
-
-	
-	if ((snprintf(WTIpluginid, MAX_WTIPLUGINID, "%s %s", 
-		namestoget[0].s_value, namestoget[1].s_value)) <= 0) {
-
-		LOG(PIL_CRIT, "Can not copy parameter to WTIpluginid");
-	}
-	
-	return (NPS_parse_config_info(nps,WTIpluginid));	
+	nps->device = namestocopy[0].s_value;
+	nps->passwd = namestocopy[1].s_value;
+	return S_OK;	
 }
 
 
@@ -755,11 +726,20 @@ wti_nps_get_info(StonithPlugin * s, int reqtype)
 		case ST_DEVICEID:
 			ret = nps->idinfo;
 			break;
+		case ST_DEVICENAME:
+			ret = nps->device;
+			break;
 		case ST_DEVICEDESCR:
-			ret = _("Western Telematic (WTI) Network Power Switch Devices (NPS-xxx)\n"
+			ret = "Western Telematic (WTI) Network Power Switch Devices (NPS-xxx)\n"
  			"Also supports the WTI Telnet Power Switch Devices (TPS-xxx)\n"
  			"NOTE: The WTI Network Power Switch, accepts only "
-			"one (telnet) connection/session at a time.");
+			"one (telnet) connection/session at a time.";
+			break;
+		case ST_DEVICEURL:
+			ret = "http://www.wti.com/";
+			break;
+		case ST_CONF_XML:		/* XML metadata */
+			ret = wti_npsXML;
 			break;
 		default:
 			ret = NULL;
@@ -801,14 +781,6 @@ wti_nps_destroy(StonithPlugin *s)
 		FREE(nps->passwd);
 		nps->passwd = NULL;
 	}
-	if (nps->idinfo != NULL) {
-		FREE(nps->idinfo);
-		nps->idinfo = NULL;
-	}
-	if (nps->unitid != NULL) {
-		FREE(nps->unitid);
-		nps->unitid = NULL;
-	}
 	FREE(nps);
 }
 
@@ -832,13 +804,9 @@ wti_nps_new(const char *subplugin)
 	nps->pid = -1;
 	nps->rdfd = -1;
 	nps->wrfd = -1;
-	nps->config = 0;
 	nps->device = NULL;
 	nps->passwd = NULL;
-	nps->idinfo = NULL;
-	nps->unitid = NULL;
-	REPLSTR(nps->idinfo, DEVICE);
-	REPLSTR(nps->unitid, "unknown");
+	nps->idinfo = DEVICE;
 	nps->sp.s_ops = &wti_npsOps;
 
 	return &(nps->sp);

@@ -1,4 +1,4 @@
-/* $Id: drac3.c,v 1.12 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: drac3.c,v 1.13 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -25,7 +25,7 @@
  *
  */
 
-#define DEVICE  "Dell DRAC III Card"
+#define DEVICE  "Dell DRACIII Card"
 #include "stonith_plugin_common.h"
 
 #include <curl/curl.h>
@@ -96,15 +96,40 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 struct pluginDevice {
 	StonithPlugin sp;
 	const char *pluginid;
+	const char *idinfo;
 	CURL *curl;
-	int config;
 	char *host;
 	char *user;
 	char *pass;
 };
 
-static const char *pluginid = DEVICE;
-static const char *NOTpluginID = "destroyed (Dell DRAC III Card)";
+static const char *pluginid = "Dell-DRACIII-Stonith;
+static const char *NOTpluginID = "Dell DRACIII device has been destroyed";
+
+#include "stonith_config_xml.h"
+
+#define XML_HOST_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_HOST \
+	XML_PARM_SHORTDESC_END
+
+#define XML_HOST_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	"The hostname of the STONITH device" \
+	XML_PARM_LONGDESC_END
+
+#define XML_HOST_PARM \
+	XML_PARAMETER_BEGIN(ST_HOST, "string") \
+	  XML_HOST_SHORTDESC \
+	  XML_HOST_LONGDESC \
+	XML_PARAMETER_END
+
+static const char *drac3XML = 
+  XML_PARAMETERS_BEGIN
+    XML_HOST_PARM
+    XML_LOGIN_PARM
+    XML_PASSWD_PARM
+  XML_PARAMETERS_END;
 
 /* ------------------------------------------------------------------ */
 /* STONITH PLUGIN API                                                 */
@@ -121,10 +146,10 @@ drac3_new(const char *subplugin)
 	memset(drac3d, 0, sizeof(*drac3d));
 	drac3d->pluginid = pluginid;
 	drac3d->curl = NULL;
-	drac3d->config = 0;
 	drac3d->host = NULL;
 	drac3d->user = NULL;
 	drac3d->pass = NULL;
+	drac3d->idinfo = DEVICE;
 	drac3d->sp.s_ops = &drac3Ops;
 	return (&(drac3d->sp));
 }
@@ -149,16 +174,16 @@ drac3_destroy(StonithPlugin * s)
 	}
 
 	if (drac3d->host != NULL) {
-			FREE(drac3d->host);
-			drac3d->host = NULL;
+		FREE(drac3d->host);
+		drac3d->host = NULL;
 	}
 	if (drac3d->user != NULL) {
-			FREE(drac3d->user);
-			drac3d->user = NULL;
+		FREE(drac3d->user);
+		drac3d->user = NULL;
 	}
 	if (drac3d->pass != NULL) {
-			FREE(drac3d->pass);
-			drac3d->pass = NULL;
+		FREE(drac3d->pass);
+		drac3d->pass = NULL;
 	}
 
 	/* release stonith-object itself */
@@ -179,7 +204,7 @@ drac3_set_config(StonithPlugin * s, StonithNVpair * list)
 {
 	struct pluginDevice* sd = (struct pluginDevice *)s;
 	int		rc;
-	StonithNamesToGet	namestoget [] =
+	StonithNamesToGet	namestocopy [] =
 	{	{ST_HOST,	NULL}
 	,	{ST_LOGIN,	NULL}
 	,	{ST_PASSWD,	NULL}
@@ -191,13 +216,12 @@ drac3_set_config(StonithPlugin * s, StonithNVpair * list)
 		return S_OOPS;
 	}
 
-	if ((rc=OurImports->GetAllValues(namestoget, list)) != S_OK) {
+	if ((rc=OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
 		return rc;
 	}
-	sd->host = namestoget[0].s_value;
-	sd->user = namestoget[1].s_value;
-	sd->pass = namestoget[2].s_value;
-	sd->config = 1;
+	sd->host = namestocopy[0].s_value;
+	sd->user = namestocopy[1].s_value;
+	sd->pass = namestocopy[2].s_value;
 
 	return(S_OK);
 }
@@ -215,14 +239,21 @@ drac3_getinfo(StonithPlugin * s, int reqtype)
 
 	switch (reqtype) {
 		case ST_DEVICEID:
-			ret = drac3d->pluginid;
+			ret = drac3d->idinfo;
+			break;
+		case ST_DEVICENAME:
+			ret = drac3d->host;
 			break;
 		case ST_DEVICEDESCR:
-			ret = _("Dell DRACIII (via HTTPS)\n"
-				"The Dell Remote Access Controller accepts XML commands over HTTPS");
+			ret = "Dell DRACIII (via HTTPS)\n"
+			"The Dell Remote Access Controller accepts XML "
+			"commands over HTTPS";
 			break;
 		case ST_DEVICEURL:
-			ret = _("http://www.dell.com/us/en/biz/topics/power_ps2q02-bell.htm");
+			ret = "http://www.dell.com/";
+			break;
+		case ST_CONF_XML:		/* XML metadata */
+			ret = drac3XML;
 			break;
 		default:
 			ret = NULL;
@@ -247,16 +278,17 @@ drac3_status(StonithPlugin  *s)
 		                drac3d->user, drac3d->pass)) {
 		 	LOG(PIL_CRIT, "%s: cannot log into %s at %s", 
 							__FUNCTION__,
-							DEVICE,
+							drac3d->idinfo,
 							drac3d->host);
 		 	return(S_ACCESS);
 		}
 	}
 
-	if (drac3GetSysInfo(drac3d->curl, drac3d->host)) 
+	if (drac3GetSysInfo(drac3d->curl, drac3d->host)) {
 		return(S_ACCESS);
-	else
+	}else{
 		return(S_OK);
+	}
 }
 
 /* ------------------------------------------------------------------ */
@@ -275,7 +307,7 @@ drac3_reset_req(StonithPlugin * s, int request, const char *host)
 		                drac3d->user, drac3d->pass)) {
 		 	LOG(PIL_CRIT, "%s: cannot log into %s at %s", 
 							__FUNCTION__,
-							DEVICE,
+							drac3d->idinfo,
 							drac3d->host);
 		 	return(S_ACCESS);
 		}
@@ -310,17 +342,10 @@ drac3_hostlist(StonithPlugin * s)
 
 	drac3d = (struct pluginDevice *) s;
 
-	hl = (char **)MALLOC(2*sizeof(char*));
+	hl = OurImports->StringToHostList(drac3d->host);
 	if (hl == NULL) {
 		LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
 	} else {
-		hl[1]=NULL;
-		hl[0]=STRDUP(drac3d->host);
-		if (hl[0]) {
-			LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
-			FREE(hl);
-			hl = NULL;
-		}
 		g_strdown(hl[0]);
 	}
 
