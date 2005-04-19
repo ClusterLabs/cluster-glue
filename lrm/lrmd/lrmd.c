@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.87 2005/04/19 07:30:55 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.88 2005/04/19 07:41:33 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -197,14 +197,13 @@ static void on_ra_proc_finished(ProcTrack* p, int status
 ,			int signo, int exitcode, int waslogged);
 static const char* on_ra_proc_query_name(ProcTrack* p);
 static volatile unsigned int signal_pending = 0;
-static unsigned int debug_level = 0;
+static int debug_level = 0;
 
 ProcTrack_ops ManagedChildTrackOps = {
 	on_ra_proc_finished,
 	on_ra_proc_registered,
 	on_ra_proc_query_name
 };
-
 
 /* msg dispatch table */
 typedef int (*msg_handler)(lrmd_client_t* client, struct ha_msg* msg);
@@ -2236,13 +2235,18 @@ debug_level_adjust(int nsig, gpointer user_data)
 				debug_level = 2;
 			}
 			dump_data_for_debug();
+			break;
 
 		case SIGUSR2:
 			debug_level--;
 			if (debug_level < 0) {
 				debug_level = 0;
 			}
+			break;
 		
+		default:
+			lrmd_log(LOG_WARNING, "debug_level_adjust: "
+				"Something wrong?.");
 	}
 
 	return TRUE;
@@ -2285,6 +2289,9 @@ facility_name_to_value(const char * name)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.88  2005/04/19 07:41:33  sunjd
+ * BEAM fixes.
+ *
  * Revision 1.87  2005/04/19 07:30:55  sunjd
  * 1) Now support multiple debug level (0, 1, 2).
  * 2) Support debug_level adjustment via signals SIGUSR1 and SIGUSR2
