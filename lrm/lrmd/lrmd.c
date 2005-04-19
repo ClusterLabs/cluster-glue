@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.86 2005/04/18 01:44:36 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.87 2005/04/19 07:30:55 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -78,6 +78,11 @@
                 cl_log(priority, fmt); \
         }
 
+#define lrmd_log2(priority, fmt...); \
+        if ( debug_level == 2 && priority == LOG_DEBUG ) { \
+                cl_log(priority, fmt); \
+        }
+
 #define	lrmd_nullcheck(p)	((p) ? (p) : "<null>")
 
 typedef struct
@@ -121,6 +126,10 @@ struct lrmd_rsc
 	GList*		repeat_op_list;
 	lrmd_op_t*	last_op;
 };
+
+/* Debug oriented funtions */
+static gboolean debug_level_adjust(int nsig, gpointer user_data);
+static void dump_data_for_debug(void);
 
 /* glib loop call back functions */
 static gboolean on_connect_cmd(IPC_Channel* ch_cmd, gpointer user_data);
@@ -475,6 +484,10 @@ register_pid(const char *pid_file,gboolean do_fork,void (*shutdown)(int nsig))
 	CL_IGNORE_SIG(SIGINT);
 	CL_IGNORE_SIG(SIGHUP);
 	CL_SIGNAL(SIGTERM, shutdown);
+	cl_signal_set_interrupt(SIGTERM, 1);
+	/* At least they are harmless, I think. ;-) */
+	cl_signal_set_interrupt(SIGINT, 0);
+	cl_signal_set_interrupt(SIGHUP, 0);
 }
 
 /* main loop of the daemon*/
@@ -621,40 +634,9 @@ init_start ()
 	lrmd_log(LOG_DEBUG, "Enabling coredumps");
 	/* Althugh lrmd can count on the parent to enable coredump, still
 	 * set it here for test, when start manually.
-	 * Moreover, we use simple code here, since coredump file can not be
-	 * overwritten after appending the pid. The old code remain for a
-	 * while, will remove later.
 	 */
  	cl_cdtocoredir();
 	cl_enable_coredumps(TRUE);	
-#if 0
-	pw_entry = getpwuid(geteuid());
-	if (pw_entry == NULL) {
-		lrmd_log(LOG_ERR, "Cannot get the user name of uid [%d]"
-			 , geteuid());
-	} else {
-		char dir_buffer[80];
-		memset(dir_buffer, 0, 80);
-		snprintf(dir_buffer, 79, "%s/%s", LRMD_COREDUMP_ROOT_DIR
-			 ,  pw_entry->pw_name);
-		if (-1 == mkdir(dir_buffer, 
-			S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) ) {
-			/* I donnot want to check it more carefully. */
-			lrmd_log(LOG_INFO, "Fail to make coredir. Perhaps "
-				 "it already exist.");
-		}
-	}
-
-	if (cl_set_corerootdir(LRMD_COREDUMP_ROOT_DIR) < 0) {
-		lrmd_log(LOG_ERR, "cannot set corerootdir");
-	}
-	if (cl_enable_coredumps(1) != 0) {
-		lrmd_log(LOG_ERR, "Cannot enable coredumps");
-	}
-	if (cl_cdtocoredir() != 0) {
-		lrmd_log(LOG_ERR, "Cannot cd to coredump dir");
-    	}
-#endif
 
 #ifdef RUN_AS_NOBODY
 	/* I commented this out so that andrew can get a core dump for a
@@ -664,6 +646,15 @@ init_start ()
 	 */
 	drop_privs(0, 0); /* become "nobody" */
 #endif
+	
+	/* Add the signal handler for SIGUSR1, SIGUSR2. 
+	 * They are used to change the debug level.
+	 */
+	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGUSR1, 
+		 	debug_level_adjust, NULL, NULL);
+	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGUSR2, 
+		 	debug_level_adjust, NULL, NULL);
+
 	/*Create the mainloop and run it*/
 	mainloop = g_main_new(FALSE);
 	lrmd_log(LOG_DEBUG, "main: run the loop...");
@@ -856,11 +847,11 @@ on_timeout_op_done(gpointer data)
 	
 	op = (lrmd_op_t*)data;
 	if (op == NULL) {
-		lrmd_log(LOG_WARNING, "on_timeout_op_done: op==NULL.");
+		lrmd_log(LOG_ERR, "on_timeout_op_done: op==NULL.");
 		return FALSE;
 	}
 	if (op->exec_pid == 0) {
-		lrmd_log(LOG_WARNING, "on_timeout_op_done: op was freed.");
+		lrmd_log2(LOG_WARNING, "on_timeout_op_done: op was freed.");
 		return FALSE;
 	}
 
@@ -1688,11 +1679,11 @@ int
 flush_op(lrmd_op_t* op)
 {
 	if (op == NULL) {
-		lrmd_log(LOG_WARNING, "flush_op: op==NULL.");
+		lrmd_log(LOG_ERR, "flush_op: op==NULL.");
 		return HA_FAIL;
 	}
 	if (op->exec_pid == 0) {
-		lrmd_log(LOG_WARNING, "flush_op: op was freed.");
+		lrmd_log2(LOG_WARNING, "flush_op: op was freed.");
 		return HA_FAIL;
 	}
 
@@ -1763,11 +1754,11 @@ op_to_msg(lrmd_op_t* op)
 	struct ha_msg* msg = NULL;
 
 	if (op == NULL) {
-		lrmd_log(LOG_WARNING, "op_to_msg: op==NULL.");
+		lrmd_log(LOG_ERR, "op_to_msg: op==NULL.");
 		return HA_FAIL;
 	}
 	if (op->exec_pid == 0) {
-		lrmd_log(LOG_WARNING, "op_to_msg: op was freed.");
+		lrmd_log2(LOG_WARNING, "op_to_msg: op was freed.");
 		return HA_FAIL;
 	}
 
@@ -2235,6 +2226,51 @@ inherit_config_from_environment(void)
 	}
 }
 
+static gboolean 
+debug_level_adjust(int nsig, gpointer user_data)
+{
+	switch (nsig) {
+		case SIGUSR1:
+			debug_level++;
+			if (debug_level > 2) {
+				debug_level = 2;
+			}
+			dump_data_for_debug();
+
+		case SIGUSR2:
+			debug_level--;
+			if (debug_level < 0) {
+				debug_level = 0;
+			}
+		
+	}
+
+	return TRUE;
+}
+
+static void
+dump_data_for_debug(void)
+{
+	GList* node;
+	lrmd_client_t* client;
+	
+	lrmd_log(LOG_DEBUG, "Dump internal data for debugging."); 
+
+	lrmd_log(LOG_DEBUG, "%d clients are connecting to lrmd."
+		 , g_list_length(client_list)); 
+	for (node = g_list_first(client_list);
+		NULL != node; node = g_list_next(node)){
+		client = (lrmd_client_t*)node->data;
+		if (client != NULL) {
+			lrmd_log(LOG_DEBUG, "client name: %s, client pid: %d, "
+				"client uid: %d, client gid: %d"
+				, client->app_name, client->pid
+				, client->uid, client->gid);
+		}
+	}
+	
+}
+
 static int
 facility_name_to_value(const char * name)
 {
@@ -2249,6 +2285,12 @@ facility_name_to_value(const char * name)
 
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.87  2005/04/19 07:30:55  sunjd
+ * 1) Now support multiple debug level (0, 1, 2).
+ * 2) Support debug_level adjustment via signals SIGUSR1 and SIGUSR2
+ * 3) Support internal data dumping when getting a SIGUSR1 ( need to continue enhancing then )
+ * 4) Log message adjustment.
+ *
  * Revision 1.86  2005/04/18 01:44:36  zhenh
  * Fix a BEAM bug.
  *
