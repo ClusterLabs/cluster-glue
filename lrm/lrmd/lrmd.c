@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.89 2005/04/20 05:52:04 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.90 2005/04/20 07:25:20 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1336,9 +1336,9 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	gboolean ra_type_exist = FALSE;
 	char* class = NULL;
 	lrmd_rsc_t* rsc = NULL;
-	char* id = NULL;
+	const char* id = NULL;
 
-	id = g_strdup(ha_msg_value(msg,F_LRM_RID));
+	id = ha_msg_value(msg,F_LRM_RID);
 	lrmd_log(LOG_DEBUG
 	,	"on_msg_add_rsc:client [%d] adds rsc %s"
 	,	client->pid, lrmd_nullcheck(id));
@@ -1354,7 +1354,7 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	}
 
 	rsc = g_new(lrmd_rsc_t,1);
-	rsc->id = id;
+	rsc->id = g_strdup(id);
 	rsc->type = g_strdup(ha_msg_value(msg, F_LRM_RTYPE));
 	rsc->class = g_strdup(ha_msg_value(msg, F_LRM_RCLASS));
 	rsc->provider = g_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
@@ -1520,9 +1520,9 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	struct ha_msg* ret = NULL;
 	lrmd_op_t* op = NULL;
 	struct ha_msg* op_msg = NULL;
-	char* id = NULL;
+	const char* id = NULL;
 
-	id = g_strdup(ha_msg_value(msg,F_LRM_RID));
+	id = ha_msg_value(msg,F_LRM_RID);
 	lrmd_log(LOG_DEBUG, "on_msg_get_state:client [%d] gets state of rsc %s"
 	,	client->pid, lrmd_nullcheck(id));
 
@@ -2067,11 +2067,11 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		return;
 	}
 	if (op->exec_pid == 0) {
-		lrmd_log(LOG_WARNING, "on_ra_proc_finished:: op was freed.");
+		lrmd_log(LOG_WARNING, "on_ra_proc_finished: op was freed.");
 		return;
 	}
 	lrmd_log(LOG_DEBUG
-	, "on_ra_proc_finished:process [%d] finished, with signo %d, should be the %s"
+	, "on_ra_proc_finished: process [%d] finished, with signo %d, %s"
 	, p->pid, signo, op_info(op));		
 
 	op->exec_pid = -1;
@@ -2453,8 +2453,8 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
- * Revision 1.89  2005/04/20 05:52:04  zhenh
- * make the logs more helpful
+ * Revision 1.90  2005/04/20 07:25:20  zhenh
+ * fix memory leak in new logs, found by BEAM
  *
  * Revision 1.88  2005/04/19 07:41:33  sunjd
  * BEAM fixes.
