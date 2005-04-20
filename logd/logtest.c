@@ -86,6 +86,12 @@ send_log_msg(gpointer data)
 }
 
 
+static void
+usage(char* prog)
+{
+	printf("Usage:%s <num_of_messages>\n", prog);
+	return;	       
+}
 
 int
 main(int argc, char** argv)
@@ -93,9 +99,9 @@ main(int argc, char** argv)
 
 	long maxcount;
 	GMainLoop* loop;
-
+	
 	if (argc < 2){
-		fprintf(stderr, "Wrong parameter\n");
+		usage(argv[0]);
 		return 1;
 	}
 	
