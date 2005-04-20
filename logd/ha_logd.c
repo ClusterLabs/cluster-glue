@@ -41,6 +41,9 @@
 #include <apphb.h>
 #include <clplumbing/Gmain_timeout.h>
 #include <clplumbing/coredumps.h>
+#include <clplumbing/setproctitle.h>
+#include <clplumbing/cl_signal.h>
+#include <sys/wait.h>
 
 #ifndef DEFAULT_CFG_FILE
 #	define DEFAULT_CFG_FILE	"/etc/logd.cf"
@@ -55,6 +58,9 @@
 #define	FD_STDERR	2
 
 
+#define WRITE_CHAN	0
+#define READ_CHAN	1
+
 #define MAXLINE 128
 #define EOS '\0'
 
@@ -63,6 +69,8 @@ int	logd_warntime_ms = 5000;
 int	logd_deadtime_ms = 10000;
 gboolean RegisteredWithApphbd = FALSE;
 gboolean	verbose =FALSE;
+pid_t	write_process_pid;
+
 
 struct {
 	char		debugfile[MAXLINE];
@@ -88,7 +96,6 @@ static int	set_useapphbd(const char* option);
 
 int		pidstatuscode = LSB_STATUS_UNKNOWN;
 
-GMainLoop*			mainloop 		= NULL;
 static long			logd_pid_in_file = 0L;
 static char*			cmdname = NULL;
 
@@ -226,9 +233,9 @@ typedef struct {
 	pid_t		pid;
 	gid_t		gid;
 	uid_t		uid;
-
+	
 	IPC_Channel*	chan;
-
+	IPC_Channel*	logchan;
 	GCHSource*	g_src;
 }ha_logd_client_t;
 
@@ -272,13 +279,11 @@ getIPCmsg(IPC_Channel* ch)
 static gboolean
 on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 {
-	ha_logd_client_t *	client = user_data;
 	IPC_Message*		ipcmsg;
+	ha_logd_client_t* client = (ha_logd_client_t*)user_data;
+	IPC_Channel*		logchan= client->logchan;
 	
-	
-	
-	
-	if (!client->chan->ops->is_message_pending(client->chan)) {
+	if (!ch->ops->is_message_pending(ch)) {
 		goto getout;
 	}
 	
@@ -290,24 +295,18 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	if( ipcmsg->msg_body 
 	    && ipcmsg->msg_len > 0 ){
 		
-		LogDaemonMsg*	logmsg = (LogDaemonMsg*) ipcmsg->msg_body;
-		int		priority = logmsg->priority;
-		
-		cl_direct_log(priority, logmsg->message, logmsg->use_pri_str,
-			      logmsg->entity, logmsg->entity_pid, logmsg->timestamp);
-		
-		if (verbose){
-			logd_log("%s[%d]: %s %s\n", 
-				 logmsg->entity[0]=='\0'?
-				 "unknown": logmsg->entity,
-				 logmsg->entity_pid, 
-				 ha_timestamp(logmsg->timestamp),
-				 logmsg->message);
+		if (logchan->ch_status != IPC_CONNECT){
+			cl_log(LOG_ERR,"on_receive_cmd: "
+			       "channel to the write process disconnected");
+			return FALSE;
+		}
+		if (logchan->ops->send(logchan, ipcmsg) != IPC_OK){
+			cl_log(LOG_ERR, "sending msg to the write process failed");
+			cl_log(LOG_ERR, "queue too small? (max=%d, current len =%d",
+			       logchan->send_queue->max_qlen, logchan->send_queue->current_qlen);
+			return FALSE;
 		}
 		
-		if (ipcmsg->msg_done){
-			ipcmsg->msg_done(ipcmsg);
-		}
 	}else {
 		cl_log(LOG_ERR, "on_receive_cmd:"
 		       " invalid ipcmsg\n");
@@ -349,12 +348,13 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 	}
 	client->app_name = NULL;
 	client->chan = ch;
-	client->g_src = G_main_add_IPC_Channel(G_PRIORITY_DEFAULT
-			,	ch, FALSE, on_receive_cmd
-			,	(gpointer)client
-			,	on_remove_client);
+	client->logchan = (IPC_Channel*)user_data;
+	client->g_src = G_main_add_IPC_Channel(G_PRIORITY_DEFAULT,
+					       ch, FALSE, on_receive_cmd,
+					       (gpointer)client,
+					       on_remove_client);
 	
-
+	
 	return TRUE;
 }
 
@@ -431,6 +431,8 @@ logd_make_daemon(gboolean daemonize)
 		(void)open(devnull, O_WRONLY);		/* Stderr: fd 2 */
 	}
 }
+
+
 
 static void
 logd_stop(void){
@@ -606,6 +608,165 @@ logd_apphb_hb(gpointer dummy)
 
 }
 
+
+static gboolean
+logd_term_action(int sig, gpointer userdata)
+{      
+        GMainLoop *     mainloop = (GMainLoop*)userdata;
+	
+        cl_log(LOG_INFO, "received SIGTERM in node");
+        if (mainloop == NULL){
+                cl_log(LOG_ERR, "logd_term_action: invalid arguments");
+                return FALSE;
+        }
+	
+	if (CL_KILL(write_process_pid, SIGTERM) >= 0){
+		
+		pid_t pid;
+		pid = wait4(write_process_pid, NULL, 0, NULL);
+		if (pid < 0){
+			cl_log(LOG_ERR, "wait4 for write process failed");
+		}
+		
+	}
+	
+        g_main_quit(mainloop);
+	
+        return TRUE;
+}
+
+
+static void
+read_msg_process(IPC_Channel* chan)
+{
+	GHashTable*		conn_cmd_attrs;
+	IPC_WaitConnection*	conn_cmd = NULL;
+	char			path[] = "path";
+	char			socketpath[] = HA_LOGDAEMON_IPC;
+	GMainLoop*		mainloop;
+
+	
+	mainloop = g_main_new(FALSE);       
+	
+	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGTERM, 
+				 logd_term_action,mainloop, NULL);
+	
+	conn_cmd_attrs = g_hash_table_new(g_str_hash, g_str_equal);
+	
+	g_hash_table_insert(conn_cmd_attrs, path, socketpath);
+	
+	conn_cmd = ipc_wait_conn_constructor(IPC_ANYTYPE, conn_cmd_attrs);
+	g_hash_table_destroy(conn_cmd_attrs);
+	
+	if (conn_cmd == NULL){
+		fprintf(stderr, "ERROR: create waiting connection failed");
+		exit(1);
+	}
+	
+	/*Create a source to handle new connect rquests for command*/
+	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cmd, NULL, FALSE,
+				       on_connect_cmd, chan, NULL);
+	
+	
+	
+	if (logd_config.useapphbd) {
+		logd_reregister_with_apphbd(NULL);
+		Gmain_timeout_add_full(G_PRIORITY_LOW,
+				       60* 1000, 
+				       logd_reregister_with_apphbd,
+				       NULL, NULL);
+		Gmain_timeout_add_full(G_PRIORITY_LOW,
+				       logd_keepalive_ms,
+				       logd_apphb_hb,
+				       NULL, NULL);
+	}
+	
+	g_main_run(mainloop);
+	
+	conn_cmd->ops->destroy(conn_cmd);
+	conn_cmd = NULL;
+	
+	return;
+}
+
+static gboolean
+direct_log(IPC_Channel* ch, gpointer user_data)
+{
+	
+	IPC_Message*		ipcmsg;
+	LogDaemonMsg*		logmsg;
+	int			priority;
+	GMainLoop*		loop;
+	
+
+	loop =(GMainLoop*)user_data;
+	
+	if (!ch->ops->is_message_pending(ch)) {
+		return TRUE;
+	}
+	
+	
+	if (ch->ch_status == IPC_DISCONNECT){
+		g_main_quit(loop);
+	}
+
+	ipcmsg = getIPCmsg(ch);
+	if (ipcmsg == NULL){
+		return FALSE;
+	}
+	
+	if( ipcmsg->msg_body 
+	    && ipcmsg->msg_len > 0 ){
+		
+		logmsg = (LogDaemonMsg*) ipcmsg->msg_body;
+		priority = logmsg->priority;
+		
+		cl_direct_log(priority, logmsg->message, logmsg->use_pri_str,
+			      logmsg->entity, logmsg->entity_pid, logmsg->timestamp);
+		
+		if (verbose){
+			logd_log("%s[%d]: %s %s\n", 
+				 logmsg->entity[0]=='\0'?
+				 "unknown": logmsg->entity,
+				 logmsg->entity_pid, 
+				 ha_timestamp(logmsg->timestamp),
+				 logmsg->message);
+		}
+		if (ipcmsg->msg_done){
+			ipcmsg->msg_done(ipcmsg);
+		}
+		return TRUE;
+	}
+	
+	
+	cl_log(LOG_ERR, "get one corruped ipcmsg");
+	return TRUE;
+}
+
+static void
+write_msg_process(IPC_Channel* readchan)
+{
+	
+	GMainLoop*	mainloop;
+	IPC_Channel*	ch = readchan;
+	
+	
+	mainloop = g_main_new(FALSE);   
+	
+
+	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT,
+			       ch, FALSE,
+			       direct_log, mainloop, NULL);
+	
+	g_main_run(mainloop);
+	
+}
+
+
+
+
+
+
 static void
 usage(void)
 {
@@ -623,19 +784,17 @@ usage(void)
 	return;
 }
 int
-main(int argc, char** argv)
+main(int argc, char** argv, char** envp)
 {
-	GHashTable*		conn_cmd_attrs;
-	IPC_WaitConnection*	conn_cmd = NULL;
-	char			path[] = "path";
-	char			socketpath[] = HA_LOGDAEMON_IPC;
+
 	int			c;
 	gboolean		daemonize = FALSE;
 	gboolean		stop_logd = FALSE;
 	gboolean		ask_status= FALSE;
 	const char*		cfgfile = NULL;
+	pid_t			pid;
+	IPC_Channel*		chanspair[2];
 	
-
 	cmdname = argv[0];
 	while ((c = getopt(argc, argv, "c:dksvh")) != -1){
 
@@ -717,57 +876,51 @@ main(int argc, char** argv)
 	cl_log_set_entity(logd_config.entity);
 	cl_log_set_facility(logd_config.log_facility);
 	
-	cl_log_enable_stderr(FALSE);
 	cl_log(LOG_INFO, "%s started with %s."
 	       ,	argv[0], cfgfile ? cfgfile : "default configuration");
-	cl_log_enable_stderr(TRUE);
 	
 	logd_make_daemon(daemonize);
 	
+
+
 	if (cl_enable_coredumps(TRUE) < 0){
 		cl_log(LOG_ERR, "enabling core dump failed");
 	}
 	cl_cdtocoredir();
 
-	conn_cmd_attrs = g_hash_table_new(g_str_hash, g_str_equal);
 	
-	g_hash_table_insert(conn_cmd_attrs, path, socketpath);
-	
-	conn_cmd = ipc_wait_conn_constructor(IPC_ANYTYPE, conn_cmd_attrs);
-	g_hash_table_destroy(conn_cmd_attrs);
-	
-	if (conn_cmd == NULL){
-		fprintf(stderr, "ERROR: create waiting connection failed");
-		exit(1);
+	if (ipc_channel_pair(chanspair) != IPC_OK){
+		cl_perror("cannot create channel pair IPC");
+		return -1;
 	}
 	
-	/*Create a source to handle new connect rquests for command*/
-	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cmd, NULL, FALSE,
-				       on_connect_cmd, conn_cmd, NULL);
-	
+	if (init_set_proc_title(argc, argv, envp) < 0) {
+		cl_log(LOG_ERR, "Allocation of proc title failed.");
+                return -1;
+        }
 
-
-	if (logd_config.useapphbd) {
-		logd_reregister_with_apphbd(NULL);
-		Gmain_timeout_add_full(G_PRIORITY_LOW,
-				       60* 1000, 
-				       logd_reregister_with_apphbd,
-				       NULL, NULL);
-		Gmain_timeout_add_full(G_PRIORITY_LOW,
-				       logd_keepalive_ms,
-				       logd_apphb_hb,
-				       NULL, NULL);
+	switch(pid = fork()){
+		
+	case -1:	
+		cl_perror("Can't fork child process!");
+		return -1;
+	case 0:
+		/*child*/
+		set_proc_title("ha_logd: write process");
+		write_msg_process(chanspair[WRITE_CHAN]);		
+		break;
+	default:
+		/*parent*/		
+		set_proc_title("ha_logd: read process");
+		write_process_pid = pid;
+		
+		read_msg_process(chanspair[READ_CHAN]);
+		break;
 	}
-
-	mainloop = g_main_new(FALSE);       
-	g_main_run(mainloop);
 	
-	conn_cmd->ops->destroy(conn_cmd);
-	conn_cmd = NULL;
 	
 	return 0;
 }
-
 
 
 
