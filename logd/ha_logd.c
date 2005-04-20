@@ -40,6 +40,7 @@
 #include <stdarg.h>
 #include <apphb.h>
 #include <clplumbing/Gmain_timeout.h>
+#include <clplumbing/coredumps.h>
 
 #ifndef DEFAULT_CFG_FILE
 #	define DEFAULT_CFG_FILE	"/etc/logd.cf"
@@ -722,9 +723,14 @@ main(int argc, char** argv)
 	cl_log_enable_stderr(TRUE);
 	
 	logd_make_daemon(daemonize);
+	
+	if (cl_enable_coredumps(TRUE) < 0){
+		cl_log(LOG_ERR, "enabling core dump failed");
+	}
+	cl_cdtocoredir();
 
 	conn_cmd_attrs = g_hash_table_new(g_str_hash, g_str_equal);
-
+	
 	g_hash_table_insert(conn_cmd_attrs, path, socketpath);
 	
 	conn_cmd = ipc_wait_conn_constructor(IPC_ANYTYPE, conn_cmd_attrs);
