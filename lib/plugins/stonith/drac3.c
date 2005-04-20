@@ -1,4 +1,4 @@
-/* $Id: drac3.c,v 1.13 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: drac3.c,v 1.14 2005/04/20 17:00:42 blaschke Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -103,7 +103,7 @@ struct pluginDevice {
 	char *pass;
 };
 
-static const char *pluginid = "Dell-DRACIII-Stonith;
+static const char *pluginid = "Dell-DRACIII-Stonith";
 static const char *NOTpluginID = "Dell DRACIII device has been destroyed";
 
 #include "stonith_config_xml.h"

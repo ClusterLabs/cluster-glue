@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.26 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: rcd_serial.c,v 1.27 2005/04/20 17:00:42 blaschke Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -238,7 +238,7 @@ struct pluginDevice {
 	int		hostcount;	/* i.e. 1 after initialisation */
 	char *		device;		/* serial device name */
 	char *		signal;		/* either rts or dtr */
-	int		msduration;	/* how long (ms) to assert the signal */
+	long		msduration;	/* how long (ms) to assert the signal */
 };
 
 static const char * pluginid = "RCD_SerialDevice-Stonith";
