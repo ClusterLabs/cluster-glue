@@ -57,7 +57,7 @@ main(int argc, char** argv)
 {
 	int	priority; 
 	char*	entity = NULL;
-	char	c;
+	int	c;
 	char*	msg;
 	char*	logtype;
 
