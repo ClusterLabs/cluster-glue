@@ -164,7 +164,7 @@ RILOE_parse_config_info(struct pluginDevice* nd, const char * info)
 		return S_OOPS;
 	}
 	for (nd->hostcount = 0; nd->hostlist[nd->hostcount]; nd->hostcount++) {
-		/* Just count */
+		g_strdown(nd->hostlist[nd->hostcount]);
 	}
 	return(S_OK);
 }

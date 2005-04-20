@@ -23,7 +23,8 @@ SUBDIRS			= external
 
 INCFILES		= stonith_expect_helpers.h	\
 			stonith_plugin_common.h		\
-			stonith_signal.h
+			stonith_signal.h		\
+			stonith_config_xml.h
 
 
 INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \

@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.25 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: wti_nps.c,v 1.26 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -423,8 +423,7 @@ NPSNametoOutlet(struct pluginDevice* nps, const char * name, char **outlets)
   					break;
   				}
   			}
-			g_strdown(sockname);
-  			if (strcmp(name, sockname) == 0) {
+  			if (strcasecmp(name, sockname) == 0) {
   				ret = sockno;
   				snprintf(buf, sizeof(buf), "%d ", sockno);
   				strncat(*outlets, buf, left);
@@ -600,17 +599,10 @@ wti_nps_reset_req(StonithPlugin * s, int request, const char * host)
 		LOG(PIL_CRIT, "Cannot log into %s.", nps->idinfo);
         }else{
 	        char *outlets;
-		char *shost;
 		int noutlet;
      
-		if ((shost = STRDUP(host)) == NULL) {
-			LOG(PIL_CRIT, "strdup failed in NPS_reset_host");
-			return(S_OOPS);
-		}
-		g_strdown(shost);
 		outlets = NULL;
-		noutlet = NPSNametoOutlet(nps, shost, &outlets);
-		FREE(shost);
+		noutlet = NPSNametoOutlet(nps, host, &outlets);
 
 		if (noutlet < 1) {
 			LOG(PIL_WARN, "%s doesn't control host [%s]"

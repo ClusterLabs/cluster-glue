@@ -1,4 +1,4 @@
-/* $Id: nw_rpc100s.c,v 1.22 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: nw_rpc100s.c,v 1.23 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  *	Stonith module for Night/Ware RPC100S 
  *
@@ -562,19 +562,12 @@ RPCDisconnect(struct pluginDevice * ctx)
 static int
 RPCNametoOutlet ( struct pluginDevice * ctx, const char * host )
 {
-	char *shost;
 	int rc = -1;
 	
-	if ( (shost = strdup(host)) == NULL) {
-		LOG(PIL_CRIT, "strdup failed in RPCNametoOutlet");
-		return -1;
-	}
-	g_strdown(shost);
-	if (!strcmp(ctx->node, shost)) {
+	if (!strcasecmp(ctx->node, host)) {
 		rc = 0;
 	}
 
-	free(shost);
 	return rc;
 }
 

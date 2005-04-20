@@ -1,4 +1,4 @@
- /* $Id: cyclades.c,v 1.7 2005/04/19 18:13:36 blaschke Exp $ */
+ /* $Id: cyclades.c,v 1.8 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  * Stonith module for Cyclades AlterPath PM
  * Bases off the SSH plugin
@@ -256,8 +256,8 @@ static int CYCNametoOutlet(struct pluginDevice *sd, const char *host)
 		if ((err == S_OK) &&
 		    (sscanf(savebuf,"%2d %10s %10s %3s", &outlet, 
 			name, locked, on) > 0)) {
-			g_strdown(name);
-			if (strstr(locked, "ocked") && !strcmp(name, host)) {
+			if (strstr(locked, "ocked")
+			&& !strcasecmp(name, host)) {
 				ret = outlet;
 			}
 		}

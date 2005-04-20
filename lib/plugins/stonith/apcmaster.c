@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.23 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: apcmaster.c,v 1.24 2005/04/20 20:18:16 blaschke Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -51,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.23 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.24 $"; 
 
 #define	DEVICE	"APC MasterSwitch"
 
@@ -475,8 +475,7 @@ MSNametoOutlet(struct pluginDevice* ms, const char * name)
 					break;
 				}
 			}
-			g_strdown(sockname);
-			if (strcmp(name, sockname) == 0) {
+			if (strcasecmp(name, sockname) == 0) {
 				ret = sockno;
 			}
 		}

@@ -1,4 +1,4 @@
-/* $Id: null.c,v 1.19 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: null.c,v 1.20 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  * Stonith module for NULL Stonith device
  *
@@ -181,7 +181,7 @@ null_set_config(StonithPlugin* s, StonithNVpair* list)
 	}
 	for (nd->hostcount = 0; nd->hostlist[nd->hostcount]
 	;	nd->hostcount++) {
-		/* Just count */
+		g_strdown(nd->hostlist[nd->hostcount]);
 	}
 	return nd->hostcount ? S_OK : S_BADCONFIG;
 }

@@ -1,4 +1,4 @@
-/* $Id: apcmastersnmp.c,v 1.21 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: apcmastersnmp.c,v 1.22 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
@@ -209,7 +209,7 @@ APC_open(char *hostname, int port, char *community)
     session.peername = hostname;
     session.version = SNMP_VERSION_1;
     session.remote_port = port;
-    session.community = community;
+    session.community = (u_char *)community;
     session.community_len = strlen(community);
     session.retries = 5;
     session.timeout = 1000000;
@@ -274,7 +274,7 @@ APC_read(struct snmp_session *sptr, const char *objname, int type)
 		    /* return response as string */
 		    if ((vars->type == type) && (type == ASN_OCTET_STR)) {
 			memset(response_str, 0, MAX_STRING);
-			strncpy(response_str, vars->val.string,
+			strncpy(response_str, (char *)vars->val.string,
 				MIN(vars->val_len, MAX_STRING));
 			snmp_free_pdu(resp);
 			return ((void *) response_str);
@@ -430,7 +430,7 @@ apcmastersnmp_hostlist(StonithPlugin * s)
 
 	/* Check whether the host is already listed */
 	for (h = 0; h < num_outlets; ++h) {
-		if (strcmp(hl[h],outlet_name) == 0)
+		if (strcasecmp(hl[h],outlet_name) == 0)
 			break;
 	}
 
@@ -447,6 +447,7 @@ apcmastersnmp_hostlist(StonithPlugin * s)
 		    hl = NULL;
 		    return (hl);
 		}
+		g_strdown(hl[num_outlets]);
 		num_outlets++;
 	}
     }
@@ -500,8 +501,7 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 	}
 	
 	/* found one */
-	g_strdown(outlet_name);
-	if (strcmp(outlet_name, host) == 0) {
+	if (strcasecmp(outlet_name, host) == 0) {
 		if (Debug) {
 			LOG(PIL_DEBUG, "%s: Found %s at outlet: %d"
 			,       __FUNCTION__, host, outlet);
