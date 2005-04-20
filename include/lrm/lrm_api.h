@@ -102,7 +102,8 @@ typedef enum {
 	LRM_OP_CANCELLED,
 	LRM_OP_TIMEOUT,
 	LRM_OP_NOTSUPPORTED,
-	LRM_OP_ERROR
+	LRM_OP_ERROR,
+	LRM_OP_NOTEXEC			
 }op_status_t;
 
 /*for all timeouts: in milliseconds. 0 for no timeout*/
