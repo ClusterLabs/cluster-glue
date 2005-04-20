@@ -1,4 +1,4 @@
-/* $Id: apcsmart.c,v 1.26 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: apcsmart.c,v 1.27 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>
@@ -112,7 +112,7 @@ static const char**	apcsmart_get_confignames(StonithPlugin*);
 static int		apcsmart_set_config(StonithPlugin *, StonithNVpair*);
 static const char *	apcsmart_get_info(StonithPlugin * s, int InfoType);
 static int		apcsmart_status(StonithPlugin * );
-static int		apcsmart_req_reset(StonithPlugin * s, int request, const char * host);
+static int		apcsmart_reset_req(StonithPlugin * s, int request, const char * host);
 static char **		apcsmart_hostlist(StonithPlugin  *);
 
 static struct stonith_ops apcsmartOps ={
@@ -122,7 +122,7 @@ static struct stonith_ops apcsmartOps ={
 	apcsmart_get_confignames, /* Return STONITH info string		*/
 	apcsmart_set_config,	  /* Get configuration from NVpairs	*/
 	apcsmart_status,	  /* Return STONITH device status	*/
-	apcsmart_req_reset,	  /* Request a reset 			*/
+	apcsmart_reset_req,	  /* Request a reset 			*/
 	apcsmart_hostlist,	  /* Return list of supported hosts	*/
 };
 
@@ -730,7 +730,7 @@ apcsmart_set_config(StonithPlugin * s, StonithNVpair* list)
 	}
 	for (ad->hostcount = 0; ad->hostlist[ad->hostcount]
 	;	ad->hostcount++) {
-		/* Just count */
+		g_strdown(ad->hostlist[ad->hostcount]);
 	}
 	if (access(ad->upsdev, R_OK|W_OK|F_OK) < 0) {
 		LOG(PIL_CRIT,"Cannot access tty [%s]", ad->upsdev);
@@ -921,7 +921,7 @@ apcsmart_ReqGenericReset(struct pluginDevice *ad)
 }
 
 static int
-apcsmart_req_reset(StonithPlugin * s, int request, const char *host)
+apcsmart_reset_req(StonithPlugin * s, int request, const char *host)
 {
 	char **			hl;
 	int			b_found=FALSE;
@@ -935,12 +935,11 @@ apcsmart_req_reset(StonithPlugin * s, int request, const char *host)
 		return (S_INVAL);
 	}
     
-
 	/* look through the hostlist */
 	hl = ad->hostlist;
 
 	while (*hl && !b_found ) {
-		if( strcmp( *hl, host ) == 0 ) {
+		if( strcasecmp( *hl, host ) == 0 ) {
 			b_found = TRUE;
 			break;
 		}else{

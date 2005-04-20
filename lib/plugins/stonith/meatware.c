@@ -1,4 +1,4 @@
-/* $Id: meatware.c,v 1.18 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: meatware.c,v 1.19 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  * Stonith module for Human Operator Stonith device
  *
@@ -175,20 +175,11 @@ meatware_reset_req(StonithPlugin * s, int request, const char * host)
 
 	char		line[256], meatpipe[256];
 	char		resp_addr[50], resp_mw[50], resp_result[50];
-	char *		shost;
 
 	
 	ERRIFWRONGDEV(s,S_OOPS);
 	
-	
-	if ((shost = STRDUP(host)) == NULL) {
-		LOG(PIL_CRIT, "strdup failed in %s", __FUNCTION__);
-		return(S_OOPS);
-	}
-	
-	g_strdown(shost);
-
-	snprintf(meatpipe, 256, "%s.%s", meatpipe_pr, shost);
+	snprintf(meatpipe, 256, "%s.%s", meatpipe_pr, host);
 	umask(0);
 	unlink(meatpipe);
 
@@ -196,20 +187,18 @@ meatware_reset_req(StonithPlugin * s, int request, const char * host)
 
 	if (rc < 0) {
 		LOG(PIL_CRIT, "cannot create FIFO for Meatware_reset_host");
-		rc = S_OOPS;
-		goto out;
+		return S_OOPS;
 	}
 
-	LOG(PIL_CRIT, "OPERATOR INTERVENTION REQUIRED to reset %s.", shost);
+	LOG(PIL_CRIT, "OPERATOR INTERVENTION REQUIRED to reset %s.", host);
 	LOG(PIL_CRIT, "Run \"meatclient -c %s\" AFTER power-cycling the "
-	                 "machine.", shost);
+	                 "machine.", host);
 
 	fd = open(meatpipe, O_RDONLY);
 
 	if (fd < 0) {
 		LOG(PIL_CRIT, "cannot open FIFO for Meatware_reset_host");
-		rc = S_OOPS;
-		goto out;
+		return S_OOPS;
 	}
 
 	memset(line, 0, 256);
@@ -217,8 +206,7 @@ meatware_reset_req(StonithPlugin * s, int request, const char * host)
 
 	if (rc < 0) {
 		LOG(PIL_CRIT, "read error on FIFO for Meatware_reset_host");
-		rc = S_OOPS;
-		goto out;
+		return S_OOPS;
 	}
 
 	memset(resp_mw, 0, 50);
@@ -230,18 +218,14 @@ meatware_reset_req(StonithPlugin * s, int request, const char * host)
 
 	if (strncmp(resp_mw, "meatware", 8) ||
 	    strncmp(resp_result, "reply", 5) ||
-	    strncmp(resp_addr, shost, strlen(resp_addr))) {
-		LOG(PIL_CRIT, "failed to Meatware-reset node %s", shost);
-		rc = S_RESETFAIL;
-		goto out;
-	}
-	else {
-		LOG(PIL_INFO, "node Meatware-reset: %s", shost);
+	    strncasecmp(resp_addr, host, strlen(resp_addr))) {
+		LOG(PIL_CRIT, "failed to Meatware-reset node %s", host);
+		return S_RESETFAIL;
+	}else{
+		LOG(PIL_INFO, "node Meatware-reset: %s", host);
 		unlink(meatpipe);
-		rc = S_OK;
+		return S_OK;
 	}
-out:	FREE(shost);
-	return rc;
 }
 
 /*

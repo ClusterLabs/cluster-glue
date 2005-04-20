@@ -1,4 +1,4 @@
-/* $Id: ipmilan.c,v 1.15 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: ipmilan.c,v 1.16 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
@@ -257,8 +257,6 @@ get_config_string(struct pluginDevice * nd, int index)
 	struct ipmilanHostInfo * host;
 	int i;
 
-	char * buf;
-
 	if (index >= nd->hostcount || index < 0) {
 		return (NULL);
 	}
@@ -268,13 +266,7 @@ get_config_string(struct pluginDevice * nd, int index)
 		host = host->next;
 	}
 
-	buf = STRDUP(host->hostname);
-	if (!buf) {
-		return (NULL);
-	}
-	g_strdown(buf);
-
-	return buf;
+	return STRDUP(host->hostname);
 }
 
 
@@ -339,29 +331,20 @@ static int
 ipmilan_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	int rc = 0;
-	char *shost;
 	struct pluginDevice * nd;
 	struct ipmilanHostInfo * node;
 
 	ERRIFWRONGDEV(s,S_OOPS);
 	
-	if ((shost = STRDUP(host)) == NULL) {
-		LOG(PIL_CRIT, "strdup failed in %s", __FUNCTION__);
-		return(S_OOPS);
-	}
-	g_strdown(shost);
-
 	nd = (struct pluginDevice *)s;
 	node = nd->hostlist;
 	do {
-		if (strcmp(node->hostname, shost) == 0) {
+		if (strcasecmp(node->hostname, host) == 0) {
 			break;
 		};
 
 		node = node->next;
 	} while (node);
-	
-	FREE(shost);
 	
 	if (!node) {
 		LOG(PIL_CRIT, "Host %s is not configured in this STONITH "
@@ -469,7 +452,7 @@ ipmilan_getinfo(StonithPlugin * s, int reqtype)
 			break;
 
 		case ST_DEVICENAME:
-			ret = nd->hostname;
+			ret = nd->hostlist ? nd->hostlist->hostname : NULL;
 			break;
 
 		case ST_DEVICEDESCR:
@@ -477,7 +460,7 @@ ipmilan_getinfo(StonithPlugin * s, int reqtype)
 			break;
 
 		case ST_DEVICEURL:
-			ret = "http://www.intel.com/design/servers/ipmi/"
+			ret = "http://www.intel.com/design/servers/ipmi/";
 			break;
 
 		case ST_CONF_XML:		/* XML metadata */

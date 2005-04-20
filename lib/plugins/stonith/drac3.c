@@ -1,4 +1,4 @@
-/* $Id: drac3.c,v 1.14 2005/04/20 17:00:42 blaschke Exp $ */
+/* $Id: drac3.c,v 1.15 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -301,6 +301,12 @@ drac3_reset_req(StonithPlugin * s, int request, const char *host)
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
 	drac3d = (struct pluginDevice *) s;
+
+	if (strcasecmp(host, drac3d->host)) {
+		LOG(PIL_CRIT, "%s doesn't control host [%s]"
+		,	drac3d->idinfo, host);
+		return(S_BADHOST);
+	}
 
 	if (drac3VerifyLogin(drac3d->curl, drac3d->host)) {
 		if (drac3Login(drac3d->curl, drac3d->host,

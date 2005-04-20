@@ -1,4 +1,4 @@
-/* $Id: ssh.c,v 1.24 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: ssh.c,v 1.25 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  * Stonith module for SSH Stonith device
  *
@@ -165,9 +165,24 @@ ssh_hostlist(StonithPlugin  *s)
 static int
 ssh_reset_req(StonithPlugin * s, int request, const char * host)
 {
+	struct pluginDevice* sd = (struct pluginDevice *)s;
 	char cmd[4096];
+	int i;
 
 	ERRIFWRONGDEV(s, S_OOPS);
+
+	for (i = 0; i < sd->hostcount; i++) {
+		if (strcasecmp(host, sd->hostlist[i]) == 0) {
+			break;
+		}
+	}
+
+	if (i >= sd->hostcount) {
+		LOG(PIL_CRIT, "%s doesn't control host [%s]"
+		,	sd->idinfo, host);
+		return(S_BADHOST);
+	}
+
 	LOG(PIL_INFO, "Initiating ssh-reset on host: %s", host);
 
 	snprintf(cmd, sizeof(cmd)-1, "%s \"%s\" \"%s\"", SSH_COMMAND
@@ -209,7 +224,7 @@ ssh_set_config(StonithPlugin* s, StonithNVpair* list)
 	}else{
 		for (sd->hostcount = 0; sd->hostlist[sd->hostcount]
 		;	sd->hostcount++) {
-			/* Just count */
+			g_strdown(sd->hostlist[sd->hostcount]);
 		}
 	}
 	

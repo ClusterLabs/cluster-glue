@@ -1,4 +1,4 @@
-/* $Id: baytech.c,v 1.26 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: baytech.c,v 1.27 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  *	Stonith module for BayTech Remote Power Controllers (RPC-x devices)
  *
@@ -516,8 +516,7 @@ RPCNametoOutletList(struct pluginDevice* bt, const char * name
 				break;
 			}
 		}
-		g_strdown(sockname);
-		if (strcmp(name, sockname) == 0) {
+		if (strcasecmp(name, sockname) == 0) {
 			outletlist[maxfound] = sockno;
 			++maxfound;
 		}

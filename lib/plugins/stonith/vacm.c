@@ -1,5 +1,5 @@
 
-/* $Id: vacm.c,v 1.12 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: vacm.c,v 1.13 2005/04/20 20:18:16 blaschke Exp $ */
 /******************************************************************************
 *
 *    Copyright 2000 Sistina Software, Inc.
@@ -119,7 +119,7 @@ static const char * NOTpluginid = "VACM device has been destroyed";
 
 #define XML_NEXXUS_LONGDESC \
 	XML_PARM_LONGDESC_BEGIN("en") \
-	The Nexxus component of the VA Cluster Manager" \
+	"The Nexxus component of the VA Cluster Manager" \
 	XML_PARM_LONGDESC_END
 
 #define XML_NEXXUS_PARM \
@@ -241,12 +241,14 @@ vacm_hostlist(StonithPlugin *s)
                }
                hacnt += MSTEP;
             }
-            hlst[hrcnt++] = STRDUP(tk); /* stuff the name. */
-            hlst[hrcnt] = NULL; /* set next to NULL for looping */
-            if (hlst[hrcnt-1] == NULL) {
+            hlst[hrcnt] = STRDUP(tk); /* stuff the name. */
+            hlst[hrcnt+1] = NULL; /* set next to NULL for looping */
+            if (hlst[hrcnt] == NULL) {
                stonith_free_hostlist(hlst);
                return NULL;
 	    }
+            g_strdown(hlst[hrcnt]);
+            hrcnt++;
          }
       }else {
          /* WTF?! */
@@ -334,7 +336,7 @@ vacm_set_config(StonithPlugin *s, StonithNVpair * list)
 {
 	struct pluginDevice* sd = (struct pluginDevice *)s;
 	int		rc;
-	StonithNamesToGet	namestoget [] =
+	StonithNamesToGet	namestocopy [] =
 	{	{ST_NEXXUS,	NULL}
 	,	{ST_LOGIN,	NULL}
 	,	{ST_PASSWD,	NULL}
@@ -348,12 +350,12 @@ vacm_set_config(StonithPlugin *s, StonithNVpair * list)
 		return S_OOPS;
 	}
 
-	if ((rc=OurImports->GetAllValues(namestoget, list)) != S_OK) {
+	if ((rc=OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
 		return rc;
 	}
-	sd->nexxus = namestoget[0].s_value;
-	sd->user   = namestoget[1].s_value;
-	sd->passwd = namestoget[2].s_value;
+	sd->nexxus = namestocopy[0].s_value;
+	sd->user   = namestocopy[1].s_value;
+	sd->passwd = namestocopy[2].s_value;
 	/* When to initialize the sd->h */
 
 	if (api_nexxus_connect(sd->nexxus, sd->user, sd->passwd, &sd->h)<0){
@@ -363,11 +365,13 @@ vacm_set_config(StonithPlugin *s, StonithNVpair * list)
 		return S_OOPS;
 	}
 	if (strcmp(rcv, "NEXXUS_READY")) {
-		return S_BADCONFIG;
+		rc = S_BADCONFIG;
+	}else{
+		rc = S_OK;
 	}
 	free(rcv);
 
-	return(S_OK);
+	return(rc);
 }
 
 /*

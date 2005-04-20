@@ -1,4 +1,4 @@
-/* File: stonithd.c
+/* File: suicide.c
  * Description: Stonith module for suicide
  *
  * Author: Sun Jiang Dong <sunjd@cn.ibm.com>

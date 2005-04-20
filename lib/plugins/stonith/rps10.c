@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.22 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: rps10.c,v 1.23 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -813,29 +813,21 @@ static signed char
 RPSNametoOutlet ( struct pluginDevice * ctx, const char * host )
 {
 	int i=0;
-	char *shost;
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
 
-	if ( (shost = STRDUP(host)) == NULL) {
-		LOG(PIL_CRIT, "strdup failed in RPSNametoOutlet");
-		return -1;
-	}
-	g_strdown(shost);
-		
 	/* scan the controllers[] array to see if this host is there */
 	for (i=0;i<ctx->unit_count;i++) {
 		/* return the outlet id */
 		if ( ctx->controllers[i].node 
-		    && !strcmp(shost, ctx->controllers[i].node)) {
+		    && !strcasecmp(host, ctx->controllers[i].node)) {
 			/* found it! */
 			break;
 		}
 	}
 	
-	FREE(shost);
 	if (i == ctx->unit_count) {
 		return -1;
 	} else {

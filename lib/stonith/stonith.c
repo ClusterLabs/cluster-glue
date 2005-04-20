@@ -1,4 +1,4 @@
-/* $Id: stonith.c,v 1.20 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: stonith.c,v 1.21 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  * Stonith API infrastructure.
  *
@@ -448,7 +448,7 @@ stonith_req_reset(Stonith* s, int operation, const char* node)
 		}
 		g_strdown(nodecopy);
 
-		rc = sp->s_ops->req_reset(sp, operation, node);
+		rc = sp->s_ops->req_reset(sp, operation, nodecopy);
 		FREE(nodecopy);
 		return rc;
 	}

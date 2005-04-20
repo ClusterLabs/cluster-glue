@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.27 2005/04/20 17:00:42 blaschke Exp $ */
+/* $Id: rcd_serial.c,v 1.28 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -351,25 +351,17 @@ rcd_serial_reset_req(StonithPlugin * s, int request, const char * host)
 	int sigbit;
 	struct itimerval timer;
 	const char * err;
-	char* shost;
 	
 	ERRIFWRONGDEV(s,S_OOPS);
 
 	rcd = (struct pluginDevice *) s;
 
 	/* check that host matches */
-	if ((shost = STRDUP(host)) == NULL) {
-		LOG(PIL_CRIT, "%s: strdup failed", __FUNCTION__);
-		return(S_OOPS);
-	}
-	g_strdown(shost);
-	if (strcmp(shost, rcd->hostlist[0])) {
+	if (strcasecmp(host, rcd->hostlist[0])) {
 		LOG(PIL_CRIT, "%s: host '%s' not in hostlist.",
 			__FUNCTION__, host);
-		FREE(shost);
 		return(S_BADHOST);
 	}
-	FREE(shost);
 
 	/* Set the appropriate bit for the signal */
 	sigbit = *(rcd->signal)=='r' ? TIOCM_RTS : TIOCM_DTR;
