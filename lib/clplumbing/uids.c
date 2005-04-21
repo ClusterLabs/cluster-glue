@@ -1,10 +1,11 @@
-/* $Id: uids.c,v 1.9 2004/02/17 22:11:59 lars Exp $ */
+/* $Id: uids.c,v 1.10 2005/04/21 04:02:46 alan Exp $ */
 #include <portability.h>
 #include <pwd.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
 #include <clplumbing/uids.h>
+#include <clplumbing/coredumps.h>
 #define	NOBODY	"nobody"
 
 #if defined(HAVE_SETEUID) && defined(HAVE_SETEGID) &&	\
@@ -77,6 +78,8 @@ drop_privs(uid_t uid, gid_t gid)
 int	/* Return to our original privileges (if any) */
 return_to_orig_privs()
 {
+	int	rc;
+	int	save_errno;
 	if (!anysaveduid) {
 		return 0;
 	}
@@ -84,7 +87,11 @@ return_to_orig_privs()
 		return -1;
 	}
 	privileged_state = 1;
-	return setegid(powergid);
+	rc = setegid(powergid);
+	save_errno = errno;
+	cl_untaint_coredumps();
+	errno = save_errno;
+	return rc;
 }
 
 int	/* Return to "nobody" level of privs (if any) */
