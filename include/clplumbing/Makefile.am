@@ -43,6 +43,7 @@ include_HEADERS	= 		\
 	netstring.h	\
 	proctrack.h	\
 	realtime.h	\
+	setproctitle.h	\
 	recoverymgr_cs.h \
 	timers.h	\
 	uids.h
