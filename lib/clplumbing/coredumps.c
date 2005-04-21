@@ -31,6 +31,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <pwd.h>
+#include <sys/prctl.h>
 #include <clplumbing/cl_malloc.h>
 #include <clplumbing/coredumps.h>
 #include <clplumbing/cl_log.h>
@@ -137,21 +138,58 @@ cl_enable_coredumps(int doenable)
   *   SIGABRT       6       Core    Abort signal from abort(3)
   *   SIGFPE        8       Core    Floating point exception
   *   SIGSEGV      11       Core    Invalid memory reference
+  *   SIGBUS    10,7,10     Core    Bus error (bad memory access)
+  *   SIGSYS     2,-,12     Core    Bad argument to routine (SVID)
+  *   SIGTRAP      5        Core    Trace/breakpoint trap
+  *   SIGXCPU     24,24,30    Core    CPU time limit exceeded (4.2 BSD)
+  *   SIGXFSZ     25,25,31    Core    File size limit exceeded (4.2 BSD)
+
   */
 void
 cl_set_all_coredump_signal_handlers()
 {
-	static const int coresigs [] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV};
+	static const int coresigs [] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV
+#ifdef SIGBUS
+,	SIGBUS
+#endif
+#ifdef SIGSYS
+,	SIGSYS
+#endif
+#ifdef SIGTRAP
+,	SIGTRAP
+#endif
+#ifdef SIGXCPU
+,	SIGXCPU
+#endif
+#ifdef SIGXFSZ
+,	SIGXFSZ
+#endif
+};
 	int	j;
 
 	for (j=0; j < DIMOF(coresigs); ++j) {
 		cl_set_coredump_signal_handler(coresigs[j]);
 	}
 }
+
+void
+cl_untaint_coredumps(void)
+{
+#if defined(PR_SET_DUMPABLE)
+	prctl(PR_SET_DUMPABLE, (unsigned long)TRUE, 0UL, 0UL, 0UL);
+#endif
+}
 static void
 cl_coredump_signal_handler(int nsig)
 {
 	return_to_orig_privs();
+	if (geteuid() == 0) {
+		/* Put ALL privileges back to root... */
+		if (setuid(0) < 0) {
+			cl_perror("cl_coredump_signal_handler: unable to setuid(0)");
+		}
+	}
+	cl_untaint_coredumps();	/* Do the best we know how to do... */
 	CL_SIGNAL(nsig, SIG_DFL);
 	kill(getpid(), nsig);
 }
