@@ -1082,7 +1082,6 @@ msg_to_op(struct ha_msg* msg)
 		cl_log(LOG_WARNING,
 			"msg_to_op: can not get op status from msg.");
                 op->op_status = LRM_OP_PENDING;
-		op->rc = EXECRA_STATUS_UNKNOWN;
 	}
 
 	/* if it finished successfully */
@@ -1106,8 +1105,10 @@ msg_to_op(struct ha_msg* msg)
 		if (0 != op->rc) {
 			op->op_status = LRM_OP_ERROR;
 		}
-	}
-	else  {
+	} else if(op->op_status == LRM_OP_PENDING) {
+		op->rc = EXECRA_STATUS_UNKNOWN;
+		
+	} else {
 		op->rc = EXECRA_EXEC_UNKNOWN_ERROR;
 	}
 
@@ -1173,10 +1174,21 @@ op_to_msg (lrm_op_t* op)
 		cl_log(LOG_ERR, "op_to_msg: can not add field.");
 		return NULL;
 	}
+
+	if (NULL != op->app_name) {
+		if (HA_OK != ha_msg_add(msg, F_LRM_APP, op->app_name)){
+			ha_msg_del(msg);
+			cl_log(LOG_ERR,
+			       "op_to_msg: can not add field: %s", F_LRM_APP);
+			return NULL;
+		}
+	}
+
 	if (NULL != op->user_data) {
 		if (HA_OK != ha_msg_add(msg,F_LRM_USERDATA,op->user_data)){
 			ha_msg_del(msg);
-			cl_log(LOG_ERR, "op_to_msg: can not add field.");
+			cl_log(LOG_ERR,
+			       "op_to_msg: can not add field: %s", F_LRM_USERDATA);
 			return NULL;
 		}
 	}
@@ -1184,7 +1196,8 @@ op_to_msg (lrm_op_t* op)
 	if (NULL != op->params) {
 		if (HA_OK != ha_msg_add_str_table(msg,F_LRM_PARAM,op->params)){
 			ha_msg_del(msg);
-			cl_log(LOG_ERR, "op_to_msg: can not add field.");
+			cl_log(LOG_ERR,
+			       "op_to_msg: can not add field: %s", F_LRM_PARAM);
 			return NULL;
 		}	
 	}
