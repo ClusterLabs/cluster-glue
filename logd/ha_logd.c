@@ -701,45 +701,44 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 
 	loop =(GMainLoop*)user_data;
 	
-	if (!ch->ops->is_message_pending(ch)) {
-		return TRUE;
-	}
-	
-	
-	if (ch->ch_status == IPC_DISCONNECT){
-		g_main_quit(loop);
-	}
 
-	ipcmsg = getIPCmsg(ch);
-	if (ipcmsg == NULL){
-		return FALSE;
+	while(ch->ops->is_message_pending(ch)){
+		
+		if (ch->ch_status == IPC_DISCONNECT){
+			cl_log(LOG_ERR, "read channel is disconnected:"
+			       "something very wrong happened");
+			return FALSE;
+		}
+		
+		ipcmsg = getIPCmsg(ch);
+		if (ipcmsg == NULL){
+			return TRUE;
+		}
+		
+		if( ipcmsg->msg_body 
+		    && ipcmsg->msg_len > 0 ){
+			
+			logmsg = (LogDaemonMsg*) ipcmsg->msg_body;
+			priority = logmsg->priority;
+		
+			cl_direct_log(priority, logmsg->message, logmsg->use_pri_str,
+				      logmsg->entity, logmsg->entity_pid, logmsg->timestamp);
+		
+			if (verbose){
+				logd_log("%s[%d]: %s %s\n", 
+					 logmsg->entity[0]=='\0'?
+					 "unknown": logmsg->entity,
+					 logmsg->entity_pid, 
+					 ha_timestamp(logmsg->timestamp),
+					 logmsg->message);
+			}
+			if (ipcmsg->msg_done){
+				ipcmsg->msg_done(ipcmsg);
+			}
+		}
+		
 	}
 	
-	if( ipcmsg->msg_body 
-	    && ipcmsg->msg_len > 0 ){
-		
-		logmsg = (LogDaemonMsg*) ipcmsg->msg_body;
-		priority = logmsg->priority;
-		
-		cl_direct_log(priority, logmsg->message, logmsg->use_pri_str,
-			      logmsg->entity, logmsg->entity_pid, logmsg->timestamp);
-		
-		if (verbose){
-			logd_log("%s[%d]: %s %s\n", 
-				 logmsg->entity[0]=='\0'?
-				 "unknown": logmsg->entity,
-				 logmsg->entity_pid, 
-				 ha_timestamp(logmsg->timestamp),
-				 logmsg->message);
-		}
-		if (ipcmsg->msg_done){
-			ipcmsg->msg_done(ipcmsg);
-		}
-		return TRUE;
-	}
-	
-	
-	cl_log(LOG_ERR, "get one corruped ipcmsg");
 	return TRUE;
 }
 
