@@ -98,12 +98,12 @@ typedef struct
 
 /*used in struct lrm_op_t to show how an operation exits*/
 typedef enum {
+	LRM_OP_PENDING = -1,
 	LRM_OP_DONE,
 	LRM_OP_CANCELLED,
 	LRM_OP_TIMEOUT,
 	LRM_OP_NOTSUPPORTED,
-	LRM_OP_ERROR,
-	LRM_OP_NOTEXEC			
+	LRM_OP_ERROR
 }op_status_t;
 
 /*for all timeouts: in milliseconds. 0 for no timeout*/

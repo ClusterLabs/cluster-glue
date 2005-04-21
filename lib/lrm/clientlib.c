@@ -1081,7 +1081,7 @@ msg_to_op(struct ha_msg* msg)
 		ha_msg_value_int(msg, F_LRM_OPSTATUS, (int*)&op->op_status)) {
 		cl_log(LOG_WARNING,
 			"msg_to_op: can not get op status from msg.");
-                op->op_status = LRM_OP_NOTEXEC;
+                op->op_status = LRM_OP_PENDING;
 		op->rc = EXECRA_STATUS_UNKNOWN;
 	}
 
