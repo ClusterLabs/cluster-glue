@@ -28,7 +28,6 @@ from time import sleep
 
 
 argv = sys.argv
-sys.stdout = sys.stderr
 
 #	We assume the device name for node X.foo.bar.com is X-rm
 #	and is accessible as a local (non-FQDN) DNS name.
@@ -127,6 +126,7 @@ if host == '<unconfigured>':
         sys.exit(1)
 if not anypass:
         print "Missing 'RI_PASSWORD' environment variable"
+        sys.exit(1)
 
 acmds=[]
 
