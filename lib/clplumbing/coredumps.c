@@ -31,7 +31,9 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <pwd.h>
-#include <sys/prctl.h>
+#ifdef HAVE_SYS_PRCTL_H
+#	include <sys/prctl.h>
+#endif
 #include <clplumbing/cl_malloc.h>
 #include <clplumbing/coredumps.h>
 #include <clplumbing/cl_log.h>
