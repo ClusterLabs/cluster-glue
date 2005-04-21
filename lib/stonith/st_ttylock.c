@@ -1,4 +1,4 @@
-/* $Id: st_ttylock.c,v 1.1 2005/04/13 23:21:47 alan Exp $ */
+/* $Id: st_ttylock.c,v 1.2 2005/04/21 16:18:20 alan Exp $ */
 #include <portability.h>
 
 #include <stdio.h>
@@ -84,6 +84,10 @@ st_ttylock(const char *serial_device)
 {
 	char rawname[64];
 
+	if (serial_device == NULL) {
+		errno = EFAULT;
+		return -3;
+	}
 	raw_device (serial_device, rawname, sizeof(rawname));
 	return(DoLock("LCK..", rawname));
 }
@@ -100,6 +104,11 @@ int
 st_ttyunlock(const char *serial_device)
 {
 	char rawname[64];
+
+	if (serial_device == NULL) {
+		errno = EFAULT;
+		return -3;
+	}
 
 	raw_device (serial_device, rawname, sizeof(rawname));
 	return(DoUnlock("LCK..", rawname));
