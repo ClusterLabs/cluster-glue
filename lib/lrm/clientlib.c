@@ -103,6 +103,7 @@ static lrm_op_done_callback_t	op_done_callback 	= NULL;
 static int get_rc_from_ch(IPC_Channel* ch);
 static int get_rc_from_msg(struct ha_msg* msg);
 static struct ha_msg* op_to_msg (lrm_op_t* op);
+static lrm_op_t* lrm_op_new(int num);
 static lrm_op_t* msg_to_op(struct ha_msg* msg);
 static void free_op (lrm_op_t* op);
 
@@ -1050,7 +1051,14 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 /* 
  * following are the implements of the utility functions
  */
+static lrm_op_t*
+lrm_op_new(int num)
+{
+	lrm_op_t* op;
 
+	op = g_new0(lrm_op_t, num);
+	return op;
+}
 
 static lrm_op_t*
 msg_to_op(struct ha_msg* msg)
@@ -1062,9 +1070,7 @@ msg_to_op(struct ha_msg* msg)
 	const char* output;
 	const void* user_data;
 
-	op = g_new0(lrm_op_t, 1);
-
-
+	op = lrm_op_new(1);
 
 	/* op->timeout, op->interval, op->target_rc, op->call_id*/
 	if (HA_OK != ha_msg_value_int(msg,F_LRM_TIMEOUT, &op->timeout)
