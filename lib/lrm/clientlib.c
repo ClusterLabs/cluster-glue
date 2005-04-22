@@ -492,7 +492,7 @@ lrm_get_all_type_metadata (ll_lrm_t* lrm, const char* rclass)
 		if (NULL == meta) {
 			continue;
 		}
-		g_hash_table_insert(metas, node->data,strdup(meta));
+		g_hash_table_insert(metas, node->data,g_strdup(meta));
 	}
 	g_list_free(types);
 	
