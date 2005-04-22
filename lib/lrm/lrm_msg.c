@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.21 2005/04/07 07:34:50 sunjd Exp $ */
+/* $Id: lrm_msg.c,v 1.22 2005/04/22 06:08:50 alan Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -32,6 +32,7 @@
 #include <lrm/lrm_api.h>
 #include <lrm/lrm_msg.h>
 
+const lrm_op_t	lrm_zero_op; /* Default initialized to zeros */
 
 static void
 copy_pair(gpointer key, gpointer value, gpointer user_data)
@@ -216,6 +217,11 @@ create_lrm_ret(int rc, int fields)
 
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.22  2005/04/22 06:08:50  alan
+ * Put in a fix for an uninitialized variable -- added a new
+ * const lrm_op_t object lrm_zero_op - which can be used as an initializer for
+ * lrm_op_t objects so this doesn't happen.
+ *
  * Revision 1.21  2005/04/07 07:34:50  sunjd
  * use STRLEN_CONST & STRNCMP_CONST instead
  *

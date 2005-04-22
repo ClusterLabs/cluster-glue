@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.29 2005/04/18 15:47:41 alan Exp $ */
+/* $Id: lrmadmin.c,v 1.30 2005/04/22 06:08:50 alan Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -549,7 +549,7 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 {
 	char rsc_id[RID_LEN];
 	GHashTable * params_ht = NULL;
-	lrm_op_t op;
+	lrm_op_t op = lrm_zero_op;
 	lrm_rsc_t * lrm_rsc;
 	int call_id;
 	
@@ -923,6 +923,11 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.30  2005/04/22 06:08:50  alan
+ * Put in a fix for an uninitialized variable -- added a new
+ * const lrm_op_t object lrm_zero_op - which can be used as an initializer for
+ * lrm_op_t objects so this doesn't happen.
+ *
  * Revision 1.29  2005/04/18 15:47:41  alan
  * Fixed a compile error (warning) in lrmadmin.
  *
