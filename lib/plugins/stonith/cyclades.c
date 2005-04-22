@@ -1,4 +1,4 @@
- /* $Id: cyclades.c,v 1.9 2005/04/22 12:38:44 blaschke Exp $ */
+ /* $Id: cyclades.c,v 1.10 2005/04/22 14:22:16 blaschke Exp $ */
 /*
  * Stonith module for Cyclades AlterPath PM
  * Bases off the SSH plugin
@@ -269,7 +269,8 @@ static char *CYCNametoOutlet(struct pluginDevice *sd, const char *host)
 						FREE(outletbuf);
 						return NULL;
 					}
-					snprintf(newbuf, len, "%s,%d", outletbuf, outlet);
+					snprintf(newbuf, len, "%s,%d"
+					,	outletbuf, outlet);
 					FREE(outletbuf);
 					outletbuf = newbuf;
 				}

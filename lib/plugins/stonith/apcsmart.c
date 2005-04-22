@@ -1,4 +1,4 @@
-/* $Id: apcsmart.c,v 1.28 2005/04/22 12:23:05 blaschke Exp $ */
+/* $Id: apcsmart.c,v 1.29 2005/04/22 14:22:16 blaschke Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>
@@ -260,6 +260,7 @@ APC_open_serialport(const char *port, speed_t speed)
 		LOG(PIL_CRIT, "%s: tcgetattr of %s failed [%s].", __FUNCTION__
 		,	port
 		,	strerror(errno));
+		close(fd);
 		OurImports->TtyUnlock(port);
 		return -1;
 	}
