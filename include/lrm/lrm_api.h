@@ -148,6 +148,7 @@ typedef struct{
 }lrm_op_t;
 
 extern const lrm_op_t lrm_zero_op;	/* an all-zeroes lrm_op_t value */
+lrm_op_t* lrm_op_new(void);
 
 /*this enum is used in get_cur_state*/
 typedef enum {
