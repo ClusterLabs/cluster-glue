@@ -147,6 +147,8 @@ typedef struct{
 	char*			app_name;
 }lrm_op_t;
 
+extern const lrm_op_t lrm_zero_op;	/* an all-zeroes lrm_op_t value */
+
 /*this enum is used in get_cur_state*/
 typedef enum {
 	LRM_RSC_IDLE,
