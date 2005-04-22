@@ -1,12 +1,17 @@
-/* $Id: GSource.c,v 1.32 2005/04/14 18:25:46 gshi Exp $ */
+/* $Id: GSource.c,v 1.33 2005/04/22 17:40:09 gshi Exp $ */
 #include <portability.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <errno.h>
 
 #include <clplumbing/cl_log.h>
 #include <clplumbing/cl_malloc.h>
 #include <clplumbing/cl_signal.h>
 #include <clplumbing/GSource.h>
-
+#include <clplumbing/proctrack.h>
 
 #define	MAG_GFDSOURCE	0xfeed0001U
 #define	MAG_GCHSOURCE	0xfeed0002U
@@ -909,6 +914,41 @@ G_main_signal_handler(int nsig)
 	
 	g_assert(IS_SIGSOURCE(sig_src));
 	sig_src->signal_triggered = TRUE;
+}
+
+/*
+ * Functions to handle child process
+ */
+
+
+static gboolean
+child_death_dispatch(int sig, gpointer userdata)
+{
+	int status;
+	pid_t	pid;
+	int waitflags = WNOHANG;
+	
+	while((pid=wait3(&status, waitflags, NULL)) > 0
+	      ||	(pid == -1 && errno == EINTR)) {
+		
+		if (pid > 0) {
+			/* If they're in the API client table, 
+			 * remove them... */
+			ReportProcHasDied(pid, status);
+		}
+		
+	}
+	
+	return TRUE;
+}
+
+void
+set_sigchld_proctrack(void)
+{
+	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGCHLD,
+				 child_death_dispatch,NULL, NULL);
+	
+	return;
 }
 
 
