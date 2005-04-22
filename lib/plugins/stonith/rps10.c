@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.23 2005/04/20 20:18:16 blaschke Exp $ */
+/* $Id: rps10.c,v 1.24 2005/04/22 12:23:05 blaschke Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -716,6 +716,11 @@ RPSConnect(struct pluginDevice * ctx)
 	if (ctx->fd < 0) {
 		struct termios tio;
 
+		if (OurImports->TtyLock(ctx->device) < 0) {
+			LOG(PIL_CRIT, "%s: TtyLock failed.", pluginid);
+			return S_OOPS;
+		}
+
 		ctx->fd = open (ctx->device, O_RDWR);
 		if (ctx->fd <0) {
 			LOG(PIL_CRIT, "%s: Can't open %s : %s",
@@ -741,6 +746,7 @@ RPSConnect(struct pluginDevice * ctx)
 			LOG(PIL_CRIT, "%s: Can't set attributes %s : %s",
 				pluginid, ctx->device, strerror(errno));
 			close (ctx->fd);
+			OurImports->TtyUnlock(ctx->device);
 			ctx->fd=-1;
 			return S_OOPS;
 		}
@@ -749,6 +755,7 @@ RPSConnect(struct pluginDevice * ctx)
 			LOG(PIL_CRIT, "%s: Can't flush %s : %s",
 				pluginid, ctx->device, strerror(errno));
 			close (ctx->fd);
+			OurImports->TtyUnlock(ctx->device);
 			ctx->fd=-1;
 			return S_OOPS;		
 		}
@@ -790,11 +797,14 @@ RPSDisconnect(struct pluginDevice * ctx)
 	}
 
 	if (ctx->fd >= 0) {
-	/* Flush the serial port, we don't care what happens to the characters
-	and failing to do this can cause close to hang.
-	*/
-	tcflush(ctx->fd, TCIOFLUSH);
-	close (ctx->fd);
+		/* Flush the serial port, we don't care what happens to the 
+		 * characters and failing to do this can cause close to hang.
+		 */
+		tcflush(ctx->fd, TCIOFLUSH);
+		close (ctx->fd);
+		if (ctx->device != NULL) {
+			OurImports->TtyUnlock(ctx->device);
+		}
 	}
 	ctx->fd = -1;
 

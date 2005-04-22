@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.28 2005/04/20 20:18:16 blaschke Exp $ */
+/* $Id: rcd_serial.c,v 1.29 2005/04/22 12:23:05 blaschke Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -162,7 +162,7 @@ static int RCD_alarmcaught;
 
 static void RCD_alarm_handler(int sig);
 static int RCD_open_serial_port(char *device);
-static int RCD_close_serial_port(int fd);
+static int RCD_close_serial_port(char *device, int fd);
 
 static void
 RCD_alarm_handler(int sig) {
@@ -203,8 +203,14 @@ RCD_open_serial_port(char *device) {
 	int status;
 	int bothbits;
 
+	if (OurImports->TtyLock(device) < 0) {
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: ttylock failed.", __FUNCTION__);
+		}
+		return -1;
+	}
+
 	bothbits = TIOCM_RTS | TIOCM_DTR;
-	fd = 0;
 
 	if ((fd = open(device, O_RDONLY | O_NDELAY)) != -1) {
 		/*
@@ -223,8 +229,12 @@ RCD_open_serial_port(char *device) {
 }
 
 static int
-RCD_close_serial_port(int fd) {
-        return close(fd);
+RCD_close_serial_port(char *device, int fd) {
+        int rc = close(fd);
+	if (device != NULL) {
+		OurImports->TtyUnlock(device);
+	}
+	return rc;
 }
 
 /*
@@ -309,7 +319,7 @@ rcd_serial_status(StonithPlugin  *s)
 		return(S_OOPS);
 	}
 
-	if (RCD_close_serial_port(fd) != 0) {
+	if (RCD_close_serial_port(rcd->device, fd) != 0) {
                 err = strerror(errno);
 		LOG(PIL_CRIT, "%s: close of %s failed - %s",
 			__FUNCTION__, rcd->device, err);
@@ -405,7 +415,7 @@ rcd_serial_reset_req(StonithPlugin * s, int request, const char * host)
         ioctl(fd, TIOCMBIC, &sigbit);
 
         /* Close the port */
-	if (RCD_close_serial_port(fd) != 0) {
+	if (RCD_close_serial_port(rcd->device, fd) != 0) {
                 err = strerror(errno);
 		LOG(PIL_CRIT, "%s: close of %s failed - %s",
 			__FUNCTION__, rcd->device, err);

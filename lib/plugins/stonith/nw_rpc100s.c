@@ -1,4 +1,4 @@
-/* $Id: nw_rpc100s.c,v 1.23 2005/04/20 20:18:16 blaschke Exp $ */
+/* $Id: nw_rpc100s.c,v 1.24 2005/04/22 12:23:05 blaschke Exp $ */
 /*
  *	Stonith module for Night/Ware RPC100S 
  *
@@ -476,6 +476,11 @@ RPCConnect(struct pluginDevice * ctx)
 	if (ctx->fd < 0) {
 		struct termios tio;
 
+		if (OurImports->TtyLock(ctx->device) < 0) {
+			LOG(PIL_CRIT, "%s: TtyLock failed.", pluginid);
+			return S_OOPS;
+		}
+
 		ctx->fd = open (ctx->device, O_RDWR);
 		if (ctx->fd <0) {
 			LOG(PIL_CRIT, "%s: Can't open %s : %s"
@@ -501,6 +506,7 @@ RPCConnect(struct pluginDevice * ctx)
 			LOG(PIL_CRIT, "%s: Can't set attributes %s : %s"
 			,	pluginid, ctx->device, strerror(errno));
 			close (ctx->fd);
+			OurImports->TtyUnlock(ctx->device);
 			ctx->fd=-1;
 			return S_OOPS;
 		}
@@ -509,6 +515,7 @@ RPCConnect(struct pluginDevice * ctx)
 			LOG(PIL_CRIT, "%s: Can't flush %s : %s"
 			,	pluginid, ctx->device, strerror(errno));
 			close (ctx->fd);
+			OurImports->TtyUnlock(ctx->device);
 			ctx->fd=-1;
 			return S_OOPS;		
 		}
@@ -545,6 +552,9 @@ RPCDisconnect(struct pluginDevice * ctx)
     */
     tcflush(ctx->fd, TCIOFLUSH);
     close (ctx->fd);
+    if (ctx->device != NULL) {
+      OurImports->TtyUnlock(ctx->device);
+    }
   }
   ctx->fd = -1;
 

@@ -1,4 +1,4 @@
-/* $Id: apcsmart.c,v 1.27 2005/04/20 20:18:16 blaschke Exp $ */
+/* $Id: apcsmart.c,v 1.28 2005/04/22 12:23:05 blaschke Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>
@@ -171,7 +171,7 @@ static const char *apcsmartXML =
  */
 
 int APC_open_serialport(const char *port, speed_t speed);
-void APC_close_serialport(int upsfd);
+void APC_close_serialport(const char *port, int upsfd);
 void APC_sh_serial_timeout(int sig);
 int APC_send_cmd(int upsfd, const char *cmd);
 int APC_recv_rsp(int upsfd, char *rsp);
@@ -180,68 +180,6 @@ int APC_set_ups_var(int upsfd, const char *cmd, char *newval);
 int APC_get_smallest_delay(int upsfd, const char *cmd, char *smdelay);
 int APC_init( struct pluginDevice *ad );
 void APC_deinit( struct pluginDevice *ad );
-
-/*
- *
- * Portable locking (non-blocking)
- *
- * This is a candidate for including in a general portability library.
- */
-
-static int
-file_lock(int fd)
-{
-	int ret;
-
-#ifdef HAVE_FCNTL
-	struct flock l;
-
-	l.l_type = F_WRLCK;
-	l.l_whence = 0;
-	l.l_start = 0;
-	l.l_len = 0;
-
-	ret = fcntl(fd, F_SETLK, &l);
-	return((ret == -1) ? -1 : 0);
-#else
-#  ifdef HAVE_FLOCK
-	ret = flock(fd, LOCK_EX | LOCK_NB);
-	return(ret);
-
-#  else
-#    error "No locking method (flock, fcntl) is available"
-	return(-1);
-#  endif /* HAVE_FLOCK */
-#endif /* HAVE_FCNTL */
-
-}
-
-static int
-file_unlock(int fd)
-{
-	int ret;
-
-#ifdef HAVE_FCNTL
-	struct flock l;
-
-	l.l_type = F_UNLCK;
-	l.l_whence = 0;
-	l.l_start = 0;
-	l.l_len = 0;
-
-	ret = fcntl(fd, F_SETLK, &l);
-	return((ret == -1) ? -1 : 0);
-#else
-#  ifdef HAVE_FLOCK
-	ret = flock(fd, LOCK_UN);
-	return(ret);
-#  else
-#    error "No unlocking method (flock, fcntl) is available"
-	return(-1);
-#  endif /* HAVE_FLOCK */
-#endif /* HAVE_FCNTL */
-
-}
 
 /*
  * Signal handler for serial port timeouts 
@@ -274,79 +212,59 @@ APC_open_serialport(const char *port, speed_t speed)
 {
 	struct termios tio;
 	int fd;
+	int rc;
+	int errno_save;
+	int fflags;
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 	}
 
+	if ((rc = OurImports->TtyLock(port)) < 0) {
+		LOG(PIL_CRIT, "%s: Could not lock tty %s [rc=%d]."
+		,	__FUNCTION__, port, rc);
+		return -1;
+	}
+
 	STONITH_SIGNAL(SIGALRM, APC_sh_serial_timeout);
-
 	alarm(SERIAL_TIMEOUT);
-
 	f_serialtimeout = FALSE;
 
 	fd = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK | O_EXCL);
+	errno_save = errno;
 
 	alarm(0);
 	STONITH_IGNORE_SIG(SIGALRM);
 
 	if (fd < 0) {
-		if (Debug) {
-			LOG(PIL_DEBUG, "%s: 1st open failed.", __FUNCTION__);
-		}
-		return (f_serialtimeout ? S_TIMEOUT : S_OOPS);
+		LOG(PIL_CRIT, "%s: Open of %s %s [%s].", __FUNCTION__
+		,	port
+		,	f_serialtimeout ? "timed out" : "failed"
+		,	strerror(errno_save));
+		OurImports->TtyUnlock(port);
+		return -1;
 	}
 
-	if (file_lock(fd) != 0) {
-		if (Debug) {
-			LOG(PIL_DEBUG, "%s: 1st lock failed.", __FUNCTION__);
-		}
-		return (S_OOPS);
+	if ((fflags = fcntl(fd, F_GETFL, 0)) < 0
+	||	fcntl(fd, F_SETFL, (fflags & ~O_NONBLOCK)) < 0) {
+		LOG(PIL_CRIT, "%s: Setting flags on %s failed [%s]."
+		,	__FUNCTION__
+		,	port
+		,	strerror(errno_save));
+		close(fd);
+		OurImports->TtyUnlock(port);
+		return -1;
 	}
 
-	tcgetattr(fd, &old_tio);
+	if (tcgetattr(fd, &old_tio) < 0) {
+		LOG(PIL_CRIT, "%s: tcgetattr of %s failed [%s].", __FUNCTION__
+		,	port
+		,	strerror(errno));
+		OurImports->TtyUnlock(port);
+		return -1;
+	}
+
 	memcpy(&tio, &old_tio, sizeof(struct termios));
-
-	tio.c_lflag = 0 | ECHOE | ECHOKE | ECHOCTL | PENDIN;
-	tio.c_iflag = 0 | IXANY | IMAXBEL | IXOFF;
-	tio.c_oflag = 0 | ONLCR;
-	tio.c_cflag = 0 | CREAD | CS8 | HUPCL | CLOCAL;
-
-	cfsetispeed(&tio, speed);
-	cfsetospeed(&tio, speed);
-
-	tio.c_cc[VMIN] = 1;
-	tio.c_cc[VTIME] = 0;
-
-	tcflush(fd, TCIFLUSH);
-	tcsetattr(fd, TCSANOW, &tio);
-	close(fd);
-
-	STONITH_SIGNAL(SIGALRM, APC_sh_serial_timeout);
-	alarm(SERIAL_TIMEOUT);
-
-	fd = open(port, O_RDWR | O_NOCTTY | O_EXCL);
-
-	alarm(0);
-	STONITH_IGNORE_SIG(SIGALRM);
-
-	if (fd < 0) {
-		if (Debug) {
-			LOG(PIL_DEBUG, "%s: 2nd open failed.", __FUNCTION__);
-		}
-		return (f_serialtimeout ? S_TIMEOUT : S_OOPS);
-	}
-
-	if (file_lock(fd) != 0) {
-		if (Debug) {
-			LOG(PIL_DEBUG, "%s: 2nd lock failed.", __FUNCTION__);
-		}
-
-		return (f_serialtimeout ? S_TIMEOUT : S_OOPS);
-	}
-
-	tcgetattr(fd, &tio);
-
 	tio.c_cflag = CS8 | CLOCAL | CREAD;
 	tio.c_iflag = IGNPAR;
 	tio.c_oflag = 0;
@@ -357,7 +275,7 @@ APC_open_serialport(const char *port, speed_t speed)
 	cfsetispeed(&tio, speed);
 	cfsetospeed(&tio, speed);
 
-	tcflush(fd, TCIFLUSH);
+	tcflush(fd, TCIOFLUSH);
 	tcsetattr(fd, TCSANOW, &tio);
 
 	return (fd);
@@ -368,18 +286,22 @@ APC_open_serialport(const char *port, speed_t speed)
  */
 
 void
-APC_close_serialport(int upsfd)
+APC_close_serialport(const char *port, int upsfd)
 {
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 	}
-
-	file_unlock(upsfd);
+	if (upsfd < 0) {
+		return;
+	}
 
 	tcflush(upsfd, TCIFLUSH);
 	tcsetattr(upsfd, TCSANOW, &old_tio);
 	close(upsfd);
+	if (port != NULL) {
+		OurImports->TtyUnlock(port);
+	}
 }
 
 /*
@@ -458,6 +380,7 @@ APC_recv_rsp(int upsfd, char *rsp)
 	    		alarm(0);
 			STONITH_IGNORE_SIG(SIGALRM);
 			*p = '\0';
+			LOG(PIL_DEBUG, "%s: returning on error.", __FUNCTION__);
 			return (f_serialtimeout ? S_TIMEOUT : S_ACCESS);
 		}
 	}
@@ -623,20 +546,21 @@ APC_init(struct pluginDevice *ad)
 	/*   has been observed to sometimes not respond. */
 	if(ad->upsfd >= 0) {
 		if(APC_enter_smartmode(ad->upsfd) != S_OK) {
-			return(-1);
+			return(S_OOPS);
 		}
-		return( S_OK );
+		return S_OK;
 	}
 
 	/* open serial port and store the fd in ad->upsfd */
 	if ((upsfd = APC_open_serialport(ad->upsdev, B2400)) == -1) {
-		return -1;
+		return S_OOPS;
 	}
 
 	/* switch into smart mode */
 	if (APC_enter_smartmode(upsfd) != S_OK) {
-		APC_close_serialport(upsfd);
-		return -1;
+		APC_close_serialport(ad->upsdev, upsfd);
+		ad->upsfd = -1;
+		return S_OOPS;
 	}
 
 	/* get the smallest possible delays for this particular hardware */
@@ -644,27 +568,30 @@ APC_init(struct pluginDevice *ad)
 		, ad->shutdown_delay) != S_OK
 	|| APC_get_smallest_delay(upsfd, CMD_WAKEUP_DELAY
 		, ad->wakeup_delay) != S_OK) {
-		LOG(PIL_CRIT, "%s: couldn't get smallest delay\n"
+		LOG(PIL_CRIT, "%s: couldn't retrieve smallest delay from UPS"
 		,	__FUNCTION__);
-		APC_close_serialport(upsfd);
-		return -1;
+		APC_close_serialport(ad->upsdev, upsfd);
+		ad->upsfd = -1;
+		return S_OOPS;
 	}
 
 	/* get the old settings and store them */
 	strcpy(value, ad->shutdown_delay);
 	if (APC_set_ups_var(upsfd, CMD_SHUTDOWN_DELAY, value) != S_OK) {
-		LOG(PIL_CRIT, "%s: couldn't set shutdown delay to %s\n"
+		LOG(PIL_CRIT, "%s: couldn't set shutdown delay to %s"
 		,	__FUNCTION__, ad->shutdown_delay);
-		APC_close_serialport(upsfd);
-		return -1;
+		APC_close_serialport(ad->upsdev, upsfd);
+		ad->upsfd = -1;
+		return S_OOPS;
 	}
 	strcpy(ad->old_shutdown_delay, value);
 	strcpy(value, ad->wakeup_delay);
 	if (APC_set_ups_var(upsfd, CMD_WAKEUP_DELAY, value) != S_OK) {
-		LOG(PIL_CRIT, "%s: couldn't set wakeup delay to %s\n"
+		LOG(PIL_CRIT, "%s: couldn't set wakeup delay to %s"
 		,	__FUNCTION__, ad->wakeup_delay);
-		APC_close_serialport(upsfd);
-		return -1;
+		APC_close_serialport(ad->upsdev, upsfd);
+		ad->upsfd = -1;
+		return S_OOPS;
 	}
 	strcpy(ad->old_wakeup_delay, value);
 
@@ -685,7 +612,10 @@ APC_deinit(struct pluginDevice *ad)
 	APC_set_ups_var(ad->upsfd, CMD_WAKEUP_DELAY, ad->old_wakeup_delay);
 
 	/* close serial port */
-	APC_close_serialport(ad->upsfd);
+	if (ad->upsfd >= 0) {
+		APC_close_serialport(ad->upsdev, ad->upsfd);
+		ad->upsfd = -1;
+	}
 }
 static const char**
 apcsmart_get_confignames(StonithPlugin* sp)
@@ -880,6 +810,10 @@ apcsmart_ReqGenericReset(struct pluginDevice *ad)
 		|| strcmp(resp, RSP_RESET2) == 0)) {
 			/* second kind of command was accepted */
 		} else {
+			if (Debug) {
+				LOG(PIL_DEBUG, "APC: neither reset command "
+					"was accepted");
+			}
 			rc = S_RESETFAIL;
 		}
 	}
@@ -895,19 +829,24 @@ apcsmart_ReqGenericReset(struct pluginDevice *ad)
 			}
 			sleep(1);
 		}
+		LOG(PIL_CRIT, "%s: timed out waiting for reset to end."
+		,	__FUNCTION__);
 		return S_RESETFAIL;
 
 	}else{
-		LOG(PIL_DEBUG, "APC: rc = %d resp[%s]"
-		,	rc, resp);
-
-		if (rc == S_OK && strcmp(resp, RSP_NA) == 0){
+		if (strcmp(resp, RSP_NA) == 0){
 			gboolean iserr;
 			/* This means it's currently powered off */
 			/* or busy on a previous command... */
 			if (apcsmart_IsPoweredOff(ad, &iserr)) {
 				if (iserr) {
+					LOG(PIL_DEBUG, "%s: power off "
+					"detection failed.", __FUNCTION__);
 					return S_RESETFAIL;
+				}
+				if (Debug) {
+					LOG(PIL_DEBUG, "APC: was powered off, "
+						"powering back on.");
 				}
 				return apcsmart_ReqOnOff(ad, ST_POWERON);
 			}
@@ -995,7 +934,7 @@ apcsmart_get_info(StonithPlugin * s, int reqtype)
 			" (via serial port - NOT USB!). "
 			" Works with higher-end APC UPSes, like"
 			" Back-UPS Pro, Smart-UPS, Matrix-UPS, etc. "
-			" (Smart-UPS may have to be >= Smart-UPS 700?)\n"
+			" (Smart-UPS may have to be >= Smart-UPS 700?). "
 		" See http://us1.networkupstools.org/protocols/apcsmart.html"
 			" for protocol compatibility details.";
 			break;
