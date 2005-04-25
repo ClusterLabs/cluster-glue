@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.91 2005/04/25 05:45:26 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.92 2005/04/25 09:05:32 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -113,6 +113,12 @@ struct lrmd_op
 	int		interval;
 	int		delay;
 	struct ha_msg*	msg;
+	/*time stamp*/
+	longclock_t	t_recv;
+	longclock_t	t_addtolist;
+	longclock_t	t_perform;
+	longclock_t	t_done;
+	
 };
 
 struct lrmd_rsc
@@ -891,6 +897,7 @@ on_repeat_op_done(gpointer data)
 	op->exec_pid = -1;
 	op->timeout_tag = -1;
 
+	op->t_addtolist = time_longclock();
 	op->rsc->op_list = g_list_append(op->rsc->op_list, op);
 	
 	if (HA_OK != ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)) {
@@ -1483,6 +1490,10 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		op->timeout_tag = -1;
 		op->rsc = rsc;
 		op->msg = ha_msg_copy(msg);
+		op->t_recv = time_longclock();
+		op->t_addtolist = 0;
+		op->t_perform = 0;
+		op->t_done = 0;
 		
 		lrmd_log(LOG_DEBUG, "on_msg_perform_op:client [%d] add %s"
 		,	client->pid
@@ -1518,6 +1529,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			lrmd_log2(LOG_DEBUG
 			,	"on_msg_perform_op:add %s to op list"
 			,	op_info(op));
+			op->t_addtolist = time_longclock();
 			rsc->op_list = g_list_append(rsc->op_list, op);
 		}
 
@@ -1642,7 +1654,15 @@ on_op_done(lrmd_op_t* op)
 		lrmd_log(LOG_WARNING, "on_op_done: op was freed.");
 		return HA_FAIL;
 	}
+	op->t_done = time_longclock();
+	
 	lrmd_log2(LOG_DEBUG, "on_op_done:DONE:%s", op_info(op));
+	lrmd_log2(LOG_DEBUG
+		 ,"TimeStamp:  Recv:%ld,Add to List:%ld,Perform:%ld, Done %ld"
+		 ,longclockto_ms(op->t_recv)
+		 ,longclockto_ms(op->t_addtolist)
+		 ,longclockto_ms(op->t_perform)
+		 ,longclockto_ms(op->t_done));
 
 	/*  we should check if the resource exists. */
 	if (NULL == g_list_find(rsc_list, op->rsc)) {
@@ -1810,6 +1830,11 @@ on_op_done(lrmd_op_t* op)
 		repeat_op->interval = op->interval;
 		repeat_op->msg = ha_msg_copy(op->msg);
 		
+		repeat_op->t_recv = op->t_recv;
+		repeat_op->t_addtolist = op->t_addtolist;
+		repeat_op->t_perform = op->t_perform;
+		repeat_op->t_done = op->t_done;
+		
 		repeat_op->repeat_timeout_tag = 
 			Gmain_timeout_add(op->interval,	
 					on_repeat_op_done, repeat_op);
@@ -1956,7 +1981,7 @@ perform_ra_op(lrmd_op_t* op)
 	free_str_table(op_params);
 	free_str_table(op->rsc->params);
 	op->rsc->params = params;
-
+	op->t_perform = time_longclock();
 	return_to_orig_privs();
 	switch(pid=fork()) {
 		case -1:
@@ -2468,6 +2493,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.92  2005/04/25 09:05:32  zhenh
+ * add timestamp to operation, fix #494
+ *
  * Revision 1.91  2005/04/25 05:45:26  zhenh
  * add start delay for operations in LRM
  *
