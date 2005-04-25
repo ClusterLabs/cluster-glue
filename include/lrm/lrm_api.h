@@ -134,6 +134,7 @@ typedef struct{
 	char*			user_data;
 	int			user_data_len;
 	int			interval;
+	int			start_delay;
 	int			target_rc;
 
 	/*output fields*/

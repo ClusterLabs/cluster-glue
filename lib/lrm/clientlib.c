@@ -1076,6 +1076,7 @@ msg_to_op(struct ha_msg* msg)
 	if (HA_OK != ha_msg_value_int(msg,F_LRM_TIMEOUT, &op->timeout)
 	||  HA_OK != ha_msg_value_int(msg,F_LRM_INTERVAL, &op->interval)
 	||  HA_OK != ha_msg_value_int(msg,F_LRM_TARGETRC, &op->target_rc)
+	||  HA_OK != ha_msg_value_int(msg,F_LRM_DELAY, &op->start_delay)
 	||  HA_OK != ha_msg_value_int(msg,F_LRM_CALLID, &op->call_id)) {
 		cl_log(LOG_ERR, "msg_to_op: can not get fields.");
 		free_op(op);
@@ -1175,6 +1176,7 @@ op_to_msg (lrm_op_t* op)
 	||  HA_OK != ha_msg_add(msg, F_LRM_OP, op->op_type)
 	||  HA_OK != ha_msg_add_int(msg, F_LRM_TIMEOUT, op->timeout)
 	||  HA_OK != ha_msg_add_int(msg, F_LRM_INTERVAL, op->interval)
+	||  HA_OK != ha_msg_add_int(msg, F_LRM_DELAY, op->start_delay)
 	||  HA_OK != ha_msg_add_int(msg, F_LRM_TARGETRC, op->target_rc)) {
 		ha_msg_del(msg);
 		cl_log(LOG_ERR, "op_to_msg: can not add field.");
