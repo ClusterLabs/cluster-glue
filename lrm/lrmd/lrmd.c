@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.90 2005/04/20 07:25:20 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.91 2005/04/25 05:45:26 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -111,6 +111,7 @@ struct lrmd_op
 	guint		timeout_tag;
 	guint		repeat_timeout_tag;
 	int		interval;
+	int		delay;
 	struct ha_msg*	msg;
 };
 
@@ -1487,24 +1488,38 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		,	client->pid
 		,	op_info(op));
 
-		if (HA_OK!=ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)) {
-			lrmd_log(LOG_ERR,
-				"on_msg_perform_op: can not get timeout.");
-		} else if (0 < timeout ) {
-			op->timeout_tag = Gmain_timeout_add(timeout,
-						on_timeout_op_done, op);
-		}
-		
 		if (HA_OK!=ha_msg_value_int(op->msg, F_LRM_INTERVAL,
 						 &op->interval)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_perform_op: can not get interval.");
 		}
-
-		lrmd_log2(LOG_DEBUG
-		,	"on_msg_perform_op:add %s to op list"
-		,	op_info(op));
-		rsc->op_list = g_list_append(rsc->op_list, op);
+		if (HA_OK!=ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)) {
+			lrmd_log(LOG_ERR,
+				"on_msg_perform_op: can not get timeout.");
+		}		
+		if (HA_OK!=ha_msg_value_int(op->msg, F_LRM_DELAY,
+						 &op->delay)) {
+			lrmd_log(LOG_ERR,
+				"on_msg_perform_op: can not get delay.");
+		}
+		if ( 0 < op->delay ) {
+			op->repeat_timeout_tag = Gmain_timeout_add(op->delay
+					        ,on_repeat_op_done, op);
+			op->rsc->repeat_op_list = 
+			    g_list_append (op->rsc->repeat_op_list, op);
+			lrmd_log2(LOG_DEBUG
+			, "on_op_done: %s is added to repeat op list for delay" 
+			, op_info(op));
+		} else {
+ 			if (0 < timeout ) {
+				op->timeout_tag = Gmain_timeout_add(timeout
+						, on_timeout_op_done, op);
+			}
+			lrmd_log2(LOG_DEBUG
+			,	"on_msg_perform_op:add %s to op list"
+			,	op_info(op));
+			rsc->op_list = g_list_append(rsc->op_list, op);
+		}
 
 		perform_op(rsc);
 	}
@@ -2453,6 +2468,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.91  2005/04/25 05:45:26  zhenh
+ * add start delay for operations in LRM
+ *
  * Revision 1.90  2005/04/20 07:25:20  zhenh
  * fix memory leak in new logs, found by BEAM
  *

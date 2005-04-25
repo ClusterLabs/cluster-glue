@@ -67,7 +67,7 @@
 #define F_LRM_STATUS		"lrm_status"
 #define F_LRM_METADATA		"lrm_metadata"
 #define F_LRM_USERDATA		"lrm_userdata"
-
+#define F_LRM_DELAY		"lrm_delay"
 #define	PRINT 	printf("file:%s,line:%d\n",__FILE__,__LINE__);
 
 
