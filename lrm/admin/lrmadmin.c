@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.30 2005/04/22 06:08:50 alan Exp $ */
+/* $Id: lrmadmin.c,v 1.31 2005/04/25 05:47:54 zhenh Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -570,7 +570,11 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 
  	/* Plus addtional 1s, make here the timeout normally takes place 
 	   after the lrmd's */
-	TIMEOUT = op.timeout + 1000;
+	if (0 < op.timeout ) {
+		TIMEOUT = op.timeout + 1000;
+	} else {
+		TIMEOUT = 60000;
+	}		
 	op.interval = atoi(argv[optind+3]);
 	op.user_data = NULL;
 	op.user_data_len = 0;
@@ -923,6 +927,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.31  2005/04/25 05:47:54  zhenh
+ * when user did not give timeout of op, use 60s as timeout of lrmadmin, if user gave one, add 1s as timeout of lrmadmin
+ *
  * Revision 1.30  2005/04/22 06:08:50  alan
  * Put in a fix for an uninitialized variable -- added a new
  * const lrm_op_t object lrm_zero_op - which can be used as an initializer for
