@@ -1056,6 +1056,7 @@ lrm_op_new(void)
 	lrm_op_t* op;
 
 	op = g_new0(lrm_op_t, 1);
+	op->op_status = LRM_OP_PENDING;
 	return op;
 }
 
