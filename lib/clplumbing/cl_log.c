@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.54 2005/04/14 05:56:44 gshi Exp $ */
+/* $Id: cl_log.c,v 1.55 2005/04/25 16:05:46 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -65,6 +65,7 @@ static const char*	debugfile_name = NULL;
 static int cl_process_pid = -1;
 static GDestroyNotify destroy_logging_channel_callback;
 static void (*create_logging_channel_callback)(IPC_Channel* chan);
+static gboolean		logging_chan_in_main_loop = FALSE;
 
 /***********************
  *debug use only, do not use this function in your program
@@ -175,14 +176,17 @@ add_logging_channel_mainloop(IPC_Channel* chan)
 	if (chp == NULL){
 		cl_log(LOG_INFO, "adding logging channel to mainloop failed");
 	}	
+
+	logging_chan_in_main_loop = TRUE;
 	
+
 	return;
 }
 
 static void
 remove_logging_channel_mainloop(gpointer userdata)
 {
-	/*do nothing*/
+	logging_chan_in_main_loop = FALSE;
 	
 	return;
 }
@@ -213,7 +217,9 @@ create_logging_channel(void)
 		cl_log(LOG_WARNING, "Initializing connection"
 		       " to logging daemon failed."
 		       " Logging daemon may not be running");
-		chan->ops->destroy(chan);
+		if (!logging_chan_in_main_loop){
+			chan->ops->destroy(chan);
+		}
 		
 		return NULL;
 	}
@@ -236,7 +242,9 @@ cl_log_test_logd(void)
 		return TRUE;
 	}
 	if (chan ){
-		chan->ops->destroy(chan);
+		if (!logging_chan_in_main_loop){
+			chan->ops->destroy(chan);
+		}
 		logging_daemon_chan = chan = NULL;
 	}
 	
@@ -247,7 +255,9 @@ cl_log_test_logd(void)
 	}
 		
 	if(chan->ops->get_chan_status(chan) != IPC_CONNECT){
-		chan->ops->destroy(chan);
+		if (!logging_chan_in_main_loop){
+			chan->ops->destroy(chan);
+		}
 		logging_daemon_chan = chan = NULL;	
 		return FALSE;
 	}
@@ -614,7 +624,9 @@ cl_set_logging_wqueue_maxlen(int qlen)
 	if (chan->ch_status != IPC_CONNECT){		
 		cl_log(LOG_ERR, "cl_set_logging_wqueue_maxle:"
 		       "channel is not connected");
-		chan->ops->destroy(chan);
+		if (!logging_chan_in_main_loop){
+			chan->ops->destroy(chan);
+		}
 		logging_daemon_chan = NULL;
 		return HA_FAIL;
 	}
@@ -692,7 +704,9 @@ LogToLoggingDaemon(int priority, const char * buf,
 	} else {
 		
 		if (chan->ops->get_chan_status(chan) != IPC_CONNECT) {
-			chan->ops->destroy(chan);
+			if (!logging_chan_in_main_loop){
+				chan->ops->destroy(chan);
+			}
 			logging_daemon_chan = NULL;
 			cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);			
 			
