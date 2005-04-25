@@ -27,6 +27,7 @@
 #include <string.h>
 #include <glib.h>
 #include <lrm/lrm_api.h>
+#include <clplumbing/cl_log.h>
 #include <syslog.h>
 
 void lrm_op_done_callback (lrm_op_t* op);
@@ -44,6 +45,10 @@ int main (int argc, char* argv[])
 	const char* rid = "ip248";
 	GHashTable* param = NULL;
 	int call_id;
+	
+	cl_log_set_entity("apitest");
+	cl_log_enable_stderr(TRUE);
+	cl_log_set_facility(LOG_DAEMON);
 
 	lrm = ll_lrm_new("lrm");
 
@@ -54,7 +59,10 @@ int main (int argc, char* argv[])
 	}
 	puts("sigon...");
 	lrm->lrm_ops->signon(lrm,"apitest");
-
+	
+	GList* classes = lrm->lrm_ops->get_rsc_class_supported(lrm);
+	lrm_free_str_list(classes);
+	
 	param = g_hash_table_new(g_str_hash,g_str_equal);
 	g_hash_table_insert(param, strdup("1"), strdup("3ffe:ffff:0:f101::3"));
 	puts("add_rsc...");
@@ -78,8 +86,11 @@ int main (int argc, char* argv[])
 	op->target_rc = EVERYTIME;
 	rsc->ops->perform_op(rsc,op);
 	printf_op(op);
-
+	lrm_free_op(op);
+	
 	puts("perform_op(status)...");
+	param = g_hash_table_new(g_str_hash,g_str_equal);
+	g_hash_table_insert(param, strdup("1"), strdup("3ffe:ffff:0:f101::3"));
 	op = lrm_op_new();
 	op->op_type = g_strdup("status");
 	op->params = param;
@@ -94,8 +105,11 @@ int main (int argc, char* argv[])
 	op->target_rc=EVERYTIME;
 	call_id = rsc->ops->perform_op(rsc,op);
 	printf_op(op);
+	lrm_free_op(op);
 
 	puts("perform_op(stop)...");
+	param = g_hash_table_new(g_str_hash,g_str_equal);
+	g_hash_table_insert(param, strdup("1"), strdup("3ffe:ffff:0:f101::3"));
 	op = lrm_op_new();
 	op->op_type = g_strdup("stop");
 	op->params = param;
@@ -110,6 +124,7 @@ int main (int argc, char* argv[])
 	op->target_rc=EVERYTIME;
 	rsc->ops->perform_op(rsc,op);
 	printf_op(op);
+	lrm_free_op(op);
 
 	puts("get_cur_state...");
 	get_cur_state(rsc);
@@ -127,7 +142,8 @@ int main (int argc, char* argv[])
         get_cur_state(rsc);
 	puts("delete_rsc...");
 	lrm->lrm_ops->delete_rsc(lrm, rid);
-
+	lrm_free_rsc(rsc);
+	
 	puts("signoff...");
 	lrm->lrm_ops->signoff(lrm);
 	
@@ -207,6 +223,7 @@ get_all_rsc(ll_lrm_t* lrm)
 	} else {
 		puts("\tnone.");
 	}
+	lrm_free_str_list(rid_list);
 }
 void
 get_cur_state(lrm_rsc_t* rsc)
@@ -225,5 +242,5 @@ get_cur_state(lrm_rsc_t* rsc)
 		op = (lrm_op_t*)node->data;
 		printf_op(op);
 	}
-
+	lrm_free_op_list(op_list);
 }
