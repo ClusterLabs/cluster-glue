@@ -1274,6 +1274,64 @@ free_op (lrm_op_t* op)
 	}
 }
 
+void lrm_free_op(lrm_op_t* op) {
+	free_op(op);
+}
+void lrm_free_rsc(lrm_rsc_t* rsc) {
+	if (NULL == rsc) {
+		return;
+	}
+	if (NULL != rsc->id) {
+		g_free(rsc->id);
+	}
+	if (NULL != rsc->type) {
+		g_free(rsc->type);
+	}
+	if (NULL != rsc->class) {
+		g_free(rsc->class);
+	}
+	if (NULL != rsc->provider) {
+		g_free(rsc->provider);
+	}
+	if (NULL != rsc->params) {
+		free_str_table(rsc->params);
+	}
+	g_free(rsc);
+}
+void lrm_free_str_list(GList* list) {
+	GList* item;
+	if (NULL == list) {
+		return;
+	}
+	item = g_list_first(list);
+	while (NULL != item) {
+		if (NULL != item->data) {
+			g_free(item->data);
+		}
+		list = g_list_delete_link(list, item);
+		item = g_list_first(list);
+	}
+}	
+void lrm_free_op_list(GList* list) {
+	GList* item;
+	if (NULL == list) {
+		return;
+	}
+	item = g_list_first(list);
+	while (NULL != item) {
+		if (NULL != item->data) {
+			free_op((lrm_op_t*)item->data);
+		}
+		list = g_list_delete_link(list, item);
+		item = g_list_first(list);
+	}
+}	
+void lrm_free_str_table(GHashTable* table) {
+	if (NULL != table) {
+		free_str_table(table);
+	}
+}
+
 const char *
 execra_code2string(uniform_ret_execra_t code)
 {

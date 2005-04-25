@@ -22,7 +22,7 @@
 
 /*
  *
- * By Huang Zhen <zhenh@cn.ibm.com> 2004/2/23
+ * By Huang Zhen <zhenhltc@cn.ibm.com> 2004/2/23
  *
  * It is based on the works of Alan Robertson, Lars Marowsky Bree,
  * Andrew Beekhof.
@@ -149,7 +149,14 @@ typedef struct{
 }lrm_op_t;
 
 extern const lrm_op_t lrm_zero_op;	/* an all-zeroes lrm_op_t value */
+
 lrm_op_t* lrm_op_new(void);
+void lrm_free_op(lrm_op_t* op);
+void lrm_free_rsc(lrm_rsc_t* rsc);
+void lrm_free_str_list(GList* list);
+void lrm_free_op_list(GList* list);
+void lrm_free_str_table(GHashTable* table);
+
 
 /*this enum is used in get_cur_state*/
 typedef enum {
@@ -163,8 +170,8 @@ struct rsc_ops
  *perform_op:	Performs the operation on the resource.
  *Notice: 	op is the operation which need to pass to RA and done asyn
  *
- *op:		the structure of the operation. caller should release
- *		the memory.
+ *op:		the structure of the operation. Caller can create the op by
+ *		lrm_op_new() and release the op using lrm_free_op()
  *
  *return:	All operations will be asynchronous.
  *		The call will return the call id or failed code immediately.
@@ -200,11 +207,11 @@ struct rsc_ops
  *
  *return:	a list of lrm_op_t*.
  *		if cur_state == LRM_RSC_IDLE, the first and the only element
- *		of the list is the last op executed.
+ *		of the list is the last op executed. The list may be empty.
  *		if cur_state == LRM_RSC_BUSY, the first op of the list is the
  *		current running opertaion and others are the pending operations
  *
- *		client should release the memory of ops
+ *		client can release the list using lrm_free_op_list()
  */
 	GList* (*get_cur_state) (lrm_rsc_t*, state_flag_t* cur_state);
 
@@ -215,6 +222,7 @@ struct rsc_ops
  *lrm_op_done_callback_t:
  *		this type of callback functions are called when some
  *		asynchronous operation is done.
+ *		client can release op by lrm_free_op()
  */
 typedef void (*lrm_op_done_callback_t)	(lrm_op_t* op);
 
@@ -242,7 +250,7 @@ struct lrm_ops
  *		e.g. ocf, heartbeat,lsb...
  *
  *return:	a list of the names of supported resource classes.
- *
+ *		caller can release the list by lrm_free_str_list().
  */
 	GList* 	(*get_rsc_class_supported)(ll_lrm_t*);
 
@@ -252,7 +260,7 @@ struct lrm_ops
  *		e.g. drdb, apache,IPaddr...
  *
  *return:	a list of the names of supported resource types.
- *
+ *		caller can release the list by lrm_free_str_list().
  */
 	GList* 	(*get_rsc_type_supported)(ll_lrm_t*, const char* rsc_class);
 
@@ -264,7 +272,7 @@ struct lrm_ops
  *rsc_provider:	if it is null, the default one will used.
  *
  *return:	a list of the names of supported resource provider.
- *
+ *		caller can release the list by lrm_free_str_list().
  */
 	GList* 	(*get_rsc_provider_supported)(ll_lrm_t*,
 		const char* rsc_class, const char* rsc_type);
@@ -275,8 +283,8 @@ struct lrm_ops
  *
  *rsc_provider:	if it is null, the default one will used.
  *
- *return:	the metadata.
- *
+ *return:	the metadata. use g_free() to free.
+ *		
  */
 	char* (*get_rsc_type_metadata)(ll_lrm_t*, const char* rsc_class,
 			const char* rsc_type, const char* rsc_provider);
@@ -288,7 +296,7 @@ struct lrm_ops
  *return:	A GHashtable, the key is the RA type,
  *		the value is the metadata.
  *		Now only default RA's metadata will be returned.
- *
+ *		please use lrm_free_str_table() to free the return value.
  */
 	GHashTable* (*get_all_type_metadata)(ll_lrm_t*, const char* rsc_class);
 
@@ -297,7 +305,7 @@ struct lrm_ops
  *		Returns all resources.
  *
  *return:	a list of id of resources.
- *
+ *		caller can release the list by lrm_free_str_list().
  */
 	GList*	(*get_all_rscs)(ll_lrm_t*);
 
@@ -306,6 +314,7 @@ struct lrm_ops
  *get_rsc:	Gets one resource pointer by the id
  *
  *return:	the lrm_rsc_t type pointer, NULL for failure
+ *		caller can release the pointer by lrm_free_rsc().
  */
 	lrm_rsc_t* (*get_rsc)(ll_lrm_t*, const char* rsc_id);
 
