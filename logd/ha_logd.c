@@ -58,8 +58,9 @@
 #define	FD_STDERR	2
 
 
-#define WRITE_CHAN	0
-#define READ_CHAN	1
+#define WRITE_PROC_CHAN	0
+#define READ_PROC_CHAN	1
+#define LOGD_QUEUE_LEN 128
 
 #define MAXLINE 128
 #define EOS '\0'
@@ -646,6 +647,7 @@ read_msg_process(IPC_Channel* chan)
 	GMainLoop*		mainloop;
 
 	
+
 	mainloop = g_main_new(FALSE);       
 	
 	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGTERM, 
@@ -893,6 +895,12 @@ main(int argc, char** argv, char** envp)
 		return -1;
 	}
 	
+	chanspair[WRITE_PROC_CHAN]->ops->set_recv_qlen(chanspair[WRITE_PROC_CHAN],
+						  LOGD_QUEUE_LEN);
+	
+	chanspair[READ_PROC_CHAN]->ops->set_send_qlen(chanspair[READ_PROC_CHAN],
+						 LOGD_QUEUE_LEN);
+	
 	if (init_set_proc_title(argc, argv, envp) < 0) {
 		cl_log(LOG_ERR, "Allocation of proc title failed.");
                 return -1;
@@ -906,14 +914,14 @@ main(int argc, char** argv, char** envp)
 	case 0:
 		/*child*/
 		set_proc_title("ha_logd: write process");
-		write_msg_process(chanspair[WRITE_CHAN]);		
+		write_msg_process(chanspair[WRITE_PROC_CHAN]);		
 		break;
 	default:
 		/*parent*/		
 		set_proc_title("ha_logd: read process");
 		write_process_pid = pid;
 		
-		read_msg_process(chanspair[READ_CHAN]);
+		read_msg_process(chanspair[READ_PROC_CHAN]);
 		break;
 	}
 	
