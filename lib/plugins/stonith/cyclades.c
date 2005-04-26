@@ -1,4 +1,4 @@
- /* $Id: cyclades.c,v 1.10 2005/04/22 14:22:16 blaschke Exp $ */
+ /* $Id: cyclades.c,v 1.11 2005/04/26 17:08:24 blaschke Exp $ */
 /*
  * Stonith module for Cyclades AlterPath PM
  * Bases off the SSH plugin
@@ -133,12 +133,21 @@ static int CYC_robust_cmd(struct pluginDevice *, char *);
 static const char * pluginid = "CycladesDevice-Stonith";
 static const char * NOTpluginID = "Cyclades device has been destroyed";
 
-#define ST_SERIALPORT "serialport"
+#define MAX_OUTLETS	128
+
+#define ST_SERIALPORT	"serialport"
+
+#define ZEROEXPECT(fd,p,t)	{					\
+                                if (StonithLookFor(fd, p, t) < 0)	\
+                                        return(0);			\
+                        }
 
 #define RESETEXPECT(fd,p,t)	{					\
-                        	if (StonithLookFor(fd, p, t) < 0)	\
+                        	if (StonithLookFor(fd, p, t) < 0) {	\
+					FREE(outletstr);		\
                                 	return(errno == ETIMEDOUT	\
 	                        ?       S_RESETFAIL : S_OOPS);		\
+				}					\
                         }
 
 #include "stonith_config_xml.h"
@@ -181,7 +190,7 @@ cyclades_status(StonithPlugin  *s)
 
 static int CYC_run_command(struct pluginDevice *sd, char *cmd)
 {
-	char	SshCommand[256];
+	char	SshCommand[MAX_OUTLETS*4];
 
 	snprintf(SshCommand, sizeof(SshCommand),
 			"exec ssh -q %s@%s /bin/pmCommand %d %s 2>/dev/null", 
@@ -219,23 +228,22 @@ CYC_robust_cmd(struct pluginDevice *sd, char *cmd)
 }
 
 #define MAXSAVE 512
-static char *CYCNametoOutlet(struct pluginDevice *sd, const char *host)
+static int CYCNametoOutlet(struct pluginDevice *sd, const char *host, int *outlets, int maxoutlet)
 {
 	char *cmd = status_all;
 	char    savebuf[MAXSAVE];
 	int err;
 	int outlet, numoutlet = 0;
 	char name[10], locked[10], on[4];
-	char *outletbuf = NULL;
 
 	if (CYC_robust_cmd(sd, cmd) != S_OK) {
 		LOG(PIL_CRIT, "can't run status all command");
-		return NULL;
+		return 0;
 	}
 
-	NULLEXPECT(sd->rdfd, StatusOutput, 50);
+	ZEROEXPECT(sd->rdfd, StatusOutput, 50);
 
-	NULLEXPECT(sd->rdfd, CRNL, 50);
+	ZEROEXPECT(sd->rdfd, CRNL, 50);
 
 	do {
 
@@ -247,39 +255,21 @@ static char *CYCNametoOutlet(struct pluginDevice *sd, const char *host)
 		err = CYCScanLine(sd, 2, savebuf, sizeof(savebuf));
 
 		if ((err == S_OK) &&
-		    (sscanf(savebuf,"%2d %10s %10s %3s", &outlet, 
+		    (sscanf(savebuf,"%3d %10s %10s %3s", &outlet, 
 			name, locked, on) > 0)) {
 			if (strstr(locked, "ocked")
 			&& !strcasecmp(name, host)) {
-				int len = outlet < 10 ? 2 : 3;
-				numoutlet++;
-				if (numoutlet == 1) {
-					outletbuf = MALLOC(len*sizeof(char *));
-					if (outletbuf == NULL) {
-						LOG(PIL_CRIT, "out of memory");
-						return NULL;
-					}
-					snprintf(outletbuf, len, "%d", outlet);
-				}else{
-					char *newbuf;
-					len += strlen(outletbuf) + 1;
-					newbuf = MALLOC(len * sizeof(char *));
-					if (newbuf == NULL) {
-						LOG(PIL_CRIT, "out of memory");
-						FREE(outletbuf);
-						return NULL;
-					}
-					snprintf(newbuf, len, "%s,%d"
-					,	outletbuf, outlet);
-					FREE(outletbuf);
-					outletbuf = newbuf;
+				if (numoutlet >= maxoutlet) {
+					LOG(PIL_CRIT, "too many outlets");
+					return 0;
 				}
+				outlets[numoutlet++] = outlet;
 			}
 		}
 
 	} while (err == S_OK);
 
-	return (outletbuf);
+	return (numoutlet);
 }
 
 
@@ -297,7 +287,7 @@ cyclades_hostlist(StonithPlugin  *s)
 	int outlet;
 	int numnames = 0;
 	char name[10], locked[10], on[4];
-	char *NameList[64];
+	char *NameList[MAX_OUTLETS];
 	char **ret = NULL;
 
 	ERRIFNOTCONFIGED(s,NULL);
@@ -326,7 +316,7 @@ cyclades_hostlist(StonithPlugin  *s)
 		err = CYCScanLine(sd, 2, savebuf, sizeof(savebuf));
 
 		if ((err == S_OK) &&
-		    (sscanf(savebuf,"%2d %10s %10s %3s", &outlet, 
+		    (sscanf(savebuf,"%3d %10s %10s %3s", &outlet, 
 			name, locked, on) > 0)) {
 			if (strstr(locked, "ocked")) {
 				nm = (char *) STRDUP (name);
@@ -363,73 +353,121 @@ out_of_memory:
 	return (NULL);
 }
 
-static int cyclades_onoff(struct pluginDevice *sd, char *outlet, 
+
+static char *cyclades_outletstr(int *outlet, int numoutlet)
+{
+        int i, len;
+        char *ret;
+
+        /* maximum length per outlet is currently four (outlet is one to
+         * three digits, followed by either a comma or null), so add one
+	 * for good measure */
+        len = numoutlet * 5 * sizeof(char);
+        if ((ret = MALLOC(len)) != NULL) {
+                snprintf(ret, len, "%d", outlet[0]);
+                for (i = 1; i < numoutlet; i++) {
+                        char buf[5];
+                        snprintf(buf, sizeof(buf), ",%d", outlet[i]);
+                        strcat(ret, buf);
+                }
+        }
+        return(ret);
+}
+
+
+static int cyclades_onoff(struct pluginDevice *sd, int *outlet, int numoutlet, 
 		const char *unitid, int req)
 {
 	const char * onoff;
-	char cmd[64], expstring[64];
+	char cmd[MAX_OUTLETS*4], expstring[64];
 	struct Etoken exp[] = {{NULL, 0, 0}, {NULL, 0, 0}};
+	char *outletstr;
+	int i;
 	
 	onoff = (req == ST_POWERON ? "on" : "off");
 
 	memset(cmd, 0, sizeof(cmd));
-	memset(expstring, 0, sizeof(expstring));
 
-	snprintf(cmd, sizeof(cmd), "%s %s", onoff, outlet);
+	outletstr = cyclades_outletstr(outlet, numoutlet);
+	if (outletstr == NULL) {
+		LOG(PIL_CRIT, "out of memory");
+		return (S_OOPS);
+	}
+	snprintf(cmd, sizeof(cmd), "%s %s", onoff, outletstr);
 
 	if (CYC_robust_cmd(sd, cmd) != S_OK) {
 		LOG(PIL_CRIT, "can't run %s command", onoff);
+		FREE(outletstr);
 		return(S_OOPS);
 	}
 
 	EXPECT(sd->rdfd, CRNL, 50);
 
-	snprintf(expstring, sizeof(expstring), "%s: Outlet(s) turned %s."
-	,	outlet, onoff);
+	for (i = 0; i < numoutlet; i++) {
+		memset(expstring, 0, sizeof(expstring));
+		snprintf(expstring, sizeof(expstring), "%d: Outlet turned %s."
+		,	outlet[i], onoff);
 
-	exp[0].string = expstring;
+		exp[0].string = expstring;
+	
+		/* FIXME: should handle "already powered on/off" case and inform 
+		   to log */
 
-	/* FIXME: should handle "already powered on/off" case and inform 
-	   to log */
-
-	EXPECT(sd->rdfd, exp, 50); 
+		EXPECT(sd->rdfd, exp, 50); 
+	}
 	
 	LOG(PIL_DEBUG, "Power to host %s turned %s", unitid, onoff);
 
+	FREE(outletstr);
 	return (S_OK);
 }
 
-static int cyclades_reset(struct pluginDevice *sd, char *outlet,
+static int cyclades_reset(struct pluginDevice *sd, int *outlet, int numoutlet,
 		const char *unitid)
 {
-	char cmd[64], expstring[64];
+	char cmd[MAX_OUTLETS*4], expstring[64];
 	struct Etoken exp[] = {{NULL, 0, 0}, {NULL, 0, 0}};
+	char *outletstr;
+	int i;
 
 	memset(cmd, 0, sizeof(cmd));
-	memset(expstring, 0, sizeof(expstring));
 
-	snprintf(cmd, sizeof(cmd), "%s %s", cycle, outlet);
+	outletstr = cyclades_outletstr(outlet, numoutlet);
+	if (outletstr == NULL) {
+		LOG(PIL_CRIT, "out of memory");
+		return (S_OOPS);
+	}
+	snprintf(cmd, sizeof(cmd), "%s %s", cycle, outletstr);
 
 	LOG(PIL_INFO, "Host %s being rebooted.", unitid);
 
 	if (CYC_robust_cmd(sd, cmd) != S_OK) {
 		LOG(PIL_CRIT, "can't run cycle command");
+		FREE(outletstr);
 		return(S_OOPS);
 	}
 
 	RESETEXPECT(sd->rdfd, CRNL, 50);
 
-	snprintf(expstring, sizeof(expstring)
-	,	"%s: Outlet(s) turned off.", outlet);
+	for (i = 0; i < numoutlet; i++) {
+		memset(expstring, 0, sizeof(expstring));
+		snprintf(expstring, sizeof(expstring)
+		,	"%d: Outlet turned off.", outlet[i]);
 
-	exp[0].string = expstring;
-	RESETEXPECT(sd->rdfd, exp, 50); 
+		exp[0].string = expstring;
+		RESETEXPECT(sd->rdfd, exp, 50); 
+	}
 
-	memset(expstring, 0, sizeof(expstring));
-	snprintf(expstring, sizeof(expstring)
-	,	"%s: Outlet(s) turned on.", outlet);
-	RESETEXPECT(sd->rdfd, exp, 50); 
+	for (i = 0; i < numoutlet; i++) {
+		memset(expstring, 0, sizeof(expstring));
+		snprintf(expstring, sizeof(expstring)
+		,	"%d: Outlet turned on.", outlet[i]);
 
+		exp[0].string = expstring;
+		RESETEXPECT(sd->rdfd, exp, 50); 
+	}
+
+	FREE(outletstr);
 	return (S_OK);
 }
 
@@ -441,18 +479,15 @@ cyclades_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	struct pluginDevice *sd;
 	int rc = 0;
-	char cmd[512];
-	char *outlet;
+	int numoutlet, outlets[MAX_OUTLETS];
 
 	ERRIFNOTCONFIGED(s,S_OOPS);
 
 	sd = (struct pluginDevice*) s;
 
-	memset (cmd, 0, sizeof(cmd));
+	numoutlet = CYCNametoOutlet(sd, host, outlets, MAX_OUTLETS);
 
-	outlet = CYCNametoOutlet(sd, host);
-
-	if (!outlet) {
+	if (!numoutlet) {
 		LOG(PIL_CRIT, "Unknown host %s to Cyclades PM", host);
 		return (S_OOPS);
 	}
@@ -461,17 +496,16 @@ cyclades_reset_req(StonithPlugin * s, int request, const char * host)
 	switch (request) {
 	case ST_POWERON:
 	case ST_POWEROFF:
-		rc = cyclades_onoff(sd, outlet, host, request);
+		rc = cyclades_onoff(sd, outlets, numoutlet, host, request);
 		break;
 
 	case ST_GENERIC_RESET:
-		rc = cyclades_reset(sd, outlet, host);
+		rc = cyclades_reset(sd, outlets, numoutlet, host);
 		break;
 	default:
 		rc = S_INVAL;
 		break;
 	}
-	FREE(outlet);
 
 	return rc;
 }
