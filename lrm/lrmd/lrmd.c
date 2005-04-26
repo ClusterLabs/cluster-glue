@@ -1,8 +1,8 @@
-/* $Id: lrmd.c,v 1.92 2005/04/25 09:05:32 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.93 2005/04/26 11:00:24 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
- * Author: Huang Zhen <zhenh@cn.ibm.com>
+ * Author: Huang Zhen <zhenhltc@cn.ibm.com>
  * Partly contributed by Andrew Beekhof <andrew@beekhof.net> 
  * Copyright (c) 2004 International Business Machines
  *
@@ -132,6 +132,7 @@ struct lrmd_rsc
 	GList*		op_list;
 	GList*		repeat_op_list;
 	lrmd_op_t*	last_op;
+	GHashTable*	last_op_table;
 };
 
 /* Debug oriented funtions */
@@ -155,6 +156,7 @@ static int on_msg_get_rsc_providers(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg);
+static int on_msg_get_last_op(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg);
@@ -230,6 +232,7 @@ struct msg_map msg_maps[] = {
 	{GETPROVIDERS,	FALSE,	on_msg_get_rsc_providers},
 	{ADDRSC,	TRUE,	on_msg_add_rsc},
 	{GETRSC,	FALSE,	on_msg_get_rsc},
+	{GETLASTOP,	FALSE,	on_msg_get_last_op},
 	{GETALLRCSES,	FALSE,	on_msg_get_all},
 	{DELRSC,	TRUE,	on_msg_del_rsc},
 	{PERFORMOP,	TRUE,	on_msg_perform_op},
@@ -259,7 +262,11 @@ static int init_status(const char *pid_file, const char *client_name);
 static long get_running_pid(const char *pid_file, gboolean* anypidfile);
 static void register_pid(const char *pid_file, gboolean do_fork,
 			void (*shutdown)(int nsig));
-
+static gboolean free_str_hash_pair(gpointer key
+,	 gpointer value, gpointer user_data);
+static gboolean free_str_op_pair(gpointer key
+,	 gpointer value, gpointer user_data);
+static lrmd_op_t* copy_op(lrmd_op_t* op);
 int
 main(int argc, char ** argv)
 {
@@ -1280,6 +1287,68 @@ on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 
 	return HA_OK;
 }
+
+int
+on_msg_get_last_op(lrmd_client_t* client, struct ha_msg* msg)
+{
+	struct ha_msg* ret = NULL;
+	const char* op_type = NULL;
+	lrmd_rsc_t* rsc = NULL;
+	const char* rid = NULL;
+
+	rid = ha_msg_value(msg, F_LRM_RID);
+	op_type = ha_msg_value(msg, F_LRM_OP);
+
+	lrmd_log(LOG_DEBUG
+	,"on_msg_get_last_op:client %s[%d] gets last %s op on %s"
+	,	client->app_name, client->pid
+	, 	lrmd_nullcheck(op_type), lrmd_nullcheck(rid));
+	
+	rsc = lookup_rsc_by_msg(msg);
+	if (NULL != rsc && NULL != op_type) {
+		GHashTable* table = g_hash_table_lookup(rsc->last_op_table
+					,	client->app_name);
+		if (NULL != table ) {
+			lrmd_op_t* op = g_hash_table_lookup(table, op_type);
+			if (NULL != op) {
+				lrmd_log(LOG_ERR
+				, "on_msg_get_last_op:return op %s",op_type);
+				ret = op_to_msg(op);
+				
+				if (NULL == ret) {
+					lrmd_log(LOG_ERR,
+					"on_msg_get_last_op: can't create msg.");
+				} else 
+				if (HA_OK != ha_msg_add_int(ret
+					, 	F_LRM_OPCNT, 1)) {
+					lrmd_log(LOG_ERR,
+					"on_msg_get_last_op: can't add op count.");
+				}
+			}
+		}
+	}
+	if (NULL == ret) {
+		
+		lrmd_log(LOG_ERR, "on_msg_get_last_op:return null");
+		ret = create_lrm_ret(HA_OK, 1);
+		if (NULL == ret) {
+			lrmd_log(LOG_ERR,
+				"on_msg_get_last_op: can not create msg.");
+			return HA_FAIL;
+		}
+		if (HA_OK != ha_msg_add_int(ret, F_LRM_OPCNT, 0)) {
+			lrmd_log(LOG_ERR, "on_msg_get_last_op: can't add op count.");
+		}
+	
+	}
+	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
+		lrmd_log(LOG_ERR, "on_msg_get_last_op: can not send the ret msg");
+	}
+	ha_msg_del(ret);
+
+	return HA_OK;
+}
+
 int
 on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 {
@@ -1314,7 +1383,8 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		while (NULL != op_node) {
 			op = (lrmd_op_t*)op_node->data;
 			op_node = g_list_next(op_node);
-			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
+			rsc->repeat_op_list = 
+				g_list_remove(rsc->repeat_op_list, op);
 			flush_op(op);
 		}
 		/* free the last_op */
@@ -1331,10 +1401,32 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		if (NULL != rsc->params) {
 			free_str_table(rsc->params);
 		}
+		g_hash_table_foreach_remove(rsc->last_op_table
+		,	 free_str_hash_pair, NULL);
+		g_hash_table_destroy(rsc->last_op_table);
 		g_free(rsc);
 	}
 
 	return HA_OK;
+}
+
+static gboolean
+free_str_hash_pair(gpointer key, gpointer value, gpointer user_data)
+{
+	GHashTable* table = (GHashTable*) value;
+	g_free(key);
+	g_hash_table_foreach_remove(table, free_str_op_pair, NULL);
+	g_hash_table_destroy(table);
+	return TRUE;
+}
+
+static gboolean
+free_str_op_pair(gpointer key, gpointer value, gpointer user_data)
+{
+	lrmd_op_t* op = (lrmd_op_t*)user_data;
+	g_free(key);
+	free_op(op);
+	return TRUE;
 }
 
 int
@@ -1366,6 +1458,7 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	rsc->type = g_strdup(ha_msg_value(msg, F_LRM_RTYPE));
 	rsc->class = g_strdup(ha_msg_value(msg, F_LRM_RCLASS));
 	rsc->provider = g_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
+	
 	ra_type_exist = FALSE;
 	for(node=g_list_first(ra_class_list); NULL!=node; node=g_list_next(node)){
 		class = (char*)node->data;
@@ -1389,6 +1482,7 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	rsc->repeat_op_list = NULL;
 	rsc->last_op = NULL;
 	rsc->params = ha_msg_value_str_table(msg,F_LRM_PARAM);
+	rsc->last_op_table = g_hash_table_new(g_str_hash, g_str_equal);
 	rsc_list = g_list_append(rsc_list, rsc);
 
 	return HA_OK;
@@ -1645,7 +1739,10 @@ on_op_done(lrmd_op_t* op)
 	op_status_t op_status;
 	int op_status_int;
 	int need_notify = 0;
-
+	const char* op_type = NULL;
+	GHashTable* client_last_op = NULL;
+	lrmd_client_t* client = NULL;
+	
 	if (op == NULL) {
 		lrmd_log(LOG_WARNING, "on_op_done: op==NULL.");
 		return HA_FAIL;
@@ -1767,7 +1864,6 @@ on_op_done(lrmd_op_t* op)
 	}
 
 	if ( need_notify ) {
-		lrmd_client_t* client;
 
 		/* send the result to client */
 		/* we have to check whether the client still exists */
@@ -1803,38 +1899,52 @@ on_op_done(lrmd_op_t* op)
 	, 	"on_op_done:%s is removed from op list" 
 	,	op_info(op));
 
-	op->rsc->last_op = g_new(lrmd_op_t, 1);
-	op->rsc->last_op->rsc = op->rsc;
-	op->rsc->last_op->client_id = op->client_id;
-	op->rsc->last_op->call_id = op->call_id;
-	op->rsc->last_op->exec_pid = op->exec_pid;
-	op->rsc->last_op->output_fd = op->output_fd;
-	op->rsc->last_op->timeout_tag = op->timeout_tag;
-	op->rsc->last_op->repeat_timeout_tag = op->repeat_timeout_tag;
-	op->rsc->last_op->interval = op->interval;
-	op->rsc->last_op->msg = ha_msg_copy(op->msg);
-
 	if( op->timeout_tag > 0 ) {
 		g_source_remove(op->timeout_tag);
+		op->timeout_tag = -1;
 	}
 	
+	op->rsc->last_op = copy_op(op);
+	
+	/*save the op in the last op hash table*/
+	client = lookup_client(op->client_id);
+	if (NULL != client) {
+		lrmd_op_t* old_op;
+		lrmd_op_t* new_op;
+		/*find the hash table for the client*/
+		client_last_op = g_hash_table_lookup(op->rsc->last_op_table
+		, 			client->app_name);
+		if (NULL == client_last_op) {
+			client_last_op = g_hash_table_new(g_str_hash, g_str_equal);
+			g_hash_table_insert(op->rsc->last_op_table
+			,	(gpointer)g_strdup(client->app_name)
+			,	(gpointer)client_last_op);
+		}
+		
+		/*insert the op to the hash table for the client*/
+		op_type = ha_msg_value(op->msg, F_LRM_OP);
+		old_op = g_hash_table_lookup(client_last_op, op_type);
+		new_op = copy_op(op);
+		if (NULL != old_op) {
+			g_hash_table_replace(client_last_op
+			, 	g_strdup(op_type)
+			,	(gpointer)new_op);
+			free_op(old_op);
+		}
+		else {
+			g_hash_table_insert(client_last_op
+			, 	g_strdup(op_type)
+			,	(gpointer)new_op);
+		}
+	}
+	
+	/*copy the repeat op to repeat list to wait next perform */
 	if ( 0!=op->interval && NULL != lookup_client(op->client_id)
 	&&   LRM_OP_CANCELLED != op_status) {
-		lrmd_op_t* repeat_op = g_new(lrmd_op_t, 1);
-		repeat_op->rsc = op->rsc;
-		repeat_op->client_id = op->client_id;
-		repeat_op->call_id = op->call_id;
+		lrmd_op_t* repeat_op = copy_op(op);
 		repeat_op->exec_pid = -1;
 		repeat_op->output_fd = -1;
 		repeat_op->timeout_tag = -1;
-		repeat_op->interval = op->interval;
-		repeat_op->msg = ha_msg_copy(op->msg);
-		
-		repeat_op->t_recv = op->t_recv;
-		repeat_op->t_addtolist = op->t_addtolist;
-		repeat_op->t_perform = op->t_perform;
-		repeat_op->t_done = op->t_done;
-		
 		repeat_op->repeat_timeout_tag = 
 			Gmain_timeout_add(op->interval,	
 					on_repeat_op_done, repeat_op);
@@ -1931,11 +2041,11 @@ op_to_msg(lrmd_op_t* op)
 
 	if (op == NULL) {
 		lrmd_log(LOG_ERR, "op_to_msg: op==NULL.");
-		return HA_FAIL;
+		return NULL;
 	}
 	if (op->exec_pid == 0) {
-		lrmd_log2(LOG_WARNING, "op_to_msg: op was freed.");
-		return HA_FAIL;
+		lrmd_log(LOG_WARNING, "op_to_msg: op was freed.");
+		return NULL;
 	}
 
 	msg = ha_msg_copy(op->msg);
@@ -2111,8 +2221,8 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		return;
 	}
 	lrmd_log(LOG_DEBUG
-	, "on_ra_proc_finished: process [%d] finished, with signo %d, %s"
-	, p->pid, signo, op_info(op));		
+	, "on_ra_proc_finished: process [%d],exitcode %d, with signo %d, %s"
+	, p->pid, exitcode, signo, op_info(op));		
 
 	op->exec_pid = -1;
 	if (9 == signo) {
@@ -2339,6 +2449,28 @@ free_op(lrmd_op_t* op)
 	op->exec_pid = 0;
 	g_free(op);
 }
+static lrmd_op_t* 
+copy_op(lrmd_op_t* op)
+{
+	lrmd_op_t* ret = g_new(lrmd_op_t, 1);
+	if ( NULL == ret) {
+		return NULL;
+	}
+	ret->rsc = op->rsc;
+	ret->client_id = op->client_id;
+	ret->call_id = op->call_id;
+	ret->exec_pid = op->exec_pid;
+	ret->output_fd = op->output_fd;
+	ret->timeout_tag = op->timeout_tag;
+	ret->repeat_timeout_tag = op->repeat_timeout_tag;
+	ret->interval = op->interval;
+	ret->msg = ha_msg_copy(op->msg);
+	ret->t_recv = op->t_recv;
+	ret->t_addtolist = op->t_addtolist;
+	ret->t_perform = op->t_perform;
+	ret->t_done = op->t_done;
+	return ret;
+}
 int
 read_pipe(int fd, char ** data)
 {
@@ -2493,6 +2625,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.93  2005/04/26 11:00:24  zhenh
+ * add get_last_result(), it will record the last op for every op type and every client.
+ *
  * Revision 1.92  2005/04/25 09:05:32  zhenh
  * add timestamp to operation, fix #494
  *

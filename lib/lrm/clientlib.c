@@ -83,6 +83,7 @@ static int rsc_perform_op (lrm_rsc_t*, lrm_op_t* op);
 static int rsc_cancel_op (lrm_rsc_t*, int call_id);
 static int rsc_flush_ops (lrm_rsc_t*);
 static GList* rsc_get_cur_state (lrm_rsc_t*, state_flag_t* cur_state);
+static lrm_op_t* rsc_get_last_result (lrm_rsc_t*, const char* op_type);
 
 static struct rsc_ops rsc_ops_instance =
 {
@@ -90,6 +91,7 @@ static struct rsc_ops rsc_ops_instance =
 	rsc_cancel_op,
 	rsc_flush_ops,
 	rsc_get_cur_state,
+	rsc_get_last_result
 };
 
 
@@ -1046,6 +1048,69 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 	cl_log(LOG_ERR, "rsc_get_cur_state: unkown state from msg");
 	ha_msg_del(ret);
 	return NULL;
+}
+
+static lrm_op_t*
+rsc_get_last_result (lrm_rsc_t* rsc, const char* op_type)
+{
+	struct ha_msg* msg = NULL;
+	struct ha_msg* ret = NULL;
+	lrm_op_t* op = NULL;
+	int opcount = 0;
+	/* check whether the channel to lrmd is available */
+	if (NULL == ch_cmd)	{
+		cl_log(LOG_ERR, "rsc_get_last_result: ch_mod is null.");
+		return NULL;
+	}
+	/* check parameter */
+	if (NULL == rsc) {
+		cl_log(LOG_ERR, "rsc_get_last_result: rsc is null.");
+		return NULL;
+	}
+	/* create the msg of get last op */
+	msg = create_lrm_rsc_msg(rsc->id,GETLASTOP);
+	if (NULL == msg) {
+		cl_log(LOG_ERR, "rsc_get_last_result: can not create msg");
+		return NULL;
+	}
+	if (HA_OK != ha_msg_add(msg, F_LRM_RID, rsc->id))	{
+		cl_log(LOG_ERR, "rsc_get_last_result: can not add rid");
+		ha_msg_del(msg);
+		return NULL;
+	}
+	if (HA_OK != ha_msg_add(msg, F_LRM_OP, op_type))	{
+		cl_log(LOG_ERR, "rsc_get_last_result: can not add op_type");
+		ha_msg_del(msg);
+		return NULL;
+	}
+	
+	/* send the msg to lrmd */
+	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
+		ha_msg_del(msg);
+		cl_log(LOG_ERR,
+			"rsc_cancel_op: can not send msg to lrmd");
+		return NULL;
+	}
+	ha_msg_del(msg);
+	
+	/* get the return msg */
+	ret = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
+	if (NULL == ret) {
+		cl_log(LOG_ERR,
+			"rsc_get_cur_state: can not receive ret msg");
+		return NULL;
+	}
+	if (HA_OK != ha_msg_value_int(msg,F_LRM_OPCNT, &opcount)) {
+		op = NULL;
+	} 
+	else if ( 1 == opcount ) {
+		op = msg_to_op(ret);
+		if (NULL != op) {
+			op->rsc = lrm_get_rsc( NULL, op->rsc_id );
+		}
+	}
+	ha_msg_del(ret);
+	return op;
 }
 /* 
  * following are the implements of the utility functions
