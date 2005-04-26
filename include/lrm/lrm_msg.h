@@ -80,6 +80,7 @@
 #define GETRSCMETA		"rmetadata"
 #define GETALLRCSES		"getall"
 #define GETRSC			"getrsc"
+#define GETLASTOP		"getlastop"
 #define GETRSCSTATE		"getstate"
 #define	SETMONITOR		"setmon"
 #define	GETMONITORS		"getmons"

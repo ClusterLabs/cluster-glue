@@ -214,7 +214,17 @@ struct rsc_ops
  *		client can release the list using lrm_free_op_list()
  */
 	GList* (*get_cur_state) (lrm_rsc_t*, state_flag_t* cur_state);
-
+	
+/*
+ *get_last_result:
+ *		return the last op of given type from current client
+ *
+ *op_type:	the given type
+ *
+ *return:	the last op. if there is no such op, return NULL.
+ *		client can release the op using lrm_free_op()
+ */
+	lrm_op_t* (*get_last_result)(lrm_rsc_t*, const char *op_type);
 };
 
 
