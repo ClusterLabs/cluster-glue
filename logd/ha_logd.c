@@ -877,10 +877,11 @@ main(int argc, char** argv, char** envp)
 	cl_log_set_entity(logd_config.entity);
 	cl_log_set_facility(logd_config.log_facility);
 	
-	cl_log(LOG_INFO, "%s started with %s."
-	       ,	argv[0], cfgfile ? cfgfile : "default configuration");
-	
 	logd_make_daemon(daemonize);
+	
+	cl_log(LOG_INFO, "logd started with %s.",
+	       cfgfile ? cfgfile : "default configuration");
+	
 	
 
 
