@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.93 2005/04/26 11:00:24 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.94 2005/04/27 03:37:30 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2233,6 +2233,12 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	}
 
 	rsc = op->rsc;
+	if (NULL == g_list_find(rsc_list, op->rsc)) {
+		lrmd_log(LOG_DEBUG,"on_ra_proc_finished: the rsc does not exist");
+		on_op_done(op);
+		p->privatedata = NULL;
+		return;
+	}	
 	RAExec = g_hash_table_lookup(RAExecFuncs,op->rsc->class);
 	if (NULL == RAExec) {
 		lrmd_log(LOG_ERR,"on_ra_proc_finished: can not find RAExec");
@@ -2612,19 +2618,28 @@ op_info(lrmd_op_t* op)
 	
 	rsc = op->rsc;
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
-	
-	snprintf(info,sizeof(info)
-	,	"operation %s on %s::%s::%s for client %d"
-	,	lrmd_nullcheck(op_type)
-	,	lrmd_nullcheck(rsc->class)
-	,	lrmd_nullcheck(rsc->type)
-	,	lrmd_nullcheck(rsc->id)
-	,	op->client_id);
-	
+	if (NULL == g_list_find(rsc_list, op->rsc)) {
+		snprintf(info,sizeof(info)
+		,"operation %s on unknown rsc(may deleted) for client %d"
+		,lrmd_nullcheck(op_type)
+		,op->client_id);
+		
+	}else{
+		snprintf(info,sizeof(info)
+		,"operation %s on %s::%s::%s for client %d"
+		,lrmd_nullcheck(op_type)
+		,lrmd_nullcheck(rsc->class)
+		,lrmd_nullcheck(rsc->type)
+		,lrmd_nullcheck(rsc->id)
+		,op->client_id);
+	}
 	return info;
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.94  2005/04/27 03:37:30  zhenh
+ * fix bug #522, deal with the situation: the resource was deleted during the RA running
+ *
  * Revision 1.93  2005/04/26 11:00:24  zhenh
  * add get_last_result(), it will record the last op for every op type and every client.
  *
