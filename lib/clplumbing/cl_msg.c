@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.65 2005/03/24 16:36:18 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.66 2005/04/27 05:31:42 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -37,7 +37,7 @@
 #include <clplumbing/base64.h>
 #include <clplumbing/netstring.h>
 #include <glib.h>
-#include <uuid/uuid.h>
+#include <clplumbing/cl_uuid.h>
 
 #define		MAXMSGLINE	MAXMSG
 #define		MINFIELDS	30
@@ -650,10 +650,10 @@ ha_msg_addbin(struct ha_msg * msg, const char * name,
 }
 
 int 
-ha_msg_adduuid(struct ha_msg* msg, const char *name, const uuid_t u)
+ha_msg_adduuid(struct ha_msg* msg, const char *name, const cl_uuid_t* u)
 {
-	return(ha_msg_addraw(msg, name, strlen(name)
-	,	u, sizeof(uuid_t), FT_BINARY, 0));
+	return(ha_msg_addraw(msg, name, strlen(name),
+			     u, sizeof(cl_uuid_t), FT_BINARY, 0));
 }
 
 /*Add a null-terminated name and struct value to a message*/
@@ -694,24 +694,24 @@ ha_msg_value_int(const struct ha_msg * msg, const char * name, int* value)
 }
 
 int
-ha_msg_add_uuid(struct ha_msg * msg, const char * name, const uuid_t id)
+ha_msg_add_uuid(struct ha_msg * msg, const char * name, cl_uuid_t* id)
 {
 	char buf[UUID_SLEN];
-	uuid_unparse(id, buf);
+	cl_uuid_unparse(id, buf);
 	return (ha_msg_nadd(msg, name, strlen(name), buf, strlen(buf)));
 }
 
 int
-ha_msg_value_uuid(struct ha_msg * msg, const char * name, uuid_t id)
+ha_msg_value_uuid(struct ha_msg * msg, const char * name, cl_uuid_t* id)
 {
 	const char* value = ha_msg_value(msg, name);
 	char buf[UUID_SLEN];
-
+	
 	if (NULL == value) {
 		return HA_FAIL;
 	}
 	strncpy(buf,value,UUID_SLEN);
-	if( 0 != uuid_parse(value, id)) {
+	if( 0 != cl_uuid_parse(buf, id)) {
 		return HA_FAIL;
 	}
 
@@ -1015,25 +1015,25 @@ cl_get_binary(const struct ha_msg *msg,
 
 /* UUIDs are stored with a machine-independent byte ordering (even though it's binary) */
 int
-cl_get_uuid(const struct ha_msg *msg, const char * name, uuid_t retval)
+cl_get_uuid(const struct ha_msg *msg, const char * name, cl_uuid_t* retval)
 {
 	const void *	vret;
 	size_t		vretsize;
 	
-	uuid_clear(retval);
+	cl_uuid_clear(retval);
 
 	if ((vret = cl_get_binary(msg, name, &vretsize)/*discouraged function*/) == NULL) {
 		/* But perfectly portable in this case */
 		return HA_FAIL;
 	}
-	if (vretsize != sizeof(uuid_t)) {
+	if (vretsize != sizeof(cl_uuid_t)) {
 		cl_log(LOG_WARNING, "Binary field %s is not a uuid.", name);
 		cl_log(LOG_INFO, "expecting %d bytes, got %d bytes",
-		       (int)sizeof(uuid_t), (int)vretsize);
+		       (int)sizeof(cl_uuid_t), (int)vretsize);
 		cl_log_message(LOG_INFO, msg);
 		return HA_FAIL;
 	}
-	memcpy(retval, vret, sizeof(uuid_t));
+	memcpy(retval, vret, sizeof(cl_uuid_t));
 	return HA_OK;
 }
 
@@ -1337,9 +1337,9 @@ cl_msg_modbin(struct ha_msg * msg, const char* name,
 }
 int
 cl_msg_moduuid(struct ha_msg * msg, const char* name, 
-	       const uuid_t uuid)
+	       const cl_uuid_t* uuid)
 {
-	return cl_msg_mod(msg, name, uuid, sizeof(uuid_t), FT_BINARY);
+	return cl_msg_mod(msg, name, uuid, sizeof(cl_uuid_t), FT_BINARY);
 }
 	
 
@@ -2291,6 +2291,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.66  2005/04/27 05:31:42  gshi
+ *  use struct cl_uuid_t to replace uuid_t
+ * use cl_uuid_xxx to replace uuid_xxx funcitons
+ *
  * Revision 1.65  2005/03/24 16:36:18  gshi
  * add more log messages in case of send failure
  *
