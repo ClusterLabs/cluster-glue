@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.99 2005/04/27 21:38:15 alan Exp $ */
+/* $Id: lrmd.c,v 1.100 2005/04/27 21:48:08 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -331,7 +331,7 @@ lrmd_op_destroy(lrmd_op_t* op)
 static lrmd_op_t*
 lrmd_op_new(void)
 {
-	lrmd_op_t*	op = (lrmd_op_t*)cl_malloc(sizeof(lrmd_op_t));
+	lrmd_op_t*	op = (lrmd_op_t*)cl_calloc(sizeof(lrmd_op_t),1);
 
 	if (op == NULL) {
 		lrmd_log(LOG_ERR, "lrmd_op_new(): out of memory");
@@ -356,11 +356,24 @@ lrmd_op_copy(lrmd_op_t* op)
 	return ret;
 }
 
+
+static void
+lrmd_client_destroy(lrmd_client_t* client)
+{
+	if (!client) {
+		return;
+	}
+	client->ch_cbk->ops->destroy(client->ch_cbk);
+	if (client->app_name) {
+		cl_free(client->app_name);
+	}
+	cl_free(client);
+}
 static lrmd_client_t*
 lrmd_client_new(void)
 {
 	lrmd_client_t*	client;
-	client = g_new0(lrmd_client_t, 1);
+	client = cl_calloc(sizeof(lrmd_client_t), 1);
 	if (client == NULL) {
 		lrmd_log(LOG_ERR, "lrmd_client_new(): out of memory");
 		return NULL;
@@ -394,15 +407,19 @@ static lrmd_rsc_t*
 lrmd_rsc_new(const char * id, struct ha_msg* msg)
 {
 	lrmd_rsc_t*	rsc;
-	rsc = (lrmd_rsc_t *)cl_malloc(sizeof(lrmd_rsc_t));
+	rsc = (lrmd_rsc_t *)cl_calloc(sizeof(lrmd_rsc_t),1);
 	if (rsc == NULL) {
 		lrmd_log(LOG_ERR, "lrmd_rsc_new(): out of memory");
 		return NULL;
 	}
-	rsc->id = cl_strdup(id);
-	rsc->type = cl_strdup(ha_msg_value(msg, F_LRM_RTYPE));
-	rsc->class = cl_strdup(ha_msg_value(msg, F_LRM_RCLASS));
-	rsc->provider = cl_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
+	if (id) {
+		rsc->id = cl_strdup(id);
+	}
+	if (msg) {
+		rsc->type = cl_strdup(ha_msg_value(msg, F_LRM_RTYPE));
+		rsc->class = cl_strdup(ha_msg_value(msg, F_LRM_RCLASS));
+		rsc->provider = cl_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
+	}
 	if (	rsc->id == NULL
 	||	rsc->type == NULL
 	||	rsc->class == NULL
@@ -997,6 +1014,8 @@ on_remove_client (gpointer user_data)
 	if (NULL != lookup_client(client->pid)) {
 		on_msg_unregister(client,NULL);
 	}
+	lrmd_client_destroy(client);
+	client = NULL;
 	client->ch_cbk->ops->destroy(client->ch_cbk);
 	g_free(client->app_name);
 	g_free(client);
@@ -1087,7 +1106,7 @@ on_msg_register(lrmd_client_t* client, struct ha_msg* msg)
 		lrmd_log(LOG_ERR, "on_msg_register: app_name is null.");
 		return HA_FAIL;
 	}
-	client->app_name = g_strdup(app_name);
+	client->app_name = cl_strdup(app_name);
 
 	if (HA_OK != ha_msg_value_int(msg, F_LRM_PID, &client->pid)) {
 		lrmd_log(LOG_ERR,
@@ -2764,6 +2783,11 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.100  2005/04/27 21:48:08  alan
+ * Fixed a few things:
+ *   should have used cl_calloc instead of cl_malloc
+ *   Got more cautious about destroying improperly constructed objects.
+ *
  * Revision 1.99  2005/04/27 21:38:15  alan
  * Reorganized the way storage was being used by the LRM - slightly.
  * Marked something suspicous as FIXME.
