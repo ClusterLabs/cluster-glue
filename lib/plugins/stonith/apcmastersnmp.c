@@ -1,4 +1,4 @@
-/* $Id: apcmastersnmp.c,v 1.22 2005/04/20 20:18:16 blaschke Exp $ */
+/* $Id: apcmastersnmp.c,v 1.23 2005/04/27 18:43:11 blaschke Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
@@ -180,12 +180,29 @@ static const char *apcmastersnmpXML =
  * own prototypes 
  */
 
+static void APC_error(struct snmp_session *sptr, const char *fn
+,	const char *msg);
 static struct snmp_session *APC_open(char *hostname, int port
 ,	char *community);
 static void *APC_read(struct snmp_session *sptr, const char *objname
 ,	int type);
 static int APC_write(struct snmp_session *sptr, const char *objname
 ,	char type, char *value);
+
+static void 
+APC_error(struct snmp_session *sptr, const char *fn, const char *msg)
+{
+    int snmperr = 0;
+    int cliberr = 0;
+    char *errstr;
+
+    snmp_error(sptr, &cliberr, &snmperr, &errstr);
+    LOG(PIL_CRIT
+    ,	"%s: %s (cliberr: %i / snmperr: %i / error: %s)."
+    ,	fn, msg, cliberr, snmperr, errstr);
+    free(errstr);
+}
+
 
 /*
  *  creates a snmp session
@@ -195,10 +212,6 @@ APC_open(char *hostname, int port, char *community)
 {
     static struct snmp_session session;
     struct snmp_session *sptr;
-
-    int snmperr = 0;
-    int cliberr = 0;
-    char *errstr;
 
     DEBUGCALL;
 
@@ -217,14 +230,8 @@ APC_open(char *hostname, int port, char *community)
     /* open session */
     sptr = snmp_open(&session);
 
-    if (Debug && sptr == NULL) {
-	snmp_error(&session, &cliberr, &snmperr, &errstr);
-	if (Debug) {
-		LOG(PIL_DEBUG
-		,	"%s: open error (cliberr %d / snmperr: %i / error: %s"
-		,	__FUNCTION__, cliberr, snmperr, errstr);
-	}
-	free(errstr);
+    if (sptr == NULL) {
+	APC_error(&session, __FUNCTION__, "cannot open snmp session");
     }
 
     /* return pointer to opened session */
@@ -252,8 +259,10 @@ APC_read(struct snmp_session *sptr, const char *objname, int type)
     DEBUGCALL;
 
     /* convert objname into oid; return NULL if invalid */
-    if (!read_objid(objname, name, &namelen))
+    if (!read_objid(objname, name, &namelen)) {
+        LOG(PIL_CRIT, "%s: cannot convert %s to oid.", __FUNCTION__, objname);
 	return (NULL);
+    }
 
     /* create pdu */
     if ((pdu = snmp_pdu_create(SNMP_MSG_GET)) != NULL) {
@@ -286,15 +295,17 @@ APC_read(struct snmp_session *sptr, const char *objname, int type)
 			return ((void *) &response_int);
 		    }
 		}
-
-	    } else if (Debug) {
-		LOG(PIL_DEBUG, "%s: Error in packet - Reason: %s"
-		,	__FUNCTION__
-		,	snmp_errstring(resp->errstat));
+	    }else{
+		LOG(PIL_CRIT, "%s: error in response packet, reason %ld [%s]."
+		,   __FUNCTION__, resp->errstat, snmp_errstring(resp->errstat));
 	    }
-	}
-	/* free repsonse pdu (neccessary?) */
+	}else{
+            APC_error(sptr, __FUNCTION__, "error sending/receiving pdu");
+        }
+	/* free repsonse pdu (necessary?) */
 	snmp_free_pdu(resp);
+    }else{
+        APC_error(sptr, __FUNCTION__, "cannot create pdu");
     }
     /* error: return nothing */
     return (NULL);
@@ -314,9 +325,11 @@ APC_write(struct snmp_session *sptr, const char *objname, char type,
 
     DEBUGCALL;
 
-    /* convert objname into oid; return NULL if invalid */
-    if (!read_objid(objname, name, &namelen))
-	return (FALSE);
+    /* convert objname into oid; return FALSE if invalid */
+    if (!read_objid(objname, name, &namelen)) {
+        LOG(PIL_CRIT, "%s: cannot convert %s to oid.", __FUNCTION__, objname);
+        return (FALSE);
+    }
 
     /* create pdu */
     if ((pdu = snmp_pdu_create(SNMP_MSG_SET)) != NULL) {
@@ -334,13 +347,17 @@ APC_write(struct snmp_session *sptr, const char *objname, char type,
 		snmp_free_pdu(resp);
 		return (TRUE);
 
-	    } else if (Debug) {
-		LOG(PIL_DEBUG, "%s: Error in packet- Reason: %s"
-		,	__FUNCTION__, snmp_errstring(resp->errstat));
+	    }else{
+		LOG(PIL_CRIT, "%s: error in response packet, reason %ld [%s]."
+		,   __FUNCTION__, resp->errstat, snmp_errstring(resp->errstat));
 	    }
-	}
-	/* free pdu (again: neccessary?) */
+	}else{
+            APC_error(sptr, __FUNCTION__, "error sending/receiving pdu");
+        }
+	/* free pdu (again: necessary?) */
 	snmp_free_pdu(resp);
+    }else{
+        APC_error(sptr, __FUNCTION__, "cannot create pdu");
     }
     /* error */
     return (FALSE);
@@ -364,9 +381,7 @@ apcmastersnmp_status(StonithPlugin * s)
     ad = (struct pluginDevice *) s;
 
     if ((ident = APC_read(ad->sptr, OID_IDENT, ASN_OCTET_STR)) == NULL) {
-	if (Debug) {
-		LOG(PIL_DEBUG, "%s: cannot read ident.", __FUNCTION__);
-	}
+	LOG(PIL_CRIT, "%s: cannot read ident.", __FUNCTION__);
 	return (S_ACCESS);
     }
 
@@ -378,9 +393,9 @@ apcmastersnmp_status(StonithPlugin * s)
     }
 
     if (i<0) {
-	LOG(PIL_WARN,
-	       "%s: module not tested with this hardware '%s'",
-	       __FUNCTION__, ident);
+	LOG(PIL_WARN
+        ,   "%s: module not tested with this hardware '%s'."
+        ,   __FUNCTION__, ident);
     }
     /* status ok */
     return (S_OK);
@@ -423,6 +438,8 @@ apcmastersnmp_hostlist(StonithPlugin * s)
 	/* read outlet name */
 	if ((outlet_name = APC_read(ad->sptr, objname, ASN_OCTET_STR)) ==
 	    NULL) {
+	    LOG(PIL_CRIT, "%s: cannot read name for outlet %d."
+            ,   __FUNCTION__, j+1);
 	    stonith_free_hostlist(hl);
 	    hl = NULL;
 	    return (hl);
@@ -437,8 +454,8 @@ apcmastersnmp_hostlist(StonithPlugin * s)
 	if (h >= num_outlets) {
 		/* put outletname in hostlist */
 		if (Debug) {
-	        	LOG(PIL_DEBUG, "%s: added %s to hostlist"
-			,	__FUNCTION__,  outlet_name);
+	            LOG(PIL_DEBUG, "%s: added %s to hostlist."
+		    ,   __FUNCTION__, outlet_name);
 		}
 		
 		if ((hl[num_outlets] = STRDUP(outlet_name)) == NULL) {
@@ -454,8 +471,8 @@ apcmastersnmp_hostlist(StonithPlugin * s)
 
 
     if (Debug) {
-    	LOG(PIL_DEBUG, "%s: %d unique hosts connected to %d outlets"
-	,	    __FUNCTION__, num_outlets, j);
+    	LOG(PIL_DEBUG, "%s: %d unique hosts connected to %d outlets."
+	,   __FUNCTION__, num_outlets, j);
     }
     /* return list */
     return (hl);
@@ -495,16 +512,16 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 	/* read outlet name */
 	if ((outlet_name = APC_read(ad->sptr, objname, ASN_OCTET_STR))
 	==	NULL) {
-	    LOG(PIL_DEBUG, "%s: cannot read outlet_names."
-	    ,	__FUNCTION__);
+	    LOG(PIL_CRIT, "%s: cannot read name for outlet %d."
+            ,   __FUNCTION__, outlet);
 	    return (S_ACCESS);
 	}
 	
 	/* found one */
 	if (strcasecmp(outlet_name, host) == 0) {
 		if (Debug) {
-			LOG(PIL_DEBUG, "%s: Found %s at outlet: %d"
-			,       __FUNCTION__, host, outlet);
+		    LOG(PIL_DEBUG, "%s: found %s at outlet %d."
+		    ,   __FUNCTION__, host, outlet);
 		}
 		/* Check that the outlet is not administratively down */
 		
@@ -513,11 +530,9 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 
 		/* get outlet's state */
 		if ((state = APC_read(ad->sptr, objname, ASN_INTEGER)) == NULL) {
-			if (Debug) {
-				LOG(PIL_DEBUG
-				,	"%s: cannot read outlet_state for outlet %d"
-				,	__FUNCTION__, outlet);
-			}
+			LOG(PIL_CRIT
+			,	"%s: cannot read state for outlet %d."
+			,	__FUNCTION__, outlet);
 			return (S_ACCESS);
 		}
 
@@ -533,22 +548,20 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 	        snprintf(objname, MAX_STRING, OID_OUTLET_REBOOT_DURATION
 		,	outlet);
 
-	        /* read reboot_duration of the port */
+	        /* read reboot duration of the port */
 	        if ((state = APC_read(ad->sptr, objname, ASN_INTEGER))
 		==	NULL) {
-			if (Debug) {
-				LOG(PIL_DEBUG
-				,	"%s: cannot read outlet's reboot duration"
-		       		,	__FUNCTION__ );
-			}
+			LOG(PIL_CRIT
+			,	"%s: cannot read reboot duration for outlet %d."
+		       	,	__FUNCTION__, outlet);
 			return (S_ACCESS);
 	        }
 	        if (num_outlets == 0) {
 		   /* save the inital value of the first port */
 		   reboot_duration = *state;
 	        } else if (reboot_duration != *state) {
-		  LOG(PIL_WARN, "%s: Outlet %d has a different reboot duration!", 
-				__FUNCTION__, outlet);
+		  LOG(PIL_WARN, "%s: outlet %d has a different reboot duration!"
+		  , __FUNCTION__, outlet);
 	    	  if (reboot_duration < *state)
 				reboot_duration = *state;
 	        }
@@ -559,39 +572,30 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 	}
     }
     if (Debug) {
-	    LOG(PIL_DEBUG, "%s: outlet: %i",
-		   __FUNCTION__, outlet);
+	    LOG(PIL_DEBUG, "%s: outlet: %i.", __FUNCTION__, outlet);
     }
 
     /* host not found in outlet names */
     if (num_outlets < 1) {
-	if (Debug) {
-		LOG(PIL_DEBUG, "%s: no active outlet '%s'."
-		,	__FUNCTION__, host);
-	}
+	LOG(PIL_CRIT, "%s: no active outlet for '%s'.", __FUNCTION__, host);
 	return (S_BADHOST);
     }
 
     /* Turn them all off */
 
-    for (outlet=outlets[0], i=0 ; i < num_outlets; i++, 
-		    outlet = outlets[i]) {
+    for (outlet=outlets[0], i=0 ; i < num_outlets; i++, outlet = outlets[i]) {
 	    /* prepare objname */
 	    snprintf(objname, MAX_STRING, OID_OUTLET_COMMAND_PENDING, outlet);
 
 	    /* are there pending commands ? */
 	    if ((state = APC_read(ad->sptr, objname, ASN_INTEGER)) == NULL) {
-		if (Debug) {
-			LOG(PIL_DEBUG, "%s: cannot read outlet_pending."
-			,	__FUNCTION__);
-		}
+		LOG(PIL_CRIT, "%s: cannot read pending commands for outlet %d." 
+                ,	__FUNCTION__, outlet);
 		return (S_ACCESS);
 	    }
 
 	    if (*state != OUTLET_NO_CMD_PEND) {
-		if (Debug) {
-			LOG(PIL_DEBUG, "%s: command pending.", __FUNCTION__);
-		}
+		LOG(PIL_CRIT, "%s: command pending.", __FUNCTION__);
 		return (S_RESETFAIL);
 	    }
 	    
@@ -601,11 +605,9 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 
 	    /* send reboot cmd */
 	    if (!APC_write(ad->sptr, objname, 'i', value)) {
-		if (Debug) {
-			LOG(PIL_DEBUG
-			,	"%s: cannot send reboot cmd for outlet %d."
-			,	__FUNCTION__, outlet);
-		}
+		LOG(PIL_CRIT
+		,	"%s: cannot send reboot command for outlet %d."
+		,	__FUNCTION__, outlet);
 		return (S_ACCESS);
 	    }
     }
@@ -625,12 +627,10 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 		
 		if ((state = APC_read(ad->sptr, objname, ASN_INTEGER))
 		== NULL)			{
-			if (Debug) {
-		    		LOG(PIL_DEBUG
-				,	"%s: cannot read outlet_state of %d."
-			   	,	__FUNCTION__, outlets[0]);
-			}
-		    return (S_ACCESS);
+		    	LOG(PIL_CRIT
+			,	"%s: cannot read state for outlet %d."
+		   	,	__FUNCTION__, outlet);
+			return (S_ACCESS);
 		}
 
 		if (*state != OUTLET_ON)
@@ -708,28 +708,27 @@ apcmastersnmp_set_config(StonithPlugin * s, StonithNVpair * list)
 			/* ok, get the number of outlets from the masterswitch */
 			if ((i = APC_read(sd->sptr, OID_NUM_OUTLETS, ASN_INTEGER))
                     		== NULL) {
-				LOG(PIL_DEBUG
-					, "%s: cannot read number of outlets."
-					,       __FUNCTION__);
+				LOG(PIL_CRIT
+				, "%s: cannot read number of outlets."
+				,       __FUNCTION__);
 				return (S_ACCESS);
 			}
 			/* store the number of outlets */
 			sd->num_outlets = *i;
 			if (Debug) {
-				LOG(PIL_DEBUG, "%s: number of outlets: %i"
+				LOG(PIL_DEBUG, "%s: number of outlets: %i."
 				,       __FUNCTION__, sd->num_outlets );
 			}
 
 			/* Everything went well */
 			return (S_OK);
-		}
-		if (Debug) {
-			LOG(PIL_DEBUG, "%s: cannot create snmp session"
+		}else{
+			LOG(PIL_CRIT, "%s: cannot create snmp session."
 			,       __FUNCTION__);
 		}
-	} else {
-		LOG(PIL_DEBUG, "%s: cannot resolve hostname '%s'"
-		,       __FUNCTION__, sd->hostname);
+	}else{
+		LOG(PIL_CRIT, "%s: cannot resolve hostname '%s', h_errno %d."
+		,       __FUNCTION__, sd->hostname, h_errno);
 	}
 
 	/* not a valid config */
