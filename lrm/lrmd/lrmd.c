@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.95 2005/04/27 07:22:35 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.96 2005/04/27 15:02:03 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -35,6 +35,7 @@
 #include <sys/wait.h>
 #include <dirent.h>
 #include <pwd.h>
+#include <time.h>
 /* Should copy the facilitynames struct here? */
 #define SYSLOG_NAMES
 #include <syslog.h>
@@ -60,6 +61,7 @@
 
 #define	MAX_PID_LEN 256
 #define	MAX_PROC_NAME 256
+#define	MAX_MSGTYPELEN 32
 
 #define OPTARGS		"skrhv"
 #define PID_FILE 	HA_VARRUNDIR"/lrmd.pid"
@@ -96,6 +98,10 @@ typedef struct
 	IPC_Channel*	ch_cbk;
 
 	GCHSource*	g_src;
+	char		lastrequest[MAX_MSGTYPELEN];
+	time_t		lastreqstart;
+	time_t		lastreqend;
+	time_t		lastrcsent;
 }lrmd_client_t;
 
 typedef struct lrmd_rsc lrmd_rsc_t;
@@ -815,12 +821,16 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	for (i=0; i<DIMOF(msg_maps); i++) {
 		if (0 == STRNCMP_CONST(type, msg_maps[i].msg_type)) {
 
+			strncmp(client->lastrequest, type, sizeof(client->lastrequest));
+			client->lastreqstart = time(NULL);
 			/*call the handler of the message*/
 			int rc = msg_maps[i].handler(client, msg);
+			client->lastreqend = time(NULL);
 
 			/*return rc to client if need*/
 			if (msg_maps[i].need_return_rc) {
 				send_rc_msg(ch, rc);
+				client->lastrcsent = time(NULL);
 			}
 			break;
 		}
@@ -2592,10 +2602,37 @@ dump_data_for_debug(void)
 		NULL != node; node = g_list_next(node)){
 		client = (lrmd_client_t*)node->data;
 		if (client != NULL) {
-			lrmd_log(LOG_DEBUG, "client name: %s, client pid: %d, "
-				"client uid: %d, client gid: %d"
-				, client->app_name, client->pid
-				, client->uid, client->gid);
+			lrmd_log(LOG_DEBUG, "client name: %s, client pid: %d"
+				", client uid: %d, gid: %d, last request: %s"
+				", last op in: %s, lastop out: %s"
+				", last op rc: %s"
+				,	client->app_name, client->pid
+				,	client->uid, client->gid
+				,	client->lastrequest
+				,	ctime(&client->lastreqstart)
+				,	ctime(&client->lastreqend)
+				,	ctime(&client->lastrcsent)
+				);
+			if (!client->ch_cmd) {
+				lrmd_log(LOG_DEBUG, "NULL client ch_cmd in dump_data_for_debug()");
+			}else{
+				lrmd_log(LOG_DEBUG
+				,	"Command channel status: %d, read Qlen: %d, write Qlen: %d"
+				,	client->ch_cmd->ch_status
+				,	client->ch_cmd->recv_queue->current_qlen
+				,	client->ch_cmd->send_queue->current_qlen);
+			}
+			if (!client->ch_cbk) {
+				lrmd_log(LOG_DEBUG, "NULL client ch_cbk in dump_data_for_debug()");
+			}else{
+				lrmd_log(LOG_DEBUG
+				,	"Callback channel status: %d, read Qlen: %d, write Qlen: %d"
+				,	client->ch_cbk->ch_status
+				,	client->ch_cbk->recv_queue->current_qlen
+				,	client->ch_cbk->send_queue->current_qlen);
+			}
+		}else{
+			lrmd_log(LOG_DEBUG, "NULL client in dump_data_for_debug()");
 		}
 	}
 	
@@ -2640,6 +2677,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.96  2005/04/27 15:02:03  alan
+ * Added more debug info for the SIGUSR1 call.
+ *
  * Revision 1.95  2005/04/27 07:22:35  zhenh
  * change some logs
  *
