@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.96 2005/04/27 15:02:03 alan Exp $ */
+/* $Id: lrmd.c,v 1.97 2005/04/27 15:03:25 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -821,7 +821,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	for (i=0; i<DIMOF(msg_maps); i++) {
 		if (0 == STRNCMP_CONST(type, msg_maps[i].msg_type)) {
 
-			strncmp(client->lastrequest, type, sizeof(client->lastrequest));
+			strncpy(client->lastrequest, type, sizeof(client->lastrequest));
 			client->lastreqstart = time(NULL);
 			/*call the handler of the message*/
 			int rc = msg_maps[i].handler(client, msg);
@@ -2677,6 +2677,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.97  2005/04/27 15:03:25  alan
+ * CV: strncmp that should have been a strncpy :-)
+ *
  * Revision 1.96  2005/04/27 15:02:03  alan
  * Added more debug info for the SIGUSR1 call.
  *
