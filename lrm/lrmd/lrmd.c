@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.94 2005/04/27 03:37:30 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.95 2005/04/27 07:22:35 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1794,28 +1794,31 @@ on_op_done(lrmd_op_t* op)
 			break;			
 		case LRM_OP_CANCELLED:
 			lrmd_log(LOG_DEBUG
-			, "on_op_done:done with status LRM_OP_CANCELLED");
+			, "on_op_done: %s done with status LRM_OP_CANCELLED"
+			, op_info(op));
 			break;			
 		case LRM_OP_TIMEOUT:
-			lrmd_log(LOG_DEBUG
-			, "on_op_done:done with status LRM_OP_TIMEOUT");
+			lrmd_log(LOG_WARNING
+			, "on_op_done: %s done with status LRM_OP_TIMEOUT"
+			, op_info(op));
 			break;			
 		case LRM_OP_NOTSUPPORTED:
-			lrmd_log(LOG_DEBUG
-			, "on_op_done:done with status LRM_OP_NOTSUPPORTED");
+			lrmd_log(LOG_WARNING
+			, "on_op_done: %s done with status LRM_OP_NOTSUPPORTED"
+			, op_info(op));
 			break;			
 		case LRM_OP_ERROR:
-			lrmd_log(LOG_DEBUG
-			, "on_op_done:done with status LRM_OP_ERROR");
+			lrmd_log(LOG_WARNING
+			, "on_op_done: %s done with status LRM_OP_ERROR"
+			, op_info(op));
 			break;			
 		default:
 			lrmd_log(LOG_WARNING
-			, "on_op_done:done with unkown status ");
+			, "on_op_done: %s done with unkown status "
+			, op_info(op));
 			break;			
 	}			
 	if (LRM_OP_DONE!= op_status) {
-		lrmd_log(LOG_DEBUG
-		,	"on_op_done:will callback for done without LRM_OP_DONE");
 		need_notify = 1;
 	}
 	else
@@ -2260,7 +2263,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 			return ;
 		}
 		lrmd_log(LOG_WARNING
-		, "on_ra_proc_finishedthe exit code shows something wrong");
+		, "on_ra_proc_finished: the exit code shows something wrong");
 		
 	}
 	else {
@@ -2637,8 +2640,8 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
- * Revision 1.94  2005/04/27 03:37:30  zhenh
- * fix bug #522, deal with the situation: the resource was deleted during the RA running
+ * Revision 1.95  2005/04/27 07:22:35  zhenh
+ * change some logs
  *
  * Revision 1.93  2005/04/26 11:00:24  zhenh
  * add get_last_result(), it will record the last op for every op type and every client.
