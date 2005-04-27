@@ -46,4 +46,5 @@ include_HEADERS	= 		\
 	setproctitle.h	\
 	recoverymgr_cs.h \
 	timers.h	\
-	uids.h
+	uids.h		\
+	cl_uuid.h
