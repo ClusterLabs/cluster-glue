@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.100 2005/04/27 21:48:08 alan Exp $ */
+/* $Id: lrmd.c,v 1.101 2005/04/27 21:50:51 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -363,12 +363,15 @@ lrmd_client_destroy(lrmd_client_t* client)
 	if (!client) {
 		return;
 	}
-	client->ch_cbk->ops->destroy(client->ch_cbk);
+	if (client->ch_cbk) {
+		client->ch_cbk->ops->destroy(client->ch_cbk);
+	}
 	if (client->app_name) {
 		cl_free(client->app_name);
 	}
 	cl_free(client);
 }
+
 static lrmd_client_t*
 lrmd_client_new(void)
 {
@@ -2783,6 +2786,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.101  2005/04/27 21:50:51  alan
+ * A tiny bit more caution...
+ *
  * Revision 1.100  2005/04/27 21:48:08  alan
  * Fixed a few things:
  *   should have used cl_calloc instead of cl_malloc
