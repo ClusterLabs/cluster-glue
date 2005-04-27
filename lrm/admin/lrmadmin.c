@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.31 2005/04/25 05:47:54 zhenh Exp $ */
+/* $Id: lrmadmin.c,v 1.32 2005/04/27 07:33:40 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -568,13 +568,12 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	op.op_type = argv[optind+1];
 	op.timeout = atoi(argv[optind+2]);
 
- 	/* Plus addtional 1s, make here the timeout normally takes place 
-	   after the lrmd's */
+ 	/* When op.timeout!=0, plus addtional 1s. Or lrmadmin may time out before
+	   the normal operation result returned from lrmd. This may be redudant, 
+	   but harmless. */
 	if (0 < op.timeout ) {
 		TIMEOUT = op.timeout + 1000;
-	} else {
-		TIMEOUT = 60000;
-	}		
+	}
 	op.interval = atoi(argv[optind+3]);
 	op.user_data = NULL;
 	op.user_data_len = 0;
@@ -927,6 +926,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.32  2005/04/27 07:33:40  sunjd
+ * Donnot set a default timeout value when the user does not want timeout
+ *
  * Revision 1.31  2005/04/25 05:47:54  zhenh
  * when user did not give timeout of op, use 60s as timeout of lrmadmin, if user gave one, add 1s as timeout of lrmadmin
  *
