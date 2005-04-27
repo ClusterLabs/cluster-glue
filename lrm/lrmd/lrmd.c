@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.101 2005/04/27 21:50:51 alan Exp $ */
+/* $Id: lrmd.c,v 1.102 2005/04/27 21:59:37 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -312,12 +312,12 @@ lrmd_op_destroy(lrmd_op_t* op)
 		return;
 	}
 
-	if (-1 != (int)op->repeat_timeout_tag) {
+	if ((int)op->repeat_timeout_tag < 0) {
 		g_source_remove(op->repeat_timeout_tag);
 		op->repeat_timeout_tag = -1;
 	}
 
-	if (-1 != (int)op->timeout_tag) {
+	if ((int)op->timeout_tag < 0) {
 		g_source_remove(op->timeout_tag);
 		op->timeout_tag = -1;
 	}
@@ -365,9 +365,11 @@ lrmd_client_destroy(lrmd_client_t* client)
 	}
 	if (client->ch_cbk) {
 		client->ch_cbk->ops->destroy(client->ch_cbk);
+		client->ch_cbk = NULL;
 	}
 	if (client->app_name) {
 		cl_free(client->app_name);
+		client->app_name = NULL;
 	}
 	cl_free(client);
 }
@@ -2393,10 +2395,18 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	op = p->privatedata;
 	if (op == NULL) {
 		lrmd_log(LOG_WARNING, "on_ra_proc_finished: op==NULL.");
+		dump_data_for_debug();
+		return;
+	}
+	if (!cl_is_allocated(op)) {
+		lrmd_log(LOG_WARNING, "on_ra_proc_finished: op %lx is not allocated!"
+		,	(unsigned long)(op));
+		dump_data_for_debug();
 		return;
 	}
 	if (op->exec_pid == 0) {
 		lrmd_log(LOG_WARNING, "on_ra_proc_finished: op was freed.");
+		dump_data_for_debug();
 		return;
 	}
 	lrmd_log(LOG_DEBUG
@@ -2408,6 +2418,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		lrmd_op_destroy(op);
 		p->privatedata = NULL;
 		lrmd_log(LOG_DEBUG, "on_ra_proc_finished: this op is killed.");
+		dump_data_for_debug();
 		return;
 	}
 
@@ -2421,6 +2432,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	RAExec = g_hash_table_lookup(RAExecFuncs,op->rsc->class);
 	if (NULL == RAExec) {
 		lrmd_log(LOG_ERR,"on_ra_proc_finished: can not find RAExec");
+		dump_data_for_debug();
 		return;
 	}
 
@@ -2786,6 +2798,11 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.102  2005/04/27 21:59:37  alan
+ * Added more caution in handling pointers, more conservative comparators,
+ * checked to see if structure was still allocated
+ * and in various circumstances call dump_data_for_debug()
+ *
  * Revision 1.101  2005/04/27 21:50:51  alan
  * A tiny bit more caution...
  *
