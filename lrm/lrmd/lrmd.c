@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.98 2005/04/27 16:38:05 alan Exp $ */
+/* $Id: lrmd.c,v 1.99 2005/04/27 21:38:15 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -183,7 +183,6 @@ static lrmd_rsc_t* lookup_rsc (const char* rid);
 static lrmd_rsc_t* lookup_rsc_by_msg (struct ha_msg* msg);
 static int read_pipe(int fd, char ** data);
 static struct ha_msg* op_to_msg(lrmd_op_t* op);
-static void free_op(lrmd_op_t* op);
 static gboolean lrm_shutdown(gpointer data);
 static gboolean can_shutdown(void);
 static void inherit_config_from_environment(void);
@@ -272,7 +271,147 @@ static gboolean free_str_hash_pair(gpointer key
 ,	 gpointer value, gpointer user_data);
 static gboolean free_str_op_pair(gpointer key
 ,	 gpointer value, gpointer user_data);
-static lrmd_op_t* copy_op(lrmd_op_t* op);
+static lrmd_op_t* lrmd_op_copy(lrmd_op_t* op);
+
+static void
+lrmd_op_destroy(lrmd_op_t* op)
+{
+	if (op == NULL) {
+		return;
+	}
+	
+	if ( 0 == op->exec_pid ) {
+		lrmd_log(LOG_DEBUG, "lrmd_op_destroy: donnot need to free a "
+			"freed struct.");
+		lrmd_log(LOG_DEBUG, "lrmd_op_destroy: op->msg address: %p", op->msg);
+		return;
+	}
+
+	/*
+	 * FIXME!
+	 * This seems WAY dangerous as a way to process this.
+	 * If we expect this to really be freed, then we should
+	 * wipe out ALL references to this data - and then
+	 * we will have a memory leak.
+	 * If we expect this *might* be freed, then we need
+	 * to leave it around for someone else to free
+	 * and hopefully they'll really free it.
+	 * But if these events happen in the other order
+	 * and the process dies before we remove it from our tables
+	 * then we are leaving it in our tables after it really exists.
+	 *
+	 * Some kind of a reference count strategy seems like a better
+	 * deal - and then I think we *probably* wouldn't have to copy it
+	 * for our various purposes, and it wouldn't matter what order
+	 * the various events happened in.
+	 */
+	if (op->exec_pid < 1) {
+		return_to_orig_privs();	
+		kill(op->exec_pid, 9);
+		return_to_dropped_privs();
+		return;
+	}
+
+	if (-1 != (int)op->repeat_timeout_tag) {
+		g_source_remove(op->repeat_timeout_tag);
+		op->repeat_timeout_tag = -1;
+	}
+
+	if (-1 != (int)op->timeout_tag) {
+		g_source_remove(op->timeout_tag);
+		op->timeout_tag = -1;
+	}
+
+	ha_msg_del(op->msg);
+	op->msg = NULL;
+	op->exec_pid = 0;
+	cl_free(op);
+}
+
+static lrmd_op_t*
+lrmd_op_new(void)
+{
+	lrmd_op_t*	op = (lrmd_op_t*)cl_malloc(sizeof(lrmd_op_t));
+
+	if (op == NULL) {
+		lrmd_log(LOG_ERR, "lrmd_op_new(): out of memory");
+		return NULL;
+	}
+	op->exec_pid = -1;
+	op->timeout_tag = -1;
+	op->t_recv = time_longclock();
+	return op;
+}
+
+static lrmd_op_t* 
+lrmd_op_copy(lrmd_op_t* op)
+{
+	lrmd_op_t* ret = lrmd_op_new();
+
+	if (NULL == ret) {
+		return NULL;
+	}
+	*ret = *op;
+	ret->msg = ha_msg_copy(op->msg);
+	return ret;
+}
+
+static lrmd_client_t*
+lrmd_client_new(void)
+{
+	lrmd_client_t*	client;
+	client = g_new0(lrmd_client_t, 1);
+	if (client == NULL) {
+		lrmd_log(LOG_ERR, "lrmd_client_new(): out of memory");
+		return NULL;
+	}
+	return client;
+}
+
+static void
+lrmd_rsc_destroy(lrmd_rsc_t* rsc)
+{
+	if (rsc->id) {
+		cl_free(rsc->id);
+		rsc->id = NULL;
+	}
+	if (rsc->type) {
+		cl_free(rsc->type);
+		rsc->type = NULL;
+	}
+	if (rsc->class) {
+		cl_free(rsc->class);
+		rsc->class = NULL;
+	}
+	if (rsc->provider) {
+		cl_free(rsc->provider);
+		rsc->provider = NULL;
+	}
+	cl_free(rsc);
+}
+
+static lrmd_rsc_t*
+lrmd_rsc_new(const char * id, struct ha_msg* msg)
+{
+	lrmd_rsc_t*	rsc;
+	rsc = (lrmd_rsc_t *)cl_malloc(sizeof(lrmd_rsc_t));
+	if (rsc == NULL) {
+		lrmd_log(LOG_ERR, "lrmd_rsc_new(): out of memory");
+		return NULL;
+	}
+	rsc->id = cl_strdup(id);
+	rsc->type = cl_strdup(ha_msg_value(msg, F_LRM_RTYPE));
+	rsc->class = cl_strdup(ha_msg_value(msg, F_LRM_RCLASS));
+	rsc->provider = cl_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
+	if (	rsc->id == NULL
+	||	rsc->type == NULL
+	||	rsc->class == NULL
+	||	rsc->provider == NULL) {
+		lrmd_rsc_destroy(rsc);
+		rsc = NULL;
+	}
+	return rsc;
+}
 int
 main(int argc, char ** argv)
 {
@@ -714,7 +853,10 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 	}
 	/* create new client */
 	/* the register will be finished in on_msg_register */
-	client = g_new(lrmd_client_t, 1);
+	client = lrmd_client_new();
+	if (client == NULL) {
+		return FALSE;
+	}
 	client->app_name = NULL;
 	client->ch_cmd = ch;
 	client->g_src = G_main_add_IPC_Channel(G_PRIORITY_DEFAULT,
@@ -1010,7 +1152,7 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 			if (op->client_id == client->pid) {
 				op_node = g_list_next(op_node);
 				rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
-				free_op(op);
+				lrmd_op_destroy(op);
 			}
 			else {
 				op_node = g_list_next(op_node);
@@ -1387,7 +1529,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 			op = (lrmd_op_t*)op_node->data;
 			op_node = g_list_next(op_node);
 			rsc->op_list = g_list_remove(rsc->op_list, op);
-			free_op(op);
+			lrmd_op_destroy(op);
 		}
 		/* remove repeat ops */
 		op_node = g_list_first(rsc->repeat_op_list);
@@ -1400,7 +1542,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		}
 		/* free the last_op */
 		if ( NULL!=rsc->last_op) {
-			free_op(rsc->last_op);
+			lrmd_op_destroy(rsc->last_op);
 		}
 		
 		rsc_list = g_list_remove(rsc_list, rsc);
@@ -1436,7 +1578,7 @@ free_str_op_pair(gpointer key, gpointer value, gpointer user_data)
 {
 	lrmd_op_t* op = (lrmd_op_t*)user_data;
 	g_free(key);
-	free_op(op);
+	lrmd_op_destroy(op);
 	return TRUE;
 }
 
@@ -1464,11 +1606,10 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		return HA_FAIL;
 	}
 
-	rsc = g_new(lrmd_rsc_t,1);
-	rsc->id = g_strdup(id);
-	rsc->type = g_strdup(ha_msg_value(msg, F_LRM_RTYPE));
-	rsc->class = g_strdup(ha_msg_value(msg, F_LRM_RCLASS));
-	rsc->provider = g_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
+	rsc = lrmd_rsc_new(id, msg);
+	if (rsc == NULL) {
+		return HA_FAIL;
+	}
 	
 	ra_type_exist = FALSE;
 	for(node=g_list_first(ra_class_list); NULL!=node; node=g_list_next(node)){
@@ -1479,19 +1620,13 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		}
 	}
 	if (!ra_type_exist) {
-		g_free(rsc->id);
-		g_free(rsc->type);
-		g_free(rsc->class);
-		g_free(rsc->provider);
-		g_free(rsc);
+		lrmd_rsc_destroy(rsc);
+		rsc = NULL;
 		lrmd_log(LOG_ERR,
 				"on_msg_add_rsc: ra class does not exist.");
 		return HA_FAIL;
 	}
 
-	rsc->op_list = NULL;
-	rsc->repeat_op_list = NULL;
-	rsc->last_op = NULL;
 	rsc->params = ha_msg_value_str_table(msg,F_LRM_PARAM);
 	rsc->last_op_table = g_hash_table_new(g_str_hash, g_str_equal);
 	rsc_list = g_list_append(rsc_list, rsc);
@@ -1582,13 +1717,18 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		if (HA_OK != ha_msg_add_int(msg, F_LRM_CALLID, call_id)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_perform_op: can not add callid.");
+			return HA_FAIL;
 		}
 		if (HA_OK !=ha_msg_add(msg, F_LRM_APP, client->app_name)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_perform_op: can not add app_name.");
+			return HA_FAIL;
 		}
 
-		op = g_new(lrmd_op_t, 1);
+		op = lrmd_op_new();
+		if (op == NULL) {
+			return HA_FAIL;
+		}
 		op->call_id = call_id;
 		op->exec_pid = -1;
 		op->client_id = client->pid;
@@ -1596,9 +1736,6 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		op->rsc = rsc;
 		op->msg = ha_msg_copy(msg);
 		op->t_recv = time_longclock();
-		op->t_addtolist = 0;
-		op->t_perform = 0;
-		op->t_done = 0;
 		
 		lrmd_log(LOG_DEBUG, "on_msg_perform_op:client [%d] add %s"
 		,	client->pid
@@ -1608,15 +1745,18 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 						 &op->interval)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_perform_op: can not get interval.");
+			goto getout;
 		}
 		if (HA_OK!=ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_perform_op: can not get timeout.");
+			goto getout;
 		}		
 		if (HA_OK!=ha_msg_value_int(op->msg, F_LRM_DELAY,
 						 &op->delay)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_perform_op: can not get delay.");
+			goto getout;
 		}
 		if ( 0 < op->delay ) {
 			op->repeat_timeout_tag = Gmain_timeout_add(op->delay
@@ -1642,6 +1782,9 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	}
 
 	return call_id;
+getout:
+	lrmd_op_destroy(op);
+	return -1;
 }
 int
 on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
@@ -1780,7 +1923,7 @@ on_op_done(lrmd_op_t* op)
 		lrmd_log(LOG_WARNING,
 			"on_op_done: the resource of this op does not exists");
 		/* delete the op */
-		free_op(op);
+		lrmd_op_destroy(op);
 
 		return HA_FAIL;
 
@@ -1905,7 +2048,7 @@ on_op_done(lrmd_op_t* op)
 	}
 	/* release the old last_op */
 	if ( NULL!=op->rsc->last_op) {
-		free_op(op->rsc->last_op);
+		lrmd_op_destroy(op->rsc->last_op);
 	}
 	/* remove the op from op_list and copy to last_op */
 	op->rsc->op_list = g_list_remove(op->rsc->op_list,op);
@@ -1918,7 +2061,7 @@ on_op_done(lrmd_op_t* op)
 		op->timeout_tag = -1;
 	}
 	
-	op->rsc->last_op = copy_op(op);
+	op->rsc->last_op = lrmd_op_copy(op);
 	
 	/*save the op in the last op hash table*/
 	client = lookup_client(op->client_id);
@@ -1938,12 +2081,12 @@ on_op_done(lrmd_op_t* op)
 		/*insert the op to the hash table for the client*/
 		op_type = ha_msg_value(op->msg, F_LRM_OP);
 		old_op = g_hash_table_lookup(client_last_op, op_type);
-		new_op = copy_op(op);
+		new_op = lrmd_op_copy(op);
 		if (NULL != old_op) {
 			g_hash_table_replace(client_last_op
 			, 	g_strdup(op_type)
 			,	(gpointer)new_op);
-			free_op(old_op);
+			lrmd_op_destroy(old_op);
 		}
 		else {
 			g_hash_table_insert(client_last_op
@@ -1955,7 +2098,7 @@ on_op_done(lrmd_op_t* op)
 	/*copy the repeat op to repeat list to wait next perform */
 	if ( 0!=op->interval && NULL != lookup_client(op->client_id)
 	&&   LRM_OP_CANCELLED != op_status) {
-		lrmd_op_t* repeat_op = copy_op(op);
+		lrmd_op_t* repeat_op = lrmd_op_copy(op);
 		repeat_op->exec_pid = -1;
 		repeat_op->output_fd = -1;
 		repeat_op->timeout_tag = -1;
@@ -1969,7 +2112,7 @@ on_op_done(lrmd_op_t* op)
 		, op_info(op));
 		
 	}
-	free_op(op);
+	lrmd_op_destroy(op);
 
 	return HA_OK;
 }
@@ -2240,7 +2383,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 
 	op->exec_pid = -1;
 	if (9 == signo) {
-		free_op(op);
+		lrmd_op_destroy(op);
 		p->privatedata = NULL;
 		lrmd_log(LOG_DEBUG, "on_ra_proc_finished: this op is killed.");
 		return;
@@ -2433,64 +2576,7 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 	rsc = lookup_rsc(id);
 	return rsc;
 }
-void
-free_op(lrmd_op_t* op)
-{
-	if (op == NULL) {
-		return;
-	}
-	
-	if ( 0 == op->exec_pid ) {
-		lrmd_log(LOG_DEBUG, "free_op: donnot need to free a "
-			"freed struct.");
-		lrmd_log(LOG_DEBUG, "free_op: op->msg address: %p", op->msg);
-		return;
-	}
 
-	if (-1 != op->exec_pid ) {
-		return_to_orig_privs();	
-		kill(op->exec_pid, 9);
-		return_to_dropped_privs();
-		return;
-	}
-
-	if (-1 != (int)op->repeat_timeout_tag) {
-		g_source_remove(op->repeat_timeout_tag);
-		op->repeat_timeout_tag = -1;
-	}
-
-	if (-1 != (int)op->timeout_tag) {
-		g_source_remove(op->timeout_tag);
-		op->timeout_tag = -1;
-	}
-
-	ha_msg_del(op->msg);
-	op->msg = NULL;
-	op->exec_pid = 0;
-	g_free(op);
-}
-static lrmd_op_t* 
-copy_op(lrmd_op_t* op)
-{
-	lrmd_op_t* ret = g_new(lrmd_op_t, 1);
-	if ( NULL == ret) {
-		return NULL;
-	}
-	ret->rsc = op->rsc;
-	ret->client_id = op->client_id;
-	ret->call_id = op->call_id;
-	ret->exec_pid = op->exec_pid;
-	ret->output_fd = op->output_fd;
-	ret->timeout_tag = op->timeout_tag;
-	ret->repeat_timeout_tag = op->repeat_timeout_tag;
-	ret->interval = op->interval;
-	ret->msg = ha_msg_copy(op->msg);
-	ret->t_recv = op->t_recv;
-	ret->t_addtolist = op->t_addtolist;
-	ret->t_perform = op->t_perform;
-	ret->t_done = op->t_done;
-	return ret;
-}
 int
 read_pipe(int fd, char ** data)
 {
@@ -2678,6 +2764,10 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.99  2005/04/27 21:38:15  alan
+ * Reorganized the way storage was being used by the LRM - slightly.
+ * Marked something suspicous as FIXME.
+ *
  * Revision 1.98  2005/04/27 16:38:05  alan
  * Fixed a non-ANSI-ism I accidentally introduced :-(
  *
@@ -2801,7 +2891,7 @@ op_info(lrmd_op_t* op)
  *
  * Revision 1.60  2005/02/16 05:28:09  zhenh
  * Fix a bug.
- * Free operation data in on_ra_proc_finished() instead of free_op()
+ * Free operation data in on_ra_proc_finished() instead of lrmd_op_destroy()
  * if the child process of the operation is running.
  * So on_ra_proc_query_name() has chance to get some information of the operation.
  *
