@@ -45,6 +45,7 @@ int main (int argc, char* argv[])
 	const char* rid = "ip248";
 	GHashTable* param = NULL;
 	int call_id;
+	GList* classes;
 	
 	cl_log_set_entity("apitest");
 	cl_log_enable_stderr(TRUE);
@@ -60,7 +61,7 @@ int main (int argc, char* argv[])
 	puts("sigon...");
 	lrm->lrm_ops->signon(lrm,"apitest");
 	
-	GList* classes = lrm->lrm_ops->get_rsc_class_supported(lrm);
+	classes = lrm->lrm_ops->get_rsc_class_supported(lrm);
 	lrm_free_str_list(classes);
 	
 	param = g_hash_table_new(g_str_hash,g_str_equal);
