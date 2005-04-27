@@ -669,7 +669,7 @@ read_msg_process(IPC_Channel* chan)
 	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cmd, NULL, FALSE,
 				       on_connect_cmd, chan, NULL);
 	
-	
+	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT, chan, FALSE,NULL,NULL,NULL);
 	
 	if (logd_config.useapphbd) {
 		logd_reregister_with_apphbd(NULL);
@@ -684,9 +684,6 @@ read_msg_process(IPC_Channel* chan)
 	}
 	
 	g_main_run(mainloop);
-	
-	conn_cmd->ops->destroy(conn_cmd);
-	conn_cmd = NULL;
 	
 	return;
 }
