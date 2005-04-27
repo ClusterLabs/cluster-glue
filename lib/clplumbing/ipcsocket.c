@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.142 2005/04/18 18:24:05 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.143 2005/04/27 17:35:07 alan Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1420,7 +1420,7 @@ socket_resume_io(struct IPC_CHANNEL *ch)
 			cl_log(LOG_ERR
 			       ,	"socket_resume_io_read() failure");
 		}
-		if (rc2 != IPC_OK) {
+		if (rc2 != IPC_OK && IPC_CONNECT == ch->ch_status) {
 			cl_log(LOG_ERR
 			,	"socket_resume_io_write() failure");
 		}
