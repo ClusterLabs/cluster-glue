@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.107 2005/04/28 16:24:30 alan Exp $ */
+/* $Id: lrmd.c,v 1.108 2005/04/28 17:21:32 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -86,6 +86,14 @@
         }
 
 #define	lrmd_nullcheck(p)	((p) ? (p) : "<null>")
+
+#define	CHECK_ALLOCATED(thing, name, result)				\
+	if (!cl_is_allocated(thing)) {					\
+		lrmd_log(LOG_ERR, "%s: %s %ld not allocated."		\
+		,	__FUNCTION__, name, (unsigned long)thing);	\
+		dump_mem_stats();					\
+		return result;						\
+	}	
 
 typedef struct
 {
@@ -293,13 +301,7 @@ static void
 lrmd_op_destroy(lrmd_op_t* op)
 {
 
-	if (!cl_is_allocated(op)) {
-		/* This means we screwed up our memory management */
-		lrmd_log(LOG_ERR, "%s(): op 0x%lx is not allocated", __FUNCTION__
-		,	(unsigned long)op);
-		dump_mem_stats();
-		return;
-	}
+	CHECK_ALLOCATED(op, "op", );
 	--lrm_objectstats.opcount;
 
 	/*
@@ -379,12 +381,7 @@ lrmd_op_copy(lrmd_op_t* op)
 static void
 lrmd_client_destroy(lrmd_client_t* client)
 {
-	if (!cl_is_allocated(client)) {
-		lrmd_log(LOG_ERR, "%s(): client 0x%lx is not allocated", __FUNCTION__
-		,	(unsigned long)client);
-		dump_mem_stats();
-		return;
-	}
+	CHECK_ALLOCATED(client, "client", );
 		
 	--lrm_objectstats.clientcount;
 	if (client->ch_cbk) {
@@ -415,12 +412,7 @@ lrmd_client_new(void)
 static void
 lrmd_rsc_destroy(lrmd_rsc_t* rsc)
 {
-	if (!cl_is_allocated(rsc)) {
-		lrmd_log(LOG_ERR, "%s(): resource 0x%lx is not allocated", __FUNCTION__
-		,	(unsigned long)rsc);
-		dump_mem_stats();
-		return;
-	}
+	CHECK_ALLOCATED(rsc, "resource", );
 	--lrm_objectstats.rsccount;
 	if (rsc->id) {
 		cl_free(rsc->id);
@@ -1061,6 +1053,9 @@ on_remove_client (gpointer user_data)
 	lrmd_client_t* client = NULL;
 
 	client = (lrmd_client_t*) user_data;
+
+	CHECK_ALLOCATED(client, "client", );
+
 	if (NULL != lookup_client(client->pid)) {
 		on_msg_unregister(client,NULL);
 	}
@@ -1074,10 +1069,8 @@ on_timeout_op_done(gpointer data)
 	lrmd_rsc_t* rsc = NULL;
 	
 	op = (lrmd_op_t*)data;
-	if (op == NULL) {
-		lrmd_log(LOG_ERR, "on_timeout_op_done: op==NULL.");
-		return FALSE;
-	}
+	CHECK_ALLOCATED(op, "op", FALSE);
+
 	if (op->exec_pid == 0) {
 		lrmd_log2(LOG_WARNING, "on_timeout_op_done: op was freed.");
 		return FALSE;
@@ -1089,7 +1082,8 @@ on_timeout_op_done(gpointer data)
 	}
 
 	rsc = op->rsc;
-	lrmd_log(LOG_WARNING, "TIMEOUT: %s.", op_info(op));
+	lrmd_log(LOG_WARNING, "%s: TIMEOUT: %s."
+	,	__FUNCTION__,  op_info(op));
 	
 	on_op_done(op);
 	perform_op(rsc);
@@ -1103,18 +1097,19 @@ on_repeat_op_done(gpointer data)
 	int timeout = 0;
 
 	op = (lrmd_op_t*)data;
-	if (op == NULL) {
-		lrmd_log(LOG_WARNING, "on_repeat_op_done: op==NULL.");
-		return FALSE;
-	}
+	CHECK_ALLOCATED(op, "op", FALSE );
+	CHECK_ALLOCATED(op->rsc, "op->rsc", FALSE );
+	CHECK_ALLOCATED(op->rsc->repeat_op_list, "op->rsc->repeat_op_list", FALSE );
+
 	if (op->exec_pid == 0) {
-		lrmd_log(LOG_WARNING, "on_repeat_op_done: op was freed.");
+		lrmd_log(LOG_ERR, "on_repeat_op_done: exec_pid is 0.");
 		return FALSE;
 	}
 
 	lrmd_log2(LOG_DEBUG
 	, 	"on_repeat_op_done:remove %s from repeat op list and add it to op list"
 	, 	op_info(op));
+
 	op->rsc->repeat_op_list = g_list_remove(op->rsc->repeat_op_list, op);
 	g_source_remove(op->repeat_timeout_tag);
 
@@ -1146,6 +1141,8 @@ on_msg_register(lrmd_client_t* client, struct ha_msg* msg)
 {
 	lrmd_client_t* exist = NULL;
 	const char* app_name = NULL;
+
+	CHECK_ALLOCATED(msg, "register message", HA_FAIL);
 
 	app_name = ha_msg_value(msg, F_LRM_APP);
 	if (NULL == app_name) {
@@ -1197,6 +1194,9 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 	GList* op_node = NULL;
 	lrmd_op_t* op = NULL;
 
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "unregister message", HA_FAIL);
+
 	if (NULL == client_list || NULL == lookup_client(client->pid)) {
 		lrmd_log(LOG_ERR,
 			"on_msg_unregister: can not find the client.");
@@ -1244,6 +1244,9 @@ on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg)
 {
 	struct ha_msg* ret = NULL;
 
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
+
 	lrmd_log(LOG_DEBUG
 	, 	"on_msg_get_rsc_classes:client [%d] gets rsc classes"
 	,	client->pid);
@@ -1274,6 +1277,8 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 	GList* type;
 	const char* rclass = NULL;
 
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
 
 	ret = create_lrm_ret(HA_OK,5);
 
@@ -1326,6 +1331,9 @@ on_msg_get_rsc_providers(lrmd_client_t* client, struct ha_msg* msg)
 	const char* rclass = NULL;
 	const char* rtype = NULL;
 
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
+
 	ret = create_lrm_ret(HA_OK,5);
 
 	rclass = ha_msg_value(msg, F_LRM_RCLASS);
@@ -1372,6 +1380,9 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 	const char* rtype = NULL;
 	const char* rclass = NULL;
 	const char* provider = NULL;
+
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
 
 	rtype = ha_msg_value(msg, F_LRM_RTYPE);
 	rclass = ha_msg_value(msg, F_LRM_RCLASS);
@@ -1421,6 +1432,9 @@ on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg)
 	GList* node;
 	int i = 1;
 	struct ha_msg* ret = NULL;
+
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
 	
 	lrmd_log(LOG_DEBUG
 	,	"on_msg_get_all:client [%d] gets all rsc"
@@ -1454,6 +1468,9 @@ on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	struct ha_msg* ret = NULL;
 	lrmd_rsc_t* rsc = NULL;
 	const char* id = NULL;
+
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
 
 	id = ha_msg_value(msg, F_LRM_RID);
 
@@ -1522,6 +1539,9 @@ on_msg_get_last_op(lrmd_client_t* client, struct ha_msg* msg)
 	lrmd_rsc_t* rsc = NULL;
 	const char* rid = NULL;
 
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
+
 	rid = ha_msg_value(msg, F_LRM_RID);
 	op_type = ha_msg_value(msg, F_LRM_OP);
 
@@ -1582,6 +1602,9 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	GList* op_node = NULL;
 	lrmd_op_t* op = NULL;
 	const char* id = NULL;
+
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
 
 	id = ha_msg_value(msg, F_LRM_RID);
 
@@ -1670,6 +1693,9 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	lrmd_rsc_t* rsc = NULL;
 	const char* id = NULL;
 
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
+
 	id = ha_msg_value(msg,F_LRM_RID);
 	lrmd_log(LOG_DEBUG
 	,	"on_msg_add_rsc:client [%d] adds rsc %s"
@@ -1721,6 +1747,9 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	const char* type = NULL;
 	lrmd_op_t* op = NULL;
 	int timeout = 0;
+
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
 
 	rsc = lookup_rsc_by_msg(msg);
 	if (NULL == rsc) {
@@ -1876,6 +1905,9 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	struct ha_msg* op_msg = NULL;
 	const char* id = NULL;
 
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
+
 	id = ha_msg_value(msg,F_LRM_RID);
 	lrmd_log(LOG_DEBUG, "on_msg_get_state:client [%d] gets state of rsc %s"
 	,	client->pid, lrmd_nullcheck(id));
@@ -1975,13 +2007,11 @@ on_op_done(lrmd_op_t* op)
 	const char* op_type = NULL;
 	GHashTable* client_last_op = NULL;
 	lrmd_client_t* client = NULL;
+
 	
-	if (op == NULL) {
-		lrmd_log(LOG_WARNING, "on_op_done: op==NULL.");
-		return HA_FAIL;
-	}
+	CHECK_ALLOCATED(op, "op", HA_FAIL );
 	if (op->exec_pid == 0) {
-		lrmd_log(LOG_WARNING, "on_op_done: op was freed.");
+		lrmd_log(LOG_ERR, "on_op_done: op->exec_pid == 0.");
 		return HA_FAIL;
 	}
 	op->t_done = time_longclock();
@@ -1999,7 +2029,7 @@ on_op_done(lrmd_op_t* op)
 		if( op->timeout_tag > 0 ) {
 			g_source_remove(op->timeout_tag);
 		}
-		lrmd_log(LOG_WARNING,
+		lrmd_log(LOG_ERR,
 			"on_op_done: the resource of this op does not exists");
 		/* delete the op */
 		lrmd_op_destroy(op);
@@ -2036,7 +2066,7 @@ on_op_done(lrmd_op_t* op)
 			, op_info(op));
 			break;			
 		case LRM_OP_NOTSUPPORTED:
-			lrmd_log(LOG_WARNING
+			lrmd_log(LOG_ERR
 			, "on_op_done: %s done with status LRM_OP_NOTSUPPORTED"
 			, op_info(op));
 			break;			
@@ -2046,7 +2076,7 @@ on_op_done(lrmd_op_t* op)
 			, op_info(op));
 			break;			
 		default:
-			lrmd_log(LOG_WARNING
+			lrmd_log(LOG_ERR
 			, "on_op_done: %s done with unkown status "
 			, op_info(op));
 			break;			
@@ -2118,7 +2148,7 @@ on_op_done(lrmd_op_t* op)
 			}
 		}
 		else {	
-			lrmd_log(LOG_WARNING
+			lrmd_log(LOG_ERR
 			,	"on_op_done:the client [%d] of this op does not exist"
 			,	op->client_id);
 		}
@@ -2199,12 +2229,9 @@ on_op_done(lrmd_op_t* op)
 int
 flush_op(lrmd_op_t* op)
 {
-	if (op == NULL) {
-		lrmd_log(LOG_ERR, "flush_op: op==NULL.");
-		return HA_FAIL;
-	}
+	CHECK_ALLOCATED(op, "op", HA_FAIL );
 	if (op->exec_pid == 0) {
-		lrmd_log2(LOG_WARNING, "flush_op: op was freed.");
+		lrmd_log2(LOG_ERR, "flush_op: op->exec_pid == 0.");
 		return HA_FAIL;
 	}
 
@@ -2230,6 +2257,7 @@ perform_op(lrmd_rsc_t* rsc)
 	GList* node = NULL;
 	lrmd_op_t* op = NULL;
 
+	CHECK_ALLOCATED(rsc, "resource", HA_FAIL );
 	if (TRUE == shutdown_in_progress && can_shutdown()) {
 		lrm_shutdown(NULL);
 	}
@@ -2270,17 +2298,16 @@ perform_op(lrmd_rsc_t* rsc)
 	return HA_OK;
 }
 
+		
+
 struct ha_msg*
 op_to_msg(lrmd_op_t* op)
 {
 	struct ha_msg* msg = NULL;
 
-	if (op == NULL) {
-		lrmd_log(LOG_ERR, "op_to_msg: op==NULL.");
-		return NULL;
-	}
+	CHECK_ALLOCATED(op, "op", NULL);
 	if (op->exec_pid == 0) {
-		lrmd_log(LOG_WARNING, "op_to_msg: op was freed.");
+		lrmd_log(LOG_ERR, "op_to_msg: op->exec_pid is 0.");
 		return NULL;
 	}
 
@@ -2309,16 +2336,16 @@ perform_ra_op(lrmd_op_t* op)
         GHashTable* params = NULL;
         GHashTable* op_params = NULL;
 
+	CHECK_ALLOCATED(op, "op", HA_FAIL);
+
 	if ( pipe(fd) < 0 ) {
 		lrmd_log(LOG_ERR,"perform_ra_op:pipe create error.");
 	}
 
-	if (op == NULL) {
-		lrmd_log(LOG_WARNING, "perform_ra_op: op==NULL.");
-		return HA_FAIL;
-	}
+	CHECK_ALLOCATED(op, "op", HA_FAIL);
+
 	if (op->exec_pid == 0) {
-		lrmd_log(LOG_WARNING, "perform_ra_op: op was freed.");
+		lrmd_log(LOG_ERR, "perform_ra_op: op->exec_pid == 0.");
 		return HA_FAIL;
 	}
 
@@ -2447,20 +2474,11 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
         int rc;
         int ret;
 
+	CHECK_ALLOCATED(p, "ProcTrack p", );
 	op = p->privatedata;
-	if (op == NULL) {
-		lrmd_log(LOG_WARNING, "on_ra_proc_finished: op==NULL.");
-		dump_data_for_debug();
-		return;
-	}
-	if (!cl_is_allocated(op)) {
-		lrmd_log(LOG_WARNING, "on_ra_proc_finished: op %lx is not allocated!"
-		,	(unsigned long)(op));
-		dump_data_for_debug();
-		return;
-	}
+	CHECK_ALLOCATED(op, "op", );
 	if (op->exec_pid == 0) {
-		lrmd_log(LOG_WARNING, "on_ra_proc_finished: op was freed.");
+		lrmd_log(LOG_ERR, "on_ra_proc_finished: op was freed.");
 		dump_data_for_debug();
 		return;
 	}
@@ -2505,7 +2523,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 			}
 			return ;
 		}
-		lrmd_log(LOG_WARNING
+		lrmd_log(LOG_ERR
 		, "on_ra_proc_finished: the exit code shows something wrong");
 		
 	}
@@ -2629,6 +2647,7 @@ lookup_client (pid_t pid)
 	for(node = g_list_first(client_list);
 		NULL != node; node = g_list_next(node)){
 		client = (lrmd_client_t*)node->data;
+		CHECK_ALLOCATED(client, "client", NULL);
 		if (pid == client->pid) {
 			return client;
 		}
@@ -2645,6 +2664,7 @@ lookup_rsc (const char* rid)
 
 	for(node=g_list_first(rsc_list); NULL!=node; node=g_list_next(node)){
 		rsc = (lrmd_rsc_t*)node->data;
+		CHECK_ALLOCATED(rsc, "rsc (node->data)", NULL);
 		if (0 == strncmp(rid, rsc->id, RID_LEN)) {
 			return rsc;
 		}
@@ -2659,6 +2679,7 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 	const char* id = NULL;
 	lrmd_rsc_t* rsc = NULL;
 
+	CHECK_ALLOCATED(msg, "msg", NULL);
 	id = ha_msg_value(msg, F_LRM_RID);
 	if (id == NULL) {
 		lrmd_log(LOG_ERR, "lookup_rsc_by_msg: NULL F_LRM_RID");
@@ -2859,6 +2880,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.108  2005/04/28 17:21:32  alan
+ * Lots more self-checking code and moved some warnings to ERRORs.
+ *
  * Revision 1.107  2005/04/28 16:24:30  alan
  * Put in two new checks for NULL ops when freeing them.
  *
