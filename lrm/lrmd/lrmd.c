@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.112 2005/04/28 18:52:43 alan Exp $ */
+/* $Id: lrmd.c,v 1.113 2005/04/28 20:52:20 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2821,10 +2821,16 @@ dump_data_for_debug(void)
 				lrmd_log(LOG_DEBUG, "NULL client ch_cmd in dump_data_for_debug()");
 			}else{
 				lrmd_log(LOG_DEBUG
-				,	"Command channel status: %d, read Qlen: %d, write Qlen: %d"
+				,	"Command channel status: %d, read queue addr: %p, write queue addr: %p"
 				,	client->ch_cmd->ch_status
-				,	client->ch_cmd->recv_queue->current_qlen
-				,	client->ch_cmd->send_queue->current_qlen);
+				,	client->ch_cmd->recv_queue
+				,	client->ch_cmd->send_queue );
+
+				if (client->ch_cmd->recv_queue && client->ch_cmd->send_queue) {
+					lrmd_log(LOG_DEBUG, "read Qlen: %d, write Qlen: %d"
+					,	client->ch_cmd->recv_queue->current_qlen
+					,	client->ch_cmd->send_queue->current_qlen);
+				}
 			}
 			if (!client->ch_cbk) {
 				lrmd_log(LOG_DEBUG, "NULL client ch_cbk in dump_data_for_debug()");
@@ -2881,6 +2887,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.113  2005/04/28 20:52:20  sunjd
+ * avoid segfault
+ *
  * Revision 1.112  2005/04/28 18:52:43  alan
  * Changed the print format slightly for unallocated storage messages.
  *
