@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.109 2005/04/28 17:40:41 alan Exp $ */
+/* $Id: lrmd.c,v 1.110 2005/04/28 17:42:31 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2148,8 +2148,9 @@ on_op_done(lrmd_op_t* op)
 			}
 		}
 		else {	
-			lrmd_log(LOG_WARNING
-			,	"on_op_done:the client [%d] of this op does not exist"
+			lrmd_log(LOG_ERR
+			,	"%s: the client [%d] of this op does not exist"
+			" and client requested notification."
 			,	op->client_id);
 		}
 			
@@ -2880,6 +2881,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.110  2005/04/28 17:42:31  alan
+ * Decided to change the last WARNING back into an ERR.
+ *
  * Revision 1.109  2005/04/28 17:40:41  alan
  * Turned on_op_done non-existent client message back to a warning.
  *
