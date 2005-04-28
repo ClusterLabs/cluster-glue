@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.102 2005/04/27 21:59:37 alan Exp $ */
+/* $Id: lrmd.c,v 1.103 2005/04/28 02:57:56 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2504,8 +2504,14 @@ on_ra_proc_query_name(ProcTrack* p)
 	}
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
-
-	snprintf(proc_name, MAX_PROC_NAME, "%s:%s", op->rsc->id, op_type);
+	if (NULL == g_list_find(rsc_list, op->rsc)) {
+		snprintf(proc_name
+		, MAX_PROC_NAME
+		, "unknown rsc(may deleted):%s"
+		, op_type);
+	}else {	
+		snprintf(proc_name, MAX_PROC_NAME, "%s:%s", op->rsc->id, op_type);
+	}
 	return proc_name;
 }
 
@@ -2798,6 +2804,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.103  2005/04/28 02:57:56  zhenh
+ * when the resource was deleted during the operation performing, this would cause core dump.
+ *
  * Revision 1.102  2005/04/27 21:59:37  alan
  * Added more caution in handling pointers, more conservative comparators,
  * checked to see if structure was still allocated
