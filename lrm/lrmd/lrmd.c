@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.103 2005/04/28 02:57:56 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.104 2005/04/28 09:49:03 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1020,10 +1020,6 @@ on_remove_client (gpointer user_data)
 		on_msg_unregister(client,NULL);
 	}
 	lrmd_client_destroy(client);
-	client = NULL;
-	client->ch_cbk->ops->destroy(client->ch_cbk);
-	g_free(client->app_name);
-	g_free(client);
 }
 
 gboolean
@@ -2804,6 +2800,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.104  2005/04/28 09:49:03  zhenh
+ * the client structure has been released in lrmd_client_destroy() functions
+ *
  * Revision 1.103  2005/04/28 02:57:56  zhenh
  * when the resource was deleted during the operation performing, this would cause core dump.
  *
