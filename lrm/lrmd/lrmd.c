@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.104 2005/04/28 09:49:03 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.105 2005/04/28 14:16:12 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -273,19 +273,34 @@ static gboolean free_str_op_pair(gpointer key
 ,	 gpointer value, gpointer user_data);
 static lrmd_op_t* lrmd_op_copy(lrmd_op_t* op);
 
+static struct {
+	int	opcount;
+	int	clientcount;
+	int	rsccount;
+}lrm_objectstats;
+
+static void
+dump_mem_stats(void)
+{
+	lrmd_log(LOG_INFO
+	,	"STATS: OP Count: %d, Client Count: %d, Resource Count: %d"
+	,	lrm_objectstats.opcount
+	,	lrm_objectstats.clientcount
+	,	lrm_objectstats.rsccount);
+}
+
 static void
 lrmd_op_destroy(lrmd_op_t* op)
 {
-	if (op == NULL) {
+
+	if (!cl_is_allocated(op)) {
+		/* This means we screwed up our memory management */
+		lrmd_log(LOG_ERR, "%s(): op 0x%lx is not allocated", __FUNCTION__
+		,	(unsigned long)op);
+		dump_mem_stats();
 		return;
 	}
-	
-	if ( 0 == op->exec_pid ) {
-		lrmd_log(LOG_DEBUG, "lrmd_op_destroy: donnot need to free a "
-			"freed struct.");
-		lrmd_log(LOG_DEBUG, "lrmd_op_destroy: op->msg address: %p", op->msg);
-		return;
-	}
+	--lrm_objectstats.opcount;
 
 	/*
 	 * FIXME!
@@ -305,7 +320,7 @@ lrmd_op_destroy(lrmd_op_t* op)
 	 * for our various purposes, and it wouldn't matter what order
 	 * the various events happened in.
 	 */
-	if (op->exec_pid < 1) {
+	if (op->exec_pid > 1) {
 		return_to_orig_privs();	
 		kill(op->exec_pid, 9);
 		return_to_dropped_privs();
@@ -335,11 +350,13 @@ lrmd_op_new(void)
 
 	if (op == NULL) {
 		lrmd_log(LOG_ERR, "lrmd_op_new(): out of memory");
+		dump_mem_stats();
 		return NULL;
 	}
 	op->exec_pid = -1;
 	op->timeout_tag = -1;
 	op->t_recv = time_longclock();
+	++lrm_objectstats.opcount;
 	return op;
 }
 
@@ -351,7 +368,9 @@ lrmd_op_copy(lrmd_op_t* op)
 	if (NULL == ret) {
 		return NULL;
 	}
+	/* Do a "shallow" copy */
 	*ret = *op;
+	/* Do a "deep" copy of the message structure */
 	ret->msg = ha_msg_copy(op->msg);
 	return ret;
 }
@@ -360,9 +379,14 @@ lrmd_op_copy(lrmd_op_t* op)
 static void
 lrmd_client_destroy(lrmd_client_t* client)
 {
-	if (!client) {
+	if (!cl_is_allocated(client)) {
+		lrmd_log(LOG_ERR, "%s(): client 0x%lx is not allocated", __FUNCTION__
+		,	(unsigned long)client);
+		dump_mem_stats();
 		return;
 	}
+		
+	--lrm_objectstats.clientcount;
 	if (client->ch_cbk) {
 		client->ch_cbk->ops->destroy(client->ch_cbk);
 		client->ch_cbk = NULL;
@@ -381,14 +405,23 @@ lrmd_client_new(void)
 	client = cl_calloc(sizeof(lrmd_client_t), 1);
 	if (client == NULL) {
 		lrmd_log(LOG_ERR, "lrmd_client_new(): out of memory");
+		dump_mem_stats();
 		return NULL;
 	}
+	++lrm_objectstats.clientcount;
 	return client;
 }
 
 static void
 lrmd_rsc_destroy(lrmd_rsc_t* rsc)
 {
+	if (!cl_is_allocated(rsc)) {
+		lrmd_log(LOG_ERR, "%s(): resource 0x%lx is not allocated", __FUNCTION__
+		,	(unsigned long)rsc);
+		dump_mem_stats();
+		return;
+	}
+	--lrm_objectstats.rsccount;
 	if (rsc->id) {
 		cl_free(rsc->id);
 		rsc->id = NULL;
@@ -415,6 +448,7 @@ lrmd_rsc_new(const char * id, struct ha_msg* msg)
 	rsc = (lrmd_rsc_t *)cl_calloc(sizeof(lrmd_rsc_t),1);
 	if (rsc == NULL) {
 		lrmd_log(LOG_ERR, "lrmd_rsc_new(): out of memory");
+		dump_mem_stats();
 		return NULL;
 	}
 	if (id) {
@@ -432,6 +466,7 @@ lrmd_rsc_new(const char * id, struct ha_msg* msg)
 		lrmd_rsc_destroy(rsc);
 		rsc = NULL;
 	}
+	++lrm_objectstats.rsccount;
 	return rsc;
 }
 int
@@ -2098,7 +2133,7 @@ on_op_done(lrmd_op_t* op)
 			,	(gpointer)client_last_op);
 		}
 		
-		/*insert the op to the hash table for the client*/
+		/* Insert the op into the hash table for the client*/
 		op_type = ha_msg_value(op->msg, F_LRM_OP);
 		old_op = g_hash_table_lookup(client_last_op, op_type);
 		new_op = lrmd_op_copy(op);
@@ -2800,6 +2835,13 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.105  2005/04/28 14:16:12  alan
+ * Put in some more code to detect what's going wrong with
+ * the LRM memory management model and print out LOUD messages
+ * when things aren't allocated that we're trying to free.
+ * Also keep and memory statistics.  Print them on memory allocation
+ * errors.
+ *
  * Revision 1.104  2005/04/28 09:49:03  zhenh
  * the client structure has been released in lrmd_client_destroy() functions
  *
