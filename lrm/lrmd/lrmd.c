@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.114 2005/04/28 21:30:27 alan Exp $ */
+/* $Id: lrmd.c,v 1.115 2005/04/28 21:55:55 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1139,7 +1139,6 @@ on_repeat_op_done(gpointer data)
 	op = (lrmd_op_t*)data;
 	CHECK_ALLOCATED(op, "op", FALSE );
 	CHECK_ALLOCATED(op->rsc, "op->rsc", FALSE );
-	CHECK_ALLOCATED(op->rsc->repeat_op_list, "op->rsc->repeat_op_list", FALSE );
 
 	if (op->exec_pid == 0) {
 		lrmd_log(LOG_ERR, "on_repeat_op_done: exec_pid is 0.");
@@ -2931,6 +2930,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.115  2005/04/28 21:55:55  alan
+ * Removed an incorrect check for allocation statement.
+ *
  * Revision 1.114  2005/04/28 21:30:27  alan
  * Added comments.
  * Turned it to use the cl_malloc() calls for the glib memory areas.
