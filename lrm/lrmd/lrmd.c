@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.110 2005/04/28 17:42:31 alan Exp $ */
+/* $Id: lrmd.c,v 1.111 2005/04/28 17:55:18 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2151,7 +2151,7 @@ on_op_done(lrmd_op_t* op)
 			lrmd_log(LOG_ERR
 			,	"%s: the client [%d] of this op does not exist"
 			" and client requested notification."
-			,	op->client_id);
+			,	__FUNCTION__, op->client_id);
 		}
 			
 
@@ -2881,6 +2881,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.111  2005/04/28 17:55:18  alan
+ * Fixed a stupid format mismatch error.
+ *
  * Revision 1.110  2005/04/28 17:42:31  alan
  * Decided to change the last WARNING back into an ERR.
  *
