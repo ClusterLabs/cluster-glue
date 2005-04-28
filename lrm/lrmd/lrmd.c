@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.115 2005/04/28 21:55:55 alan Exp $ */
+/* $Id: lrmd.c,v 1.116 2005/04/28 22:16:09 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -558,7 +558,6 @@ main(int argc, char ** argv)
 		debug_level++;
 	}
 
-	cl_malloc_forced_for_glib();
 	cl_log_set_entity(lrm_system_name);
 	cl_log_enable_stderr(debug_level?TRUE:FALSE);
 	cl_log_set_facility(LOG_DAEMON);
@@ -2930,6 +2929,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.116  2005/04/28 22:16:09  alan
+ * Removed a superfluous call to set up cl_malloc() as allocator for glib.
+ *
  * Revision 1.115  2005/04/28 21:55:55  alan
  * Removed an incorrect check for allocation statement.
  *
