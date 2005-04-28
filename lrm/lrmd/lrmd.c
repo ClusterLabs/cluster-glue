@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.113 2005/04/28 20:52:20 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.114 2005/04/28 21:30:27 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -95,6 +95,42 @@
 		return result;						\
 	}	
 
+/*
+ * The basic objects in our world:
+ *
+ *	lrmd_client_t:
+ *	Client - a process which has connected to us for service.
+ *
+ *	lrmd_rsc_t:
+ *	Resource - an abstract HA cluster resource implemented by a
+ *		resource agent through our RA plugins
+ *		It has two list of operations (lrmd_op_t) associated with it
+ *			op_list - operations to be run as soon as they're ready
+ *			repeat_op_list - operations to be run later
+ *		It maintains the following tracking structures:
+ *			last_op        Last operation performed on this resource
+ *			last_op_table  Last operations of each type done per client
+ *
+ *	lrmd_op_t:
+ *	Resource operation - an operation on a resource -- requested
+ *	by a client.
+ *
+ *	ProcTrack - tracks a currently running resource operation.
+ *		It points back to the lrmd_op_t that started it.
+ *
+ * Global structures containing these things:
+ *
+ *	client_list - a linked list of all (currently connected) clients
+ *
+ *	rsc_list - a linked list of all (currently configured) resources
+ *
+ *	Proctrack keeps its own private data structures to keep track of
+ *	child processes that it created.  They in turn point to the
+ *	lrmd_op_t objects that caused us to fork the child process.
+ *
+ *
+ */
+
 typedef struct
 {
 	char*		app_name;
@@ -115,6 +151,22 @@ typedef struct
 typedef struct lrmd_rsc lrmd_rsc_t;
 typedef struct lrmd_op	lrmd_op_t;
 
+
+struct lrmd_rsc
+{
+	char*		id;		/* Unique resource identifier		*/
+	char*		type;		/* 					*/
+	char*		class;		/*					*/
+	char*		provider;	/* Resource provider (optional)		*/
+	GHashTable* 	params;		/* Parameters to this resource		*/
+
+	GList*		op_list;	/* List of operations queued to run */
+	GList*		repeat_op_list;	/* list of repeating ops */
+					/* They will run later */
+	lrmd_op_t*	last_op;	/* Last operation performed on this structure */
+	GHashTable*	last_op_table;	/* Last operations of each type done by anyone */
+};
+
 struct lrmd_op
 {
 	lrmd_rsc_t*	rsc;
@@ -133,20 +185,6 @@ struct lrmd_op
 	longclock_t	t_perform;
 	longclock_t	t_done;
 	
-};
-
-struct lrmd_rsc
-{
-	char*		id;
-	char*		type;
-	char*		class;
-	char*		provider;
-	GHashTable* 	params;
-
-	GList*		op_list;
-	GList*		repeat_op_list;
-	lrmd_op_t*	last_op;
-	GHashTable*	last_op_table;
 };
 
 /* Debug oriented funtions */
@@ -481,6 +519,8 @@ main(int argc, char ** argv)
 	int argerr = 0;
 	int flag;
 	char * inherit_debuglevel;
+	cl_malloc_forced_for_glib();
+
 
 	while ((flag = getopt(argc, argv, OPTARGS)) != EOF) {
 		switch(flag) {
@@ -1125,6 +1165,10 @@ on_repeat_op_done(gpointer data)
 			"on_repeat_op_done: can not get timeout value");
 		return FALSE;
 	}
+
+	/* FIXME:  Timeouts should be for how long the operation runs
+ 	 * Not how long it takes to get scheduled.
+	 */
 	if (0 < timeout ) {
 		op->timeout_tag = Gmain_timeout_add(timeout,
 			on_timeout_op_done, op);
@@ -2887,6 +2931,10 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.114  2005/04/28 21:30:27  alan
+ * Added comments.
+ * Turned it to use the cl_malloc() calls for the glib memory areas.
+ *
  * Revision 1.113  2005/04/28 20:52:20  sunjd
  * avoid segfault
  *
