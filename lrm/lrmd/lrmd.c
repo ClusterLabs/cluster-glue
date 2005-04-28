@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.105 2005/04/28 14:16:12 alan Exp $ */
+/* $Id: lrmd.c,v 1.106 2005/04/28 15:08:47 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -457,16 +457,26 @@ lrmd_rsc_new(const char * id, struct ha_msg* msg)
 	if (msg) {
 		rsc->type = cl_strdup(ha_msg_value(msg, F_LRM_RTYPE));
 		rsc->class = cl_strdup(ha_msg_value(msg, F_LRM_RCLASS));
-		rsc->provider = cl_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
-	}
-	if (	rsc->id == NULL
-	||	rsc->type == NULL
-	||	rsc->class == NULL
-	||	rsc->provider == NULL) {
-		lrmd_rsc_destroy(rsc);
-		rsc = NULL;
+		if (NULL == ha_msg_value(msg, F_LRM_RPROVIDER)) {
+			lrmd_log(LOG_ERR, "%s(): No %s field in message"
+			, __FUNCTION__, F_LRM_RPROVIDER);
+		}else{
+			rsc->provider = cl_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
+			if (rsc->provider == NULL) {
+				goto errout;
+			}
+		}
+		if (rsc->id == NULL
+		||	rsc->type == NULL
+		||	rsc->class == NULL) {
+			goto errout;
+		}
 	}
 	++lrm_objectstats.rsccount;
+	return rsc;
+errout:
+	lrmd_rsc_destroy(rsc);
+	rsc = NULL;
 	return rsc;
 }
 int
@@ -2835,6 +2845,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.106  2005/04/28 15:08:47  alan
+ * Changed lrmd.c so that it checks for missing fields before trying to copy them.
+ *
  * Revision 1.105  2005/04/28 14:16:12  alan
  * Put in some more code to detect what's going wrong with
  * the LRM memory management model and print out LOUD messages
