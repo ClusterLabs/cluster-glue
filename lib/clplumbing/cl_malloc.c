@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.13 2005/04/10 19:51:25 lars Exp $ */
+/* $Id: cl_malloc.c,v 1.14 2005/04/28 15:04:38 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -568,7 +568,13 @@ cl_calloc(size_t nmemb, size_t size)
 char *
 cl_strdup(const char *s)
 {
-	void * ret = cl_malloc((strlen(s) + 1) * sizeof(char));
+	void * ret;
+
+	if (!s) {
+		cl_log(LOG_ERR, "cl_strdup(NULL)");
+		return(NULL);
+	}
+	ret = cl_malloc((strlen(s) + 1) * sizeof(char));
 
 	if (ret) {
 		strcpy(ret, s);
