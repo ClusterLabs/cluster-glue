@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.106 2005/04/28 15:08:47 alan Exp $ */
+/* $Id: lrmd.c,v 1.107 2005/04/28 16:24:30 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1217,7 +1217,15 @@ on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 			if (op->client_id == client->pid) {
 				op_node = g_list_next(op_node);
 				rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
-				lrmd_op_destroy(op);
+				if (NULL == op) {
+					lrmd_log(LOG_ERR
+					,	"%s (): repeat_op_list node has NULL data."
+					,	__FUNCTION__);
+					lrmd_log(LOG_INFO, "Message follows:");
+					cl_log_message(LOG_INFO, msg);
+				}else{
+					lrmd_op_destroy(op);
+				}
 			}
 			else {
 				op_node = g_list_next(op_node);
@@ -1606,7 +1614,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 			flush_op(op);
 		}
 		/* free the last_op */
-		if ( NULL!=rsc->last_op) {
+		if ( NULL != rsc->last_op) {
 			lrmd_op_destroy(rsc->last_op);
 		}
 		
@@ -1642,8 +1650,14 @@ static gboolean
 free_str_op_pair(gpointer key, gpointer value, gpointer user_data)
 {
 	lrmd_op_t* op = (lrmd_op_t*)user_data;
+
+	if (NULL == op) {
+		lrmd_log(LOG_ERR, "%s(): NULL op in op_pair(%s)" , __FUNCTION__
+		,	(const char *)key);
+	}else{
+		lrmd_op_destroy(op);
+	}
 	g_free(key);
-	lrmd_op_destroy(op);
 	return TRUE;
 }
 
@@ -2112,7 +2126,7 @@ on_op_done(lrmd_op_t* op)
 
 	}
 	/* release the old last_op */
-	if ( NULL!=op->rsc->last_op) {
+	if ( NULL != op->rsc->last_op) {
 		lrmd_op_destroy(op->rsc->last_op);
 	}
 	/* remove the op from op_list and copy to last_op */
@@ -2161,7 +2175,7 @@ on_op_done(lrmd_op_t* op)
 	}
 	
 	/*copy the repeat op to repeat list to wait next perform */
-	if ( 0!=op->interval && NULL != lookup_client(op->client_id)
+	if ( 0 != op->interval && NULL != lookup_client(op->client_id)
 	&&   LRM_OP_CANCELLED != op_status) {
 		lrmd_op_t* repeat_op = lrmd_op_copy(op);
 		repeat_op->exec_pid = -1;
@@ -2845,6 +2859,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.107  2005/04/28 16:24:30  alan
+ * Put in two new checks for NULL ops when freeing them.
+ *
  * Revision 1.106  2005/04/28 15:08:47  alan
  * Changed lrmd.c so that it checks for missing fields before trying to copy them.
  *
