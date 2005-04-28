@@ -1091,13 +1091,13 @@ rsc_get_last_result (lrm_rsc_t* rsc, const char* op_type)
 			"rsc_cancel_op: can not send msg to lrmd");
 		return NULL;
 	}
-	ha_msg_del(msg);
 	
 	/* get the return msg */
 	ret = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
 	if (NULL == ret) {
 		cl_log(LOG_ERR,
 			"rsc_get_cur_state: can not receive ret msg");
+		ha_msg_del(msg);
 		return NULL;
 	}
 	if (HA_OK != ha_msg_value_int(msg,F_LRM_OPCNT, &opcount)) {
@@ -1109,6 +1109,7 @@ rsc_get_last_result (lrm_rsc_t* rsc, const char* op_type)
 			op->rsc = lrm_get_rsc( NULL, op->rsc_id );
 		}
 	}
+	ha_msg_del(msg);
 	ha_msg_del(ret);
 	return op;
 }
