@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.111 2005/04/28 17:55:18 alan Exp $ */
+/* $Id: lrmd.c,v 1.112 2005/04/28 18:52:43 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -89,7 +89,7 @@
 
 #define	CHECK_ALLOCATED(thing, name, result)				\
 	if (!cl_is_allocated(thing)) {					\
-		lrmd_log(LOG_ERR, "%s: %s %ld not allocated."		\
+		lrmd_log(LOG_ERR, "%s: %s pointer 0x%lx is not allocated."		\
 		,	__FUNCTION__, name, (unsigned long)thing);	\
 		dump_mem_stats();					\
 		return result;						\
@@ -2881,6 +2881,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.112  2005/04/28 18:52:43  alan
+ * Changed the print format slightly for unallocated storage messages.
+ *
  * Revision 1.111  2005/04/28 17:55:18  alan
  * Fixed a stupid format mismatch error.
  *
