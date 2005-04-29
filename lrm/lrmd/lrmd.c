@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.119 2005/04/29 01:48:36 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.120 2005/04/29 05:19:34 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1713,7 +1713,7 @@ free_str_hash_pair(gpointer key, gpointer value, gpointer user_data)
 static gboolean
 free_str_op_pair(gpointer key, gpointer value, gpointer user_data)
 {
-	lrmd_op_t* op = (lrmd_op_t*)user_data;
+	lrmd_op_t* op = (lrmd_op_t*)value;
 
 	if (NULL == op) {
 		lrmd_log(LOG_ERR, "%s(): NULL op in op_pair(%s)" , __FUNCTION__
@@ -2928,6 +2928,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.120  2005/04/29 05:19:34  zhenh
+ * fix a mistype error
+ *
  * Revision 1.119  2005/04/29 01:48:36  zhenh
  * fixed two mistype
  *
