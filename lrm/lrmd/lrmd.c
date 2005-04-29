@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.116 2005/04/28 22:16:09 alan Exp $ */
+/* $Id: lrmd.c,v 1.117 2005/04/29 01:41:27 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -488,7 +488,7 @@ lrmd_rsc_new(const char * id, struct ha_msg* msg)
 		rsc->type = cl_strdup(ha_msg_value(msg, F_LRM_RTYPE));
 		rsc->class = cl_strdup(ha_msg_value(msg, F_LRM_RCLASS));
 		if (NULL == ha_msg_value(msg, F_LRM_RPROVIDER)) {
-			lrmd_log(LOG_ERR, "%s(): No %s field in message"
+			lrmd_log(LOG_NOTICE, "%s(): No %s field in message"
 			, __FUNCTION__, F_LRM_RPROVIDER);
 		}else{
 			rsc->provider = cl_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
@@ -519,8 +519,6 @@ main(int argc, char ** argv)
 	int argerr = 0;
 	int flag;
 	char * inherit_debuglevel;
-	cl_malloc_forced_for_glib();
-
 
 	while ((flag = getopt(argc, argv, OPTARGS)) != EOF) {
 		switch(flag) {
@@ -2929,6 +2927,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.117  2005/04/29 01:41:27  sunjd
+ * remove the redundant cl_malloc_forced_for_glib; degrade one log to none-error level
+ *
  * Revision 1.116  2005/04/28 22:16:09  alan
  * Removed a superfluous call to set up cl_malloc() as allocator for glib.
  *
