@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.122 2005/04/29 07:45:00 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.123 2005/04/29 17:08:47 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -709,6 +709,9 @@ sigterm_action(int nsig)
 	CL_SIGNAL(nsig, sigterm_action);
 	shutdown_in_progress = TRUE;		
 	if (can_shutdown()) {
+		/* FIXME: CANNOT call this function from a signal handler */
+		/* MUST use G_main_add_SignalHandler() instead */
+		/* it "almost always" works right - or it crashes instead ;-) */
 		 Gmain_timeout_add(1, lrm_shutdown, NULL);
 	}
 }
@@ -788,6 +791,13 @@ init_start ()
 	PILLoadPlugin(PluginLoadingSystem, "InterfaceMgr", "generic",
 				  &RegisterRqsts);
 
+	/*
+	 *	FIXME!!!
+	 *	Almost all the code through the end of the next loop is
+	 *	unnecessary - The plugin system will do this for you quite
+	 *	nicely.  And, it does it portably, too...
+	 */
+
 	dir = opendir(RA_PLUGIN_DIR);
 	if (NULL == dir) {
 		lrmd_log(LOG_ERR, "main: can not open RA plugin dir "RA_PLUGIN_DIR);
@@ -816,6 +826,7 @@ init_start ()
 		PILLoadPlugin(PluginLoadingSystem , "RAExec", ra_name, NULL);
 		ra_class_list = g_list_append(ra_class_list,ra_name);
 	}
+	closedir(dir); dir = NULL; /* Don't forget to close 'dir' */
 
 	/*
 	 *create the waiting connections
@@ -899,11 +910,14 @@ init_start ()
 	 * a current bug - so that it can be fixed.  I tried lots of other
 	 * things, then I read the kernel code.  This is the only way.
 	 * FIXME!!  -- Alan R.
+	 *
+	 * This is now fixable by user code - when we are willing...
 	 */
 	drop_privs(0, 0); /* become "nobody" */
 #endif
 	
-	/* Add the signal handler for SIGUSR1, SIGUSR2. 
+	/*
+	 * Add the signal handler for SIGUSR1, SIGUSR2. 
 	 * They are used to change the debug level.
 	 */
 	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGUSR1, 
@@ -952,6 +966,7 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 	/* the register will be finished in on_msg_register */
 	client = lrmd_client_new();
 	if (client == NULL) {
+		/* Will returning FALSE destroy ch? FIXME? */
 		return FALSE;
 	}
 	client->app_name = NULL;
@@ -1011,6 +1026,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 		send_rc_msg(ch, HA_FAIL);
 		return TRUE;
 	}
+	/* FIXME: Should verify that client->ch_cbk is NULL */
 
 	/*fill the channel of callback field*/
 	client->ch_cbk = ch;
@@ -1030,6 +1046,11 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	if (IPC_DISCONNECT == ch->ch_status) {
 		lrmd_log(LOG_DEBUG,
 			"on_receive_cmd: channel status is disconnect");
+		/* FIXME??  I don't think we need to return FALSE here
+		 * since it will probably cause the client to disconnect
+		 * before any pending operations they might have going on
+		 * complete 
+		 */
 		return FALSE;
 	}
 
@@ -1042,7 +1063,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	/*get the message */
 	msg = msgfromIPC_noauth(ch);
 	if (NULL == msg) {
-		lrmd_log(LOG_DEBUG, "on_receive_cmd: can not receive msg");
+		lrmd_log(LOG_ERR, "on_receive_cmd: can not receive msg");
 		return TRUE;
 	}
 	
@@ -1076,7 +1097,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 		}
 	}
 	if (i == DIMOF(msg_maps)) {
-		lrmd_log(LOG_DEBUG, "on_receive_cmd: unknown msg");
+		lrmd_log(LOG_ERR, "on_receive_cmd: unknown msg");
 	}
 
 	/*delete the msg*/
@@ -2455,6 +2476,13 @@ perform_ra_op(lrmd_op_t* op)
 	lrmd_log(LOG_ERR, "perform_ra_op: end(impossible).");
 	return HA_OK;
 }
+
+/*
+ * FIXME:
+ *	The next 3 functions can be replaced by a single call to
+ *	set_sigchld_proctrack().  To be perfectly fair, this is
+ *	a fairly new capability
+ */
 /*g_source_add */
 static gboolean
 on_polled_input_prepare(GSource* source,
@@ -2626,6 +2654,12 @@ on_ra_proc_query_name(ProcTrack* p)
 }
 
 
+/*
+ * FIXME:
+ *	The next 2 functions can be replaced by a single call to
+ *	set_sigchld_proctrack().  To be fair to the authors, this is
+ *	a fairly new capability
+ */
 static void
 child_signal_handler(int sig)
 {
@@ -2958,6 +2992,11 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.123  2005/04/29 17:08:47  alan
+ * Added a missing closedir()
+ * Added some FIXME type comments to the code to mark where some things
+ * needed to change.
+ *
  * Revision 1.122  2005/04/29 07:45:00  zhenh
  * make the timeout of op as the timeout of RA running only
  *
