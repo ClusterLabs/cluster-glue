@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.121 2005/04/29 07:24:49 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.122 2005/04/29 07:45:00 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1132,7 +1132,6 @@ gboolean
 on_repeat_op_done(gpointer data)
 {
 	lrmd_op_t* op = NULL;
-	int timeout = 0;
 
 	op = (lrmd_op_t*)data;
 	CHECK_ALLOCATED(op, "op", FALSE );
@@ -1156,20 +1155,6 @@ on_repeat_op_done(gpointer data)
 
 	op->t_addtolist = time_longclock();
 	op->rsc->op_list = g_list_append(op->rsc->op_list, op);
-	
-	if (HA_OK != ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)) {
-		lrmd_log(LOG_ERR,
-			"on_repeat_op_done: can not get timeout value");
-		return FALSE;
-	}
-
-	/* FIXME:  Timeouts should be for how long the operation runs
- 	 * Not how long it takes to get scheduled.
-	 */
-	if (0 < timeout ) {
-		op->timeout_tag = Gmain_timeout_add(timeout,
-			on_timeout_op_done, op);
-	}
 
 	perform_op(op->rsc);
 
@@ -1916,10 +1901,6 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			, "on_op_done: %s is added to repeat op list for delay" 
 			, op_info(op));
 		} else {
- 			if (0 < timeout ) {
-				op->timeout_tag = Gmain_timeout_add(timeout
-						, on_timeout_op_done, op);
-			}
 			lrmd_log2(LOG_DEBUG
 			,	"on_msg_perform_op:add %s to op list"
 			,	op_info(op));
@@ -2406,6 +2387,15 @@ perform_ra_op(lrmd_op_t* op)
 		);
 		dump_data_for_debug();
 	}
+	if(HA_OK != ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)){
+		timeout = 0;
+		lrmd_log(LOG_ERR,"perform_ra_op: can not find timeout");
+	}
+	if (0 < timeout ) {
+		op->timeout_tag = Gmain_timeout_add(timeout
+				, on_timeout_op_done, op);
+	}
+	
 	return_to_orig_privs();
 	switch(pid=fork()) {
 		case -1:
@@ -2442,10 +2432,6 @@ perform_ra_op(lrmd_op_t* op)
 				return HA_FAIL;
 			}
 			op_type = ha_msg_value(op->msg, F_LRM_OP);
-			if(HA_OK != ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)){
-				timeout = 0;
-				lrmd_log(LOG_ERR,"perform_ra_op: can not find timeout");
-			}
 			/*should we use logging daemon or not in script*/
 			setenv(HALOGD, cl_log_get_uselogd()?"yes":"no",1);
 
@@ -2972,6 +2958,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.122  2005/04/29 07:45:00  zhenh
+ * make the timeout of op as the timeout of RA running only
+ *
  * Revision 1.121  2005/04/29 07:24:49  zhenh
  * 1. print resources and operatios information out in dump_data_for_debug(); 2. dump data when an op stay in op list longer than 5s
  *
