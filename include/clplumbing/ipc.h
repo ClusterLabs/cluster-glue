@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.44 2005/04/18 18:25:37 gshi Exp $ */
+/* $Id: ipc.h,v 1.45 2005/04/29 16:51:10 alan Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -190,7 +190,6 @@ struct IPC_AUTH {
 	GHashTable * uid;	/* hash table for user id */
 	GHashTable * gid;	/* hash table for group id */
 };
-
 
 
 /* Message structure. */
@@ -665,10 +664,17 @@ int ipc_channel_pair(IPC_Channel* channels[2]);
  *	be created.
  *
  */
+/*
+ * FIXME: We need a simpler way to do all this...
+ * WE ALSO NEED THIS FUNCTION:
+ * ipc_str_to_auth(const char * uidlist, const char * gidlist)
+ * NOTE: This function already written as part of heartbeat/config.c
+ *
+ */
 extern IPC_Auth * ipc_set_auth(uid_t * a_uid, gid_t * a_gid
 ,	int num_uid, int num_gid);
 
-/* Destroys an object constructed by ipc_set_auth */
+/* Destroys an object constructed by ipc_set_auth or ipc_str_to_auth() */
 extern void ipc_destroy_auth(IPC_Auth * auth);
 
 extern void ipc_set_pollfunc(int (*)(struct pollfd*, unsigned int, int));
