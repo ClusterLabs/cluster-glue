@@ -1100,7 +1100,7 @@ rsc_get_last_result (lrm_rsc_t* rsc, const char* op_type)
 		ha_msg_del(msg);
 		return NULL;
 	}
-	if (HA_OK != ha_msg_value_int(msg,F_LRM_OPCNT, &opcount)) {
+	if (HA_OK != ha_msg_value_int(ret,F_LRM_OPCNT, &opcount)) {
 		op = NULL;
 	} 
 	else if ( 1 == opcount ) {
