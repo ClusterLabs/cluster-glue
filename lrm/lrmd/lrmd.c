@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.118 2005/04/29 01:45:56 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.119 2005/04/29 01:48:36 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -367,12 +367,12 @@ lrmd_op_destroy(lrmd_op_t* op)
 		return;
 	}
 
-	if ((int)op->repeat_timeout_tag < 0) {
+	if ((int)op->repeat_timeout_tag > 0) {
 		g_source_remove(op->repeat_timeout_tag);
 		op->repeat_timeout_tag = -1;
 	}
 
-	if ((int)op->timeout_tag < 0) {
+	if ((int)op->timeout_tag > 0) {
 		g_source_remove(op->timeout_tag);
 		op->timeout_tag = -1;
 	}
@@ -2928,6 +2928,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.119  2005/04/29 01:48:36  zhenh
+ * fixed two mistype
+ *
  * Revision 1.118  2005/04/29 01:45:56  sunjd
  * readd cl_malloc_forced_for_glib -- sorry for not noticing alan's removing
  *
