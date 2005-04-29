@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.117 2005/04/29 01:41:27 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.118 2005/04/29 01:45:56 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -520,6 +520,7 @@ main(int argc, char ** argv)
 	int flag;
 	char * inherit_debuglevel;
 
+	cl_malloc_forced_for_glib();
 	while ((flag = getopt(argc, argv, OPTARGS)) != EOF) {
 		switch(flag) {
 			case 'h':		/* Help message */
@@ -2927,6 +2928,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.118  2005/04/29 01:45:56  sunjd
+ * readd cl_malloc_forced_for_glib -- sorry for not noticing alan's removing
+ *
  * Revision 1.117  2005/04/29 01:41:27  sunjd
  * remove the redundant cl_malloc_forced_for_glib; degrade one log to none-error level
  *
