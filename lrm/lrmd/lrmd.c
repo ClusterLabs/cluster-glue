@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.123 2005/04/29 17:08:47 alan Exp $ */
+/* $Id: lrmd.c,v 1.124 2005/04/29 17:47:34 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -213,7 +213,7 @@ static int on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg);
-static void sigterm_action(int nsig);
+static gboolean sigterm_action(int nsig, gpointer unused);
 
 /* functions wrap the call to ra plugins */
 static int perform_ra_op(lrmd_op_t* op);
@@ -229,7 +229,7 @@ static lrmd_rsc_t* lookup_rsc (const char* rid);
 static lrmd_rsc_t* lookup_rsc_by_msg (struct ha_msg* msg);
 static int read_pipe(int fd, char ** data);
 static struct ha_msg* op_to_msg(lrmd_op_t* op);
-static gboolean lrm_shutdown(gpointer data);
+static gboolean lrm_shutdown(void);
 static gboolean can_shutdown(void);
 static void inherit_config_from_environment(void);
 static int facility_name_to_value(const char * name);
@@ -312,7 +312,7 @@ static int init_stop(const char *pid_file);
 static int init_status(const char *pid_file, const char *client_name);
 static long get_running_pid(const char *pid_file, gboolean* anypidfile);
 static void register_pid(const char *pid_file, gboolean do_fork,
-			void (*shutdown)(int nsig));
+			gboolean (*shutdown)(int nsig, gpointer userdata));
 static gboolean free_str_hash_pair(gpointer key
 ,	 gpointer value, gpointer user_data);
 static gboolean free_str_op_pair(gpointer key
@@ -672,7 +672,7 @@ usage(const char* cmd, int exit_status)
 }
 
 static gboolean
-lrm_shutdown(gpointer data)
+lrm_shutdown(void)
 {
 	lrmd_log(LOG_INFO,"lrmd is shutting down");
 	if (mainloop != NULL && g_main_is_running(mainloop)) {
@@ -703,21 +703,18 @@ can_shutdown()
 	}
 	return TRUE;
 }
-void
-sigterm_action(int nsig)
+gboolean
+sigterm_action(int nsig, gpointer user_data)
 {
-	CL_SIGNAL(nsig, sigterm_action);
 	shutdown_in_progress = TRUE;		
 	if (can_shutdown()) {
-		/* FIXME: CANNOT call this function from a signal handler */
-		/* MUST use G_main_add_SignalHandler() instead */
-		/* it "almost always" works right - or it crashes instead ;-) */
-		 Gmain_timeout_add(1, lrm_shutdown, NULL);
+		 lrm_shutdown();
 	}
+	return TRUE;
 }
 
 void
-register_pid(const char *pid_file,gboolean do_fork,void (*shutdown)(int nsig))
+register_pid(const char *pid_file,gboolean do_fork,gboolean (*shutdown)(int nsig, gpointer userdata))
 {
 	int	j;
 	long	pid;
@@ -742,11 +739,13 @@ register_pid(const char *pid_file,gboolean do_fork,void (*shutdown)(int nsig))
 	}
 	CL_IGNORE_SIG(SIGINT);
 	CL_IGNORE_SIG(SIGHUP);
-	CL_SIGNAL(SIGTERM, shutdown);
+	G_main_add_SignalHandler(G_PRIORITY_LOW, SIGTERM
+	,	 	shutdown, NULL, NULL);
 	cl_signal_set_interrupt(SIGTERM, 1);
 	/* At least they are harmless, I think. ;-) */
 	cl_signal_set_interrupt(SIGINT, 0);
 	cl_signal_set_interrupt(SIGHUP, 0);
+
 }
 
 /* main loop of the daemon*/
@@ -2303,7 +2302,7 @@ perform_op(lrmd_rsc_t* rsc)
 
 	CHECK_ALLOCATED(rsc, "resource", HA_FAIL );
 	if (TRUE == shutdown_in_progress && can_shutdown()) {
-		lrm_shutdown(NULL);
+		lrm_shutdown();
 	}
 	if (NULL == g_list_find(rsc_list, rsc)) {
 		lrmd_log(LOG_DEBUG,
@@ -2992,6 +2991,12 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.124  2005/04/29 17:47:34  alan
+ * Fixed a bug in the LRM where it tried to do something complicated
+ * in a signal handler.  This type of behavior will work most of the time
+ * but eventually it will fail - depending on exactly when the SIGTERM
+ * comes in.
+ *
  * Revision 1.123  2005/04/29 17:08:47  alan
  * Added a missing closedir()
  * Added some FIXME type comments to the code to mark where some things
