@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.120 2005/04/29 05:19:34 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.121 2005/04/29 07:24:49 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -62,7 +62,7 @@
 #define	MAX_PID_LEN 256
 #define	MAX_PROC_NAME 256
 #define	MAX_MSGTYPELEN 32
-
+#define WARMINGTIME_IN_LIST 5000
 #define OPTARGS		"skrhv"
 #define PID_FILE 	HA_VARRUNDIR"/lrmd.pid"
 #define LRMD_COREDUMP_ROOT_DIR HA_COREDIR
@@ -2377,7 +2377,7 @@ perform_ra_op(lrmd_op_t* op)
 	const char* op_type = NULL;
         GHashTable* params = NULL;
         GHashTable* op_params = NULL;
-
+	longclock_t t_stay_in_list = 0;
 	CHECK_ALLOCATED(op, "op", HA_FAIL);
 
 	if ( pipe(fd) < 0 ) {
@@ -2397,6 +2397,15 @@ perform_ra_op(lrmd_op_t* op)
 	free_str_table(op->rsc->params);
 	op->rsc->params = params;
 	op->t_perform = time_longclock();
+	t_stay_in_list = longclockto_ms(op->t_perform - op->t_addtolist);
+	if ( t_stay_in_list > WARMINGTIME_IN_LIST) 
+	{
+		lrmd_log(LOG_ERR
+		,	"perform_ra_op: op %s stay in op list longer than %dms"
+		,	op_info(op), WARMINGTIME_IN_LIST
+		);
+		dump_data_for_debug();
+	}
 	return_to_orig_privs();
 	switch(pid=fork()) {
 		case -1:
@@ -2837,9 +2846,11 @@ static void
 dump_data_for_debug(void)
 {
 	GList* node;
+	GList* opnode;
 	lrmd_client_t* client;
-	
-	lrmd_log(LOG_DEBUG, "Dump internal data for debugging."); 
+	lrmd_rsc_t* rsc;
+	lrmd_op_t* op;
+	lrmd_log(LOG_DEBUG, "begin dump internal data for debugging."); 
 
 	lrmd_log(LOG_DEBUG, "%d clients are connecting to lrmd."
 		 , g_list_length(client_list)); 
@@ -2887,6 +2898,39 @@ dump_data_for_debug(void)
 		}
 	}
 	
+	lrmd_log(LOG_DEBUG, "%d resources are managed by lrmd."
+		 , g_list_length(rsc_list)); 
+	for (node = g_list_first(rsc_list);
+		NULL != node; node = g_list_next(node)){
+		rsc = (lrmd_rsc_t*)node->data;
+		if (rsc != NULL) {
+			lrmd_log(LOG_DEBUG, "rsc id: %s, type: %s"
+				", class: %s, provider: %s"
+				,	rsc->id, rsc->type
+				,	rsc->class,rsc->provider
+				);
+			lrmd_log(LOG_DEBUG, "%d op are in op list."
+			,	g_list_length(rsc->op_list));
+			for (opnode = g_list_first(rsc->op_list);
+				NULL != opnode; opnode = g_list_next(opnode)){
+				op = (lrmd_op_t*)opnode->data;
+				lrmd_log(LOG_DEBUG, "%s", op_info(op));
+			}
+			
+			lrmd_log(LOG_DEBUG, "%d op are in repeat op list."
+			,	g_list_length(rsc->repeat_op_list));
+			for (opnode = g_list_first(rsc->repeat_op_list);
+				NULL != opnode; opnode = g_list_next(opnode)){
+				op = (lrmd_op_t*)opnode->data;
+				lrmd_log(LOG_DEBUG, "%s", op_info(op));
+			}
+						
+		}else{
+			lrmd_log(LOG_DEBUG, "NULL rsc in dump_data_for_debug()");
+		}
+	}
+	
+	lrmd_log(LOG_DEBUG, "end dump internal data for debugging."); 
 }
 
 static int
@@ -2928,6 +2972,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.121  2005/04/29 07:24:49  zhenh
+ * 1. print resources and operatios information out in dump_data_for_debug(); 2. dump data when an op stay in op list longer than 5s
+ *
  * Revision 1.120  2005/04/29 05:19:34  zhenh
  * fix a mistype error
  *
