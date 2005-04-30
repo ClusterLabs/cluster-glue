@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.125 2005/04/30 08:06:52 alan Exp $ */
+/* $Id: lrmd.c,v 1.126 2005/04/30 13:34:07 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1181,7 +1181,8 @@ on_remove_client (gpointer user_data)
 
 	if (NULL == lookup_client(client->pid)) {
 		/* This should never happen */
-		lrmd_log(LOG_ERR , "%s: can not find client", __FUNCTION__);
+		lrmd_log(LOG_ERR , "%s: can not find client %d"
+		,	__FUNCTION__, client->pid);
 	}else{
 		on_msg_unregister(client,NULL);
 	}
@@ -3100,6 +3101,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.126  2005/04/30 13:34:07  alan
+ * Added which pid couldn't be found to the message.
+ *
  * Revision 1.125  2005/04/30 08:06:52  alan
  * Fixed a few bona-fide bugs:
  *    STRLEN_CONST can only be called on a string literal
