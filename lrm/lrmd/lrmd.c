@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.127 2005/05/01 03:53:16 alan Exp $ */
+/* $Id: lrmd.c,v 1.128 2005/05/01 07:12:57 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1848,11 +1848,11 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		}
 	}
 	if (!ra_type_exist) {
-		rsc = NULL;
 		lrmd_log(LOG_ERR
 		,	"on_msg_add_rsc: ra class [%s] does not exist."
 		,	rsc->class);
 		lrmd_rsc_destroy(rsc);
+		rsc = NULL;
 		return HA_FAIL;
 	}
 
@@ -3111,6 +3111,9 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.128  2005/05/01 07:12:57  sunjd
+ * BEAM fix: void to operate a NULL pointer
+ *
  * Revision 1.127  2005/05/01 03:53:16  alan
  * Moved all client unregistration work to the destructor for the client
  * object.  We never want to destroy a client without doing this, and we
