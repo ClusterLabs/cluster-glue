@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.126 2005/04/30 13:34:07 alan Exp $ */
+/* $Id: lrmd.c,v 1.127 2005/05/01 03:53:16 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -222,6 +222,7 @@ static int perform_ra_op(lrmd_op_t* op);
 /* Utility functions */
 static int flush_op(lrmd_op_t* op);
 static int perform_op(lrmd_rsc_t* rsc);
+static int unregister_client(lrmd_client_t* client);
 static int on_op_done(lrmd_op_t* op);
 static const char* op_info(lrmd_op_t* op);
 static int send_rc_msg ( IPC_Channel* ch, int rc);
@@ -447,6 +448,11 @@ lrmd_client_destroy(lrmd_client_t* client)
 	CHECK_ALLOCATED(client, "client", );
 		
 	--lrm_objectstats.clientcount;
+	/*
+	 * Delete direct references to this client
+	 * and repeating operations it might have scheduled
+	 */
+	unregister_client(client);
 	if (client->ch_cbk) {
 		client->ch_cbk->ops->destroy(client->ch_cbk);
 		client->ch_cbk = NULL;
@@ -1170,6 +1176,58 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	return TRUE;
 }
 
+/* Remove all direct pointer references to 'client' before destroying it */
+static int
+unregister_client(lrmd_client_t* client)
+{
+	lrmd_rsc_t* rsc = NULL;
+	GList* rsc_node = NULL;
+	GList* op_node = NULL;
+	lrmd_op_t* op = NULL;
+
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+
+	if (NULL == client_list || NULL == lookup_client(client->pid)) {
+		lrmd_log(LOG_ERR,"%s: can not find client %s pid %d"
+		,	__FUNCTION__
+	,	client->app_name, client->pid);
+		return HA_FAIL;
+	}
+	/* Remove from client_list */
+	client_list = g_list_remove(client_list, client);
+	
+	/* Search all resources for repeating ops this client owns */
+	for(rsc_node = g_list_first(rsc_list);
+		NULL != rsc_node; rsc_node = g_list_next(rsc_node)){
+		rsc = (lrmd_rsc_t*)rsc_node->data;
+
+		/* Remove repeating ops belonging to this client */
+		op_node = g_list_first(rsc->repeat_op_list);
+		while (NULL != op_node) {
+			op = (lrmd_op_t*)op_node->data;
+			if (op->client_id == client->pid) {
+				op_node = g_list_next(op_node);
+				rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
+				if (NULL == op) {
+					lrmd_log(LOG_ERR
+					,	"%s (): repeat_op_list node has NULL data."
+					,	__FUNCTION__);
+				}else{
+					lrmd_op_destroy(op);
+				}
+			}
+			else {
+				op_node = g_list_next(op_node);
+			}
+
+		}
+	}
+	lrmd_log(LOG_DEBUG, "%s: client %s [%d] unregistered", __FUNCTION__
+	,	client->app_name
+	,	client->pid);
+	return HA_OK;
+}
+
 void
 on_remove_client (gpointer user_data)
 {
@@ -1179,13 +1237,6 @@ on_remove_client (gpointer user_data)
 
 	CHECK_ALLOCATED(client, "client", );
 
-	if (NULL == lookup_client(client->pid)) {
-		/* This should never happen */
-		lrmd_log(LOG_ERR , "%s: can not find client %d"
-		,	__FUNCTION__, client->pid);
-	}else{
-		on_msg_unregister(client,NULL);
-	}
 	lrmd_client_destroy(client);
 }
 
@@ -1312,53 +1363,12 @@ on_msg_register(lrmd_client_t* client, struct ha_msg* msg)
 int
 on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
 {
-	lrmd_rsc_t* rsc = NULL;
-	GList* rsc_node = NULL;
-	GList* op_node = NULL;
-	lrmd_op_t* op = NULL;
+	/*
+	 * All the work is now done on socket close.
+	 * The unregister function is useful, but the message
+	 * sent to us here doesn't do anything useful
+	 */
 
-	CHECK_ALLOCATED(client, "client", HA_FAIL);
-	CHECK_ALLOCATED(msg, "unregister message", HA_FAIL);
-
-	if (NULL == client_list || NULL == lookup_client(client->pid)) {
-		lrmd_log(LOG_ERR,
-			"on_msg_unregister: can not find the client.");
-		return HA_FAIL;
-	}
-	/* remove from client_list */
-	client_list = g_list_remove(client_list, client);
-	
-	/* remove all ops */
-	for(rsc_node = g_list_first(rsc_list);
-		NULL != rsc_node; rsc_node = g_list_next(rsc_node)){
-		rsc = (lrmd_rsc_t*)rsc_node->data;
-
-		/* remove repeat ops belong to this client */
-		op_node = g_list_first(rsc->repeat_op_list);
-		while (NULL != op_node) {
-			op = (lrmd_op_t*)op_node->data;
-			if (op->client_id == client->pid) {
-				op_node = g_list_next(op_node);
-				rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
-				if (NULL == op) {
-					lrmd_log(LOG_ERR
-					,	"%s (): repeat_op_list node has NULL data."
-					,	__FUNCTION__);
-					lrmd_log(LOG_INFO, "Message follows:");
-					cl_log_message(LOG_INFO, msg);
-				}else{
-					lrmd_op_destroy(op);
-				}
-			}
-			else {
-				op_node = g_list_next(op_node);
-			}
-
-		}
-	}
-	lrmd_log(LOG_DEBUG, "on_msg_unregister:client %s [%d] unregistered"
-	,	client->app_name
-	,	client->pid);
 	return HA_OK;
 }
 
@@ -3101,6 +3111,13 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.127  2005/05/01 03:53:16  alan
+ * Moved all client unregistration work to the destructor for the client
+ * object.  We never want to destroy a client without doing this, and we
+ * also never want to do this without also destroying the client - since
+ * an unregistered client is useless.  So doing them both in the destructor
+ * makes the most sense.
+ *
  * Revision 1.126  2005/04/30 13:34:07  alan
  * Added which pid couldn't be found to the message.
  *
