@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.66 2005/04/27 05:31:42 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.67 2005/05/02 20:00:04 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1874,7 +1874,7 @@ ipcmsg2hamsg(IPC_Message*m)
 	struct ha_msg*	ret = NULL;
 
 
-	ret = wirefmt2msg(m->msg_body, m->msg_len);
+	ret = wirefmt2msg(m->msg_body, m->msg_len,MSG_NEEDAUTH);
 	return ret;
 }
 
@@ -2241,9 +2241,9 @@ wirefmt2msg_ll(const char* s, size_t length, int need_auth)
 
 
 struct ha_msg*
-wirefmt2msg(const char* s, size_t length)
+wirefmt2msg(const char* s, size_t length, int flag)
 {
-	return(wirefmt2msg_ll(s, length, 1));
+	return(wirefmt2msg_ll(s, length, flag& MSG_NEEDAUTH));
 }
 
 void
@@ -2291,6 +2291,16 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.67  2005/05/02 20:00:04  gshi
+ * change wirefmt2msg() from
+ * struct ha_msg* wirefmt2msg(char* string, int len)
+ * to
+ * struct ha_msg* wirefmt2msg(char* string, int len, int flag)
+ * (flag can be 0 or MSG_NEEDAUTH right now)
+ *
+ * so that we allow a user to convert a string to an ha_msg without
+ * authentication.
+ *
  * Revision 1.66  2005/04/27 05:31:42  gshi
  *  use struct cl_uuid_t to replace uuid_t
  * use cl_uuid_xxx to replace uuid_xxx funcitons
