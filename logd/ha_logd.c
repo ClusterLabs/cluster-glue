@@ -290,22 +290,29 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	
 	ipcmsg = getIPCmsg(ch);
 	if (ipcmsg == NULL){
+		if (IPC_ISRCONN(ch)) {
+			cl_log(LOG_ERR, "%s: read error on connected channel [%s:%d]"
+			,	__FUNCTION__, client->app_name, client->pid);
+		}
 		return FALSE;
 	}
 	
-	if( ipcmsg->msg_body 
-	    && ipcmsg->msg_len > 0 ){
-		
-		if (logchan->ch_status != IPC_CONNECT){
-			cl_log(LOG_ERR,"on_receive_cmd: "
-			       "channel to the write process disconnected");
+	if( ipcmsg->msg_body &&	ipcmsg->msg_len > 0 ){
+		if (!IPC_ISWCONN(logchan)){
+			cl_log(LOG_ERR
+			,	"%s: channel to write process disconnected"
+			,	__FUNCTION__);
 			return FALSE;
 		}
 		if (logchan->ops->send(logchan, ipcmsg) != IPC_OK){
-			cl_log(LOG_ERR, "sending msg to the write process failed");
-			cl_log(LOG_ERR, "queue too small? (max=%d, current len =%d",
+			cl_log(LOG_ERR
+			,	"%s: forwarding msg from [%s:%d] to"
+			" write process failed"
+			,	__FUNCTION__
+			,	client->app_name, client->pid);
+			cl_log(LOG_ERR, "queue too small? (max=%d, current len =%d)",
 			       logchan->send_queue->max_qlen, logchan->send_queue->current_qlen);
-			return FALSE;
+			return TRUE;
 		}
 		
 	}else {
