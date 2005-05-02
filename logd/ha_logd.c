@@ -230,7 +230,7 @@ set_useapphbd(const char* option)
 
 
 typedef struct {
-	char*		app_name;
+	char		app_name[MAXENTITY];
 	pid_t		pid;
 	gid_t		gid;
 	uid_t		uid;
@@ -298,6 +298,13 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	}
 	
 	if( ipcmsg->msg_body &&	ipcmsg->msg_len > 0 ){
+		
+		if (client->app_name[0] == '\0'){
+			LogDaemonMsg*	logmsg;
+			logmsg = (LogDaemonMsg*) ipcmsg->msg_body;
+			strncpy(client->app_name, logmsg->entity, MAXENTITY);
+		}
+
 		if (!IPC_ISWCONN(logchan)){
 			cl_log(LOG_ERR
 			,	"%s: channel to write process disconnected"
@@ -309,7 +316,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 			,	"%s: forwarding msg from [%s:%d] to"
 			" write process failed"
 			,	__FUNCTION__
-			,	client->app_name, client->pid);
+		       ,	client->app_name, client->pid);
 			cl_log(LOG_ERR, "queue too small? (max=%d, current len =%d)",
 			       logchan->send_queue->max_qlen, logchan->send_queue->current_qlen);
 			return TRUE;
@@ -354,7 +361,8 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 	if (NULL == (client = cl_malloc(sizeof(ha_logd_client_t)))) {
 		return FALSE;
 	}
-	client->app_name = NULL;
+	memset(client, 0, sizeof(ha_logd_client_t));
+	client->pid = ch->farside_pid;	
 	client->chan = ch;
 	client->logchan = (IPC_Channel*)user_data;
 	client->g_src = G_main_add_IPC_Channel(G_PRIORITY_DEFAULT,
