@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.34 2005/05/02 14:29:04 alan Exp $ */
+/* $Id: GSource.c,v 1.35 2005/05/02 17:24:51 gshi Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -375,8 +375,6 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 void
 G_main_IPC_Channel_pause(GCHSource* chp)
 {
-	GSource* source;	
-	
 	if (chp == NULL){
 		cl_log(LOG_ERR, "G_main_IPC_Channel_remove_source:"
 		       "invalid input");
@@ -385,9 +383,6 @@ G_main_IPC_Channel_pause(GCHSource* chp)
 	
 	chp->pausenow = TRUE;
 	
-	source = &chp->source;
-	
-	g_source_remove_poll(source, &chp->infd);
 	return;
 }
 
@@ -395,8 +390,6 @@ G_main_IPC_Channel_pause(GCHSource* chp)
 void 
 G_main_IPC_Channel_resume(GCHSource* chp)
 {
-	GSource* source;	
-
 	if (chp == NULL){
 		cl_log(LOG_ERR, "G_main_IPC_Channel_remove_source:"
 		       "invalid input");
@@ -405,9 +398,6 @@ G_main_IPC_Channel_resume(GCHSource* chp)
 	
 	chp->pausenow = FALSE;
 	
-	source = &chp->source;
-	
-	g_source_add_poll(source, &chp->infd);
 
 	return;	
 
