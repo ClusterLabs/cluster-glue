@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.33 2005/04/22 17:40:09 gshi Exp $ */
+/* $Id: GSource.c,v 1.34 2005/05/02 14:29:04 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -89,8 +89,10 @@ struct GTRIGSource_s {
 	guint		gsourceid;
 };
 
-#define	DEF_EVENTS	(G_IO_IN|G_IO_PRI|G_IO_HUP|G_IO_ERR|G_IO_NVAL)
+#define	ERR_EVENTS	(G_IO_ERR|G_IO_NVAL)
+#define	INPUT_EVENTS	(G_IO_IN|G_IO_PRI|G_IO_HUP)
 #define	OUTPUT_EVENTS	(G_IO_OUT)
+#define	DEF_EVENTS	(INPUT_EVENTS|ERR_EVENTS)
 
 
 static gboolean G_fd_prepare(GSource* source,
@@ -442,16 +444,27 @@ G_CH_prepare(GSource* source,
 	g_assert(IS_CHSOURCE(chp));
 	
 	
-	if (chp->pausenow){
-		return FALSE;
-	}
-	
 	if (chp->ch->ops->is_sending_blocked(chp->ch)) {
 		if (chp->fd_fdx) {
 			chp->infd.events |= OUTPUT_EVENTS;
 		}else{
 			chp->outfd.events |= OUTPUT_EVENTS;
 		}
+	}
+
+	if (chp->ch->recv_queue->current_qlen < chp->ch->recv_queue->max_qlen) {
+		chp->infd.events |= INPUT_EVENTS;
+	}else{
+		/*
+		 * This also disables EOF events - until we 
+		 * read some of the packets we've already gotten
+		 * This prevents a tight loop in poll(2).
+		 */
+		chp->infd.events &= ~INPUT_EVENTS;
+	}
+	
+	if (chp->pausenow){
+		return FALSE;
 	}
 	return chp->ch->ops->is_message_pending(chp->ch);
 }
@@ -468,10 +481,12 @@ G_CH_check(GSource* source)
 
 	g_assert(IS_CHSOURCE(chp));
 	
+
 	if (chp->pausenow){
+		/* Make sure output gets unblocked */
+		chp->ch->ops->resume_io(chp->ch);
 		return FALSE;
 	}
-	
 	
 	return (chp->infd.revents != 0
 		||	(!chp->fd_fdx && chp->outfd.revents != 0)
