@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.35 2005/05/02 17:24:51 gshi Exp $ */
+/* $Id: GSource.c,v 1.36 2005/05/02 22:05:29 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -53,7 +53,10 @@ struct GCHSource_s {
 	GPollFD		infd;
 	GPollFD		outfd;
 	guint		gsourceid;
-	gboolean	pausenow;
+	gboolean	dontread;	/* TRUE when we don't want to read
+					 * more input for a while - we're
+					 * flow controlling the writer off
+					 */
 };
 
 struct GWCSource_s {
@@ -336,7 +339,7 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 	chp->dispatch = dispatch;
 	chp->udata=userdata;
 	chp->dnotify = notify;
-	chp->pausenow = FALSE;
+	chp->dontread = FALSE;
 
 	rfd = ch->ops->get_recv_select_fd(ch);
 	wfd = ch->ops->get_send_select_fd(ch);
@@ -372,33 +375,28 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 }
 
 
-void
+void	/* Suspend reading from far end writer (flow control) */
 G_main_IPC_Channel_pause(GCHSource* chp)
 {
 	if (chp == NULL){
-		cl_log(LOG_ERR, "G_main_IPC_Channel_remove_source:"
-		       "invalid input");
+		cl_log(LOG_ERR, "%s: invalid input", __FUNCTION__);
 		return;
 	}
 	
-	chp->pausenow = TRUE;
-	
+	chp->dontread = TRUE;
 	return;
 }
 
 
-void 
+void 	/* Resume reading from far end writer (un-flow-control) */
 G_main_IPC_Channel_resume(GCHSource* chp)
 {
 	if (chp == NULL){
-		cl_log(LOG_ERR, "G_main_IPC_Channel_remove_source:"
-		       "invalid input");
+		cl_log(LOG_ERR, "%s: invalid input", __FUNCTION__);
 		return;
 	}
 	
-	chp->pausenow = FALSE;
-	
-
+	chp->dontread = FALSE;
 	return;	
 
 }
@@ -453,7 +451,7 @@ G_CH_prepare(GSource* source,
 		chp->infd.events &= ~INPUT_EVENTS;
 	}
 	
-	if (chp->pausenow){
+	if (chp->dontread){
 		return FALSE;
 	}
 	return chp->ch->ops->is_message_pending(chp->ch);
@@ -472,7 +470,7 @@ G_CH_check(GSource* source)
 	g_assert(IS_CHSOURCE(chp));
 	
 
-	if (chp->pausenow){
+	if (chp->dontread){
 		/* Make sure output gets unblocked */
 		chp->ch->ops->resume_io(chp->ch);
 		return FALSE;
