@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.27 2005/04/01 22:55:40 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.28 2005/05/02 20:00:04 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -32,7 +32,7 @@
 #include <unistd.h>
 
 #ifdef IPC_TIME_DEBUG
-extern struct ha_msg* wirefmt2msg(const char* s, size_t length);
+struct ha_msg;
 void cl_log_message (int log_level, const struct ha_msg *m);
 int  timediff(longclock_t t1, longclock_t t2);
 void   ha_msg_del(struct ha_msg* msg);
