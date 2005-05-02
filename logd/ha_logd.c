@@ -240,6 +240,8 @@ typedef struct {
 	GCHSource*	g_src;
 }ha_logd_client_t;
 
+static GList*	logd_client_list = NULL;
+
 static IPC_Message*
 getIPCmsg(IPC_Channel* ch)
 {
@@ -275,6 +277,32 @@ getIPCmsg(IPC_Channel* ch)
 	
 	return ipcmsg;
 
+}
+
+/* Flow control all clients off */
+static void
+logd_suspend_clients(IPC_Channel* notused1, gpointer notused2)
+{
+	GList *	gl;
+
+	for (gl=g_list_first(logd_client_list); gl != NULL
+	;	gl = g_list_next(gl)) {
+		ha_logd_client_t* client = gl->data;
+		G_main_IPC_Channel_pause(client->g_src);
+	}
+}
+
+/* Resume input from clients - Flow control all clients back on */
+static void
+logd_resume_clients(IPC_Channel* notused1, gpointer notused2)
+{
+	GList *	gl;
+
+	for (gl=g_list_first(logd_client_list); gl != NULL
+	;	gl = g_list_next(gl)) {
+		ha_logd_client_t* client = gl->data;
+		G_main_IPC_Channel_resume(client->g_src);
+	}
 }
 
 static gboolean
@@ -335,6 +363,7 @@ static void
 on_remove_client (gpointer user_data)
 {
 	
+	logd_client_list = g_list_remove(logd_client_list, user_data);
 	if (user_data){
 		cl_free(user_data);
 	}
@@ -357,7 +386,6 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 		return TRUE;
 	}
 	/* create new client */
-	/* the register will be finished in on_msg_register */
 	if (NULL == (client = cl_malloc(sizeof(ha_logd_client_t)))) {
 		return FALSE;
 	}
@@ -369,6 +397,7 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 					       ch, FALSE, on_receive_cmd,
 					       (gpointer)client,
 					       on_remove_client);
+	logd_client_list = g_list_append(logd_client_list, user_data);
 	
 	
 	return TRUE;
@@ -681,9 +710,13 @@ read_msg_process(IPC_Channel* chan)
 	}
 	
 	/*Create a source to handle new connect rquests for command*/
-	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cmd, NULL, FALSE,
-				       on_connect_cmd, chan, NULL);
-	
+	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cmd, NULL, FALSE
+	,	on_connect_cmd, chan, NULL);
+	chan->ops->set_high_flow_callback(chan, logd_suspend_clients, NULL);
+	chan->ops->set_low_flow_callback(chan, logd_resume_clients, NULL);
+	chan->high_flow_mark = chan->send_queue->max_qlen;
+	chan->low_flow_mark = (chan->send_queue->max_qlen*3)/4;
+
 	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT, chan, FALSE,NULL,NULL,NULL);
 	
 	if (logd_config.useapphbd) {
