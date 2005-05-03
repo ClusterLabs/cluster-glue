@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.132 2005/05/03 21:19:15 alan Exp $ */
+/* $Id: lrmd.c,v 1.133 2005/05/03 23:32:27 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -378,7 +378,7 @@ lrmd_op_destroy(lrmd_op_t* op)
 	 */
 	if (op->exec_pid > 1) {
 		return_to_orig_privs();	
-		if (kill(op->exec_pid, SIGKILL) < 0 && errno != ESRCH) {
+		if (kill(-op->exec_pid, SIGKILL) < 0 && errno != ESRCH) {
 			cl_perror("Cannot kill pid %d", op->exec_pid);
 		}
 		return_to_dropped_privs();
@@ -3297,6 +3297,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.133  2005/05/03 23:32:27  alan
+ * Put the -pid change back into the lrmd.
+ *
  * Revision 1.132  2005/05/03 21:19:15  alan
  * Fixed up an error message to not come out inappropriately
  * changed signal 9 to SIGKILL
