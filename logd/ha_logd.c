@@ -288,7 +288,12 @@ logd_suspend_clients(IPC_Channel* notused1, gpointer notused2)
 	for (gl=g_list_first(logd_client_list); gl != NULL
 	;	gl = g_list_next(gl)) {
 		ha_logd_client_t* client = gl->data;
-		G_main_IPC_Channel_pause(client->g_src);
+		if (client && client->g_src) {
+			G_main_IPC_Channel_pause(client->g_src);
+		}else{
+			cl_log(LOG_ERR, Could not suspend client [%s] pid %d"
+			,	client->app_name, client->pid);
+		}
 	}
 }
 
@@ -301,7 +306,12 @@ logd_resume_clients(IPC_Channel* notused1, gpointer notused2)
 	for (gl=g_list_first(logd_client_list); gl != NULL
 	;	gl = g_list_next(gl)) {
 		ha_logd_client_t* client = gl->data;
-		G_main_IPC_Channel_resume(client->g_src);
+		if (client && client->g_src) {
+			G_main_IPC_Channel_resume(client->g_src);
+		}else{
+			cl_log(LOG_ERR, Could not resume client [%s] pid %d"
+			,	client->app_name, client->pid);
+		}
 	}
 }
 
@@ -397,7 +407,7 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 					       ch, FALSE, on_receive_cmd,
 					       (gpointer)client,
 					       on_remove_client);
-	logd_client_list = g_list_append(logd_client_list, user_data);
+	logd_client_list = g_list_append(logd_client_list, client);
 	
 	
 	return TRUE;
