@@ -205,12 +205,13 @@ struct rsc_ops
  *
  *cur_state:	current state of the resource
  *
- *return:	a list of lrm_op_t*.
- *		if cur_state == LRM_RSC_IDLE, the first and the only element
- *		of the list is the last op executed. The list may be empty.
- *		if cur_state == LRM_RSC_BUSY, the first op of the list is the
- *		current running opertaion and others are the pending operations
- *
+ *return:	cur_state should be in LRM_RSC_IDLE or LRM_RSC_BUSY.
+ *		and the function returns a list of ops.
+ *		the list includes:
+ *		1. last ops for each type (start/stop/etc) from current client
+ *		2. current pending ops
+ *		3. all recurring ops waiting to execute
+ *		the list is sorted by the call_id of ops.
  *		client can release the list using lrm_free_op_list()
  */
 	GList* (*get_cur_state) (lrm_rsc_t*, state_flag_t* cur_state);

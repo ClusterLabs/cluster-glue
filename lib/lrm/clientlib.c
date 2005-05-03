@@ -58,7 +58,6 @@ static int lrm_delete_rsc (ll_lrm_t*, const char* id);
 static int lrm_inputfd (ll_lrm_t*);
 static int lrm_msgready (ll_lrm_t*);
 static int lrm_rcvmsg (ll_lrm_t*, int blocking);
-
 static struct lrm_ops lrm_ops_instance =
 {
 	lrm_signon,
@@ -84,6 +83,7 @@ static int rsc_cancel_op (lrm_rsc_t*, int call_id);
 static int rsc_flush_ops (lrm_rsc_t*);
 static GList* rsc_get_cur_state (lrm_rsc_t*, state_flag_t* cur_state);
 static lrm_op_t* rsc_get_last_result (lrm_rsc_t*, const char* op_type);
+static gint compare_call_id(gconstpointer a, gconstpointer b);
 
 static struct rsc_ops rsc_ops_instance =
 {
@@ -945,16 +945,21 @@ rsc_flush_ops (lrm_rsc_t* rsc)
 
 	return rc>0?HA_OK:HA_FAIL;
 }
-
+static gint 
+compare_call_id(gconstpointer a, gconstpointer b)
+{
+	const lrm_op_t* opa = (const lrm_op_t*)a;
+	const lrm_op_t* opb = (const lrm_op_t*)b;
+	return opa->call_id - opb->call_id;
+}
 static GList*
 rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 {
-	GList* pending_op_list = NULL;
+	GList* op_list = NULL;
 	struct ha_msg* msg = NULL;
 	struct ha_msg* ret = NULL;
 	struct ha_msg* op_msg = NULL;
-	lrm_op_t* op       = NULL;
-	GList* node = NULL;
+	lrm_op_t* op = NULL;
 	int state;
 	int op_count, i;
 
@@ -999,55 +1004,38 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 		return NULL;
 	}
 	*cur_state = (state_flag_t)state;
-
-	if (LRM_RSC_IDLE == *cur_state) {
-		/* if the state is idle, the last finsihed op returned. */
-		/* the op is stored in the same msg, just get it out */
-		op = msg_to_op(ret);
-		if (NULL != op) {
-			op->rsc = lrm_get_rsc( NULL, op->rsc_id );
-			pending_op_list = g_list_append(pending_op_list, op);
-		}
+	/* the first msg includes the count of pending ops. */
+	if (HA_OK != ha_msg_value_int(ret, F_LRM_OPCNT, &op_count)) {
+		cl_log(LOG_WARNING,
+			"rsc_get_cur_state: can not get op count");
 		ha_msg_del(ret);
-		return pending_op_list;
+		return NULL;
 	}
-	if (LRM_RSC_BUSY == *cur_state) {
-	/* if the state is busy, the whole pending op list would be return */
-		/* the first msg includes the count of pending ops. */
-		if (HA_OK != ha_msg_value_int(ret, F_LRM_OPCNT, &op_count)) {
-			cl_log(LOG_WARNING,
-				"rsc_get_cur_state: can not get op count");
-			ha_msg_del(ret);
-			return NULL;
-		}
-		ha_msg_del(ret);
-		for (i = 0; i < op_count; i++) {
-			/* one msg for one pending op */
-			op_msg = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
-
-			if (NULL == op_msg) {
-				cl_log(LOG_WARNING,
-				"rsc_get_cur_state: can not recieve ret msg");
-				continue;
-			}
-			op = msg_to_op(op_msg);
-			/* add msg to the return list */
-			if (NULL != op) {
-				pending_op_list =
-					g_list_append(pending_op_list, op);
-			}
-			ha_msg_del(op_msg);
-		}
-		for (node = g_list_first(pending_op_list);
-			NULL!=node; node = g_list_next(node)) {
-			lrm_op_t* op = (lrm_op_t*) node->data;
-			op->rsc = lrm_get_rsc( NULL, op->rsc_id );
-		}
-		return pending_op_list;
-	}
-	cl_log(LOG_ERR, "rsc_get_cur_state: unkown state from msg");
 	ha_msg_del(ret);
-	return NULL;
+	for (i = 0; i < op_count; i++) {
+		/* one msg for one op */
+		op_msg = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
+
+		if (NULL == op_msg) {
+			cl_log(LOG_WARNING,
+			"rsc_get_cur_state: can not recieve ret msg");
+			continue;
+		}
+		op = msg_to_op(op_msg);
+		/* add msg to the return list */
+		
+		if (NULL != op) {
+			op->rsc = rsc;
+			op_list = g_list_append(op_list, op);
+		}
+		else {
+			cl_log(LOG_WARNING,
+			"rsc_get_cur_state: can not convert msg to op");
+		}
+		ha_msg_del(op_msg);
+	}
+	g_list_sort(op_list, compare_call_id);
+	return op_list;
 }
 
 static lrm_op_t*
