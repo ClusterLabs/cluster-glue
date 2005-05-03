@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.128 2005/05/01 07:12:57 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.129 2005/05/03 16:33:36 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -224,7 +224,7 @@ static int flush_op(lrmd_op_t* op);
 static int perform_op(lrmd_rsc_t* rsc);
 static int unregister_client(lrmd_client_t* client);
 static int on_op_done(lrmd_op_t* op);
-static const char* op_info(lrmd_op_t* op);
+static const char* op_info(const lrmd_op_t* op);
 static int send_rc_msg ( IPC_Channel* ch, int rc);
 static lrmd_client_t* lookup_client (pid_t pid);
 static lrmd_rsc_t* lookup_rsc (const char* rid);
@@ -375,7 +375,10 @@ lrmd_op_destroy(lrmd_op_t* op)
 	 */
 	if (op->exec_pid > 1) {
 		return_to_orig_privs();	
-		kill(op->exec_pid, 9);
+		/* Kill the entire process group */
+		if (kill(-op->exec_pid, 9) < 0) {
+			cl_perror("Cannot kill pid %d", op->exec_pid);
+		}
 		return_to_dropped_privs();
 		return;
 	}
@@ -428,6 +431,45 @@ lrmd_op_copy(const lrmd_op_t* op)
 	return ret;
 }
 
+static
+const char *
+op_status_to_str(int op_status)
+{
+	static char whatwasthat[25];
+	switch (op_status) {
+		case LRM_OP_DONE:
+			return "LRM_OP_DONE";
+		case LRM_OP_CANCELLED:
+			return "LRM_OP_CANCELLED";
+		case LRM_OP_TIMEOUT:
+			return "LRM_OP_TIMEOUT";
+		case LRM_OP_NOTSUPPORTED:
+			return "LRM_OP_NOTSUPPORTED";
+		case -1:
+			return "N/A (-1)";
+		default:
+			break;
+	}
+	snprintf(whatwasthat, sizeof(whatwasthat), "?status=%d?", op_status);
+	return whatwasthat;
+}
+static
+const char *
+op_target_rc_to_str(int target)
+{
+	static char whatwasthat[25];
+	switch (target) {
+		case EVERYTIME:
+			return "EVERYTIME";
+		case CHANGED:
+			return "CHANGED";
+		default:
+			break;
+	}
+	snprintf(whatwasthat, sizeof(whatwasthat), "?target_rc=%d?", target);
+	return whatwasthat;
+}
+
 /*
  * We need a separate function to dump out operations for
  * debugging.  Then we wouldn't have to have the code for this
@@ -436,10 +478,68 @@ lrmd_op_copy(const lrmd_op_t* op)
  * the help :-)
  */
 
+
+/* Debug oriented funtions */
+static gboolean debug_level_adjust(int nsig, gpointer user_data);
+
 static void
-lrmd_op_dump(const lrmd_op_t* op)
+lrmd_op_dump(const lrmd_op_t* op, const char * text)
 {
-	(void)lrmd_op_dump; /* FIXME: get rid of this statement */
+	int		op_status = -1;
+	int		target_rc = -1;
+	const char *	pidstat;
+	longclock_t	now = time_longclock();
+	long		t_recv;
+	long		t_addtolist;
+	long		t_perform;
+	long		t_done;
+
+#if 0
+	lrmd_rsc_t*	rsc;		/* should this be rsc_id?	*/
+#endif
+
+	if (op->exec_pid < 1
+	||	((kill(op->exec_pid, 0) < 0) && ESRCH == errno)) {
+		pidstat = "not running";
+	}else{
+		pidstat = "running";
+	}
+	ha_msg_value_int(op->msg, F_LRM_OPSTATUS, &op_status);
+	ha_msg_value_int(op->msg, F_LRM_TARGETRC, &target_rc);
+	lrmd_log(LOG_INFO
+	,	"%s: lrmd_op: %s status: %s, target_rc=%s, client pid %d call_id"
+	": %d, child pid: %d (%s)"
+	,	text,	op_info(op), op_status_to_str(op_status)
+	,	op_target_rc_to_str(target_rc)
+	,	op->client_id, op->call_id, op->exec_pid, pidstat);
+	lrmd_log(LOG_INFO
+	,	"%s: lrmd_op2: to_tag: %u rt_tag: %d, interval: %d, delay: %d"
+	,	text, op->timeout_tag, op->repeat_timeout_tag
+	,	op->interval, op->delay);
+	if (cmp_longclock(op->t_recv, zero_longclock) <= 0) {
+		t_recv = -1;
+	}else{
+		t_recv = longclockto_ms(sub_longclock(now, op->t_recv));
+	}
+	if (cmp_longclock(op->t_addtolist, zero_longclock) <= 0) {
+		t_addtolist = -1;
+	}else{
+		t_addtolist = longclockto_ms(sub_longclock(now, op->t_addtolist));
+	}
+	if (cmp_longclock(op->t_perform, zero_longclock) <= 0) {
+		t_perform = -1;
+	}else{
+		t_perform = longclockto_ms(sub_longclock(now, op->t_perform));
+	}
+	if (cmp_longclock(op->t_done, zero_longclock) <= 0) {
+		t_done = -1;
+	}else{
+		t_done = longclockto_ms(sub_longclock(now, op->t_recv));
+	}
+	lrmd_log(LOG_INFO
+	,	"%s: lrmd_op3: t_recv: %ldms, t_add: %ldms"
+	", t_perform: %ldms, t_done: %ldms"
+	,	text, t_recv, t_addtolist, t_perform, t_done);
 }
 
 static void
@@ -549,6 +649,28 @@ errout:
 	lrmd_rsc_destroy(rsc);
 	rsc = NULL;
 	return rsc;
+}
+
+static void
+lrm_debug_running_op(lrmd_op_t* op, const char * text)
+{
+	char	cmd[256];
+	lrmd_op_dump(op, text);
+	if (op->exec_pid >= 1) {
+		/* This really ought to use our logger
+		 * So... it might not get forwarded to the central machine
+		 * if you're testing with CTS -- FIXME
+		 */
+		snprintf(cmd, sizeof(cmd)
+		,	"ps -l -f -s %d | logger -p daemon.info -t 'T/O PS:'"
+		,	op->exec_pid);
+		lrmd_log(LOG_INFO, "Running [%s]", cmd);
+		system(cmd);
+		snprintf(cmd, sizeof(cmd)
+		,	"ps axww | logger -p daemon.info -t 't/o ps:'");
+		lrmd_log(LOG_INFO, "Running [%s]", cmd);
+		system(cmd);
+	}
 }
 int
 main(int argc, char ** argv)
@@ -1265,6 +1387,9 @@ on_op_timeout_expired(gpointer data)
 
 	lrmd_log(LOG_WARNING, "%s: TIMEOUT: %s."
 	,	__FUNCTION__,  op_info(op));
+	if (debug_level) {
+		lrm_debug_running_op(op, __FUNCTION__);
+	}
 	
 	on_op_done(op);
 	rsc = op->rsc;
@@ -2170,39 +2295,10 @@ on_op_done(lrmd_op_t* op)
 	}
 	op_status = (op_status_t)op_status_int;
 	
-	/* Move this code to the lrmd_op_dump() function */
-	switch (op_status) {
-		case LRM_OP_DONE:
-			lrmd_log2(LOG_DEBUG
-			, "on_op_done:done with status LRM_OP_DONE");
-			break;			
-		case LRM_OP_CANCELLED:
-			lrmd_log(LOG_DEBUG
-			, "on_op_done: %s done with status LRM_OP_CANCELLED"
-			, op_info(op));
-			break;			
-		case LRM_OP_TIMEOUT:
-			lrmd_log(LOG_WARNING
-			, "on_op_done: %s done with status LRM_OP_TIMEOUT"
-			, op_info(op));
-			break;			
-		case LRM_OP_NOTSUPPORTED:
-			lrmd_log(LOG_ERR
-			, "on_op_done: %s done with status LRM_OP_NOTSUPPORTED"
-			, op_info(op));
-			break;			
-		case LRM_OP_ERROR:
-			lrmd_log(LOG_WARNING
-			, "on_op_done: %s done with status LRM_OP_ERROR"
-			, op_info(op));
-			break;			
-		default:
-			lrmd_log(LOG_ERR
-			, "on_op_done: %s done with unkown status "
-			, op_info(op));
-			break;			
-	}			
-	if (LRM_OP_DONE!= op_status) {
+	if (debug_level >= 2) {
+		lrmd_op_dump(op, __FUNCTION__);
+	}
+	if (LRM_OP_DONE != op_status) {
 		need_notify = 1;
 	} else if (HA_OK != ha_msg_value_int(op->msg,F_LRM_RC,&op_rc)){
 		lrmd_log(LOG_DEBUG
@@ -3084,7 +3180,7 @@ facility_name_to_value(const char * name)
 	return -1;
 }
 static const char* 
-op_info(lrmd_op_t* op)
+op_info(const lrmd_op_t* op)
 {
 	static char info[255];
 	lrmd_rsc_t* rsc = NULL;
@@ -3111,6 +3207,13 @@ op_info(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.129  2005/05/03 16:33:36  alan
+ * Put in a good bit more debug information for when
+ * an operation times out.
+ * In the process wrote a lrmd_dump_op() function useful for other
+ * places - and used it to replace some older debug code
+ * that wasn't as thorough.
+ *
  * Revision 1.128  2005/05/01 07:12:57  sunjd
  * BEAM fix: void to operate a NULL pointer
  *
