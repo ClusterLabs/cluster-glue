@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.130 2005/05/03 17:38:55 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.131 2005/05/03 19:43:03 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -86,6 +86,7 @@
         }
 
 #define	lrmd_nullcheck(p)	((p) ? (p) : "<null>")
+#define	lrm_str(p)	(lrmd_nullcheck(p))
 
 #define	CHECK_ALLOCATED(thing, name, result)				\
 	if (!cl_is_allocated(thing)) {					\
@@ -322,6 +323,8 @@ static int init_status(const char *pid_file, const char *client_name);
 static long get_running_pid(const char *pid_file, gboolean* anypidfile);
 static void register_pid(const char *pid_file, gboolean do_fork,
 			gboolean (*shutdown)(int nsig, gpointer userdata));
+static lrmd_op_t* lrmd_op_copy(const lrmd_op_t* op);
+static void lrmd_rsc_dump(lrmd_rsc_t* rsc, const char * text);
 
 static struct {
 	int	opcount;
@@ -540,6 +543,7 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	,	"%s: lrmd_op3: t_recv: %ldms, t_add: %ldms"
 	", t_perform: %ldms, t_done: %ldms"
 	,	text, t_recv, t_addtolist, t_perform, t_done);
+	lrmd_rsc_dump(op->rsc, text);
 }
 
 static void
@@ -650,6 +654,44 @@ errout:
 	rsc = NULL;
 	return rsc;
 }
+static void
+lrmd_rsc_dump(lrmd_rsc_t* rsc, const char * text)
+{
+	static gboolean	incall = FALSE;
+	GList*		oplist;
+
+	/* TODO: Dump params and last_op_table FIXME */
+
+	lrmd_log(LOG_INFO, "%s: resource %s/%s/%s/%s"
+	,	text
+	,	lrm_str(rsc->id)
+	,	lrm_str(rsc->type)
+	,	lrm_str(rsc->class)
+	,	lrm_str(rsc->provider));
+
+	/* Avoid infinite recursion loops... */
+	if (incall) {
+		return;
+	}
+	incall = TRUE;
+
+	lrmd_op_dump(rsc->last_op, "rsc->last_op");
+
+	lrmd_log(LOG_INFO, "%s: rsc->op_list...", text);
+	oplist = g_list_first(rsc->op_list);
+	for(;NULL!=oplist; oplist=g_list_next(oplist)) {
+		lrmd_op_dump(oplist->data, "rsc->op_list");
+	}
+
+	lrmd_log(LOG_INFO, "%s: rsc->repeat_op_list...", text);
+	oplist = g_list_first(rsc->repeat_op_list);
+	for(; NULL!=oplist; oplist=g_list_next(oplist)) {
+		lrmd_op_dump(oplist->data, "rsc->repeat_op_list");
+	}
+	lrmd_log(LOG_INFO, "%s: END resource dump", text);
+	incall = FALSE;
+};
+
 
 static void
 lrm_debug_running_op(lrmd_op_t* op, const char * text)
@@ -2617,6 +2659,7 @@ op_to_msg(lrmd_op_t* op)
 		return NULL;
 	}
 
+	CHECK_ALLOCATED(op->rsc, "op->rsc", NULL);
 	msg = ha_msg_copy(op->msg);
 	if (NULL == msg) {
 		lrmd_log(LOG_ERR,"op_to_msg: can not copy the msg");
@@ -3255,6 +3298,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.131  2005/05/03 19:43:03  alan
+ * Added lrm_rsc_dump() and called it from lrm_op_dump()
+ *
  * Revision 1.130  2005/05/03 17:38:55  zhenh
  * Change the function of get_cur_state(). Now it returns an op list including last ops, pending ops, and waiting recurring ops. the list is sorted by call_id
  *
