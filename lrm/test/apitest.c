@@ -46,10 +46,10 @@ int main (int argc, char* argv[])
 	GHashTable* param = NULL;
 	int call_id;
 	GList* classes;
+	int i;
 	
 	cl_log_set_entity("apitest");
-	cl_log_enable_stderr(TRUE);
-	cl_log_set_facility(LOG_DAEMON);
+	cl_log_set_facility(LOG_USER);
 
 	lrm = ll_lrm_new("lrm");
 
@@ -65,9 +65,9 @@ int main (int argc, char* argv[])
 	lrm_free_str_list(classes);
 	
 	param = g_hash_table_new(g_str_hash,g_str_equal);
-	g_hash_table_insert(param, strdup("1"), strdup("3ffe:ffff:0:f101::3"));
+	g_hash_table_insert(param, strdup("1"), strdup("192.168.192.100"));
 	puts("add_rsc...");
-	lrm->lrm_ops->add_rsc(lrm, rid, "heartbeat", "IPv6addr", NULL, param);
+	lrm->lrm_ops->add_rsc(lrm, rid, "heartbeat", "IPaddr", "heartbeat", param);
 	puts("get_rsc...");
 	rsc = lrm->lrm_ops->get_rsc(lrm, rid);
 	printf_rsc(rsc);
@@ -91,7 +91,7 @@ int main (int argc, char* argv[])
 	
 	puts("perform_op(status)...");
 	param = g_hash_table_new(g_str_hash,g_str_equal);
-	g_hash_table_insert(param, strdup("1"), strdup("3ffe:ffff:0:f101::3"));
+	g_hash_table_insert(param, strdup("1"), strdup("192.168.192.100"));
 	op = lrm_op_new();
 	op->op_type = g_strdup("status");
 	op->params = param;
@@ -110,7 +110,7 @@ int main (int argc, char* argv[])
 
 	puts("perform_op(stop)...");
 	param = g_hash_table_new(g_str_hash,g_str_equal);
-	g_hash_table_insert(param, strdup("1"), strdup("3ffe:ffff:0:f101::3"));
+	g_hash_table_insert(param, strdup("1"), strdup("192.168.192.100"));
 	op = lrm_op_new();
 	op->op_type = g_strdup("stop");
 	op->params = param;
@@ -126,21 +126,90 @@ int main (int argc, char* argv[])
 	rsc->ops->perform_op(rsc,op);
 	printf_op(op);
 	lrm_free_op(op);
-
-	puts("get_cur_state...");
-	get_cur_state(rsc);
-
-        puts("stop_op...");
-	rsc->ops->cancel_op(rsc,call_id);
-
-	puts("get_cur_state...");
-        get_cur_state(rsc);
-
-        puts("sleep a while...");
-	sleep(10);
 	
-	puts("get_cur_state...");
-        get_cur_state(rsc);
+	puts("perform_op(status)...");
+	param = g_hash_table_new(g_str_hash,g_str_equal);
+	g_hash_table_insert(param, strdup("1"), strdup("192.168.192.100"));
+	op = lrm_op_new();
+	op->op_type = g_strdup("status");
+	op->params = param;
+	op->timeout = 0;
+	op->user_data = strdup("It is a status op!");
+	if ( op->user_data == NULL ) {
+		fprintf(stderr, "No enough memory.\n");
+		return -1;
+	}
+	op->user_data_len = strlen(op->user_data)+1;
+	op->interval = 2000;
+	op->target_rc=EVERYTIME;
+	call_id = rsc->ops->perform_op(rsc,op);
+	printf_op(op);
+	lrm_free_op(op);
+
+	puts("perform_op(start)...");
+	param = g_hash_table_new(g_str_hash,g_str_equal);
+	g_hash_table_insert(param, strdup("1"), strdup("192.168.192.100"));
+	op = lrm_op_new();
+	op->op_type = g_strdup("start");
+	op->params = param;
+	op->timeout = 0;
+	op->user_data = strdup("It is a start op!");
+	if ( op->user_data == NULL ) {
+		fprintf(stderr, "No enough memory.\n");
+		return -1;
+	}
+	op->user_data_len = strlen(op->user_data)+1;
+	op->interval = 0;
+	op->target_rc = EVERYTIME;
+	rsc->ops->perform_op(rsc,op);
+	printf_op(op);
+	lrm_free_op(op);
+	
+	puts("perform_op(status)...");
+	param = g_hash_table_new(g_str_hash,g_str_equal);
+	g_hash_table_insert(param, strdup("1"), strdup("192.168.192.100"));
+	op = lrm_op_new();
+	op->op_type = g_strdup("status");
+	op->params = param;
+	op->timeout = 0;
+	op->user_data = strdup("It is a status op!");
+	if ( op->user_data == NULL ) {
+		fprintf(stderr, "No enough memory.\n");
+		return -1;
+	}
+	op->user_data_len = strlen(op->user_data)+1;
+	op->interval = 3000;
+	op->target_rc=EVERYTIME;
+	call_id = rsc->ops->perform_op(rsc,op);
+	printf_op(op);
+	lrm_free_op(op);
+
+	puts("perform_op(stop)...");
+	param = g_hash_table_new(g_str_hash,g_str_equal);
+	g_hash_table_insert(param, strdup("1"), strdup("192.168.192.100"));
+	op = lrm_op_new();
+	op->op_type = g_strdup("stop");
+	op->params = param;
+	op->timeout = 0;
+	op->user_data = strdup("It is a stop op!");
+	if ( op->user_data == NULL ) {
+		fprintf(stderr, "No enough memory.\n");
+		return -1;
+	}
+	op->user_data_len = strlen(op->user_data)+1;
+	op->interval = 0;
+	op->target_rc=EVERYTIME;
+	rsc->ops->perform_op(rsc,op);
+	printf_op(op);
+	lrm_free_op(op);
+		
+	for(i = 0; i < 5; i++) {
+		puts("get_cur_state...");
+		get_cur_state(rsc);
+        	puts("sleep a while...");
+		sleep(1);
+	}
+	
 	puts("delete_rsc...");
 	lrm->lrm_ops->delete_rsc(lrm, rid);
 	lrm_free_rsc(rsc);
@@ -157,7 +226,7 @@ void lrm_op_done_callback(lrm_op_t* op)
 }
 void printf_rsc(lrm_rsc_t* rsc)
 {
-	printf("print resource\n");
+	printf("print resource>>>>>>>>>\n");
 	if (NULL == rsc) {
 		printf("resource is null\n");
 		printf("print end\n");
@@ -168,12 +237,12 @@ void printf_rsc(lrm_rsc_t* rsc)
 	printf("\tclass:%s\n", rsc->class);
 	printf("\tparams:\n");
 	printf_hash_table(rsc->params);
-	printf("print end\n");
+	printf("print end<<<<<<<<<<<<<<<\n");
 }
 
 void printf_op(lrm_op_t* op)
 {
-	printf("print op\n");
+	printf("print op>>>>>>>>>>>>>>>>\n");
 
 	if (NULL == op) {
 		printf("op is null\n");
@@ -190,8 +259,8 @@ void printf_op(lrm_op_t* op)
 	printf("\tapp_name:%s\n",op->app_name?op->app_name:"null");
 	printf("\toutput:%s\n",op->output?op->output:"null");
 	printf("\trc:%d\n",op->rc);
-/*	printf("\tcall_id:%d\n",op->call_id); */
-	printf("print end\n");
+	printf("\tcall_id:%d\n",op->call_id); 
+	printf("print end<<<<<<<<<<<<<<<<<<\n");
 }
 
 static void
@@ -229,13 +298,14 @@ get_all_rsc(ll_lrm_t* lrm)
 void
 get_cur_state(lrm_rsc_t* rsc)
 {
+	printf("current state>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
 	state_flag_t state;
 	GList* node = NULL, * op_list = NULL;
 	lrm_op_t* op = NULL;
 
 	op_list = rsc->ops->get_cur_state(rsc, &state);
 
-	printf("\tcurrent state:%s\n",state==LRM_RSC_IDLE?"Idel":"Busy");
+	printf("\tcurrent state:%s\n",state==LRM_RSC_IDLE?"Idle":"Busy");
 
        
 	for(node = g_list_first(op_list); NULL != node;
@@ -244,4 +314,5 @@ get_cur_state(lrm_rsc_t* rsc)
 		printf_op(op);
 	}
 	lrm_free_op_list(op_list);
+	printf("current end<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
 }

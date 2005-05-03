@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.129 2005/05/03 16:33:36 alan Exp $ */
+/* $Id: lrmd.c,v 1.130 2005/05/03 17:38:55 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -235,7 +235,12 @@ static gboolean lrm_shutdown(void);
 static gboolean can_shutdown(void);
 static void inherit_config_from_environment(void);
 static int facility_name_to_value(const char * name);
-
+static gboolean free_str_hash_pair(gpointer key
+,	 gpointer value, gpointer user_data);
+static gboolean free_str_op_pair(gpointer key
+,	 gpointer value, gpointer user_data);
+static lrmd_op_t* lrmd_op_copy(const lrmd_op_t* op);
+static void send_last_op(gpointer key, gpointer value, gpointer user_data);
 /*
  * following functions are used to monitor the exit of ra proc
  */
@@ -317,11 +322,6 @@ static int init_status(const char *pid_file, const char *client_name);
 static long get_running_pid(const char *pid_file, gboolean* anypidfile);
 static void register_pid(const char *pid_file, gboolean do_fork,
 			gboolean (*shutdown)(int nsig, gpointer userdata));
-static gboolean free_str_hash_pair(gpointer key
-,	 gpointer value, gpointer user_data);
-static gboolean free_str_op_pair(gpointer key
-,	 gpointer value, gpointer user_data);
-static lrmd_op_t* lrmd_op_copy(const lrmd_op_t* op);
 
 static struct {
 	int	opcount;
@@ -2139,6 +2139,28 @@ getout:
 	lrmd_op_destroy(op);
 	return -1;
 }
+
+static void 
+send_last_op(gpointer key, gpointer value, gpointer user_data)
+{
+	IPC_Channel* ch = NULL;
+	lrmd_op_t* op = NULL;
+	struct ha_msg* msg = NULL;
+	
+	ch = (IPC_Channel*)user_data;
+	op = (lrmd_op_t*)value; 
+	msg = op_to_msg(op);
+	if (msg == NULL) {
+		lrmd_log(LOG_ERR,
+			"send_last_op: convert op to msg failed.");
+		return;
+	}
+	if (HA_OK != msg2ipcchan(msg, ch)) {
+		lrmd_log(LOG_ERR, "send_last_op: can not send msg");
+	}
+	ha_msg_del(msg);
+}
+
 int
 on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 {
@@ -2149,7 +2171,8 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	lrmd_op_t* op = NULL;
 	struct ha_msg* op_msg = NULL;
 	const char* id = NULL;
-
+	GHashTable* last_ops = NULL;
+	
 	CHECK_ALLOCATED(client, "client", HA_FAIL);
 	CHECK_ALLOCATED(msg, "message", HA_FAIL);
 
@@ -2164,73 +2187,98 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 		send_rc_msg(client->ch_cmd, HA_FAIL);
 		return HA_FAIL;
 	}
+	
+	ret = ha_msg_new(5);
+	/* add the F_LRM_STATE field */
 	if ( NULL == rsc->op_list )
 	{
-		if (NULL != rsc->last_op) {
-			ret = op_to_msg(rsc->last_op);
-		} else {
-			ret = ha_msg_new(5);
-		}
-
 		if (HA_OK != ha_msg_add_int(ret, F_LRM_STATE, LRM_RSC_IDLE)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_get_state: can not add state to msg.");
 			ha_msg_del(ret);
 			return HA_FAIL;
 		}
-		if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
-			lrmd_log(LOG_ERR,
-				"on_msg_get_state: can not send the ret msg");
-		}
-		ha_msg_del(ret);
 		lrmd_log(LOG_DEBUG
 		,	"on_msg_get_state:state of rsc %s is LRM_RSC_IDLE"
 		,	lrmd_nullcheck(id));
 		
 	}
 	else {
-		ret = ha_msg_new(5);
-
 		if (HA_OK != ha_msg_add_int(ret, F_LRM_STATE, LRM_RSC_BUSY)) {
 			lrmd_log(LOG_ERR,
 				"on_msg_get_state: can not add state to msg.");
 			ha_msg_del(ret);
 			return HA_FAIL;
 		}
-		op_count = g_list_length(rsc->op_list);
-		if (HA_OK != ha_msg_add_int(ret, F_LRM_OPCNT, op_count)) {
-			lrmd_log(LOG_ERR,
-				"on_msg_get_state: can not add state count.");
-			ha_msg_del(ret);
-			return HA_FAIL;
-		}
-		if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
-			lrmd_log(LOG_ERR,
-				"on_msg_get_state: can not send the ret msg");
-			ha_msg_del(ret);
-			return HA_FAIL;
-		}
-		ha_msg_del(ret);
-
-		for(node = g_list_first(rsc->op_list);
-			NULL != node; node = g_list_next(node)){
-			op = (lrmd_op_t*)node->data;
-			op_msg = op_to_msg(op);
-			if (NULL == op_msg) {
-				lrmd_log(LOG_ERR,
-					"on_msg_get_state: can not add op.");
-				continue;
-			}
-			if (HA_OK != msg2ipcchan(op_msg, client->ch_cmd)) {
-				lrmd_log(LOG_ERR,
-					"on_msg_get_state: can not send msg");
-			}
-			ha_msg_del(op_msg);
-		}
 		lrmd_log(LOG_DEBUG
 		,	"on_msg_get_state:state of rsc %s is LRM_RSC_BUSY"
 		,	lrmd_nullcheck(id));
-		
+	}	
+	/* calculate the count of ops being returned */
+	last_ops = g_hash_table_lookup(rsc->last_op_table, client->app_name);
+	if (last_ops == NULL) {
+		op_count = g_list_length(rsc->op_list) 
+			+  g_list_length(rsc->repeat_op_list);
+	}
+	else {
+		op_count = g_hash_table_size(last_ops)
+			+  g_list_length(rsc->op_list) 
+			+  g_list_length(rsc->repeat_op_list);
+	}					 
+	/* add the count of ops being returned */	
+	if (HA_OK != ha_msg_add_int(ret, F_LRM_OPCNT, op_count)) {
+		lrmd_log(LOG_ERR,
+			"on_msg_get_state: can not add state count.");
+		ha_msg_del(ret);
+		return HA_FAIL;
+	}
+	/* send the first message to client */	
+	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
+		lrmd_log(LOG_ERR,
+			"on_msg_get_state: can not send the ret msg");
+		ha_msg_del(ret);
+		return HA_FAIL;
+	}
+	ha_msg_del(ret);
+
+	/* send the ops in last ops table */
+	if(last_ops != NULL) {
+		g_hash_table_foreach(last_ops
+		,	send_last_op
+		,	(gpointer) client->ch_cmd);
+	}
+	/* send the ops in op list */
+	for(node = g_list_first(rsc->op_list)
+	;	NULL != node; node = g_list_next(node)){
+		op = (lrmd_op_t*)node->data;
+		op_msg = op_to_msg(op);
+		if (NULL == op_msg) {
+			lrmd_log(LOG_ERR,
+				"on_msg_get_state: convert op to msg failed.");
+			continue;
+		}
+		if (HA_OK != msg2ipcchan(op_msg, client->ch_cmd)) {
+			lrmd_log(LOG_ERR,
+				"on_msg_get_state: can not send msg");
+		}
+		ha_msg_del(op_msg);
+	}
+	
+	/* send the ops in repeat op list */
+	for(node = g_list_first(rsc->repeat_op_list)
+	;	NULL != node; node = g_list_next(node)){
+		op = (lrmd_op_t*)node->data;
+		op_msg = op_to_msg(op);
+		if (NULL == op_msg) {
+			lrmd_log(LOG_ERR,
+				"on_msg_get_state: can not add repeat op.");
+			continue;
+		}
+		if (HA_OK != msg2ipcchan(op_msg, client->ch_cmd)) {
+			lrmd_log(LOG_ERR,
+				"on_msg_get_state: can not send msg");
+		}
+		ha_msg_del(op_msg);
 	}
 	return HA_OK;
 }
@@ -3207,6 +3255,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.130  2005/05/03 17:38:55  zhenh
+ * Change the function of get_cur_state(). Now it returns an op list including last ops, pending ops, and waiting recurring ops. the list is sorted by call_id
+ *
  * Revision 1.129  2005/05/03 16:33:36  alan
  * Put in a good bit more debug information for when
  * an operation times out.
