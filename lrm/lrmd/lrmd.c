@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.134 2005/05/04 14:01:49 alan Exp $ */
+/* $Id: lrmd.c,v 1.135 2005/05/04 16:14:03 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2589,9 +2589,11 @@ on_op_done(lrmd_op_t* op)
 			}
 		} else {	
 			lrmd_log(LOG_ERR
-			,	"%s: the client [%d] of this op does not exist"
+			,	"%s: the client [%d] of this op (%s) does not exist"
 			" and client requested notification."
-			,	__FUNCTION__, op->client_id);
+			,	__FUNCTION__, op->client_id
+			,	op_info(op));
+			lrmd_op_dump(op, "lrmd_op_done: no client");
 		}
 			
 
@@ -3319,6 +3321,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.135  2005/05/04 16:14:03  alan
+ * Put in a small lrmd debugging enhancement for Andrew.
+ *
  * Revision 1.134  2005/05/04 14:01:49  alan
  * More debugging code.
  * Including checking for allocated pointers in debugging code :-)
