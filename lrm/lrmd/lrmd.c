@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.133 2005/05/03 23:32:27 alan Exp $ */
+/* $Id: lrmd.c,v 1.134 2005/05/04 14:01:49 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -62,7 +62,7 @@
 #define	MAX_PID_LEN 256
 #define	MAX_PROC_NAME 256
 #define	MAX_MSGTYPELEN 32
-#define WARMINGTIME_IN_LIST 5000
+#define WARNINGTIME_IN_LIST 5000
 #define OPTARGS		"skrhv"
 #define PID_FILE 	HA_VARRUNDIR"/lrmd.pid"
 #define LRMD_COREDUMP_ROOT_DIR HA_COREDIR
@@ -88,13 +88,20 @@
 #define	lrmd_nullcheck(p)	((p) ? (p) : "<null>")
 #define	lrm_str(p)	(lrmd_nullcheck(p))
 
+static	gboolean	in_alloc_dump = FALSE;
 #define	CHECK_ALLOCATED(thing, name, result)				\
 	if (!cl_is_allocated(thing)) {					\
-		lrmd_log(LOG_ERR, "%s: %s pointer 0x%lx is not allocated."		\
+		lrmd_log(LOG_ERR					\
+		,	"%s: %s pointer 0x%lx is not allocated."	\
 		,	__FUNCTION__, name, (unsigned long)thing);	\
-		dump_mem_stats();					\
-		return result;						\
-	}	
+		if (!in_alloc_dump) {					\
+			in_alloc_dump = TRUE;				\
+			dump_mem_stats();				\
+			dump_data_for_debug();				\
+			in_alloc_dump = FALSE;				\
+			return result;					\
+		}							\
+	}
 
 /*
  * The basic objects in our world:
@@ -500,6 +507,7 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	lrmd_rsc_t*	rsc;		/* should this be rsc_id?	*/
 #endif
 
+	CHECK_ALLOCATED(op, "op", );
 	if (op->exec_pid < 1
 	||	((kill(op->exec_pid, 0) < 0) && ESRCH == errno)) {
 		pidstat = "not running";
@@ -545,6 +553,7 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	lrmd_rsc_dump(op->rsc, text);
 }
 
+
 static void
 lrmd_client_destroy(lrmd_client_t* client)
 {
@@ -579,6 +588,73 @@ lrmd_client_new(void)
 	}
 	++lrm_objectstats.clientcount;
 	return client;
+}
+static void
+lrmd_client_dump(lrmd_client_t * client)
+{
+	CHECK_ALLOCATED(client, "client", );
+	
+	lrmd_log(LOG_DEBUG, "client name: %s, client pid: %d"
+		", client uid: %d, gid: %d, last request: %s"
+		", last op in: %s, lastop out: %s"
+		", last op rc: %s"
+		,	lrm_str(client->app_name)
+		,	client->pid
+		,	client->uid, client->gid
+		,	lrm_str(client->lastrequest)
+		,	ctime(&client->lastreqstart)
+		,	ctime(&client->lastreqend)
+		,	ctime(&client->lastrcsent)
+		);
+	if (!client->ch_cmd) {
+		lrmd_log(LOG_DEBUG, "NULL client ch_cmd in dump_data_for_debug()");
+	}else{
+		lrmd_log(LOG_DEBUG
+		,	"Command channel status: %d, read queue addr: %p, write queue addr: %p"
+		,	client->ch_cmd->ch_status
+		,	client->ch_cmd->recv_queue
+		,	client->ch_cmd->send_queue );
+
+		if (client->ch_cmd->recv_queue && client->ch_cmd->send_queue) {
+			lrmd_log(LOG_DEBUG, "read Qlen: %d, write Qlen: %d"
+			,	client->ch_cmd->recv_queue->current_qlen
+			,	client->ch_cmd->send_queue->current_qlen);
+		}
+	}
+	if (!client->ch_cbk) {
+		lrmd_log(LOG_DEBUG, "NULL client ch_cbk in %s()", __FUNCTION__);
+	}else{
+		lrmd_log(LOG_DEBUG
+		,	"Callback channel status: %d, read Qlen: %d, write Qlen: %d"
+		,	client->ch_cbk->ch_status
+		,	client->ch_cbk->recv_queue->current_qlen
+		,	client->ch_cbk->send_queue->current_qlen);
+	}
+}
+static void
+lrmd_dump_all_clients(void)
+{
+	GList*	node;
+	static gboolean	incall = FALSE;
+
+	if (incall) {
+		return;
+	}
+
+	incall = TRUE;
+
+	lrmd_log(LOG_DEBUG, "%d clients are connecting to lrmd."
+	 ,	g_list_length(client_list)); 
+	for (node = g_list_first(client_list);
+		NULL != node; node = g_list_next(node)){
+		lrmd_client_t* client = node->data;
+		if (client != NULL) {
+			lrmd_client_dump(client);
+		}else{
+			lrmd_log(LOG_ERR, "NULL client in client_list");
+		}
+	}
+	incall = FALSE;
 }
 
 static void
@@ -659,6 +735,7 @@ lrmd_rsc_dump(lrmd_rsc_t* rsc, const char * text)
 	static gboolean	incall = FALSE;
 	GList*		oplist;
 
+	CHECK_ALLOCATED(rsc, "rsc", );
 	/* TODO: Dump params and last_op_table FIXME */
 
 	lrmd_log(LOG_INFO, "%s: resource %s/%s/%s/%s"
@@ -691,12 +768,34 @@ lrmd_rsc_dump(lrmd_rsc_t* rsc, const char * text)
 	incall = FALSE;
 };
 
+static void
+lrmd_dump_all_resources(void)
+{
+	static gboolean	incall = FALSE;
+	GList*		node;
+	
+	if (incall) {
+		return;
+	}
+	incall = TRUE;
+
+	lrmd_log(LOG_DEBUG, "%d resources are managed by lrmd."
+		 , g_list_length(rsc_list)); 
+	for (node = g_list_first(rsc_list);
+		NULL != node; node = g_list_next(node)){
+		lrmd_rsc_t* rsc= node->data;
+		lrmd_rsc_dump(rsc, __FUNCTION__);
+	}
+	incall = FALSE;
+}
+
 
 static void
 lrm_debug_running_op(lrmd_op_t* op, const char * text)
 {
 	char	cmd[256];
 	lrmd_op_dump(op, text);
+	CHECK_ALLOCATED(op, "op", );
 	if (op->exec_pid >= 1) {
 		/* This really ought to use our logger
 		 * So... it might not get forwarded to the central machine
@@ -2363,8 +2462,11 @@ on_op_done(lrmd_op_t* op)
 		if( op->timeout_tag > 0 ) {
 			g_source_remove(op->timeout_tag);
 		}
-		lrmd_log(LOG_ERR,
-			"on_op_done: the resource of this op does not exists");
+		lrmd_log(LOG_ERR
+		,	"%s: the resource for op %s does not exist"
+		,	__FUNCTION__, op_info(op));
+		lrmd_op_dump(op, __FUNCTION__);
+		lrmd_dump_all_resources();
 		/* delete the op */
 		lrmd_op_destroy(op);
 
@@ -2628,7 +2730,7 @@ perform_op(lrmd_rsc_t* rsc)
 		}
 		if ( HA_OK != perform_ra_op(op)) {
 			lrmd_log(LOG_ERR
-			,	"perform_ra_op failed on %s"
+			,	"unable to perform_ra_op on %s"
 			,	op_info(op));
 			if (HA_OK != ha_msg_add_int(op->msg, F_LRM_OPSTATUS,
 						LRM_OP_ERROR)) {
@@ -2704,11 +2806,13 @@ perform_ra_op(lrmd_op_t* op)
 	op->rsc->params = params;
 	op->t_perform = time_longclock();
 	t_stay_in_list = longclockto_ms(op->t_perform - op->t_addtolist);
-	if ( t_stay_in_list > WARMINGTIME_IN_LIST) 
+	if ( t_stay_in_list > WARNINGTIME_IN_LIST) 
 	{
 		lrmd_log(LOG_ERR
-		,	"perform_ra_op: op %s stay in op list longer than %dms"
-		,	op_info(op), WARMINGTIME_IN_LIST
+		,	"perform_ra_op: op %s stay in op list for %lu ms"
+		" (longer than %d ms)"
+		,	op_info(op), (unsigned long)longclockto_ms(t_stay_in_list)
+		,	WARNINGTIME_IN_LIST
 		);
 		dump_data_for_debug();
 	}
@@ -3170,91 +3274,9 @@ debug_level_adjust(int nsig, gpointer user_data)
 static void
 dump_data_for_debug(void)
 {
-	GList* node;
-	GList* opnode;
-	lrmd_client_t* client;
-	lrmd_rsc_t* rsc;
-	lrmd_op_t* op;
 	lrmd_log(LOG_DEBUG, "begin dump internal data for debugging."); 
-
-	lrmd_log(LOG_DEBUG, "%d clients are connecting to lrmd."
-		 , g_list_length(client_list)); 
-	for (node = g_list_first(client_list);
-		NULL != node; node = g_list_next(node)){
-		client = (lrmd_client_t*)node->data;
-		if (client != NULL) {
-			lrmd_log(LOG_DEBUG, "client name: %s, client pid: %d"
-				", client uid: %d, gid: %d, last request: %s"
-				", last op in: %s, lastop out: %s"
-				", last op rc: %s"
-				,	client->app_name, client->pid
-				,	client->uid, client->gid
-				,	client->lastrequest
-				,	ctime(&client->lastreqstart)
-				,	ctime(&client->lastreqend)
-				,	ctime(&client->lastrcsent)
-				);
-			if (!client->ch_cmd) {
-				lrmd_log(LOG_DEBUG, "NULL client ch_cmd in dump_data_for_debug()");
-			}else{
-				lrmd_log(LOG_DEBUG
-				,	"Command channel status: %d, read queue addr: %p, write queue addr: %p"
-				,	client->ch_cmd->ch_status
-				,	client->ch_cmd->recv_queue
-				,	client->ch_cmd->send_queue );
-
-				if (client->ch_cmd->recv_queue && client->ch_cmd->send_queue) {
-					lrmd_log(LOG_DEBUG, "read Qlen: %d, write Qlen: %d"
-					,	client->ch_cmd->recv_queue->current_qlen
-					,	client->ch_cmd->send_queue->current_qlen);
-				}
-			}
-			if (!client->ch_cbk) {
-				lrmd_log(LOG_DEBUG, "NULL client ch_cbk in dump_data_for_debug()");
-			}else{
-				lrmd_log(LOG_DEBUG
-				,	"Callback channel status: %d, read Qlen: %d, write Qlen: %d"
-				,	client->ch_cbk->ch_status
-				,	client->ch_cbk->recv_queue->current_qlen
-				,	client->ch_cbk->send_queue->current_qlen);
-			}
-		}else{
-			lrmd_log(LOG_DEBUG, "NULL client in dump_data_for_debug()");
-		}
-	}
-	
-	lrmd_log(LOG_DEBUG, "%d resources are managed by lrmd."
-		 , g_list_length(rsc_list)); 
-	for (node = g_list_first(rsc_list);
-		NULL != node; node = g_list_next(node)){
-		rsc = (lrmd_rsc_t*)node->data;
-		if (rsc != NULL) {
-			lrmd_log(LOG_DEBUG, "rsc id: %s, type: %s"
-				", class: %s, provider: %s"
-				,	rsc->id, rsc->type
-				,	rsc->class,rsc->provider
-				);
-			lrmd_log(LOG_DEBUG, "%d op are in op list."
-			,	g_list_length(rsc->op_list));
-			for (opnode = g_list_first(rsc->op_list);
-				NULL != opnode; opnode = g_list_next(opnode)){
-				op = (lrmd_op_t*)opnode->data;
-				lrmd_log(LOG_DEBUG, "%s", op_info(op));
-			}
-			
-			lrmd_log(LOG_DEBUG, "%d op are in repeat op list."
-			,	g_list_length(rsc->repeat_op_list));
-			for (opnode = g_list_first(rsc->repeat_op_list);
-				NULL != opnode; opnode = g_list_next(opnode)){
-				op = (lrmd_op_t*)opnode->data;
-				lrmd_log(LOG_DEBUG, "%s", op_info(op));
-			}
-						
-		}else{
-			lrmd_log(LOG_DEBUG, "NULL rsc in dump_data_for_debug()");
-		}
-	}
-	
+	lrmd_dump_all_clients();
+	lrmd_dump_all_resources();
 	lrmd_log(LOG_DEBUG, "end dump internal data for debugging."); 
 }
 
@@ -3297,6 +3319,10 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.134  2005/05/04 14:01:49  alan
+ * More debugging code.
+ * Including checking for allocated pointers in debugging code :-)
+ *
  * Revision 1.133  2005/05/03 23:32:27  alan
  * Put the -pid change back into the lrmd.
  *
