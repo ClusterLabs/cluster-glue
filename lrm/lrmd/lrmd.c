@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.136 2005/05/04 20:45:03 alan Exp $ */
+/* $Id: lrmd.c,v 1.137 2005/05/04 20:53:22 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2592,10 +2592,9 @@ on_op_done(lrmd_op_t* op)
 			}
 		} else {	
 			lrmd_log(LOG_ERR
-			,	"%s: the client [%d] of this op (%s) does not exist"
+			,	"%s: client for %s does not exist"
 			" and client requested notification."
-			,	__FUNCTION__, op->client_id
-			,	op_info(op));
+			,	__FUNCTION__,	op_info(op));
 			lrmd_op_dump(op, "lrmd_op_done: no client");
 		}
 			
@@ -3325,6 +3324,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.137  2005/05/04 20:53:22  alan
+ * Made an error message slightly more succinct.
+ *
  * Revision 1.136  2005/05/04 20:45:03  alan
  * Put in a little debugging code to make sure we're dealing with originals/copies of
  * 'op's correctly.
