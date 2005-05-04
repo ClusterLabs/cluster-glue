@@ -64,6 +64,7 @@
 
 #define MAXLINE 128
 #define EOS '\0'
+#define	nullchk(a)	((a) ? (a) : "<null>")
 
 int	logd_keepalive_ms = 1000;
 int	logd_warntime_ms = 5000;
@@ -290,9 +291,12 @@ logd_suspend_clients(IPC_Channel* notused1, gpointer notused2)
 		ha_logd_client_t* client = gl->data;
 		if (client && client->g_src) {
 			G_main_IPC_Channel_pause(client->g_src);
-		}else{
+		}else if (client) {
 			cl_log(LOG_ERR, "Could not suspend client [%s] pid %d"
-			,	client->app_name, client->pid);
+			,	nullchk(client->app_name), client->pid);
+		}else{
+			cl_log(LOG_ERR, "%s: Could not suspend NULL client",
+			__FUNCTION__);
 		}
 	}
 }
@@ -308,9 +312,12 @@ logd_resume_clients(IPC_Channel* notused1, gpointer notused2)
 		ha_logd_client_t* client = gl->data;
 		if (client && client->g_src) {
 			G_main_IPC_Channel_resume(client->g_src);
-		}else{
+		}else if (client) {
 			cl_log(LOG_ERR, "Could not resume client [%s] pid %d"
-			,	client->app_name, client->pid);
+			,	nullchk(client->app_name), client->pid);
+		}else{
+			cl_log(LOG_ERR, "%s: Could not suspend NULL client",
+			__FUNCTION__);
 		}
 	}
 }
