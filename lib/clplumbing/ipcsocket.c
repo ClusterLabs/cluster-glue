@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.144 2005/05/02 20:00:04 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.145 2005/05/04 07:09:40 andrew Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -87,11 +87,6 @@
 #	define	USE_SO_PEERCRED
 #elif HAVE_GETPEEREID
 #	define USE_GETPEEREID
-#elif ON_DARWIN
-/* Darwin has SCM_CREDS but it has been crippled by Apple
- *  - force USE_BINDSTAT_CREDS instead
- */
-#	define	USE_BINDSTAT_CREDS
 #elif defined(SCM_CREDS)
 #	define	USE_SCM_CREDS
 #else
