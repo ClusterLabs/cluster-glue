@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.135 2005/05/04 16:14:03 alan Exp $ */
+/* $Id: lrmd.c,v 1.136 2005/05/04 20:45:03 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -179,6 +179,7 @@ struct lrmd_rsc
 struct lrmd_op
 {
 	lrmd_rsc_t*	rsc;		/* should this be rsc_id?	*/
+	gboolean	is_copy;
 	pid_t		client_id;
 	int		call_id;
 	int		exec_pid;
@@ -437,6 +438,7 @@ lrmd_op_copy(const lrmd_op_t* op)
 	*ret = *op;
 	/* Do a "deep" copy of the message structure */
 	ret->msg = ha_msg_copy(op->msg);
+	ret->is_copy = TRUE;
 	return ret;
 }
 
@@ -518,10 +520,11 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	ha_msg_value_int(op->msg, F_LRM_TARGETRC, &target_rc);
 	lrmd_log(LOG_INFO
 	,	"%s: lrmd_op: %s status: %s, target_rc=%s, client pid %d call_id"
-	": %d, child pid: %d (%s)"
+	": %d, child pid: %d (%s) %s"
 	,	text,	op_info(op), op_status_to_str(op_status)
 	,	op_target_rc_to_str(target_rc)
-	,	op->client_id, op->call_id, op->exec_pid, pidstat);
+	,	op->client_id, op->call_id, op->exec_pid, pidstat
+	,	(op->is_copy ? "copy" : "original"));
 	lrmd_log(LOG_INFO
 	,	"%s: lrmd_op2: to_tag: %u rt_tag: %d, interval: %d, delay: %d"
 	,	text, op->timeout_tag, op->repeat_timeout_tag
@@ -2662,6 +2665,7 @@ on_op_done(lrmd_op_t* op)
 		repeat_op->exec_pid = -1;
 		repeat_op->output_fd = -1;
 		repeat_op->timeout_tag = -1;
+		repeat_op->is_copy = FALSE;
 		repeat_op->repeat_timeout_tag = 
 			Gmain_timeout_add(op->interval,	
 					on_repeat_op_readytorun, repeat_op);
@@ -3321,6 +3325,10 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.136  2005/05/04 20:45:03  alan
+ * Put in a little debugging code to make sure we're dealing with originals/copies of
+ * 'op's correctly.
+ *
  * Revision 1.135  2005/05/04 16:14:03  alan
  * Put in a small lrmd debugging enhancement for Andrew.
  *
