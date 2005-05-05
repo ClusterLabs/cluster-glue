@@ -1,4 +1,4 @@
-/* $Id: GSource.h,v 1.11 2005/04/22 17:40:09 gshi Exp $ */
+/* $Id: GSource.h,v 1.12 2005/05/05 14:36:58 alan Exp $ */
 #ifndef _CLPLUMBING_GSOURCE_H
 #	define _CLPLUMBING_GSOURCE_H
 #	include <clplumbing/ipc.h>
@@ -132,7 +132,7 @@ void	set_SignalHandler_dnotify(GSIGSource* chp, GDestroyNotify notify);
 
 
 /*	manage child process death using sig source*/
-void	set_sigchld_proctrack(void);
+void	set_sigchld_proctrack(int priority);
      
 
 
