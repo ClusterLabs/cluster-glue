@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.138 2005/05/05 13:39:15 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.139 2005/05/05 14:35:18 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1447,7 +1447,7 @@ static void
 remove_repeat_op_from_client(gpointer key, gpointer value, gpointer user_data)
 {
 	lrmd_rsc_t* rsc = (lrmd_rsc_t*)value;
-	pid_t pid = (pid_t)user_data;
+	pid_t pid = GPOINTER_TO_UINT(user_data);
 	GList* op_node = NULL;
 	lrmd_op_t* op = NULL;
 		
@@ -1488,7 +1488,7 @@ unregister_client(lrmd_client_t* client)
 	
 	/* Search all resources for repeating ops this client owns */
 	g_hash_table_foreach(resources
-	,	remove_repeat_op_from_client, (gpointer)client->pid);
+	,	remove_repeat_op_from_client, GUINT_TO_POINTER(client->pid));
 	
 	lrmd_log(LOG_DEBUG, "%s: client %s [%d] unregistered", __FUNCTION__
 	,	client->app_name
@@ -3297,6 +3297,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.139  2005/05/05 14:35:18  alan
+ * Fixed some portability warnings.
+ *
  * Revision 1.138  2005/05/05 13:39:15  zhenh
  * 1. change the resource list and client list to hashtable. 2. remove the rsc->last_op
  *
