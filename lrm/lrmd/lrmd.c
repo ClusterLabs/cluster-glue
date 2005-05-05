@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.139 2005/05/05 14:35:18 alan Exp $ */
+/* $Id: lrmd.c,v 1.140 2005/05/05 15:36:21 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -150,6 +150,7 @@ typedef struct
 	IPC_Channel*	ch_cbk;
 
 	GCHSource*	g_src;
+	GCHSource*	g_src_cbk;
 	char		lastrequest[MAX_MSGTYPELEN];
 	time_t		lastreqstart;
 	time_t		lastreqend;
@@ -248,30 +249,14 @@ static gboolean free_str_op_pair(gpointer key
 ,	 gpointer value, gpointer user_data);
 static lrmd_op_t* lrmd_op_copy(const lrmd_op_t* op);
 static void send_last_op(gpointer key, gpointer value, gpointer user_data);
+static void record_op_completion(lrmd_client_t* client, lrmd_op_t* op);
 /*
  * following functions are used to monitor the exit of ra proc
  */
-static void set_child_signal(void);
-static void child_signal_handler(int sig);
-
-static gboolean	on_polled_input_prepare(GSource* source,
-					gint* timeout);
-static gboolean	on_polled_input_check(GSource* source);
-static gboolean	on_polled_input_dispatch(GSource* source,
-					 GSourceFunc callback,
-					 gpointer user_data);
-
-static GSourceFuncs polled_input_SourceFuncs = {
-	on_polled_input_prepare,
-	on_polled_input_check,
-	on_polled_input_dispatch,
-	NULL,
-};
 static void on_ra_proc_registered(ProcTrack* p);
 static void on_ra_proc_finished(ProcTrack* p, int status
 ,			int signo, int exitcode, int waslogged);
 static const char* on_ra_proc_query_name(ProcTrack* p);
-static volatile unsigned int signal_pending = 0;
 static int debug_level = 0;
 
 ProcTrack_ops ManagedChildTrackOps = {
@@ -589,6 +574,8 @@ lrmd_client_new(void)
 		dump_mem_stats();
 		return NULL;
 	}
+	client->g_src = NULL;
+	client->g_src_cbk = NULL;
 	++lrm_objectstats.clientcount;
 	return client;
 }
@@ -1043,7 +1030,7 @@ register_pid(const char *pid_file,gboolean do_fork
 	}
 	CL_IGNORE_SIG(SIGINT);
 	CL_IGNORE_SIG(SIGHUP);
-	G_main_add_SignalHandler(G_PRIORITY_LOW, SIGTERM
+	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGTERM
 	,	 	shutdown, NULL, NULL);
 	cl_signal_set_interrupt(SIGTERM, 1);
 	/* At least they are harmless, I think. ;-) */
@@ -1191,15 +1178,8 @@ init_start ()
 	/*Create a source to handle new connect rquests for callback*/
 	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cbk, auth, FALSE,
 	                               on_connect_cbk, conn_cbk, NULL);
-
-	if (G_main_add_input(G_PRIORITY_HIGH, FALSE, 
-			     &polled_input_SourceFuncs) ==NULL){
-		cl_log(LOG_ERR, "main: G_main_add_input failed");
-		lrmd_log(LOG_ERR, "Startup aborted (G_main_add_input failed). "
-				  " Shutting down.");
-	}
 	
-	set_child_signal();
+	set_sigchld_proctrack(G_PRIORITY_HIGH);
 
 	lrmd_log(LOG_DEBUG, "Enabling coredumps");
 	/* Althugh lrmd can count on the parent to enable coredump, still
@@ -1284,8 +1264,7 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 	/* the register will be finished in on_msg_register */
 	client = lrmd_client_new();
 	if (client == NULL) {
-		/* Will returning FALSE destroy ch? FIXME? */
-		return FALSE;
+		return TRUE;
 	}
 	client->app_name = NULL;
 	client->ch_cmd = ch;
@@ -1297,22 +1276,6 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 	return TRUE;
 }
 
-/* There is the possibility of delayed messages or even deadlock
- * on the ch_cbk channel under the following circumstances:
- *    Do lots of output on the ch_cbk channel
- *    The OS stops accepting output on it
- *    This output then just sits in the out queue until the
- *	the next time we send a message on the ch_cbk channel
- *
- *    If the client won't get any more messages on the ch_cbk
- *    channel until we send the ones that are there, then
- *    deadlock may occur.
- *
- *    The cure for this is to (strangely enough) call
- *    G_main_add_IPC_channel() for it.  This will cause
- *    its output to be automatically resumed as soon as the OS
- *    will take more data from us.  FIXME
- */
 gboolean
 on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 {
@@ -1367,7 +1330,12 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 		send_rc_msg(ch, HA_FAIL);
 		return TRUE;
 	}
-	/* FIXME: Should verify that client->ch_cbk is NULL */
+	if (client->ch_cbk != NULL) {
+		client->ch_cbk->ops->destroy(client->ch_cbk);
+		client->ch_cbk = NULL;
+	}
+	client->g_src_cbk = G_main_add_IPC_Channel(G_PRIORITY_DEFAULT
+	, 	ch, FALSE,NULL,NULL,NULL);
 
 	/*fill the channel of callback field*/
 	client->ch_cbk = ch;
@@ -1502,7 +1470,12 @@ on_remove_client (gpointer user_data)
 	lrmd_client_t* client = (lrmd_client_t*) user_data;
 
 	CHECK_ALLOCATED(client, "client", );
-
+	if (client->g_src != NULL) {
+		G_main_del_IPC_Channel(client->g_src);
+	}
+	if (client->g_src_cbk != NULL) {
+		G_main_del_IPC_Channel(client->g_src_cbk);
+	}
 	lrmd_client_destroy(client);
 	
 }
@@ -2425,7 +2398,47 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	return HA_OK;
 }
 /* /////////////////////op functions//////////////////////////////////////////// */
+static void 
+record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
+{
+	lrmd_rsc_t* rsc = NULL;
+	lrmd_op_t* old_op = NULL;
+	lrmd_op_t* new_op = NULL;
+	GHashTable* client_last_op = NULL;
+	const char* op_type = NULL;
+	
+	rsc = lookup_rsc(op->rsc_id);
+	if (rsc == NULL) {
+		lrmd_log(LOG_ERR, "record_op_completion, rsc == NULL");
+		return;
+	}
+	/*find the hash table for the client*/
+	client_last_op = g_hash_table_lookup(rsc->last_op_table
+	, 			client->app_name);
+	if (NULL == client_last_op) {
+		client_last_op = g_hash_table_new(g_str_hash, g_str_equal);
+		g_hash_table_insert(rsc->last_op_table
+		,	(gpointer)cl_strdup(client->app_name)
+		,	(gpointer)client_last_op);
+	}
+		
+	/* Insert the op into the hash table for the client*/
+	op_type = ha_msg_value(op->msg, F_LRM_OP);
+	old_op = g_hash_table_lookup(client_last_op, op_type);
+	new_op = lrmd_op_copy(op);
+	if (NULL != old_op) {
+		g_hash_table_replace(client_last_op
+		, 	cl_strdup(op_type)
+		,	(gpointer)new_op);
+		lrmd_op_destroy(old_op);
+	}
+	else {
+		g_hash_table_insert(client_last_op
+		, 	cl_strdup(op_type)
+		,	(gpointer)new_op);
+	}
 
+}
 /* this function return the op result to client if it is generated by client.
  * or do some monitor check if it is generated by monitor.
  * then remove it from the op list and put it into the lastop field of rsc.
@@ -2439,8 +2452,6 @@ on_op_done(lrmd_op_t* op)
 	op_status_t op_status;
 	int op_status_int;
 	int need_notify = 0;
-	const char* op_type = NULL;
-	GHashTable* client_last_op = NULL;
 	lrmd_client_t* client = NULL;
 	lrmd_rsc_t* rsc = NULL;
 
@@ -2625,33 +2636,7 @@ on_op_done(lrmd_op_t* op)
 	/*save the op in the last op hash table*/
 	client = lookup_client(op->client_id);
 	if (NULL != client) {
-		lrmd_op_t* old_op;
-		lrmd_op_t* new_op;
-		/*find the hash table for the client*/
-		client_last_op = g_hash_table_lookup(rsc->last_op_table
-		, 			client->app_name);
-		if (NULL == client_last_op) {
-			client_last_op = g_hash_table_new(g_str_hash, g_str_equal);
-			g_hash_table_insert(rsc->last_op_table
-			,	(gpointer)cl_strdup(client->app_name)
-			,	(gpointer)client_last_op);
-		}
-		
-		/* Insert the op into the hash table for the client*/
-		op_type = ha_msg_value(op->msg, F_LRM_OP);
-		old_op = g_hash_table_lookup(client_last_op, op_type);
-		new_op = lrmd_op_copy(op);
-		if (NULL != old_op) {
-			g_hash_table_replace(client_last_op
-			, 	cl_strdup(op_type)
-			,	(gpointer)new_op);
-			lrmd_op_destroy(old_op);
-		}
-		else {
-			g_hash_table_insert(client_last_op
-			, 	cl_strdup(op_type)
-			,	(gpointer)new_op);
-		}
+		record_op_completion(client, op);
 	}
 	
 	/*copy the repeat op to repeat list to wait next perform */
@@ -2882,50 +2867,6 @@ perform_ra_op(lrmd_op_t* op)
 	return HA_OK;
 }
 
-/*
- * FIXME:
- *	The next 3 functions can be replaced by a single call to
- *	set_sigchld_proctrack().  To be perfectly fair, this is
- *	a fairly new capability
- */
-/*g_source_add */
-static gboolean
-on_polled_input_prepare(GSource* source,
-			gint* timeout)
-{
-	return signal_pending != 0;
-}
-
-
-static gboolean
-on_polled_input_check(GSource* source)
-{
-	return signal_pending != 0;
-}
-
-static gboolean
-on_polled_input_dispatch(GSource* source,
-			 GSourceFunc callback,
-			 gpointer	user_data)
-{
-	unsigned long	handlers;
-	int status;
-	pid_t pid;
-
-	while (signal_pending) {
-		handlers = signal_pending;
-		signal_pending=0;
-
-		while((pid=wait3(&status, WNOHANG, NULL)) > 0
-			||(pid == -1 && errno == EINTR)) {
-
-			if (pid > 0) {
-				ReportProcHasDied(pid, status);
-			}
-		}
-	}
-	return TRUE;
-}
 static void
 on_ra_proc_registered(ProcTrack* p)
 {
@@ -3061,43 +3002,6 @@ on_ra_proc_query_name(ProcTrack* p)
 	return proc_name;
 }
 
-
-/*
- * FIXME:
- *	The next 2 functions can be replaced by a single call to
- *	set_sigchld_proctrack().  To be fair to the authors, this is
- *	a fairly new capability
- */
-static void
-child_signal_handler(int sig)
-{
-	signal_pending = 1;
-}
-
-void
-set_child_signal()
-{
-	sigset_t our_set;
-
-	const cl_signal_mode_t mode [] =
-	{
-		{SIGCHLD,	child_signal_handler,	1}
-	,	{0,		0,			0}
-	};
-
-
-	if (CL_SIGEMPTYSET(&our_set) < 0) {
-		lrmd_log(LOG_ERR, "hb_signal_set_common(): "
-			"CL_SIGEMPTYSET(): %s", strerror(errno));
-		return;
-	}
-
-	if (cl_signal_set_handler_mode(mode, &our_set) < 0) {
-		lrmd_log(LOG_ERR, "hb_signal_set_common(): "
-			"cl_signal_set_handler_mode()");
-		return;
-	}
-}
 
 /* /////////////////Util Functions////////////////////////////////////////////// */
 int
@@ -3297,6 +3201,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.140  2005/05/05 15:36:21  zhenh
+ * 1. using set_sigchld_proctrack(). 2. add record_op_completion() to reduce on_op_done(). 3. call G_main_add_IPC_Channel() for callback channel to avoid deadlock
+ *
  * Revision 1.139  2005/05/05 14:35:18  alan
  * Fixed some portability warnings.
  *
