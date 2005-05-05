@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.45 2005/04/29 16:51:10 alan Exp $ */
+/* $Id: ipc.h,v 1.46 2005/05/05 17:40:25 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -48,7 +48,7 @@
 #endif
 
 /* constants */
-#define DEFAULT_MAX_QLEN 40
+#define DEFAULT_MAX_QLEN 64
 #define MAX_MESSAGE_SIZE 4096
 #define MAX_MSGPAD 128
 /* channel and connection status */
@@ -57,6 +57,8 @@
 #define IPC_DISCONNECT		3	/* Disconnected, can't read or write*/
 #define IPC_DISC_PENDING	4	/* Disconnected, can't write but    */
 					/* may be more data to read	    */
+
+#define MAXFAILREASON		128
 
 #define IPC_SERVER		1
 #define IPC_CLIENT		2
@@ -177,6 +179,8 @@ struct IPC_CHANNEL{
 	flow_callback_t	low_flow_callback;
 	
 	int		conntype;
+	
+	char		failreason[MAXFAILREASON];
 };
 
 struct IPC_QUEUE{
