@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.67 2005/05/02 20:00:04 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.68 2005/05/05 17:37:33 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1896,12 +1896,10 @@ msg2ipcchan(struct ha_msg*m, IPC_Channel*ch)
 
 	if (ch->ops->send(ch, imsg) != IPC_OK) {
 		if (ch->ch_status == IPC_CONNECT) {
-			cl_log(LOG_ERR,
-			       "msg2ipcchan: ch->ops->send() failure");
-			cl_log(LOG_INFO, "ch->farside_pid=%d, send_queue length is %d(max is %d)",
-			       ch->farside_pid, ch->send_queue->current_qlen, 
-			       ch->send_queue->max_qlen);
-			
+			snprintf(ch->failreason,MAXFAILREASON, 
+				 "send failed,farside_pid=%d, sendq length=%d(max is %d)",
+				 ch->farside_pid, ch->send_queue->current_qlen, 
+				 ch->send_queue->max_qlen);	
 		}
 		imsg->msg_done(imsg);
 		return HA_FAIL;
@@ -2291,6 +2289,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.68  2005/05/05 17:37:33  gshi
+ * Store the channel fail reason into a string stored in  channel
+ * instead of print out using cl_log. The reason is someone may try to send
+ * a message again ang again and we do not want to overflow cl_log
+ *
  * Revision 1.67  2005/05/02 20:00:04  gshi
  * change wirefmt2msg() from
  * struct ha_msg* wirefmt2msg(char* string, int len)
