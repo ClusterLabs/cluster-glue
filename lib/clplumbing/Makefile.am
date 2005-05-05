@@ -23,7 +23,8 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/linux-ha -I$(top_srcdir)/linux-ha  \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 
-
+# if we want to do extreme stress test for messages, we need to disable IPC_TIME_DEBUG 
+# because there will be too many debug log about delayed messages 
 AM_CFLAGS			= @CFLAGS@  -DALIGNFUNC=@ALIGN@ -DMSGHDR_TYPE=@MSGHDR_TYPE@ -DIPC_TIME_DEBUG
 
 ## libraries
