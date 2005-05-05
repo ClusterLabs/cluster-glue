@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.36 2005/05/02 22:05:29 alan Exp $ */
+/* $Id: GSource.c,v 1.37 2005/05/05 14:36:59 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -946,9 +946,9 @@ child_death_dispatch(int sig, gpointer userdata)
 }
 
 void
-set_sigchld_proctrack(void)
+set_sigchld_proctrack(int priority)
 {
-	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGCHLD,
+	G_main_add_SignalHandler(priority, SIGCHLD,
 				 child_death_dispatch,NULL, NULL);
 	
 	return;
