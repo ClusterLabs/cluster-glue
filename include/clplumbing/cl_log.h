@@ -1,4 +1,4 @@
-/* $Id: cl_log.h,v 1.16 2005/04/13 18:04:46 gshi Exp $ */
+/* $Id: cl_log.h,v 1.17 2005/05/06 11:42:14 andrew Exp $ */
 #ifndef _CLPLUMBING_CL_LOG_H
 #	define _CLPLUMBING_CL_LOG_H
 #	include <glib.h>
@@ -33,4 +33,32 @@ char *		ha_timestamp(TIME_T t);
 void		cl_glib_msg_handler(const gchar *log_domain
 ,		GLogLevelFlags log_level, const gchar *message
 ,		gpointer user_data);
+
+
+typedef struct CircularBuffer_s 
+{
+	const char *name;
+	unsigned int size;
+	gboolean empty_after_dump;
+	GQueue *queue;
+	
+} CircularBuffer_t;
+
+typedef struct CircularBufferEntry_s 
+{
+	int level;
+	char *buf;
+	
+} CircularBufferEntry_t;
+
+CircularBuffer_t *NewCircularBuffer(
+	const char *name, unsigned int size, gboolean empty_after_dump);
+void LogToCircularBuffer(
+	CircularBuffer_t *buffer, int level, const char *fmt, ...) G_GNUC_PRINTF(3,4);
+
+void EmptyCircularBuffer(CircularBuffer_t *buffer);
+
+/* the prototype is designed to be easy to give to G_main_add_SignalHandler() */
+gboolean DumpCircularBuffer(int nsig, gpointer buffer);
+
 #endif

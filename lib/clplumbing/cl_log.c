@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.55 2005/04/25 16:05:46 gshi Exp $ */
+/* $Id: cl_log.c,v 1.56 2005/05/06 11:42:14 andrew Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -487,6 +487,7 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
  */
 
 gboolean last_log_failed = FALSE;
+static int	cl_log_depth = 0;
 
 /* Cluster logging function */
 void
@@ -498,7 +499,6 @@ cl_log(int priority, const char * fmt, ...)
 	ssize_t		nbytes;
 	const char *	pristr;
 	int	needprivs = !cl_have_full_privs();
-	static int	cl_log_depth = 0;
 
 	static const char *log_prio[8] = {
 		"EMERG",
@@ -848,4 +848,110 @@ cl_opensyslog(void)
 	syslog_enabled = 1;
 	openlog(log_entity, LOG_CONS, cl_log_facility);
 
+}
+
+
+CircularBuffer_t *
+NewCircularBuffer(const char *name, uint size, gboolean empty_after_dump)
+{
+	CircularBuffer_t *buffer = cl_malloc(sizeof(CircularBuffer_t));
+	buffer->name = name;
+	buffer->size = size;
+	buffer->empty_after_dump = empty_after_dump;
+	buffer->queue = g_queue_new();
+
+#if 1
+	if(empty_after_dump == FALSE) {
+		cl_log(LOG_ERR, "This requires glib 2.4");
+		empty_after_dump = TRUE;
+	}
+#endif
+
+	return buffer;
+}
+
+void
+LogToCircularBuffer(CircularBuffer_t *buffer, int level, const char *fmt, ...)
+{
+	va_list ap;
+	char	*buf = NULL;
+	int	nbytes;
+	CircularBufferEntry_t *entry = cl_malloc(sizeof(CircularBufferEntry_t));
+	
+	va_start(ap, fmt);
+	nbytes=vasprintf(&buf, fmt, ap);
+	va_end(ap);
+
+	entry->buf = buf;
+	entry->level = level;
+
+	g_queue_push_tail(buffer->queue, entry);
+
+	while(buffer->queue->length > buffer->size) {
+		entry = g_queue_pop_head(buffer->queue);
+		cl_free(entry->buf);
+		cl_free(entry);
+	}
+}
+
+void
+EmptyCircularBuffer(CircularBuffer_t *buffer) 
+{
+	CircularBufferEntry_t *entry = NULL;
+	while(buffer->queue->length > 0) {
+		entry = g_queue_pop_head(buffer->queue);
+		cl_free(entry->buf);
+		cl_free(entry);
+	}
+}
+
+gboolean
+DumpCircularBuffer(int nsig, gpointer user_data) 
+{
+	CircularBuffer_t *buffer = user_data;
+	CircularBufferEntry_t *entry = NULL;
+	
+	if(buffer == NULL) {
+		/* error */
+		cl_log(LOG_ERR, "No buffer supplied to dump.");
+		return FALSE;
+	}
+
+	if(logging_daemon_chan != NULL
+	   && logging_daemon_chan->send_queue->max_qlen < buffer->size) {
+		/* We have no hope of getting the whole buffer out via the
+		 *  logging daemon.  Use direct log instead so the messages
+		 *  come out in the right order.
+		 */ 
+		cl_log_depth++;
+	}
+	
+	cl_log(LOG_INFO, "Mark: Begin dump of buffer %s", buffer->name);
+	if(buffer->empty_after_dump) {
+		while(buffer->queue->length > 0) {
+			entry = g_queue_pop_head(buffer->queue);
+			cl_log(entry->level, "%s", entry->buf);
+			cl_free(entry->buf);
+			cl_free(entry);
+		}
+
+	} else {
+#if 1
+		cl_log(LOG_ERR, "This requires g_queue_peek_nth() from glib 2.4");
+#else
+		uint lpc = 0;
+		uint queue_len = buffer->queue->length;
+		for(lpc = 0; lpc < queue_len; lpc++) {
+			entry = g_queue_peek_nth(buffer->queue, lpc);
+			cl_log(entry->level, "%s", entry->buf);
+		}
+#endif
+	}
+	if(logging_daemon_chan != NULL
+	   && logging_daemon_chan->send_queue->max_qlen < buffer->size) {
+		/* Return is back to normal */
+		cl_log_depth--;
+	}
+	cl_log(LOG_INFO, "Mark: End dump of buffer %s", buffer->name);
+	return TRUE;
 }
