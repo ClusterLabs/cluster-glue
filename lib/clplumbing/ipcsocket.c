@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.146 2005/05/06 11:32:04 andrew Exp $ */
+/* $Id: ipcsocket.c,v 1.147 2005/05/06 22:05:43 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -985,7 +985,7 @@ socket_waitfor(struct IPC_CHANNEL * ch
 		if (rc < 0) {
 			return (errno == EINTR ? IPC_INTR : IPC_FAIL);
 		}
-
+		
 		rc = socket_check_poll(ch, &sockpoll);
 		if (sockpoll.revents & POLLIN) {
 			socket_resume_io(ch);
@@ -1032,7 +1032,9 @@ socket_waitout(struct IPC_CHANNEL * ch)
 static gboolean
 socket_is_message_pending(struct IPC_CHANNEL * ch)
 {
-
+	
+	int nbytes;
+	socket_resume_io_read(ch, &nbytes, TRUE);
 	ch->ops->resume_io(ch);
 	if (ch->recv_queue->current_qlen > 0) {
 		return TRUE;
