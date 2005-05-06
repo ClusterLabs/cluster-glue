@@ -1,4 +1,4 @@
-/* $Id: cl_log.h,v 1.17 2005/05/06 11:42:14 andrew Exp $ */
+/* $Id: cl_log.h,v 1.18 2005/05/06 16:03:17 gshi Exp $ */
 #ifndef _CLPLUMBING_CL_LOG_H
 #	define _CLPLUMBING_CL_LOG_H
 #	include <glib.h>
@@ -7,7 +7,7 @@
 #define TIME_T  unsigned long
 #define	HA_FAIL		0
 #define	HA_OK		1
-#define MAXMSG		40000
+#define MAXMSG		MAXDATASIZE
 
 struct IPC_CHANNEL;
 
