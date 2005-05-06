@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.145 2005/05/04 07:09:40 andrew Exp $ */
+/* $Id: ipcsocket.c,v 1.146 2005/05/06 11:32:04 andrew Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -28,7 +28,10 @@
 #include <clplumbing/cl_poll.h>
 
 #include <ha_msg.h>
-#include <crm/cib.h>
+/* avoid including cib.h - used in gshi's "late message" code to avoid
+ *   printing insanely large messages
+ */
+#define F_CIB_CALLDATA  "cib_calldata"
 
 #include <stdio.h>
 #include <stdlib.h>
