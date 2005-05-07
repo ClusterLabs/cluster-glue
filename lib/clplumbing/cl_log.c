@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.56 2005/05/06 11:42:14 andrew Exp $ */
+/* $Id: cl_log.c,v 1.57 2005/05/07 16:26:20 alan Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -850,11 +850,15 @@ cl_opensyslog(void)
 
 }
 
+/* What a horrible substitute for a low-overhead event log!! - FIXME!! */
 
 CircularBuffer_t *
 NewCircularBuffer(const char *name, uint size, gboolean empty_after_dump)
 {
 	CircularBuffer_t *buffer = cl_malloc(sizeof(CircularBuffer_t));
+	if (!buffer) {
+		return buffer;
+	}
 	buffer->name = name;
 	buffer->size = size;
 	buffer->empty_after_dump = empty_after_dump;
@@ -878,6 +882,9 @@ LogToCircularBuffer(CircularBuffer_t *buffer, int level, const char *fmt, ...)
 	int	nbytes;
 	CircularBufferEntry_t *entry = cl_malloc(sizeof(CircularBufferEntry_t));
 	
+	if (!entry) {
+		return;
+	}
 	va_start(ap, fmt);
 	nbytes=vasprintf(&buf, fmt, ap);
 	va_end(ap);
