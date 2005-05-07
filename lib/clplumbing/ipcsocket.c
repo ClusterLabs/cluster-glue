@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.147 2005/05/06 22:05:43 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.148 2005/05/07 16:14:28 alan Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -238,8 +238,25 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 					ha_msg_del(hamsg);
 					
 				} else {
-					cl_log(LOG_INFO, "Not a HA message: %s",
-					       (char*)ipcmsg->msg_body);
+#if 0
+					if (!cl_is_allocated(ipcmsg)) {
+						cl_log(LOG_ERR,
+						"IPC msg 0x%lx is unallocated"
+						,	(gulong)ipcmsg);
+						return;
+					}
+					if (!cl_is_allocated(ipcmsg->msg_body)) {
+						cl_log(LOG_ERR,
+						"IPC msg body 0x%lx is unallocated"
+						,	(gulong)ipcmsg->msg_body);
+						return;
+					}
+#endif
+					cl_log(LOG_WARNING
+					,	"Delayed msg not an HA message"
+					": %ld bytes [%s]"
+					,	(unsigned long)ipcmsg->msg_len
+					,	(char*)ipcmsg->msg_body);
 				}
 				
 			}
