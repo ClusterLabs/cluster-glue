@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.140 2005/05/05 15:36:21 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.141 2005/05/07 16:39:52 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -385,8 +385,9 @@ lrmd_op_destroy(lrmd_op_t* op)
 	}
 
 	ha_msg_del(op->msg);
-	cl_free(op->rsc_id);
 	op->msg = NULL;
+	cl_free(op->rsc_id);
+	op->rsc_id = NULL;
 	op->exec_pid = 0;
 	cl_free(op);
 }
@@ -710,7 +711,7 @@ lrmd_rsc_new(const char * id, struct ha_msg* msg)
 	++lrm_objectstats.rsccount;
 	return rsc;
 errout:
-	lrmd_rsc_destroy(rsc);
+	lrmd_rsc_destroy(rsc); /* violated property */ /* Or so BEAM thinks :-) */
 	rsc = NULL;
 	return rsc;
 }
@@ -763,17 +764,15 @@ static void
 lrmd_dump_all_resources(void)
 {
 	static gboolean	incall = FALSE;
-	char* text = NULL;
+	char text[] = __FUNCTION__;
 	if (incall) {
 		return;
 	}
 	incall = TRUE;
 
 	lrmd_log(LOG_DEBUG, "%d resources are managed by lrmd."
-		 , g_hash_table_size(resources)); 
-	text = cl_strdup(__FUNCTION__); 
-	g_hash_table_foreach(resources,dump_id_rsc_pair,text);
-	cl_free(text);
+	,	g_hash_table_size(resources)); 
+	g_hash_table_foreach(resources, dump_id_rsc_pair, text);
 	incall = FALSE;
 }
 
@@ -1415,7 +1414,7 @@ static void
 remove_repeat_op_from_client(gpointer key, gpointer value, gpointer user_data)
 {
 	lrmd_rsc_t* rsc = (lrmd_rsc_t*)value;
-	pid_t pid = GPOINTER_TO_UINT(user_data);
+	pid_t pid = GPOINTER_TO_UINT(user_data); /* pointer cast as int */
 	GList* op_node = NULL;
 	lrmd_op_t* op = NULL;
 		
@@ -3201,6 +3200,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.141  2005/05/07 16:39:52  alan
+ * Put in a few BEAM fixes.
+ *
  * Revision 1.140  2005/05/05 15:36:21  zhenh
  * 1. using set_sigchld_proctrack(). 2. add record_op_completion() to reduce on_op_done(). 3. call G_main_add_IPC_Channel() for callback channel to avoid deadlock
  *
