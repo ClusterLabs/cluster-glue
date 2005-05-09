@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.32 2005/04/27 07:33:40 sunjd Exp $ */
+/* $Id: lrmadmin.c,v 1.33 2005/05/09 03:20:55 alan Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -146,7 +146,7 @@ static lrm_rsc_t * get_lrm_rsc(ll_lrm_t * lrmd, char * rscid);
 
 static int ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
 static int ra_provider(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
-static gboolean lrmd_output_dispatch(int fd, gpointer user_data);
+static gboolean lrmd_output_dispatch(IPC_Channel* notused, gpointer user_data);
 static gboolean lrm_op_timeout(gpointer data);
 
 /* the end of the internal used function list */
@@ -482,7 +482,7 @@ int main(int argc, char **argv)
 	}
 
 	if (ASYN_OPS) {
-        	G_main_add_fd(G_PRIORITY_LOW, lrmd->lrm_ops->inputfd(lrmd),
+        	G_main_add_IPC_Channel(G_PRIORITY_LOW, lrmd->lrm_ops->ipcchan(lrmd),
 			FALSE, lrmd_output_dispatch, lrmd, NULL);
 		if (TIMEOUT > 0) {
 			Gmain_timeout_add(TIMEOUT, lrm_op_timeout, &ret_value);
@@ -510,7 +510,7 @@ lrm_op_timeout(gpointer data)
 }
 
 static gboolean 
-lrmd_output_dispatch(int fd, gpointer user_data)
+lrmd_output_dispatch(IPC_Channel* notused, gpointer user_data)
 {
         ll_lrm_t *lrm = (ll_lrm_t*)user_data;
         lrm->lrm_ops->rcvmsg(lrm, FALSE);
@@ -926,6 +926,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.33  2005/05/09 03:20:55  alan
+ * Finished changes for bug 544 :-(
+ *
  * Revision 1.32  2005/04/27 07:33:40  sunjd
  * Donnot set a default timeout value when the user does not want timeout
  *
