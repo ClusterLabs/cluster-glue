@@ -359,12 +359,12 @@ struct lrm_ops
 	int	(*delete_rsc)(ll_lrm_t*, const char* rsc_id);
 
 /*
- *inputfd:	Return fd which can be given to select(2) or poll(2)
- *		for determining when messages are ready to be read.
- *return:	the fd
+ *ipcchan:	Return the IPC channel which can be used for determining
+ *		when messages are ready to be read.
+ *return:	the IPC Channel
  */
 
-	int	(*inputfd)(ll_lrm_t*);
+   IPC_Channel*	(*ipcchan)(ll_lrm_t*);
 
 /*
  *msgready:	Returns TRUE (1) when a message is ready to be read.
