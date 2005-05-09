@@ -55,7 +55,7 @@ static int lrm_add_rsc (ll_lrm_t*, const char* id, const char* class
 			,const char* type, const char* provider
 			,GHashTable* parameter);
 static int lrm_delete_rsc (ll_lrm_t*, const char* id);
-static int lrm_inputfd (ll_lrm_t*);
+static IPC_Channel* lrm_ipcchan (ll_lrm_t*);
 static int lrm_msgready (ll_lrm_t*);
 static int lrm_rcvmsg (ll_lrm_t*, int blocking);
 static struct lrm_ops lrm_ops_instance =
@@ -73,7 +73,7 @@ static struct lrm_ops lrm_ops_instance =
 	lrm_get_rsc,
 	lrm_add_rsc,
 	lrm_delete_rsc,
-	lrm_inputfd,
+	lrm_ipcchan,
 	lrm_msgready,
 	lrm_rcvmsg
 };
@@ -765,16 +765,16 @@ lrm_delete_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	return HA_OK;
 }
 
-static int
-lrm_inputfd (ll_lrm_t* lrm)
+static IPC_Channel*
+lrm_ipcchan (ll_lrm_t* lrm)
 {
 	if (NULL == ch_cbk) {
 		cl_log(LOG_ERR,
 			"lrm_inputfd: callback channel is null.");
-		return -1;
+		return NULL;
 	}
 
-	return ch_cbk->ops->get_recv_select_fd(ch_cbk);
+	return ch_cbk;
 }
 
 static gboolean
