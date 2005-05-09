@@ -77,6 +77,7 @@
 
 #include <glib.h>
 #include <lrm/raexec.h>
+#include <clplumbing/GSource.h>
 
 #define LRM_PROTOCOL_MAJOR 0
 #define LRM_PROTOCOL_MINOR 1

@@ -35,7 +35,7 @@ void printf_op(lrm_op_t* op);
 void printf_hash_table(GHashTable* hash_table);
 void get_all_rsc(ll_lrm_t* lrm);
 void get_cur_state(lrm_rsc_t* rsc);
-gboolean lrm_dispatch(int fd, gpointer user_data);
+gboolean lrm_dispatch(IPC_Channel* notused, gpointer user_data);
 GMainLoop* mainloop 		= NULL;
 
 int main (int argc, char* argv[])
@@ -114,8 +114,8 @@ int main (int argc, char* argv[])
 	rsc->ops->perform_op(rsc,op);
 	printf_op(op);
 
-	G_main_add_fd(G_PRIORITY_LOW,
-		      lrm->lrm_ops->inputfd(lrm),
+	G_main_add_IPC_Channel(G_PRIORITY_LOW,
+		      lrm->lrm_ops->ipcchan(lrm),
 		      FALSE,
 		      lrm_dispatch, lrm,
 		      NULL);
@@ -136,7 +136,7 @@ void lrm_op_done_callback(lrm_op_t* op)
 	puts("lrm_op_done_callback...");
 	printf_op(op);
 }
-gboolean lrm_dispatch(int fd, gpointer user_data)
+gboolean lrm_dispatch(IPC_Channel* notused, gpointer user_data)
 {
 	ll_lrm_t *lrm = (ll_lrm_t*)user_data;
 	lrm->lrm_ops->rcvmsg(lrm, FALSE);
