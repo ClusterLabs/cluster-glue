@@ -53,7 +53,8 @@ libplumb_la_SOURCES	= 		\
 			timers.c	\
 			uids.c 		\
 			setproctitle.c \
-			cl_uuid.c
+			cl_uuid.c	\
+			pidfile.c
 
 libplumb_la_LIBADD      = $(top_builddir)/replace/libreplace.la
 
