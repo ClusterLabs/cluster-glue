@@ -1,4 +1,4 @@
-/* $Id: st_ttylock.c,v 1.2 2005/04/21 16:18:20 alan Exp $ */
+/* $Id: st_ttylock.c,v 1.3 2005/05/10 21:03:37 gshi Exp $ */
 #include <portability.h>
 
 #include <stdio.h>
@@ -150,8 +150,8 @@ DoLock(const char * prefix, const char *lockname)
 			if (sscanf(buf, "%lu", &pid) < 1) {
 				/* lockfile screwed up -> rm it and go on */
 			} else {
-				if (CL_KILL((pid_t)pid, 0) < 0 
-				&&	errno != ESRCH) {
+				if (CL_KILL((pid_t)pid, 0) >= 0 
+				||	errno != ESRCH) {
 					/* tty is locked by existing (not
 					 * necessarily running) process
 					 * -> give up */
