@@ -44,6 +44,7 @@
 #include <clplumbing/setproctitle.h>
 #include <clplumbing/cl_signal.h>
 #include <sys/wait.h>
+#include <clplumbing/lockfile.h>
 
 #ifndef DEFAULT_CFG_FILE
 #	define DEFAULT_CFG_FILE	"/etc/logd.cf"
@@ -452,7 +453,8 @@ logd_make_daemon(gboolean daemonize)
 	FILE *			lockfd = NULL;
 	const char *		devnull = "/dev/null";
 
-	if ((pid = get_running_logd_pid()) > 0  && pid != getpid()){
+	if (lock_pidfile(LOGD_PIDFILE) < 0 ){
+		pid = read_pidfile(LOGD_PIDFILE);
 		fprintf(stderr, "%s: already running [pid %ld].\n",
 			cmdname, pid);
 		exit(LSB_EXIT_OK);
