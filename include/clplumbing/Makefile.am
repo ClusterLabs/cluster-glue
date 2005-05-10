@@ -47,4 +47,5 @@ include_HEADERS	= 		\
 	recoverymgr_cs.h \
 	timers.h	\
 	uids.h		\
-	cl_uuid.h
+	cl_uuid.h 	\
+	pidfile.h
