@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.141 2005/05/07 16:39:52 alan Exp $ */
+/* $Id: lrmd.c,v 1.142 2005/05/10 17:43:05 gshi Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -764,7 +764,7 @@ static void
 lrmd_dump_all_resources(void)
 {
 	static gboolean	incall = FALSE;
-	char text[] = __FUNCTION__;
+	char text[]= "lrmd_dump_all_resources";
 	if (incall) {
 		return;
 	}
@@ -3200,6 +3200,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.142  2005/05/10 17:43:05  gshi
+ * fix a compiler complain
+ *
  * Revision 1.141  2005/05/07 16:39:52  alan
  * Put in a few BEAM fixes.
  *
