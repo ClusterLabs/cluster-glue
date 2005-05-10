@@ -46,6 +46,20 @@
 #include <sys/wait.h>
 #include <clplumbing/lockfile.h>
 
+/*two processes involved
+  1. parent process which reads messages from all client channels 
+  and writes them to the child process 
+  
+  2. the child process which reads messages from the parent process through IPC
+  and writes them to syslog/disk
+  
+  I call the parent process READ process, and the child process WRITE one,
+  for convenience.
+
+*/
+  
+
+
 #ifndef DEFAULT_CFG_FILE
 #	define DEFAULT_CFG_FILE	"/etc/logd.cf"
 #endif
@@ -73,6 +87,7 @@ int	logd_deadtime_ms = 10000;
 gboolean RegisteredWithApphbd = FALSE;
 gboolean	verbose =FALSE;
 pid_t	write_process_pid;
+IPC_Channel*		chanspair[2];
 
 
 struct {
@@ -96,6 +111,8 @@ static int	set_logfile(const char* option);
 static int	set_facility(const char * value);
 static int	set_entity(const char * option);
 static int	set_useapphbd(const char* option);
+static int	set_sendqlen(const char * option);
+static int	set_recvqlen(const char * option);
 
 int		pidstatuscode = LSB_STATUS_UNKNOWN;
 
@@ -111,7 +128,9 @@ struct directive{
 	{"logfile", set_logfile},
 	{"logfacility", set_facility},
 	{"entity", set_entity},
-	{"useapphbd", set_useapphbd}
+	{"useapphbd", set_useapphbd},
+	{"sendqlen", set_sendqlen},
+	{"recvqlen", set_recvqlen}
 };
 
 struct _syslog_code {
@@ -229,6 +248,57 @@ set_useapphbd(const char* option)
 		return FALSE;
 	}
 }
+
+
+static int
+set_sendqlen(const char * option)
+{
+	int length;
+
+	if (!option){
+		cl_log(LOG_ERR, "NULL send queue length");
+		return FALSE;
+	}
+
+	length = atoi(option);
+	if (length < 0){
+		cl_log(LOG_ERR, "negative send queue length");
+		return FALSE;
+	}
+	
+	cl_log(LOG_INFO, "setting send queue length to %d", length);
+	chanspair[READ_PROC_CHAN]->ops->set_send_qlen(chanspair[READ_PROC_CHAN],
+						      length);
+	
+	return TRUE;
+
+}
+
+static int
+set_recvqlen(const char * option)
+{
+	int length;
+	
+	if (!option){
+		cl_log(LOG_ERR, "NULL recv queue length");
+		return FALSE;
+	}
+
+	length = atoi(option);
+	if (length < 0){
+		cl_log(LOG_ERR, "negative recv queue length");
+		return FALSE;
+	}
+	
+	cl_log(LOG_INFO, "setting recv queue length to %d", length);
+	chanspair[WRITE_PROC_CHAN]->ops->set_recv_qlen(chanspair[WRITE_PROC_CHAN],
+						       length);
+	
+	return TRUE;
+	
+}
+
+
 
 
 typedef struct {
@@ -858,7 +928,6 @@ main(int argc, char** argv, char** envp)
 	gboolean		ask_status= FALSE;
 	const char*		cfgfile = NULL;
 	pid_t			pid;
-	IPC_Channel*		chanspair[2];
 	
 	cmdname = argv[0];
 	while ((c = getopt(argc, argv, "c:dksvh")) != -1){
@@ -924,7 +993,11 @@ main(int argc, char** argv, char** envp)
 		exit(LSB_EXIT_OK);
 	}
 	
-
+	if (ipc_channel_pair(chanspair) != IPC_OK){
+		cl_perror("cannot create channel pair IPC");
+		return -1;
+	}
+	
 	
 	if (cfgfile && !parse_config(cfgfile)) {
 		cl_log(LOG_ERR, "Config file [%s] is incorrect."
@@ -955,10 +1028,7 @@ main(int argc, char** argv, char** envp)
 	cl_cdtocoredir();
 
 	
-	if (ipc_channel_pair(chanspair) != IPC_OK){
-		cl_perror("cannot create channel pair IPC");
-		return -1;
-	}
+
 	
 	chanspair[WRITE_PROC_CHAN]->ops->set_recv_qlen(chanspair[WRITE_PROC_CHAN],
 						  LOGD_QUEUE_LEN);
