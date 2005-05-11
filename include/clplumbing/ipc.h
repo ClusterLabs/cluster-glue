@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.47 2005/05/06 16:05:53 gshi Exp $ */
+/* $Id: ipc.h,v 1.48 2005/05/11 00:44:56 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -668,13 +668,10 @@ int ipc_channel_pair(IPC_Channel* channels[2]);
  *	be created.
  *
  */
-/*
- * FIXME: We need a simpler way to do all this...
- * WE ALSO NEED THIS FUNCTION:
- * ipc_str_to_auth(const char * uidlist, const char * gidlist)
- * NOTE: This function already written as part of heartbeat/config.c
- *
- */
+
+
+IPC_Auth*  ipc_str_to_auth(const char * uidlist, const char * gidlist);
+
 extern IPC_Auth * ipc_set_auth(uid_t * a_uid, gid_t * a_gid
 ,	int num_uid, int num_gid);
 

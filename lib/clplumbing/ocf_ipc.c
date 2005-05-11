@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.28 2005/05/02 20:00:04 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.29 2005/05/11 00:44:56 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -30,6 +30,11 @@
 #include <clplumbing/cl_log.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <ctype.h>
+#include <pwd.h>
+#include <clplumbing/cl_malloc.h>
+#include <grp.h>
+
 
 #ifdef IPC_TIME_DEBUG
 struct ha_msg;
@@ -75,7 +80,145 @@ ipc_channel_constructor(const char * ch_type, GHashTable* ch_attrs)
   }
   return NULL;
 }
+static int
+gnametonum(const char * gname, int gnlen)
+{
+	char	grpname[64];
+	struct group*	grp;
 
+	if (isdigit(gname[0])) {
+		return atoi(gname);
+	}
+	if (gnlen >= (int)sizeof(grpname)) {
+		return -1;
+	}
+	strncpy(grpname, gname, gnlen);
+	grpname[gnlen] = EOS;
+	if ((grp = getgrnam(grpname)) == NULL) {
+		cl_log(LOG_ERR 
+		,	"Invalid group name [%s]", grpname);
+		return -1;
+	}
+	return (int)grp->gr_gid;
+}
+
+static int
+unametonum(const char * lname, int llen)
+{
+	char	loginname[64];
+	struct passwd*	pwd;
+
+	if (llen >= (int)sizeof(loginname)) {
+		cl_log(LOG_ERR 
+		,	"user id name [%s] is too long", loginname);
+		return -1;
+	}
+	strncpy(loginname, lname, llen);
+	loginname[llen] = EOS;
+
+	if (isdigit(loginname[0])) {
+		return atoi(loginname);
+	}
+	if ((pwd = getpwnam(loginname)) == NULL) {
+		cl_log(LOG_ERR 
+		,	"Invalid user id name [%s]", loginname);
+		return -1;
+	}
+	return (int)pwd->pw_uid;
+}
+
+static GHashTable*
+make_id_table(const char * list, int listlen, int (*map)(const char *, int))
+{
+	GHashTable*	ret;
+	const char *	id;
+	const char *	lastid = list + listlen;
+	int		idlen;
+	int		idval;
+	static int	one = 1;
+
+	ret = g_hash_table_new(g_direct_hash, g_direct_equal);
+
+	id = list;
+	while (id < lastid && *id != EOS) {
+		idlen = strcspn(id, ",");
+		if (id+idlen >= lastid) {
+			idlen = (lastid - id);
+		}
+		idval = map(id, idlen);
+		if (idval < 0) {
+			g_hash_table_destroy(ret);
+			return NULL;
+		}
+		cl_log(LOG_DEBUG,
+		       "Adding [ug]id %*s [%d] to authorization g_hash_table",
+		       	idlen, id, idval);
+		g_hash_table_insert(ret, GUINT_TO_POINTER(idval), &one);
+		id += idlen;
+		if (id < lastid) {
+			id += strspn(id, ",");
+		}
+	}
+	return ret;
+}
+
+
+
+struct IPC_AUTH*
+ipc_str_to_auth(const char* uidlist, const char* gidlist)
+{
+	struct IPC_AUTH* auth;
+	int uidlen;
+	int gidlen;
+	
+	auth = ha_malloc(sizeof(struct IPC_AUTH));
+	if (auth == NULL) {
+		cl_log(LOG_ERR, "Out of memory for IPC_AUTH");
+		return NULL;
+	}
+	
+	memset(auth, 0, sizeof(*auth));
+	
+	if (uidlist) {
+		uidlen = strlen(uidlist);
+		auth->uid = make_id_table(uidlist, uidlen, unametonum);
+		if (auth->uid == NULL) {
+			cl_log(LOG_ERR,
+			       "Bad uid list [%*s]",
+			       uidlen, uidlist);
+			goto errout;
+		}
+	}
+	if (gidlist) {
+		gidlen= strlen(gidlist);
+		auth->gid = make_id_table(gidlist, gidlen, gnametonum);
+		if (auth->gid == NULL) {
+			cl_log(LOG_ERR ,
+			       "Bad gid list [%*s]",
+			       gidlen, gidlist);
+			goto errout;
+		}
+	}
+	
+	
+	return auth;
+	
+ errout:
+	if (auth->uid){
+		g_hash_table_destroy(auth->uid);
+		auth->uid = NULL;	
+	}
+	
+	if (auth->gid){
+		g_hash_table_destroy(auth->gid);
+		auth->gid = NULL;		
+	}
+	
+	ha_free(auth);
+	auth = NULL;
+	return NULL;
+	
+}
 
 struct IPC_AUTH * 
 ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid)
