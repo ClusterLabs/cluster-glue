@@ -820,7 +820,6 @@ lrm_rcvmsg (ll_lrm_t* lrm, int blocking)
 
 		op = msg_to_op(msg);
 		if (NULL!=op && NULL!=op_done_callback) {
-			op->rsc = lrm_get_rsc( NULL, op->rsc_id );
 			(*op_done_callback)(op);
 		}
 		ha_msg_del(msg);
@@ -1025,7 +1024,6 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 		/* add msg to the return list */
 		
 		if (NULL != op) {
-			op->rsc = rsc;
 			op_list = g_list_append(op_list, op);
 		}
 		else {
@@ -1093,9 +1091,6 @@ rsc_get_last_result (lrm_rsc_t* rsc, const char* op_type)
 	} 
 	else if ( 1 == opcount ) {
 		op = msg_to_op(ret);
-		if (NULL != op) {
-			op->rsc = lrm_get_rsc( NULL, op->rsc_id );
-		}
 	}
 	ha_msg_del(msg);
 	ha_msg_del(ret);
