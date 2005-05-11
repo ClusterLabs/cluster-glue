@@ -1,4 +1,4 @@
-/* $Id: expect.c,v 1.20 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: expect.c,v 1.21 2005/05/11 11:49:20 andrew Exp $ */
 /*
  * Simple expect module for the STONITH library
  *
@@ -273,7 +273,7 @@ StartProcess(const char * cmd, int * readfd, int * writefd)
 				dup2(rdpipe[1], 1);
 				close(rdpipe[0]);
 				close(rdpipe[1]);
-#if defined(SCHED_OTHER)
+#if defined(SCHED_OTHER) && !defined(ON_DARWIN)
 			{
 				/*
 				 * Try and (re)set our scheduling to "normal"
