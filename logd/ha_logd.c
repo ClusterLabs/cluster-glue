@@ -44,7 +44,7 @@
 #include <clplumbing/setproctitle.h>
 #include <clplumbing/cl_signal.h>
 #include <sys/wait.h>
-#include <clplumbing/lockfile.h>
+#include <clplumbing/pidfile.h>
 
 /*two processes involved
   1. parent process which reads messages from all client channels 
