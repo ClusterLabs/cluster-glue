@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <clplumbing/cl_signal.h>
-#include <clplumbing/lockfile.h>
+#include <clplumbing/pidfile.h>
 
 /*
  * The following information is from the Filesystem Hierarchy Standard
