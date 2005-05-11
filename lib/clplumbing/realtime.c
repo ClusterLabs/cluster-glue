@@ -1,4 +1,4 @@
-/* $Id: realtime.c,v 1.21 2005/04/10 19:52:21 lars Exp $ */
+/* $Id: realtime.c,v 1.22 2005/05/11 11:49:20 andrew Exp $ */
 #include <portability.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -25,7 +25,7 @@
 static gboolean	cl_realtimepermitted = TRUE;
 static void cl_rtmalloc_setup(void);
 
-#if defined(SCHED_RR) && defined(_POSIX_PRIORITY_SCHEDULING)
+#if defined(SCHED_RR) && defined(_POSIX_PRIORITY_SCHEDULING) && !defined(ON_DARWIN)
 #	define DEFAULT_REALTIME	SCHED_RR
 #endif
 

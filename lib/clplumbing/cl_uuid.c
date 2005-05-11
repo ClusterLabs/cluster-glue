@@ -89,8 +89,12 @@ cl_uuid_time(cl_uuid_t* uu, struct timeval *ret_tv)
 		assert(0);
 	}
 
+#if defined(ON_DARWIN)
+	cl_log(LOG_ERR, "cl_uuid_time: not supported");
+	assert(0);	
+#else
 	return uuid_time(uu->uuid, ret_tv);
-
+#endif
 }
 
 int
