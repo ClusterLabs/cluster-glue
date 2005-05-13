@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.142 2005/05/10 17:43:05 gshi Exp $ */
+/* $Id: lrmd.c,v 1.143 2005/05/13 21:19:13 gshi Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -53,7 +53,7 @@
 #include <clplumbing/coredumps.h>
 #include <clplumbing/uids.h>
 #include <clplumbing/Gmain_timeout.h>
-
+#include <clplumbing/cl_pidfile.h>
 #include <ha_msg.h>
 #include <lrm/lrm_api.h>
 #include <lrm/lrm_msg.h>
@@ -309,9 +309,6 @@ static void usage(const char* cmd, int exit_status);
 static int init_start(void);
 static int init_stop(const char *pid_file);
 static int init_status(const char *pid_file, const char *client_name);
-static long get_running_pid(const char *pid_file, gboolean* anypidfile);
-static void register_pid(const char *pid_file, gboolean do_fork,
-			gboolean (*shutdown)(int nsig, gpointer userdata));
 static lrmd_op_t* lrmd_op_copy(const lrmd_op_t* op);
 static void lrmd_rsc_dump(char* rsc_id, const char * text);
 
@@ -874,45 +871,15 @@ main(int argc, char ** argv)
 int
 init_status(const char *pid_file, const char *client_name)
 {
-	gboolean	anypidfile;
-	long	pid =	get_running_pid(pid_file, &anypidfile);
-
+	long	pid =	cl_read_pidfile(pid_file);
+	
 	if (pid > 0) {
 		fprintf(stderr, "%s is running [pid: %ld]\n"
 			,	client_name, pid);
 		return LSB_STATUS_OK;
 	}
-	if (anypidfile) {
-		fprintf(stderr, "%s is stopped [pidfile exists]\n"
-			,	client_name);
-		return LSB_STATUS_VAR_PID;
-	}
 	fprintf(stderr, "%s is stopped.\n", client_name);
 	return LSB_STATUS_STOPPED;
-}
-
-
-long
-get_running_pid(const char *pid_file, gboolean* anypidfile)
-{
-	long    pid;
-	FILE *  lockfd;
-	lockfd = fopen(pid_file, "r");
-
-	if (anypidfile) {
-		*anypidfile = (lockfd != NULL);
-	}
-
-	if (lockfd != NULL && fscanf(lockfd, "%ld", &pid) == 1 && pid > 0) {
-		if (CL_PID_EXISTS((pid_t)pid)) {
-			fclose(lockfd);
-			return(pid);
-		}
-	}
-	if (lockfd != NULL) {
-		fclose(lockfd);
-	}
-	return(-1L);
 }
 
 int
@@ -927,7 +894,7 @@ init_stop(const char *pid_file)
 		lrmd_log(LOG_ERR, "No pid file specified to kill process");
 		return LSB_EXIT_GENERIC;
 	}
-	pid =	get_running_pid(pid_file, NULL);
+	pid =	cl_read_pidfile(pid_file);
 
 	if (pid > 0) {
 		if (CL_KILL((pid_t)pid, SIGTERM) < 0) {
@@ -1002,24 +969,11 @@ sigterm_action(int nsig, gpointer user_data)
 	return TRUE;
 }
 
-void
-register_pid(const char *pid_file,gboolean do_fork
-,		gboolean (*shutdown)(int nsig, gpointer userdata))
+static void
+register_pid(gboolean do_fork,
+	     gboolean (*shutdown)(int nsig, gpointer userdata))
 {
 	int	j;
-	long	pid;
-	FILE *	lockfd;
-
-	pid = getpid();
-	lockfd = fopen(pid_file, "w");
-	if (lockfd == NULL) {
-		lrmd_log(LOG_ERR, "cannot create pid file: %s", pid_file);
-		exit(100);
-	}else{
-		pid = getpid();
-		fprintf(lockfd, "%ld\n", pid);
-		fclose(lockfd);
-	}
 
 	umask(022);
 
@@ -1066,14 +1020,14 @@ init_start ()
 	PILGenericIfMgmtRqst RegisterRqsts[]= {
 		{"RAExec", &RAExecFuncs, NULL, NULL, NULL},
 		{ NULL, NULL, NULL, NULL, NULL} };
-
-	if ((pid = get_running_pid(PID_FILE, NULL)) > 0) {
-		lrmd_log(LOG_ERR, "already running: [pid %ld].", pid);
+	
+	if ((pid = cl_lock_pidfile(PID_FILE)) < 0) {
+		lrmd_log(LOG_ERR, "already running: [pid %d].", cl_read_pidfile(PID_FILE));
 		lrmd_log(LOG_ERR, "Startup aborted (already running).  Shutting down."); 
 		exit(100);
 	}
-
-	register_pid(PID_FILE, FALSE, sigterm_action);
+	
+	register_pid(FALSE, sigterm_action);
 
 	/* load RA plugins   */
 	PluginLoadingSystem = NewPILPluginUniv (PLUGIN_DIR);
@@ -3200,6 +3154,10 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.143  2005/05/13 21:19:13  gshi
+ * use cl_read_pidfile() and cl_lock_pidfile()
+ * to handler pid file
+ *
  * Revision 1.142  2005/05/10 17:43:05  gshi
  * fix a compiler complain
  *
