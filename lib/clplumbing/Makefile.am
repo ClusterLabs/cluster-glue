@@ -54,7 +54,7 @@ libplumb_la_SOURCES	= 		\
 			uids.c 		\
 			setproctitle.c \
 			cl_uuid.c	\
-			pidfile.c
+			cl_pidfile.c
 
 libplumb_la_LIBADD      = $(top_builddir)/replace/libreplace.la
 
