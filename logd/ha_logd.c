@@ -116,7 +116,6 @@ static int	set_recvqlen(const char * option);
 
 int		pidstatuscode = LSB_STATUS_UNKNOWN;
 
-static long			logd_pid_in_file = 0L;
 static char*			cmdname = NULL;
 
 
@@ -508,29 +507,6 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 }
 
 
-static long
-get_running_logd_pid(void)
-{
-	long	pid;
-	FILE *	lockfd = NULL;
-	if ((lockfd = fopen(LOGD_PIDFILE, "r")) != NULL
-	&&	fscanf(lockfd, "%ld", &pid) == 1 && pid > 0) {
-		logd_pid_in_file = pid;
-		if (kill((pid_t)pid, 0) >= 0 || errno != ESRCH) {
-			fclose(lockfd);
-			pidstatuscode = LSB_STATUS_OK;
-			return pid;
-		}
-		pidstatuscode = LSB_STATUS_VAR_PID;
-	}else{
-		pidstatuscode = LSB_STATUS_STOPPED;
-	}
-	if (lockfd != NULL) {
-		fclose(lockfd);
-	}
-	return -1L;
-}
-
 
 static void
 logd_make_daemon(gboolean daemonize)
@@ -569,9 +545,9 @@ logd_make_daemon(gboolean daemonize)
 		exit(LSB_EXIT_EPERM);
 	}
 	
-	cl_log_enable_stderr(FALSE);
 	
 	if (daemonize){
+		cl_log_enable_stderr(FALSE);
 		umask(022);
 		close(FD_STDIN);
 		(void)open(devnull, O_RDONLY);		/* Stdin:  fd 0 */
@@ -586,8 +562,8 @@ logd_make_daemon(gboolean daemonize)
 
 static void
 logd_stop(void){
-
-	long running_logd_pid = get_running_logd_pid();
+	
+	long running_logd_pid = read_pidfile(LOGD_PIDFILE);
 	int	err;
 	
 	if (running_logd_pid < 0) {
@@ -989,13 +965,13 @@ main(int argc, char** argv, char** envp)
 	
 	if (ask_status){
 		long pid;
-
-		if( (pid = get_running_logd_pid()) > 0 ){
+		
+		if( (pid = read_pidfile(LOGD_PIDFILE)) > 0 ){
 			printf("logging daemon is running [pid = %ld].\n", pid);
 		}else{
 			if (pidstatuscode ==  LSB_STATUS_VAR_PID) {
 				printf("logging daemon is stopped: %s exists.\n"
-				,	LOGD_PIDFILE);
+				       ,	LOGD_PIDFILE);
 			}else{
 				printf("logging daemon is stopped.");
 			}
@@ -1007,6 +983,9 @@ main(int argc, char** argv, char** envp)
 		logd_stop();
 		exit(LSB_EXIT_OK);
 	}
+
+	logd_make_daemon(daemonize);
+
 	
 	if (ipc_channel_pair(chanspair) != IPC_OK){
 		cl_perror("cannot create channel pair IPC");
@@ -1029,13 +1008,9 @@ main(int argc, char** argv, char** envp)
 	cl_log_set_entity(logd_config.entity);
 	cl_log_set_facility(logd_config.log_facility);
 	
-	logd_make_daemon(daemonize);
 	
 	cl_log(LOG_INFO, "logd started with %s.",
 	       cfgfile ? cfgfile : "default configuration");
-	
-	
-
 
 	if (cl_enable_coredumps(TRUE) < 0){
 		cl_log(LOG_ERR, "enabling core dump failed");
