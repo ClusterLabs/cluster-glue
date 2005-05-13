@@ -171,8 +171,11 @@ read_pidfile(const char*filename)
 		return -1;
 	}
 
-	return pid;
-	
+	if (CL_KILL(pid, 0) >= 0 || errno != ESRCH){
+		return pid;
+	}else{
+		return -1;
+	}
 }
 
 int
