@@ -37,7 +37,7 @@
 
 #define EXIT_OK		0
 #define EXIT_FAIL	1
-#define MAXMSGSIZE		4096
+#define MAXMSGSIZE     (1024*3)
 
 int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 extern IPC_Channel * get_log_chan(void);
@@ -116,7 +116,7 @@ main(int argc, char** argv)
 	
 	cl_log_set_logd_channel_source(NULL, NULL);
 	
-	g_idle_add(send_log_msg, (gpointer)maxcount);
+	g_idle_add(send_log_msg, (gpointer)maxcount); 
 	
 
 	loop = g_main_loop_new(NULL, FALSE);
