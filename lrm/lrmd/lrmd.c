@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.143 2005/05/13 21:19:13 gshi Exp $ */
+/* $Id: lrmd.c,v 1.144 2005/05/13 23:18:58 gshi Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1193,7 +1193,7 @@ init_start ()
 	if ( NULL != auth ) {
 		cl_free(auth);
 	}
-	if (unlink(PID_FILE) == 0) {
+	if (cl_unlock_pidfile(PID_FILE) == 0) {
 		lrmd_log(LOG_DEBUG, "[%s] stopped", lrm_system_name);
 	}
 
@@ -3154,6 +3154,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.144  2005/05/13 23:18:58  gshi
+ * use cl_unlock_pid_file() instead of  unlink()
+ *
  * Revision 1.143  2005/05/13 21:19:13  gshi
  * use cl_read_pidfile() and cl_lock_pidfile()
  * to handler pid file
