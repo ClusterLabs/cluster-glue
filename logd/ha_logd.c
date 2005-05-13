@@ -88,7 +88,7 @@ gboolean RegisteredWithApphbd = FALSE;
 gboolean	verbose =FALSE;
 pid_t	write_process_pid;
 IPC_Channel*		chanspair[2];
-
+gboolean stop_reading = FALSE;
 
 struct {
 	char		debugfile[MAXLINE];
@@ -357,8 +357,9 @@ logd_suspend_clients(IPC_Channel* notused1, gpointer notused2)
 {
 	GList *	gl;
 
+	stop_reading = TRUE;
 	for (gl=g_list_first(logd_client_list); gl != NULL
-	;	gl = g_list_next(gl)) {
+		     ;	gl = g_list_next(gl)) {
 		ha_logd_client_t* client = gl->data;
 		if (client && client->g_src) {
 			G_main_IPC_Channel_pause(client->g_src);
@@ -378,6 +379,7 @@ logd_resume_clients(IPC_Channel* notused1, gpointer notused2)
 {
 	GList *	gl;
 
+	stop_reading = FALSE;
 	for (gl=g_list_first(logd_client_list); gl != NULL
 	;	gl = g_list_next(gl)) {
 		ha_logd_client_t* client = gl->data;
@@ -387,7 +389,7 @@ logd_resume_clients(IPC_Channel* notused1, gpointer notused2)
 			cl_log(LOG_ERR, "Could not resume client [%s] pid %d"
 			,	nullchk(client->app_name), client->pid);
 		}else{
-			cl_log(LOG_ERR, "%s: Could not suspend NULL client",
+		cl_log(LOG_ERR, "%s: Could not suspend NULL client",
 			__FUNCTION__);
 		}
 	}
@@ -399,6 +401,11 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	IPC_Message*		ipcmsg;
 	ha_logd_client_t* client = (ha_logd_client_t*)user_data;
 	IPC_Channel*		logchan= client->logchan;
+
+	
+	if (stop_reading){
+		return TRUE;
+	}
 	
 	if (!ch->ops->is_message_pending(ch)) {
 		goto getout;
@@ -485,6 +492,15 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 					       ch, FALSE, on_receive_cmd,
 					       (gpointer)client,
 					       on_remove_client);
+	if (client->g_src <=0){
+		cl_log(LOG_ERR, "add the client to main loop failed");
+		cl_free(client);
+		return TRUE;
+	}
+	if (stop_reading){
+		G_main_IPC_Channel_pause(client->g_src);
+	}
+	
 	logd_client_list = g_list_append(logd_client_list, client);
 	
 	
@@ -888,7 +904,6 @@ write_msg_process(IPC_Channel* readchan)
 	
 	mainloop = g_main_new(FALSE);   
 	
-
 	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT,
 			       ch, FALSE,
 			       direct_log, mainloop, NULL);
