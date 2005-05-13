@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.68 2005/05/05 17:37:33 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.69 2005/05/13 17:41:56 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -2220,13 +2220,25 @@ wirefmt2msg_ll(const char* s, size_t length, int need_auth)
 {
 
 	int startlen;
+	
+
 
 	startlen = sizeof(MSG_START)-1;
-	if (strncmp(s, MSG_START, startlen) == 0) {
+	
+	if (startlen > length){
+		return NULL;
+	}
+
+	if (strncmp( s, MSG_START, startlen) == 0) {
 		return(string2msg_ll(s, length, 0, need_auth));
 	}
 
 	startlen = sizeof(MSG_START_NETSTRING) - 1;
+	
+	if (startlen > length){
+		return NULL;
+	}
+	
 	if (strncmp(s, MSG_START_NETSTRING, startlen) == 0) {
 		return netstring2msg(s, length, need_auth);
 	}
@@ -2289,6 +2301,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.69  2005/05/13 17:41:56  gshi
+ * if the startlen is greater than the length of a given string
+ * obviously it is not a valid message string
+ *
  * Revision 1.68  2005/05/05 17:37:33  gshi
  * Store the channel fail reason into a string stored in  channel
  * instead of print out using cl_log. The reason is someone may try to send
