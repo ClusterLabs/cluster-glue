@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.149 2005/05/13 17:40:42 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.150 2005/05/13 21:15:57 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1203,7 +1203,8 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 				
 			default:
 				cl_perror("socket_resume_io_read"
-					  ": unknown recv error");
+					  ": unknown recv error, peerpid=%d",
+					  ch->farside_pid);
 				ch->ch_status = IPC_DISCONNECT;
 				retcode = IPC_FAIL;
 				break;
