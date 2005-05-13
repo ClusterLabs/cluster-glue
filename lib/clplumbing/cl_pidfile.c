@@ -151,8 +151,28 @@ DoUnlock(const char * filename)
 	return unlink(lf_name);
 }
 
+
 int
 cl_read_pidfile(const char*filename)
+{
+	long pid = 0;
+
+	pid = cl_read_pidfile_no_checking(filename);
+	
+	if (pid < 0){
+		return -1;
+	}
+	
+	if (CL_KILL(pid, 0) >= 0 || errno != ESRCH){
+		return pid;
+	}else{
+		return -1;
+	}
+}
+
+
+int
+cl_read_pidfile_no_checking(const char*filename)
 {
 	int fd;
 	long pid = 0;
@@ -171,12 +191,9 @@ cl_read_pidfile(const char*filename)
 		return -1;
 	}
 
-	if (CL_KILL(pid, 0) >= 0 || errno != ESRCH){
-		return pid;
-	}else{
-		return -1;
-	}
+	return pid;
 }
+
 
 int
 cl_lock_pidfile(const char *filename)
