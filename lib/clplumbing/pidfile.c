@@ -88,8 +88,9 @@ DoLock(const char *filename)
 			if (sscanf(buf, "%lu", &pid) < 1) {
 				/* lockfile screwed up -> rm it and go on */
 			} else {
-				if (CL_KILL((pid_t)pid, 0) >= 0 
-				    ||	errno != ESRCH) {
+				if (pid > 1 && (getpid() != pid)
+				&&	((CL_KILL((pid_t)pid, 0) >= 0)
+				||	errno != ESRCH)) {
 					/* tty is locked by existing (not
 					 * necessarily running) process
 					 * -> give up */
