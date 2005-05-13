@@ -48,4 +48,4 @@ include_HEADERS	= 		\
 	timers.h	\
 	uids.h		\
 	cl_uuid.h 	\
-	pidfile.h
+	cl_pidfile.h
