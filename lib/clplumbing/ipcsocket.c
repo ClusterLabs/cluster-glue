@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.148 2005/05/07 16:14:28 alan Exp $ */
+/* $Id: ipcsocket.c,v 1.149 2005/05/13 17:40:42 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -195,6 +195,14 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 		"recv",
 		"dequeue"};
 	
+	if (ipcmsg->msg_body == NULL
+	    || ipcmsg->msg_buf == NULL){
+		cl_log(LOG_ERR, "msg_body =%p, msg_bu=%p",
+		       ipcmsg->msg_body, ipcmsg->msg_buf);
+		abort();
+		return;
+	}
+
 	switch(whichpos){
 		case MSGPOS_ENQUEUE:			
 			SET_ENQUEUE_TIME(ipcmsg, lnow);	
@@ -839,7 +847,6 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 	CHECKFOO(0,ch, msg, SavedQueuedBody, "queued message");
 	SocketIPCStats.noutqueued++;
 
-	
 	diff = 0;
 	if (msg->msg_buf ){
 		diff = (char*)msg->msg_body - (char*)msg->msg_buf;				
