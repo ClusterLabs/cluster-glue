@@ -44,7 +44,7 @@
 #include <clplumbing/setproctitle.h>
 #include <clplumbing/cl_signal.h>
 #include <sys/wait.h>
-#include <clplumbing/pidfile.h>
+#include <clplumbing/cl_pidfile.h>
 
 /*two processes involved
   1. parent process which reads messages from all client channels 
@@ -515,8 +515,8 @@ logd_make_daemon(gboolean daemonize)
 	FILE *			lockfd = NULL;
 	const char *		devnull = "/dev/null";
 
-	if (lock_pidfile(LOGD_PIDFILE) < 0 ){
-		pid = read_pidfile(LOGD_PIDFILE);
+	if (cl_lock_pidfile(LOGD_PIDFILE) < 0 ){
+		pid = cl_read_pidfile(LOGD_PIDFILE);
 		fprintf(stderr, "%s: already running [pid %ld].\n",
 			cmdname, pid);
 		exit(LSB_EXIT_OK);
@@ -563,7 +563,7 @@ logd_make_daemon(gboolean daemonize)
 static void
 logd_stop(void){
 	
-	long running_logd_pid = read_pidfile(LOGD_PIDFILE);
+	long running_logd_pid = cl_read_pidfile(LOGD_PIDFILE);
 	int	err;
 	
 	if (running_logd_pid < 0) {
@@ -966,7 +966,7 @@ main(int argc, char** argv, char** envp)
 	if (ask_status){
 		long pid;
 		
-		if( (pid = read_pidfile(LOGD_PIDFILE)) > 0 ){
+		if( (pid = cl_read_pidfile(LOGD_PIDFILE)) > 0 ){
 			printf("logging daemon is running [pid = %ld].\n", pid);
 		}else{
 			if (pidstatuscode ==  LSB_STATUS_VAR_PID) {
