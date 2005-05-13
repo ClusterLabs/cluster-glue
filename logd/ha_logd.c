@@ -512,15 +512,9 @@ static void
 logd_make_daemon(gboolean daemonize)
 {
 	long			pid;
-	FILE *			lockfd = NULL;
 	const char *		devnull = "/dev/null";
 
-	if (cl_lock_pidfile(LOGD_PIDFILE) < 0 ){
-		pid = cl_read_pidfile(LOGD_PIDFILE);
-		fprintf(stderr, "%s: already running [pid %ld].\n",
-			cmdname, pid);
-		exit(LSB_EXIT_OK);
-	}
+
 
 	if (daemonize){		
 		pid = fork();
@@ -534,17 +528,12 @@ logd_make_daemon(gboolean daemonize)
 		}
 	}
 	
-	pid = (long) getpid();
-	lockfd = fopen(LOGD_PIDFILE, "w");
-	if (lockfd != NULL) {
-		fprintf(lockfd, "%ld\n", pid);
-		fclose(lockfd);
-	}else{
-		fprintf(stderr, "%s: could not create pidfile [%s]\n"
-		,	cmdname, LOGD_PIDFILE);
-		exit(LSB_EXIT_EPERM);
+	if (cl_lock_pidfile(LOGD_PIDFILE) < 0 ){
+		pid = cl_read_pidfile(LOGD_PIDFILE);
+		fprintf(stderr, "%s: already running [pid %ld].\n",
+			cmdname, pid);
+		exit(LSB_EXIT_OK);
 	}
-	
 	
 	if (daemonize){
 		cl_log_enable_stderr(FALSE);
