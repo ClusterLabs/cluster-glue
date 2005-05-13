@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <clplumbing/cl_signal.h>
-#include <clplumbing/pidfile.h>
+#include <clplumbing/cl_pidfile.h>
 
 /*
  * The following information is from the Filesystem Hierarchy Standard
@@ -152,7 +152,7 @@ DoUnlock(const char * filename)
 }
 
 int
-read_pidfile(const char*filename)
+cl_read_pidfile(const char*filename)
 {
 	int fd;
 	long pid = 0;
@@ -179,7 +179,7 @@ read_pidfile(const char*filename)
 }
 
 int
-lock_pidfile(const char *filename)
+cl_lock_pidfile(const char *filename)
 {
 	if (filename == NULL) {
 		errno = EFAULT;
@@ -197,7 +197,7 @@ lock_pidfile(const char *filename)
  */ 
 
 int
-unlock_pidfile(const char *filename)
+cl_unlock_pidfile(const char *filename)
 {
 	if (filename == NULL) {
 		errno = EFAULT;
