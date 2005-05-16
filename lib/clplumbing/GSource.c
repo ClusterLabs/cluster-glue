@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.37 2005/05/05 14:36:59 alan Exp $ */
+/* $Id: GSource.c,v 1.38 2005/05/16 17:04:17 gshi Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -492,6 +492,12 @@ G_CH_dispatch(GSource * source,
 	GCHSource* chp = (GCHSource*)source;
 
 	g_assert(IS_CHSOURCE(chp));
+
+
+	if (chp->dontread){
+		return TRUE;
+	}
+
 	/* Is output now unblocked? 
 	 *
 	 * If so, turn off OUTPUT_EVENTS to avoid going into
