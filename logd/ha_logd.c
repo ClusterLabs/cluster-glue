@@ -402,10 +402,6 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	IPC_Channel*		logchan= client->logchan;
 
 	
-	if (stop_reading){
-		return TRUE;
-	}
-	
 	if (!ch->ops->is_message_pending(ch)) {
 		goto getout;
 	}
