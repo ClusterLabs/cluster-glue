@@ -958,7 +958,7 @@ main(int argc, char** argv, char** envp)
 				printf("logging daemon is stopped: %s exists.\n"
 				       ,	LOGD_PIDFILE);
 			}else{
-				printf("logging daemon is stopped.");
+				printf("logging daemon is stopped.\n");
 			}
 		}
 		exit(pidstatuscode);
