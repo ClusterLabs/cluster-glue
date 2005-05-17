@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <clplumbing/cl_signal.h>
 #include <clplumbing/cl_pidfile.h>
+#include <clplumbing/lsb_exitcodes.h>
 
 /*
  * The following information is from the Filesystem Hierarchy Standard
@@ -160,14 +161,14 @@ cl_read_pidfile(const char*filename)
 	pid = cl_read_pidfile_no_checking(filename);
 	
 	if (pid < 0){
-		return -1;
+		return - LSB_STATUS_STOPPED;
 	}
 	
 	if (CL_KILL(pid, 0) >= 0 || errno != ESRCH){
 		return pid;
 	}else{
-		return -1;
-	}
+		return -LSB_STATUS_VAR_PID;
+	}	
 }
 
 
