@@ -1,4 +1,4 @@
-/* $Id: lsb_exitcodes.h,v 1.2 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: lsb_exitcodes.h,v 1.3 2005/05/17 16:25:21 gshi Exp $ */
 /* LSB status exit codes.
  *
  * All of these and the supporting text are taken from the LSB.
@@ -70,7 +70,7 @@
 #define	LSB_EXIT_EPERM		4
 #define	LSB_EXIT_NOTINSTALLED	5
 #define	LSB_EXIT_NOTCONFIGED	6
-#define	LSB_EXIT_NOTRUNNING	8
+#define	LSB_EXIT_NOTRUNNING	7
 #define	LSB_EXIT_LSBRESERVED	8
 #define	LSB_EXIT_DISTRESERVED	100
 #define	LSB_EXIT_APPRESERVED	150
