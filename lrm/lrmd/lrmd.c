@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.144 2005/05/13 23:18:58 gshi Exp $ */
+/* $Id: lrmd.c,v 1.145 2005/05/18 08:36:21 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -400,6 +400,7 @@ lrmd_op_new(void)
 		return NULL;
 	}
 	op->rsc_id = NULL;
+	op->msg = NULL;
 	op->exec_pid = -1;
 	op->timeout_tag = -1;
 	op->repeat_timeout_tag = -1;
@@ -2206,6 +2207,17 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 
 	return call_id;
 getout:
+	/* FIXME.
+	  The following code just for make BEAM happy, since I cannot change
+	  beam.tcl to void this warning. Is it a BEAM bug?
+	*/
+	ha_msg_del(op->msg);
+	op->msg = NULL;
+	if (op->rsc_id !=NULL ) {
+		cl_free(op->rsc_id);
+		op->rsc_id = NULL;
+	}
+
 	lrmd_op_destroy(op);
 	return -1;
 }
@@ -3154,6 +3166,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.145  2005/05/18 08:36:21  sunjd
+ * BEAM : not a real fix
+ *
  * Revision 1.144  2005/05/13 23:18:58  gshi
  * use cl_unlock_pid_file() instead of  unlink()
  *
