@@ -1,4 +1,4 @@
-/* $Id: realtime.c,v 1.22 2005/05/11 11:49:20 andrew Exp $ */
+/* $Id: realtime.c,v 1.23 2005/05/18 18:36:04 alan Exp $ */
 #include <portability.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -210,10 +210,16 @@ cl_shortsleep(void)
 }
 
 
-static int	post_rt_morecore_count = 0;
+static int		post_rt_morecore_count = 0;
+static unsigned long	init_malloc_arena = 0L;
+
 #ifdef HAVE_MALLINFO
-static long	init_malloc_arena = 0L;
+#	define	MALLOC_ARENA()	(mallinfo().arena)
+#else
+#	define	MALLOC_ARENA()	(OL)
 #endif
+
+
 
 /* Return the number of times we went after more core */
 int
@@ -221,53 +227,60 @@ cl_nonrealtime_malloc_count(void)
 {
 	return post_rt_morecore_count;
 }
-/* Return the number of times we went after more core */
+unsigned long
+cl_nonrealtime_malloc_size(void)
+{
+		return (MALLOC_ARENA() - init_malloc_arena);
+}
+/* Log the number of times we went after more core */
 void
 cl_realtime_malloc_check(void)
 {
-	static	int lastcount = 0;
+	static	int		lastcount = 0;
+	static unsigned long	oldarena = 0UL;
 
 	if (post_rt_morecore_count > lastcount) {
 		cl_log(LOG_WARNING
-		,	"Performed %d non-realtime malloc calls."
+		,	"Performed %d more non-realtime malloc calls."
 		,	post_rt_morecore_count - lastcount);
-#ifdef HAVE_MALLINFO
+		lastcount = post_rt_morecore_count;
+	}
+	if (oldarena == 0UL) {
+		oldarena = init_malloc_arena;
+	}
+	if (MALLOC_ARENA() > oldarena) {
 		cl_log(LOG_INFO
 		,	"Total non-realtime malloc bytes: %ld"
-		,	mallinfo().arena - init_malloc_arena);
-#endif
-		lastcount = post_rt_morecore_count;
+		,	MALLOC_ARENA() - init_malloc_arena);
+		oldarena = MALLOC_ARENA();
 	}
 }
 
-#ifndef HAVE___DEFAULT_MORECORE
-static void
-cl_rtmalloc_setup(void)
-{
-	post_rt_morecore_count = 0;
-#ifdef HAVE_MALLINFO
-	init_malloc_arena = mallinfo().arena;
-#endif
-	return;
-}
+#ifdef HAVE___DEFAULT_MORECORE
 
-#else	/* HAVE___DEFAULT_MORECORE */
-
-#	include <malloc.h>
-
-static void	(*save_morecore_hook)(void);
+static void	(*our_save_morecore_hook)(void) = NULL;
 static void	cl_rtmalloc_morecore_fun(void);
-
-static void
-cl_rtmalloc_setup(void)
-{
-	save_morecore_hook = __after_morecore_hook;
-	 __after_morecore_hook = cl_rtmalloc_morecore_fun;
-}
 
 static void
 cl_rtmalloc_morecore_fun(void)
 {
 	post_rt_morecore_count++;
+	if (our_save_morecore_hook) {
+		our_save_morecore_hook();
+	}
 }
 #endif
+
+static void
+cl_rtmalloc_setup(void)
+{
+	static gboolean	inityet = FALSE;
+	if (!inityet) {
+		init_malloc_arena = MALLOC_ARENA();
+#ifdef HAVE___DEFAULT_MORECORE
+		our_save_morecore_hook = __after_morecore_hook;
+	 	__after_morecore_hook = cl_rtmalloc_morecore_fun;
+		inityet = TRUE;
+	}
+#endif
+}
