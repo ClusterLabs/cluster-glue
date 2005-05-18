@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.39 2005/05/18 17:12:47 alan Exp $ */
+/* $Id: GSource.c,v 1.40 2005/05/18 17:38:30 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -937,13 +937,13 @@ child_death_dispatch(int sig, gpointer notused)
 	pid_t	pid;
 	const int waitflags = WNOHANG;
 	
-	while((pid=wait3(&status, waitflags, NULL)) >= 0
+	while((pid=wait3(&status, waitflags, NULL)) > 0
 	||	errno == EINTR) {
 		if (pid > 0) {
 			ReportProcHasDied(pid, status);
 		}
 	}
-	if (errno != ECHILD) {
+	if (pid < 0 && errno != ECHILD) {
 		cl_perror("%s: wait3() failed"
 		,	__FUNCTION__);
 	}
