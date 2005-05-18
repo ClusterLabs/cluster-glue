@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.150 2005/05/13 21:15:57 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.151 2005/05/18 17:32:19 andrew Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -242,7 +242,7 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 							hamsg, crm_data);
 					}
 					
-					cl_log_message(LOG_INFO, hamsg);
+					cl_log_message(LOG_DEBUG, hamsg);
 					ha_msg_del(hamsg);
 					
 				} else {
