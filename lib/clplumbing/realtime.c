@@ -1,4 +1,4 @@
-/* $Id: realtime.c,v 1.23 2005/05/18 18:36:04 alan Exp $ */
+/* $Id: realtime.c,v 1.24 2005/05/18 19:53:01 alan Exp $ */
 #include <portability.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -214,9 +214,9 @@ static int		post_rt_morecore_count = 0;
 static unsigned long	init_malloc_arena = 0L;
 
 #ifdef HAVE_MALLINFO
-#	define	MALLOC_ARENA()	(mallinfo().arena)
+#	define	MALLOC_TOTALSIZE()	(((unsigned long)mallinfo().arena)+((unsigned long)mallinfo().hblkhd))
 #else
-#	define	MALLOC_ARENA()	(OL)
+#	define	MALLOC_TOTALSIZE()	(OL)
 #endif
 
 
@@ -230,7 +230,7 @@ cl_nonrealtime_malloc_count(void)
 unsigned long
 cl_nonrealtime_malloc_size(void)
 {
-		return (MALLOC_ARENA() - init_malloc_arena);
+		return (MALLOC_TOTALSIZE() - init_malloc_arena);
 }
 /* Log the number of times we went after more core */
 void
@@ -248,11 +248,11 @@ cl_realtime_malloc_check(void)
 	if (oldarena == 0UL) {
 		oldarena = init_malloc_arena;
 	}
-	if (MALLOC_ARENA() > oldarena) {
+	if (MALLOC_TOTALSIZE() > oldarena) {
 		cl_log(LOG_INFO
 		,	"Total non-realtime malloc bytes: %ld"
-		,	MALLOC_ARENA() - init_malloc_arena);
-		oldarena = MALLOC_ARENA();
+		,	MALLOC_TOTALSIZE() - init_malloc_arena);
+		oldarena = MALLOC_TOTALSIZE();
 	}
 }
 
@@ -276,7 +276,7 @@ cl_rtmalloc_setup(void)
 {
 	static gboolean	inityet = FALSE;
 	if (!inityet) {
-		init_malloc_arena = MALLOC_ARENA();
+		init_malloc_arena = MALLOC_TOTALSIZE();
 #ifdef HAVE___DEFAULT_MORECORE
 		our_save_morecore_hook = __after_morecore_hook;
 	 	__after_morecore_hook = cl_rtmalloc_morecore_fun;
