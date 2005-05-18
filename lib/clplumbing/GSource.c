@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.38 2005/05/16 17:04:17 gshi Exp $ */
+/* $Id: GSource.c,v 1.39 2005/05/18 17:12:47 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -931,32 +931,31 @@ G_main_signal_handler(int nsig)
 
 
 static gboolean
-child_death_dispatch(int sig, gpointer userdata)
+child_death_dispatch(int sig, gpointer notused)
 {
 	int status;
 	pid_t	pid;
-	int waitflags = WNOHANG;
+	const int waitflags = WNOHANG;
 	
-	while((pid=wait3(&status, waitflags, NULL)) > 0
-	      ||	(pid == -1 && errno == EINTR)) {
-		
+	while((pid=wait3(&status, waitflags, NULL)) >= 0
+	||	errno == EINTR) {
 		if (pid > 0) {
-			/* If they're in the API client table, 
-			 * remove them... */
 			ReportProcHasDied(pid, status);
 		}
-		
 	}
-	
+	if (errno != ECHILD) {
+		cl_perror("%s: wait3() failed"
+		,	__FUNCTION__);
+	}
 	return TRUE;
 }
 
 void
 set_sigchld_proctrack(int priority)
 {
-	G_main_add_SignalHandler(priority, SIGCHLD,
-				 child_death_dispatch,NULL, NULL);
-	
+	G_main_add_SignalHandler(priority, SIGCHLD
+	,	child_death_dispatch, NULL, NULL);
+	cl_signal_set_interrupt(SIGCHLD, TRUE);
 	return;
 }
 
