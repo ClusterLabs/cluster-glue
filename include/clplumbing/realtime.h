@@ -1,4 +1,4 @@
-/* $Id: realtime.h,v 1.6 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: realtime.h,v 1.7 2005/05/18 18:36:04 alan Exp $ */
 #ifndef _CLPLUMBING_REALTIME_H
 #	define _CLPLUMBING_REALTIME_H
 #	include <sched.h>
@@ -40,5 +40,7 @@ void cl_realtime_malloc_check(void);
 
 /* Number of times we "go to the well" for memory after becoming realtime */
 int cl_nonrealtime_malloc_count(void);
+/* Number of bytes we "got from the well" for memory after becoming realtime */
+unsigned long cl_nonrealtime_malloc_size(void);
 
 #endif
