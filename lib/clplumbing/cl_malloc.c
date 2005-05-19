@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.15 2005/05/19 15:50:47 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.16 2005/05/19 16:44:20 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -152,6 +152,8 @@ static void	cl_dump_item(const struct cl_bucket*b);
 #define	CBHDR(p) ((const struct cl_bucket*)(const void*)(((const char*)p)-cl_malloc_hdr_offset))
 #define	MEMORYSIZE(p)(CBHDR(p)->hdr.reqsize)
 
+#define MALLOCSIZE(allocsize) ((allocsize) + cl_malloc_hdr_offset + GUARDSIZE)
+
 #ifdef MAKE_GUARD
 #	define GUARDLEN 4
 	static const unsigned char cl_malloc_guard[] =
@@ -265,7 +267,8 @@ cl_malloc(size_t size)
 #endif /* HA_MALLOC_MAGIC */
 		if (memstats) {
 			memstats->nbytes_req += size;
-			memstats->nbytes_alloc+=cl_bucket_sizes[numbuck];
+			memstats->nbytes_alloc
+			+=	MALLOCSIZE(cl_bucket_sizes[numbuck]);
 		}
 		
 	}
@@ -373,8 +376,8 @@ cl_free(void *ptr)
 	if (bucket >= NUMBUCKS) {
 		if (memstats) {
 			memstats->nbytes_req   -= bhdr->hdr.reqsize;
-			memstats->nbytes_alloc -= bhdr->hdr.reqsize;
-			memstats->mallocbytes  -= bhdr->hdr.reqsize;
+			memstats->nbytes_alloc -= MALLOCSIZE(bhdr->hdr.reqsize);
+			memstats->mallocbytes  -= MALLOCSIZE(bhdr->hdr.reqsize);
 		}
 		free(bhdr);
 	}else{
@@ -383,8 +386,8 @@ cl_free(void *ptr)
 		g_assert(bhdr->hdr.reqsize <= cl_bucket_sizes[bucket]);
 #endif
 		if (memstats) {
-			memstats->nbytes_req  -= bhdr->hdr.reqsize;
-			memstats->nbytes_alloc-= bucksize;
+			memstats->nbytes_req   -= bhdr->hdr.reqsize;
+			memstats->nbytes_alloc -= MALLOCSIZE(bucksize);
 		}
 		bhdr->next = cl_malloc_buckets[bucket];
 		cl_malloc_buckets[bucket] = bhdr;
@@ -455,11 +458,11 @@ cl_realloc(void *ptr, size_t newsize)
 		/* Not from our bucket-area... Call realloc... */
 		if (memstats) {
 			memstats->nbytes_req   -= bhdr->hdr.reqsize;
-			memstats->nbytes_alloc -= bhdr->hdr.reqsize;
-			memstats->mallocbytes  -= bhdr->hdr.reqsize;
+			memstats->nbytes_alloc -= MALLOCSIZE(bhdr->hdr.reqsize);
+			memstats->mallocbytes  -= MALLOCSIZE(bhdr->hdr.reqsize);
 			memstats->nbytes_req   += newsize;
-			memstats->nbytes_alloc += newsize;
-			memstats->mallocbytes  += newsize;
+			memstats->nbytes_alloc += MALLOCSIZE(newsize);
+			memstats->mallocbytes  += MALLOCSIZE(newsize);
 		}
 		bhdr = realloc(bhdr, newsize + cl_malloc_hdr_offset + GUARDSIZE);
 		if (!bhdr) {
@@ -515,7 +518,7 @@ cl_new_mem(size_t size, int numbuck)
 		allocsize = size;
 	}
 
-	mallocsize = allocsize + cl_malloc_hdr_offset + GUARDSIZE;
+	mallocsize = MALLOCSIZE(allocsize);
 
 	if ((hdrret = malloc(mallocsize)) == NULL) {
 		return NULL;
