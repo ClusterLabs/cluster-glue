@@ -298,10 +298,10 @@ get_all_rsc(ll_lrm_t* lrm)
 void
 get_cur_state(lrm_rsc_t* rsc)
 {
-	printf("current state>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
 	state_flag_t state;
 	GList* node = NULL, * op_list = NULL;
 	lrm_op_t* op = NULL;
+	printf("current state>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
 
 	op_list = rsc->ops->get_cur_state(rsc, &state);
 
