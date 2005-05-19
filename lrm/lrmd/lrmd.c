@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.145 2005/05/18 08:36:21 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.146 2005/05/19 06:47:12 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1505,6 +1505,9 @@ on_repeat_op_readytorun(gpointer data)
 	if (!shutdown_in_progress) {
 		op->t_addtolist = time_longclock();
 		rsc->op_list = g_list_append(rsc->op_list, op);
+		if (g_list_length(rsc->op_list) >= 4) {
+			lrmd_rsc_dump(rsc->id, "rsc->op_list: too many ops");
+		}
 	}
 	perform_op(rsc);
 
@@ -2200,6 +2203,10 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			,	op_info(op));
 			op->t_addtolist = time_longclock();
 			rsc->op_list = g_list_append(rsc->op_list, op);
+
+			if (g_list_length(rsc->op_list) >= 4) {
+				lrmd_rsc_dump(rsc->id, "rsc->op_list: too many ops");
+			}
 		}
 
 		perform_op(rsc);
@@ -3166,6 +3173,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.146  2005/05/19 06:47:12  sunjd
+ * Bug 553: add more debug output
+ *
  * Revision 1.145  2005/05/18 08:36:21  sunjd
  * BEAM : not a real fix
  *
