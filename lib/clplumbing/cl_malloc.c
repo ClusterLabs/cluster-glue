@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.14 2005/04/28 15:04:38 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.15 2005/05/19 15:50:47 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -15,7 +15,8 @@
 
 #include <ltdl.h>
 
-static volatile cl_mem_stats_t *	memstats = NULL;
+static cl_mem_stats_t			default_memstats;
+static volatile cl_mem_stats_t *	memstats = &default_memstats;
 
 /*
  * Compile time malloc debugging switches:
@@ -371,11 +372,9 @@ cl_free(void *ptr)
 
 	if (bucket >= NUMBUCKS) {
 		if (memstats) {
-			if (memstats->nbytes_alloc >= bhdr->hdr.reqsize) {
-				memstats->nbytes_req   -= bhdr->hdr.reqsize;
-				memstats->nbytes_alloc -= bhdr->hdr.reqsize;
-				memstats->mallocbytes  -= bhdr->hdr.reqsize;
-			}
+			memstats->nbytes_req   -= bhdr->hdr.reqsize;
+			memstats->nbytes_alloc -= bhdr->hdr.reqsize;
+			memstats->mallocbytes  -= bhdr->hdr.reqsize;
 		}
 		free(bhdr);
 	}else{
@@ -384,10 +383,8 @@ cl_free(void *ptr)
 		g_assert(bhdr->hdr.reqsize <= cl_bucket_sizes[bucket]);
 #endif
 		if (memstats) {
-			if (memstats->nbytes_alloc >= bhdr->hdr.reqsize) {
-				memstats->nbytes_req  -= bhdr->hdr.reqsize;
-				memstats->nbytes_alloc-= bucksize;
-			}
+			memstats->nbytes_req  -= bhdr->hdr.reqsize;
+			memstats->nbytes_alloc-= bucksize;
 		}
 		bhdr->next = cl_malloc_buckets[bucket];
 		cl_malloc_buckets[bucket] = bhdr;
@@ -457,11 +454,9 @@ cl_realloc(void *ptr, size_t newsize)
 	if (bucket >= NUMBUCKS) {
 		/* Not from our bucket-area... Call realloc... */
 		if (memstats) {
-			if (memstats->nbytes_alloc >= bhdr->hdr.reqsize) {
-				memstats->nbytes_req   -= bhdr->hdr.reqsize;
-				memstats->nbytes_alloc -= bhdr->hdr.reqsize;
-				memstats->mallocbytes  -= bhdr->hdr.reqsize;
-			}
+			memstats->nbytes_req   -= bhdr->hdr.reqsize;
+			memstats->nbytes_alloc -= bhdr->hdr.reqsize;
+			memstats->mallocbytes  -= bhdr->hdr.reqsize;
 			memstats->nbytes_req   += newsize;
 			memstats->nbytes_alloc += newsize;
 			memstats->mallocbytes  += newsize;
@@ -495,9 +490,7 @@ cl_realloc(void *ptr, size_t newsize)
 	/* Amazing! It fits into the space previously allocated for it! */
 	bhdr->hdr.reqsize = newsize;
 	if (memstats) {
-		if (memstats->nbytes_alloc >= bhdr->hdr.reqsize) {
-			memstats->nbytes_req  -= bhdr->hdr.reqsize;
-		}
+		memstats->nbytes_req  -= bhdr->hdr.reqsize;
 		memstats->nbytes_req  += newsize;
 	}
 	ADD_GUARD(ptr);
@@ -613,9 +606,19 @@ cl_malloc_init()
 #endif
 }
 
-void cl_malloc_setstats(volatile cl_mem_stats_t *stats)
+void
+cl_malloc_setstats(volatile cl_mem_stats_t *stats)
 {
+	if (memstats && stats) {
+		*stats = *memstats;
+	}
 	memstats = stats;
+}
+
+volatile cl_mem_stats_t *
+cl_malloc_getstats(void)
+{
+	return	memstats;
 }
 
 static void
