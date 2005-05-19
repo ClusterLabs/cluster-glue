@@ -1,7 +1,8 @@
-/* $Id: realtime.c,v 1.24 2005/05/18 19:53:01 alan Exp $ */
+/* $Id: realtime.c,v 1.25 2005/05/19 14:29:07 msoffen Exp $ */
 #include <portability.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <stddef.h>
 /* The BSD's do not use malloc.h directly. */
 /* They use stdlib.h instead */
 #ifndef BSD
@@ -216,7 +217,7 @@ static unsigned long	init_malloc_arena = 0L;
 #ifdef HAVE_MALLINFO
 #	define	MALLOC_TOTALSIZE()	(((unsigned long)mallinfo().arena)+((unsigned long)mallinfo().hblkhd))
 #else
-#	define	MALLOC_TOTALSIZE()	(OL)
+#	define	MALLOC_TOTALSIZE()	(0L)
 #endif
 
 
@@ -281,6 +282,6 @@ cl_rtmalloc_setup(void)
 		our_save_morecore_hook = __after_morecore_hook;
 	 	__after_morecore_hook = cl_rtmalloc_morecore_fun;
 		inityet = TRUE;
-	}
 #endif
+	}
 }
