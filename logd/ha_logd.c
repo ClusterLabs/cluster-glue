@@ -114,7 +114,6 @@ static int	set_useapphbd(const char* option);
 static int	set_sendqlen(const char * option);
 static int	set_recvqlen(const char * option);
 
-int		pidstatuscode = LSB_STATUS_UNKNOWN;
 
 static char*			cmdname = NULL;
 
@@ -953,15 +952,16 @@ main(int argc, char** argv, char** envp)
 		
 		if( (pid = cl_read_pidfile(LOGD_PIDFILE)) > 0 ){
 			printf("logging daemon is running [pid = %ld].\n", pid);
+			exit(LSB_EXIT_OK);
 		}else{
-			if (pidstatuscode ==  LSB_STATUS_VAR_PID) {
+			if (pid ==  - LSB_STATUS_VAR_PID) {
 				printf("logging daemon is stopped: %s exists.\n"
 				       ,	LOGD_PIDFILE);
 			}else{
 				printf("logging daemon is stopped.\n");
 			}
 		}
-		exit(pidstatuscode);
+		exit(-pid);
 		
 	}
 	if (stop_logd){
