@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.h,v 1.3 2005/02/07 03:07:23 alan Exp $ */
+/* $Id: cl_malloc.h,v 1.4 2005/05/19 15:50:46 alan Exp $ */
 /*
  * ha_malloc.h: malloc utilities for the Linux-HA heartbeat program
  *
@@ -42,6 +42,7 @@ void		cl_free(void *ptr);
 int		cl_is_allocated(const void *ptr);
 void		cl_malloc_report(void);
 void		cl_malloc_setstats(volatile cl_mem_stats_t*);
+volatile cl_mem_stats_t* cl_malloc_getstats(void);
 void		cl_malloc_forced_for_glib(void);
 		/* Call before using any glib functions(!) */
 		/* See also: g_mem_set_vtable() */
