@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.148 2005/05/20 13:23:47 alan Exp $ */
+/* $Id: lrmd.c,v 1.149 2005/05/20 16:24:52 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -386,6 +386,8 @@ lrmd_op_destroy(lrmd_op_t* op)
 	cl_free(op->rsc_id);
 	op->rsc_id = NULL;
 	op->exec_pid = 0;
+	lrmd_log2(LOG_DEBUG, "lrmd_op_destroy: free the op whose address is %p"
+		  , op);
 	cl_free(op);
 }
 
@@ -1136,7 +1138,7 @@ init_start ()
 	set_sigchld_proctrack(G_PRIORITY_HIGH);
 
 	lrmd_log(LOG_DEBUG, "Enabling coredumps");
-	/* Althugh lrmd can count on the parent to enable coredump, still
+	/* Although lrmd can count on the parent to enable coredump, still
 	 * set it here for test, when start manually.
 	 */
  	cl_cdtocoredir();
@@ -2634,6 +2636,7 @@ on_op_done(lrmd_op_t* op)
 int
 flush_op(lrmd_op_t* op)
 {
+	lrmd_log2(LOG_DEBUG, "flush_op: start.");
 	CHECK_ALLOCATED(op, "op", HA_FAIL );
 	if (op->exec_pid == 0) {
 		lrmd_log2(LOG_ERR, "flush_op: op->exec_pid == 0.");
@@ -2651,7 +2654,7 @@ flush_op(lrmd_op_t* op)
 	}
 
 	on_op_done(op);
-
+	lrmd_log2(LOG_DEBUG, "flush_op: end.");
 	return HA_OK;
 }
 
@@ -2853,9 +2856,12 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	char* data = NULL;
         int rc;
         int ret;
+	int op_status;
 
 	CHECK_ALLOCATED(p, "ProcTrack p", );
 	op = p->privatedata;
+	lrmd_log2(LOG_DEBUG, "on_ra_proc_finished: accessing the op whose "
+		  "address is %p", op);
 	CHECK_ALLOCATED(op, "op", );
 	if (op->exec_pid == 0) {
 		lrmd_log(LOG_ERR, "on_ra_proc_finished: op was freed.");
@@ -2873,6 +2879,17 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		lrmd_log(LOG_DEBUG, "on_ra_proc_finished: this op is killed.");
 		dump_data_for_debug();
 		return;
+	}
+
+	if (HA_OK == ha_msg_value_int(op->msg, F_LRM_OPSTATUS, &op_status)) {
+		if ( LRM_OP_CANCELLED == (op_status_t)op_status ) {
+			lrmd_op_destroy(op);
+			p->privatedata = NULL;
+			lrmd_log(LOG_DEBUG, "on_ra_proc_finished: "
+				"this op is cancelled.");
+			dump_data_for_debug();
+			return;
+		}
 	}
 
 	rsc = lookup_rsc(op->rsc_id);
@@ -3170,6 +3187,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.149  2005/05/20 16:24:52  sunjd
+ * Bug 557:LRM performs previously cancelled operation
+ *
  * Revision 1.148  2005/05/20 13:23:47  alan
  * Put some comments into lrmd.c explaining why we need to take secure core dumps.
  *
