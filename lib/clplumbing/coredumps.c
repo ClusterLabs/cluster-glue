@@ -134,19 +134,44 @@ cl_enable_coredumps(int doenable)
 	return 0;
 }
 
- /*
-  *   SIGQUIT       3       Core    Quit from keyboard
-  *   SIGILL        4       Core    Illegal Instruction
-  *   SIGABRT       6       Core    Abort signal from abort(3)
-  *   SIGFPE        8       Core    Floating point exception
-  *   SIGSEGV      11       Core    Invalid memory reference
-  *   SIGBUS    10,7,10     Core    Bus error (bad memory access)
-  *   SIGSYS     2,-,12     Core    Bad argument to routine (SVID)
-  *   SIGTRAP      5        Core    Trace/breakpoint trap
-  *   SIGXCPU     24,24,30    Core    CPU time limit exceeded (4.2 BSD)
-  *   SIGXFSZ     25,25,31    Core    File size limit exceeded (4.2 BSD)
+/*
+ *   SIGQUIT      3        Core    Quit from keyboard
+ *   SIGILL       4        Core    Illegal Instruction
+ *   SIGABRT      6        Core    Abort signal from abort(3)
+ *   SIGFPE       8        Core    Floating point exception
+ *   SIGSEGV      11       Core    Invalid memory reference
+ *   SIGBUS    10,7,10     Core    Bus error (bad memory access)
+ *   SIGSYS     2,-,12     Core    Bad argument to routine (SVID)
+ *   SIGTRAP      5        Core    Trace/breakpoint trap
+ *   SIGXCPU   24,24,30    Core    CPU time limit exceeded (4.2 BSD)
+ *   SIGXFSZ   25,25,31    Core    File size limit exceeded (4.2 BSD)
+ */
 
-  */
+/*
+ * This function exists to allow security-sensitive programs
+ * to safely take core dumps.  Such programs can't can't call
+ * cl_untaint_coredumps() alone - because it might cause a
+ * leak of confidential information - as information which should
+ * only be known by the "high-privilege" user id will be written
+ * into a core dump which is readable by the "low-privilege" user id.
+ * This is a bad thing.
+ *
+ * This function causes this program to call a special signal handler
+ * on receipt of any core dumping signal.  This handler then does
+ * the following four things on receipt of a core dumping signal:
+ *
+ *  1)	Set privileges to "maximum" on receipt of a signal
+ *  2)	"untaint" themselves with regard to core dumping
+ *  3)	set SIG_DFLT for the received signal
+ *  4)	Kill themselves with the received core-dumping signal
+ *
+ * Any process *could* do this to get core dumps, but if your stack
+ * is screwed up, then the signal handler might not work.
+ * If you're core dumping because of a stack overflow, it certainly won't work.
+ *
+ * On the other hand, this function may work on some OSes that don't support
+ * prctl(2).  This is an untested theory at this time...
+ */
 void
 cl_set_all_coredump_signal_handlers()
 {
@@ -174,6 +199,11 @@ cl_set_all_coredump_signal_handlers()
 	}
 }
 
+/*
+ * See note above about why using this function directly is sometimes
+ * a bad idea, and you might need to use cl_set_all_coredump_signal_handlers()
+ * instead.
+ */
 void
 cl_untaint_coredumps(void)
 {
