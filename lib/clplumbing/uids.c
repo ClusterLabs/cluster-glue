@@ -1,4 +1,4 @@
-/* $Id: uids.c,v 1.11 2005/05/20 06:45:22 sunjd Exp $ */
+/* $Id: uids.c,v 1.12 2005/05/20 13:16:48 alan Exp $ */
 #include <portability.h>
 #include <pwd.h>
 #include <sys/types.h>
@@ -80,7 +80,6 @@ int	/* Return to our original privileges (if any) */
 return_to_orig_privs()
 {
 	int	rc;
-	int	save_errno;
 	if (!anysaveduid) {
 		return 0;
 	}
@@ -89,9 +88,16 @@ return_to_orig_privs()
 	}
 	privileged_state = 1;
 	rc = setegid(powergid);
-	save_errno = errno;
-	cl_untaint_coredumps();
-	errno = save_errno;
+	/*
+	 * Sad but true, for security reasons we can't call
+	 * cl_untaint_coredumps() here - because it might cause an
+	 * leak of confidential information for some applications.
+	 * So, the applications need to use either cl_untaint_coredumps()
+	 * when they change privileges, or they need to call
+	 * cl_set_all_coredump_signal_handlers() to handle core dump
+	 * signals and set their privileges to maximum before core
+	 * dumping.  See the comments in coredumps.c for more details.
+	 */
 	return rc;
 }
 
@@ -106,7 +112,7 @@ return_to_dropped_privs(void)
 	setegid(nobodygid);
 	privileged_state = 0;
 	rc =  seteuid(nobodyuid);
-	cl_untaint_coredumps();
+	/* See note above about dumping core */
 	return rc;
 }
 
