@@ -1,4 +1,4 @@
-/* $Id: uids.c,v 1.10 2005/04/21 04:02:46 alan Exp $ */
+/* $Id: uids.c,v 1.11 2005/05/20 06:45:22 sunjd Exp $ */
 #include <portability.h>
 #include <pwd.h>
 #include <sys/types.h>
@@ -72,6 +72,7 @@ drop_privs(uid_t uid, gid_t gid)
 		setegid(curgid);
 		errno = err;
 	}
+	cl_untaint_coredumps();
 	return rc;
 }
 
@@ -97,12 +98,16 @@ return_to_orig_privs()
 int	/* Return to "nobody" level of privs (if any) */
 return_to_dropped_privs(void)
 {
+	int rc;
+
 	if (!anysaveduid) {
 		return 0;
 	}
 	setegid(nobodygid);
 	privileged_state = 0;
-	return seteuid(nobodyuid);
+	rc =  seteuid(nobodyuid);
+	cl_untaint_coredumps();
+	return rc;
 }
 
 /* Return TRUE if we have full privileges at the moment */
