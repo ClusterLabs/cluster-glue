@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.147 2005/05/20 06:43:39 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.148 2005/05/20 13:23:47 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1142,6 +1142,11 @@ init_start ()
  	cl_cdtocoredir();
 	cl_enable_coredumps(TRUE);	
 
+	/* Allow us to always take a "secure" core dump
+	 * We might have STONITH logins and passwords, etc. in our address
+	 * space - so we need to make sure it's only readable by root.
+	 * Calling this function accomplishes that.
+	 */
 	cl_set_all_coredump_signal_handlers();
 	drop_privs(0, 0); /* become "nobody" */
 	
@@ -3165,6 +3170,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.148  2005/05/20 13:23:47  alan
+ * Put some comments into lrmd.c explaining why we need to take secure core dumps.
+ *
  * Revision 1.147  2005/05/20 06:43:39  sunjd
  * Bug 479: fixed with prctl system call
  *
