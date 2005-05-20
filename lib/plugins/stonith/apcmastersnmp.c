@@ -1,4 +1,4 @@
-/* $Id: apcmastersnmp.c,v 1.23 2005/04/27 18:43:11 blaschke Exp $ */
+/* $Id: apcmastersnmp.c,v 1.24 2005/05/20 17:50:32 msoffen Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
@@ -25,6 +25,22 @@
 
 #include "stonith_plugin_common.h"
 #undef FREE	/* defined by snmp stuff */
+
+#ifdef PACKAGE_BUGREPORT
+#undef PACKAGE_BUGREPORT
+#endif
+#ifdef PACKAGE_NAME
+#undef PACKAGE_NAME
+#endif
+#ifdef PACKAGE_STRING
+#undef PACKAGE_STRING
+#endif
+#ifdef PACKAGE_TARNAME
+#undef PACKAGE_TARNAME
+#endif
+#ifdef PACKAGE_VERSION
+#undef PACKAGE_VERSION
+#endif
 
 #ifdef HAVE_NET_SNMP_NET_SNMP_CONFIG_H
 #       include <net-snmp/net-snmp-config.h>
