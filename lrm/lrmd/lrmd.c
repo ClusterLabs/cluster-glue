@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.146 2005/05/19 06:47:12 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.147 2005/05/20 06:43:39 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1142,16 +1142,8 @@ init_start ()
  	cl_cdtocoredir();
 	cl_enable_coredumps(TRUE);	
 
-#ifdef RUN_AS_NOBODY
-	/* I commented this out so that andrew can get a core dump for a
-	 * a current bug - so that it can be fixed.  I tried lots of other
-	 * things, then I read the kernel code.  This is the only way.
-	 * FIXME!!  -- Alan R.
-	 *
-	 * This is now fixable by user code - when we are willing...
-	 */
+	cl_set_all_coredump_signal_handlers();
 	drop_privs(0, 0); /* become "nobody" */
-#endif
 	
 	/*
 	 * Add the signal handler for SIGUSR1, SIGUSR2. 
@@ -3173,6 +3165,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.147  2005/05/20 06:43:39  sunjd
+ * Bug 479: fixed with prctl system call
+ *
  * Revision 1.146  2005/05/19 06:47:12  sunjd
  * Bug 553: add more debug output
  *
