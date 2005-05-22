@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.149 2005/05/20 16:24:52 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.150 2005/05/22 15:18:20 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1117,8 +1117,8 @@ init_start ()
 				   on_connect_cmd, conn_cmd, NULL);
 
 	/*
-	 *Create a waiting connection to accept the callback connect from client
-	*/
+	 * Create a waiting connection to accept the callback connect from client
+	 */
 	conn_cbk_attrs = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(conn_cbk_attrs, path, cbk_path);
 	conn_cbk = ipc_wait_conn_constructor( IPC_ANYTYPE, conn_cbk_attrs);
@@ -1505,6 +1505,11 @@ on_repeat_op_readytorun(gpointer data)
 		op->t_addtolist = time_longclock();
 		rsc->op_list = g_list_append(rsc->op_list, op);
 		if (g_list_length(rsc->op_list) >= 4) {
+			lrmd_log(LOG_ERR
+			,	"%s: Operations list for %s is suspicously"
+			" long [%d]"
+			,	__FUNCTION__, rsc->id
+			,	g_list_length(rsc->op_list));
 			lrmd_rsc_dump(rsc->id, "rsc->op_list: too many ops");
 		}
 	}
@@ -3187,6 +3192,10 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.150  2005/05/22 15:18:20  alan
+ * Put in a change to make long operations lists print out one line
+ * as an ERROR
+ *
  * Revision 1.149  2005/05/20 16:24:52  sunjd
  * Bug 557:LRM performs previously cancelled operation
  *
