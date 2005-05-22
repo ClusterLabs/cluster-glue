@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.40 2005/05/18 17:38:30 alan Exp $ */
+/* $Id: GSource.c,v 1.41 2005/05/22 15:19:13 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -12,6 +12,7 @@
 #include <clplumbing/cl_signal.h>
 #include <clplumbing/GSource.h>
 #include <clplumbing/proctrack.h>
+#include <clplumbing/timers.h>
 
 #define	MAG_GFDSOURCE	0xfeed0001U
 #define	MAG_GCHSOURCE	0xfeed0002U
@@ -929,23 +930,59 @@ G_main_signal_handler(int nsig)
  * Functions to handle child process
  */
 
+#define	WAITALARM	5000L /* milliseconds */
+
+static int	alarm_count = 0;
+static void
+G_main_alarm_helper(int nsig)
+{
+	++alarm_count;
+}
 
 static gboolean
 child_death_dispatch(int sig, gpointer notused)
 {
-	int status;
-	pid_t	pid;
-	const int waitflags = WNOHANG;
+	int 			status;
+	pid_t			pid;
+	const int		waitflags = WNOHANG;
+	struct sigaction	saveaction;
+	int			childcount;
+
+	/*
+	 * wait3(WNOHANG) isn't _supposed_ to hang
+	 * Unfortunately, it seems to do just that on some OSes.
+	 *
+	 * The workaround is to set an alarm.  I don't think for this purpose
+	 * that it matters if siginterrupt(SIGALRM) is set TRUE or FALSE since
+	 * the tiniest little excuse seems to cause the wait3() to finish.
+	 */
 	
+	memset(&saveaction, 0, sizeof(saveaction));
+	cl_signal_set_simple_handler(SIGALRM, G_main_alarm_helper, &saveaction);
+
+	alarm_count = 0;
+	setmsrepeattimer(WAITALARM); /* Might as well be persistent ;-) */
 	while((pid=wait3(&status, waitflags, NULL)) > 0
 	||	errno == EINTR) {
+		cancelmstimer();
 		if (pid > 0) {
+			++childcount;
 			ReportProcHasDied(pid, status);
 		}
+		setmsrepeattimer(WAITALARM); /* Let's be persistent ;-) */
 	}
+	cancelmstimer();
+	cl_signal_set_simple_handler(SIGALRM, saveaction.sa_handler, &saveaction);
+
 	if (pid < 0 && errno != ECHILD) {
 		cl_perror("%s: wait3() failed"
 		,	__FUNCTION__);
+	}
+	if (alarm_count) {
+		cl_log(LOG_ERR
+		,	"%s: wait3() call hung %d times. childcount = %d"
+		,	__FUNCTION__, alarm_count, childcount);
+		alarm_count = 0;
 	}
 	return TRUE;
 }
