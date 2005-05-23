@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.150 2005/05/22 15:18:20 alan Exp $ */
+/* $Id: lrmd.c,v 1.151 2005/05/23 03:49:38 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2209,6 +2209,11 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			rsc->op_list = g_list_append(rsc->op_list, op);
 
 			if (g_list_length(rsc->op_list) >= 4) {
+				lrmd_log(LOG_ERR
+				,	"%s: Operations list for %s is suspicously"
+				" long [%d]"
+				,	__FUNCTION__, rsc->id
+				,	g_list_length(rsc->op_list));
 				lrmd_rsc_dump(rsc->id, "rsc->op_list: too many ops");
 			}
 		}
@@ -3192,6 +3197,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.151  2005/05/23 03:49:38  alan
+ * Added another occurance of the warning about too many ops.
+ *
  * Revision 1.150  2005/05/22 15:18:20  alan
  * Put in a change to make long operations lists print out one line
  * as an ERROR
