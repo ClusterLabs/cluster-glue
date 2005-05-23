@@ -1,4 +1,4 @@
-/* $Id: realtime.h,v 1.7 2005/05/18 18:36:04 alan Exp $ */
+/* $Id: realtime.h,v 1.8 2005/05/23 19:13:52 alan Exp $ */
 #ifndef _CLPLUMBING_REALTIME_H
 #	define _CLPLUMBING_REALTIME_H
 #	include <sched.h>
@@ -17,7 +17,7 @@
  */
 
 void cl_make_realtime
-(	int spolicy,	/* SCHED_RR or SCHED_FIFO */
+(	int spolicy,	/* SCHED_RR or SCHED_FIFO (or SCHED_OTHER) */
 	int priority,	/* typically 1-99 */
 	int stackgrowK,	/* Amount to grow stack by */
 	int heapgrowK	/* Amount to grow heap by */
