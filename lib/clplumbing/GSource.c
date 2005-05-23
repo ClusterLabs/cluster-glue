@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.42 2005/05/23 02:52:36 sunjd Exp $ */
+/* $Id: GSource.c,v 1.43 2005/05/23 03:18:27 sunjd Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -992,7 +992,7 @@ set_sigchld_proctrack(int priority)
 {
 	G_main_add_SignalHandler(priority, SIGCHLD
 	,	child_death_dispatch, NULL, NULL);
-	cl_signal_set_interrupt(SIGCHLD, TRUE);
+	cl_signal_set_interrupt(SIGCHLD, 0);
 	return;
 }
 
