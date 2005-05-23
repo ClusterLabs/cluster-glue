@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.41 2005/05/22 15:19:13 alan Exp $ */
+/* $Id: GSource.c,v 1.42 2005/05/23 02:52:36 sunjd Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -946,7 +946,7 @@ child_death_dispatch(int sig, gpointer notused)
 	pid_t			pid;
 	const int		waitflags = WNOHANG;
 	struct sigaction	saveaction;
-	int			childcount;
+	int			childcount = 0;
 
 	/*
 	 * wait3(WNOHANG) isn't _supposed_ to hang
