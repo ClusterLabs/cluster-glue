@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.44 2005/05/23 03:41:48 alan Exp $ */
+/* $Id: GSource.c,v 1.45 2005/05/23 04:21:14 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -784,34 +784,44 @@ G_main_add_SignalHandler(int priority, int signal,
 	g_source_set_can_recurse(source, FALSE);
 
 	if(G_main_signal_list[signal] != NULL) {
-		cl_log(LOG_ERR,
-		       "G_main_add_SignalHandler: Handler already present for signal %d",
-		       signal);
+		cl_log(LOG_ERR
+		,	"%s: Handler already present for signal %d"
+		,	__FUNCTION__, signal);
 		failed = TRUE;
 	}
 	if(!failed) {
 		sig_src->gsourceid = g_source_attach(source, NULL);
 		if (sig_src->gsourceid < 1) {
-			cl_log(LOG_ERR, "G_main_add_SignalHandler: Could not attach source for signal %d (%d)",
-			       signal, sig_src->gsourceid);
+			cl_log(LOG_ERR
+			,	"%s: Could not attach source for signal %d (%d)"
+			,	__FUNCTION__
+			,	signal, sig_src->gsourceid);
 			failed = TRUE;
 		}
 	}
 	
 	if(failed) {
-		cl_log(LOG_ERR, "G_main_add_SignalHandler: Signal handler for signal %d NOT added",
-			signal);
+		cl_log(LOG_ERR
+		,	"%s: Signal handler for signal %d NOT added"
+		,	__FUNCTION__, signal);
 		g_source_remove(sig_src->gsourceid);
 		g_source_unref(source);
 		source = NULL;
 		sig_src = NULL;
 	} else {
-		cl_log(LOG_INFO, "G_main_add_SignalHandler: Added signal handler for signal %d",
-			signal);
+		cl_log(LOG_INFO
+		, "%s: Added signal handler for signal %d"
+		,	__FUNCTION__, signal);
 		G_main_signal_list[signal] = sig_src;
 		CL_SIGNAL(signal, G_main_signal_handler);
+		/*
+		 * If we don't set this on, then the mainloop poll(2) call
+		 * will never be interrupted by this signal - which sort of
+		 * defeats the whole purpose of a signal handler in a
+		 * mainloop program
+		 */
+		cl_signal_set_interrupt(signal, TRUE);
 	}
-	
 	return sig_src;
 }
 
@@ -992,7 +1002,6 @@ set_sigchld_proctrack(int priority)
 {
 	G_main_add_SignalHandler(priority, SIGCHLD
 	,	child_death_dispatch, NULL, NULL);
-	cl_signal_set_interrupt(SIGCHLD, TRUE);
 	return;
 }
 
