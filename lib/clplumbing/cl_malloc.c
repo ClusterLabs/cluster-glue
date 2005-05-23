@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.16 2005/05/19 16:44:20 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.17 2005/05/23 03:41:48 alan Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -35,6 +35,7 @@ static volatile cl_mem_stats_t *	memstats = &default_memstats;
 #define	MAKE_GUARD	1	/* Adds 'n' bytes memory - cheap in CPU*/
 #define	USE_ASSERTS	1
 #define	DUMPONERR	1
+#undef	RETURN_TO_MALLOC
 
 #ifndef DUMPONERR
 #	define	DUMPIFASKED()	/* nothing */
@@ -373,28 +374,36 @@ cl_free(void *ptr)
 	 * it if it didn't come from one of our lists...
 	 */
 
+#ifndef RETURN_TO_MALLOC
 	if (bucket >= NUMBUCKS) {
+#endif
+#ifdef	MARK_PRISTINE
+		/* Is this size right? */
+		cl_mark_pristine(ptr, bhdr->hdr.reqsize);
+#endif
 		if (memstats) {
 			memstats->nbytes_req   -= bhdr->hdr.reqsize;
 			memstats->nbytes_alloc -= MALLOCSIZE(bhdr->hdr.reqsize);
 			memstats->mallocbytes  -= MALLOCSIZE(bhdr->hdr.reqsize);
 		}
 		free(bhdr);
+#ifndef RETURN_TO_MALLOC
 	}else{
 		int	bucksize = cl_bucket_sizes[bucket];
-#if defined(USE_ASSERTS)
+#if	defined(USE_ASSERTS)
 		g_assert(bhdr->hdr.reqsize <= cl_bucket_sizes[bucket]);
-#endif
+#	endif
 		if (memstats) {
 			memstats->nbytes_req   -= bhdr->hdr.reqsize;
 			memstats->nbytes_alloc -= MALLOCSIZE(bucksize);
 		}
 		bhdr->next = cl_malloc_buckets[bucket];
 		cl_malloc_buckets[bucket] = bhdr;
-#ifdef MARK_PRISTINE
+#ifdef	MARK_PRISTINE
 		cl_mark_pristine(ptr, bucksize);
-#endif
+#	endif
 	}
+#endif /* RETURN_TO_MALLOC */
 	if (memstats) {
 		memstats->numfree++;
 	}
