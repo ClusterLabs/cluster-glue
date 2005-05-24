@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.29 2005/05/11 00:44:56 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.30 2005/05/24 20:11:26 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -227,7 +227,7 @@ ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid)
   int i;
   static int v = 1;
 
-  temp_auth = g_new(struct IPC_AUTH, 1);
+  temp_auth = ha_malloc(sizeof(struct IPC_AUTH));
   temp_auth->uid = g_hash_table_new(g_direct_hash, g_direct_equal);
   temp_auth->gid = g_hash_table_new(g_direct_hash, g_direct_equal);
 
@@ -258,7 +258,7 @@ ipc_destroy_auth(struct IPC_AUTH *auth)
 		if (auth->gid) {
 			g_hash_table_destroy(auth->gid);
 		}
-		g_free((void *)auth);
+		ha_free((void *)auth);
 	}
 }
 
@@ -291,7 +291,7 @@ ipc_bufpool_new(int size)
 		return NULL;
 	}
 	
-	pool = (struct ipc_bufpool*)g_malloc(totalsize+1);
+	pool = (struct ipc_bufpool*)ha_malloc(totalsize+1);
 	memset(pool, 0, totalsize);
 	pool->refcount = 1;
 	pool->startpos = pool->currpos = pool->consumepos =
@@ -319,7 +319,7 @@ ipc_bufpool_del(struct ipc_bufpool* pool)
 	}
 	
 	memset(pool, 0, pool->size);
-	g_free(pool);	
+	ha_free(pool);	
 	return;
 }
 
@@ -355,7 +355,7 @@ ipc_bufpool_msg_done(struct IPC_MESSAGE * msg) {
 	pool = (struct ipc_bufpool*)msg->msg_private;
 	
 	ipc_bufpool_unref(pool);
-	g_free(msg);
+	ha_free(msg);
 	
 }
 
@@ -364,7 +364,7 @@ ipc_bufpool_msg_new(void)
 {
 	struct IPC_MESSAGE * temp_msg;
 	
-	temp_msg = g_malloc(sizeof(struct IPC_MESSAGE));
+	temp_msg = ha_malloc(sizeof(struct IPC_MESSAGE));
 	if (temp_msg == NULL){
 		cl_log(LOG_ERR, "ipc_bufpool_msg_new:"
 		       "allocating new msg failed");
