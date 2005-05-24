@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.152 2005/05/24 20:12:21 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.153 2005/05/24 21:12:11 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -262,11 +262,6 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 						return;
 					}
 #endif
-					cl_log(LOG_WARNING
-					,	"Delayed msg not an HA message"
-					": %ld bytes [%s]"
-					,	(unsigned long)ipcmsg->msg_len
-					,	(char*)ipcmsg->msg_body);
 				}
 				
 			}
