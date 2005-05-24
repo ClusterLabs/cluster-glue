@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.151 2005/05/18 17:32:19 andrew Exp $ */
+/* $Id: ipcsocket.c,v 1.152 2005/05/24 20:12:21 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -227,6 +227,7 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 				       msdiff,
 				       longclockto_ms(GET_ENQUEUE_TIME(ipcmsg)),
 				       ch->farside_pid);			
+
 				hamsg = wirefmt2msg(ipcmsg->msg_body, ipcmsg->msg_len, 0);
 				if (hamsg != NULL){
 					struct ha_msg *crm_data = NULL;
@@ -242,9 +243,10 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 							hamsg, crm_data);
 					}
 					
+#if 0
 					cl_log_message(LOG_DEBUG, hamsg);
+#endif					
 					ha_msg_del(hamsg);
-					
 				} else {
 #if 0
 					if (!cl_is_allocated(ipcmsg)) {
