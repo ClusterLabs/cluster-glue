@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.45 2005/05/23 04:21:14 alan Exp $ */
+/* $Id: GSource.c,v 1.46 2005/05/24 05:44:45 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -971,6 +971,7 @@ child_death_dispatch(int sig, gpointer notused)
 	cl_signal_set_simple_handler(SIGALRM, G_main_alarm_helper, &saveaction);
 
 	alarm_count = 0;
+	cl_signal_set_interrupt(SIGALRM, TRUE);
 	setmsrepeattimer(WAITALARM); /* Might as well be persistent ;-) */
 	while((pid=wait3(&status, waitflags, NULL)) > 0
 	||	errno == EINTR) {
