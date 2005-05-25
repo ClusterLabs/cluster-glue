@@ -530,8 +530,11 @@ logd_make_daemon(gboolean daemonize)
 		exit(LSB_EXIT_OK);
 	}
 	
-	if (daemonize){
+	if (daemonize || !verbose){
 		cl_log_enable_stderr(FALSE);
+	}
+
+	if (daemonize){
 		umask(022);
 		close(FD_STDIN);
 		(void)open(devnull, O_RDONLY);		/* Stdin:  fd 0 */
@@ -836,6 +839,9 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 			cl_direct_log(priority, logmsg->message, logmsg->use_pri_str,
 				      logmsg->entity, logmsg->entity_pid, logmsg->timestamp);
 		
+
+			(void)logd_log;
+/*
 			if (verbose){
 				logd_log("%s[%d]: %s %s\n", 
 					 logmsg->entity[0]=='\0'?
@@ -843,7 +849,8 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 					 logmsg->entity_pid, 
 					 ha_timestamp(logmsg->timestamp),
 					 logmsg->message);
-			}
+				 }
+ */
 			if (ipcmsg->msg_done){
 				ipcmsg->msg_done(ipcmsg);
 			}
@@ -932,6 +939,7 @@ main(int argc, char** argv, char** envp)
 		
 	}
 	
+	set_ipc_time_debug_flag(FALSE);
 	cl_log_set_uselogd(FALSE);
 
 	if (!cfgfile && access(DEFAULT_CFG_FILE, F_OK) == 0) {
