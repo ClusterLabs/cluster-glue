@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.48 2005/05/11 00:44:56 gshi Exp $ */
+/* $Id: ipc.h,v 1.49 2005/05/25 23:31:54 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -704,7 +704,7 @@ enum MSGPOS_IN_IPC{
 
 struct SOCKET_MSG_HEAD{
 	int msg_len;
-	int magic;
+	unsigned int magic;
 #ifdef IPC_TIME_DEBUG
 	longclock_t enqueue_time;
 	longclock_t send_time;
@@ -749,6 +749,7 @@ void	ipc_bufpool_ref(struct ipc_bufpool* pool);
 
 void	ipc_bufpool_unref(struct ipc_bufpool* pool);
 
+void	set_ipc_time_debug_flag(gboolean flag);
 
 #define	IPC_PATH_ATTR		"path"		/* pathname attribute */
 #define	IPC_DOMAIN_SOCKET	"uds"		/* Unix domain socket */
