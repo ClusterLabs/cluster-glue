@@ -38,7 +38,7 @@
 #define EXIT_OK		0
 #define EXIT_FAIL	1
 
-int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
+int LogToDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 void            cl_log(int priority, const char * fmt, ...) G_GNUC_PRINTF(2,3);
 static void
 usage(int argc, char** argv)
@@ -102,7 +102,7 @@ main(int argc, char** argv)
 		return EXIT_FAIL;
 	}
 	
-	if (LogToLoggingDaemon(priority, msg,strlen(msg), FALSE) == HA_OK){
+        if (LogToDaemon(priority, msg,strlen(msg), FALSE) == HA_OK){
 		return EXIT_OK;
 	}else {
 		return EXIT_FAIL;
