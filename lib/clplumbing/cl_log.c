@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.57 2005/05/07 16:26:20 alan Exp $ */
+/* $Id: cl_log.c,v 1.58 2005/05/25 23:34:09 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -46,7 +46,9 @@
 static char	log_entity[MAXENTITY];
 static IPC_Channel*	logging_daemon_chan = NULL;
 
-int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
+int LogToDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
+
+static int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 IPC_Message* ChildLogIPCMessage(int priority, const char *buf, int bstrlen, 
 				gboolean use_priority_str, IPC_Channel* ch);
 void	FreeChildLogIPCMessage(IPC_Message* msg);
@@ -640,6 +642,22 @@ cl_set_logging_wqueue_maxlen(int qlen)
 	}
 }
 
+
+
+int
+LogToDaemon(int priority, const char * buf, 
+	    int bufstrlen, gboolean use_pri_str){
+
+	int rc;
+	
+	cl_log_depth++;
+
+	rc= LogToLoggingDaemon(priority, buf, bufstrlen, use_pri_str);
+	
+	cl_log_depth--;
+	
+	return rc;
+}
 
 static int		drop_msg_num = 0;
 
