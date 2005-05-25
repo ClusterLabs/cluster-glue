@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.153 2005/05/24 21:12:11 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.154 2005/05/25 23:33:12 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -163,8 +163,15 @@ extern int (*ipc_pollfunc_ptr)(struct pollfd *, nfds_t, int);
 
 static int socket_resume_io_read(struct IPC_CHANNEL *ch, int*, gboolean read1anyway);
 static struct IPC_OPS socket_ops;
+static gboolean ipc_time_debug_flag = TRUE;
 
 
+void
+set_ipc_time_debug_flag(gboolean flag)
+{
+	ipc_time_debug_flag = flag;
+	
+}
 
 #ifdef IPC_TIME_DEBUG
 
@@ -194,7 +201,11 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 		"send",
 		"recv",
 		"dequeue"};
-	
+
+	if (ipc_time_debug_flag == FALSE){
+		return ;
+	}
+
 	if (ipcmsg->msg_body == NULL
 	    || ipcmsg->msg_buf == NULL){
 		cl_log(LOG_ERR, "msg_body =%p, msg_bu=%p",
@@ -228,6 +239,8 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 				       longclockto_ms(GET_ENQUEUE_TIME(ipcmsg)),
 				       ch->farside_pid);			
 
+				(void)hamsg;
+#if 0
 				hamsg = wirefmt2msg(ipcmsg->msg_body, ipcmsg->msg_len, 0);
 				if (hamsg != NULL){
 					struct ha_msg *crm_data = NULL;
@@ -243,12 +256,9 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 							hamsg, crm_data);
 					}
 					
-#if 0
 					cl_log_message(LOG_DEBUG, hamsg);
-#endif					
 					ha_msg_del(hamsg);
 				} else {
-#if 0
 					if (!cl_is_allocated(ipcmsg)) {
 						cl_log(LOG_ERR,
 						"IPC msg 0x%lx is unallocated"
@@ -261,8 +271,8 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 						,	(gulong)ipcmsg->msg_body);
 						return;
 					}
-#endif
 				}
+#endif
 				
 			}
 			break;
