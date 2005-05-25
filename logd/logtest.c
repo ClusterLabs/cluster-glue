@@ -37,9 +37,9 @@
 
 #define EXIT_OK		0
 #define EXIT_FAIL	1
-#define MAXMSGSIZE     (1024*3)
+#define MAXMSGSIZE     (1048*4)
 
-int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
+int LogToDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 extern IPC_Channel * get_log_chan(void);
 
 
@@ -75,7 +75,7 @@ send_log_msg(gpointer data)
 	
 	sprintf(msgstring, "Message %d", count++);
 	fprintf(stderr, "sending %s\n", msgstring);
-	if (LogToLoggingDaemon(priority, msgstring,MAXMSGSIZE, FALSE) != HA_OK){			
+	if (LogToDaemon(priority, msgstring,MAXMSGSIZE, FALSE) != HA_OK){			
 		printf("sending out messge %d failed\n", count);
 		dropmsg++;
 	}
