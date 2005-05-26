@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.30 2005/05/24 20:11:26 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.31 2005/05/26 00:03:22 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -262,7 +262,26 @@ ipc_destroy_auth(struct IPC_AUTH *auth)
 	}
 }
 
+static void 
+ipc_bufpool_display(struct ipc_bufpool* pool)
+{
 	
+	if (pool == NULL){
+		cl_log(LOG_ERR, "pool is NULL");		
+		return;
+	}
+
+
+	cl_log(LOG_INFO, "pool: refcount=%d, startpos=%p, currpos=%p,"
+	       "consumepos=%p, endpos=%p, size=%d", 
+	       pool->refcount,
+	       pool->startpos,
+	       pool->currpos,
+	       pool->consumepos,
+	       pool->endpos,
+	       pool->size);
+}
+
 struct ipc_bufpool*
 ipc_bufpool_new(int size)
 {
@@ -377,6 +396,27 @@ ipc_bufpool_msg_new(void)
 }
 
 
+static void
+ipcmsg_display(IPC_Message* ipcmsg)
+{
+	if (ipcmsg){
+		cl_log(LOG_ERR, "ipcmsg is NULL");
+		return;
+	}
+	
+	cl_log(LOG_INFO, "ipcmsg: msg_len=%d, msg_buf=%p, msg_body=%p,"
+	       "msg_done=%p, msg_private=%p, msg_ch=%p",
+	       ipcmsg->msg_len,
+	       ipcmsg->msg_buf, 
+	       ipcmsg->msg_body,
+	       ipcmsg->msg_done,
+	       ipcmsg->msg_private,
+	       ipcmsg->msg_ch);
+	      
+	return;
+	
+}
+
 /* after a recv call, we have new data
  * in the pool buf, we need to update our
  * pool struct to consume it
@@ -412,10 +452,19 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 		memcpy(head, pool->consumepos, sizeof(struct SOCKET_MSG_HEAD));
 		
 		if (head->magic != HEADMAGIC){
+			GList* last = g_list_last(rqueue->queue);
 			cl_log(LOG_ERR, "ipc_bufpool_update: "
 			       "magic number in head does not match."
 			       "Something very bad happened, abort now, farside pid =%d",
 			       ch->farside_pid);
+			cl_log(LOG_ERR, "magic=%x, expected value=%x", head->magic, HEADMAGIC);
+			ipc_bufpool_display(pool);
+			cl_log(LOG_INFO, "nmsgs=%d", nmsgs);
+			/*print out the last message in queue*/
+			if (last){
+				IPC_Message* m = (IPC_Message*)last;
+				ipcmsg_display(m);
+			}
 			abort();
 		}
 
