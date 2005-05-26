@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.31 2005/05/26 00:03:22 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.32 2005/05/26 14:55:11 alan Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -404,9 +404,9 @@ ipcmsg_display(IPC_Message* ipcmsg)
 		return;
 	}
 	
-	cl_log(LOG_INFO, "ipcmsg: msg_len=%d, msg_buf=%p, msg_body=%p,"
+	cl_log(LOG_INFO, "ipcmsg: msg_len=%lu, msg_buf=%p, msg_body=%p,"
 	       "msg_done=%p, msg_private=%p, msg_ch=%p",
-	       ipcmsg->msg_len,
+	       (unsigned long)ipcmsg->msg_len,
 	       ipcmsg->msg_buf, 
 	       ipcmsg->msg_body,
 	       ipcmsg->msg_done,
