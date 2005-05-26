@@ -30,6 +30,7 @@
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <pwd.h>
 #ifdef HAVE_SYS_PRCTL_H
 #	include <sys/prctl.h>
@@ -98,7 +99,41 @@ cl_cdtocoredir(void)
 	return rc;
 }
 
+#define	PROC_SYS_KERNEL	"/proc/sys/kernel/core_uses_pid"
+
 static void cl_coredump_signal_handler(int nsig);
+
+/*
+ *	core_uses_pid():
+ *
+ *	returns {-1, 0, 1}
+ *		-1:	not supported
+ *		 0:	supported and disabled
+ *		 1:	supported and enabled
+ */
+static int
+core_uses_pid(void)
+{
+	const char *	pathnames[] = {PROC_SYS_KERNEL};
+	int		j;
+
+
+	for (j=0; j < DIMOF(pathnames); ++j) {
+		int	fd;
+		char	buf[2];
+		int	rc;
+		if ((fd = open(pathnames[j], O_RDONLY)) < 0) {
+			continue;
+		}
+		rc = read(fd, buf, sizeof(buf));
+		close(fd);
+		if (rc < 1) {
+			continue;
+		}
+		return (buf[0] == '1');
+	}
+	return -1;
+}
 
 /* Enable/disable core dumps for ourselves and our child processes */
 int
@@ -131,6 +166,14 @@ cl_enable_coredumps(int doenable)
 		errno = errsave;
 		return rc;
 	}
+	if (core_uses_pid() == 0) {
+		cl_log(LOG_WARNING
+		,	"Core dumps could be lost if multiple dumps occur");
+		cl_log(LOG_WARNING
+		,	"Consider setting %s (or equivalent) to"
+		" 1 for maximum supportability", PROC_SYS_KERNEL);
+	}
+		
 	return 0;
 }
 
