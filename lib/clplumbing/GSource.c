@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.48 2005/05/27 19:54:15 alan Exp $ */
+/* $Id: GSource.c,v 1.49 2005/05/27 20:03:02 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -989,7 +989,8 @@ child_death_dispatch(int sig, gpointer notused)
 		cl_perror("%s: wait3() failed"
 		,	__FUNCTION__);
 	}
-	if (childcount < 1 && ANYDEBUG) {
+#if defined(DEBUG)
+	if (childcount < 1) {
 		/*
 		 * This happens when we receive a SIGCHLD after we clear
 		 * 'sig_src->signal_triggered' in G_SIG_dispatch() but
@@ -998,6 +999,7 @@ child_death_dispatch(int sig, gpointer notused)
 		cl_log(LOG_DEBUG, "NOTE: %s called without children to wait on"
 		,	__FUNCTION__);
 	}
+#endif
 	if (alarm_count) {
 		cl_log(LOG_ERR
 		,	"%s: wait3() call hung %d times. childcount = %d"
