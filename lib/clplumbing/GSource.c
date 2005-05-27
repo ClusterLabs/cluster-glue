@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.47 2005/05/27 18:03:07 alan Exp $ */
+/* $Id: GSource.c,v 1.48 2005/05/27 19:54:15 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -989,8 +989,13 @@ child_death_dispatch(int sig, gpointer notused)
 		cl_perror("%s: wait3() failed"
 		,	__FUNCTION__);
 	}
-	if (childcount < 1) {
-		cl_log(LOG_ERR, "%s called without children to wait on"
+	if (childcount < 1 && ANYDEBUG) {
+		/*
+		 * This happens when we receive a SIGCHLD after we clear
+		 * 'sig_src->signal_triggered' in G_SIG_dispatch() but
+		 * before the last wait3() call returns no child above.
+		 */
+		cl_log(LOG_DEBUG, "NOTE: %s called without children to wait on"
 		,	__FUNCTION__);
 	}
 	if (alarm_count) {
