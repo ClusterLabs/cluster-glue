@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.46 2005/05/24 05:44:45 alan Exp $ */
+/* $Id: GSource.c,v 1.47 2005/05/27 18:03:07 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -974,7 +974,7 @@ child_death_dispatch(int sig, gpointer notused)
 	cl_signal_set_interrupt(SIGALRM, TRUE);
 	setmsrepeattimer(WAITALARM); /* Might as well be persistent ;-) */
 	while((pid=wait3(&status, waitflags, NULL)) > 0
-	||	errno == EINTR) {
+	||	(pid < 0 && errno == EINTR)) {
 		cancelmstimer();
 		if (pid > 0) {
 			++childcount;
@@ -987,6 +987,10 @@ child_death_dispatch(int sig, gpointer notused)
 
 	if (pid < 0 && errno != ECHILD) {
 		cl_perror("%s: wait3() failed"
+		,	__FUNCTION__);
+	}
+	if (childcount < 1) {
+		cl_log(LOG_ERR, "%s called without children to wait on"
 		,	__FUNCTION__);
 	}
 	if (alarm_count) {
