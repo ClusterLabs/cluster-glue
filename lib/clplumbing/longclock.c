@@ -1,4 +1,4 @@
-/* $Id: longclock.c,v 1.13 2004/08/16 00:02:20 horms Exp $ */
+/* $Id: longclock.c,v 1.14 2005/05/30 09:59:26 sunjd Exp $ */
 /*
  * Longclock operations
  *
@@ -93,7 +93,7 @@ time_longclock(void)
 	}
 
 
-	if (timesval < lasttimes) {
+	if ( ((clock_t) -1 != timesval) && (timesval < lasttimes) ) {
 		++wrapcount;
 		lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
 	}
