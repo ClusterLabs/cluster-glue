@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.152 2005/05/30 08:11:52 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.153 2005/05/31 02:03:52 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -62,6 +62,7 @@
 #define	MAX_PID_LEN 256
 #define	MAX_PROC_NAME 256
 #define	MAX_MSGTYPELEN 32
+#define	MAX_CLASSNAMELEN 32
 #define WARNINGTIME_IN_LIST 5000
 #define OPTARGS		"skrhv"
 #define PID_FILE 	HA_VARRUNDIR"/lrmd.pid"
@@ -1338,7 +1339,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	type = ha_msg_value(msg, F_LRM_TYPE);
 
 	for (i=0; i<DIMOF(msg_maps); i++) {
-		if (0 == strncmp(type, msg_maps[i].msg_type, 80)) {
+		if (0 == strncmp(type, msg_maps[i].msg_type, MAX_MSGTYPELEN)) {
 			int rc;
 
 			strncpy(client->lastrequest, type, sizeof(client->lastrequest));
@@ -2045,7 +2046,7 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	ra_type_exist = FALSE;
 	for(node=g_list_first(ra_class_list); NULL!=node; node=g_list_next(node)){
 		class = (char*)node->data;
-		if (0 == strcmp(class, rsc->class)) {
+		if (0 == strncmp(class, rsc->class, MAX_CLASSNAMELEN)) {
 			ra_type_exist = TRUE;
 			break;
 		}
@@ -3162,7 +3163,10 @@ facility_name_to_value(const char * name)
 {
 	int i;
 	for (i = 0; facilitynames[i].c_name != NULL; i++) {
-		if (strcmp(name, facilitynames[i].c_name) == 0) {
+		/* 32 is big enough here. Don't want to define it as const
+		 * definition for using only once.
+		 */
+		if (strncmp(name, facilitynames[i].c_name, 32) == 0) {
 			return facilitynames[i].c_val;
 		}
 	}
@@ -3197,6 +3201,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.153  2005/05/31 02:03:52  sunjd
+ * remove the using of strcmp
+ *
  * Revision 1.152  2005/05/30 08:11:52  sunjd
  * remove the abuse of STRNCMP_CONST.
  *
