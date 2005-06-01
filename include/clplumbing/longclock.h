@@ -1,4 +1,4 @@
-/* $Id: longclock.h,v 1.7 2004/03/25 08:20:33 alan Exp $ */
+/* $Id: longclock.h,v 1.8 2005/06/01 03:34:32 alan Exp $ */
 /*
  * Longclock operations
  *
@@ -23,6 +23,7 @@
 
 #ifndef _LONGCLOCK_H
 #	define _LONGCLOCK_H
+#	include <ha_config.h>
 /*
  *	A longclock_t object is a lot like a clock_t object, except that it
  *	won't wrap in the lifetime of the earth.  It is guaranteed to be at
@@ -83,31 +84,27 @@
 #	endif
 
 #	include <sys/times.h>
-#	define	time_longclock()			\
-	((longclock_t)times(&longclock_dummy_tms_struct))
 
 	typedef clock_t longclock_t;
 	extern	struct tms	longclock_dummy_tms_struct;
 
 #else /* clock_t isn't at least 64 bits */
-
 	typedef unsigned long long longclock_t;
-	longclock_t	time_longclock(void);
 #endif
+
+longclock_t	time_longclock(void);
 
 extern const longclock_t	zero_longclock;
 
 unsigned	hz_longclock(void);
+longclock_t	secsto_longclock(unsigned long);
 longclock_t	dsecsto_longclock(double);
-
-#ifndef HAVE_LONGCLOCK_ARITHMETIC
-
 longclock_t	msto_longclock(unsigned long);
-
 unsigned long	longclockto_ms(longclock_t);		/* Can overflow! */
 long		longclockto_long(longclock_t);		/* May overflow! */
 
-longclock_t	secsto_longclock(unsigned long);
+
+#ifndef HAVE_LONGCLOCK_ARITHMETIC
 
 longclock_t	add_longclock(longclock_t l, longclock_t r);
 
@@ -119,14 +116,6 @@ int		cmp_longclock(longclock_t l, longclock_t r);
 
 #else /* We HAVE_LONGCLOCK_ARITHMETIC */
 
-#	define	secsto_longclock(l)				\
-	((longclock_t)(l)*hz_longclock())
-
-#	define	msto_longclock(l)				\
-	(secs_to_longclock(l)/1000)
-
-#	define	longclockto_ms(l)				\
-	(unsigned long)(secs_to_longclock(l)/1000)
 #	define	longclockto_long(lc)	((long)(lc))
 
 #	define	add_longclock(l,r)			\
