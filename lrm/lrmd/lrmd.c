@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.154 2005/05/31 11:29:38 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.155 2005/06/01 10:36:57 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2866,7 +2866,7 @@ perform_ra_op(lrmd_op_t* op)
 			/* Name of the resource and some others also
 			 * need to be passed in. Maybe pass through the
 			 * entire lrm_op_t too? */
-			lrmd_log(LOG_DEBUG
+			lrmd_log2(LOG_DEBUG
 			,	"perform_ra_op:call RA plugin to perform %s, pid: [%d]"
 			,	op_info(op), getpid());		
 			RAExec->execra (rsc->id,
@@ -2913,7 +2913,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		dump_data_for_debug();
 		return;
 	}
-	lrmd_log(LOG_DEBUG
+	lrmd_log2(LOG_DEBUG
 	, "on_ra_proc_finished: process [%d],exitcode %d, with signo %d, %s"
 	, p->pid, exitcode, signo, op_info(op));		
 
@@ -3229,6 +3229,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.155  2005/06/01 10:36:57  sunjd
+ * log tweak
+ *
  * Revision 1.154  2005/05/31 11:29:38  sunjd
  * Bug 495:log tweak; other little polish
  *
