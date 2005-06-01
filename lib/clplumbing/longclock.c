@@ -1,4 +1,4 @@
-/* $Id: longclock.c,v 1.14 2005/05/30 09:59:26 sunjd Exp $ */
+/* $Id: longclock.c,v 1.15 2005/06/01 03:34:32 alan Exp $ */
 /*
  * Longclock operations
  *
@@ -36,7 +36,7 @@ static	unsigned 	Hz = 0;
 static	longclock_t 	Lc_Hz;
 static	double		d_Hz;
 
-#define	WRAPSHIFT	32
+#define	WRAPSHIFT	(8*sizeof(clock_t))
 
 const longclock_t	zero_longclock = 0UL;
 
@@ -67,12 +67,13 @@ hz_longclock(void)
 	return Hz;
 }
 
+static struct tms	longclock_dummy_tms_struct;
 #ifdef CLOCK_T_IS_LONG_ENOUGH
-
 longclock_t
 time_longclock(void)
 {
-	struct tms	longclock_dummy_tms_struct;
+
+	/* See note below about deliberately ignoring errors... */
 	return (longclock_t)times(&longclock_dummy_tms_struct);
 }
 
@@ -81,11 +82,20 @@ time_longclock(void)
 longclock_t
 time_longclock(void)
 {
-	struct tms	longclock_dummy_tms_struct;
-	unsigned long	timesval;
+	unsigned long		timesval;
 	
 	
-	/* times really returns an unsigned value ... */
+	/*
+	 * times(2) really returns an unsigned value ...
+	 *
+	 * We don't check to see if we got back the error value (-1), because
+	 * the only possibility for an error would be if the address of 
+	 * longclock_dummy_tms_struct was invalid.  Since it's a compiler-generated
+	 * address, we assume that errors are impossible.  And, unfortunately, it is
+	 * theoretically possible for the correct return from times(2) to be exactly
+	 * (clock_t)-1.  Sigh...
+	 *
+	 */
 	timesval = (unsigned long) times(&longclock_dummy_tms_struct);
 
 	if (!lasttimes) {
@@ -93,7 +103,7 @@ time_longclock(void)
 	}
 
 
-	if ( ((clock_t) -1 != timesval) && (timesval < lasttimes) ) {
+	if (timesval < lasttimes)  {
 		++wrapcount;
 		lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
 	}
@@ -152,6 +162,7 @@ longclockto_ms(longclock_t t)
 	}
 	return (unsigned long) ((t*1000UL)/Lc_Hz);
 }
+#ifndef CLOCK_T_IS_LONG_ENOUGH
 long
 longclockto_long(longclock_t t)
 {
@@ -181,3 +192,4 @@ cmp_longclock(longclock_t l, longclock_t r)
 	}
 	return 0;
 }
+#endif /* CLOCK_T_IS_LONG_ENOUGH */
