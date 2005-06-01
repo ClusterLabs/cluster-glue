@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.23 2005/05/30 08:16:58 sunjd Exp $ */
+/* $Id: lrm_msg.c,v 1.24 2005/06/01 09:37:16 sunjd Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -31,6 +31,8 @@
 #include <heartbeat.h>
 #include <lrm/lrm_api.h>
 #include <lrm/lrm_msg.h>
+#define LOG_BASIC_ERROR(apiname)	\
+	cl_log(LOG_ERR, "%s(%d): %s failed.", __FUNCTION__, __LINE__, apiname)
 
 const lrm_op_t	lrm_zero_op; /* Default initialized to zeros */
 
@@ -112,7 +114,7 @@ create_lrm_msg (const char* msg)
 	ret = ha_msg_new(1);
 	if (HA_OK != ha_msg_add(ret, F_LRM_TYPE, msg)) {
 		ha_msg_del(ret);
-		cl_log(LOG_ERR, "ha_msg_add in create_lrm_msg failed");
+		LOG_BASIC_ERROR("ha_msg_add");
 		return NULL;
 	}
 
@@ -135,7 +137,7 @@ create_lrm_reg_msg(const char* app_name)
 	|| HA_OK != ha_msg_add_int(ret, F_LRM_GID, getegid())
 	|| HA_OK != ha_msg_add_int(ret, F_LRM_UID, getuid())) {
 		ha_msg_del(ret);
-		cl_log(LOG_ERR, "ha_msg_add in create_lrm_reg_msg failed");
+		LOG_BASIC_ERROR("ha_msg_add");
 		return NULL;
 	}
 	
@@ -157,15 +159,14 @@ create_lrm_addrsc_msg(const char* rid, const char* class, const char* type,
 	|| HA_OK != ha_msg_add(msg, F_LRM_RCLASS, class)
 	|| HA_OK != ha_msg_add(msg, F_LRM_RTYPE, type)) {
 		ha_msg_del(msg);
-		cl_log(LOG_ERR, "ha_msg_add in create_lrm_addrsc_msg failed");
+		LOG_BASIC_ERROR("ha_msg_add");
 		return NULL;
 	}
 		
 	if( provider ) {
 		if (HA_OK != ha_msg_add(msg, F_LRM_RPROVIDER, provider)) {
 			ha_msg_del(msg);
-			cl_log(LOG_ERR,
-			"ha_msg_add in create_lrm_addrsc_msg failed");
+			LOG_BASIC_ERROR("ha_msg_add");
 			return NULL;
 		}
 	}
@@ -173,8 +174,7 @@ create_lrm_addrsc_msg(const char* rid, const char* class, const char* type,
 	if ( params ) {
 		if (HA_OK != ha_msg_add_str_table(msg,F_LRM_PARAM,params)) {
 			ha_msg_del(msg);
-			cl_log(LOG_ERR,
-			"ha_msg_add_str_table in create_lrm_addrsc_msg failed");
+			LOG_BASIC_ERROR("ha_msg_add");
 			return NULL;
 		}
 	}
@@ -194,7 +194,7 @@ create_lrm_rsc_msg(const char* rid, const char* msg)
 	if(HA_OK != ha_msg_add(ret, F_LRM_TYPE, msg)
 	|| HA_OK != ha_msg_add(ret, F_LRM_RID, rid)) {
 		ha_msg_del(ret);
-		cl_log(LOG_ERR, "ha_msg_add in create_lrm_rsc_msg failed");
+		LOG_BASIC_ERROR("ha_msg_add");
 		return NULL;
 	}
 	return ret;
@@ -209,7 +209,7 @@ create_lrm_ret(int rc, int fields)
 	if(HA_OK != ha_msg_add(ret, F_LRM_TYPE, RETURN)
 	|| HA_OK != ha_msg_add_int(ret, F_LRM_RC, rc)) {
 		ha_msg_del(ret);
-		cl_log(LOG_ERR, "ha_msg_add in create_lrm_ret failed");
+		LOG_BASIC_ERROR("ha_msg_add");
 		return NULL;
 	}
 	return ret;
@@ -217,6 +217,9 @@ create_lrm_ret(int rc, int fields)
 
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.24  2005/06/01 09:37:16  sunjd
+ * Bug 495: log message tweak
+ *
  * Revision 1.23  2005/05/30 08:16:58  sunjd
  * fix the mis-use of STRLEN_CONST
  *
