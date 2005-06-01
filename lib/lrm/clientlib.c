@@ -642,7 +642,7 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	lrm_rsc_t* rsc     = NULL;
 
 	/* check whether the rsc_id is available */
-	if (RID_LEN <= strlen(rsc_id))	{
+	if (strlen(rsc_id) >= RID_LEN)	{
 		cl_log(LOG_ERR, "lrm_get_rsc: rsc_id is too long.");
 		return NULL;
 	}
