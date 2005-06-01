@@ -4,3 +4,4 @@ ha_logd
 ha_logger
 .libs
 .deps
+logtest
