@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.32 2005/05/26 14:55:11 alan Exp $ */
+/* $Id: ocf_ipc.c,v 1.33 2005/06/02 15:54:50 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -165,11 +165,9 @@ make_id_table(const char * list, int listlen, int (*map)(const char *, int))
 
 
 struct IPC_AUTH*
-ipc_str_to_auth(const char* uidlist, const char* gidlist)
+ipc_str_to_auth(const char* uidlist, int uidlen, const char* gidlist, int gidlen)
 {
 	struct IPC_AUTH* auth;
-	int uidlen;
-	int gidlen;
 	
 	auth = ha_malloc(sizeof(struct IPC_AUTH));
 	if (auth == NULL) {
@@ -180,7 +178,6 @@ ipc_str_to_auth(const char* uidlist, const char* gidlist)
 	memset(auth, 0, sizeof(*auth));
 	
 	if (uidlist) {
-		uidlen = strlen(uidlist);
 		auth->uid = make_id_table(uidlist, uidlen, unametonum);
 		if (auth->uid == NULL) {
 			cl_log(LOG_ERR,
@@ -190,7 +187,6 @@ ipc_str_to_auth(const char* uidlist, const char* gidlist)
 		}
 	}
 	if (gidlist) {
-		gidlen= strlen(gidlist);
 		auth->gid = make_id_table(gidlist, gidlen, gnametonum);
 		if (auth->gid == NULL) {
 			cl_log(LOG_ERR ,
