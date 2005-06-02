@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.156 2005/06/02 01:07:33 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.157 2005/06/02 06:35:57 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -858,8 +858,8 @@ main(int argc, char ** argv)
 	}
 
 	inherit_debuglevel = getenv(HADEBUGVAL);
-	if (inherit_debuglevel != NULL &&  atoi(inherit_debuglevel) != 0 ) {
-		debug_level++;
+	if (inherit_debuglevel != NULL) {
+		debug_level = atoi(inherit_debuglevel) % 2;
 	}
 
 	cl_log_set_entity(lrm_system_name);
@@ -3215,6 +3215,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.157  2005/06/02 06:35:57  sunjd
+ * use the accurate loglevel from the environment variable
+ *
  * Revision 1.156  2005/06/02 01:07:33  zhenh
  * 1. improve some names of internal functions.
  * 2. remove the useless "unregister" message.
