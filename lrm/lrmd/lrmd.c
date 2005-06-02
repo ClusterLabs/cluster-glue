@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.158 2005/06/02 07:28:52 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.159 2005/06/02 07:49:54 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3180,10 +3180,7 @@ facility_name_to_value(const char * name)
 {
 	int i;
 	for (i = 0; facilitynames[i].c_name != NULL; i++) {
-		/* 32 is big enough here. Don't want to define it as const
-		 * definition for using only once.
-		 */
-		if (strncmp(name, facilitynames[i].c_name, 32) == 0) {
+		if (STRNCMP_CONST(name, facilitynames[i].c_name) == 0) {
 			return facilitynames[i].c_val;
 		}
 	}
@@ -3218,6 +3215,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.159  2005/06/02 07:49:54  sunjd
+ * for a const char array, use STRNCMP_CONST instead
+ *
  * Revision 1.158  2005/06/02 07:28:52  sunjd
  * donnot use mod op, let the loglevel reflects what the user really want
  *
