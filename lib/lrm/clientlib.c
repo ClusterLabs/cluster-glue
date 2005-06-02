@@ -61,11 +61,11 @@
 
 #ifndef EXTRA_LOGGING
 	/* Don't generate spurious failure messages... */
-#	define LOG_GOT_FAIL_RC(msg_type) /* Nothing */
+#	define LOG_GOT_FAIL_RET(msg_type) /* Nothing */
 #else
-#	define LOG_GOT_FAIL_RC(msg_type)					\
+#	define LOG_GOT_FAIL_RET(msg_type)					\
 	{cl_log(LOG_DEBUG, "%s(%d): got a return code HA_FAIL from "	\
-		"a reply message of %s with function get_rc_from_msg."	\
+		"a reply message of %s with function get_ret_from_msg."	\
 	,	__FUNCTION__, __LINE__, msg_type);			\
 	}
 #endif
@@ -149,8 +149,8 @@ static IPC_Channel* ch_cbk 				= NULL;
 static lrm_op_done_callback_t	op_done_callback 	= NULL;
 
 /* define some utility functions*/
-static int get_rc_from_ch(IPC_Channel* ch);
-static int get_rc_from_msg(struct ha_msg* msg);
+static int get_ret_from_ch(IPC_Channel* ch);
+static int get_ret_from_msg(struct ha_msg* msg);
 static struct ha_msg* op_to_msg (lrm_op_t* op);
 static lrm_op_t* msg_to_op(struct ha_msg* msg);
 static void free_op (lrm_op_t* op);
@@ -239,7 +239,7 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 		return HA_FAIL;
 	}
 	/* parse the return msg*/
-	if (HA_OK != get_rc_from_ch(ch_cmd)) {
+	if (HA_OK != get_ret_from_ch(ch_cmd)) {
 		ha_msg_del(msg);
 		lrm_signoff(lrm);
 		LOG_FAIL_receive_reply(REGISTER);
@@ -276,7 +276,7 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 	}
 	ha_msg_del(msg);
 	/* parse the return msg*/
-	if (HA_OK != get_rc_from_ch(ch_cbk)) {
+	if (HA_OK != get_ret_from_ch(ch_cbk)) {
 		lrm_signoff(lrm);
 		cl_log(LOG_ERR, "lrm_signon: can not receive the reply message "
 			"from lrmd via callback channel.");
@@ -290,36 +290,6 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 static int
 lrm_signoff (ll_lrm_t* lrm)
 {
-	int ret = HA_OK;
-	struct ha_msg* msg = NULL;
-
-	/* construct the unreg msg*/
-	if ( NULL == ch_cmd ) {
-		cl_log(LOG_ERR,"lrm_signoff: ch_cmd is NULL");
-		ret = HA_FAIL;
-	}
-	else
-	if ( NULL == (msg = create_lrm_msg(UNREGISTER))) {
-		LOG_FAIL_create_lrm_msg(UNREGISTER);
-		ret = HA_FAIL;
-	}
-	else
-	/* send the msg*/
-	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
-		LOG_FAIL_SEND_MSG(UNREGISTER, "ch_cmd");
-		ret = HA_FAIL;
-	}
-	else
-	/* parse the return msg*/
-	if (HA_OK != get_rc_from_ch(ch_cmd)) {
-		LOG_FAIL_receive_reply(UNREGISTER);
-		ret = HA_FAIL;
-	}
-
-	if( NULL != msg ) {
-		ha_msg_del(msg);
-	}
-
 	/* close channels */
 	if (NULL != ch_cmd) {
  		ch_cmd->ops->destroy(ch_cmd);
@@ -331,7 +301,7 @@ lrm_signoff (ll_lrm_t* lrm)
 	}
 	is_signed_on = FALSE;
 
-	return ret;
+	return HA_OK;
 }
 
 static int
@@ -390,9 +360,9 @@ lrm_get_rsc_class_supported (ll_lrm_t* lrm)
 		LOG_FAIL_receive_reply(GETRSCCLASSES);
 		return NULL;
 	}
-	/* get the rc of the message */
-	if (HA_OK != get_rc_from_msg(ret)) {
-		LOG_GOT_FAIL_RC(GETRSCCLASSES);
+	/* get the return code of the message */
+	if (HA_OK != get_ret_from_msg(ret)) {
+		LOG_GOT_FAIL_RET(GETRSCCLASSES);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -442,9 +412,9 @@ lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rclass)
 		LOG_FAIL_receive_reply(GETRSCTYPES);
 		return NULL;
 	}
-	/* get the rc of the message */
-	if (HA_OK != get_rc_from_msg(ret)) {
-		LOG_GOT_FAIL_RC(GETRSCTYPES);
+	/* get the return code of the message */
+	if (HA_OK != get_ret_from_msg(ret)) {
+		LOG_GOT_FAIL_RET(GETRSCTYPES);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -494,9 +464,9 @@ lrm_get_rsc_provider_supported (ll_lrm_t* lrm, const char* class, const char* ty
 		LOG_FAIL_receive_reply(GETPROVIDERS);
 		return NULL;
 	}
-	/* get the rc of the message */
-	if (HA_OK != get_rc_from_msg(ret)) {
-		LOG_GOT_FAIL_RC(GETPROVIDERS);
+	/* get the return code of the message */
+	if (HA_OK != get_ret_from_msg(ret)) {
+		LOG_GOT_FAIL_RET(GETPROVIDERS);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -585,9 +555,9 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype,
 		LOG_FAIL_receive_reply(GETRSCMETA);
 		return NULL;
 	}
-	/* get the rc of the message */
-	if (HA_OK != get_rc_from_msg(ret)) {
-		LOG_GOT_FAIL_RC(GETRSCMETA);
+	/* get the return code of the message */
+	if (HA_OK != get_ret_from_msg(ret)) {
+		LOG_GOT_FAIL_RET(GETRSCMETA);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -633,9 +603,9 @@ lrm_get_all_rscs (ll_lrm_t* lrm)
 		LOG_FAIL_receive_reply(GETALLRCSES);
 		return NULL;
 	}
-	/* get the rc of msg */
-	if (HA_OK != get_rc_from_msg(ret)) {
-		LOG_GOT_FAIL_RC(GETALLRCSES);
+	/* get the return code of msg */
+	if (HA_OK != get_ret_from_msg(ret)) {
+		LOG_GOT_FAIL_RET(GETALLRCSES);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -685,9 +655,9 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 		LOG_FAIL_receive_reply(GETRSC);
 		return NULL;
 	}
-	/* get the rc of return message */
-	if (HA_OK != get_rc_from_msg(ret)) {
-		LOG_GOT_FAIL_RC(GETRSC);
+	/* get the return code of return message */
+	if (HA_OK != get_ret_from_msg(ret)) {
+		LOG_GOT_FAIL_RET(GETRSC);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -741,8 +711,8 @@ lrm_add_rsc (ll_lrm_t* lrm, const char* rsc_id, const char* class
 	}
 	ha_msg_del(msg);
 	/* check the result */
-	if (HA_OK != get_rc_from_ch(ch_cmd)) {
-		LOG_GOT_FAIL_RC(ADDRSC);
+	if (HA_OK != get_ret_from_ch(ch_cmd)) {
+		LOG_GOT_FAIL_RET(ADDRSC);
 		return HA_FAIL;
 	}
 
@@ -780,8 +750,8 @@ lrm_delete_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	}
 	ha_msg_del(msg);
 	/* check the response of the msg */
-	if (HA_OK != get_rc_from_ch(ch_cmd)) {
-		LOG_GOT_FAIL_RC(DELRSC);
+	if (HA_OK != get_ret_from_ch(ch_cmd)) {
+		LOG_GOT_FAIL_RET(DELRSC);
 		return HA_FAIL;
 	}
 
@@ -886,7 +856,7 @@ rsc_perform_op (lrm_rsc_t* rsc, lrm_op_t* op)
 	ha_msg_del(msg);
 
 	/* check return code, the return code is the call_id of the op */
-	rc = get_rc_from_ch(ch_cmd);
+	rc = get_ret_from_ch(ch_cmd);
 	op->rsc_id = NULL;
 	return rc;
 }
@@ -927,7 +897,7 @@ rsc_cancel_op (lrm_rsc_t* rsc, int call_id)
 	}
 	ha_msg_del(msg);
 
-	rc = get_rc_from_ch(ch_cmd);
+	rc = get_ret_from_ch(ch_cmd);
 
 	return rc;
 }
@@ -962,7 +932,7 @@ rsc_flush_ops (lrm_rsc_t* rsc)
 	}
 	ha_msg_del(msg);
 
-	rc = get_rc_from_ch(ch_cmd);
+	rc = get_ret_from_ch(ch_cmd);
 
 	return rc>0?HA_OK:HA_FAIL;
 }
@@ -1276,9 +1246,9 @@ op_to_msg (lrm_op_t* op)
 }
 
 static int
-get_rc_from_ch(IPC_Channel* ch)
+get_ret_from_ch(IPC_Channel* ch)
 {
-	int rc;
+	int ret;
 	struct ha_msg* msg;
 
 	msg = msgfromIPC(ch, MSG_ALLOWINTR);
@@ -1289,30 +1259,30 @@ get_rc_from_ch(IPC_Channel* ch)
 		, __FUNCTION__, __LINE__);
 		return HA_FAIL;
 	}
-	if (HA_OK != ha_msg_value_int(msg, F_LRM_RC, &rc)) {
-		LOG_FAIL_GET_MSG_FIELD(F_LRM_RC, msg);
+	if (HA_OK != ha_msg_value_int(msg, F_LRM_RET, &ret)) {
+		LOG_FAIL_GET_MSG_FIELD(F_LRM_RET, msg);
 		ha_msg_del(msg);
 		return HA_FAIL;
 	}
 	ha_msg_del(msg);
-	return rc;
+	return ret;
 }
 
 static int
-get_rc_from_msg(struct ha_msg* msg)
+get_ret_from_msg(struct ha_msg* msg)
 {
-	int rc;
+	int ret;
 
 	if (NULL == msg) {
 		cl_log(LOG_ERR, "%s(%d): the parameter is a NULL pointer."
 		,	__FUNCTION__, __LINE__);
 		return HA_FAIL;
 	}
-	if (HA_OK != ha_msg_value_int(msg, F_LRM_RC, &rc)) {
-		LOG_FAIL_GET_MSG_FIELD(F_LRM_RC, msg);
+	if (HA_OK != ha_msg_value_int(msg, F_LRM_RET, &ret)) {
+		LOG_FAIL_GET_MSG_FIELD(F_LRM_RET, msg);
 		return HA_FAIL;
 	}
-	return rc;
+	return ret;
 }
 static void
 free_op (lrm_op_t* op)

@@ -55,6 +55,7 @@
 #define F_LRM_OPCNT		"lrm_opcount"
 #define F_LRM_OPSTATUS		"lrm_opstatus"
 #define F_LRM_RC		"lrm_rc"
+#define F_LRM_RET		"lrm_ret"
 #define F_LRM_CALLID		"lrm_callid"
 #define F_LRM_RCOUNT		"lrm_rcount"
 #define F_LRM_RIDS		"lrm_rids"
@@ -73,7 +74,6 @@
 
 /*define the message typs between lrmd and client lib*/
 #define REGISTER		"reg"
-#define UNREGISTER		"unreg"
 #define GETRSCCLASSES		"rclasses"
 #define GETRSCTYPES		"rtypes"
 #define GETPROVIDERS		"rproviders"

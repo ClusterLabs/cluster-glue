@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.24 2005/06/01 09:37:16 sunjd Exp $ */
+/* $Id: lrm_msg.c,v 1.25 2005/06/02 01:07:33 zhenh Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -203,20 +203,24 @@ create_lrm_rsc_msg(const char* rid, const char* msg)
 
 
 struct ha_msg*
-create_lrm_ret(int rc, int fields)
+create_lrm_ret(int ret, int fields)
 {
-	struct ha_msg* ret = ha_msg_new(fields);
-	if(HA_OK != ha_msg_add(ret, F_LRM_TYPE, RETURN)
-	|| HA_OK != ha_msg_add_int(ret, F_LRM_RC, rc)) {
-		ha_msg_del(ret);
+	struct ha_msg* msg = ha_msg_new(fields);
+	if(HA_OK != ha_msg_add(msg, F_LRM_TYPE, RETURN)
+	|| HA_OK != ha_msg_add_int(msg, F_LRM_RET, ret)) {
+		ha_msg_del(msg);
 		LOG_BASIC_ERROR("ha_msg_add");
 		return NULL;
 	}
-	return ret;
+	return msg;
 }
 
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.25  2005/06/02 01:07:33  zhenh
+ * 1. improve some names of internal functions.
+ * 2. remove the useless "unregister" message.
+ *
  * Revision 1.24  2005/06/01 09:37:16  sunjd
  * Bug 495: log message tweak
  *

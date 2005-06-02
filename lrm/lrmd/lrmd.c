@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.155 2005/06/01 10:36:57 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.156 2005/06/02 01:07:33 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -105,7 +105,7 @@ static	gboolean	in_alloc_dump = FALSE;
 	}
 
 #define CHECK_RETURN_OF_CREATE_LRM_RET					\
-	if (NULL == ret) {						\
+	if (NULL == msg) {						\
 		lrmd_log(LOG_ERR					\
 		, 	"%s: can not create a ret message with create_lrm_ret."	\
 		, 	__FUNCTION__);					\
@@ -223,7 +223,6 @@ static gboolean on_repeat_op_readytorun(gpointer data);
 static void on_remove_client(gpointer user_data);
 
 /* message handlers */
-static int on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_register(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg);
@@ -247,7 +246,7 @@ static int perform_op(lrmd_rsc_t* rsc);
 static int unregister_client(lrmd_client_t* client);
 static int on_op_done(lrmd_op_t* op);
 static const char* op_info(const lrmd_op_t* op);
-static int send_rc_msg ( IPC_Channel* ch, int rc);
+static int send_ret_msg ( IPC_Channel* ch, int rc);
 static lrmd_client_t* lookup_client (pid_t pid);
 static lrmd_rsc_t* lookup_rsc (const char* rid);
 static lrmd_rsc_t* lookup_rsc_by_msg (struct ha_msg* msg);
@@ -284,12 +283,11 @@ typedef int (*msg_handler)(lrmd_client_t* client, struct ha_msg* msg);
 struct msg_map
 {
 	const char* 	msg_type;
-	gboolean	need_return_rc;
+	gboolean	need_return_ret;
 	msg_handler	handler;
 };
 
 struct msg_map msg_maps[] = {
-	{UNREGISTER,	TRUE,	on_msg_unregister},
 	{REGISTER,	TRUE,	on_msg_register},
 	{GETRSCCLASSES,	FALSE,	on_msg_get_rsc_classes},
 	{GETRSCTYPES,	FALSE,	on_msg_get_rsc_types},
@@ -1280,7 +1278,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 		lrmd_log(LOG_ERR, "on_connect_cbk: received a message which is "
 			 "not known by lrmd.");
 		ha_msg_del(msg);
-		send_rc_msg(ch, HA_FAIL);
+		send_ret_msg(ch, HA_FAIL);
 		return TRUE;
 	}
 
@@ -1289,7 +1287,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 		lrmd_log(LOG_ERR, "on_connect_cbk: can not get pid from the "
 			 "message.");
 		ha_msg_del(msg);
-		send_rc_msg(ch, HA_FAIL);
+		send_ret_msg(ch, HA_FAIL);
 		return TRUE;
 	}
 	ha_msg_del(msg);
@@ -1299,7 +1297,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 	if (NULL == client) {
 		lrmd_log(LOG_ERR, "on_connect_cbk: donnot find the client "
 			"[pid:%d] in internal client list. ", pid);
-		send_rc_msg(ch, HA_FAIL);
+		send_ret_msg(ch, HA_FAIL);
 		return TRUE;
 	}
 	if (client->ch_cbk != NULL) {
@@ -1311,7 +1309,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 
 	/*fill the channel of callback field*/
 	client->ch_cbk = ch;
-	send_rc_msg(ch, HA_OK);
+	send_ret_msg(ch, HA_OK);
 	return TRUE;
 }
 
@@ -1347,7 +1345,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	}
 	
 	if (TRUE == shutdown_in_progress ) {
-		send_rc_msg(ch,HA_FAIL);
+		send_ret_msg(ch,HA_FAIL);
 		ha_msg_del(msg);
 		lrmd_log(LOG_DEBUG, "on_receive_cmd: return HA_FAIL because"\
 			 " lrmd is in shutdown.");
@@ -1359,17 +1357,17 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 
 	for (i=0; i<DIMOF(msg_maps); i++) {
 		if (0 == strncmp(type, msg_maps[i].msg_type, MAX_MSGTYPELEN)) {
-			int rc;
+			int ret;
 
 			strncpy(client->lastrequest, type, sizeof(client->lastrequest));
 			client->lastreqstart = time(NULL);
 			/*call the handler of the message*/
-			rc = msg_maps[i].handler(client, msg);
+			ret = msg_maps[i].handler(client, msg);
 			client->lastreqend = time(NULL);
 
 			/*return rc to client if need*/
-			if (msg_maps[i].need_return_rc) {
-				send_rc_msg(ch, rc);
+			if (msg_maps[i].need_return_ret) {
+				send_ret_msg(ch, ret);
 				client->lastrcsent = time(NULL);
 			}
 			break;
@@ -1592,18 +1590,6 @@ on_msg_register(lrmd_client_t* client, struct ha_msg* msg)
 	,	client->app_name
 	,	client->pid);
 	
-	return HA_OK;
-}
-
-int
-on_msg_unregister(lrmd_client_t* client, struct ha_msg* msg)
-{
-	/*
-	 * All the work is now done on socket close.
-	 * The unregister function is useful, but the message
-	 * sent to us here doesn't do anything useful
-	 */
-
 	return HA_OK;
 }
 
@@ -2306,7 +2292,7 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	if (NULL == rsc) {
 		lrmd_log(LOG_ERR, "on_msg_get_state: no resource with id %s."
 		,	lrmd_nullcheck(id));
-		send_rc_msg(client->ch_cmd, HA_FAIL);
+		send_ret_msg(client->ch_cmd, HA_FAIL);
 		return HA_FAIL;
 	}
 	
@@ -3033,17 +3019,17 @@ on_ra_proc_query_name(ProcTrack* p)
 
 /* /////////////////Util Functions////////////////////////////////////////////// */
 int
-send_rc_msg (IPC_Channel* ch, int rc)
+send_ret_msg (IPC_Channel* ch, int ret)
 {
-	struct ha_msg* ret = NULL;
+	struct ha_msg* msg = NULL;
 
-	ret = create_lrm_ret(rc, 1);
+	msg = create_lrm_ret(ret, 1);
 	CHECK_RETURN_OF_CREATE_LRM_RET
 
-	if (HA_OK != msg2ipcchan(ret, ch)) {
-		lrmd_log(LOG_ERR, "send_rc_msg: can not send the ret msg");
+	if (HA_OK != msg2ipcchan(msg, ch)) {
+		lrmd_log(LOG_ERR, "send_ret_msg: can not send the ret msg");
 	}
-	ha_msg_del(ret);
+	ha_msg_del(msg);
 	return HA_OK;
 }
 
@@ -3229,6 +3215,10 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.156  2005/06/02 01:07:33  zhenh
+ * 1. improve some names of internal functions.
+ * 2. remove the useless "unregister" message.
+ *
  * Revision 1.155  2005/06/01 10:36:57  sunjd
  * log tweak
  *
