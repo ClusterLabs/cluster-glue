@@ -34,8 +34,6 @@
 
 #include <lrm/lrm_msg.h>
 
-#undef EXTRA_LOGGING
-
 /* FIXME: Notice: this define should be replaced when merge to the whole pkg*/
 #define	LRM_MAXPIDLEN 	256
 #define LRM_ID		"lrm"
@@ -59,24 +57,17 @@
 		"via %s channel."					\
 	,	__FUNCTION__, __LINE__, msg_type, chan_name)
 
-#ifndef EXTRA_LOGGING
-	/* Don't generate spurious failure messages... */
-#	define LOG_GOT_FAIL_RET(msg_type) /* Nothing */
-#else
-#	define LOG_GOT_FAIL_RET(msg_type)					\
-	{cl_log(LOG_DEBUG, "%s(%d): got a return code HA_FAIL from "	\
+#define LOG_GOT_FAIL_RET(priority, msg_type)				\
+	cl_log(priority, "%s(%d): got a return code HA_FAIL from "	\
 		"a reply message of %s with function get_ret_from_msg."	\
-	,	__FUNCTION__, __LINE__, msg_type);			\
-	}
-#endif
-
+	,	__FUNCTION__, __LINE__, msg_type)
 
 #define LOG_BASIC_ERROR(apiname)			\
 	cl_log(LOG_ERR, "%s(%d): %s failed."		\
 	, __FUNCTION__, __LINE__, apiname)
 
-#define LOG_FAIL_GET_MSG_FIELD(field_name, msg)				\
-		{cl_log(LOG_ERR, "%s(%d): failed to get the value "	\
+#define LOG_FAIL_GET_MSG_FIELD(priority, field_name, msg)		\
+		{cl_log(priority, "%s(%d): failed to get the value "	\
 			"of field %s from a ha_msg"			\
 		,	__FUNCTION__, __LINE__, field_name);		\
 		cl_log(LOG_INFO, "%s: Message follows:", __FUNCTION__);	\
@@ -278,8 +269,7 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 	/* parse the return msg*/
 	if (HA_OK != get_ret_from_ch(ch_cbk)) {
 		lrm_signoff(lrm);
-		cl_log(LOG_ERR, "lrm_signon: can not receive the reply message "
-			"from lrmd via callback channel.");
+		LOG_FAIL_receive_reply(REGISTER);
 		return HA_FAIL;
 	}
 	/* ok, we sign on sucessfully now*/
@@ -362,7 +352,7 @@ lrm_get_rsc_class_supported (ll_lrm_t* lrm)
 	}
 	/* get the return code of the message */
 	if (HA_OK != get_ret_from_msg(ret)) {
-		LOG_GOT_FAIL_RET(GETRSCCLASSES);
+		LOG_GOT_FAIL_RET(LOG_WARNING, GETRSCCLASSES);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -414,7 +404,7 @@ lrm_get_rsc_type_supported (ll_lrm_t* lrm, const char* rclass)
 	}
 	/* get the return code of the message */
 	if (HA_OK != get_ret_from_msg(ret)) {
-		LOG_GOT_FAIL_RET(GETRSCTYPES);
+		LOG_GOT_FAIL_RET(LOG_ERR, GETRSCTYPES);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -466,7 +456,7 @@ lrm_get_rsc_provider_supported (ll_lrm_t* lrm, const char* class, const char* ty
 	}
 	/* get the return code of the message */
 	if (HA_OK != get_ret_from_msg(ret)) {
-		LOG_GOT_FAIL_RET(GETPROVIDERS);
+		LOG_GOT_FAIL_RET(LOG_ERR, GETPROVIDERS);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -535,8 +525,7 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype,
 
 	if( provider ) {
 		if (HA_OK != ha_msg_add(msg, F_LRM_RPROVIDER, provider)) {
-			cl_log(LOG_ERR,
-			"lrm_get_rsc_type_metadata: can not add provider");
+			LOG_BASIC_ERROR("ha_msg_add");	
 			ha_msg_del(msg);
 			return NULL;
 		}
@@ -557,7 +546,7 @@ lrm_get_rsc_type_metadata (ll_lrm_t* lrm, const char* rclass, const char* rtype,
 	}
 	/* get the return code of the message */
 	if (HA_OK != get_ret_from_msg(ret)) {
-		LOG_GOT_FAIL_RET(GETRSCMETA);
+		LOG_GOT_FAIL_RET(LOG_ERR, GETRSCMETA);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -605,7 +594,7 @@ lrm_get_all_rscs (ll_lrm_t* lrm)
 	}
 	/* get the return code of msg */
 	if (HA_OK != get_ret_from_msg(ret)) {
-		LOG_GOT_FAIL_RET(GETALLRCSES);
+		LOG_GOT_FAIL_RET(LOG_ERR, GETALLRCSES);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -657,7 +646,7 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	}
 	/* get the return code of return message */
 	if (HA_OK != get_ret_from_msg(ret)) {
-		LOG_GOT_FAIL_RET(GETRSC);
+		LOG_GOT_FAIL_RET(LOG_WARNING, GETRSC);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -712,7 +701,7 @@ lrm_add_rsc (ll_lrm_t* lrm, const char* rsc_id, const char* class
 	ha_msg_del(msg);
 	/* check the result */
 	if (HA_OK != get_ret_from_ch(ch_cmd)) {
-		LOG_GOT_FAIL_RET(ADDRSC);
+		LOG_GOT_FAIL_RET(LOG_ERR, ADDRSC);
 		return HA_FAIL;
 	}
 
@@ -751,7 +740,7 @@ lrm_delete_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	ha_msg_del(msg);
 	/* check the response of the msg */
 	if (HA_OK != get_ret_from_ch(ch_cmd)) {
-		LOG_GOT_FAIL_RET(DELRSC);
+		LOG_GOT_FAIL_RET(LOG_ERR, DELRSC);
 		return HA_FAIL;
 	}
 
@@ -806,7 +795,7 @@ lrm_rcvmsg (ll_lrm_t* lrm, int blocking)
 		msg = msgfromIPC(ch_cbk, MSG_ALLOWINTR);
 		if (msg == NULL) {
 			cl_log(LOG_WARNING,
-				"%s(%d): recieve a null message with msgfromIPC."
+				"%s(%d): receive a null message with msgfromIPC."
 			,	__FUNCTION__, __LINE__);
 			return msg_count;
 		}
@@ -987,14 +976,14 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 
 	/* get the state of the resource from the message */
 	if (HA_OK != ha_msg_value_int(ret, F_LRM_STATE, &state)) {
-		LOG_FAIL_GET_MSG_FIELD(F_LRM_STATE, ret);
+		LOG_FAIL_GET_MSG_FIELD(LOG_ERR, F_LRM_STATE, ret);
 		ha_msg_del(ret);
 		return NULL;
 	}
 	*cur_state = (state_flag_t)state;
 	/* the first msg includes the count of pending ops. */
 	if (HA_OK != ha_msg_value_int(ret, F_LRM_OPCNT, &op_count)) {
-		LOG_FAIL_GET_MSG_FIELD(F_LRM_OPCNT, ret);
+		LOG_FAIL_GET_MSG_FIELD(LOG_WARNING, F_LRM_OPCNT, ret);
 		ha_msg_del(ret);
 		return NULL;
 	}
@@ -1005,7 +994,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 
 		if (NULL == op_msg) {
 			cl_log(LOG_WARNING, "%s(%d): failed to receive a "
-				"message from lrmd."
+				"(pending operation) message from lrmd."
 			,	__FUNCTION__, __LINE__);
 			continue;
 		}
@@ -1123,7 +1112,7 @@ msg_to_op(struct ha_msg* msg)
 	/* op->op_status */
 	if (HA_OK !=
 		ha_msg_value_int(msg, F_LRM_OPSTATUS, (int*)&op->op_status)) {
-		LOG_FAIL_GET_MSG_FIELD(F_LRM_OPSTATUS, msg);
+		LOG_FAIL_GET_MSG_FIELD(LOG_WARNING, F_LRM_OPSTATUS, msg);
                 op->op_status = LRM_OP_PENDING;
 	}
 
@@ -1132,7 +1121,7 @@ msg_to_op(struct ha_msg* msg)
 		/* op->rc */
 		if (HA_OK != ha_msg_value_int(msg, F_LRM_RC, &op->rc)) {
 			free_op(op);
-			LOG_FAIL_GET_MSG_FIELD(F_LRM_RC, msg);
+			LOG_FAIL_GET_MSG_FIELD(LOG_ERR, F_LRM_RC, msg);
 			return NULL;
 		}
 		/* op->output */
@@ -1158,7 +1147,7 @@ msg_to_op(struct ha_msg* msg)
 	/* op->app_name */
 	app_name = ha_msg_value(msg, F_LRM_APP);
 	if (NULL == app_name) {
-		LOG_FAIL_GET_MSG_FIELD(F_LRM_APP, msg);
+		LOG_FAIL_GET_MSG_FIELD(LOG_ERR, F_LRM_APP, msg);
 		free_op(op);
 		return NULL;
 	}
@@ -1168,7 +1157,7 @@ msg_to_op(struct ha_msg* msg)
 	/* op->op_type */
 	op_type = ha_msg_value(msg, F_LRM_OP);
 	if (NULL == op_type) {
-		LOG_FAIL_GET_MSG_FIELD(F_LRM_OP, msg);
+		LOG_FAIL_GET_MSG_FIELD(LOG_ERR, F_LRM_OP, msg);
 		free_op(op);
 		return NULL;
 	}
@@ -1177,7 +1166,7 @@ msg_to_op(struct ha_msg* msg)
 	/* op->rsc_id */
 	rsc_id = ha_msg_value(msg, F_LRM_RID);
 	if (NULL == rsc_id) {
-		LOG_FAIL_GET_MSG_FIELD(F_LRM_RID, msg);
+		LOG_FAIL_GET_MSG_FIELD(LOG_ERR, F_LRM_RID, msg);
 		free_op(op);
 		return NULL;
 	}
@@ -1260,7 +1249,7 @@ get_ret_from_ch(IPC_Channel* ch)
 		return HA_FAIL;
 	}
 	if (HA_OK != ha_msg_value_int(msg, F_LRM_RET, &ret)) {
-		LOG_FAIL_GET_MSG_FIELD(F_LRM_RET, msg);
+		LOG_FAIL_GET_MSG_FIELD(LOG_ERR, F_LRM_RET, msg);
 		ha_msg_del(msg);
 		return HA_FAIL;
 	}
@@ -1279,7 +1268,7 @@ get_ret_from_msg(struct ha_msg* msg)
 		return HA_FAIL;
 	}
 	if (HA_OK != ha_msg_value_int(msg, F_LRM_RET, &ret)) {
-		LOG_FAIL_GET_MSG_FIELD(F_LRM_RET, msg);
+		LOG_FAIL_GET_MSG_FIELD(LOG_ERR, F_LRM_RET, msg);
 		return HA_FAIL;
 	}
 	return ret;
