@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.49 2005/05/25 23:31:54 gshi Exp $ */
+/* $Id: ipc.h,v 1.50 2005/06/02 15:54:49 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -670,7 +670,7 @@ int ipc_channel_pair(IPC_Channel* channels[2]);
  */
 
 
-IPC_Auth*  ipc_str_to_auth(const char * uidlist, const char * gidlist);
+IPC_Auth*  ipc_str_to_auth(const char * uidlist, int, const char * gidlist, int);
 
 extern IPC_Auth * ipc_set_auth(uid_t * a_uid, gid_t * a_gid
 ,	int num_uid, int num_gid);
