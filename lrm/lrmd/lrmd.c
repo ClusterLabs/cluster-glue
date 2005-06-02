@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.157 2005/06/02 06:35:57 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.158 2005/06/02 07:28:52 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -859,7 +859,10 @@ main(int argc, char ** argv)
 
 	inherit_debuglevel = getenv(HADEBUGVAL);
 	if (inherit_debuglevel != NULL) {
-		debug_level = atoi(inherit_debuglevel) % 2;
+		debug_level = atoi(inherit_debuglevel);
+		if (debug_level > 2) {
+			debug_level = 2;
+		}
 	}
 
 	cl_log_set_entity(lrm_system_name);
@@ -3215,6 +3218,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.158  2005/06/02 07:28:52  sunjd
+ * donnot use mod op, let the loglevel reflects what the user really want
+ *
  * Revision 1.157  2005/06/02 06:35:57  sunjd
  * use the accurate loglevel from the environment variable
  *
