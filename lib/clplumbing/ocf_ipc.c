@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.33 2005/06/02 15:54:50 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.34 2005/06/03 17:01:03 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -224,6 +224,10 @@ ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid)
   static int v = 1;
 
   temp_auth = ha_malloc(sizeof(struct IPC_AUTH));
+  if (temp_auth == NULL){
+	  cl_log(LOG_ERR, "%s: memory allocation failed",__FUNCTION__);
+	  return NULL;
+  }
   temp_auth->uid = g_hash_table_new(g_direct_hash, g_direct_equal);
   temp_auth->gid = g_hash_table_new(g_direct_hash, g_direct_equal);
 
@@ -307,6 +311,10 @@ ipc_bufpool_new(int size)
 	}
 	
 	pool = (struct ipc_bufpool*)ha_malloc(totalsize+1);
+	if (pool == NULL){
+		cl_log(LOG_ERR, "%s: memory allocation failed", __FUNCTION__);
+		return NULL;
+	}
 	memset(pool, 0, totalsize);
 	pool->refcount = 1;
 	pool->startpos = pool->currpos = pool->consumepos =
@@ -395,7 +403,7 @@ ipc_bufpool_msg_new(void)
 static void
 ipcmsg_display(IPC_Message* ipcmsg)
 {
-	if (ipcmsg){
+	if (ipcmsg == NULL){
 		cl_log(LOG_ERR, "ipcmsg is NULL");
 		return;
 	}
