@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.159 2005/06/02 07:49:54 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.160 2005/06/07 07:39:21 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -55,6 +55,7 @@
 #include <clplumbing/Gmain_timeout.h>
 #include <clplumbing/cl_pidfile.h>
 #include <ha_msg.h>
+#include <apphb.h>
 #include <lrm/lrm_api.h>
 #include <lrm/lrm_msg.h>
 #include <lrm/raexec.h>
@@ -64,9 +65,11 @@
 #define	MAX_MSGTYPELEN 32
 #define	MAX_CLASSNAMELEN 32
 #define WARNINGTIME_IN_LIST 5000
-#define OPTARGS		"skrhv"
+#define OPTARGS		"skrhvmi:"
 #define PID_FILE 	HA_VARRUNDIR"/lrmd.pid"
 #define LRMD_COREDUMP_ROOT_DIR HA_COREDIR
+#define APPHB_WARNTIME_FACTOR	3
+#define APPHB_INTVL_DETLA 	30  /* Millisecond */
 
 /* Donnot directly use the definition in heartbeat.h/hb_api.h for fewer
  * dependency, but need to keep identical with them.
@@ -118,6 +121,14 @@ static	gboolean	in_alloc_dump = FALSE;
 			,	__FUNCTION__				\
 			,	__LINE__				\
 			,	field);
+
+#define LRMD_APPHB_HB				\
+        if (reg_to_apphb == TRUE) {		\
+                if (apphb_hb() != 0) {		\
+                        reg_to_apphb = FALSE;	\
+                }				\
+        }
+
 /*
  * The basic objects in our world:
  *
@@ -240,6 +251,10 @@ static gboolean sigterm_action(int nsig, gpointer unused);
 /* functions wrap the call to ra plugins */
 static int perform_ra_op(lrmd_op_t* op);
 
+/* Apphb related functions */
+static int init_using_apphb(void);
+static gboolean emit_apphb(gpointer data);
+
 /* Utility functions */
 static int flush_op(lrmd_op_t* op);
 static int perform_op(lrmd_rsc_t* rsc);
@@ -304,14 +319,17 @@ struct msg_map msg_maps[] = {
 	{GETRSCMETA,	FALSE, 	on_msg_get_metadata},
 };
 
-GMainLoop* mainloop 		= NULL;
-GHashTable* clients		= NULL;	/* a GHashTable indexed by pid */
-GHashTable* resources 		= NULL;	/* a GHashTable indexed by rsc_id */
-static int call_id 		= 1;
-const char* lrm_system_name 	= "lrmd";
-GHashTable * RAExecFuncs 	= NULL;
-GList* ra_class_list		= NULL;
-gboolean shutdown_in_progress	= FALSE;
+static GMainLoop* mainloop 		= NULL;
+static GHashTable* clients		= NULL;	/* a GHashTable indexed by pid */
+static GHashTable* resources 		= NULL;	/* a GHashTable indexed by rsc_id */
+static int call_id 			= 1;
+static const char* lrm_system_name 	= "lrmd";
+static GHashTable * RAExecFuncs 	= NULL;
+static GList* ra_class_list		= NULL;
+static gboolean shutdown_in_progress	= FALSE;
+static unsigned long apphb_interval 	= 2000; /* Millisecond */
+static gboolean reg_to_apphbd		= FALSE;
+
 /*
  * Daemon functions
  *
@@ -843,6 +861,15 @@ main(int argc, char ** argv)
 			case 'r':		/* Restart */
 				req_restart = TRUE;
 				break;
+			/* Register to apphbd then monitored by it */
+			case 'm':
+				reg_to_apphbd = TRUE;
+				break;
+			case 'i':		/* Get apphb interval */
+				if (optarg) {
+					apphb_interval = atoi(optarg);
+				}
+				break;
 			default:
 				++argerr;
 				break;
@@ -936,8 +963,9 @@ init_stop(const char *pid_file)
 	return rc;
 }
 
-static const char usagemsg[] = "[-srkhV]\n\ts:status\n\tr:restart"
-	"\n\tk:kill\n\th:help\n\tV:debug\n";
+static const char usagemsg[] = "[-srkhV]\n\ts: status\n\tr: restart"
+	"\n\tk: kill\n\tm: register to apphbd\n\ti: the interval of apphb\n\t"
+	"h: help\n\tV: debug\n";
 
 void
 usage(const char* cmd, int exit_status)
@@ -1011,6 +1039,47 @@ register_pid(gboolean do_fork,
 	cl_signal_set_interrupt(SIGINT, 0);
 	cl_signal_set_interrupt(SIGHUP, 0);
 
+}
+
+static int
+init_using_apphb(void)
+{
+	char lrmd_instance[40];
+
+	if (reg_to_apphbd == FALSE) {
+		return -1;
+	}
+
+	sprintf(lrmd_instance, "%s_%ld", lrm_system_name, (long)getpid());
+	if (apphb_register(lrm_system_name, lrmd_instance) != 0) {
+		lrmd_log(LOG_ERR, "Failed when trying to register to apphbd.");
+		lrmd_log(LOG_ERR, "Maybe apphd isnot running. Quit.");
+		return -1;
+	}
+	lrmd_log(LOG_INFO, "Registered to apphbd.");
+
+	apphb_setinterval(apphb_interval);
+	apphb_setwarn(apphb_interval*APPHB_WARNTIME_FACTOR);
+
+	Gmain_timeout_add(apphb_interval - APPHB_INTVL_DETLA, emit_apphb, NULL);
+
+	return 0;
+}
+
+static gboolean
+emit_apphb(gpointer data)
+{
+	if (reg_to_apphbd == FALSE) {
+		return FALSE;
+	}
+
+	if (apphb_hb() != 0) {
+		lrmd_log(LOG_ERR, "emit_apphb: Failed to emit an apphb.");
+		reg_to_apphbd = FALSE;
+		return FALSE;
+	};
+
+	return TRUE;
 }
 
 /* main loop of the daemon*/
@@ -1198,7 +1267,18 @@ init_start ()
 	mainloop = g_main_new(FALSE);
 	lrmd_log(LOG_DEBUG, "main: run the loop...");
 	lrmd_log(LOG_INFO, "Started.");
+
+	/* apphb initializing */
+	init_using_apphb();
+	emit_apphb(NULL); /* Avoid warning */
+
 	g_main_run(mainloop);
+
+	emit_apphb(NULL);
+        if (reg_to_apphbd == TRUE) {
+                apphb_unregister();
+                reg_to_apphbd = FALSE;
+        }
 
 	return_to_orig_privs();
 	conn_cmd->ops->destroy(conn_cmd);
@@ -3215,6 +3295,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.160  2005/06/07 07:39:21  sunjd
+ * Bug 317. support to emit apphb
+ *
  * Revision 1.159  2005/06/02 07:49:54  sunjd
  * for a const char array, use STRNCMP_CONST instead
  *
