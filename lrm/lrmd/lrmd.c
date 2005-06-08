@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.160 2005/06/07 07:39:21 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.161 2005/06/08 08:29:38 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1646,13 +1646,13 @@ on_msg_register(lrmd_client_t* client, struct ha_msg* msg)
 		return HA_FAIL;
 	}
 
-	if (HA_OK != ha_msg_value_int(msg, F_LRM_GID, &client->gid)) {
+	if (HA_OK != ha_msg_value_int(msg, F_LRM_GID, (int *)&client->gid)) {
 		lrmd_log(LOG_ERR,
 			"on_msg_register: didnot get gid from the ha message.");
 		return HA_FAIL;
 	}
 
-	if (HA_OK != ha_msg_value_int(msg, F_LRM_UID, &client->uid)) {
+	if (HA_OK != ha_msg_value_int(msg, F_LRM_UID, (int *)&client->uid)) {
 		lrmd_log(LOG_ERR,
 			"on_msg_register: didnot get uid from the ha message.");
 		return HA_FAIL;
@@ -3295,6 +3295,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.161  2005/06/08 08:29:38  sunjd
+ * make GCC4 happy. unsigned->signed
+ *
  * Revision 1.160  2005/06/07 07:39:21  sunjd
  * Bug 317. support to emit apphb
  *
