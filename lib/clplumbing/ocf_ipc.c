@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.34 2005/06/03 17:01:03 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.35 2005/06/08 20:46:44 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -35,6 +35,8 @@
 #include <clplumbing/cl_malloc.h>
 #include <grp.h>
 
+static int num_pool_allocated = 0;
+static int num_pool_freed = 0;
 
 #ifdef IPC_TIME_DEBUG
 struct ha_msg;
@@ -323,6 +325,8 @@ ipc_bufpool_new(int size)
 	pool->endpos = ((char*)pool)  + totalsize;
 	pool->size = totalsize;
 	
+	num_pool_allocated ++ ;
+	
 	return pool;
 }
 
@@ -343,6 +347,7 @@ ipc_bufpool_del(struct ipc_bufpool* pool)
 	
 	memset(pool, 0, pool->size);
 	ha_free(pool);	
+	num_pool_freed ++ ;
 	return;
 }
 
