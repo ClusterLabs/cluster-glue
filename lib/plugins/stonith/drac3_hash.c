@@ -1,4 +1,4 @@
-/* $Id: drac3_hash.c,v 1.5 2004/08/29 22:38:26 kevin Exp $ */
+/* $Id: drac3_hash.c,v 1.6 2005/06/08 08:08:40 sunjd Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -78,7 +78,7 @@ drac3AuthHash(const char * chall,
     BIO_read(b64bio, challBytes, MD5LEN);
 
     /* gets MD5 from pass -> passMD5 */
-    MD5(pass, strlen(pass), passMD5);
+    MD5((const unsigned char *)pass, strlen(pass), (unsigned char *)passMD5);
     
     /* calculate challBytes and passMD5 xor -> xorBytes */
     for (i=0; i<MD5LEN; i++) {
@@ -86,7 +86,7 @@ drac3AuthHash(const char * chall,
     }
     
     /* calculate xorBytes MD5 -> xorBytesMD5 */
-    MD5(xorBytes, MD5LEN, xorBytesMD5);
+    MD5((unsigned char *)xorBytes, MD5LEN, (unsigned char *)xorBytesMD5);
     
     /* calculate xorBytesMD5 crc16 */
     crc = drac3Crc16(xorBytesMD5, MD5LEN);
