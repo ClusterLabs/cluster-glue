@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.58 2005/05/25 23:34:09 gshi Exp $ */
+/* $Id: cl_log.c,v 1.59 2005/06/08 11:44:27 andrew Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -896,7 +896,7 @@ void
 LogToCircularBuffer(CircularBuffer_t *buffer, int level, const char *fmt, ...)
 {
 	va_list ap;
-	char	*buf = NULL;
+	char buf[MAXLINE];
 	int	nbytes;
 	CircularBufferEntry_t *entry = cl_malloc(sizeof(CircularBufferEntry_t));
 	
@@ -904,7 +904,8 @@ LogToCircularBuffer(CircularBuffer_t *buffer, int level, const char *fmt, ...)
 		return;
 	}
 	va_start(ap, fmt);
-	nbytes=vasprintf(&buf, fmt, ap);
+	nbytes=vsnprintf(buf, MAXLINE, fmt, ap);
+	/*	nbytes=vasprintf(&buf, fmt, ap); */
 	va_end(ap);
 
 	entry->buf = buf;
