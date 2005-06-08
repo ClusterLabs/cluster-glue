@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.69 2005/05/13 17:41:56 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.70 2005/06/08 20:47:25 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -110,8 +110,16 @@ cl_set_msg_format(enum cl_msgfmt mfmt)
 	msgfmt = mfmt;
 }
 
-
-
+void
+cl_dump_msgstats(void)
+{
+	if (msgstats){
+		cl_log(LOG_INFO, "dumping msg stats: "
+		       "allocmsgs=%lu totalmsgs=%lu",
+		       msgstats->allocmsgs, msgstats->totalmsgs);
+	}
+	return;
+}
 void
 list_cleanup(GList* list)
 {
@@ -2301,6 +2309,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.70  2005/06/08 20:47:25  gshi
+ * add a function to dump message stats
+ *
  * Revision 1.69  2005/05/13 17:41:56  gshi
  * if the startlen is greater than the length of a given string
  * obviously it is not a valid message string
