@@ -1,7 +1,6 @@
 
 #include <portability.h>
 #include <config.h>
-#include <uuid/uuid.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
