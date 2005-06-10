@@ -1,7 +1,7 @@
 #ifndef _CL_UUID_H_
 #define _CL_UUID_H_
 
-#include <uuid/uuid.h>
+#include <hb_uuid.h>
 
 typedef struct cl_uuid_s{	
 	uuid_t uuid;	
