@@ -1,8 +1,6 @@
 #ifndef _CL_UUID_H_
 #define _CL_UUID_H_
 
-#include <hb_uuid.h>
-
 typedef struct cl_uuid_s{	
 	unsigned char	uuid[8];
 }cl_uuid_t;
