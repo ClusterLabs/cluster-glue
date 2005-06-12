@@ -2,7 +2,7 @@
 #define _CL_UUID_H_
 
 typedef struct cl_uuid_s{	
-	unsigned char	uuid[8];
+	unsigned char	uuid[16];
 }cl_uuid_t;
 
 void cl_uuid_copy(cl_uuid_t* dst, cl_uuid_t* src);
