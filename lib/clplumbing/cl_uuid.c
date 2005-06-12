@@ -69,7 +69,7 @@ cl_uuid_clear(cl_uuid_t* uu)
 }
 
 int 
-cl_uuid_compare(cl_uuid_t* uu1, cl_uuid_t* uu2)
+cl_uuid_compare(const cl_uuid_t* uu1, const cl_uuid_t* uu2)
 {
 	if (uu1 == NULL || uu2 == NULL){
 		cl_log(LOG_ERR, "cl_uuid_compare: "
