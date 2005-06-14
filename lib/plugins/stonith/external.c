@@ -30,6 +30,8 @@
  *
  */
 
+#include <portability.h>
+
 #include <dirent.h>
 
 #include "stonith_plugin_common.h"
