@@ -25,11 +25,12 @@
 
 #include <portability.h>
 
+#include <unistd.h>
+#include <sys/time.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/resource.h>
 #include <sys/time.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <pwd.h>
 #ifdef HAVE_SYS_PRCTL_H
