@@ -10,6 +10,7 @@
  * For instance Linux makes these available if SYSLOG_NAMES is defined.
  */
 #define SYSLOG_NAMES
+#include <stdlib.h>
 #include <clplumbing/cl_syslog.h>
 
 #include <syslog.h>
