@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.161 2005/06/08 08:29:38 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.162 2005/06/15 14:13:27 davidlee Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -36,15 +36,13 @@
 #include <dirent.h>
 #include <pwd.h>
 #include <time.h>
-/* Should copy the facilitynames struct here? */
-#define SYSLOG_NAMES
-#include <syslog.h>
 
 #include <glib.h>
 #include <heartbeat.h>
 #include <pils/plugin.h>
 #include <pils/generic.h>
 #include <clplumbing/cl_log.h>
+#include <clplumbing/cl_syslog.h>
 #include <clplumbing/ipc.h>
 #include <clplumbing/GSource.h>
 #include <clplumbing/lsb_exitcodes.h>
@@ -270,7 +268,6 @@ static struct ha_msg* op_to_msg(lrmd_op_t* op);
 static gboolean lrm_shutdown(void);
 static gboolean can_shutdown(void);
 static void inherit_config_from_environment(void);
-static int facility_name_to_value(const char * name);
 static gboolean free_str_hash_pair(gpointer key
 ,	 gpointer value, gpointer user_data);
 static gboolean free_str_op_pair(gpointer key
@@ -3211,7 +3208,7 @@ inherit_config_from_environment(void)
 	inherit_env = getenv(LOGFACILITY);
 	if (inherit_env != NULL) {
 		int facility = -1;
-		facility = facility_name_to_value(inherit_env);
+		facility = cl_syslogfac_str2int(inherit_env);
 		if ( facility != -1 ) {
 			cl_log_set_facility(facility);
 		}
@@ -3255,17 +3252,6 @@ dump_data_for_debug(void)
 	lrmd_log(LOG_DEBUG, "end to dump internal data for debugging."); 
 }
 
-static int
-facility_name_to_value(const char * name)
-{
-	int i;
-	for (i = 0; facilitynames[i].c_name != NULL; i++) {
-		if (STRNCMP_CONST(name, facilitynames[i].c_name) == 0) {
-			return facilitynames[i].c_val;
-		}
-	}
-	return -1;
-}
 static const char* 
 op_info(const lrmd_op_t* op)
 {
@@ -3295,6 +3281,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.162  2005/06/15 14:13:27  davidlee
+ * common code for syslog facility name/value conversion
+ *
  * Revision 1.161  2005/06/08 08:29:38  sunjd
  * make GCC4 happy. unsigned->signed
  *
