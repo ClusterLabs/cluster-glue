@@ -9,12 +9,12 @@
 # modify it under the terms of the GNU Lesser General Public
 # License as published by the Free Software Foundation; either
 # version 2.1 of the License, or (at your option) any later version.
-# 
+#
 # This library is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # Lesser General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -24,7 +24,7 @@ MAINTAINERCLEANFILES    = Makefile.in
 
 includedir=$(base_includedir)/clplumbing
 
-include_HEADERS	= 		\
+include_HEADERS	=	\
 	Gmain_timeout.h	\
 	GSource.h	\
 	apphb_cs.h	\
@@ -32,9 +32,12 @@ include_HEADERS	= 		\
 	cl_log.h	\
 	cl_malloc.h	\
 	cl_poll.h	\
-	cl_signal.h     \
-	coredumps.h     \
-	cpulimits.h     \
+	cl_signal.h	\
+	cl_pidfile.h	\
+	cl_syslog.h	\
+	cl_uuid.h	\
+	coredumps.h	\
+	cpulimits.h	\
 	ipc.h		\
 	lsb_exitcodes.h	\
 	loggingdaemon.h	\
@@ -44,8 +47,6 @@ include_HEADERS	= 		\
 	proctrack.h	\
 	realtime.h	\
 	setproctitle.h	\
-	recoverymgr_cs.h \
+	recoverymgr_cs.h\
 	timers.h	\
-	uids.h		\
-	cl_uuid.h 	\
-	cl_pidfile.h
+	uids.h
