@@ -43,6 +43,7 @@ libplumb_la_SOURCES	= 		\
 			cl_netstring.c	\
 			cl_poll.c	\
 			cl_signal.c	\
+			cl_syslog.c	\
 			coredumps.c	\
 			cpulimits.c	\
 			longclock.c	\
