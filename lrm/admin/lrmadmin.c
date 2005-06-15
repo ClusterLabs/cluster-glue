@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.33 2005/05/09 03:20:55 alan Exp $ */
+/* $Id: lrmadmin.c,v 1.34 2005/06/15 15:06:50 davidlee Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -48,6 +48,7 @@
 
 const char * optstring = "AD:dEF:d:sg:M:P:c:S:LI:CT:h";
 
+#ifdef HAVE_GETOPT_H
 static struct option long_options[] = {
 	{"daemon", 0, 0, 'd'},
 	{"executera", 1, 0, 'E'},
@@ -65,6 +66,7 @@ static struct option long_options[] = {
 	{"help",0,0,'h'},
 	{0,0,0,0}
 };
+#endif /* HAVE_GETOPT_H */
 
 GMainLoop *mainloop = NULL;
 const char * lrmadmin_name = "lrmadmin";
@@ -180,8 +182,12 @@ int main(int argc, char **argv)
 	memset(rscid_arg_tmp, '\0', RID_LEN);
 	memset(raclass, '\0', 20);
 	do {
+#ifdef HAVE_GETOPT_H
 		option_char = getopt_long (argc, argv, optstring,
 			long_options, NULL);
+#else
+		option_char = getopt (argc, argv, optstring);
+#endif
 
 		if (option_char == -1) {
 			break;
@@ -926,6 +932,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.34  2005/06/15 15:06:50  davidlee
+ * Somes OSes don't have getopt_long()
+ *
  * Revision 1.33  2005/05/09 03:20:55  alan
  * Finished changes for bug 544 :-(
  *
