@@ -45,6 +45,7 @@
 #include <clplumbing/cl_signal.h>
 #include <sys/wait.h>
 #include <clplumbing/cl_pidfile.h>
+#include <clplumbing/cl_syslog.h>
 
 /*two processes involved
   1. parent process which reads messages from all client channels 
@@ -136,27 +137,6 @@ struct _syslog_code {
         int     c_val;
 };
 
-struct _syslog_code facilitynames[] = {
-	{ "user",	LOG_USER },
-	{ "mail",	LOG_MAIL },
-	{ "daemon",	LOG_DAEMON },
-	{ "auth",	LOG_AUTH },
-	{ "syslog",	LOG_SYSLOG },
-	{ "lpr",	LOG_LPR },
-	{ "news",	LOG_NEWS },
-	{ "uucp",	LOG_UUCP },
-	{ "cron",	LOG_CRON },
-	{ "local0",	LOG_LOCAL0 },
-	{ "local1",	LOG_LOCAL1 },
-	{ "local2",	LOG_LOCAL2 },
-	{ "local3",	LOG_LOCAL3 },
-	{ "local4",	LOG_LOCAL4 },
-	{ "local5",	LOG_LOCAL5 },
-	{ "local6",	LOG_LOCAL6 },
-	{ "local7",	LOG_LOCAL7 },
-	{ NULL, -1 }
-};
-
 static void
 logd_log( const char * fmt, ...)
 {
@@ -203,14 +183,16 @@ static int
 set_facility(const char * value)
 {
 	int		i;	 
-	for(i = 0; facilitynames[i].c_name != NULL; ++i) {
-		if(strcasecmp(value, facilitynames[i].c_name) == 0) {
-			cl_log(LOG_INFO,  "setting log facility to %s", value);
-			logd_config.log_facility = facilitynames[i].c_val;
-			return(TRUE);
-		}
+
+	i = cl_syslogfac_str2int(value);
+	if (i >= 0) {
+		cl_log(LOG_INFO,  "setting log facility to %s", value);
+		logd_config.log_facility = i;
+		return(TRUE);
 	}
-	return(FALSE);
+	else {
+		return(FALSE);
+	}
 }
 
 static int
