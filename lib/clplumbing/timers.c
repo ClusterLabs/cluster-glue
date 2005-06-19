@@ -1,4 +1,4 @@
-/* $Id: timers.c,v 1.9 2005/05/27 18:10:45 gshi Exp $ */
+/* $Id: timers.c,v 1.10 2005/06/19 02:59:30 alan Exp $ */
 #include <portability.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -20,10 +20,13 @@ setmsrepeattimer(long	ms)
 	,	{secs, usecs}	/* Timer Value */
 	};
 
+#if 0
         cl_log(LOG_DEBUG, "Setting repeating timer for %ld ms"   
          ,       ms); 
+#endif
 
 
+	/* Is this right??? */
 	CL_IGNORE_SIG(SIGALRM);
 	return setitimer(ITIMER_REAL, &nexttime, NULL);
 }
