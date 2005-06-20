@@ -1,4 +1,4 @@
-/* $Id: realtime.c,v 1.25 2005/05/19 14:29:07 msoffen Exp $ */
+/* $Id: realtime.c,v 1.26 2005/06/20 13:04:24 andrew Exp $ */
 #include <portability.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -161,7 +161,7 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 	}
 #endif
 
-#ifdef _POSIX_MEMLOCK
+#if defined _POSIX_MEMLOCK && !defined(ON_DARWIN)
 	if (mlockall(MCL_CURRENT|MCL_FUTURE) < 0) {
 		cl_perror("Unable to lock pid %d in memory", (int) getpid());
 	}else{
