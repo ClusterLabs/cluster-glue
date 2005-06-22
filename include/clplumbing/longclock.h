@@ -1,4 +1,4 @@
-/* $Id: longclock.h,v 1.8 2005/06/01 03:34:32 alan Exp $ */
+/* $Id: longclock.h,v 1.9 2005/06/22 14:01:34 davidlee Exp $ */
 /*
  * Longclock operations
  *
@@ -86,7 +86,6 @@
 #	include <sys/times.h>
 
 	typedef clock_t longclock_t;
-	extern	struct tms	longclock_dummy_tms_struct;
 
 #else /* clock_t isn't at least 64 bits */
 	typedef unsigned long long longclock_t;
