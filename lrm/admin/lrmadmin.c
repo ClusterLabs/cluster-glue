@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.34 2005/06/15 15:06:50 davidlee Exp $ */
+/* $Id: lrmadmin.c,v 1.35 2005/06/22 06:53:41 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -71,7 +71,7 @@ static struct option long_options[] = {
 GMainLoop *mainloop = NULL;
 const char * lrmadmin_name = "lrmadmin";
 /* 20 is the length limit for a argv[x] */
-const int ARGVI_MAX_LEN = 20;
+const int ARGVI_MAX_LEN = 48;
 
 typedef enum {
 	ERROR_OPTION = -1,
@@ -787,6 +787,9 @@ params_hashtable_to_str(const char * class, GHashTable * ht)
 	} else if (   strncmp("lsb", class, strlen("lsb")) == 0
 		   || strncmp("heartbeat", class, strlen("heartbeat")) == 0 ) {
 		ht_size = g_hash_table_size(ht);
+		if (ht_size == 0) {
+			return NULL;
+		}
 		tmp_str = g_new(gchar, ht_size*ARGVI_MAX_LEN); 	
 		memset(tmp_str, ' ', ht_size*ARGVI_MAX_LEN);
 		tmp_str[ht_size*ARGVI_MAX_LEN-1] = '\0';
@@ -873,13 +876,17 @@ print_rsc_inf(lrm_rsc_t * lrm_rsc)
 	printf("\nResource ID:%s\n", rscid_str_tmp);
 	printf("Resource agency class:%s\n", lrm_rsc->class);
 	printf("Resource agency type:%s\n", lrm_rsc->type);
-	printf("Resource agency provider:%s\n", lrm_rsc->provider?lrm_rsc->provider:"default");
+	printf("Resource agency provider:%s\n"
+		, lrm_rsc->provider?lrm_rsc->provider:"default");
 
 	if (lrm_rsc->params) {
 		tmp = params_hashtable_to_str(lrm_rsc->class, 
 				lrm_rsc->params);
-		printf("Resource agency parameters:%s\n", tmp);
-		g_free(tmp);
+		printf("Resource agency parameters:%s\n"
+			, (tmp == NULL) ? "No parameter" : tmp);
+		if (tmp != NULL) {
+			 g_free(tmp);
+		}
 	}
 }
 
@@ -932,6 +939,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.35  2005/06/22 06:53:41  sunjd
+ * handling for no parameter
+ *
  * Revision 1.34  2005/06/15 15:06:50  davidlee
  * Somes OSes don't have getopt_long()
  *
