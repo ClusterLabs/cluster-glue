@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.26 2005/04/20 20:18:16 blaschke Exp $ */
+/* $Id: wti_nps.c,v 1.27 2005/06/27 17:42:57 blaschke Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -13,6 +13,17 @@
  *  author: mike ledoux <mwl@mclinux.com>
  *  author: Todd Wheeling <wheeling@mclinux.com>
  *  Mangled by Zhaokai <zhaokai@cn.ibm.com>, IBM, 2005
+ *  Further hurt by Lon <lhh@redhat.com>, Red Hat, 2005
+ *
+ *  Supported WTI devices:
+ *     NPS-115
+ *     NPS-230
+ *     IPS-15
+ *     IPS-800
+ *     IPS-800-CE
+ *     NBB-1600
+ *     NBB-1600-CE
+ *     TPS-2
  *
  *  Based strongly on original code from baytech.c by Alan Robertson.
  *
@@ -153,13 +164,16 @@ static const char *wti_npsXML =
  */
 
 #define WTINPSSTR	" Power Switch"
-static struct Etoken EscapeChar[] =	{ {"Escape character is '^]'.", 0, 0}
-					,	{NULL,0,0}};
-static struct Etoken password[] =	{ {"Password:", 0, 0},
-						{NULL,0,0}};
-static struct Etoken Prompt[] =	{ {"PS>", 0, 0} ,{NULL,0,0}};
+#define WTINBBSTR	"Boot Bar"
+ 
+static struct Etoken password[] =	{ {"Password:", 0, 0}, {NULL,0,0}};
+static struct Etoken Prompt[] =		{ {"PS>", 0, 0}
+					, {"BB>", 0, 0}
+					, {NULL,0,0}};
 static struct Etoken LoginOK[] =	{ {WTINPSSTR, 0, 0}
-                    , {"Invalid password", 1, 0} ,{NULL,0,0}};
+					, {WTINBBSTR, 0, 0}
+					, {"Invalid password", 1, 0}
+					, {NULL,0,0} };
 static struct Etoken Separator[] =	{ {"-----+", 0, 0} ,{NULL,0,0}};
 
 /* We may get a notice about rebooting, or a request for confirmation */
@@ -218,11 +232,6 @@ NPSLogin(struct pluginDevice * nps)
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
 
-	/*EXPECT(nps->rdfd, EscapeChar, 10);*/
-	if (StonithLookFor(nps->rdfd, EscapeChar, 10) < 0) {
-		sleep(1);
-		return (errno == ETIMEDOUT ? S_TIMEOUT : S_OOPS);
-	}
 	/* Look for the unit type info */
 	if (EXPECT_TOK(nps->rdfd, password, 2, IDinfo
 	,	sizeof(IDinfo), Debug) < 0) {
@@ -337,17 +346,11 @@ NPS_onoff(struct pluginDevice* nps, const char * outlets, const char * unitid, i
 	char		unum[32];
 
 	const char *	onoff = (req == ST_POWERON ? "/On" : "/Off");
-	int	rc;
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
 
-	if ((rc = NPSRobustLogin(nps) != S_OK)) {
-		LOG(PIL_CRIT, "Cannot log into %s.", nps->idinfo);
-		return(rc);
-	}
-       
 	/* Send "/h" help command and expect prompt back */
 	SEND(nps->wrfd, "/h\r");
 	/* Expect "PS>" */
@@ -367,6 +370,8 @@ NPS_onoff(struct pluginDevice* nps, const char * outlets, const char * unitid, i
 
 	/* All Right!  Command done. Life is Good! */
 	LOG(PIL_INFO, "Power to NPS outlet(s) %s turned %s", outlets, onoff);
+
+	SEND(nps->wrfd, "/h\r");
 	return(S_OK);
 }
 #endif /* defined(ST_POWERON) && defined(ST_POWEROFF) */
@@ -483,10 +488,6 @@ wti_nps_hostlist(StonithPlugin  *s)
 	ERRIFNOTCONFIGED(s,NULL);
 
 	nps = (struct pluginDevice*) s;
-	if (NPS_connect_device(nps) != S_OK) {
-		return(NULL);
-	}
- 
 	if (NPSRobustLogin(nps) != S_OK) {
 		LOG(PIL_CRIT, "Cannot log into %s.", nps->idinfo);
 		return(NULL);
@@ -527,6 +528,11 @@ wti_nps_hostlist(StonithPlugin  *s)
 			}
 			if (numnames >= DIMOF(NameList)-1) {
 				break;
+			}
+			if (!strcmp(sockname,"(undefined)") ||
+			    !strcmp(sockname,"---")) {
+				/* lhh - skip undefined */
+				continue;
 			}
 			if ((nm = STRDUP(sockname)) == NULL) {
 				goto out_of_memory;
