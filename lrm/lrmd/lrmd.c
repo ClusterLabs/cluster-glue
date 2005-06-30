@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.164 2005/06/30 08:22:03 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.165 2005/06/30 09:42:41 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3264,23 +3264,28 @@ op_info(const lrmd_op_t* op)
 	
 	if (rsc == NULL) {
 		snprintf(info,sizeof(info)
-		,"operation %s on unknown rsc(may deleted) for client %d"
+		,"operation %s[%d] on unknown rsc(may deleted) for client %d"
 		,lrmd_nullcheck(op_type)
+		,op->call_id
 		,op->client_id);
 		
 	}else{
 		snprintf(info, sizeof(info)
-		,	"operation %s on %s::%s::%s for client %d"
-		,	lrmd_nullcheck(op_type)
-		,	lrmd_nullcheck(rsc->class)
-		,	lrmd_nullcheck(rsc->type)
-		,	lrmd_nullcheck(rsc->id)
-		,	op->client_id);
+		,"operation %s[%d] on %s::%s::%s for client %d"
+		,lrmd_nullcheck(op_type)
+		,op->call_id
+		,lrmd_nullcheck(rsc->class)
+		,lrmd_nullcheck(rsc->type)
+		,lrmd_nullcheck(rsc->id)
+		,op->client_id);
 	}
 	return info;
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.165  2005/06/30 09:42:41  zhenh
+ * show call id of op to make it more clear
+ *
  * Revision 1.164  2005/06/30 08:22:03  zhenh
  * Fixed a bug. the t_stay_in_list has been in ms already
  *
