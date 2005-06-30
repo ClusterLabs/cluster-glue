@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.163 2005/06/30 07:12:16 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.164 2005/06/30 08:22:03 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2847,7 +2847,7 @@ perform_ra_op(lrmd_op_t* op)
 	const char* op_type = NULL;
         GHashTable* params = NULL;
         GHashTable* op_params = NULL;
-	longclock_t t_stay_in_list = 0;
+	unsigned long t_stay_in_list = 0;
 	lrmd_rsc_t* rsc = NULL;
 	
 	CHECK_ALLOCATED(op, "op", HA_FAIL);
@@ -2875,7 +2875,7 @@ perform_ra_op(lrmd_op_t* op)
 		lrmd_log(LOG_ERR
 		,	"perform_ra_op: the operation %s stayed in operation "
 			"list for %lu ms (longer than %d ms)"
-		,	op_info(op), (unsigned long)longclockto_ms(t_stay_in_list)
+		,	op_info(op), t_stay_in_list
 		,	WARNINGTIME_IN_LIST
 		);
 		dump_data_for_debug();
@@ -3281,6 +3281,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.164  2005/06/30 08:22:03  zhenh
+ * Fixed a bug. the t_stay_in_list has been in ms already
+ *
  * Revision 1.163  2005/06/30 07:12:16  sunjd
  * Bug 499: SIGCHLD should interrupt the system calls
  *
