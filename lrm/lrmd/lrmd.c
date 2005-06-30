@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.165 2005/06/30 09:42:41 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.166 2005/06/30 10:49:33 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2849,6 +2849,7 @@ perform_ra_op(lrmd_op_t* op)
         GHashTable* op_params = NULL;
 	unsigned long t_stay_in_list = 0;
 	lrmd_rsc_t* rsc = NULL;
+	int flag;
 	
 	CHECK_ALLOCATED(op, "op", HA_FAIL);
 	rsc = (lrmd_rsc_t*)lookup_rsc(op->rsc_id);
@@ -2901,9 +2902,19 @@ perform_ra_op(lrmd_op_t* op)
 		default:	/* Parent */
 			NewTrackedProc(pid, 1, PT_LOGNONE, op, &ManagedChildTrackOps);
 			close(fd[1]);
+			/* Let the read operation be NONBLOCK */ 
+			if (-1 != (flag = fcntl(fd[0], F_GETFL))) {
+				if (-1 == fcntl(fd[0], F_SETFL, flag|O_NONBLOCK)) {
+					lrmd_log(LOG_ERR,"perform_ra_op: fcntl: %s"
+					, 	strerror(errno));
+				}
+			} else {
+				lrmd_log(LOG_ERR,"perform_ra_op: fcntl: %s"
+				, 	strerror(errno));
+			}
 			op->output_fd = fd[0];
 			op->exec_pid = pid;
-
+			
 			return_to_dropped_privs();
 			return HA_OK;
 
@@ -3163,12 +3174,14 @@ read_pipe(int fd, char ** data)
 			g_string_append(gstr_tmp, buffer);
 		}
 	} while (readlen == BUFFLEN - 1 || errno == EINTR);
-	close(fd);
 
-	if (readlen < 0) {
+	if ( (errno != EAGAIN) && (readlen < 0) ) {
 		lrmd_log(LOG_ERR, "read_pipe: an error happens when reading.");
+		close(fd);
 		return -1;
 	}
+	close(fd);
+
 	if ( gstr_tmp->len == 0 ) {
 		lrmd_log(LOG_DEBUG, "read_pipe: read 0 byte from this pipe.");
 		return 0;
@@ -3283,6 +3296,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.166  2005/06/30 10:49:33  sunjd
+ * bug 553: let the pipe reading be NOBLOCK
+ *
  * Revision 1.165  2005/06/30 09:42:41  zhenh
  * show call id of op to make it more clear
  *
