@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.162 2005/06/15 14:13:27 davidlee Exp $ */
+/* $Id: lrmd.c,v 1.163 2005/06/30 07:12:16 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1032,10 +1032,10 @@ register_pid(gboolean do_fork,
 	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGTERM
 	,	 	shutdown, NULL, NULL);
 	cl_signal_set_interrupt(SIGTERM, 1);
+	cl_signal_set_interrupt(SIGCHLD, 1);
 	/* At least they are harmless, I think. ;-) */
 	cl_signal_set_interrupt(SIGINT, 0);
 	cl_signal_set_interrupt(SIGHUP, 0);
-
 }
 
 static int
@@ -3281,6 +3281,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.163  2005/06/30 07:12:16  sunjd
+ * Bug 499: SIGCHLD should interrupt the system calls
+ *
  * Revision 1.162  2005/06/15 14:13:27  davidlee
  * common code for syslog facility name/value conversion
  *
