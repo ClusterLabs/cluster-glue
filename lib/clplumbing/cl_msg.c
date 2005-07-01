@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.70 2005/06/08 20:47:25 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.71 2005/07/01 19:08:42 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -115,8 +115,8 @@ cl_dump_msgstats(void)
 {
 	if (msgstats){
 		cl_log(LOG_INFO, "dumping msg stats: "
-		       "allocmsgs=%lu totalmsgs=%lu",
-		       msgstats->allocmsgs, msgstats->totalmsgs);
+		       "allocmsgs=%lu",
+		      msgstats->allocmsgs);
 	}
 	return;
 }
@@ -144,7 +144,7 @@ ha_msg_new(nfields)
 {
 	struct ha_msg *	ret;
 	int	nalloc;
-
+	
 	ret = MALLOCT(struct ha_msg);
 	if (ret) {
 		ret->nfields = 0;
@@ -1790,6 +1790,21 @@ msg2stream(struct ha_msg* m, FILE * f)
 }
 static void ipcmsg_done(IPC_Message* m);
 
+static int clmsg_ipcmsg_allocated = 0;
+static int clmsg_ipcmsg_freed = 0;
+
+void dump_clmsg_ipcmsg_stats(void);
+void
+dump_clmsg_ipcmsg_stats(void)
+{
+	cl_log(LOG_INFO, "clmsg ipcmsg allocated=%d, freed=%d, diff=%d",
+	       clmsg_ipcmsg_allocated,
+	       clmsg_ipcmsg_freed,
+	       clmsg_ipcmsg_allocated - clmsg_ipcmsg_freed);
+	
+	return;
+}
+
 static void
 ipcmsg_done(IPC_Message* m)
 {
@@ -1801,7 +1816,9 @@ ipcmsg_done(IPC_Message* m)
 	}
 	ha_free(m);
 	m = NULL;
+	clmsg_ipcmsg_freed ++;
 }
+
 
 
 /*
@@ -1835,6 +1852,8 @@ wirefmt2ipcmsg(void* p, size_t len, IPC_Channel* ch)
 	ret->msg_private = NULL;
 	ret->msg_ch = ch;
 	ret->msg_len = len;
+
+	clmsg_ipcmsg_allocated ++;
 
 	return ret;
 
@@ -1872,6 +1891,8 @@ hamsg2ipcmsg(struct ha_msg* m, IPC_Channel* ch)
 	ret->msg_private = NULL;
 	ret->msg_ch = ch;
 	ret->msg_len = len;
+
+	clmsg_ipcmsg_allocated ++;
 
 	return ret;
 }
@@ -2309,6 +2330,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.71  2005/07/01 19:08:42  gshi
+ * keep track of ipcmsg in cl_msg.c
+ *
  * Revision 1.70  2005/06/08 20:47:25  gshi
  * add a function to dump message stats
  *
