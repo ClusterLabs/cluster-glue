@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.35 2005/06/08 20:46:44 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.36 2005/07/01 18:58:13 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -282,6 +282,18 @@ ipc_bufpool_display(struct ipc_bufpool* pool)
 	       pool->consumepos,
 	       pool->endpos,
 	       pool->size);
+}
+
+void ipc_bufpool_dump_stats(void);
+void
+ipc_bufpool_dump_stats(void)
+{
+	cl_log(LOG_INFO, "num_pool_allocated=%d, num_pool_freed=%d, diff=%d", 
+	       num_pool_allocated, 
+	       num_pool_freed, 
+	       num_pool_allocated - num_pool_freed);
+	return;
+	       
 }
 
 struct ipc_bufpool*
