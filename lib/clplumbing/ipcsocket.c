@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.155 2005/06/03 17:01:03 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.156 2005/07/01 18:59:50 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1503,6 +1503,21 @@ socket_set_recv_qlen (struct IPC_CHANNEL* ch, int q_len)
 }
 
 
+static int ipcmsg_count_allocated = 0;
+static int ipcmsg_count_freed = 0;
+void socket_ipcmsg_dump_stats(void);
+void
+socket_ipcmsg_dump_stats(void){
+	
+	cl_log(LOG_INFO, "ipcsocket ipcmsg allocated=%d, freed=%d, diff=%d",
+	       ipcmsg_count_allocated,
+	       ipcmsg_count_freed,
+	       ipcmsg_count_allocated - ipcmsg_count_freed);
+
+	return;
+
+}
+
 static void
 socket_del_ipcmsg(IPC_Message* m)
 {
@@ -1521,6 +1536,8 @@ socket_del_ipcmsg(IPC_Message* m)
 	
 	memset(m, 0, sizeof(*m));
 	g_free(m);
+
+	ipcmsg_count_freed ++;
 	
 	return;
 }
@@ -1533,7 +1550,7 @@ socket_new_ipcmsg(IPC_Channel* ch, const void* data, int len, void* private)
 	char*	copy = NULL;
 	char*	buf;
 	char*	body;
-
+	
 	if (ch == NULL || len < 0){
 		cl_log(LOG_ERR, "socket_new_ipcmsg:"
 		       " invalid parameter");
@@ -1575,6 +1592,8 @@ socket_new_ipcmsg(IPC_Channel* ch, const void* data, int len, void* private)
 	hdr->msg_ch = ch;
 	hdr->msg_done = socket_del_ipcmsg;
 	hdr->msg_private = private;
+	
+	ipcmsg_count_allocated ++;
 	
 	return hdr;
 }
