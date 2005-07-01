@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.59 2005/06/08 11:44:27 andrew Exp $ */
+/* $Id: cl_log.c,v 1.60 2005/07/01 19:02:58 gshi Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -739,7 +739,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 			}
 			
 			drop_msg_num=0;
-			
+			FreeChildLogIPCMessage(msg);
 			return HA_FAIL;
 		}
 
@@ -780,6 +780,25 @@ send_dropped_message(gboolean use_pri_str, IPC_Channel *chan)
 }
 
 
+
+
+static int childlog_ipcmsg_allocated = 0;
+static int childlog_ipcmsg_freed = 0;
+void	childlog_dump_ipcmsg_stats(void);
+void
+childlog_dump_ipcmsg_stats(void)
+{
+	
+	cl_log(LOG_INFO, "childlog ipcmsg allocated:%d, freed=%d, diff =%d",
+	       childlog_ipcmsg_allocated,
+	       childlog_ipcmsg_freed,
+	       childlog_ipcmsg_allocated - childlog_ipcmsg_freed);
+	
+	return;
+	
+	
+}
+
 IPC_Message*
 ChildLogIPCMessage(int priority, const char *buf, int bufstrlen, 
 		   gboolean use_prio_str, IPC_Channel* ch)
@@ -788,6 +807,7 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	LogDaemonMsg	logbuf;
 	int		msglen;
 	char*		bodybuf;
+	
 	
 	if (ch->msgpad > MAX_MSGPAD){
 		cl_log(LOG_ERR, "ChildLogIPCMessage: invalid msgpad(%d)",
@@ -837,6 +857,9 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	ret->msg_body = bodybuf + ch->msgpad;
 	ret->msg_done = FreeChildLogIPCMessage;
 	ret->msg_ch = ch;
+
+	childlog_ipcmsg_allocated++;
+
 	return ret;
 }
 
@@ -847,12 +870,16 @@ FreeChildLogIPCMessage(IPC_Message* msg)
 	if (msg == NULL) {
 		return;
 	}
-	if (msg->msg_buf != NULL) {
-		memset(msg->msg_body, 0, msg->msg_len);
-		cl_free(msg->msg_buf);
-	}
+	memset(msg->msg_body, 0, msg->msg_len);
+	cl_free(msg->msg_buf);
+	
 	memset(msg, 0, sizeof (*msg));
 	cl_free(msg);
+	
+	childlog_ipcmsg_freed ++;
+	
+	return;
+
 }
 
 
