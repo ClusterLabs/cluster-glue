@@ -62,7 +62,7 @@ DoLock(const char *filename)
 {
 	char lf_name[256], tf_name[256], buf[LOCKSTRLEN+1];
 	int fd;
-	unsigned long pid, mypid;
+	long	pid, mypid;
 	int rc;
 	struct stat sbuf;
 

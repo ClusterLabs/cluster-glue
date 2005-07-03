@@ -1,4 +1,4 @@
-/* $Id: cl_log.h,v 1.18 2005/05/06 16:03:17 gshi Exp $ */
+/* $Id: cl_log.h,v 1.19 2005/07/03 22:15:49 alan Exp $ */
 #ifndef _CLPLUMBING_CL_LOG_H
 #	define _CLPLUMBING_CL_LOG_H
 #	include <glib.h>
@@ -37,10 +37,10 @@ void		cl_glib_msg_handler(const gchar *log_domain
 
 typedef struct CircularBuffer_s 
 {
-	const char *name;
-	unsigned int size;
-	gboolean empty_after_dump;
-	GQueue *queue;
+	const char*	name;
+	size_t		size;
+	gboolean	empty_after_dump;
+	GQueue*		queue;
 	
 } CircularBuffer_t;
 

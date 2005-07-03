@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.27 2005/06/27 17:42:57 blaschke Exp $ */
+/* $Id: wti_nps.c,v 1.28 2005/07/03 22:15:50 alan Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -479,7 +479,7 @@ wti_nps_hostlist(StonithPlugin  *s)
 	unsigned int	numnames = 0;
 	char **		ret = NULL;
 	struct pluginDevice*	nps;
-	int		i;
+	unsigned int	i;
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
