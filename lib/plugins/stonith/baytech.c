@@ -1,4 +1,4 @@
-/* $Id: baytech.c,v 1.27 2005/04/20 20:18:16 blaschke Exp $ */
+/* $Id: baytech.c,v 1.28 2005/07/03 22:15:50 alan Exp $ */
 /*
  *	Stonith module for BayTech Remote Power Controllers (RPC-x devices)
  *
@@ -564,7 +564,7 @@ baytech_hostlist(StonithPlugin  *s)
 	unsigned int	numnames = 0;
 	char **		ret = NULL;
 	struct pluginDevice*	bt;
-	int		i;
+	unsigned int	i;
 
 	ERRIFNOTCONFIGED(s,NULL);
 

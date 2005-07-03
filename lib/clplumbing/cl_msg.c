@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.71 2005/07/01 19:08:42 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.72 2005/07/03 22:15:50 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -2248,7 +2248,7 @@ static struct ha_msg*
 wirefmt2msg_ll(const char* s, size_t length, int need_auth)
 {
 
-	int startlen;
+	size_t startlen;
 	
 
 
@@ -2330,6 +2330,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.72  2005/07/03 22:15:50  alan
+ * Huge number of signed/unsigned comparisons.
+ *
  * Revision 1.71  2005/07/01 19:08:42  gshi
  * keep track of ipcmsg in cl_msg.c
  *

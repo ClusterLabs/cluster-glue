@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.50 2005/06/02 15:54:49 gshi Exp $ */
+/* $Id: ipc.h,v 1.51 2005/07/03 22:15:49 alan Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -184,9 +184,9 @@ struct IPC_CHANNEL{
 };
 
 struct IPC_QUEUE{
-	int		current_qlen;	/* Current qlen */
-	int		max_qlen;	/* Max allowed qlen */
-	GList*	queue;		/* List of messages */
+	size_t		current_qlen;	/* Current qlen */
+	size_t		max_qlen;	/* Max allowed qlen */
+	GList*		queue;		/* List of messages */
 };
 
 /* authentication information : set of gids and uids */

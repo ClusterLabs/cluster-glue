@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.24 2005/04/20 20:18:16 blaschke Exp $ */
+/* $Id: apcmaster.c,v 1.25 2005/07/03 22:15:50 alan Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -51,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.24 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.25 $"; 
 
 #define	DEVICE	"APC MasterSwitch"
 
@@ -527,7 +527,7 @@ apcmaster_hostlist(StonithPlugin  *s)
 	unsigned int	numnames = 0;
 	char **		ret = NULL;
 	struct pluginDevice*	ms;
-	int		i;
+	unsigned int	i;
 
 	ERRIFNOTCONFIGED(s,NULL);
 

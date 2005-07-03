@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.156 2005/07/01 18:59:50 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.157 2005/07/03 22:15:50 alan Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1128,7 +1128,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 	struct pollfd			sockpoll;
 	int				debug_loopcount = 0;
 	int				debug_bytecount = 0;
-	int				maxqlen = ch->recv_queue->max_qlen;
+	size_t				maxqlen = ch->recv_queue->max_qlen;
 	struct ipc_bufpool*		pool = ch->pool;
 	int				nmsgs = 0;
 	int				spaceneeded;
