@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.167 2005/07/04 04:27:48 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.168 2005/07/04 23:54:06 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2849,7 +2849,9 @@ perform_ra_op(lrmd_op_t* op)
         GHashTable* op_params = NULL;
 	unsigned long t_stay_in_list = 0;
 	lrmd_rsc_t* rsc = NULL;
+#if defined(ENABLE_BROKEN_CODE)
 	int flag;
+#endif
 	
 	CHECK_ALLOCATED(op, "op", HA_FAIL);
 	rsc = (lrmd_rsc_t*)lookup_rsc(op->rsc_id);
@@ -2902,9 +2904,17 @@ perform_ra_op(lrmd_op_t* op)
 		default:	/* Parent */
 			NewTrackedProc(pid, 1, PT_LOGNONE, op, &ManagedChildTrackOps);
 			close(fd[1]);
+#if defined(ENABLE_BROKEN_CODE)
+			/*
+			 * If you hang in a read system call, then this is an OS
+			 * bug, which is highly unlikely - not impossible - but
+			 * I haven't seen any proof of an OS bug exists - or that
+			 * you were even in the read system call.
+			 * Not only that, but this code breaks basic Sanity Check.
+			 */
 			/* Let the read operation be NONBLOCK */ 
-			if (-1 != (flag = fcntl(fd[0], F_GETFL))) {
-				if (-1 == fcntl(fd[0], F_SETFL, flag|O_NONBLOCK)) {
+			if ((flag = fcntl(fd[0], F_GETFL)) < 0) {
+				if (fcntl(fd[0], F_SETFL, flag|O_NONBLOCK) < 0) {
 					lrmd_log(LOG_ERR,"perform_ra_op: fcntl: %s"
 					, 	strerror(errno));
 				}
@@ -2912,6 +2922,7 @@ perform_ra_op(lrmd_op_t* op)
 				lrmd_log(LOG_ERR,"perform_ra_op: fcntl: %s"
 				, 	strerror(errno));
 			}
+#endif
 			op->output_fd = fd[0];
 			op->exec_pid = pid;
 			
@@ -2925,7 +2936,7 @@ perform_ra_op(lrmd_op_t* op)
 			 */
 			setpgid(0,0);
 			close(fd[0]);
-			if ( STDOUT_FILENO != fd[1]) {
+			if (STDOUT_FILENO != fd[1]) {
 				if (dup2(fd[1], STDOUT_FILENO)!=STDOUT_FILENO) {
 					lrmd_log(LOG_ERR,"perform_ra_op: dup2 error.");
 				}
@@ -3170,22 +3181,22 @@ read_pipe(int fd, char ** data)
 	/* the log is only for bug 475, or should remove it. */
 	lrmd_log(LOG_DEBUG, "read_pipe: begin to read.");
 	do {
-		memset(buffer, 0, BUFFLEN);
 		errno = 0;
 		readlen = read(fd, buffer, BUFFLEN - 1);
 		if ( readlen > 0 ) {
+			buffer[readlen] = EOS;
 			g_string_append(gstr_tmp, buffer);
 		}
 	} while (readlen == BUFFLEN - 1 || errno == EINTR);
-	/* the log is only for bug 475, or should remove it. */
-	lrmd_log(LOG_DEBUG, "read_pipe: out of the pipe reading loop.");
-
-	if ( (errno != EAGAIN) && (readlen < 0) ) {
-		lrmd_log(LOG_ERR, "read_pipe: an error happens when reading.");
-		close(fd);
+	close(fd);
+	if (readlen < 0) {
+		/* EAGAIN is a fatal error
+		 * it means you failed to read what was there to read.
+		 * Ignoring it is NOT OK.
+		 */
+		cl_perror("read_pipe: read error");
 		return -1;
 	}
-	close(fd);
 
 	if ( gstr_tmp->len == 0 ) {
 		lrmd_log(LOG_DEBUG, "read_pipe: read 0 byte from this pipe.");
@@ -3194,6 +3205,7 @@ read_pipe(int fd, char ** data)
 
 	*data = g_malloc(gstr_tmp->len + 1);
 	if ( *data == NULL ) {
+		/* Note: g_malloc will never fail - it will core dump you */
 		lrmd_log(LOG_ERR, "read_pipe: g_malloc error.");
 		return -1;
 	}
@@ -3301,6 +3313,10 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.168  2005/07/04 23:54:06  alan
+ * BasicSanityCheck fix in lrmd:  the code for NODELAY reading appears to be breaking BSC.
+ * If not, I'll revert it.
+ *
  * Revision 1.167  2005/07/04 04:27:48  sunjd
  * add log for bug 475
  *
