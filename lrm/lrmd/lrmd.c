@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.166 2005/06/30 10:49:33 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.167 2005/07/04 04:27:48 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3166,6 +3166,9 @@ read_pipe(int fd, char ** data)
 
 	*data = NULL;
 	gstr_tmp = g_string_new("");
+	
+	/* the log is only for bug 475, or should remove it. */
+	lrmd_log(LOG_DEBUG, "read_pipe: begin to read.");
 	do {
 		memset(buffer, 0, BUFFLEN);
 		errno = 0;
@@ -3174,6 +3177,8 @@ read_pipe(int fd, char ** data)
 			g_string_append(gstr_tmp, buffer);
 		}
 	} while (readlen == BUFFLEN - 1 || errno == EINTR);
+	/* the log is only for bug 475, or should remove it. */
+	lrmd_log(LOG_DEBUG, "read_pipe: out of the pipe reading loop.");
 
 	if ( (errno != EAGAIN) && (readlen < 0) ) {
 		lrmd_log(LOG_ERR, "read_pipe: an error happens when reading.");
@@ -3296,6 +3301,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.167  2005/07/04 04:27:48  sunjd
+ * add log for bug 475
+ *
  * Revision 1.166  2005/06/30 10:49:33  sunjd
  * bug 553: let the pipe reading be NOBLOCK
  *
