@@ -1,4 +1,4 @@
-/* $Id: realtime.c,v 1.26 2005/06/20 13:04:24 andrew Exp $ */
+/* $Id: realtime.c,v 1.27 2005/07/04 05:05:43 alan Exp $ */
 #include <portability.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -13,6 +13,8 @@
 #include <unistd.h>
 #ifdef _POSIX_MEMLOCK
 #	include <sys/mman.h>
+#	include <sys/time.h>
+#	include <sys/resource.h>
 #endif
 #ifdef _POSIX_PRIORITY_SCHEDULING
 #	include <sched.h>
@@ -161,7 +163,36 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 	}
 #endif
 
-#if defined _POSIX_MEMLOCK && !defined(ON_DARWIN)
+#if defined _POSIX_MEMLOCK /* && !defined(ON_DARWIN) Wrong way to do this -- add an autoconf test ...*/
+#	ifdef RLIMIT_MEMLOCK
+#	define	THRESHOLD(lim)	(((lim))/2)
+	{
+		unsigned long		growsize = ((stackgrowK+heapgrowK)*1024);
+		struct rlimit		memlocklim;
+
+		getrlimit(RLIMIT_MEMLOCK, &memlocklim);	/* Allow for future added fields */
+		memlocklim.rlim_max = RLIM_INFINITY;
+		memlocklim.rlim_cur = RLIM_INFINITY;
+		/* Try and remove memory locking limits -- if we can */
+		if (setrlimit(RLIMIT_MEMLOCK, &memlocklim) < 0) {
+			/* Didn't work - get what we can */
+			getrlimit(RLIMIT_MEMLOCK, &memlocklim);
+			memlocklim.rlim_cur = memlocklim.rlim_max;
+			setrlimit(RLIMIT_MEMLOCK, &memlocklim);
+		}
+
+		/* Could we get 'enough' ? */
+		/* (this is a guess - might not be right if we're not root) */
+		if (getrlimit(RLIMIT_MEMLOCK, &memlocklim) >= 0
+		&&	memlocklim.rlim_cur != RLIM_INFINITY
+		&&	(growsize >= THRESHOLD(memlocklim.rlim_cur))) {
+			cl_log(LOG_ERR
+			,	"Cannot lock ourselves into memory:  System limits"
+			" on locked-in memory are too small.");
+				return;
+		}
+	}
+#	endif	/*RLIMIT_MEMLOCK*/
 	if (mlockall(MCL_CURRENT|MCL_FUTURE) < 0) {
 		cl_perror("Unable to lock pid %d in memory", (int) getpid());
 	}else{
