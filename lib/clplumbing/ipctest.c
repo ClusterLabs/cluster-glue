@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.37 2005/04/12 21:00:11 alan Exp $ */
+/* $Id: ipctest.c,v 1.38 2005/07/05 15:34:59 andrew Exp $ */
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -211,8 +211,8 @@ EOFcheck(IPC_Channel* chan)
 	cl_log(LOG_INFO, "channel state: %d", chan->ch_status);
 
 	if (chan->recv_queue->current_qlen > 0) {
-		cl_log(LOG_INFO, "EOF Receive queue has %d messages in it"
-		,	chan->recv_queue->current_qlen);
+		cl_log(LOG_INFO, "EOF Receive queue has %ld messages in it"
+		,	(long)chan->recv_queue->current_qlen);
 	}
 	if (fd <= 0) {
 		cl_log(LOG_INFO, "EOF receive fd: %d", fd);
@@ -830,9 +830,9 @@ s_send_msg(gpointer data)
 		" %d rc iter %d"
 		,	rc, i->wcount);
 		cl_log(LOG_ERR
-		,	"s_send_msg: channel status: %d qlen: %d"
+		,	"s_send_msg: channel status: %d qlen: %ld"
 		,	i->chan->ch_status
-		,	i->chan->send_queue->current_qlen);
+		,	(long)i->chan->send_queue->current_qlen);
 		++i->errcount;
 		if (i->chan->ch_status != IPC_CONNECT) {
 			cl_log(LOG_ERR,	"s_send_msg: Exiting.");
@@ -992,8 +992,8 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 		
 		if (chan->ch_status !=  IPC_CONNECT){
 			cl_log(LOG_ERR,
-			       "s_echo_msg: send failed %d rc iter %d qlen %d",
-			       rc, i->rcount, chan->send_queue->current_qlen);
+			       "s_echo_msg: send failed %d rc iter %d qlen %ld",
+			       rc, i->rcount, (long)chan->send_queue->current_qlen);
 			cl_perror("send");
 			i->errcount ++;
 			

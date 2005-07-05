@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.168 2005/07/04 23:54:06 alan Exp $ */
+/* $Id: lrmd.c,v 1.169 2005/07/05 15:34:59 andrew Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -637,19 +637,19 @@ lrmd_client_dump(gpointer key, gpointer value, gpointer user_data)
 		,	client->ch_cmd->send_queue );
 
 		if (client->ch_cmd->recv_queue && client->ch_cmd->send_queue) {
-			lrmd_log(LOG_DEBUG, "read Qlen: %d, write Qlen: %d"
-			,	client->ch_cmd->recv_queue->current_qlen
-			,	client->ch_cmd->send_queue->current_qlen);
+			lrmd_log(LOG_DEBUG, "read Qlen: %ld, write Qlen: %ld"
+			,	(long)client->ch_cmd->recv_queue->current_qlen
+			,	(long)client->ch_cmd->send_queue->current_qlen);
 		}
 	}
 	if (!client->ch_cbk) {
 		lrmd_log(LOG_DEBUG, "NULL client ch_cbk in %s()", __FUNCTION__);
 	}else{
 		lrmd_log(LOG_DEBUG
-		,	"Callback channel status: %d, read Qlen: %d, write Qlen: %d"
+		,	"Callback channel status: %d, read Qlen: %ld, write Qlen: %ld"
 		,	client->ch_cbk->ch_status
-		,	client->ch_cbk->recv_queue->current_qlen
-		,	client->ch_cbk->send_queue->current_qlen);
+		,	(long)client->ch_cbk->recv_queue->current_qlen
+		,	(long)client->ch_cbk->send_queue->current_qlen);
 	}
 }
 static void
@@ -3313,6 +3313,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.169  2005/07/05 15:34:59  andrew
+ * Printing size_t on Darwin
+ *
  * Revision 1.168  2005/07/04 23:54:06  alan
  * BasicSanityCheck fix in lrmd:  the code for NODELAY reading appears to be breaking BSC.
  * If not, I'll revert it.
