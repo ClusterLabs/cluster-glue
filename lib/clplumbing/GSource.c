@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.49 2005/05/27 20:03:02 alan Exp $ */
+/* $Id: GSource.c,v 1.50 2005/07/05 20:59:27 alan Exp $ */
 #include <portability.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -850,12 +850,14 @@ G_main_del_SignalHandler(GSIGSource* sig_src)
 }
 
 static gboolean
-G_SIG_prepare(GSource* source, gint* timeout)
+G_SIG_prepare(GSource* source, gint* timeoutms)
 {
 	GSIGSource* sig_src = (GSIGSource*)source;
 	
 	g_assert(IS_SIGSOURCE(sig_src));
 	
+	/* Don't let a timing window keep us in poll() forever */
+	*timeoutms = 1000;
 	return sig_src->signal_triggered;
 }
 
