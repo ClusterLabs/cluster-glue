@@ -76,7 +76,7 @@
 
 #define WRITE_PROC_CHAN	0
 #define READ_PROC_CHAN	1
-#define LOGD_QUEUE_LEN 128
+#define LOGD_QUEUE_LEN  128
 
 #define MAXLINE 128
 #define EOS '\0'
@@ -416,8 +416,9 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 			" write process failed"
 			,	__FUNCTION__
 		       ,	client->app_name, client->pid);
-			cl_log(LOG_ERR, "queue too small? (max=%d, current len =%d)",
-			       logchan->send_queue->max_qlen, logchan->send_queue->current_qlen);
+			cl_log(LOG_ERR, "queue too small? (max=%ld, current len =%ld)",
+			       (long)logchan->send_queue->max_qlen,
+			       (long)logchan->send_queue->current_qlen);
 			return TRUE;
 		}
 		
