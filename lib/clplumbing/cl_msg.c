@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.72 2005/07/03 22:15:50 alan Exp $ */
+/* $Id: cl_msg.c,v 1.73 2005/07/06 09:41:09 andrew Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1926,9 +1926,9 @@ msg2ipcchan(struct ha_msg*m, IPC_Channel*ch)
 	if (ch->ops->send(ch, imsg) != IPC_OK) {
 		if (ch->ch_status == IPC_CONNECT) {
 			snprintf(ch->failreason,MAXFAILREASON, 
-				 "send failed,farside_pid=%d, sendq length=%d(max is %d)",
-				 ch->farside_pid, ch->send_queue->current_qlen, 
-				 ch->send_queue->max_qlen);	
+				 "send failed,farside_pid=%d, sendq length=%ld(max is %ld)",
+				 ch->farside_pid, (long)ch->send_queue->current_qlen, 
+				 (long)ch->send_queue->max_qlen);	
 		}
 		imsg->msg_done(imsg);
 		return HA_FAIL;
@@ -2330,6 +2330,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.73  2005/07/06 09:41:09  andrew
+ * Some more places where printing size_t as an int was a problem.
+ *
  * Revision 1.72  2005/07/03 22:15:50  alan
  * Huge number of signed/unsigned comparisons.
  *
