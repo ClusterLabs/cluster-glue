@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.157 2005/07/03 22:15:50 alan Exp $ */
+/* $Id: ipcsocket.c,v 1.158 2005/07/06 09:41:09 andrew Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -920,8 +920,8 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 	if (element == NULL) {
 		/* Internal accounting error, but correctable */
 		cl_log(LOG_ERR
-		, "recv failure: qlen (%d) > 0, but no message found."
-		,	ch->recv_queue->current_qlen);
+		, "recv failure: qlen (%ld) > 0, but no message found."
+		,	(long)ch->recv_queue->current_qlen);
 		ch->recv_queue->current_qlen = 0;
 		return IPC_FAIL;
 	}
