@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.169 2005/07/05 15:34:59 andrew Exp $ */
+/* $Id: lrmd.c,v 1.170 2005/07/06 08:58:38 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2849,9 +2849,7 @@ perform_ra_op(lrmd_op_t* op)
         GHashTable* op_params = NULL;
 	unsigned long t_stay_in_list = 0;
 	lrmd_rsc_t* rsc = NULL;
-#if defined(ENABLE_BROKEN_CODE)
 	int flag;
-#endif
 	
 	CHECK_ALLOCATED(op, "op", HA_FAIL);
 	rsc = (lrmd_rsc_t*)lookup_rsc(op->rsc_id);
@@ -2904,25 +2902,20 @@ perform_ra_op(lrmd_op_t* op)
 		default:	/* Parent */
 			NewTrackedProc(pid, 1, PT_LOGNONE, op, &ManagedChildTrackOps);
 			close(fd[1]);
-#if defined(ENABLE_BROKEN_CODE)
 			/*
-			 * If you hang in a read system call, then this is an OS
-			 * bug, which is highly unlikely - not impossible - but
-			 * I haven't seen any proof of an OS bug exists - or that
-			 * you were even in the read system call.
-			 * Not only that, but this code breaks basic Sanity Check.
+			 * No any obviouse proof of lrmd hang in pipe read yet.
+			 * Bug 475 may be a duplicate of bug 499.
+			 * Anyway, via test, it's proved that NOBLOCK read will
+			 * obviously reduce the RA execution time (bug 553).
 			 */
 			/* Let the read operation be NONBLOCK */ 
-			if ((flag = fcntl(fd[0], F_GETFL)) < 0) {
+			if ((flag = fcntl(fd[0], F_GETFL)) >= 0) {
 				if (fcntl(fd[0], F_SETFL, flag|O_NONBLOCK) < 0) {
-					lrmd_log(LOG_ERR,"perform_ra_op: fcntl: %s"
-					, 	strerror(errno));
+					cl_perror("perform_ra_op: fcntl");
 				}
 			} else {
-				lrmd_log(LOG_ERR,"perform_ra_op: fcntl: %s"
-				, 	strerror(errno));
+				cl_perror("perform_ra_op: fcntl");
 			}
-#endif
 			op->output_fd = fd[0];
 			op->exec_pid = pid;
 			
@@ -3178,7 +3171,7 @@ read_pipe(int fd, char ** data)
 	*data = NULL;
 	gstr_tmp = g_string_new("");
 	
-	/* the log is only for bug 475, or should remove it. */
+	/* the log is only for analysing bug 475, or should remove it. */
 	lrmd_log(LOG_DEBUG, "read_pipe: begin to read.");
 	do {
 		errno = 0;
@@ -3188,15 +3181,20 @@ read_pipe(int fd, char ** data)
 			g_string_append(gstr_tmp, buffer);
 		}
 	} while (readlen == BUFFLEN - 1 || errno == EINTR);
-	close(fd);
-	if (readlen < 0) {
-		/* EAGAIN is a fatal error
-		 * it means you failed to read what was there to read.
-		 * Ignoring it is NOT OK.
+
+	if ((readlen < 0) && (errno != EAGAIN)) {
+		/* EAGAIN is a not an error for pipe NOBLOCK reading.
+		 * From 'mans -S 2 read'
+		 * EAGAIN Non-blocking  I/O has been selected using O_NONBLOCK
+		 * and no data was immediately available for reading.
 		 */
 		cl_perror("read_pipe: read error");
+		close(fd);
 		return -1;
 	}
+	/* the log is only for analysing bug 475, or should remove it. */
+	lrmd_log(LOG_DEBUG, "read_pipe: finished the pipe read.");
+	close(fd);
 
 	if ( gstr_tmp->len == 0 ) {
 		lrmd_log(LOG_DEBUG, "read_pipe: read 0 byte from this pipe.");
@@ -3313,6 +3311,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.170  2005/07/06 08:58:38  sunjd
+ * enable the NOBLOCK pipe read which not break BSC anymore
+ *
  * Revision 1.169  2005/07/05 15:34:59  andrew
  * Printing size_t on Darwin
  *
