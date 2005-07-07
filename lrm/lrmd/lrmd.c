@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.170 2005/07/06 08:58:38 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.171 2005/07/07 03:26:42 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2539,7 +2539,7 @@ on_op_done(lrmd_op_t* op)
 	}
 	op->t_done = time_longclock();
 	
-	lrmd_log2(LOG_DEBUG, "on_op_done:DONE:%s", op_info(op));
+	lrmd_log(LOG_DEBUG, "on_op_done: %s", op_info(op));
 	lrmd_log2(LOG_DEBUG
 		 ,"TimeStamp:  Recv:%ld,Add to List:%ld,Perform:%ld, Done %ld"
 		 ,longclockto_ms(op->t_recv)
@@ -3311,6 +3311,9 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.171  2005/07/07 03:26:42  zhenh
+ * upgrade the log of on_op_done
+ *
  * Revision 1.170  2005/07/06 08:58:38  sunjd
  * enable the NOBLOCK pipe read which not break BSC anymore
  *
