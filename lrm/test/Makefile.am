@@ -37,7 +37,7 @@ apitest_DEPENDENCIES    = 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 
 plugintest_SOURCES 	= 	plugintest.c
 plugintest_LDADD 	= 	$(top_builddir)/lib/clplumbing/libplumb.la $(GLIBLIB)
-plugintest_LDFLAGS 	= 	-L$(top_builddir)/lib/pils -lpils
+plugintest_LDFLAGS 	= 	-L$(top_builddir)/lib/pils -lpils @LIBLTDL@
 
 callbacktest_SOURCES	=	callbacktest.c
 callbacktest_LDFLAGS 	= 	$(COMMONLIBS)
