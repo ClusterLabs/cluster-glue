@@ -734,7 +734,7 @@ logd_term_action(int sig, gpointer userdata)
 
 		cl_log(LOG_DEBUG, "logd_term_action:"
 		       " waiting for %d messages to be read for process %s",
-		       client->logchan->send_queue->current_qlen,
+		       (int)client->logchan->send_queue->current_qlen,
 		       client->app_name);
 		
 		while(client->logchan->send_queue->current_qlen > 0) {
@@ -744,7 +744,7 @@ logd_term_action(int sig, gpointer userdata)
 
 	cl_log(LOG_DEBUG, "logd_term_action:"
 	       " waiting for %d messages to be read by write process",
-	       chanspair[WRITE_PROC_CHAN]->send_queue->current_qlen);
+	       (int)chanspair[WRITE_PROC_CHAN]->send_queue->current_qlen);
 	while(chanspair[WRITE_PROC_CHAN]->send_queue->current_qlen > 0) {
 		sleep(1);
 	}
@@ -892,7 +892,7 @@ logd_term_write_action(int sig, gpointer userdata)
 	needs_shutdown = TRUE;
 	cl_log(LOG_INFO, "logd_term_write_action: received SIGTERM");
 	cl_log(LOG_DEBUG, "Writing out %d messages then quitting",
-	       chanspair[WRITE_PROC_CHAN]->recv_queue->current_qlen);
+	       (int)chanspair[WRITE_PROC_CHAN]->recv_queue->current_qlen);
 
 	direct_log(chanspair[WRITE_PROC_CHAN], userdata);
 
