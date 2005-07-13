@@ -90,6 +90,7 @@ gboolean	verbose =FALSE;
 pid_t	write_process_pid;
 IPC_Channel*		chanspair[2];
 gboolean stop_reading = FALSE;
+gboolean needs_shutdown = FALSE;
 
 struct {
 	char		debugfile[MAXLINE];
@@ -538,24 +539,31 @@ logd_stop(void){
 	
 	if (running_logd_pid < 0) {
 		fprintf(stderr, "ha_logd already stopped.\n");
+		cl_log(LOG_INFO, "ha_logd already stopped.");
 		exit(LSB_EXIT_OK);
 	}
 	
+	cl_log(LOG_DEBUG, "Stopping ha_logd with pid %ld", running_logd_pid);
 	if (kill((pid_t)running_logd_pid, SIGTERM) >= 0) {
 		/* Wait for the running logd to die */
+		cl_log(LOG_INFO, "Waiting for pid=%ld to exit",
+		       running_logd_pid);
 		alarm(0);
 		do {
 			sleep(1);
-			continue;
 		}while (kill((pid_t)running_logd_pid, 0) >= 0);
-		exit(LSB_EXIT_OK);
 	}
 	err = errno;
-	cl_log(LOG_ERR, "Could not kill pid %ld\n",
-	       running_logd_pid);
-	exit((err == EPERM || err == EACCES)
-		  ?	LSB_EXIT_EPERM
-		  :	LSB_EXIT_GENERIC);
+	
+	if(errno == ESRCH) {
+		cl_log(LOG_INFO, "Pid %ld exited", running_logd_pid);
+		exit(LSB_EXIT_OK);
+	} else {
+		cl_perror("Pid %ld not killed", running_logd_pid);
+		exit((err == EPERM || err == EACCES)
+		     ?	LSB_EXIT_EPERM
+		     :	LSB_EXIT_GENERIC);
+	}
 	
 }
 
@@ -708,14 +716,40 @@ logd_apphb_hb(gpointer dummy)
 static gboolean
 logd_term_action(int sig, gpointer userdata)
 {      
-        GMainLoop *     mainloop = (GMainLoop*)userdata;
+	GList *log_iter   = logd_client_list;
+	GMainLoop *mainloop = (GMainLoop*)userdata;
+	ha_logd_client_t *client = NULL;
 	
-        cl_log(LOG_INFO, "received SIGTERM in node");
+        cl_log(LOG_DEBUG, "logd_term_action: received SIGTERM");
         if (mainloop == NULL){
                 cl_log(LOG_ERR, "logd_term_action: invalid arguments");
                 return FALSE;
         }
+
+	stop_reading = TRUE;
+
+	while(log_iter != NULL) {
+		client = log_iter->data;
+		log_iter = log_iter->next;
+
+		cl_log(LOG_DBEUG, "logd_term_action:"
+		       " waiting for %d messages to be read for process %s",
+		       client->logchan->send_queue->current_qlen,
+		       client->app_name);
+		
+		while(client->logchan->send_queue->current_qlen > 0) {
+			sleep(1);
+		}
+	}
+
+	cl_log(LOG_DEBUG, "logd_term_action:"
+	       " waiting for %d messages to be read by write process",
+	       chanspair[WRITE_PROC_CHAN]->send_queue->current_qlen);
+	while(chanspair[WRITE_PROC_CHAN]->send_queue->current_qlen > 0) {
+		sleep(1);
+	}
 	
+        cl_log(LOG_DEBUG, "logd_term_action: sending SIGTERM to write process");
 	if (CL_KILL(write_process_pid, SIGTERM) >= 0){
 		
 		pid_t pid;
@@ -840,7 +874,28 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 		}
 		
 	}
+	if(needs_shutdown) {
+		cl_log(LOG_INFO, "ha_logd: Exiting write process");
+		g_main_quit(loop);
+		return FALSE;
+	}
 	
+	return TRUE;
+}
+
+static gboolean
+logd_term_write_action(int sig, gpointer userdata)
+{
+	/* as a side-effect, the log message makes sure we enter direct_log()
+	 * one last time (so we always exit)
+	 */
+	needs_shutdown = TRUE;
+	cl_log(LOG_INFO, "logd_term_write_action: received SIGTERM");
+	cl_log(LOG_DBEUG, "Writing out %d messages then quitting",
+	       chanspair[WRITE_PROC_CHAN]->recv_queue->current_qlen);
+
+	direct_log(chanspair[WRITE_PROC_CHAN], userdata);
+
 	return TRUE;
 }
 
@@ -857,6 +912,9 @@ write_msg_process(IPC_Channel* readchan)
 	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT,
 			       ch, FALSE,
 			       direct_log, mainloop, NULL);
+
+	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGTERM, 
+				 logd_term_write_action, mainloop, NULL);
 	
 	g_main_run(mainloop);
 	
