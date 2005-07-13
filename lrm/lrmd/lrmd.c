@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.171 2005/07/07 03:26:42 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.172 2005/07/13 14:55:42 lars Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -816,17 +816,21 @@ lrm_debug_running_op(lrmd_op_t* op, const char * text)
 	if (op->exec_pid >= 1) {
 		/* This really ought to use our logger
 		 * So... it might not get forwarded to the central machine
-		 * if you're testing with CTS -- FIXME
+		 * if you're testing with CTS -- FIXME!!!
 		 */
 		snprintf(cmd, sizeof(cmd)
 		,	"ps -l -f -s %d | logger -p daemon.info -t 'T/O PS:'"
 		,	op->exec_pid);
 		lrmd_log(LOG_DEBUG, "Running [%s]", cmd);
-		system(cmd);
+		if (system(cmd) < 0) {
+			lrmd_log(LOG_ERR, "Running [%s] failed", cmd);
+		}
 		snprintf(cmd, sizeof(cmd)
 		,	"ps axww | logger -p daemon.info -t 't/o ps:'");
 		lrmd_log(LOG_DEBUG, "Running [%s]", cmd);
-		system(cmd);
+		if (system(cmd) < 0) {
+			lrmd_log(LOG_ERR, "Running [%s] failed", cmd);
+		}
 	}
 }
 int
@@ -3311,6 +3315,10 @@ op_info(const lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.172  2005/07/13 14:55:42  lars
+ * Compile warnings: Ignored return values from sscanf/fgets/system etc,
+ * minor signedness issues.
+ *
  * Revision 1.171  2005/07/07 03:26:42  zhenh
  * upgrade the log of on_op_done
  *
