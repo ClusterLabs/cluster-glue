@@ -1398,7 +1398,12 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 			}
 			return(HA_FAIL);
 		}
-		sscanf(name + 1, "%lu", &tmptype);
+		if (sscanf(name + 1, "%lu", &tmptype) <= 0) {
+			cl_log(LOG_ERR
+			       ,	"ha_msg_addraw_ll(): not a number.");
+			return(HA_FAIL);
+		}
+
 		internal_type = tmptype;
 		
 		if (internal_type ==  FT_STRING){

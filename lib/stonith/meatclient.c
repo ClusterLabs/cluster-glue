@@ -1,4 +1,4 @@
-/* $Id: meatclient.c,v 1.6 2004/03/25 11:58:22 lars Exp $ */
+/* $Id: meatclient.c,v 1.7 2005/07/13 14:55:42 lars Exp $ */
 /*
  * Stonith client for Human Operator Stonith device
  *
@@ -117,9 +117,9 @@ main(int argc, char** argv)
 			"corresponds to the node you just rebooted.\n\n"
 			"PROCEED? [yN] ", opthost);
 
-		scanf("%s", resp);
+		rc = scanf("%s", resp);
 
-		if (tolower(resp[0] != 'y')) {
+		if (rc == 0 || rc == EOF || tolower(resp[0] != 'y')) {
 			printf("Meatware_client: operation canceled.\n");
 			exit(S_INVAL);
 		}

@@ -1,4 +1,4 @@
-/* $Id: meatware.c,v 1.19 2005/04/20 20:18:16 blaschke Exp $ */
+/* $Id: meatware.c,v 1.20 2005/07/13 14:55:41 lars Exp $ */
 /*
  * Stonith module for Human Operator Stonith device
  *
@@ -213,7 +213,12 @@ meatware_reset_req(StonithPlugin * s, int request, const char * host)
 	memset(resp_result, 0, 50);
 	memset(resp_addr, 0, 50);
 
-	sscanf(line, "%s %s %s", resp_mw, resp_result, resp_addr);
+	if (sscanf(line, "%s %s %s", resp_mw, resp_result, resp_addr) < 3) {
+		LOG(PIL_CRIT, "Format error - failed to Meatware-reset node %s",
+				host);
+		return S_RESETFAIL;
+	}
+	
 	g_strdown(resp_addr);
 
 	if (strncmp(resp_mw, "meatware", 8) ||

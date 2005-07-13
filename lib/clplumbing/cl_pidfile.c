@@ -186,7 +186,9 @@ cl_read_pidfile_no_checking(const char*filename)
 		return -1;
 	} 
 	
-	sscanf(buf, "%lu", &pid);
+	if (sscanf(buf, "%lu", &pid) <= 0) {
+		return -1;
+	}
 	
 	if (pid <= 0){
 		return -1;
