@@ -52,6 +52,6 @@ plugin_LTLIBRARIES	= test.la
 libpils_la_SOURCES	= pils.c
 libpils_la_LDFLAGS	= -version-info 1:0:0
 libpils_la_LIBADD	= $(top_builddir)/replace/libreplace.la	\
-			$(GLIBLIB)
+			@LIBLTDL@ $(GLIBLIB)
 test_la_SOURCES		= test.c
 test_la_LDFLAGS		= -export-dynamic -module -avoid-version
