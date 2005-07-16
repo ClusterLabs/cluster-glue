@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.60 2005/07/01 19:02:58 gshi Exp $ */
+/* $Id: cl_log.c,v 1.61 2005/07/16 20:52:21 alan Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -201,6 +201,7 @@ create_logging_channel(void)
 	char		path[] = IPC_PATH_ATTR;
 	char		sockpath[] = HA_LOGDAEMON_IPC;	
 	IPC_Channel*	chan;
+	static		complained_yet = FALSE;
 	
 	attrs = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(attrs, path, sockpath);	
@@ -216,15 +217,19 @@ create_logging_channel(void)
 	}
 			
 	if (chan->ops->initiate_connection(chan) != IPC_OK) {
-		cl_log(LOG_WARNING, "Initializing connection"
-		       " to logging daemon failed."
-		       " Logging daemon may not be running");
+		if (!complained_yet) {
+			complained_yet = TRUE;
+			cl_log(LOG_WARNING, "Initializing connection"
+			       " to logging daemon failed."
+			       " Logging daemon may not be running");
+		}
 		if (!logging_chan_in_main_loop){
 			chan->ops->destroy(chan);
 		}
 		
 		return NULL;
 	}
+	complained_yet = FALSE;
 
 	if (create_logging_channel_callback){
 		create_logging_channel_callback(chan);
