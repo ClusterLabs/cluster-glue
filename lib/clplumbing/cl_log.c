@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.61 2005/07/16 20:52:21 alan Exp $ */
+/* $Id: cl_log.c,v 1.62 2005/07/17 07:35:48 alan Exp $ */
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -201,7 +201,7 @@ create_logging_channel(void)
 	char		path[] = IPC_PATH_ATTR;
 	char		sockpath[] = HA_LOGDAEMON_IPC;	
 	IPC_Channel*	chan;
-	static		complained_yet = FALSE;
+	static gboolean	complained_yet = FALSE;
 	
 	attrs = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(attrs, path, sockpath);	
