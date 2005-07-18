@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.17 2005/05/23 03:41:48 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.18 2005/07/18 16:31:53 gshi Exp $ */
 #include <portability.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -96,7 +96,7 @@ static volatile cl_mem_stats_t *	memstats = &default_memstats;
 
 /*
  * We put a struct cl_mhdr in front of every malloc item.
- * This means each malloc item is 12 bytes bigger than it theoretically
+ * This means each malloc item is at least 12 bytes bigger than it theoretically
  * needs to be.  But, it allows this code to be fast and recognize
  * multiple free attempts, and memory corruption *before* the object
  *
@@ -110,7 +110,13 @@ static volatile cl_mem_stats_t *	memstats = &default_memstats;
  *
  * The idea of getting it all down into 32-bits of overhead is
  * an interesting thought...
- */
+ *
+ * But some architectures have alignment constraints.  For instance, sparc
+ * requires that double-word accesses be aligned on double-word boundaries.
+ * Thus if the requested space is bigger than a double-word, then cl_mhdr
+ * should, for safety, be a double-word multiple (minimum 8bytes, 64bits).
+
+*/
 
 struct cl_mhdr {
 #	ifdef HA_MALLOC_MAGIC
@@ -598,11 +604,17 @@ cl_malloc_init()
 {
 	int	j;
 	size_t	cursize = 32;
+	int llcount = 1;
 
 	cl_malloc_inityet = 1;
-	if (cl_malloc_hdr_offset < sizeof(long long)) {
-		cl_malloc_hdr_offset = sizeof(long long);
-	}
+
+       /* cl_malloc_hdr_offset should be a double-word multiple */
+       while (cl_malloc_hdr_offset > (llcount * sizeof(long long))) {
+               llcount++;
+        }
+       cl_malloc_hdr_offset = llcount * sizeof(long long);
+
+
 	for (j=0; j < NUMBUCKS; ++j) {
 		cl_malloc_buckets[j] = NULL;
 
