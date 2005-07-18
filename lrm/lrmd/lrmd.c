@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.172 2005/07/13 14:55:42 lars Exp $ */
+/* $Id: lrmd.c,v 1.173 2005/07/18 08:38:34 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -275,6 +275,9 @@ static gboolean free_str_op_pair(gpointer key
 static lrmd_op_t* lrmd_op_copy(const lrmd_op_t* op);
 static void send_last_op(gpointer key, gpointer value, gpointer user_data);
 static void record_op_completion(lrmd_client_t* client, lrmd_op_t* op);
+static void hash_to_str(GHashTable * , GString *);
+static void hash_to_str_foreach(gpointer key, gpointer value, gpointer userdata);
+
 /*
  * following functions are used to monitor the exit of ra proc
  */
@@ -1013,8 +1016,11 @@ gboolean
 sigterm_action(int nsig, gpointer user_data)
 {
 	shutdown_in_progress = TRUE;		
+
 	if (can_shutdown()) {
-		 lrm_shutdown();
+		lrm_shutdown();
+	} else {
+		lrmd_log(LOG_DEBUG, "sigterm_action: can't shutdown now.");
 	}
 	return TRUE;
 }
@@ -2998,9 +3004,6 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		dump_data_for_debug();
 		return;
 	}
-	lrmd_log2(LOG_DEBUG
-	, "on_ra_proc_finished: process [%d],exitcode %d, with signo %d, %s"
-	, p->pid, exitcode, signo, op_info(op));		
 
 	op->exec_pid = -1;
 	if (SIGKILL == signo) {
@@ -3042,6 +3045,11 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	/* Or they will hang waiting for us to read and never die :-) */
 	read_pipe(op->output_fd, &data);
 	rc = RAExec->map_ra_retvalue(exitcode, op_type, data);
+	if (rc != EXECRA_OK) {
+		lrmd_log(LOG_DEBUG, "on_ra_proc_finished: process [%d], "
+			"exitcode %d, with signo %d, %s, RA stdout: %s"
+			, p->pid, exitcode, signo, op_info(op), data);
+	}
 	if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
 		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS,
 							LRM_OP_ERROR)) {
@@ -3290,6 +3298,7 @@ op_info(const lrmd_op_t* op)
 	static char info[255];
 	lrmd_rsc_t* rsc = NULL;
 	const char * op_type;
+	GString * param_gstr;
 	
 	rsc = lookup_rsc(op->rsc_id);
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
@@ -3302,19 +3311,47 @@ op_info(const lrmd_op_t* op)
 		,op->client_id);
 		
 	}else{
+		param_gstr = g_string_new("");	
+		hash_to_str(rsc->params, param_gstr);
+
 		snprintf(info, sizeof(info)
-		,"operation %s[%d] on %s::%s::%s for client %d"
+		,"operation %s[%d] on %s::%s::%s for client %d, its parameters: %s"
 		,lrmd_nullcheck(op_type)
 		,op->call_id
 		,lrmd_nullcheck(rsc->class)
 		,lrmd_nullcheck(rsc->type)
 		,lrmd_nullcheck(rsc->id)
-		,op->client_id);
+		,op->client_id
+		,param_gstr->str);
+
+		g_string_free(param_gstr, TRUE);
 	}
 	return info;
 }
+
+static void
+hash_to_str(GHashTable * params , GString * str)
+{
+	if (params) {
+		g_hash_table_foreach(params, hash_to_str_foreach, str);
+	}
+}
+
+static void
+hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
+{
+	char buffer_tmp[80];
+	GString * str = (GString *)user_data;
+
+	g_snprintf(buffer_tmp, sizeof(buffer_tmp), "%s=%s "
+		, (char *)key, (char *)value);
+	str = g_string_append(str, buffer_tmp);
+}
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.173  2005/07/18 08:38:34  sunjd
+ * bug 495: add a detailed log for RA action failure
+ *
  * Revision 1.172  2005/07/13 14:55:42  lars
  * Compile warnings: Ignored return values from sscanf/fgets/system etc,
  * minor signedness issues.
