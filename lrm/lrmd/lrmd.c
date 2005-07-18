@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.173 2005/07/18 08:38:34 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.174 2005/07/18 16:04:36 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -263,7 +263,7 @@ static int send_ret_msg ( IPC_Channel* ch, int rc);
 static lrmd_client_t* lookup_client (pid_t pid);
 static lrmd_rsc_t* lookup_rsc (const char* rid);
 static lrmd_rsc_t* lookup_rsc_by_msg (struct ha_msg* msg);
-static int read_pipe(int fd, char ** data);
+static int read_pipe(int fd, char ** data, void * user_data);
 static struct ha_msg* op_to_msg(lrmd_op_t* op);
 static gboolean lrm_shutdown(void);
 static gboolean can_shutdown(void);
@@ -3043,7 +3043,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	data = NULL;
 	/* We hope we never have to read too much data from a child process */
 	/* Or they will hang waiting for us to read and never die :-) */
-	read_pipe(op->output_fd, &data);
+	read_pipe(op->output_fd, &data, &(p->pid));
 	rc = RAExec->map_ra_retvalue(exitcode, op_type, data);
 	if (rc != EXECRA_OK) {
 		lrmd_log(LOG_DEBUG, "on_ra_proc_finished: process [%d], "
@@ -3173,9 +3173,10 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 }
 
 int
-read_pipe(int fd, char ** data)
+read_pipe(int fd, char ** data, void * user_data)
 {
 	const int BUFFLEN = 81;
+	int pid = *(int *) user_data;
 	char buffer[BUFFLEN];
 	int readlen;
 	GString * gstr_tmp;
@@ -3194,13 +3195,17 @@ read_pipe(int fd, char ** data)
 		}
 	} while (readlen == BUFFLEN - 1 || errno == EINTR);
 
-	if ((readlen < 0) && (errno != EAGAIN)) {
-		/* EAGAIN is a not an error for pipe NOBLOCK reading.
-		 * From 'mans -S 2 read'
-		 * EAGAIN Non-blocking  I/O has been selected using O_NONBLOCK
-		 * and no data was immediately available for reading.
-		 */
-		cl_perror("read_pipe: read error");
+	if ((readlen < 0) ) {
+		if (errno != EAGAIN) {
+			lrmd_log(LOG_ERR, "Process %d failed to redirect stdout "
+				"for its background child (daemon) processes. "
+				"This will likely cause those processes to die "
+				"mysteriously at some later time (terminated by "
+				"signal SIGPIPE)."
+				, pid);
+		} else {
+			cl_perror("read_pipe: read error");
+		}
 		close(fd);
 		return -1;
 	}
@@ -3349,6 +3354,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.174  2005/07/18 16:04:36  sunjd
+ * regard EAGAIN as an error
+ *
  * Revision 1.173  2005/07/18 08:38:34  sunjd
  * bug 495: add a detailed log for RA action failure
  *
