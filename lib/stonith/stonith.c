@@ -1,4 +1,4 @@
-/* $Id: stonith.c,v 1.22 2005/06/11 20:39:47 alan Exp $ */
+/* $Id: stonith.c,v 1.23 2005/07/18 11:00:54 zhenh Exp $ */
 /*
  * Stonith API infrastructure.
  *
@@ -381,7 +381,7 @@ stonith_set_config_file(Stonith* s, const char * configname)
 		}
 		
 		/*remove the new line in the end*/
-		len = strnlen(line, sizeof(line-1));
+		len = strnlen(line, sizeof(line)-1);
 		if (line[len-1] == '\n'){
 			line[len-1] = '\0';
 		}else{
