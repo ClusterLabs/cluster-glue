@@ -1,4 +1,4 @@
-/* $Id: meatclient.c,v 1.7 2005/07/13 14:55:42 lars Exp $ */
+/* $Id: meatclient.c,v 1.8 2005/07/18 20:19:45 horms Exp $ */
 /*
  * Stonith client for Human Operator Stonith device
  *
@@ -55,7 +55,7 @@ int
 main(int argc, char** argv)
 {
 	char *		cmdname;
-	const char *	meatpipe_pr = "/tmp/.meatware";	/* if you intend to
+	const char *	meatpipe_pr = "/var/run/meatware";	/* if you intend to
 							 change this, modify
 							 meatware.c as well */
 	char *		opthost = NULL;
