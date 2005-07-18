@@ -1,4 +1,4 @@
-/* $Id: meatware.c,v 1.20 2005/07/13 14:55:41 lars Exp $ */
+/* $Id: meatware.c,v 1.21 2005/07/18 20:19:45 horms Exp $ */
 /*
  * Stonith module for Human Operator Stonith device
  *
@@ -169,7 +169,7 @@ static int
 meatware_reset_req(StonithPlugin * s, int request, const char * host)
 {
 	int fd, rc;
-	const char *	meatpipe_pr = "/tmp/.meatware"; /* if you intend to
+	const char *	meatpipe_pr = "/var/run/meatware"; /* if you intend to
 							change this, modify
 							meatclient.c as well */
 
