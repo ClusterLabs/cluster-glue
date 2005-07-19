@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.174 2005/07/18 16:04:36 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.175 2005/07/19 05:12:25 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -263,7 +263,7 @@ static int send_ret_msg ( IPC_Channel* ch, int rc);
 static lrmd_client_t* lookup_client (pid_t pid);
 static lrmd_rsc_t* lookup_rsc (const char* rid);
 static lrmd_rsc_t* lookup_rsc_by_msg (struct ha_msg* msg);
-static int read_pipe(int fd, char ** data, void * user_data);
+static void read_pipe(int fd, char ** data, void * user_data);
 static struct ha_msg* op_to_msg(lrmd_op_t* op);
 static gboolean lrm_shutdown(void);
 static gboolean can_shutdown(void);
@@ -3048,15 +3048,14 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	if (rc != EXECRA_OK) {
 		lrmd_log(LOG_DEBUG, "on_ra_proc_finished: process [%d], "
 			"exitcode %d, with signo %d, %s, RA stdout: %s"
-			, p->pid, exitcode, signo, op_info(op), data);
+			, p->pid, exitcode, signo, op_info(op)
+			, (data!=NULL)?data:"NULL");
 	}
 	if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
 		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS,
 							LRM_OP_ERROR)) {
 			LOG_FAILED_TO_ADD_FIELD("opstatus")
-			if (data!=NULL) {
-				g_free(data);
-			}
+			g_free(data);
 			return ;
 		}
 		lrmd_log(LOG_ERR
@@ -3066,16 +3065,12 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS,
 								LRM_OP_DONE)) {
 			LOG_FAILED_TO_ADD_FIELD("opstatus")
-			if (data!=NULL) {
-				g_free(data);
-			}
+			g_free(data);
 			return ;
 		}
 		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_RC, rc)) {
 			LOG_FAILED_TO_ADD_FIELD("F_LRM_RC")
-			if (data!=NULL) {
-				g_free(data);
-			}
+			g_free(data);
 			return ;
 		}
 	}
@@ -3172,7 +3167,7 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 	return rsc;
 }
 
-int
+void
 read_pipe(int fd, char ** data, void * user_data)
 {
 	const int BUFFLEN = 81;
@@ -3196,7 +3191,7 @@ read_pipe(int fd, char ** data, void * user_data)
 	} while (readlen == BUFFLEN - 1 || errno == EINTR);
 
 	if ((readlen < 0) ) {
-		if (errno != EAGAIN) {
+		if (errno == EAGAIN) {
 			lrmd_log(LOG_ERR, "Process %d failed to redirect stdout "
 				"for its background child (daemon) processes. "
 				"This will likely cause those processes to die "
@@ -3207,7 +3202,7 @@ read_pipe(int fd, char ** data, void * user_data)
 			cl_perror("read_pipe: read error");
 		}
 		close(fd);
-		return -1;
+		return;
 	}
 	/* the log is only for analysing bug 475, or should remove it. */
 	lrmd_log(LOG_DEBUG, "read_pipe: finished the pipe read.");
@@ -3215,21 +3210,13 @@ read_pipe(int fd, char ** data, void * user_data)
 
 	if ( gstr_tmp->len == 0 ) {
 		lrmd_log(LOG_DEBUG, "read_pipe: read 0 byte from this pipe.");
-		return 0;
+		g_string_free(gstr_tmp, TRUE);	
+		return; 
 	}
 
-	*data = g_malloc(gstr_tmp->len + 1);
-	if ( *data == NULL ) {
-		/* Note: g_malloc will never fail - it will core dump you */
-		lrmd_log(LOG_ERR, "read_pipe: g_malloc error.");
-		return -1;
-	}
-
-	(*data)[0] = '\0';
-	(*data)[gstr_tmp->len] = '\0';
-	g_strlcpy(*data, gstr_tmp->str, gstr_tmp->len);
-	g_string_free(gstr_tmp, TRUE);
-	return 0;
+	*data = gstr_tmp->str;
+	g_string_free(gstr_tmp, FALSE);
+	return;
 }
 
 static void
@@ -3354,6 +3341,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.175  2005/07/19 05:12:25  sunjd
+ * make read_pipe return void, suggested by Lars; other polish: remove the redundant error checkings
+ *
  * Revision 1.174  2005/07/18 16:04:36  sunjd
  * regard EAGAIN as an error
  *
