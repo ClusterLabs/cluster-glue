@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.175 2005/07/19 05:12:25 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.176 2005/07/21 08:12:59 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -263,7 +263,7 @@ static int send_ret_msg ( IPC_Channel* ch, int rc);
 static lrmd_client_t* lookup_client (pid_t pid);
 static lrmd_rsc_t* lookup_rsc (const char* rid);
 static lrmd_rsc_t* lookup_rsc_by_msg (struct ha_msg* msg);
-static void read_pipe(int fd, char ** data, void * user_data);
+static int read_pipe(int fd, char ** data, void * user_data);
 static struct ha_msg* op_to_msg(lrmd_op_t* op);
 static gboolean lrm_shutdown(void);
 static gboolean can_shutdown(void);
@@ -3043,9 +3043,9 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	data = NULL;
 	/* We hope we never have to read too much data from a child process */
 	/* Or they will hang waiting for us to read and never die :-) */
-	read_pipe(op->output_fd, &data, &(p->pid));
+	ret = read_pipe(op->output_fd, &data, &(p->pid));
 	rc = RAExec->map_ra_retvalue(exitcode, op_type, data);
-	if (rc != EXECRA_OK) {
+	if (rc != EXECRA_OK || ret != 0) {
 		lrmd_log(LOG_DEBUG, "on_ra_proc_finished: process [%d], "
 			"exitcode %d, with signo %d, %s, RA stdout: %s"
 			, p->pid, exitcode, signo, op_info(op)
@@ -3167,10 +3167,11 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 	return rsc;
 }
 
-void
+int
 read_pipe(int fd, char ** data, void * user_data)
 {
 	const int BUFFLEN = 81;
+	int rc = 0;
 	int pid = *(int *) user_data;
 	char buffer[BUFFLEN];
 	int readlen;
@@ -3189,6 +3190,7 @@ read_pipe(int fd, char ** data, void * user_data)
 			g_string_append(gstr_tmp, buffer);
 		}
 	} while (readlen == BUFFLEN - 1 || errno == EINTR);
+	close(fd);
 
 	if ((readlen < 0) ) {
 		if (errno == EAGAIN) {
@@ -3201,22 +3203,19 @@ read_pipe(int fd, char ** data, void * user_data)
 		} else {
 			cl_perror("read_pipe: read error");
 		}
-		close(fd);
-		return;
+		rc = -1;
 	}
 	/* the log is only for analysing bug 475, or should remove it. */
 	lrmd_log(LOG_DEBUG, "read_pipe: finished the pipe read.");
-	close(fd);
 
 	if ( gstr_tmp->len == 0 ) {
 		lrmd_log(LOG_DEBUG, "read_pipe: read 0 byte from this pipe.");
 		g_string_free(gstr_tmp, TRUE);	
-		return; 
+	} else {
+		*data = gstr_tmp->str;
+		g_string_free(gstr_tmp, FALSE);
 	}
-
-	*data = gstr_tmp->str;
-	g_string_free(gstr_tmp, FALSE);
-	return;
+	return rc;
 }
 
 static void
@@ -3341,6 +3340,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.176  2005/07/21 08:12:59  sunjd
+ * let the detailed action log output when EAGAIN happens
+ *
  * Revision 1.175  2005/07/19 05:12:25  sunjd
  * make read_pipe return void, suggested by Lars; other polish: remove the redundant error checkings
  *
