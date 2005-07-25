@@ -1,4 +1,4 @@
-/* $Id: Gmain_timeout.c,v 1.8 2005/02/23 00:53:49 gshi Exp $ */
+/* $Id: Gmain_timeout.c,v 1.9 2005/07/25 21:03:27 gshi Exp $ */
 /*
  * Glib mainloop timeout handling code.
  *
@@ -56,6 +56,8 @@ struct GTimeoutAppend {
 	guint		interval;
 };
 
+#define        GTIMEOUT(GS)    ((struct GTimeoutAppend*)((void*)(GS)))
+
 guint
 Gmain_timeout_add(guint interval
 ,	GSourceFunc	function
@@ -111,7 +113,7 @@ static gboolean
 Gmain_timeout_prepare(GSource* src,  gint* timeout)
 {
 	
-	struct GTimeoutAppend* append = (struct GTimeoutAppend*)src;
+	struct GTimeoutAppend* append = GTIMEOUT(src);
 	longclock_t	lnow = time_longclock();
 	longclock_t	remain;
 	
@@ -130,7 +132,7 @@ Gmain_timeout_prepare(GSource* src,  gint* timeout)
 static gboolean
 Gmain_timeout_check    (GSource* src)
 {
-	struct GTimeoutAppend* append = (struct GTimeoutAppend*)src;
+	struct GTimeoutAppend* append = GTIMEOUT(src);
 	longclock_t	lnow = time_longclock();
 	
 	if (cmp_longclock(lnow, append->nexttime) >= 0) {
@@ -143,7 +145,7 @@ Gmain_timeout_check    (GSource* src)
 static gboolean
 Gmain_timeout_dispatch(GSource* src, GSourceFunc func, gpointer user_data)
 {
-	struct GTimeoutAppend* append = (struct GTimeoutAppend*)src;
+	struct GTimeoutAppend* append = GTIMEOUT(src);
 
 	/* Schedule our next dispatch */
 	append->nexttime = add_longclock(time_longclock()
