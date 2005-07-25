@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.51 2005/07/03 22:15:49 alan Exp $ */
+/* $Id: ipc.h,v 1.52 2005/07/25 20:43:12 gshi Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -689,15 +689,6 @@ enum MSGPOS_IN_IPC{
 	MSGPOS_RECV,
 	MSGPOS_DEQUEUE
 };
-
-#define GET_ENQUEUE_TIME(x)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->enqueue_time
-#define GET_SEND_TIME(x)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->send_time
-#define GET_RECV_TIME(x)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->recv_time
-#define GET_DEQUEUE_TIME(x)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->dequeue_time
-#define SET_ENQUEUE_TIME(x,t)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->enqueue_time = t
-#define SET_SEND_TIME(x,t)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->send_time = t
-#define SET_RECV_TIME(x,t)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->recv_time = t
-#define SET_DEQUEUE_TIME(x,t)	((struct SOCKET_MSG_HEAD*)x->msg_buf)->dequeue_time =t 
 
 #endif
 
