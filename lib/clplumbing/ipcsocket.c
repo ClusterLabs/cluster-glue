@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.159 2005/07/16 20:49:51 alan Exp $ */
+/* $Id: ipcsocket.c,v 1.160 2005/07/25 20:43:12 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -180,6 +180,25 @@ void cl_log_message (int log_level, const struct ha_msg *m);
 int timediff(longclock_t t1, longclock_t t2);
 void   ha_msg_del(struct ha_msg* msg);
 void	ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos);
+
+#define SET_ENQUEUE_TIME(x,t)	memcpy(&((struct SOCKET_MSG_HEAD*)x->msg_buf)->enqueue_time, &t, sizeof(longclock_t))
+#define SET_SEND_TIME(x,t)	memcpy(&((struct SOCKET_MSG_HEAD*)x->msg_buf)->send_time, &t, sizeof(longclock_t))
+#define SET_RECV_TIME(x,t)	memcpy(&((struct SOCKET_MSG_HEAD*)x->msg_buf)->recv_time, &t, sizeof(longclock_t))
+#define SET_DEQUEUE_TIME(x,t)	memcpy(&((struct SOCKET_MSG_HEAD*)x->msg_buf)->dequeue_time, &t, sizeof(longclock_t))
+
+static
+longclock_t
+get_enqueue_time(IPC_Message *ipcmsg)
+{
+	longclock_t t;
+
+	memcpy(&t,
+	  &(((struct SOCKET_MSG_HEAD *)ipcmsg->msg_buf)->enqueue_time),
+	  sizeof(longclock_t));
+
+	return t;
+}
+
 int 
 timediff(longclock_t t1, longclock_t t2)
 {
@@ -228,7 +247,7 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 			SET_DEQUEUE_TIME(ipcmsg, lnow);
 			
 	checktime:			
-			msdiff = timediff(lnow, GET_ENQUEUE_TIME(ipcmsg));
+			msdiff = timediff(lnow, get_enqueue_time(ipcmsg));
 			if (msdiff > MAXIPCTIME){
 				struct ha_msg* hamsg = NULL;
 				cl_log(LOG_WARNING, 
@@ -236,7 +255,7 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 				       "(enqueue-time=%lu, peer pid=%d) ",
 				       positions[whichpos],
 				       msdiff,
-				       longclockto_ms(GET_ENQUEUE_TIME(ipcmsg)),
+				       longclockto_ms(get_enqueue_time(ipcmsg)),
 				       ch->farside_pid);			
 
 				(void)hamsg;
