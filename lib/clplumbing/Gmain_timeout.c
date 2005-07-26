@@ -1,4 +1,4 @@
-/* $Id: Gmain_timeout.c,v 1.9 2005/07/25 21:03:27 gshi Exp $ */
+/* $Id: Gmain_timeout.c,v 1.10 2005/07/26 19:31:44 gshi Exp $ */
 /*
  * Glib mainloop timeout handling code.
  *
@@ -80,7 +80,7 @@ Gmain_timeout_add_full(gint priority
 	GSource* source = g_source_new( &Gmain_timeout_funcs, 
 					sizeof(struct GTimeoutAppend));
 	
-	append = (struct GTimeoutAppend*)source;
+	append = GTIMEOUT(source);
 	
 	append->nexttime = add_longclock(time_longclock()
 					 ,msto_longclock(interval));
