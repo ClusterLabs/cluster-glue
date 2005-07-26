@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.176 2005/07/21 08:12:59 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.177 2005/07/26 08:17:10 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3046,8 +3046,8 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	ret = read_pipe(op->output_fd, &data, &(p->pid));
 	rc = RAExec->map_ra_retvalue(exitcode, op_type, data);
 	if (rc != EXECRA_OK || ret != 0) {
-		lrmd_log(LOG_DEBUG, "on_ra_proc_finished: process [%d], "
-			"exitcode %d, with signo %d, %s, RA stdout: %s"
+		lrmd_log(LOG_DEBUG, "A RA execution: process [%d], "
+			"exitcode %d, with signo %d, %s, the RA output: %s"
 			, p->pid, exitcode, signo, op_info(op)
 			, (data!=NULL)?data:"NULL");
 	}
@@ -3340,6 +3340,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.177  2005/07/26 08:17:10  sunjd
+ * log message polish
+ *
  * Revision 1.176  2005/07/21 08:12:59  sunjd
  * let the detailed action log output when EAGAIN happens
  *
