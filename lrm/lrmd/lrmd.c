@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.178 2005/07/27 02:09:04 panjiam Exp $ */
+/* $Id: lrmd.c,v 1.179 2005/07/27 08:40:54 panjiam Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -9,7 +9,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
  * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * version 2 of the License, or (at your option) any later version.
  * 
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -3340,6 +3340,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.179  2005/07/27 08:40:54  panjiam
+ * fixed GPL license version
+ *
  * Revision 1.178  2005/07/27 02:09:04  panjiam
  * changed license to GPL
  *
