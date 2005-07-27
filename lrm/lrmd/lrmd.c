@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.177 2005/07/26 08:17:10 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.178 2005/07/27 02:09:04 panjiam Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -6,21 +6,21 @@
  * Partly contributed by Andrew Beekhof <andrew@beekhof.net> 
  * Copyright (c) 2004 International Business Machines
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public
  * License as published by the Free Software Foundation; either
  * version 2.1 of the License, or (at your option) any later version.
  * 
- * This library is distributed in the hope that it will be useful,
+ * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * General Public License for more details.
  * 
- * You should have received a copy of the GNU Lesser General Public
+ * You should have received a copy of the GNU General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
  */
+
 #include <config.h>
 #include <portability.h>
 #include <unistd.h>
@@ -3340,6 +3340,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.178  2005/07/27 02:09:04  panjiam
+ * changed license to GPL
+ *
  * Revision 1.177  2005/07/26 08:17:10  sunjd
  * log message polish
  *
