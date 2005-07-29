@@ -110,12 +110,13 @@
 #include <pils/plugin.h>
 
 #define MAX_HOST_NAME_LEN	(256*4)
-#define MAX_CMD_LEN		1024
+#define MAX_CMD_LEN		2048
 #define FULLSYSTEMPARTITION	"FullSystemPartition"
 #define MAX_POWERON_RETRY	10
 #define MAX_HMC_NAME_LEN	256
 
 #define ST_MANSYSPAT		"managedsyspat"
+#define NOPASS			"nopass"
 
 #define STATE_UNKNOWN		-1
 #define STATE_OFF		0
@@ -186,6 +187,7 @@ struct pluginDevice {
 	char *			hmc;
 	GList*		 	hostlist;
 	int			hmcver;
+	char *			password;
 	char **			mansyspats;
 };
 
@@ -203,8 +205,8 @@ static int get_hmc_hostlist(struct pluginDevice* dev);
 static void free_hmc_hostlist(struct pluginDevice* dev);
 static int get_hmc_mansyspats(struct pluginDevice* dev, const char* mansyspats);
 static void free_hmc_mansyspats(struct pluginDevice* dev);
-static char* do_shell_cmd(const char* cmd, int* status);
-static int check_hmc_status(const char* hmc);
+static char* do_shell_cmd(const char* cmd, int* status, const char* password);
+static int check_hmc_status(struct pluginDevice* dev);
 static int get_num_tokens(char *str);
 static gboolean pattern_match(char **patterns, char *string);
 /* static char* do_shell_cmd_fake(const char* cmd, int* status); */
@@ -222,7 +224,7 @@ ibmhmc_status(StonithPlugin  *s)
 
 	dev = (struct pluginDevice*) s;
 	
-	return check_hmc_status(dev->hmc);
+	return check_hmc_status(dev);
 }
 
 
@@ -415,7 +417,7 @@ ibmhmc_reset_req(StonithPlugin * s, int request, const char * host)
 		" --filter \"lpar_names=%s\""
 		,	dev->hmc, names[0], names[1]);
 
-		output = do_shell_cmd(on_cmd, &status);
+		output = do_shell_cmd(on_cmd, &status, dev->password);
 		if (output == NULL) {
 			LOG(PIL_CRIT, "command %s failed", on_cmd);
 			return (S_OOPS);
@@ -448,7 +450,7 @@ ibmhmc_reset_req(StonithPlugin * s, int request, const char * host)
 		,	__FUNCTION__, off_cmd, on_cmd, reset_cmd, state_cmd);
 	}
 
-	output = do_shell_cmd(state_cmd, &status);
+	output = do_shell_cmd(state_cmd, &status, dev->password);
 	if (output == NULL) {
 		LOG(PIL_CRIT, "command %s failed", on_cmd);
 		return S_OOPS;
@@ -483,7 +485,7 @@ ibmhmc_reset_req(StonithPlugin * s, int request, const char * host)
 			return S_OK;
 		}
 
-		output = do_shell_cmd(on_cmd, &status);
+		output = do_shell_cmd(on_cmd, &status, dev->password);
 		if (0 != status) {
 			LOG(PIL_CRIT, "command %s failed", on_cmd);
 			return S_OOPS;
@@ -495,7 +497,7 @@ ibmhmc_reset_req(StonithPlugin * s, int request, const char * host)
 			return S_OK;
 		}
 
-		output = do_shell_cmd(off_cmd, &status);
+		output = do_shell_cmd(off_cmd, &status, dev->password);
 		if (0 != status) {
 			LOG(PIL_CRIT, "command %s failed", off_cmd);
 			return S_OOPS;
@@ -505,7 +507,8 @@ ibmhmc_reset_req(StonithPlugin * s, int request, const char * host)
 		if (dev->hmcver < 4) {
 			if (is_lpar) {
 				if (state == STATE_ON) {
-					output = do_shell_cmd(off_cmd, &status);
+					output = do_shell_cmd(off_cmd
+					, &status, dev->password);
 					if (0 != status) {
 						LOG(PIL_CRIT, "command %s "
 							"failed", off_cmd);
@@ -514,7 +517,8 @@ ibmhmc_reset_req(StonithPlugin * s, int request, const char * host)
 				}
 				for (i = 0; i < MAX_POWERON_RETRY; i++) {
 					char *output2;
-					output2 = do_shell_cmd(on_cmd, &status);
+					output2 = do_shell_cmd(on_cmd
+					, &status, dev->password);
 					if (output2 != NULL) {
 						FREE(output2);
 					}
@@ -530,7 +534,8 @@ ibmhmc_reset_req(StonithPlugin * s, int request, const char * host)
 					return S_OOPS;
 				}
 			}else{
-				output = do_shell_cmd(reset_cmd, &status);
+				output = do_shell_cmd(reset_cmd
+				, &status, dev->password);
 				if (0 != status) {
 					LOG(PIL_CRIT, "command %s failed"						,	reset_cmd);
 					return S_OOPS;
@@ -539,9 +544,11 @@ ibmhmc_reset_req(StonithPlugin * s, int request, const char * host)
 			}
 		}else{
 			if (state == STATE_ON) {
-				output = do_shell_cmd(reset_cmd, &status);
+				output = do_shell_cmd(reset_cmd
+				, &status, dev->password);
 			}else{
-				output = do_shell_cmd(on_cmd, &status);
+				output = do_shell_cmd(on_cmd
+				, &status, dev->password);
 			}
 			if (0 != status) {
 				LOG(PIL_CRIT, "command %s failed", reset_cmd);
@@ -606,17 +613,18 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 		mansyspats = OurImports->GetValue(list, ST_MANSYSPAT);
 		if (mansyspats != NULL) {
 			if (get_hmc_mansyspats(dev, mansyspats) != S_OK) {
-				FREE(namestocopy[0].s_value);
+				FREE(namestocopy[1].s_value);
 				return S_OOPS;
 			}
 		}
-
+		/* look for password */
+		dev->password = STRDUP(OurImports->GetValue(list, ST_PASSWD));
 		dev->hmc = namestocopy[0].s_value;
 	}else{
 		/* -p or -F option with args "ipaddr [managedsyspat]..." */
 		char *pch = namestocopy[0].s_value;
 
-		/* skip over ipaddr and null-terminate */
+		/* skip over password and null-terminate */
 		pch += strcspn(pch, WHITESPACE);
 		*pch = EOS;
 
@@ -632,7 +640,7 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 	}
 	
 	/* check whether the HMC has ssh command enabled */
-	if (check_hmc_status(dev->hmc) != S_OK) {
+	if (check_hmc_status(dev) != S_OK) {
 		LOG(PIL_CRIT, "HMC %s does not have remote "
 		"command execution using the ssh facility enabled", dev->hmc);
 		return S_BADCONFIG;
@@ -645,7 +653,7 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 		LOG(PIL_DEBUG, "%s: get_hmcver=%s", __FUNCTION__, get_hmcver);
 	}
 
-	output = do_shell_cmd(get_hmcver, &status);
+	output = do_shell_cmd(get_hmcver, &status, dev->password);
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: output=%s\n", __FUNCTION__
 		, output ? output : "(nil)");
@@ -760,6 +768,10 @@ ibmhmc_destroy(StonithPlugin *s)
 		FREE(dev->hmc);
 		dev->hmc = NULL;
 	}
+	if (dev->password) {
+		FREE(dev->password);
+		dev->password = NULL;
+	}
 	if (dev->idinfo) {
 		FREE(dev->idinfo);
 		dev->idinfo = NULL;
@@ -789,6 +801,7 @@ ibmhmc_new(const char *subplugin)
 
 	dev->pluginid = pluginid;
 	dev->hmc = NULL;
+	dev->password = NULL;
 	dev->hostlist = NULL;
 	dev->mansyspats = NULL;
 	dev->hmcver = -1;
@@ -839,7 +852,7 @@ get_hmc_hostlist(struct pluginDevice* dev)
 		LOG(PIL_DEBUG, "%s: get_syslist=%s", __FUNCTION__, get_syslist);
 	}
 
-	output = do_shell_cmd(get_syslist, &status);
+	output = do_shell_cmd(get_syslist, &status, dev->password);
 	if (output == NULL) {
 		return S_BADCONFIG;
 	}		
@@ -880,7 +893,8 @@ get_hmc_hostlist(struct pluginDevice* dev)
 					,	__FUNCTION__, get_lpar);
 				}
 
-				output = do_shell_cmd(get_lpar, &status);
+				output = do_shell_cmd(get_lpar
+				, &status, dev->password);
 				if (output == NULL) {
 					g_strfreev(name_mode);
 					g_strfreev(syslist);
@@ -926,7 +940,7 @@ get_hmc_hostlist(struct pluginDevice* dev)
 				,	__FUNCTION__, get_lpar);
 			}
 
-			output = do_shell_cmd(get_lpar, &status);
+			output = do_shell_cmd(get_lpar, &status, dev->password);
 			if (output == NULL) {
 				g_strfreev(syslist);
 				return S_BADCONFIG;
@@ -1041,15 +1055,34 @@ free_hmc_mansyspats(struct pluginDevice* dev)
 }
 
 static char*
-do_shell_cmd(const char* cmd, int* status)
+do_shell_cmd(const char* cmd, int* status, const char* password)
 {
 	const int BUFF_LEN=4096;
 	int read_len = 0;
 	char buff[BUFF_LEN];
+	char cmd_password[MAX_CMD_LEN];
 	char* data = NULL;
 	GString* g_str_tmp = NULL;
 
-	FILE* file = popen(cmd, "r");
+	FILE* file;
+	if (NULL == password) {
+		file = popen(cmd, "r");
+	} else {
+		snprintf(cmd_password, MAX_CMD_LEN
+		,"umask 077;"
+		 "if [ ! -d /var/lib/heartbeat/rsctmp/ibmhmc ];"
+		 "then mkdir /var/lib/heartbeat/rsctmp/ibmhmc 2>/dev/null;"
+		 "fi;"
+		 "export hmc_tmp=`mktemp -p /var/lib/heartbeat/rsctmp/ibmhmc/`;" 
+		 "echo \"echo '%s'\">$hmc_tmp;" 
+		 "chmod +x $hmc_tmp;"
+		 "unset SSH_AGENT_SOCK SSH_AGENT_PID;"
+		 "SSH_ASKPASS=$hmc_tmp setsid %s;"
+		 "rm $hmc_tmp -f;"
+		 "unset hmc_tmp"
+		,password, cmd);
+		file = popen(cmd_password, "r"); 
+	}		
 	if (NULL == file) {
 		return NULL;
 	}
@@ -1070,13 +1103,12 @@ do_shell_cmd(const char* cmd, int* status)
 		strncpy(data, g_str_tmp->str, g_str_tmp->len);
 	}
 	g_string_free(g_str_tmp, TRUE);
-
 	*status = pclose(file);
 	return data;
 }
 
 static int
-check_hmc_status(const char* hmc)
+check_hmc_status(struct pluginDevice* dev)
 {
 	int status;
 	char check_status[MAX_CMD_LEN];
@@ -1084,17 +1116,17 @@ check_hmc_status(const char* hmc)
 	int rc = S_OK;
 
 	if(Debug){
-		LOG(PIL_DEBUG, "%s: called, hmc=%s\n", __FUNCTION__, hmc);
+		LOG(PIL_DEBUG, "%s: called, hmc=%s\n", __FUNCTION__, dev->hmc);
 	}
 
 	snprintf(check_status, MAX_CMD_LEN
-	,	SSH_CMD " -l " HMCROOT " %s lshmc -r -F ssh", hmc);
+	,	SSH_CMD " -l " HMCROOT " %s lshmc -r -F ssh", dev->hmc);
 	if(Debug){
 		LOG(PIL_DEBUG, "%s: check_status %s\n", __FUNCTION__
 		,	check_status);
 	}
 
-	output = do_shell_cmd(check_status, &status);
+	output = do_shell_cmd(check_status, &status, dev->password);
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: status=%d, output=%s\n", __FUNCTION__
 		,	status, output ? output : "(nil)");
