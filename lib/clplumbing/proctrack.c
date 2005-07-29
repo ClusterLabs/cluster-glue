@@ -1,4 +1,4 @@
-/* $Id: proctrack.c,v 1.19 2005/07/29 23:16:17 alan Exp $ */
+/* $Id: proctrack.c,v 1.20 2005/07/29 23:57:55 alan Exp $ */
 /*
  * Process tracking object.
  *
@@ -225,7 +225,7 @@ SetTrackedProcTimeouts(pid_t pid, ProcTrackKillInfo* info)
 static gboolean
 TrackedProcTimeoutFunction(gpointer p)
 {
-	pid_t		pid = GPOINTER_TO_SIZE(p);
+	pid_t		pid = POINTER_TO_SIZE_T(p);
 	ProcTrack*	pinfo;
 	int		nsig;
 	long		mstimeout;
