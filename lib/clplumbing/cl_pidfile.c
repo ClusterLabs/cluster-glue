@@ -130,7 +130,9 @@ DoLock(const char *filename)
 
 	if (write(fd, buf, LOCKSTRLEN) != LOCKSTRLEN) {
 		/* Again, nothing we can do about this */
-		return -3;
+		rc = -3;
+		close(fd);
+		goto out;
 	}
 	close(fd);
 
@@ -154,6 +156,7 @@ DoLock(const char *filename)
 	default:
 		rc = -3;
 	}
+ out:
 	unlink(tf_name);
 	return rc;
 }
