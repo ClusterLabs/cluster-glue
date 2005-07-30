@@ -1,4 +1,4 @@
-/* $Id: proctrack.c,v 1.20 2005/07/29 23:57:55 alan Exp $ */
+/* $Id: proctrack.c,v 1.21 2005/07/30 02:33:08 alan Exp $ */
 /*
  * Process tracking object.
  *
@@ -225,7 +225,8 @@ SetTrackedProcTimeouts(pid_t pid, ProcTrackKillInfo* info)
 static gboolean
 TrackedProcTimeoutFunction(gpointer p)
 {
-	pid_t		pid = POINTER_TO_SIZE_T(p);
+	/* This is safe - Pids are relative small ints */
+	pid_t		pid = POINTER_TO_SIZE_T(p); /*pointer cast as int*/
 	ProcTrack*	pinfo;
 	int		nsig;
 	long		mstimeout;
