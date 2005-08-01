@@ -42,6 +42,7 @@
 #	define MAX(a,b)	(((a) > (b)) ? (a) : (b))
 #endif
 
+#define NETSTRING_EXTRA(x) (intlen(x) + x + 2)
 
 extern const char* FT_strings[];
 
@@ -75,12 +76,72 @@ int struct_stringlen(size_t namlen, size_t vallen, const void* value);
 int struct_netstringlen(size_t namlen, size_t vallen, const void* value);
 int	convert_nl_sym(char* s, int len, char sym, int direction);
  
+
 static int
 intlen(int x)
 {
 	char	buf[20];
 	return snprintf(buf, sizeof(buf), "%d", x);
 }
+
+
+int
+get_netstringlen(const struct ha_msg *m)
+{
+	int i;
+	int total_len =0 ;
+	
+	if (m == NULL){
+		cl_log(LOG_ERR, "get_netstringlen:"
+		       "asking netstringlen of a NULL message");
+		return 0;
+	}
+	
+	total_len = sizeof(MSG_START_NETSTRING)
+		+ sizeof(MSG_END_NETSTRING) -2 ;
+	
+	
+	for (i = 0; i < m->nfields; i++){		
+		int len;
+		len = fieldtypefuncs[m->types[i]].netstringlen(m->nlens[i], 
+							       m->vlens[i],
+							       m->values[i]);
+		total_len += NETSTRING_EXTRA(len);
+	}
+	
+	
+	return total_len;	
+	
+	
+}
+
+
+
+int
+get_stringlen(const struct ha_msg *m)
+{
+	int i;
+	int total_len =0 ;
+
+	if (m == NULL){
+		cl_log(LOG_ERR, "get_stringlen:"
+		       "asking stringlen of a NULL message");
+		return 0;
+	}
+	
+	for (i = 0; i < m->nfields; i++){		
+		if (m->types[i] == FT_STRUCT){			
+			total_len += struct_stringlen(m->nlens[i], 
+						      m->vlens[i],
+						      m->values[i]);
+		}
+	}
+	
+	total_len += m->stringlen;
+	
+	return total_len;
+}
+
 
 
 /*
@@ -689,20 +750,26 @@ string_stringlen(size_t namlen, size_t vallen, const void* value)
 	return namlen + vallen+ 2;
 }
 
+static int
+binary_netstringlen(size_t namlen, size_t vallen, const void* value)
+{
+	int	length;
+	
+	HA_MSG_ASSERT(value);
+	
+	length = 3 + namlen + 1 + vallen;
+	
+	return length;
+}
+
+
 static int 
 string_netstringlen(size_t namlen, size_t vallen, const void* value)
 {
-	
-	int length;
-	
 	HA_MSG_ASSERT(value);
 	HA_MSG_ASSERT( vallen == strlen(value));
 	
-	length = intlen(namlen) + (namlen)
-		+	intlen(vallen) + vallen + 4 ;
-	length  += 4; /* for type*/
-		
-	return length;
+	return binary_netstringlen(namlen, vallen, value);
 }
 
 
@@ -715,19 +782,7 @@ binary_stringlen(size_t namlen, size_t vallen, const void* value)
 	/*overhead 3 is for type*/	
 }
 
-static int
-binary_netstringlen(size_t namlen, size_t vallen, const void* value)
-{
-	int length;
-	
-	HA_MSG_ASSERT(value);
 
-	length = intlen(namlen) + (namlen)
-		+	intlen(vallen) + vallen + 4 ;
-	length  += 4; /* for type*/
-	
-	return length;	
-}
 
 
 
@@ -760,12 +815,7 @@ struct_netstringlen(size_t namlen, size_t vallen, const void* value)
 	
 	len = get_netstringlen(childmsg);
 
-	ret = intlen(namlen) + namlen + 2;
-	/*for name*/
-	ret += 4;
-	/*for type*/
-	ret += intlen(len) + len + 2;
-	/*for child msg*/
+	ret = 3 + namlen + 1 + len;
 
 	return ret;
 	
@@ -784,13 +834,11 @@ static int
 list_netstringlen(size_t namlen, size_t vallen, const void* value)
 {
 	int ret;
+	const GList* list;
 	
-	(void)value;
-	ret =  intlen(namlen) + (namlen)
-		+ intlen(vallen) 
-		+ vallen +  4 ;
+	list = (const GList*)value;
 	
-	ret += 4; /*for type*/
+	ret =  3 + namlen + 1 + string_list_pack_length(list);
 	
 	return ret;
 
@@ -819,8 +867,6 @@ add_binary_field(struct ha_msg* msg, char* name, size_t namelen,
 	
 	msg->stringlen += binary_stringlen(namelen, vallen, value);
 	
-	msg->netstringlen += binary_netstringlen(namelen, vallen, value);
-
 	msg->types[next] = FT_BINARY;
 	msg->nfields++;	
 	
@@ -867,8 +913,7 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 	int j;
 	GList* list = NULL;
 	int stringlen_add;
-	int netstringlen_add;
-	
+
 	if ( !msg || !name || !value
 	     || namelen <= 0 
 	     || vallen <= 0
@@ -893,9 +938,6 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 
 		stringlen_add = list_stringlen(namelen,listlen , value);
 		
-		netstringlen_add = list_netstringlen(namelen, 
-						     listlen, 
-						     value);
 		next = msg->nfields;
 		msg->names[next] = name;
 		msg->nlens[next] = namelen;
@@ -903,7 +945,6 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 		msg->vlens[next] =  vallen;
 		msg->types[next] = FT_LIST;
 		msg->stringlen += stringlen_add;
-		msg->netstringlen += netstringlen_add;
 		msg->nfields++;
 		
 	}  else if(  msg->types[j] == FT_LIST ){
@@ -925,14 +966,10 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 		newlistlen = string_list_pack_length(list);		
 		
 		stringlen_add = newlistlen - oldlistlen;
-		netstringlen_add = intlen(newlistlen) + newlistlen
-			- intlen(oldlistlen) - oldlistlen;		
-		
-		
+
 		msg->values[j] = list;
 		msg->vlens[j] =  string_list_pack_length(list);
 		msg->stringlen +=  stringlen_add;
-		msg->netstringlen += netstringlen_add;
 		g_list_free((GList*)value); /*we don't free each element
 					      because they are used in new list*/
 		
@@ -1162,112 +1199,85 @@ string2list(void* value, size_t vallen, int depth, void** nv, size_t* nlen)
 
 }
 
-
-static int 
-string2netstring(char* sp, char* smax, void* value, 
-		 size_t vallen, size_t* comlen)
+static int
+fields2netstring(char* sp, char* smax, char* name, size_t nlen,
+		 void* value, size_t vallen, int type, size_t* comlen)
 {
-	
-	if ( !sp || !smax || !value
-	     || !comlen ){
-		cl_log(LOG_ERR, "string2netstring:"
-		       "invalid input arguments");
+	size_t fieldlen;
+	int slen;
+	int ret = HA_OK;
+	char* sp_save = sp;
+
+	fieldlen = fieldtypefuncs[type].netstringlen(nlen, vallen, value);
+	if (fieldlen > MAXMSG){
+		cl_log(LOG_INFO, "field too big(%d)", fieldlen);
 		return HA_FAIL;
 	}
+	sp += sprintf(sp , "%d:(%d)%s=", 
+		      fieldlen, type, name);
+	switch (type){
 
-	
-	return compose_netstring(sp, smax, value, vallen, comlen);
-	
-}
+	case FT_STRING:
+	case FT_BINARY:
+		memcpy(sp, value, vallen);
+		slen = vallen;
+		break;
 
-static int
-binary2netstring(char* sp, char* smax, void* value,
-		 size_t vallen, size_t* comlen)
-{
-	
-	return string2netstring(sp, smax, value, vallen, comlen);
-	
-}
+	case FT_STRUCT:
+		{
+			struct ha_msg* msg = (struct ha_msg*) value;
+			ret = msg2netstring_buf(msg, sp,get_netstringlen(msg),
+						&slen);
+			break;
+		}
+	case FT_LIST:
+		{
 
-static int
-struct2netstring(char* sp, char* smax, void* value,
-		 size_t vallen, size_t* comlen)
-{
-	size_t	tmplen;
-	char	*sp_save = sp;
-	struct ha_msg* msg;
-	int llen;
-
-	(void)vallen;
-	if ( !sp || !smax || !value || !comlen ){
-		cl_log(LOG_ERR, "struct2netstring:"
-		       "invalid input arguments");
-		return HA_FAIL;
+			char buf[MAXLENGTH];
+			GList* list = NULL;
+			int tmplen;
+			
+			list = (GList*) value;
+			
+			tmplen = string_list_pack_length(list);
+			if (tmplen >= MAXLENGTH){
+				cl_log(LOG_ERR,
+				       "string list length exceeds limit");
+				return(HA_FAIL);
+			}
+			
+			if (string_list_pack(list, buf, buf + MAXLENGTH) 
+			    != tmplen ){
+				cl_log(LOG_ERR, 
+				       "packing string list return wrong length");
+				return(HA_FAIL);
+			}
+			
+			
+			memcpy(sp, buf, tmplen);
+			slen = tmplen;
+			ret = HA_OK;
+			break;
+		}
+		
+	default:
+		ret = HA_FAIL;
+		cl_log(LOG_ERR, "%s: Wrong type (%d)", __FUNCTION__,type);
 	}	
-	
-	msg = (struct ha_msg*) value;
-	
-	llen =  get_netstringlen(msg);
 
-	sp += sprintf(sp, "%ld:", (long)llen);
-	
-	if (msg2netstring_buf(msg, sp, llen, &tmplen) != HA_OK){
-		cl_log(LOG_ERR, "struct2netstring()"
-		       ": msg2netstring_buf() failed");
-		return(HA_FAIL);
+	if (ret == HA_FAIL){
+		return ret;
 	}
 	
-	sp +=llen;
-	
+	sp +=slen;
 	*sp++ = ',';
 	*comlen = sp - sp_save;
 	
 	return HA_OK;
-}
-
-
-static int
-list2netstring(char* sp, char* smax, void* value, 
-	       size_t vallen, size_t* comlen)
-{	
-	int tmplen;
-	GList* list = NULL;
-	char buf[MAXLENGTH];
 	
-	(void)vallen;
-	if ( !sp || !smax || !value || !comlen ){
-		cl_log(LOG_ERR, "list2netstring:"
-		       "invalid input arguments");
-		return HA_FAIL;
-	}		
-	
-	list= (GList*) value;
-
-	tmplen = string_list_pack_length(list);
-	if (tmplen >= MAXLENGTH){
-		cl_log(LOG_ERR,
-		       "string list length exceeds limit");
-		return(HA_FAIL);
-	}
-	
-	if (string_list_pack(list, buf, buf + MAXLENGTH) 
-	    != tmplen ){
-		cl_log(LOG_ERR, 
-		       "packing string list return wrong length");
-		return(HA_FAIL);
-	}
-	
-	if (compose_netstring(sp, smax, buf, tmplen, comlen)
-	    != HA_OK){
-		cl_log(LOG_ERR,
-		       "list2netstring: compose_netstring fails for"
-		       " value");
-		return(HA_FAIL);
-	}
-	
-	return HA_OK;
 	
 }
+
 
 static int
 netstring2string(const void* value, size_t vlen, void** retvalue, size_t* ret_vlen)
@@ -1317,7 +1327,7 @@ netstring2struct(const void* value, size_t vlen, void** retvalue, size_t* ret_vl
 		return HA_FAIL;
 	}	
 	
-	msg =  netstring2msg(value, vlen, 1);
+	msg =  netstring2msg(value, vlen, 0);
 	if (!msg){
 		cl_log(LOG_ERR, "netstring2struct:"
 		       "netstring2msg failed");
@@ -1374,8 +1384,6 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 	void	*cp_value = NULL;
 	int	next;
 	int	stringlen_add = 0 ;
-	int	netstringlen_add =0;
-
 
 	if ( !msg || !name || !value
 	     || namelen <= 0 
@@ -1425,7 +1433,6 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 	if(internal_type  < DIMOF(fieldtypefuncs)){
 		int (*stringtofield)(void*, size_t, int depth, void**, size_t* );
 		int (*fieldstringlen)( size_t, size_t, const void*);
-		int (*fieldnetstringlen)( size_t, size_t, const void*);
 
 		stringtofield= fieldtypefuncs[internal_type].stringtofield;
 		
@@ -1442,13 +1449,6 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 			return HA_FAIL;
 		}
 		
-		fieldnetstringlen = fieldtypefuncs[internal_type].netstringlen;
-		if (!fieldnetstringlen || (netstringlen_add = 
-					   fieldnetstringlen(cp_namelen, cp_vallen, cp_value)) <= 0 ){
-			
-			cl_log(LOG_ERR, "add_string_field: netstringlen failed");
-			return HA_FAIL;
-		}		
 	} else {
 		cl_log(LOG_ERR, "add_string_field():"
 		       " wrong type %lu", (unsigned long)internal_type);
@@ -1464,7 +1464,6 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 	
 	if (internal_type != FT_STRUCT){
 		msg->stringlen += stringlen_add;	
-		msg->netstringlen += netstringlen_add;
 	}
 	
 	msg->types[next] = internal_type;
@@ -1478,16 +1477,16 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 
 struct fieldtypefuncs_s fieldtypefuncs[4]=
 	{ {string_memfree, string_dup, string_display, add_string_field, 
-	   string_stringlen,string_netstringlen, str2string,string2netstring, string2str, netstring2string},
+	   string_stringlen,string_netstringlen, str2string,fields2netstring, string2str, netstring2string},
 	  
 	  {binary_memfree, binary_dup, binary_display, add_binary_field,
-	   binary_stringlen,binary_netstringlen, binary2string,binary2netstring, string2binary, netstring2binary},
+	   binary_stringlen,binary_netstringlen, binary2string,fields2netstring, string2binary, netstring2binary},
 	  
 	  {struct_memfree, struct_dup, struct_display, add_struct_field, 
-	   struct_stringlen, struct_netstringlen, struct2string, struct2netstring, string2struct, netstring2struct},
-
+	   struct_stringlen, struct_netstringlen, struct2string, fields2netstring, string2struct, netstring2struct},
+	  
 	  {list_memfree, list_dup, list_display, add_list_field, 
-	   list_stringlen, list_netstringlen, list2string, list2netstring, string2list, netstring2list},
+	   list_stringlen, list_netstringlen, list2string, fields2netstring, string2list, netstring2list},
 	};
 
 

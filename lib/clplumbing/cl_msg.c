@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.73 2005/07/06 09:41:09 andrew Exp $ */
+/* $Id: cl_msg.c,v 1.74 2005/08/01 19:16:43 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -42,7 +42,6 @@
 #define		MAXMSGLINE	MAXMSG
 #define		MINFIELDS	30
 #define		CRNL		"\r\n"
-#define		MAX_AUTH_BYTES	64
 
 
 #define		NEEDAUTH	1
@@ -95,7 +94,7 @@ struct ha_msg* string2msg_ll(const char * s, size_t length, int need_auth, int d
 
 extern int struct_stringlen(size_t namlen, size_t vallen, const void* value);
 extern int struct_netstringlen(size_t namlen, size_t vallen, const void* value);
-
+extern int process_netstring_nvpair(struct ha_msg* m, const char* nvpair, int nvlen);
 
 void
 cl_msg_setstats(volatile hb_msg_stats_t* stats)
@@ -161,8 +160,6 @@ ha_msg_new(nfields)
 		ret->values    = (void **)ha_calloc(sizeof(void *), nalloc);
 		ret->vlens     = (size_t *)ha_calloc(sizeof(size_t), nalloc);
 		ret->stringlen = sizeof(MSG_START)+sizeof(MSG_END)-1;
-		ret->netstringlen = sizeof(MSG_START_NETSTRING)
-		+	sizeof(MSG_END_NETSTRING) - 1 + MAX_AUTH_BYTES;
 		ret->types	= (int*)ha_calloc(sizeof(int), nalloc);
 
 		if (ret->names == NULL || ret->values == NULL
@@ -233,7 +230,6 @@ ha_msg_del(struct ha_msg *msg)
 		msg->nfields = -1;
 		msg->nalloc = -1;
 		msg->stringlen = -1;
-		msg->netstringlen = -1;
 		ha_free(msg);
 	}
 }
@@ -251,7 +247,6 @@ ha_msg_copy(const struct ha_msg *msg)
 
 	ret->nfields	= msg->nfields;
 	ret->stringlen	= msg->stringlen;
-	ret->netstringlen = msg->netstringlen;
 
 	memcpy(ret->nlens, msg->nlens, sizeof(msg->nlens[0])*msg->nfields);
 	memcpy(ret->vlens, msg->vlens, sizeof(msg->vlens[0])*msg->nfields);
@@ -311,12 +306,11 @@ ha_msg_audit(const struct ha_msg* msg)
 		,	msg, msg->nalloc);
 		doabort = TRUE;
 	}
-	if (msg->stringlen <=0 
-	    || msg->netstringlen <= 0) {
+	if (msg->stringlen <=0 ){
 		cl_log(LOG_CRIT,
-		       "Message @ %p has non-negative net/stringlen field"
-		       "stringlen=(%ld), netstringlen=(%ld)",
-		       msg,(long)msg->stringlen, (long)msg->netstringlen);
+		       "Message @ %p has non-positive net/stringlen field"
+		       "stringlen=(%ld)",
+		       msg,(long)msg->stringlen);
 		doabort = TRUE;
 	}
 
@@ -505,16 +499,6 @@ cl_msg_remove_offset(struct ha_msg* msg, int offset)
 			return HA_FAIL;
 		}
 		
-		tmplen = msg->netstringlen;
-		msg->netstringlen -=  fieldtypefuncs[msg->types[j]].netstringlen(msg->nlens[j],
-										 msg->vlens[j],       
-										 msg->values[j]);	
-		if (msg->netstringlen <=0){
-			cl_log(LOG_ERR, "cl_msg_remove: netstringlen <= 0 after removing"
-			       "field %s. return failure", msg->names[j]);
-			msg->netstringlen =tmplen;
-			return HA_FAIL;
-		}
 	}
 
 	
@@ -548,7 +532,6 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 {
 	
 	size_t	startlen = sizeof(MSG_START)-1;
-	size_t	startlen_netstring = sizeof(MSG_START_NETSTRING) -1 ;
 	int	internal_type;
 	
 
@@ -574,13 +557,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		}
 		return(HA_FAIL);
 	}
-	if (namelen >= startlen_netstring
-	    && strncmp(name, MSG_START_NETSTRING, startlen_netstring) == 0){
-		if(!cl_msg_quiet_fmterr) {
-			cl_log(LOG_ERR, "ha_msg_addraw_ll: illegal field");
-		}
-	}
-	
+
 	if (name == NULL || (value == NULL)
 	    ||	namelen <= 0 || vallen < 0) {
 		cl_log(LOG_ERR, "ha_msg_addraw_ll: "
@@ -1293,7 +1270,6 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 			char *	newv ;
 			int	newlen = vlen;
 			int	string_sizediff = 0;
-			int	netstring_sizediff = 0;
 			
 			newv = fieldtypefuncs[type].dup(value,vlen);
 			if (!newv){
@@ -1307,11 +1283,7 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 				string_sizediff = fieldtypefuncs[type].stringlen(strlen(name), vlen, value)
 					- fieldtypefuncs[type].stringlen(strlen(name), 
 									 msg->vlens[j], msg->values[j]);
-				netstring_sizediff = fieldtypefuncs[type].netstringlen(strlen(name), vlen, value)
-					- fieldtypefuncs[type].netstringlen(strlen(name), 
-									    msg->vlens[j], msg->values[j]);
 				msg->stringlen += string_sizediff;
-				msg->netstringlen += netstring_sizediff;
 			}
 			
 			
@@ -1437,17 +1409,12 @@ msgfromstream_string(FILE * f)
 }
 
 
-/* Return the next message found in the stream with string format*/
+/* Return the next message found in the stream with netstring format*/
 
 struct ha_msg *
 msgfromstream_netstring(FILE * f)
 {
 	struct ha_msg *		ret;
-	char			total_databuf[MAXMSG];
-	char *			sp = total_databuf;
-	int (*netstringtofield)(const void*, size_t, void**, size_t*);			
-	void (*memfree)(void*);
-	
 
 	if ((ret = ha_msg_new(0)) == NULL) {
 		/* Getting an error with EINTR is pretty normal */
@@ -1461,179 +1428,27 @@ msgfromstream_netstring(FILE * f)
 	}
 
 	while(1) {
-		int	namelen=-1;
-		char *	name;
-		char *	namebuf;
-		int	datalen;
-		char *	data;
-		char *	databuf;
+		char*	nvpair;
+		int	nvlen;
 		int	n;
-		int	typelen;
-		char *  type;
-		char *	typebuf;
-		int		fieldtype;
-		void*		ret_data;
-		size_t		ret_datalen;
-		
-		if (fscanf(f, "%d:", &namelen) <= 0 || namelen <= 0){
-			if (!cl_msg_quiet_fmterr) {
-				cl_log(LOG_WARNING
-				,	" msgfromstream_netstring()"
-				": scanning for namelen failed");
-			}
-			ha_msg_del(ret);
-			return(NULL);
-		}
 
-		namebuf = ha_malloc(namelen + 2);
-
-		if ((n = fread(namebuf, 1, namelen + 1, f)) != namelen + 1){
-			cl_log(LOG_WARNING, "msgfromstream_netstring()"
-			": Can't get enough name string,"
-			"expecting %d bytes long name, got %d bytes"
-			,	namelen, n);
-			ha_msg_del(ret);
-			return(NULL);
-		}
-
-		if (*(namebuf + namelen) != ',' ){
-			if (!cl_msg_quiet_fmterr) {
-				cl_log(LOG_WARNING
-				,	"msgfromstream_netstring()"
-				": \",\" is missing in netstring for name");
-			}
-			ha_msg_del(ret);
-			return(NULL);
-		}
-
-		namebuf[namelen] = 0;
-		name = namebuf;
-
-		if (fscanf(f, "%d:", &typelen) <= 0 || typelen <= 0){
-
-			if (!is_auth_netstring(total_databuf
-			,	sp - total_databuf, name,namelen) ){
-				if (!cl_msg_quiet_fmterr) {
-					cl_log(LOG_ERR
-					,	"msgfromstream_netstring()"
-					": netstring authentication"
-					" failed msgfromstream_netstring()");
-				}
-				cl_log_message(LOG_INFO, ret);
-				ha_msg_del(ret);
-				return(NULL);
-			}
-
+		if (fscanf(f, "%d:", &nvlen) <= 0 || nvlen <= 0){
 			return(ret);
 		}
 
-		typebuf = ha_malloc(typelen + 2);
-		if ((n = fread(typebuf, 1, typelen + 1, f)) != typelen + 1){
-			cl_log(LOG_WARNING
-			,	"msgfromstream_netstring()"
-			": Can't get enough type string,"
-			"expecting %d bytes long type, got %d type"
-			,	typelen, n);
-			ha_msg_del(ret);
-			return(NULL);
-		}
-
-		if (*(typebuf + typelen) != ',' ){
-			if  (!cl_msg_quiet_fmterr) {
-				cl_log(LOG_WARNING
-				,	"msgfromstream_netstring()"
-				": \",\" is missing in netstring for type");
-			}
-			ha_msg_del(ret);
-			return(NULL);
-		}
-
-		typebuf[typelen] = 0;
-		type = typebuf;
-
-		if (fscanf(f, "%d:", &datalen) <= 0) {
-			if (!cl_msg_quiet_fmterr) {
-				cl_log(LOG_WARNING
-				,	"msgfromstream_netstring()"
-				": scanning for datalen failed");
-			}
-			ha_msg_del(ret);
-			return(NULL);
-		}
-
-		databuf = ha_malloc(datalen + 2);
-
-		if ((n = fread(databuf, 1, datalen + 1, f)) != datalen + 1) {
-			cl_log(LOG_WARNING
-			,	"msgfromstream_netstring()"
-			": Can't get enough data"
-			", expecting %d bytes long data, got %d bytes"
-			,	datalen, n);
-			ha_msg_del(ret);
-			return(NULL);
-		}
-
-		if (*(databuf + datalen ) != ',' ){
-			if (!cl_msg_quiet_fmterr) {
-				cl_log(LOG_WARNING
-				,	"msgfromstream_netstring()"
-				": \",\" is missing in netstring for data");
-			}
-			ha_msg_del(ret);
-			return(NULL);
-		}
-
-		databuf[datalen] = 0;
-		data = databuf ;
-
-		sp += sprintf(sp, "%d:%s,", namelen, name);
-		sp += sprintf(sp, "%d:%s,", typelen, type);
-		sp += sprintf(sp, "%d:%s,", datalen, data);
+		nvpair = ha_malloc(nvlen + 2);
 		
-				
-		fieldtype = atoi(type);
-
-
-		
-		if (fieldtype < DIMOF(fieldtypefuncs)){					
-			netstringtofield = fieldtypefuncs[fieldtype].netstringtofield;
-			memfree = fieldtypefuncs[fieldtype].memfree;
-			if (!netstringtofield || netstringtofield(data, datalen,
-								  &ret_data, &ret_datalen) != HA_OK){
-				cl_log(LOG_ERR, "msgfromstream_netstring: "
-				       "tonetstring() failed, type=%d", fieldtype);
-				return NULL;
-			}
-		}else {
-			cl_log(LOG_ERR, "msgfromstream_netstring: wrong type(%d)", fieldtype);
-			return NULL;
-		}
-		
-		if (ha_msg_nadd_type(ret, name, namelen, data, datalen, fieldtype)
-		    != HA_OK) {
-			cl_log(LOG_ERR, "ha_msg_nadd fails(netstring2msg)");
-			
-			if (memfree && ret_data){
-				memfree(ret_data);
-			} else{
-				cl_log(LOG_ERR, "netstring2msg:"
-				       "memfree or ret_value is NULL");
-			}
-			
+		if ((n =fread(nvpair, 1, nvlen + 1, f)) != nvlen + 1){
+			cl_log(LOG_WARNING, "msgfromstream_netstring()"
+			       ": Can't get enough nvpair,"
+			       "expecting %d bytes long, got %d bytes",
+			       nvlen + 1, n);
 			ha_msg_del(ret);
 			return(NULL);
 		}
 		
-		
-		if (memfree && ret_data){
-			memfree(ret_data);
-		} else{
-			cl_log(LOG_ERR, "netstring2msg:"
-			       "memfree or ret_value is NULL");
-		}
-		
-		ha_free(namebuf);
-		ha_free(databuf);
+		process_netstring_nvpair(ret, nvpair, nvlen);
+
 	}
 
 }
@@ -2169,57 +1984,8 @@ msg2string(const struct ha_msg *m)
 }
 
 
-int
-get_stringlen(const struct ha_msg *m)
-{
-	int i;
-	int total_len =0 ;
-
-	if (m == NULL){
-		cl_log(LOG_ERR, "get_stringlen:"
-		       "asking stringlen of a NULL message");
-		return 0;
-	}
-	
-	for (i = 0; i < m->nfields; i++){		
-		if (m->types[i] == FT_STRUCT){			
-			total_len += struct_stringlen(m->nlens[i], 
-						      m->vlens[i],
-						      m->values[i]);
-		}
-	}
-	
-	total_len += m->stringlen;
-	
-	return total_len;
-}
-
-int
-get_netstringlen(const struct ha_msg *m)
-{
-	int i;
-	int total_len =0 ;
-	
-	if (m == NULL){
-		cl_log(LOG_ERR, "get_netstringlen:"
-		       "asking netstringlen of a NULL message");
-		return 0;
-	}
-	
-	for (i = 0; i < m->nfields; i++){		
-		if (m->types[i] == FT_STRUCT){			
-			total_len += struct_netstringlen(m->nlens[i],
-							 m->vlens[i],
-							 m->values[i]);
-		}
-	}
-	
-	total_len += m->netstringlen;
-	
-	return total_len;	
 
 
-}
 
 char*
 msg2wirefmt(const struct ha_msg*m, size_t* len)
@@ -2330,6 +2096,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.74  2005/08/01 19:16:43  gshi
+ * fix bug 257
+ *
+ * make netstring encoding more efficient
+ *
  * Revision 1.73  2005/07/06 09:41:09  andrew
  * Some more places where printing size_t as an int was a problem.
  *

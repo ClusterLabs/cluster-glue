@@ -32,6 +32,7 @@
 #include <clplumbing/ipc.h>
 #include <clplumbing/netstring.h>
 #include <clplumbing/base64.h>
+#include <assert.h>
 
 /*
  * Avoid sprintf.  Use snprintf instead, even if you count your bytes.
@@ -39,12 +40,14 @@
  * and will not make the security audit tools crazy.
  */
 
+#define		MAX_AUTH_BYTES	64
+
 
 int msg2netstring_buf(const struct ha_msg*, char*, size_t, size_t*);
 int compose_netstring(char*, const char*, const char*, size_t, size_t*);
 int is_auth_netstring(const char*, size_t, const char*, size_t);
 char* msg2netstring(const struct ha_msg*, size_t*);
-struct ha_msg* netstring2msg(const char *, size_t, int);
+int process_netstring_nvpair(struct ha_msg* m, const char* nvpair, int nvlen);
 
 extern const char *	FT_strings[];
 
@@ -103,12 +106,8 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 	int	i;
 	char *	sp;
 	char *	smax;
+	int	ret = HA_OK;
 
-	char *	datap;
-	int	datalen = 0;
-	char	authtoken[MAXLINE];
-	char	authstring[MAXLINE];
-	int	authnum;
 	sp = s;
 	smax = s + buflen;
 
@@ -116,75 +115,51 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 
 	sp += strlen(MSG_START_NETSTRING);
 
-	datap = sp;
-
 	for (i=0; i < m->nfields; i++) {
-		size_t comlen;
-		size_t llen;
-
-		if (compose_netstring(sp, smax, m->names[i],
-				      m->nlens[i], &comlen) != HA_OK){
-			cl_log(LOG_ERR
-			,	"compose_netstring fails for"
-			" name(msg2netstring_buf)");
-			return(HA_FAIL);
-		}
-
-		sp += comlen;
-		datalen +=comlen;
-
-
-		if (compose_netstring(sp, smax, FT_strings[m->types[i]], 1, 
-				      &comlen) != HA_OK) {
-			cl_log(LOG_ERR
-			, "compose_netstring fails for"
-			       " type(msg2netstring_buf)");
-			return(HA_FAIL);
+		size_t flen;
+		
+		
+		ret = fieldtypefuncs[m->types[i]].tonetstring(sp, 
+							      smax,
+							      m->names[i],
+							      m->nlens[i],
+							      m->values[i],
+							      m->vlens[i],
+							      m->types[i],
+							      &flen);
+		
+		if (ret != HA_OK){
+			cl_log(LOG_ERR, "encoding msg to netstring failed");
+			cl_log_message(LOG_ERR, m);
+			return ret;
 		}
 		
-		sp += comlen;
-		datalen +=comlen;
+		sp +=flen;
 		
-		llen = (size_t)m->nlens[i];
-		
-		if(m->types[i] < DIMOF(fieldtypefuncs)){
-			int (*tonetstring)(char*, char*, void*, size_t, size_t*);			
-			tonetstring = fieldtypefuncs[m->types[i]].tonetstring;
-			if (!tonetstring || tonetstring(sp, smax, m->values[i], m->vlens[i], &comlen) != HA_OK){
-				cl_log(LOG_ERR, "msg2netstring_buf: "
-				       "tonetstring() failed, type=%d", m->types[i]);
-				return HA_FAIL;
-			}
-			
-			sp += comlen;
-			datalen +=comlen;
-		}
 	}
 	
-
-	/* Add authentication */
 	
-	if ((authnum=authmethod(-1, datap, datalen, authtoken
-				,		sizeof(authtoken))) < 0) {
-		cl_log(LOG_WARNING
-		       ,	"Cannot compute message authentication!");
-		return(HA_FAIL);
-	}
-	sprintf(authstring, "%d %s", authnum, authtoken);
-	sp += sprintf(sp, "%ld:%s,", (long)strlen(authstring), authstring);
-
 	strcpy(sp, MSG_END_NETSTRING);
 	sp += sizeof(MSG_END_NETSTRING) -1;
-
+	
 	if (sp > smax){
-		cl_log(LOG_ERR
-		,	"msg2netstring: exceed memory boundary sp =%p smax=%p"
-		,	sp, smax);
+		cl_log(LOG_ERR,
+		       "msg2netstring: exceed memory boundary sp =%p smax=%p",
+		       sp, smax);
 		return(HA_FAIL);
 	}
-
-	*slen = sp - s + 1;
+	
+	*slen = sp - s;
 	return(HA_OK);
+}
+
+
+int get_netstringlen_auth(const struct ha_msg* m);
+
+int get_netstringlen_auth(const struct ha_msg* m)
+{
+	int len =  get_netstringlen(m) + MAX_AUTH_BYTES;
+	return len;
 }
 
 char *
@@ -192,9 +167,14 @@ msg2netstring(const struct ha_msg *m, size_t * slen)
 {
 
 	int	len;
-	void	*s;
-	
-	len= get_netstringlen(m) + 1;
+	char*	s;
+	int	authnum;
+	char	authtoken[MAXMSG];
+	char	authstring[MAXMSG];
+	char*	sp;
+	int	payload_len;
+
+	len= get_netstringlen_auth(m) + 1;
 	
 	if (len >= MAXMSG){
 		cl_log(LOG_ERR, "msg2netstring: msg is too large"
@@ -208,11 +188,27 @@ msg2netstring(const struct ha_msg *m, size_t * slen)
 		return(NULL);
 	}
 
-	if (msg2netstring_buf(m, s, len, slen) != HA_OK){
+	if (msg2netstring_buf(m, s, len, &payload_len) != HA_OK){
 		cl_log(LOG_ERR, "msg2netstring: msg2netstring_buf() failed");
 		ha_free(s);
 		return(NULL);
 	}
+
+	sp = s + payload_len;
+
+	if (authmethod){
+		authnum = authmethod(-1, s, payload_len, authtoken,sizeof(authtoken));
+		if (authnum < 0){
+			cl_log(LOG_WARNING
+			       ,	"Cannot compute message authentication!");
+			return(NULL);
+		}
+		
+		sprintf(authstring, "%d %s", authnum, authtoken);
+		sp += sprintf(sp, "%ld:%s,", (long)strlen(authstring), authstring);	
+		
+	}
+	*slen = sp - s + 1;
 
 	return(s);
 }
@@ -263,19 +259,85 @@ peel_netstring(const char * s, const char * smax, int* len,
 	return(HA_OK);
 }
 
+
+int
+process_netstring_nvpair(struct ha_msg* m, const char* nvpair, int nvlen)
+{
+	
+	const char	*name;
+	int		nlen;
+	const char	*ns_value;
+	int		ns_vlen;
+	void		*value;
+	int		vlen;
+	int		type;		
+	void (*memfree)(void*);
+	int		ret = HA_OK;
+
+	assert(*nvpair == '(');
+	nvpair++;
+	if (sscanf(nvpair, "%d", &type) != 1){
+		cl_log(LOG_ERR, " sscaning for type failed in %s", 
+		       __FUNCTION__);
+		return HA_FAIL;
+	}
+	
+	nvpair++;
+	assert(*nvpair == ')');
+	nvpair++;
+	
+	
+	if ((nlen = strcspn(nvpair, EQUAL)) <= 0
+	    ||	nvpair[nlen] != '=') {
+		if (!cl_msg_quiet_fmterr) {
+			cl_log(LOG_WARNING
+			       ,	"%s: line doesn't contain '='", __FUNCTION__);
+			cl_log(LOG_INFO, "%s", nvpair);
+		}
+		return(HA_FAIL);
+	}
+	
+	name = nvpair;
+	ns_value = name +nlen + 1;
+	ns_vlen = nvpair + nvlen - ns_value -3 ;
+	if (fieldtypefuncs[type].netstringtofield(ns_value,ns_vlen, &value, &vlen) != HA_OK){
+		cl_log(LOG_ERR, "netstringtofield failed in %s", __FUNCTION__);
+		return HA_FAIL;
+		
+	}
+	
+	memfree = fieldtypefuncs[type].memfree;
+	
+	if (ha_msg_nadd_type(m  , name, nlen, value, vlen,type)
+	    != HA_OK) {
+		cl_log(LOG_ERR, "ha_msg_nadd fails(netstring2msg_rec)");	
+		ret = HA_FAIL;
+	}
+	
+	
+	if (memfree && value){
+		memfree(value);
+	} else{
+		cl_log(LOG_ERR, "netstring2msg_rec:"
+		       "memfree or ret_value is NULL");
+		ret= HA_FAIL;
+	}
+
+	return ret;
+
+	
+}
+			 
+
 /* Converts a netstring into a message*/
-struct ha_msg *
-netstring2msg(const char *s, size_t length, int need_auth)
+static struct ha_msg *
+netstring2msg_rec(const char *s, size_t length, int* slen)
 {
 	struct ha_msg*	ret = NULL;
 	const char *	sp = s;
 	const char *	smax = s + length;
 	int		startlen;
 	int		endlen;
-	const char *	datap;
-	int		datalen = 0;
-	int (*netstringtofield)(const void*, size_t, void**, size_t*);			
-	void (*memfree)(void*);
 	
 	if ((ret = ha_msg_new(0)) == NULL){
 		return(NULL);
@@ -287,7 +349,7 @@ netstring2msg(const char *s, size_t length, int need_auth)
 		/* This can happen if the sender gets killed */
 		/* at just the wrong time... */
 		if (!cl_msg_quiet_fmterr) {
-			cl_log(LOG_WARNING, "netstring2msg: no MSG_START");
+			cl_log(LOG_WARNING, "netstring2msg_rec: no MSG_START");
 			ha_msg_del(ret);
 		}
 		return(NULL);
@@ -297,135 +359,98 @@ netstring2msg(const char *s, size_t length, int need_auth)
 
 	endlen = sizeof(MSG_END_NETSTRING) - 1;
 
-	datap = sp;
 	while (sp < smax && strncmp(sp, MSG_END_NETSTRING, endlen) !=0  ){
-		int		nlen;
-		int		vlen;
-		const char *	name;
-		const char *	value;
+		
+		const char	*nvpair;
+		int		nvlen;	
 		int		parselen;
-		int		tmp;
-
-		int		tlen;
-		const char *	type;
-		int		fieldtype;
-		void*		ret_value;
-		size_t		ret_vlen;
-
-		tmp = datalen;
-		if (peel_netstring(sp , smax, &nlen, &name,&parselen) != HA_OK){
+		
+		if (peel_netstring(sp , smax, &nvlen, &nvpair,&parselen) != HA_OK){
 			cl_log(LOG_ERR
-			,	"peel_netstring fails for name(netstring2msg)");
+			       ,	"%s:peel_netstring fails for name/value pair", __FUNCTION__);
+			cl_log(LOG_ERR, "sp=%s", sp);
 			ha_msg_del(ret);
 			return(NULL);
 		}
 		sp +=  parselen;
-		datalen += parselen;
-
-		if (strncmp(sp, MSG_END_NETSTRING, endlen) == 0) {
-			if (!is_auth_netstring(datap, tmp, name,nlen) ){
-				if (!cl_msg_quiet_fmterr) {
-					cl_log(LOG_ERR
-					,	"netstring authentication"
-					" failed, s=%s, autotoken=%s, sp=%s"
-					,	s, name, sp);
-					cl_log_message(LOG_ERR, ret);
-				}
-				ha_msg_del(ret);
-				return(NULL);
-			}
-
-			goto happyexit;
+		
+		if (process_netstring_nvpair(ret, nvpair, nvlen) != HA_OK){
+			cl_log(LOG_ERR, "%s: processing nvpair failed", __FUNCTION__);
+			return HA_FAIL;
 		}
 
-
-		if (peel_netstring(sp , smax, &tlen, &type, &parselen) !=HA_OK){
-			cl_log(LOG_ERR
-			,	"peel_netstring() error in netstring2msg"
-			" for type");
-			ha_msg_del(ret);
-			return(NULL);
-		}
-		sp +=  parselen;
-		datalen += parselen;
-		
-		
-		if (peel_netstring(sp, smax, &vlen, &value, &parselen) !=HA_OK){
-			cl_log(LOG_ERR
-			,  "peel_netstring() error in netstring2msg for value");
-			ha_msg_del(ret);
-			return(NULL);
-		}
-		sp +=  parselen;
-		datalen += parselen;
-		
-		fieldtype = atoi(type);		
-		
-		if (fieldtype < DIMOF(fieldtypefuncs)){
-			netstringtofield = fieldtypefuncs[fieldtype].netstringtofield;
-			memfree = fieldtypefuncs[fieldtype].memfree;
-			if (!netstringtofield || netstringtofield(value, vlen,
-								  &ret_value, &ret_vlen) != HA_OK){
-				cl_log(LOG_ERR, "netstring2msg: "
-				       "tonetstring() failed, type=%d", fieldtype);
-				return NULL;
-			}
-		}else {
-			cl_log(LOG_ERR, "netstring2msg: wrong type(%d)", fieldtype);
-			return NULL;
-		}
-		
-		
-		if (ha_msg_nadd_type(ret, name, nlen, ret_value, ret_vlen, fieldtype)
-		    != HA_OK) {
-			cl_log(LOG_ERR, "ha_msg_nadd fails(netstring2msg)");
-			
-			if (memfree && ret_value){
-				memfree(ret_value);
-			} else{
-				cl_log(LOG_ERR, "netstring2msg:"
-				       "memfree or ret_value is NULL");
-			}
-			
-			ha_msg_del(ret);
-			return(NULL);
-		}
-		
-		
-		if (memfree && ret_value){
-			memfree(ret_value);
-		} else{
-			cl_log(LOG_ERR, "netstring2msg:"
-			       "memfree or ret_value is NULL");
-		}
-	}
-	/* if program runs here,
-	   the message is generated but
-	   no authentication found*/
-	
-	if (!need_auth){
-		return(ret);
-	}else {
-		if (!cl_msg_quiet_fmterr) {
-			cl_log(LOG_ERR, "no authentication found in netstring");
-		}
-		ha_msg_del(ret);
-		return(NULL);
 	}
 	
- happyexit:
+	
+	sp += sizeof(MSG_END_NETSTRING) -1;
+	*slen = sp - s;
 	return(ret);
 	
 }
+
+
+struct ha_msg *
+netstring2msg(const char* s, size_t length, int needauth)
+{
+	const char	*sp;
+	struct ha_msg	*msg;
+	const char	*smax = s + length;
+	int		parselen;
+	int		authlen;
+	const char	*authstring;
+	/*actual string length used excluding auth string*/
+	int		slen; 
+	
+	msg = netstring2msg_rec(s, length, &slen);
+	
+	if (needauth == FALSE){
+		return msg;
+	} 
+	
+	sp =  s + slen;
+	
+	if (peel_netstring(sp , smax, &authlen, &authstring, &parselen) !=HA_OK){
+		cl_log(LOG_ERR,
+		       "peel_netstring() error in getting auth string");		
+		cl_log(LOG_ERR, "sp=%s", sp);
+		cl_log(LOG_ERR, "s=%s", s);
+		
+		ha_msg_del(msg);
+		return(NULL);
+	}
+
+	if (sp + parselen > smax){		
+		cl_log(LOG_ERR, " netstring2msg: smax passed");
+		ha_msg_del(msg);
+		return NULL;
+	}
+
+	if (!is_auth_netstring(s, slen, authstring,authlen) ){
+		if (!cl_msg_quiet_fmterr) {
+			cl_log(LOG_ERR
+			       ,	"netstring authentication"
+			       " failed, s=%s, autotoken=%s"
+			       ,	s, authstring);
+			cl_log_message(LOG_ERR, msg);
+		}
+		ha_msg_del(msg);
+		return(NULL);
+	}	
+
+	return msg;
+}
+
+
+
 
 int
 is_auth_netstring(const char * datap, size_t datalen,
 		  const char * authstring, size_t authlen)
 {
 
-	char	authstr[MAXLINE];	/* A copy of authstring */
+	char	authstr[MAXMSG];	/* A copy of authstring */
 	int	authwhich;
-	char	authtoken[MAXLINE];
+	char	authtoken[MAXMSG];
 
 
 	/*
@@ -434,7 +459,7 @@ is_auth_netstring(const char * datap, size_t datalen,
 	if (!authmethod) {
 		return TRUE;
 	}
-	strncpy(authstr, authstring, MAXLINE);
+	strncpy(authstr, authstring, MAXMSG);
 	authstr[authlen] = 0;
 	if (sscanf(authstr, "%d %s", &authwhich, authtoken) != 2) {
 		if (!cl_msg_quiet_fmterr) {
