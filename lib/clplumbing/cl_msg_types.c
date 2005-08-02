@@ -1204,17 +1204,16 @@ fields2netstring(char* sp, char* smax, char* name, size_t nlen,
 		 void* value, size_t vallen, int type, size_t* comlen)
 {
 	size_t fieldlen;
-	int slen;
+	size_t slen;
 	int ret = HA_OK;
 	char* sp_save = sp;
 
 	fieldlen = fieldtypefuncs[type].netstringlen(nlen, vallen, value);
 	if (fieldlen > MAXMSG){
-		cl_log(LOG_INFO, "field too big(%d)", fieldlen);
+		cl_log(LOG_INFO, "field too big(%d)", (int)fieldlen);
 		return HA_FAIL;
 	}
-	sp += sprintf(sp , "%d:(%d)%s=", 
-		      fieldlen, type, name);
+	sp += sprintf(sp , "%d:(%d)%s=", (int)fieldlen, type, name);
 	switch (type){
 
 	case FT_STRING:
