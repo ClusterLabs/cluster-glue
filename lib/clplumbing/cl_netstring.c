@@ -172,7 +172,7 @@ msg2netstring(const struct ha_msg *m, size_t * slen)
 	char	authtoken[MAXMSG];
 	char	authstring[MAXMSG];
 	char*	sp;
-	int	payload_len;
+	size_t	payload_len;
 
 	len= get_netstringlen_auth(m) + 1;
 	
@@ -269,7 +269,7 @@ process_netstring_nvpair(struct ha_msg* m, const char* nvpair, int nvlen)
 	const char	*ns_value;
 	int		ns_vlen;
 	void		*value;
-	int		vlen;
+	size_t		vlen;
 	int		type;		
 	void (*memfree)(void*);
 	int		ret = HA_OK;
