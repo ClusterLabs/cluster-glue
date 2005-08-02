@@ -34,8 +34,8 @@
 
 #include <lrm/lrm_api.h>
 
-#define LRM_CMDPATH 		HA_VARLIBDIR"/heartbeat/lrm_cmd_sock"
-#define LRM_CALLBACKPATH 	HA_VARLIBDIR"/heartbeat/lrm_callback_sock"
+#define LRM_CMDPATH 		HA_VARRUNDIR"/heartbeat/lrm_cmd_sock"
+#define LRM_CALLBACKPATH 	HA_VARRUNDIR"/heartbeat/lrm_callback_sock"
 
 /*define the field type used by lrm*/
 #define F_LRM_TYPE		"lrm_t"
