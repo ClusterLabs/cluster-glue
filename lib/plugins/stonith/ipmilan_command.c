@@ -1,4 +1,4 @@
-/* $Id: ipmilan_command.c,v 1.9 2005/07/27 01:50:51 panjiam Exp $ */
+/* $Id: ipmilan_command.c,v 1.10 2005/08/03 14:26:32 horms Exp $ */
 /*
  * This program is largely based on the ipmicmd.c program that's part of OpenIPMI package.
  * 
@@ -74,7 +74,7 @@ typedef enum chassis_control_request {
 } chassis_control_request_t;
 
 void dump_msg_data(ipmi_msg_t *msg, ipmi_addr_t *addr, char *type);
-int rsp_handler(ipmi_con_t *ipmi, ipmi_msgi_t *rsp);
+int rsp_handler(ipmi_con_t *ipmi, ipmi_msg_t *rsp);
 
 void send_ipmi_cmd(ipmi_con_t *con, int request);
 
@@ -143,12 +143,12 @@ dump_msg_data(ipmi_msg_t *msg, ipmi_addr_t *addr, char *type)
  */
 
 int
-rsp_handler(ipmi_con_t *ipmi, ipmi_msgi_t *rsp)
+rsp_handler(ipmi_con_t *ipmi, ipmi_msg_t *rsp)
 {
 	int rv;
 	int * request;
 
-	request = (int *) rsp->data1;
+	request = (void *) rsp->data;
 
 #if 0
 	dump_msg_data(rsp, addr, NULL);
@@ -175,7 +175,7 @@ send_ipmi_cmd(ipmi_con_t *con, int request)
 	ipmi_msg_t msg;
 	struct ipmi_system_interface_addr *si;
 	int rv;
-	ipmi_msgi_t msgi;
+	ipmi_msg_t msgi;
 	/* chassis control command request is only 1 byte long */
 	unsigned char cc_data = POWER_CYCLE; 
 
@@ -215,9 +215,9 @@ send_ipmi_cmd(ipmi_con_t *con, int request)
 			return;
 	}
 
-	msgi.data1 = (int *) malloc(sizeof(int));
-	*((int *)msgi.data1) = request;
-	rv = con->send_command(con, &addr, addr_len, &msg, rsp_handler, &msgi);
+	msgi.data = (void *) malloc(sizeof(int));
+	*((unsigned char *)msgi.data) = request;
+	rv = con->send_command(con, &addr, addr_len, &msg, (ipmi_ll_rsp_handler_t) rsp_handler, (void *) &msgi);
 	if (rv == -1) {
 		PILCallLog(PluginImports->log,PIL_CRIT, "Error sending IPMI command: %x\n", rv);
 		gstatus = S_ACCESS;
@@ -311,7 +311,13 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 		return S_ACCESS;
 	}
 
-	con->set_con_change_handler(con, con_changed_handler, &request);
+	/* in the OpenIPMI 1.3.x implementation the callback function was
+	 * called set_con_change_handler(), now with the OpenIPMI 2.0.x
+	 * implementation it has changed to add_con_change_handler(). Check out:
+	 *
+	 * http://cvs.sourceforge.net/viewcvs.py/openipmi/OpenIPMI/include/OpenIPMI/ipmi_conn.h?r1=1.27&r2=1.28
+	 */
+	con->add_con_change_handler(con, con_changed_handler, &request);
 
 	gstatus = IPMI_RUNNING;
 
