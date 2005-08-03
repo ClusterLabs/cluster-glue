@@ -399,7 +399,7 @@ netstring2msg(const char* s, size_t length, int needauth)
 	int		authlen;
 	const char	*authstring;
 	/*actual string length used excluding auth string*/
-	int		slen; 
+	int		slen = 0; /* assign to keep compiler happy */
 	
 	msg = netstring2msg_rec(s, length, &slen);
 	
