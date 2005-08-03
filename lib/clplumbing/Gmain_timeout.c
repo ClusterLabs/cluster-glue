@@ -1,4 +1,4 @@
-/* $Id: Gmain_timeout.c,v 1.10 2005/07/26 19:31:44 gshi Exp $ */
+/* $Id: Gmain_timeout.c,v 1.11 2005/08/03 14:31:29 horms Exp $ */
 /*
  * Glib mainloop timeout handling code.
  *
@@ -54,7 +54,7 @@ struct GTimeoutAppend {
 	GSource		Source;
 	longclock_t	nexttime;
 	guint		interval;
-};
+}__attribute((packed));
 
 #define        GTIMEOUT(GS)    ((struct GTimeoutAppend*)((void*)(GS)))
 
