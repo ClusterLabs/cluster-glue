@@ -19,13 +19,18 @@
 #
 MAINTAINERCLEANFILES    = Makefile.in
 
+
+halibdir                = $(libdir)/@HB_PKG@
+
 INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/linux-ha -I$(top_srcdir)/linux-ha  \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 
 # if we want to do extreme stress test for messages, we need to disable IPC_TIME_DEBUG 
 # because there will be too many debug log about delayed messages 
-AM_CFLAGS			= @CFLAGS@  -DALIGNFUNC=@ALIGN@ -DMSGHDR_TYPE=@MSGHDR_TYPE@
+AM_CFLAGS			= @CFLAGS@  -DALIGNFUNC=@ALIGN@ -DMSGHDR_TYPE=@MSGHDR_TYPE@ \
+				-DHALIB='"$(halibdir)"'
+
 
 ## libraries
 
@@ -55,9 +60,11 @@ libplumb_la_SOURCES	= 		\
 			uids.c 		\
 			setproctitle.c \
 			cl_uuid.c	\
-			cl_pidfile.c
+			cl_pidfile.c	\
+			cl_compress.c
 
-libplumb_la_LIBADD      = $(top_builddir)/replace/libreplace.la
+libplumb_la_LIBADD      = $(top_builddir)/replace/libreplace.la \
+			$(top_builddir)/lib/pils/libpils.la
 
 testdir = $(libdir)/@HB_PKG@
 test_PROGRAMS = ipctest ipctransientclient ipctransientserver
@@ -65,16 +72,20 @@ test_PROGRAMS = ipctest ipctransientclient ipctransientserver
 libplumb_la_LDFLAGS	= -version-info 1:0:0
 
 ipctest_SOURCES = ipctest.c
-ipctest_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB)
+ipctest_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB) \
+		$(top_builddir)/lib/pils/libpils.la
+
 
 #ipctransient_SOURCES = ipctransient.c
 #ipctransient_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
 
 ipctransientclient_SOURCES = ipctransientclient.c
-ipctransientclient_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB)
+ipctransientclient_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB) \
+			$(top_builddir)/lib/pils/libpils.la
 
 ipctransientserver_SOURCES = ipctransientserver.c
-ipctransientserver_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB)
+ipctransientserver_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB) \
+			$(top_builddir)/lib/pils/libpils.la
 
 #netstring_test_SOURCES	= netstring_test.c
 #netstring_test_LDADD	= libplumb.la $(top_builddir)/replace/libreplace.la libhbclient.la $(gliblib)
