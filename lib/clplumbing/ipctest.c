@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.39 2005/07/29 05:31:28 panjiam Exp $ */
+/* $Id: ipctest.c,v 1.40 2005/08/05 19:37:05 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -612,9 +612,9 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 		}
 		if (wchan->ch_status == IPC_DISCONNECT
 		    &&	rdcount < repcount) {
-			cl_log(LOG_ERR
-			,	"asyn_echoserver: EOF in iter %d"
-			,	rdcount);
+			cl_log(LOG_ERR,
+			       "asyn_echoserver: EOF in iter %d (wrcount=%d)",
+			       rdcount, wrcount);
 			EOFcheck(wchan);
 			++errcount;
 			break;
