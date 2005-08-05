@@ -30,6 +30,7 @@ extern gboolean cl_msg_quiet_fmterr;
 
 /* Convert a message to netstring data */
 char*			msg2netstring(const struct ha_msg*, size_t*);
+char *		msg2netstring_noauth(const struct ha_msg *m, size_t * slen);
 
 /* Convert netstring data to a message */
 struct ha_msg *		netstring2msg(const char*, size_t, int);

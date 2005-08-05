@@ -1,0 +1,331 @@
+
+/*
+ * compress.c: Compression functions for Linux-HA
+ *
+ * Copyright (C) 2005 Guochun Shi <gshi@ncsa.uiuc.edu>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+#include <portability.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <unistd.h>
+#include <assert.h>
+#include <glib.h>
+#include <compress.h>
+#include <ha_msg.h>
+#include <clplumbing/netstring.h>
+#include <clplumbing/cl_malloc.h>
+#include <pils/plugin.h>
+#include <pils/generic.h>
+#include <stonith/stonith.h>
+#include <stonith/stonith_plugin.h>
+
+#define COMPRESS_MAXBUF (64*1024)
+#define COMPRESSED_FIELD "_compressed_payload"
+#define COMPRESS_NAME "_compression_algorithm"
+
+#define HA_PLUGIN_D HALIB "/plugins"
+
+static struct hb_compress_fns* msg_compress_fns = NULL;
+GHashTable*		CompressFuncs = NULL;
+
+static PILGenericIfMgmtRqst	Reqs[] =
+	{
+		{"HBcompress", &CompressFuncs, NULL, NULL, NULL},
+		{NULL, NULL, NULL, NULL, NULL}
+	};
+
+static PILPluginUniv*		CompressPIsys = NULL;
+
+static int
+init_pluginsys(void){
+	
+	if (CompressPIsys) {
+		return TRUE;
+	}
+
+	CompressPIsys = NewPILPluginUniv(HA_PLUGIN_D);
+	
+	if (CompressPIsys) {
+		if (PILLoadPlugin(CompressPIsys, PI_IFMANAGER, "generic", Reqs)
+		!=	PIL_OK){
+			cl_log(LOG_ERR, "generic plugin load failed\n");
+			DelPILPluginUniv(CompressPIsys);
+			CompressPIsys = NULL;
+		}
+	}else{
+		cl_log(LOG_ERR, "pi univ creation failed\n");
+	}
+	return CompressPIsys != NULL;
+
+}
+
+int
+cl_compress_remove_plugin(const char* pluginname)
+{
+	return HA_OK;
+}
+
+int
+cl_compress_load_plugin(const char* pluginname)
+{
+	struct hb_compress_fns*	funcs = NULL;
+
+	if (!init_pluginsys()){
+		return HA_FAIL;
+	}
+	
+	if ((funcs = g_hash_table_lookup(CompressFuncs, pluginname))
+	    == NULL){
+		if (PILPluginExists(CompressPIsys, HB_COMPRESS_TYPE_S,
+				    pluginname) == PIL_OK){
+			PIL_rc rc;
+			if ((rc = PILLoadPlugin(CompressPIsys,
+						HB_COMPRESS_TYPE_S, 
+						pluginname,
+						NULL))!= PIL_OK){
+				cl_log(LOG_ERR, 
+				       "Cannot load compress plugin %s[%s]",
+				       pluginname, 
+				       PIL_strerror(rc));
+				return HA_FAIL;
+			}
+			funcs = g_hash_table_lookup(CompressFuncs, 
+						    pluginname);
+			cl_log(LOG_INFO,  "compression module %s loaded successfully", pluginname);
+		}
+		
+	}
+	if (funcs == NULL){
+		cl_log(LOG_ERR, "Compression module(%s) not found", pluginname);
+		return HA_FAIL;
+	}
+
+	msg_compress_fns = funcs;
+	
+	return HA_OK;
+	
+}
+
+
+
+int
+cl_set_compress_fns(const char* pluginname)
+{
+	struct hb_compress_fns*	funcs = NULL;
+	
+	if (cl_compress_load_plugin(pluginname) != HA_OK){
+		cl_log(LOG_ERR, "%s: loading compression module"
+		       "(%s) failed",
+		       __FUNCTION__, pluginname);
+		return HA_FAIL;
+	}
+
+	funcs = g_hash_table_lookup(CompressFuncs, pluginname);
+	
+	assert(funcs != NULL);
+	
+	msg_compress_fns = funcs;
+
+	return HA_OK;
+}
+
+struct hb_compress_fns*
+cl_get_compress_fns(void)
+{
+	return msg_compress_fns;
+}
+
+static struct hb_compress_fns*
+get_compress_fns(const char* pluginname)
+{
+	struct hb_compress_fns*	funcs = NULL;
+	
+	if (cl_compress_load_plugin(pluginname) != HA_OK){
+		cl_log(LOG_ERR, "%s: loading compression module"
+		       "(%s) failed",
+		       __FUNCTION__, pluginname);
+		return NULL;
+	}
+	
+	funcs = g_hash_table_lookup(CompressFuncs, pluginname);      
+	return funcs;	
+
+	
+}
+
+void cl_realtime_malloc_check(void);
+
+char* 
+cl_compressmsg(const struct ha_msg*m, size_t* len)
+{
+	char*	src;
+	char	dest[COMPRESS_MAXBUF];
+	int	destlen;
+	int rc;
+	char* ret;
+	struct ha_msg* tmpmsg;
+	int datalen;
+
+	if (msg_compress_fns == NULL){
+		cl_log(LOG_ERR, "%s: msg_compress_fns is NULL!",
+		       __FUNCTION__);
+		return NULL;
+	}
+	if ( get_netstringlen(m) > COMPRESS_MAXBUF
+	     || get_stringlen(m) > COMPRESS_MAXBUF){
+		cl_log(LOG_ERR, "%s: msg too big(stringlen=%d,"
+		       "netstringlen=%d)", 
+		       __FUNCTION__, 
+		       get_stringlen(m),
+		       get_netstringlen(m));
+		return NULL;
+	}
+	
+	if ((src = msg2wirefmt_noac(m, &datalen)) == NULL){
+		cl_log(LOG_ERR,"%s: converting msg"
+		       " to netstring failed", __FUNCTION__);
+		return NULL;
+	}
+	
+	destlen = COMPRESS_MAXBUF;
+
+	rc = msg_compress_fns->compress(dest, &destlen, 
+					src, datalen);
+	if (rc != HA_OK){
+		cl_log(LOG_ERR, "%s: compression failed",
+		       __FUNCTION__);
+		return NULL;
+	}
+	
+	ha_free(src);
+
+	tmpmsg =ha_msg_new(0);
+	rc = ha_msg_addbin(tmpmsg, COMPRESSED_FIELD, dest, destlen);
+	
+	if (rc != HA_OK){
+		cl_log(LOG_ERR, "%s: adding binary to msg failed",
+		       __FUNCTION__);
+		return NULL;
+	}
+
+	rc = ha_msg_add(tmpmsg, COMPRESS_NAME, 
+			msg_compress_fns->getname());
+	
+	if (rc != HA_OK){
+		cl_log(LOG_ERR, "%s: adding compress name to msg failed",
+		       __FUNCTION__);
+		return NULL;
+	}
+	
+
+	ret = msg2netstring(tmpmsg, len);
+	ha_msg_del(tmpmsg);
+	
+#if 0
+	cl_log(LOG_INFO, "------original stringlen=%d, netstringlen=%d,"
+	       "compressed_datalen=%d,current len=%d",
+	       get_stringlen(m), get_netstringlen(m),destlen,  *len);
+	
+#endif
+
+	return ret;
+}
+
+
+gboolean 
+is_compressed_msg(const struct ha_msg* m)
+{
+	if( cl_get_binary(m, COMPRESSED_FIELD, NULL) != NULL){
+		return TRUE;
+	}
+
+	return FALSE;
+	
+}
+
+/* the decompressmsg function is not exactly the reverse
+ * operation of compressmsg, it starts when the prorgram
+ * detects there is compressed_field in a msg
+ */
+
+struct ha_msg*
+cl_decompressmsg(const struct ha_msg* m)
+{
+	const char* src;
+	size_t srclen;
+	char dest[COMPRESS_MAXBUF];
+	size_t destlen = COMPRESS_MAXBUF;
+	int rc;
+	struct ha_msg* ret;
+	const char* compress_name;
+	struct hb_compress_fns* funcs = NULL;
+
+	if (m == NULL){
+		cl_log(LOG_ERR, "NULL message");
+		return NULL;
+	}
+	src = cl_get_binary(m, COMPRESSED_FIELD, &srclen);
+	if (src == NULL){
+		cl_log(LOG_ERR, "%s: compressed-field is NULL",
+		       __FUNCTION__);
+		return NULL;
+	}
+
+	if (srclen > COMPRESS_MAXBUF){
+		cl_log(LOG_ERR, "%s: field too long(%d)", 
+		       __FUNCTION__, srclen);
+		return NULL;
+	}
+	
+	compress_name = ha_msg_value(m, COMPRESS_NAME);
+	if (compress_name == NULL){
+		cl_log(LOG_ERR, "compress name not found");
+		return NULL;
+	}
+
+	
+	funcs = get_compress_fns(compress_name);
+	
+	if (funcs == NULL){
+		cl_log(LOG_ERR, "%s: compress method(%s) is not"
+		       " supported in this machine",		       
+		       __FUNCTION__, compress_name);
+		return NULL;
+	}
+	
+	rc = funcs->decompress(dest, &destlen, src, srclen);
+	
+	if (rc != HA_OK){
+		cl_log(LOG_ERR, "%s: decompression failed",
+		       __FUNCTION__);
+		return NULL;
+	}
+	
+	ret = wirefmt2msg(dest, destlen, 0);	
+	
+#if 0
+	cl_log(LOG_INFO, "%s: srclen =%d, destlen=%d", 
+	       __FUNCTION__, 
+	       srclen, destlen);
+#endif
+
+	return ret;
+}

@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.74 2005/08/01 19:16:43 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.75 2005/08/05 19:40:14 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -38,6 +38,7 @@
 #include <clplumbing/netstring.h>
 #include <glib.h>
 #include <clplumbing/cl_uuid.h>
+#include <compress.h>
 
 #define		MAXMSGLINE	MAXMSG
 #define		MINFIELDS	30
@@ -49,6 +50,8 @@
 #define		MAX_INT_LEN 	64
 #define		MAX_NAME_LEN 	255
 #define		UUID_SLEN	64
+static int	compression_threshold = (2*1024);
+
 static enum cl_msgfmt msgfmt = MSGFMT_NVPAIR;
 
 
@@ -95,7 +98,14 @@ struct ha_msg* string2msg_ll(const char * s, size_t length, int need_auth, int d
 extern int struct_stringlen(size_t namlen, size_t vallen, const void* value);
 extern int struct_netstringlen(size_t namlen, size_t vallen, const void* value);
 extern int process_netstring_nvpair(struct ha_msg* m, const char* nvpair, int nvlen);
+static char*	msg2wirefmt_ll(const struct ha_msg*m, size_t* len, gboolean need_compress);
 
+void
+cl_set_compression_threshold(size_t threadhold)
+{
+	compression_threshold = threadhold;
+
+}
 void
 cl_msg_setstats(volatile hb_msg_stats_t* stats)
 {
@@ -1678,7 +1688,7 @@ IPC_Message*
 hamsg2ipcmsg(struct ha_msg* m, IPC_Channel* ch)
 {
 	size_t		len;
-	char *		s  = msg2wirefmt(m, &len);
+	char *		s  = msg2wirefmt_ll(m, &len, FALSE);
 	IPC_Message*	ret = NULL;
 
 
@@ -1759,6 +1769,7 @@ cl_set_oldmsgauthfunc(gboolean (*authfunc)(const struct ha_msg*))
 {
 	msg_authentication_method = authfunc;
 }
+
 
 
 /* Converts a string (perhaps received via UDP) into a message */
@@ -1842,7 +1853,7 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 struct ha_msg *
 string2msg(const char * s, size_t length)
 {
-	return(string2msg_ll(s, length, 0, NEEDAUTH));
+	return(string2msg_ll(s, length, 0, MSG_NEEDAUTH));
 }
 
 
@@ -1984,19 +1995,34 @@ msg2string(const struct ha_msg *m)
 }
 
 
-
-
-
-char*
-msg2wirefmt(const struct ha_msg*m, size_t* len)
+static char*
+msg2wirefmt_ll(const struct ha_msg*m, size_t* len, int flag)
 {
+	
+	int wirefmtlen;
+	
+	if (msgfmt  ==  MSGFMT_NETSTRING){
+		wirefmtlen = get_netstringlen(m);
+	}else{
+		wirefmtlen =  get_stringlen(m);
+	}
 
+	if ((flag & MSG_NEEDCOMPRESS)
+	    && (wirefmtlen> compression_threshold)
+	    && cl_get_compress_fns() != NULL){
+		return cl_compressmsg(m, len);		
+	}
+	
 	if (msgfmt == MSGFMT_NETSTRING) {
-		return(msg2netstring(m, len));
+		if (flag& MSG_NEEDAUTH){
+			return msg2netstring(m, len);
+		}else{
+			return msg2netstring_noauth(m, len);
+		}
 	}
 	else{
 		char	*tmp;
-
+		
 		tmp = msg2string(m);
 		
 		if(tmp == NULL){
@@ -2010,12 +2036,24 @@ msg2wirefmt(const struct ha_msg*m, size_t* len)
 }
 
 
+char*
+msg2wirefmt(const struct ha_msg*m, size_t* len){
+	return msg2wirefmt_ll(m, len, MSG_NEEDAUTH|MSG_NEEDCOMPRESS);
+}
+
+
+char*
+msg2wirefmt_noac(const struct ha_msg*m, size_t* len){
+	return msg2wirefmt_ll(m, len, 0);
+}
+
+
 static struct ha_msg*
 wirefmt2msg_ll(const char* s, size_t length, int need_auth)
 {
 
 	size_t startlen;
-	
+	struct ha_msg* msg = NULL;	
 
 
 	startlen = sizeof(MSG_START)-1;
@@ -2025,7 +2063,8 @@ wirefmt2msg_ll(const char* s, size_t length, int need_auth)
 	}
 
 	if (strncmp( s, MSG_START, startlen) == 0) {
-		return(string2msg_ll(s, length, 0, need_auth));
+		msg = string2msg_ll(s, length, 0, need_auth);
+		goto out;
 	}
 
 	startlen = sizeof(MSG_START_NETSTRING) - 1;
@@ -2035,10 +2074,22 @@ wirefmt2msg_ll(const char* s, size_t length, int need_auth)
 	}
 	
 	if (strncmp(s, MSG_START_NETSTRING, startlen) == 0) {
-		return netstring2msg(s, length, need_auth);
+		msg =  netstring2msg(s, length, need_auth);
+		goto out;
 	}
 
-	return NULL;
+out:
+        if (msg && is_compressed_msg(msg)){
+                struct ha_msg* ret;
+                if ((ret = cl_decompressmsg(msg))==NULL){
+                        cl_log(LOG_ERR, "decompress msg failed");
+                        ha_msg_del(msg);
+                        return NULL;
+                }
+                ha_msg_del(msg);
+                return ret;
+	}
+	return msg;
 
 }
 
@@ -2048,7 +2099,8 @@ wirefmt2msg_ll(const char* s, size_t length, int need_auth)
 struct ha_msg*
 wirefmt2msg(const char* s, size_t length, int flag)
 {
-	return(wirefmt2msg_ll(s, length, flag& MSG_NEEDAUTH));
+ 	return wirefmt2msg_ll(s, length, flag& MSG_NEEDAUTH);
+
 }
 
 void
@@ -2096,6 +2148,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.75  2005/08/05 19:40:14  gshi
+ * add compression capability
+ *
  * Revision 1.74  2005/08/01 19:16:43  gshi
  * fix bug 257
  *

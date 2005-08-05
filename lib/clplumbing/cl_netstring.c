@@ -162,10 +162,11 @@ int get_netstringlen_auth(const struct ha_msg* m)
 	return len;
 }
 
-char *
-msg2netstring(const struct ha_msg *m, size_t * slen)
-{
 
+
+static char *
+msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
+{
 	int	len;
 	char*	s;
 	int	authnum;
@@ -193,10 +194,10 @@ msg2netstring(const struct ha_msg *m, size_t * slen)
 		ha_free(s);
 		return(NULL);
 	}
-
+	
 	sp = s + payload_len;
-
-	if (authmethod){
+	
+	if ( need_auth && authmethod){
 		authnum = authmethod(-1, s, payload_len, authtoken,sizeof(authtoken));
 		if (authnum < 0){
 			cl_log(LOG_WARNING
@@ -211,6 +212,17 @@ msg2netstring(const struct ha_msg *m, size_t * slen)
 	*slen = sp - s + 1;
 
 	return(s);
+}
+
+char *
+msg2netstring(const struct ha_msg *m, size_t * slen)
+{
+	return msg2netstring_ll(m, slen, TRUE);
+}
+char *
+msg2netstring_noauth(const struct ha_msg *m, size_t * slen)
+{
+	return msg2netstring_ll(m, slen, FALSE);
 }
 
 
@@ -404,7 +416,7 @@ netstring2msg(const char* s, size_t length, int needauth)
 	msg = netstring2msg_rec(s, length, &slen);
 	
 	if (needauth == FALSE){
-		return msg;
+		goto out;
 	} 
 	
 	sp =  s + slen;
@@ -436,7 +448,8 @@ netstring2msg(const char* s, size_t length, int needauth)
 		ha_msg_del(msg);
 		return(NULL);
 	}	
-
+	
+ out:
 	return msg;
 }
 
