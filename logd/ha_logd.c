@@ -532,7 +532,8 @@ logd_make_daemon(gboolean daemonize)
 
 
 static void
-logd_stop(void){
+logd_stop(void)
+{
 	
 	long running_logd_pid = cl_read_pidfile(LOGD_PIDFILE);
 	int	err;
