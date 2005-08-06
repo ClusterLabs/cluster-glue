@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.36 2005/07/01 18:58:13 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.37 2005/08/06 04:25:42 alan Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -152,9 +152,11 @@ make_id_table(const char * list, int listlen, int (*map)(const char *, int))
 			g_hash_table_destroy(ret);
 			return NULL;
 		}
-		cl_log(LOG_DEBUG,
-		       "Adding [ug]id %*s [%d] to authorization g_hash_table",
-		       	idlen, id, idval);
+#if 0
+		cl_log(LOG_DEBUG
+		,       "Adding [ug]id %*s [%d] to authorization g_hash_table"
+		,	idlen, id, idval);
+#endif
 		g_hash_table_insert(ret, GUINT_TO_POINTER(idval), &one);
 		id += idlen;
 		if (id < lastid) {
