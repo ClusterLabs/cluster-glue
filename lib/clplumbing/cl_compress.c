@@ -178,11 +178,11 @@ cl_compressmsg(const struct ha_msg*m, size_t* len)
 {
 	char*	src;
 	char	dest[COMPRESS_MAXBUF];
-	int	destlen;
+	size_t	destlen;
 	int rc;
 	char* ret;
 	struct ha_msg* tmpmsg;
-	int datalen;
+	size_t datalen;
 
 	if (msg_compress_fns == NULL){
 		cl_log(LOG_ERR, "%s: msg_compress_fns is NULL!",
@@ -291,7 +291,7 @@ cl_decompressmsg(const struct ha_msg* m)
 
 	if (srclen > COMPRESS_MAXBUF){
 		cl_log(LOG_ERR, "%s: field too long(%d)", 
-		       __FUNCTION__, srclen);
+		       __FUNCTION__, (int)srclen);
 		return NULL;
 	}
 	
