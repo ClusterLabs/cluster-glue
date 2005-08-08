@@ -218,7 +218,7 @@ cl_compressmsg(const struct ha_msg*m, size_t* len)
 	ha_free(src);
 
 	tmpmsg =ha_msg_new(0);
-	rc = ha_msg_addbin(tmpmsg, COMPRESSED_FIELD, dest, destlen);
+	rc = ha_msg_addbin(tmpmsg, COMPRESSED_FIELD, dest, destlen)/*discouraged function*/;
 	
 	if (rc != HA_OK){
 		cl_log(LOG_ERR, "%s: adding binary to msg failed",
@@ -253,7 +253,8 @@ cl_compressmsg(const struct ha_msg*m, size_t* len)
 gboolean 
 is_compressed_msg(const struct ha_msg* m)
 {
-	if( cl_get_binary(m, COMPRESSED_FIELD, NULL) != NULL){
+	if( cl_get_binary(m, COMPRESSED_FIELD, NULL) /*discouraged function*/
+	    != NULL){
 		return TRUE;
 	}
 
@@ -282,7 +283,7 @@ cl_decompressmsg(const struct ha_msg* m)
 		cl_log(LOG_ERR, "NULL message");
 		return NULL;
 	}
-	src = cl_get_binary(m, COMPRESSED_FIELD, &srclen);
+	src = cl_get_binary(m, COMPRESSED_FIELD, &srclen)/*discouraged function*/;
 	if (src == NULL){
 		cl_log(LOG_ERR, "%s: compressed-field is NULL",
 		       __FUNCTION__);
