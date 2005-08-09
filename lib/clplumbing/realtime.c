@@ -1,4 +1,4 @@
-/* $Id: realtime.c,v 1.28 2005/07/29 05:31:27 panjiam Exp $ */
+/* $Id: realtime.c,v 1.29 2005/08/09 20:42:13 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -287,23 +287,29 @@ cl_realtime_malloc_check(void)
 	static	int		lastcount = 0;
 	static unsigned long	oldarena = 0UL;
 
-	if (post_rt_morecore_count > lastcount) {
-		cl_log(LOG_WARNING
-		,	"Performed %d more non-realtime malloc calls."
-		,	post_rt_morecore_count - lastcount);
-		lastcount = post_rt_morecore_count;
-	}
 	if (oldarena == 0UL) {
 		oldarena = init_malloc_arena;
 	}
-	if (MALLOC_TOTALSIZE() > oldarena) {
-		cl_log(LOG_INFO
-		,	"Total non-realtime malloc bytes: %ld"
-		,	MALLOC_TOTALSIZE() - init_malloc_arena);
-		oldarena = MALLOC_TOTALSIZE();
+
+	if (post_rt_morecore_count > lastcount) {
+
+		if (MALLOC_TOTALSIZE() > oldarena) {
+
+			cl_log(LOG_WARNING,
+			       "Performed %d more non-realtime malloc calls.",
+			       post_rt_morecore_count - lastcount);
+			
+			cl_log(LOG_INFO,
+			       "Total non-realtime malloc bytes: %ld",
+			       MALLOC_TOTALSIZE() - init_malloc_arena);
+			oldarena = MALLOC_TOTALSIZE();			
+			
+		}
+		
+		lastcount = post_rt_morecore_count;
 	}
 }
-
+	
 #ifdef HAVE___DEFAULT_MORECORE
 
 static void	(*our_save_morecore_hook)(void) = NULL;
@@ -331,4 +337,4 @@ cl_rtmalloc_setup(void)
 		inityet = TRUE;
 #endif
 	}
-}
+ }
