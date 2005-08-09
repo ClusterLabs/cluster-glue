@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.40 2005/08/05 19:37:05 gshi Exp $ */
+/* $Id: ipctest.c,v 1.41 2005/08/09 17:25:07 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -806,6 +806,8 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 	cl_log(LOG_INFO, "%d destroying channel 0x%lx",getpid(), (unsigned long)chan);
 #endif
 
+	
+	chan->ops->waitout(chan);
 
 	chan->ops->destroy(chan); chan = NULL;
 	return errcount;
