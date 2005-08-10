@@ -109,7 +109,6 @@ cl_compress_load_plugin(const char* pluginname)
 			}
 			funcs = g_hash_table_lookup(CompressFuncs, 
 						    pluginname);
-			cl_log(LOG_INFO,  "compression module %s loaded successfully", pluginname);
 		}
 		
 	}
