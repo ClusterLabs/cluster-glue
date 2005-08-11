@@ -61,7 +61,8 @@ libplumb_la_SOURCES	= 		\
 			setproctitle.c \
 			cl_uuid.c	\
 			cl_pidfile.c	\
-			cl_compress.c
+			cl_compress.c	\
+			cl_misc.c
 
 libplumb_la_LIBADD      = $(top_builddir)/replace/libreplace.la \
 			$(top_builddir)/lib/pils/libpils.la
