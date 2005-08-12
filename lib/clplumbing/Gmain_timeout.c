@@ -1,4 +1,4 @@
-/* $Id: Gmain_timeout.c,v 1.12 2005/08/04 02:15:04 horms Exp $ */
+/* $Id: Gmain_timeout.c,v 1.13 2005/08/12 05:09:09 zhenh Exp $ */
 /*
  * Glib mainloop timeout handling code.
  *
@@ -102,6 +102,7 @@ Gmain_timeout_remove(guint tag)
 	GSource* source = g_main_context_find_source_by_id(NULL,tag);
 	
 	if (source != NULL){
+		g_source_unref(source);
 		g_source_destroy(source);		
 	}
 							   
