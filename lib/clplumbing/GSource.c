@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.51 2005/07/29 05:31:27 panjiam Exp $ */
+/* $Id: GSource.c,v 1.52 2005/08/12 19:56:48 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -197,7 +197,7 @@ G_main_add_fd(int priority, int fd, gboolean can_recurse
 gboolean
 G_main_del_fd(GFDSource* fdp)
 {
-	GSource * source;
+	GSource * source = (GSource*) fdp;
 
 
 	if (fdp->gsourceid <= 0) {
@@ -205,16 +205,10 @@ G_main_del_fd(GFDSource* fdp)
 		return FALSE;
 	}
 	
-	source = g_main_context_find_source_by_id(NULL, fdp->gsourceid);
-	if (source == NULL){
-		cl_log(LOG_ERR, "Cannot find source using source id");
-		return FALSE;
-	}
-
-	g_source_unref(source);
-	
+	g_source_remove(fdp->gsourceid);
 	fdp->gsourceid = 0;
-
+	g_source_destroy(source);
+	
 	return TRUE;
 
 }
@@ -424,13 +418,16 @@ G_main_IPC_Channel_resume(GCHSource* chp)
 gboolean 
 G_main_del_IPC_Channel(GCHSource* chp)
 {
+	GSource* source = (GSource*) chp;
+
 	if (chp->gsourceid <= 0) {
 		cl_log(LOG_CRIT, "Bad gsource in G_main_del_IPC_channel");
 		return FALSE;
 	}
-
+	
 	g_source_remove(chp->gsourceid);
 	chp->gsourceid = 0;
+	g_source_destroy(source);
 	return TRUE;
 }
 
@@ -647,16 +644,19 @@ G_main_add_IPC_WaitConnection(int priority
 gboolean G_main_del_IPC_WaitConnection(GWCSource* wcp)
 {
 
-	GSource* source = g_main_context_find_source_by_id(NULL, wcp->gsourceid);
-	if (source == NULL){
-		cl_log(LOG_ERR, "G_main_del_IPC_WaitConnection: Cannot find source using source id");
+	GSource* source =  (GSource*) wcp;
+
+	
+	if (wcp->gsourceid <= 0) {
+		cl_log(LOG_CRIT, "%s:Bad gsource",
+		       __FUNCTION__);
 		return FALSE;
 	}
-
-	g_source_unref(source);
 	
+	g_source_remove(wcp->gsourceid);
 	wcp->gsourceid = 0;
-
+	g_source_destroy(source);
+	
 	return TRUE;
 }
 
@@ -848,6 +848,8 @@ G_main_add_SignalHandler(int priority, int signal,
 gboolean 
 G_main_del_SignalHandler(GSIGSource* sig_src)
 {
+	GSource* source = (GSource*) sig_src;
+
 	if (sig_src->gsourceid <= 0) {
 		cl_log(LOG_CRIT, "Bad gsource in G_main_del_IPC_channel");
 		return FALSE;
@@ -859,9 +861,9 @@ G_main_del_SignalHandler(GSIGSource* sig_src)
 	sig_src->gsourceid = 0;
 	sig_src->signal_triggered = FALSE;
 	g_source_remove(sig_src->gsourceid);
-
 	G_main_signal_list[sig_src->signal] = NULL;
-
+	g_source_destroy(source);
+	
 	return TRUE;
 }
 
@@ -1124,6 +1126,8 @@ G_main_set_trigger(GTRIGSource* source)
 gboolean 
 G_main_del_TriggerHandler(GTRIGSource* trig_src)
 {
+	GSource* source = (GSource*) trig_src;
+
 	if (trig_src->gsourceid <= 0) {
 		cl_log(LOG_CRIT, "Bad gsource in G_main_del_TriggerHandler");
 		return FALSE;
@@ -1131,7 +1135,8 @@ G_main_del_TriggerHandler(GTRIGSource* trig_src)
 	trig_src->gsourceid = 0;
 	trig_src->manual_trigger = FALSE;
 	g_source_remove(trig_src->gsourceid);
-
+	g_source_destroy(source);
+	
 	return TRUE;
 }
 
