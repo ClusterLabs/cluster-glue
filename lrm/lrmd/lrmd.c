@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.179 2005/07/27 08:40:54 panjiam Exp $ */
+/* $Id: lrmd.c,v 1.180 2005/08/12 05:05:55 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -351,6 +351,12 @@ static struct {
 static void
 dump_mem_stats(void)
 {
+	volatile cl_mem_stats_t * ms = cl_malloc_getstats();
+	lrmd_log(LOG_INFO
+	,	"MEM STATS: pending alloc %ld, pending size %ld"
+	,	ms->numalloc - ms->numfree
+	,	ms->nbytes_alloc);
+	
 	lrmd_log(LOG_INFO
 	,	"STATS: OP Count: %d, Client Count: %d, Resource Count: %d"
 	,	lrm_objectstats.opcount
@@ -402,12 +408,12 @@ lrmd_op_destroy(lrmd_op_t* op)
 	}
 
 	if ((int)op->repeat_timeout_tag > 0) {
-		g_source_remove(op->repeat_timeout_tag);
+		Gmain_timeout_remove(op->repeat_timeout_tag);
 		op->repeat_timeout_tag = -1;
 	}
 
 	if ((int)op->timeout_tag > 0) {
-		g_source_remove(op->timeout_tag);
+		Gmain_timeout_remove(op->timeout_tag);
 		op->timeout_tag = -1;
 	}
 
@@ -1607,7 +1613,7 @@ on_repeat_op_readytorun(gpointer data)
 		return FALSE;
 	}
 	rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
-	g_source_remove(op->repeat_timeout_tag);
+	Gmain_timeout_remove(op->repeat_timeout_tag);
 
 	op->repeat_timeout_tag = -1;
 	op->exec_pid = -1;
@@ -2099,7 +2105,6 @@ free_str_op_pair(gpointer key, gpointer value, gpointer user_data)
 	}else{
 		lrmd_op_destroy(op);
 	}
-	cl_free(key);
 	return TRUE;
 }
 
@@ -2502,7 +2507,8 @@ record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
 	client_last_op = g_hash_table_lookup(rsc->last_op_table
 	, 			client->app_name);
 	if (NULL == client_last_op) {
-		client_last_op = g_hash_table_new(g_str_hash, g_str_equal);
+		client_last_op = g_hash_table_new_full(	g_str_hash
+		, 	g_str_equal, cl_free, NULL);
 		g_hash_table_insert(rsc->last_op_table
 		,	(gpointer)cl_strdup(client->app_name)
 		,	(gpointer)client_last_op);
@@ -2561,7 +2567,7 @@ on_op_done(lrmd_op_t* op)
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
 		if( op->timeout_tag > 0 ) {
-			g_source_remove(op->timeout_tag);
+			Gmain_timeout_remove(op->timeout_tag);
 		}
 		lrmd_log(LOG_ERR
 		,	"%s: the resource for the operation %s does not exist."
@@ -2709,7 +2715,7 @@ on_op_done(lrmd_op_t* op)
 	,	op_info(op));
 
 	if( op->timeout_tag > 0 ) {
-		g_source_remove(op->timeout_tag);
+		Gmain_timeout_remove(op->timeout_tag);
 		op->timeout_tag = -1;
 	}
 	
@@ -3340,6 +3346,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.180  2005/08/12 05:05:55  zhenh
+ * 1,fix a memory leak, the key of hash table is not released. 2, improve the memdump
+ *
  * Revision 1.179  2005/07/27 08:40:54  panjiam
  * fixed GPL license version
  *
