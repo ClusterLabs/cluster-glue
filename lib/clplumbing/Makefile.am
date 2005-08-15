@@ -34,7 +34,7 @@ AM_CFLAGS			= @CFLAGS@  -DALIGNFUNC=@ALIGN@ -DMSGHDR_TYPE=@MSGHDR_TYPE@ \
 
 ## libraries
 
-lib_LTLIBRARIES		= libplumb.la
+lib_LTLIBRARIES		= libplumb.la libplumbgpl.la
 
 libplumb_la_SOURCES	= 		\
 			Gmain_timeout.c	\
@@ -58,7 +58,6 @@ libplumb_la_SOURCES	= 		\
 			realtime.c	\
 			timers.c	\
 			uids.c 		\
-			setproctitle.c \
 			cl_uuid.c	\
 			cl_pidfile.c	\
 			cl_compress.c	\
@@ -66,11 +65,15 @@ libplumb_la_SOURCES	= 		\
 
 libplumb_la_LIBADD      = $(top_builddir)/replace/libreplace.la \
 			$(top_builddir)/lib/pils/libpils.la
+libplumb_la_LDFLAGS	= -version-info 1:0:0
+
+libplumbgpl_la_SOURCES	= setproctitle.c
+libplumbgpl_la_LIBADD   = $(top_builddir)/replace/libreplace.la \
+			$(top_builddir)/lib/pils/libpils.la
+libplumbgpl_la_LDFLAGS	= -version-info 1:0:0
 
 testdir = $(libdir)/@HB_PKG@
 test_PROGRAMS = ipctest ipctransientclient ipctransientserver
-
-libplumb_la_LDFLAGS	= -version-info 1:0:0
 
 ipctest_SOURCES = ipctest.c
 ipctest_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB) \

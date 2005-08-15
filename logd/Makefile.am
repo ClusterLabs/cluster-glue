@@ -52,6 +52,7 @@ halib_PROGRAMS		= ha_logd ha_logger logtest
 
 ha_logd_SOURCES	= ha_logd.c
 ha_logd_LDADD		= $(top_builddir)/lib/clplumbing/libplumb.la	\
+			  $(top_builddir)/lib/clplumbing/libplumbgpl.la	\
 	  		  $(top_builddir)/lib/pils/libpils.la	\
 			 $(gliblib) $(top_builddir)/lib/apphb/libapphb.la
 
