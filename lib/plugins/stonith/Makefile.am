@@ -177,10 +177,6 @@ wti_nps_la_SOURCES	= wti_nps.c $(INCFILES)
 wti_nps_la_LDFLAGS	= -export-dynamic -module -avoid-version
 wti_nps_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
-riloe_la_SOURCES        = riloe.c $(INCFILES)
-riloe_la_LDFLAGS        = -export-dynamic -module -avoid-version
-riloe_la_LIBADD         = $(GLIBLIB)
-
 suicide_la_SOURCES	= suicide.c $(INCFILES)
 suicide_la_LDFLAGS	= -export-dynamic -module -avoid-version
 
