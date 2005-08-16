@@ -18,6 +18,6 @@
 
 #ifndef _CLPLUMBING_CL_MISC_H
 #define _CLPLUMBING_CL_MISC_H
-int	str_to_boolean(const char*, int*);
+int	cl_str_to_boolean(const char*, int*);
 
 #endif

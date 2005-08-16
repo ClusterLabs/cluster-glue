@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.63 2005/07/29 05:31:27 panjiam Exp $ */
+/* $Id: cl_log.c,v 1.64 2005/08/16 15:08:20 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -35,6 +35,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <clplumbing/GSource.h>
+#include <clplumbing/cl_misc.h>
 
 #ifndef MAXLINE
 #	define MAXLINE	512
@@ -127,31 +128,6 @@ cl_log_set_logdtime(int logdtime)
 {	
 	conn_logd_time = logdtime;	
 	return;
-}
-
-static int
-cl_str_to_boolean(const char * s, int * ret)
-{
-	if(s == NULL) {
-		return -1;
-		
-	} else if (strcasecmp(s, "true") == 0
-	||	strcasecmp(s, "on") == 0
-	||	strcasecmp(s, "yes") == 0
-	||	strcasecmp(s, "y") == 0
-	||	strcasecmp(s, "1") == 0){
-		*ret = TRUE;
-		return 1;
-
-	} else if (strcasecmp(s, "false") == 0
-	||	strcasecmp(s, "off") == 0
-	||	strcasecmp(s, "no") == 0
-	||	strcasecmp(s, "n") == 0
-	||	strcasecmp(s, "0") == 0){
-		*ret = FALSE;
-		return 1;
-	}
-	return -1;
 }
 
 gboolean

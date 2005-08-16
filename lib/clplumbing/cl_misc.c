@@ -21,7 +21,7 @@
 #include  <clplumbing/cl_misc.h>
 #include  <clplumbing/cl_log.h>
 int
-str_to_boolean(const char * s, int * ret)
+cl_str_to_boolean(const char * s, int * ret)
 {
 	if (	strcasecmp(s, "true") == 0
 	||	strcasecmp(s, "on") == 0
