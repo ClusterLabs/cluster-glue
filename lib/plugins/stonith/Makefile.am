@@ -104,7 +104,6 @@ plugin_LTLIBRARIES =	apcmaster.la	\
 			null.la			\
 			nw_rpc100s.la		\
 			rcd_serial.la		\
-			riloe.la		\
 			rps10.la		\
 			ssh.la			\
 			suicide.la		\
