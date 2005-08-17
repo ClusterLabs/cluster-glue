@@ -1,4 +1,4 @@
-/* $Id: stonith_expect_helpers.h,v 1.4 2005/08/17 04:04:43 alan Exp $ */
+/* $Id: stonith_expect_helpers.h,v 1.5 2005/08/17 04:26:26 alan Exp $ */
 /*
  * stonith_expect_helpers.h: Some common expect defines.
  *
@@ -30,13 +30,18 @@
  */
 
 #define	SEND(fd,s)	{						\
+				size_t	slen = strlen(s);		\
 				if (Debug) {				\
 					LOG(PIL_DEBUG			\
 					,	"Sending [%s] (len %d)"	\
-					,	(s)		\
-					,	(int)strlen(s));	\
+					,	(s)			\
+					,	(int)slen);		\
 				}					\
-				(void)write((fd), (s), strlen(s));		\
+				if (write((fd), (s), slen) != slen) {	\
+					LOG(PIL_CRIT			\
+					,	"%s: write failed"	\
+					,	__FUNCTION__);		\
+				}					\
 			}
 
 #define	EXPECT(fd,p,t)	{						\
