@@ -1,4 +1,4 @@
-/* $Id: stonith_expect_helpers.h,v 1.3 2005/04/19 18:13:36 blaschke Exp $ */
+/* $Id: stonith_expect_helpers.h,v 1.4 2005/08/17 04:04:43 alan Exp $ */
 /*
  * stonith_expect_helpers.h: Some common expect defines.
  *
@@ -36,7 +36,7 @@
 					,	(s)		\
 					,	(int)strlen(s));	\
 				}					\
-				write((fd), (s), strlen(s));		\
+				(void)write((fd), (s), strlen(s));		\
 			}
 
 #define	EXPECT(fd,p,t)	{						\
