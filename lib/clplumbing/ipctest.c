@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.41 2005/08/09 17:25:07 gshi Exp $ */
+/* $Id: ipctest.c,v 1.42 2005/08/18 05:09:40 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -119,6 +119,10 @@ channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
 }
 
 #if 0
+/*
+ *	FIX commpath to non/tmp before enabling this code.
+ *
+ */
 static void
 clientserverpair(IPC_Channel* channels[2])
 {
