@@ -24,12 +24,6 @@ int
 cl_str_to_boolean(const char * s, int * ret)
 {
 	if(s == NULL) {
-#if 0
-		cl_log(LOG_CRIT, __FILE__, __PRETTY_FUNCTION__,
-		       "Triggered assert at %s:%d : s != NULL",
-			   __FILE__, __LINE__);
-		abort();
-#endif
 		return HA_FAIL;
 	}
 	
