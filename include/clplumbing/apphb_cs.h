@@ -1,4 +1,4 @@
-/* $Id: apphb_cs.h,v 1.9 2004/11/08 09:07:51 sunjd Exp $ */
+/* $Id: apphb_cs.h,v 1.10 2005/08/29 02:17:17 sunjd Exp $ */
 /*
  * Copyright (C) 2002 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -22,12 +22,14 @@
 #ifndef _CLPLUMBING_APPHB_CS_H
 #define _CLPLUMBING_APPHB_CS_H
 
+#include <config.h>
+
 /* Internal client-server messages for APP heartbeat service */
 
-#ifndef HA_VARLIBDIR
-#define HA_VARLIBDIR "/var/lib"
+#ifndef HA_VARRUNDIR
+#define HA_VARRUNDIR "/var/run"
 #endif
-#define APPHBSOCKPATH		HA_VARLIBDIR "/heartbeat/apphb.comm"
+#define APPHBSOCKPATH		HA_VARRUNDIR "/heartbeat/apphb.comm"
 
 #define APPHB_TLEN	8
 #define APPHB_OLEN	256
