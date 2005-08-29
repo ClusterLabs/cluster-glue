@@ -1070,10 +1070,10 @@ do_shell_cmd(const char* cmd, int* status, const char* password)
 	} else {
 		snprintf(cmd_password, MAX_CMD_LEN
 		,"umask 077;"
-		 "if [ ! -d /var/lib/heartbeat/rsctmp/ibmhmc ];"
-		 "then mkdir /var/lib/heartbeat/rsctmp/ibmhmc 2>/dev/null;"
+		 "if [ ! -d /var/run/heartbeat/rsctmp/ibmhmc ];"
+		 "then mkdir /var/run/heartbeat/rsctmp/ibmhmc 2>/dev/null;"
 		 "fi;"
-		 "export hmc_tmp=`mktemp -p /var/lib/heartbeat/rsctmp/ibmhmc/`;" 
+		 "export hmc_tmp=`mktemp -p /var/run/heartbeat/rsctmp/ibmhmc/`;" 
 		 "echo \"echo '%s'\">$hmc_tmp;" 
 		 "chmod +x $hmc_tmp;"
 		 "unset SSH_AGENT_SOCK SSH_AGENT_PID;"
