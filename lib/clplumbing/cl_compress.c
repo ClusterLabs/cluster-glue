@@ -200,7 +200,7 @@ cl_compressmsg(const struct ha_msg*m, size_t* len)
 	
 	if ((src = msg2wirefmt_noac(m, &datalen)) == NULL){
 		cl_log(LOG_ERR,"%s: converting msg"
-		       " to netstring failed", __FUNCTION__);
+		       " to wirefmt failed", __FUNCTION__);
 		return NULL;
 	}
 	
