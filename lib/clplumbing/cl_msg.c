@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.75 2005/08/05 19:40:14 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.76 2005/09/08 20:05:56 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -42,7 +42,7 @@
 
 #define		MAXMSGLINE	MAXMSG
 #define		MINFIELDS	30
-#define		CRNL		"\r\n"
+#define		CRNL		"\n"
 
 
 #define		NEEDAUTH	1
@@ -2148,6 +2148,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.76  2005/09/08 20:05:56  gshi
+ * we should only use '\n' as delimiter for an ha_msg field
+ *
  * Revision 1.75  2005/08/05 19:40:14  gshi
  * add compression capability
  *
