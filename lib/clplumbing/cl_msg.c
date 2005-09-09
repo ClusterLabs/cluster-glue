@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.76 2005/09/08 20:05:56 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.77 2005/09/09 17:15:44 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -42,7 +42,7 @@
 
 #define		MAXMSGLINE	MAXMSG
 #define		MINFIELDS	30
-#define		CRNL		"\n"
+#define		NEWLINE		"\n"
 
 
 #define		NEEDAUTH	1
@@ -931,7 +931,7 @@ ha_msg_add_nv_depth(struct ha_msg* msg, const char * nvline,
 	if (valp >= bufmax){
 		return HA_FAIL;
 	}
-	vallen = strcspn(valp, CRNL);
+	vallen = strcspn(valp, NEWLINE);
 	if ((valp + vallen) >= bufmax){
 		return HA_FAIL;
 	}
@@ -1810,7 +1810,7 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 			return(NULL);
 		}
 		/* Skip over initial CR/NL things */
-		sp += strspn(sp, CRNL);
+		sp += strspn(sp, NEWLINE);
 		if (sp >= smax)	{
 			return(NULL);
 		}
@@ -1831,7 +1831,7 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 		if (sp >= smax) {
 			return(NULL);
 		}
-		sp += strcspn(sp, CRNL);
+		sp += strcspn(sp, NEWLINE);
 	}
 
 	if (need_auth && msg_authentication_method
@@ -2148,6 +2148,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.77  2005/09/09 17:15:44  gshi
+ * rename CRNL to NEWLINE since it only contains newline now
+ *
  * Revision 1.76  2005/09/08 20:05:56  gshi
  * we should only use '\n' as delimiter for an ha_msg field
  *
