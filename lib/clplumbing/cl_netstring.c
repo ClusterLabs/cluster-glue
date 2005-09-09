@@ -482,10 +482,10 @@ is_auth_netstring(const char * datap, size_t datalen,
 		return(0);
 	}
 
-
-	if (authmethod(authwhich, datap, datalen, authstr, authlen)
-	!=	authwhich) {
-
+	memset(authstr, 0, MAXMSG);
+	if (authmethod(authwhich, datap, datalen, authstr, MAXMSG)
+	    !=	authwhich) {
+	  
 		if (!cl_msg_quiet_fmterr) {
 			cl_log(LOG_WARNING
 			,	"Invalid authentication [%d] in message!"
