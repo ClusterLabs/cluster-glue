@@ -20,4 +20,5 @@
 #define _CLPLUMBING_CL_MISC_H
 int	cl_str_to_boolean(const char*, int*);
 
+int	cl_file_exists(const char* filename);
 #endif

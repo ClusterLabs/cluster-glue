@@ -20,6 +20,10 @@
 #include <strings.h>
 #include  <clplumbing/cl_misc.h>
 #include  <clplumbing/cl_log.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 int
 cl_str_to_boolean(const char * s, int * ret)
 {
@@ -46,3 +50,20 @@ cl_str_to_boolean(const char * s, int * ret)
 	return HA_FAIL;
 }
 
+int
+cl_file_exists(const char* filename)
+{
+	struct stat st;
+
+	if (filename == NULL){
+		cl_log(LOG_ERR, "%s: NULL filename", 
+		       __FUNCTION__);
+		return FALSE;
+	}
+
+	if (lstat(filename, &st) == 0){	
+		return  S_ISREG(st.st_mode);
+	}
+	
+	return FALSE;
+}
