@@ -27,7 +27,8 @@ int cl_uuid_compare(const cl_uuid_t* uu1, const cl_uuid_t* uu2);
 void cl_uuid_generate(cl_uuid_t* out);
 int cl_uuid_is_null(cl_uuid_t* uu);
 int cl_uuid_parse( char *in, cl_uuid_t* uu);
-void cl_uuid_unparse(cl_uuid_t* uu, char *out);
+#define	UU_UNPARSE_SIZEOF	37 /* Including NULL byte */
+void cl_uuid_unparse(const cl_uuid_t* uu, char *out);
 
 
 #endif

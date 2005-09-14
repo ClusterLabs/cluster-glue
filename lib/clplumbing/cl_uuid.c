@@ -141,7 +141,7 @@ cl_uuid_parse( char *in, cl_uuid_t* uu)
 
 
 void
-cl_uuid_unparse(cl_uuid_t* uu, char *out){
+cl_uuid_unparse(const cl_uuid_t* uu, char *out){
 	
 	if (uu == NULL || out == NULL){
 		cl_log(LOG_ERR, "cl_uuid_unparse: "
