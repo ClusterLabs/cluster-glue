@@ -88,9 +88,9 @@ int	logd_deadtime_ms = 10000;
 gboolean RegisteredWithApphbd = FALSE;
 gboolean	verbose =FALSE;
 pid_t	write_process_pid;
-IPC_Channel*		chanspair[2];
-gboolean stop_reading = FALSE;
-gboolean needs_shutdown = FALSE;
+IPC_Channel*	chanspair[2];
+gboolean	stop_reading = FALSE;
+gboolean	needs_shutdown = FALSE;
 
 struct {
 	char		debugfile[MAXLINE];
@@ -98,13 +98,15 @@ struct {
 	char		entity[MAXLINE];
 	int		log_facility;
 	gboolean	useapphbd;
+	mode_t		logmode;
 } logd_config =
 	{
 		"",
 		"",
 		"logd",
 		LOG_LOCAL7,
-		FALSE
+		FALSE,
+		0644
 	};
 
 static void	logd_log(const char * fmt, ...) G_GNUC_PRINTF(1,2);
@@ -115,6 +117,7 @@ static int	set_entity(const char * option);
 static int	set_useapphbd(const char* option);
 static int	set_sendqlen(const char * option);
 static int	set_recvqlen(const char * option);
+static int	set_logmode(const char * option);
 
 
 static char*			cmdname = NULL;
@@ -124,13 +127,14 @@ struct directive{
 	const char* name;
 	int (*add_func)(const char*);
 } Directives[]= {
-	{"debugfile", set_debugfile},
-	{"logfile", set_logfile},
-	{"logfacility", set_facility},
-	{"entity", set_entity},
-	{"useapphbd", set_useapphbd},
-	{"sendqlen", set_sendqlen},
-	{"recvqlen", set_recvqlen}
+	{"debugfile",	set_debugfile},
+	{"logfile",	set_logfile},
+	{"logfacility",	set_facility},
+	{"entity",	set_entity},
+	{"useapphbd",	set_useapphbd},
+	{"sendqlen",	set_sendqlen},
+	{"recvqlen",	set_recvqlen},
+	{"logmode",	set_logmode}
 };
 
 struct _syslog_code {
@@ -279,7 +283,28 @@ set_recvqlen(const char * option)
 	
 }
 
-
+static int
+set_logmode(const char * option)
+{
+	unsigned long	mode;
+	char *		endptr;
+	if (!option){
+		cl_log(LOG_ERR, "NULL logmode parameter");
+		return FALSE;
+	}
+	mode = strtoul(option, &endptr, 8);
+	if (*endptr != EOS) {
+		cl_log(LOG_ERR, "Invalid log mode [%s]", option);
+		return FALSE;
+	}
+	if (*option != '0') {
+		/* Whine if mode doesn't start with '0' */
+		cl_log(LOG_WARNING, "Log mode [%s] assumed to be octal"
+		,	option);
+	}
+	logd_config.logmode = (mode_t)mode;
+	return TRUE;
+}
 
 
 typedef struct {
@@ -519,7 +544,23 @@ logd_make_daemon(gboolean daemonize)
 	}
 
 	if (daemonize){
-		umask(022);
+		mode_t	mask;
+		/*
+		 *	Some sample umask calculations:
+		 *
+		 *	logmode		= 0644
+		 *
+		 *	(~0644)&0777	= 0133
+		 *	(0133 & ~0111)	= 0022
+		 *	=> umask will be 022 (the expected result)
+		 *
+		 *	logmode		= 0600
+		 *	(~0600)&0777	= 0177
+		 *	(0177 & ~0111)	= 0066
+		 */
+		mask = (mode_t)(((~logd_config.logmode) & 0777) & (~0111));
+		umask(mask);
+		
 		close(FD_STDIN);
 		(void)open(devnull, O_RDONLY);		/* Stdin:  fd 0 */
 		close(FD_STDOUT);
@@ -854,8 +895,10 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 			logmsg = (LogDaemonMsg*) ipcmsg->msg_body;
 			priority = logmsg->priority;
 		
-			cl_direct_log(priority, logmsg->message, logmsg->use_pri_str,
-				      logmsg->entity, logmsg->entity_pid, logmsg->timestamp);
+			cl_direct_log(priority, logmsg->message
+			,	logmsg->use_pri_str
+			,	logmsg->entity, logmsg->entity_pid
+			,	logmsg->timestamp);
 		
 
 			(void)logd_log;
