@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.52 2005/08/12 19:56:48 gshi Exp $ */
+/* $Id: GSource.c,v 1.53 2005/09/15 00:02:52 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -201,13 +201,12 @@ G_main_del_fd(GFDSource* fdp)
 
 
 	if (fdp->gsourceid <= 0) {
-		cl_log(LOG_CRIT, "Bad gsource in G_main_del_fd");
 		return FALSE;
 	}
 	
 	g_source_remove(fdp->gsourceid);
 	fdp->gsourceid = 0;
-	g_source_destroy(source);
+	g_source_unref(source);
 	
 	return TRUE;
 
@@ -289,10 +288,10 @@ G_fd_destroy(GSource* source)
 {
 	GFDSource*	fdp =  (GFDSource*)source;	
 	g_assert(IS_FDSOURCE(fdp));
+	fdp->gsourceid = 0;
 	if (fdp->dnotify) {
 		fdp->dnotify(fdp->udata);
 	}
-	g_source_unref(source);
 }
 
 
@@ -421,13 +420,13 @@ G_main_del_IPC_Channel(GCHSource* chp)
 	GSource* source = (GSource*) chp;
 
 	if (chp->gsourceid <= 0) {
-		cl_log(LOG_CRIT, "Bad gsource in G_main_del_IPC_channel");
 		return FALSE;
 	}
-	
+
 	g_source_remove(chp->gsourceid);
 	chp->gsourceid = 0;
-	g_source_destroy(source);
+	g_source_unref(source);
+	
 	return TRUE;
 }
 
@@ -561,7 +560,7 @@ G_CH_destroy(GSource* source)
 {
 	GCHSource* chp = (GCHSource*)source;
 	
-
+	chp->gsourceid = 0;
 	g_assert(IS_CHSOURCE(chp));
 	
 	if (chp->dnotify) {
@@ -569,7 +568,6 @@ G_CH_destroy(GSource* source)
 	}	
 	chp->ch->ops->destroy(chp->ch);
 	
-	g_source_destroy(source);
 }
 
 
@@ -648,14 +646,12 @@ gboolean G_main_del_IPC_WaitConnection(GWCSource* wcp)
 
 	
 	if (wcp->gsourceid <= 0) {
-		cl_log(LOG_CRIT, "%s:Bad gsource",
-		       __FUNCTION__);
 		return FALSE;
 	}
 	
 	g_source_remove(wcp->gsourceid);
 	wcp->gsourceid = 0;
-	g_source_destroy(source);
+	g_source_unref(source);
 	
 	return TRUE;
 }
@@ -735,13 +731,12 @@ G_WC_destroy(GSource* source)
 {
 	
 	GWCSource* wcp = (GWCSource*)source;
-	
+	wcp->gsourceid = 0;
 	g_assert(IS_WCSOURCE(wcp));
 	wcp->wch->ops->destroy(wcp->wch);
 	if (wcp->dnotify) {
 		wcp->dnotify(wcp->udata);
 	}
-	g_source_destroy(source);
 }
 
 
@@ -851,7 +846,6 @@ G_main_del_SignalHandler(GSIGSource* sig_src)
 	GSource* source = (GSource*) sig_src;
 
 	if (sig_src->gsourceid <= 0) {
-		cl_log(LOG_CRIT, "Bad gsource in G_main_del_IPC_channel");
 		return FALSE;
 	}
 	g_assert(_NSIG > sig_src->signal);
@@ -862,7 +856,7 @@ G_main_del_SignalHandler(GSIGSource* sig_src)
 	sig_src->signal_triggered = FALSE;
 	g_source_remove(sig_src->gsourceid);
 	G_main_signal_list[sig_src->signal] = NULL;
-	g_source_destroy(source);
+	g_source_unref(source);
 	
 	return TRUE;
 }
@@ -927,11 +921,11 @@ G_SIG_destroy(GSource* source)
 	GSIGSource* sig_src = (GSIGSource*)source;
 	
 	g_assert(IS_SIGSOURCE(sig_src));
-	
+	sig_src->gsourceid = 0;
+
 	if (sig_src->dnotify) {
 		sig_src->dnotify(sig_src->udata);
 	}	
-	g_source_destroy(source);
 }
 
 /* Find and set the correct mainloop input */
@@ -1129,13 +1123,12 @@ G_main_del_TriggerHandler(GTRIGSource* trig_src)
 	GSource* source = (GSource*) trig_src;
 
 	if (trig_src->gsourceid <= 0) {
-		cl_log(LOG_CRIT, "Bad gsource in G_main_del_TriggerHandler");
 		return FALSE;
 	}
 	trig_src->gsourceid = 0;
 	trig_src->manual_trigger = FALSE;
 	g_source_remove(trig_src->gsourceid);
-	g_source_destroy(source);
+	g_source_unref(source);
 	
 	return TRUE;
 }
@@ -1198,10 +1191,10 @@ G_TRIG_destroy(GSource* source)
 	GTRIGSource* trig_src = (GTRIGSource*)source;
 	
 	g_assert(IS_TRIGSOURCE(trig_src));
-	
+	trig_src->gsourceid = 0;
+
 	if (trig_src->dnotify) {
 		trig_src->dnotify(trig_src->udata);
 	}	
-	g_source_destroy(source);
 }
 
