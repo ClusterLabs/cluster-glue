@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.180 2005/08/12 05:05:55 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.181 2005/09/15 00:04:42 gshi Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -591,10 +591,6 @@ lrmd_client_destroy(lrmd_client_t* client)
 	 * and repeating operations it might have scheduled
 	 */
 	unregister_client(client);
-	if (client->ch_cbk) {
-		client->ch_cbk->ops->destroy(client->ch_cbk);
-		client->ch_cbk = NULL;
-	}
 	if (client->app_name) {
 		cl_free(client->app_name);
 		client->app_name = NULL;
@@ -3346,6 +3342,10 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.181  2005/09/15 00:04:42  gshi
+ * the ipc channel will be destroyed by main loop
+ * we should not destroy it here
+ *
  * Revision 1.180  2005/08/12 05:05:55  zhenh
  * 1,fix a memory leak, the key of hash table is not released. 2, improve the memdump
  *
