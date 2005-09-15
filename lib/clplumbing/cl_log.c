@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.64 2005/08/16 15:08:20 gshi Exp $ */
+/* $Id: cl_log.c,v 1.65 2005/09/15 00:01:48 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -54,8 +54,6 @@
 #  endif 
 #endif
 
-#define	cl_malloc	malloc
-#define	cl_free		free
 #define	DFLT_ENTITY	"cluster"
 #define NULLTIME 	0
 #define QUEUE_SATURATION_FUZZ 10
