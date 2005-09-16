@@ -32,7 +32,8 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 			
 
-AM_CFLAGS		= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
+CFLAGS			= 
+AM_CFLAGS		= @NON_FATAL_CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 			-DSTONITH_MODULES='"$(stonithlibdir)"' \
 			-DLOCALEDIR='"@LOCALE@"' 		
 
