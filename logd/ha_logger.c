@@ -42,15 +42,10 @@
 int LogToDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 void            cl_log(int priority, const char * fmt, ...) G_GNUC_PRINTF(2,3);
 static void
-usage(int argc, char** argv)
+usage(void)
 {
 	printf("usage: "
-	       "%s: [option] <destination> <message>\n\n"
-	       "options:"
-	       "	-E <entity> The message will be printed with the given entity\n"
-	       "@destination  can be  either ha-log or ha-debug\n"
-	       "@message is the message you want to log into file\n\n",
-	       argv[0]);	
+	       "ha_logger [-t tag] [-D <ha-log/ha-debug>] [message]\n");
 	return;
 }
 int
@@ -59,34 +54,37 @@ main(int argc, char** argv)
 	int	priority; 
 	char*	entity = NULL;
 	int	c;
-	char*	msg;
-	char*	logtype;
+	char	buf[1024];
+	const char* logtype = "ha-log";
 
 	
-	while (( c =getopt(argc, argv,"E:h")) != -1){
+	while (( c =getopt(argc, argv,"t:D:h")) != -1){
 		switch(c){
 			
-		case 'E':
+		case 't':
 			entity = optarg;
 			break;
+		case 'D':
+			logtype=optarg;
+			break;
 		case 'h':
-			usage(argc, argv);
+			usage();
 			exit(1);		
 		default:
-			continue;
+			usage();
+			exit(1);
 		}
 		
 	}
-	
-	if ( argc - optind != 2){
-		cl_log(LOG_ERR, "Wrong argument");
-		goto err_exit;
+
+	if(!cl_log_test_logd()){
+		fprintf(stderr, "logd is not running");
+		return EXIT_FAIL;
 	}
 	
-	
-	logtype = argv[optind];
-	msg = argv[optind+1];
-	
+	argc -=optind;
+	argv += optind;
+		
 	if (entity != NULL){
 		cl_log_set_entity(entity);		
 	}
@@ -97,20 +95,72 @@ main(int argc, char** argv)
 		priority = LOG_DEBUG;
 	}else{
 		goto err_exit;
-	}
+	}	
 	
-	if(!cl_log_test_logd()){
-		return EXIT_FAIL;
-	}
-	
-        if (LogToDaemon(priority, msg,strlen(msg), FALSE) == HA_OK){
-		return EXIT_OK;
+	if (argc > 0){
+		
+		register char *p, *endp;
+		int len;
+		
+		for (p = buf, endp = buf + sizeof(buf) - 2; *argv;) {
+			len = strlen(*argv);
+			if (p + len > endp && p > buf) {
+				if (LogToDaemon(priority,buf,
+						strnlen(buf, 1024),FALSE) ==HA_OK){
+					continue;
+				}else{
+					return EXIT_FAIL;
+				}
+				p = buf;
+			}
+			if (len > sizeof(buf) - 1) {
+				if (LogToDaemon(priority,*argv,
+						strnlen(*argv, 1024),FALSE) ==HA_OK){
+					argv++;
+					continue;
+				}else{
+					return EXIT_FAIL;
+				}
+				
+			} else {
+				if (p != buf){
+					*p++ = ' ';
+				}
+				bcopy(*argv++, p, len);
+				*(p += len) = '\0';
+			}
+		}
+		if (p != buf) {
+			if (LogToDaemon(priority,buf,
+					strnlen(buf, 1024),FALSE) ==HA_OK){
+				return EXIT_OK;
+			}else{
+				return EXIT_FAIL;
+			}
+		}
+		
+
 	}else {
-		return EXIT_FAIL;
+		while (fgets(buf, sizeof(buf), stdin) != NULL) {
+			/* glibc is buggy and adds an additional newline,
+			   so we have to remove it here until glibc is fixed */
+			int len = strlen(buf);
+			
+			if (len > 0 && buf[len - 1] == '\n')
+				buf[len - 1] = '\0';
+			
+			if (LogToDaemon(priority, buf,strlen(buf), FALSE) == HA_OK){
+				continue;
+			}else {
+				return EXIT_FAIL;
+			}
+		}
+		
+		return EXIT_OK;
 	}
 	
  err_exit:
-	usage(argc, argv);
+	usage();
 	return(1);
 
 }
