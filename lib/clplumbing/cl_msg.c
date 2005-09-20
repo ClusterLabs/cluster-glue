@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.77 2005/09/09 17:15:44 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.78 2005/09/20 23:45:03 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -687,33 +687,6 @@ ha_msg_value_int(const struct ha_msg * msg, const char * name, int* value)
 	*value = atoi(svalue);
 	return HA_OK;
 }
-
-int
-ha_msg_add_uuid(struct ha_msg * msg, const char * name, cl_uuid_t* id)
-{
-	char buf[UUID_SLEN];
-	cl_uuid_unparse(id, buf);
-	return (ha_msg_nadd(msg, name, strlen(name), buf, strlen(buf)));
-}
-
-int
-ha_msg_value_uuid(struct ha_msg * msg, const char * name, cl_uuid_t* id)
-{
-	const char* value = ha_msg_value(msg, name);
-	char buf[UUID_SLEN];
-	
-	if (NULL == value) {
-		return HA_FAIL;
-	}
-	strncpy(buf,value,UUID_SLEN);
-	if( 0 != cl_uuid_parse(buf, id)) {
-		return HA_FAIL;
-	}
-
-	return HA_OK;
-}
-
-
 
 /*
  * ha_msg_value_str_list()/ha_msg_add_str_list():
@@ -2148,6 +2121,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.78  2005/09/20 23:45:03  gshi
+ * bug 267: remove ont set of uuid add/remove functions
+ *
  * Revision 1.77  2005/09/09 17:15:44  gshi
  * rename CRNL to NEWLINE since it only contains newline now
  *
