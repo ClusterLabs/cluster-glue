@@ -1,4 +1,4 @@
-/* $Id: drac3_hash.c,v 1.7 2005/09/16 13:35:17 msoffen Exp $ */
+/* $Id: drac3_hash.c,v 1.8 2005/09/26 05:05:54 sunjd Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -27,10 +27,9 @@
 #endif
 
 #include <string.h>
-#include <unistd.h>
-#include <openssl/bio.h>
-#include <openssl/evp.h>
-#include <openssl/md5.h>
+#include <stdio.h>
+#include <clplumbing/base64.h>
+#include <clplumbing/md5.h>
 #include <glib.h>
 
 #include "drac3_hash.h"
@@ -57,14 +56,13 @@ drac3Crc16(const char *str,
     return crc;
 }
 
-
 void 
 drac3AuthHash(const char * chall, 
 	const char * pass, 
 	char * token, 
 	int len) {
-        
-    BIO *b64bio, *membio;
+    
+    char * chall_dup;    
     char challBytes[MD5LEN];
     char passMD5[MD5LEN];
     char xorBytes[MD5LEN];
@@ -75,12 +73,12 @@ drac3AuthHash(const char * chall,
     int i;
     
     /* decodes chall -> challBytes */
-    b64bio = BIO_new(BIO_f_base64());
-    membio = BIO_new(BIO_s_mem());
-    b64bio = BIO_push(b64bio, membio);
-    BIO_puts(membio, chall);
-    BIO_flush(b64bio);
-    BIO_read(b64bio, challBytes, MD5LEN);
+    memset(challBytes, 0, MD5LEN);
+    chall_dup = g_strdup(chall);
+    if (chall_dup[strlen(chall_dup) - 1] == '\n' ) {
+        chall_dup[strlen(chall_dup) - 1] = '\0';
+    }
+    base64_to_binary(chall_dup, strlen(chall_dup), challBytes, MD5LEN);
 
     /* gets MD5 from pass -> passMD5 */
     MD5((const unsigned char *)pass, strlen(pass), (unsigned char *)passMD5);
@@ -92,7 +90,7 @@ drac3AuthHash(const char * chall,
     
     /* calculate xorBytes MD5 -> xorBytesMD5 */
     MD5((unsigned char *)xorBytes, MD5LEN, (unsigned char *)xorBytesMD5);
-    
+
     /* calculate xorBytesMD5 crc16 */
     crc = drac3Crc16(xorBytesMD5, MD5LEN);
     
@@ -101,11 +99,8 @@ drac3AuthHash(const char * chall,
     memcpy(response+MD5LEN, &crc, 2);
     
     /* calculate response base64 -> responseb64 */
-    BIO_write(b64bio, response, MD5LEN+2);
-    BIO_flush(b64bio);
-    BIO_gets(membio, responseb64, SBUFLEN);
-
-    BIO_free_all(b64bio);
+    memset(responseb64, 0, SBUFLEN);
+    binary_to_base64(response, MD5LEN+2, responseb64, SBUFLEN);
 
     /* assuring null-termination */
     responseb64[SBUFLEN-1]=0x00;

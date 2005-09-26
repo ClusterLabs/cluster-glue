@@ -32,7 +32,6 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 			
 
-CFLAGS			= 
 AM_CFLAGS		= @NON_FATAL_CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 			-DSTONITH_MODULES='"$(stonithlibdir)"' \
 			-DLOCALEDIR='"@LOCALE@"' 		
@@ -72,8 +71,7 @@ endif
 #
 #       We need <curl/curl.h>, <libxml/xmlmemory.h>, 
 #       <libxml/parser.h>, <libxml/xpath.h>, 
-#       <openssl/bio.h>, <openssl/evp.h>, <openssl/md5.h>, 
-#       -lcurl, -lxml2 and -lssl for the drac3 plugin to work
+#       -lcurl and -lxml2 for the drac3 plugin to work
 #
 if USE_DRAC3
 drac3_LIB = drac3.la
@@ -133,7 +131,7 @@ cyclades_la_LDFLAGS	= -export-dynamic -module -avoid-version
 cyclades_la_LIBADD	= $(GLIBLIB)
 
 drac3_la_SOURCES	= drac3.c drac3_command.c drac3_command.h drac3_hash.c drac3_hash.h	$(INCFILES)
-drac3_la_LDFLAGS	= -export-dynamic -module -avoid-version -lcurl -lxml2 -lssl $(GLIBLIB)
+drac3_la_LDFLAGS	= -export-dynamic -module -avoid-version -lcurl -lxml2 $(GLIBLIB)
 
 external_la_SOURCES	= external.c	$(INCFILES)
 external_la_LDFLAGS	= -export-dynamic -module -avoid-version
