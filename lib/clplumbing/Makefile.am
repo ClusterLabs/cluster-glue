@@ -40,6 +40,7 @@ libplumb_la_SOURCES	= 		\
 			Gmain_timeout.c	\
 			GSource.c	\
 			base64.c	\
+			md5.c		\
 			ipcsocket.c	\
 			cl_log.c	\
 			cl_malloc.c	\
