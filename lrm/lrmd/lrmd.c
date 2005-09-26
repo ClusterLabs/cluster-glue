@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.181 2005/09/15 00:04:42 gshi Exp $ */
+/* $Id: lrmd.c,v 1.182 2005/09/26 02:06:49 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -352,12 +352,12 @@ static void
 dump_mem_stats(void)
 {
 	volatile cl_mem_stats_t * ms = cl_malloc_getstats();
-	lrmd_log(LOG_INFO
+	lrmd_log2(LOG_DEBUG
 	,	"MEM STATS: pending alloc %ld, pending size %ld"
 	,	ms->numalloc - ms->numfree
 	,	ms->nbytes_alloc);
 	
-	lrmd_log(LOG_INFO
+	lrmd_log2(LOG_DEBUG
 	,	"STATS: OP Count: %d, Client Count: %d, Resource Count: %d"
 	,	lrm_objectstats.opcount
 	,	lrm_objectstats.clientcount
@@ -541,14 +541,14 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	}
 	ha_msg_value_int(op->msg, F_LRM_OPSTATUS, &op_status);
 	ha_msg_value_int(op->msg, F_LRM_TARGETRC, &target_rc);
-	lrmd_log(LOG_DEBUG
+	lrmd_log2(LOG_DEBUG
 	,	"%s: lrmd_op: %s status: %s, target_rc=%s, client pid %d call_id"
 	": %d, child pid: %d (%s) %s"
 	,	text,	op_info(op), op_status_to_str(op_status)
 	,	op_target_rc_to_str(target_rc)
 	,	op->client_id, op->call_id, op->exec_pid, pidstat
 	,	(op->is_copy ? "copy" : "original"));
-	lrmd_log(LOG_DEBUG
+	lrmd_log2(LOG_DEBUG
 	,	"%s: lrmd_op2: to_tag: %u rt_tag: %d, interval: %d, delay: %d"
 	,	text, op->timeout_tag, op->repeat_timeout_tag
 	,	op->interval, op->delay);
@@ -572,7 +572,7 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	}else{
 		t_done = longclockto_ms(sub_longclock(now, op->t_recv));
 	}
-	lrmd_log(LOG_DEBUG
+	lrmd_log2(LOG_DEBUG
 	,	"%s: lrmd_op3: t_recv: %ldms, t_add: %ldms"
 	", t_perform: %ldms, t_done: %ldms"
 	,	text, t_recv, t_addtolist, t_perform, t_done);
@@ -620,7 +620,7 @@ lrmd_client_dump(gpointer key, gpointer value, gpointer user_data)
 	lrmd_client_t * client = (lrmd_client_t*)value;
 	CHECK_ALLOCATED(client, "client", );
 	
-	lrmd_log(LOG_DEBUG, "client name: %s, client pid: %d"
+	lrmd_log2(LOG_DEBUG, "client name: %s, client pid: %d"
 		", client uid: %d, gid: %d, last request: %s"
 		", last op in: %s, lastop out: %s"
 		", last op rc: %s"
@@ -635,14 +635,14 @@ lrmd_client_dump(gpointer key, gpointer value, gpointer user_data)
 	if (!client->ch_cmd) {
 		lrmd_log(LOG_DEBUG, "NULL client ch_cmd in dump_data_for_debug()");
 	}else{
-		lrmd_log(LOG_DEBUG
+		lrmd_log2(LOG_DEBUG
 		,	"Command channel status: %d, read queue addr: %p, write queue addr: %p"
 		,	client->ch_cmd->ch_status
 		,	client->ch_cmd->recv_queue
 		,	client->ch_cmd->send_queue );
 
 		if (client->ch_cmd->recv_queue && client->ch_cmd->send_queue) {
-			lrmd_log(LOG_DEBUG, "read Qlen: %ld, write Qlen: %ld"
+			lrmd_log2(LOG_DEBUG, "read Qlen: %ld, write Qlen: %ld"
 			,	(long)client->ch_cmd->recv_queue->current_qlen
 			,	(long)client->ch_cmd->send_queue->current_qlen);
 		}
@@ -650,7 +650,7 @@ lrmd_client_dump(gpointer key, gpointer value, gpointer user_data)
 	if (!client->ch_cbk) {
 		lrmd_log(LOG_DEBUG, "NULL client ch_cbk in %s()", __FUNCTION__);
 	}else{
-		lrmd_log(LOG_DEBUG
+		lrmd_log2(LOG_DEBUG
 		,	"Callback channel status: %d, read Qlen: %ld, write Qlen: %ld"
 		,	client->ch_cbk->ch_status
 		,	(long)client->ch_cbk->recv_queue->current_qlen
@@ -761,7 +761,7 @@ lrmd_rsc_dump(char* rsc_id, const char * text)
 	CHECK_ALLOCATED(rsc, "rsc", );
 	/* TODO: Dump params and last_op_table FIXME */
 
-	lrmd_log(LOG_DEBUG, "%s: resource %s/%s/%s/%s"
+	lrmd_log2(LOG_DEBUG, "%s: resource %s/%s/%s/%s"
 	,	text
 	,	lrm_str(rsc->id)
 	,	lrm_str(rsc->type)
@@ -774,18 +774,18 @@ lrmd_rsc_dump(char* rsc_id, const char * text)
 	}
 	incall = TRUE;
 
-	lrmd_log(LOG_DEBUG, "%s: rsc->op_list...", text);
+	lrmd_log2(LOG_DEBUG, "%s: rsc->op_list...", text);
 	oplist = g_list_first(rsc->op_list);
 	for(;NULL!=oplist; oplist=g_list_next(oplist)) {
 		lrmd_op_dump(oplist->data, "rsc->op_list");
 	}
 
-	lrmd_log(LOG_DEBUG, "%s: rsc->repeat_op_list...", text);
+	lrmd_log2(LOG_DEBUG, "%s: rsc->repeat_op_list...", text);
 	oplist = g_list_first(rsc->repeat_op_list);
 	for(; NULL!=oplist; oplist=g_list_next(oplist)) {
 		lrmd_op_dump(oplist->data, "rsc->repeat_op_list");
 	}
-	lrmd_log(LOG_DEBUG, "%s: END resource dump", text);
+	lrmd_log2(LOG_DEBUG, "%s: END resource dump", text);
 	incall = FALSE;
 };
 static void
@@ -1423,7 +1423,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	}
 
 	if (!ch->ops->is_message_pending(ch)) {
-		lrmd_log(LOG_DEBUG, "on_receive_cmd: no pending message in IPC "
+		lrmd_log2(LOG_DEBUG, "on_receive_cmd: no pending message in IPC "
 			 "channel.");
 		return TRUE;
 	}
@@ -1990,7 +1990,7 @@ on_msg_get_last_op(lrmd_client_t* client, struct ha_msg* msg)
 		if (NULL != table ) {
 			lrmd_op_t* op = g_hash_table_lookup(table, op_type);
 			if (NULL != op) {
-				lrmd_log(LOG_DEBUG
+				lrmd_log2(LOG_DEBUG
 				, 	"%s: will return op %s"
 				,	__FUNCTION__
 				,	op_type);
@@ -2551,7 +2551,7 @@ on_op_done(lrmd_op_t* op)
 	}
 	op->t_done = time_longclock();
 	
-	lrmd_log(LOG_DEBUG, "on_op_done: %s", op_info(op));
+	lrmd_log2(LOG_DEBUG, "on_op_done: %s", op_info(op));
 	lrmd_log2(LOG_DEBUG
 		 ,"TimeStamp:  Recv:%ld,Add to List:%ld,Perform:%ld, Done %ld"
 		 ,longclockto_ms(op->t_recv)
@@ -2598,22 +2598,22 @@ on_op_done(lrmd_op_t* op)
 	if (LRM_OP_DONE != op_status) {
 		need_notify = 1;
 	} else if (HA_OK != ha_msg_value_int(op->msg,F_LRM_RC,&op_rc)){
-		lrmd_log(LOG_DEBUG, "on_op_done: will callback due to not "
+		lrmd_log2(LOG_DEBUG, "on_op_done: will callback due to not "
 			"finding F_LRM_RC field in the message op->msg.");
 		need_notify = 1;
 	} else if (EVERYTIME == target_rc) {
-		lrmd_log(LOG_DEBUG, "on_op_done: will callback for being "
+		lrmd_log2(LOG_DEBUG, "on_op_done: will callback for being "
 			"asked to callback everytime.");
 		need_notify = 1;
 	} else if (CHANGED == target_rc) {
 		if (HA_OK != ha_msg_value_int(op->msg,F_LRM_LASTRC,
 						&last_rc)){
-			lrmd_log(LOG_DEBUG ,"on_op_done: will callback because "
+			lrmd_log2(LOG_DEBUG ,"on_op_done: will callback because "
 				"this is first execution [rc: %d].", op_rc);
 			need_notify = 1;
 		} else {
 			if (last_rc != op_rc) {
-				lrmd_log(LOG_DEBUG, "on_op_done: will callback "
+				lrmd_log2(LOG_DEBUG, "on_op_done: will callback "
 					" for this rc %d != last rc %d"
 				, 	op_rc, last_rc);
 				need_notify = 1;
@@ -2628,7 +2628,7 @@ on_op_done(lrmd_op_t* op)
 	}
 	else {
 		if ( op_rc==target_rc ) {
-			lrmd_log(LOG_DEBUG
+			lrmd_log2(LOG_DEBUG
 			,"on_op_done: will callback for target rc %d reached"
 			,op_rc);
 			
@@ -2799,7 +2799,7 @@ perform_op(lrmd_rsc_t* rsc)
 	while ( NULL != node ) {
 		op = node->data;
 		if (-1 != op->exec_pid )	{
-			lrmd_log(LOG_DEBUG, "perform_op: current op is performing.");
+			lrmd_log2(LOG_DEBUG, "perform_op: current op is performing.");
 			lrmd_log2(LOG_DEBUG, "perform_op: its information: %s."
 			,	  op_info(op));
 			break;
@@ -3009,19 +3009,20 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 
 	op->exec_pid = -1;
 	if (SIGKILL == signo) {
+		lrmd_log(LOG_DEBUG, "on_ra_proc_finished: this op %s is killed."
+			, op_info(op));
 		lrmd_op_destroy(op);
 		p->privatedata = NULL;
-		lrmd_log(LOG_DEBUG, "on_ra_proc_finished: this op is killed.");
 		dump_data_for_debug();
 		return;
 	}
 
 	if (HA_OK == ha_msg_value_int(op->msg, F_LRM_OPSTATUS, &op_status)) {
 		if ( LRM_OP_CANCELLED == (op_status_t)op_status ) {
+			lrmd_log2(LOG_DEBUG, "on_ra_proc_finished: "
+				"this op %s is cancelled.", op_info(op));
 			lrmd_op_destroy(op);
 			p->privatedata = NULL;
-			lrmd_log(LOG_DEBUG, "on_ra_proc_finished: "
-				"this op is cancelled.");
 			dump_data_for_debug();
 			return;
 		}
@@ -3029,14 +3030,16 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
-		lrmd_log(LOG_DEBUG,"on_ra_proc_finished: the rsc does not exist");
+		lrmd_log(LOG_DEBUG,"on_ra_proc_finished: the rsc (id=%s) does"
+			" not exist", op->rsc_id);
 		on_op_done(op);
 		p->privatedata = NULL;
 		return;
 	}	
 	RAExec = g_hash_table_lookup(RAExecFuncs,rsc->class);
 	if (NULL == RAExec) {
-		lrmd_log(LOG_ERR,"on_ra_proc_finished: can not find RAExec");
+		lrmd_log(LOG_ERR,"on_ra_proc_finished: can not find RAExec for"
+			"resource class <%s>", rsc->class);
 		dump_data_for_debug();
 		return;
 	}
@@ -3183,7 +3186,7 @@ read_pipe(int fd, char ** data, void * user_data)
 	gstr_tmp = g_string_new("");
 	
 	/* the log is only for analysing bug 475, or should remove it. */
-	lrmd_log(LOG_DEBUG, "read_pipe: begin to read.");
+	lrmd_log2(LOG_DEBUG, "read_pipe: begin to read.");
 	do {
 		errno = 0;
 		readlen = read(fd, buffer, BUFFLEN - 1);
@@ -3208,7 +3211,7 @@ read_pipe(int fd, char ** data, void * user_data)
 		rc = -1;
 	}
 	/* the log is only for analysing bug 475, or should remove it. */
-	lrmd_log(LOG_DEBUG, "read_pipe: finished the pipe read.");
+	lrmd_log2(LOG_DEBUG, "read_pipe: finished the pipe read.");
 
 	if ( gstr_tmp->len == 0 ) {
 		lrmd_log(LOG_DEBUG, "read_pipe: read 0 byte from this pipe.");
@@ -3279,10 +3282,10 @@ debug_level_adjust(int nsig, gpointer user_data)
 static void
 dump_data_for_debug(void)
 {
-	lrmd_log(LOG_DEBUG, "begin to dump internal data for debugging."); 
+	lrmd_log2(LOG_DEBUG, "begin to dump internal data for debugging."); 
 	lrmd_dump_all_clients();
 	lrmd_dump_all_resources();
-	lrmd_log(LOG_DEBUG, "end to dump internal data for debugging."); 
+	lrmd_log2(LOG_DEBUG, "end to dump internal data for debugging."); 
 }
 
 static const char* 
@@ -3342,6 +3345,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.182  2005/09/26 02:06:49  sunjd
+ * Bug 894:decrease the debug log in debug 1 mode; polish some logs
+ *
  * Revision 1.181  2005/09/15 00:04:42  gshi
  * the ipc channel will be destroyed by main loop
  * we should not destroy it here
