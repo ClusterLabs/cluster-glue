@@ -74,7 +74,7 @@ libplumbgpl_la_LIBADD   = $(top_builddir)/replace/libreplace.la \
 libplumbgpl_la_LDFLAGS	= -version-info 1:0:0
 
 testdir = $(libdir)/@HB_PKG@
-test_PROGRAMS = ipctest ipctransientclient ipctransientserver
+test_PROGRAMS = ipctest ipctransientclient ipctransientserver base64_md5_test
 
 ipctest_SOURCES = ipctest.c
 ipctest_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB) \
@@ -94,4 +94,7 @@ ipctransientserver_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(G
 
 #netstring_test_SOURCES	= netstring_test.c
 #netstring_test_LDADD	= libplumb.la $(top_builddir)/replace/libreplace.la libhbclient.la $(gliblib)
+
+base64_md5_test_SOURCES	= base64_md5_test.c
+base64_md5_test_LDADD	= libplumb.la $(top_builddir)/replace/libreplace.la $(gliblib)
 
