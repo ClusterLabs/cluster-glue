@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.65 2005/09/15 00:01:48 gshi Exp $ */
+/* $Id: cl_log.c,v 1.66 2005/09/28 20:29:56 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 #include <clplumbing/GSource.h>
 #include <clplumbing/cl_misc.h>
+#include <clplumbing/cl_syslog.h>
 
 #ifndef MAXLINE
 #	define MAXLINE	512
@@ -83,6 +84,7 @@ static int cl_process_pid = -1;
 static GDestroyNotify destroy_logging_channel_callback;
 static void (*create_logging_channel_callback)(IPC_Channel* chan);
 static gboolean		logging_chan_in_main_loop = FALSE;
+int			debug_level = 0;
 
 /***********************
  *debug use only, do not use this function in your program
@@ -153,6 +155,46 @@ cl_inherit_use_logd(const char* param_name, int sendq_length)
 	return truefalse;
 	
 }     
+
+#define HADEBUGVAL	"HA_DEBUG"
+#define LOGFENV		"HA_LOGFILE"	/* well-formed log file :-) */
+#define DEBUGFENV	"HA_DEBUGLOG"	/* Debug log file */
+#define LOGFACILITY	"HA_LOGFACILITY"/* Facility to use for logger */
+void
+inherit_logconfig_from_environment(void)
+{
+	char * inherit_env = NULL;
+
+	/* Donnot need to free the return pointer from getenv */
+	inherit_env = getenv(HADEBUGVAL);
+	if (inherit_env != NULL && atoi(inherit_env) != 0 ) {
+		debug_level = atoi(inherit_env);
+		inherit_env = NULL;
+	}
+
+	inherit_env = getenv(LOGFENV);
+	if (inherit_env != NULL) {
+		cl_log_set_logfile(inherit_env);
+		inherit_env = NULL;
+	}
+
+	inherit_env = getenv(DEBUGFENV);
+	if (inherit_env != NULL) {
+		cl_log_set_debugfile(inherit_env);
+		inherit_env = NULL;
+	}
+
+	inherit_env = getenv(LOGFACILITY);
+	if (inherit_env != NULL) {
+		int facility = -1;
+		facility = cl_syslogfac_str2int(inherit_env);
+		if ( facility != -1 ) {
+			cl_log_set_facility(facility);
+		}
+		inherit_env = NULL;
+	}
+}
+
 
 static void
 add_logging_channel_mainloop(IPC_Channel* chan)

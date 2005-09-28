@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.182 2005/09/26 02:06:49 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.183 2005/09/28 20:29:56 gshi Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -267,7 +267,6 @@ static int read_pipe(int fd, char ** data, void * user_data);
 static struct ha_msg* op_to_msg(lrmd_op_t* op);
 static gboolean lrm_shutdown(void);
 static gboolean can_shutdown(void);
-static void inherit_config_from_environment(void);
 static gboolean free_str_hash_pair(gpointer key
 ,	 gpointer value, gpointer user_data);
 static gboolean free_str_op_pair(gpointer key
@@ -905,7 +904,7 @@ main(int argc, char ** argv)
 	/* Use logd if it's enabled by heartbeat */
 	cl_inherit_use_logd(ENV_PREFIX""KEY_LOGDAEMON, 0);
 
-	inherit_config_from_environment();
+	inherit_logconfig_from_environment();
 
 	if (req_status){
 		return init_status(PID_FILE, lrm_system_name);
@@ -3223,34 +3222,6 @@ read_pipe(int fd, char ** data, void * user_data)
 	return rc;
 }
 
-static void
-inherit_config_from_environment(void)
-{
-	char * inherit_env = NULL;
-
-	/* Donnot need to free the return pointer from getenv */
-	inherit_env = getenv(LOGFENV);
-	if (inherit_env != NULL) {
-		cl_log_set_logfile(inherit_env);
-		inherit_env = NULL;
-	}
-
-	inherit_env = getenv(DEBUGFENV);
-	if (inherit_env != NULL) {
-		cl_log_set_debugfile(inherit_env);
-		inherit_env = NULL;
-	}
-
-	inherit_env = getenv(LOGFACILITY);
-	if (inherit_env != NULL) {
-		int facility = -1;
-		facility = cl_syslogfac_str2int(inherit_env);
-		if ( facility != -1 ) {
-			cl_log_set_facility(facility);
-		}
-		inherit_env = NULL;
-	}
-}
 
 static gboolean 
 debug_level_adjust(int nsig, gpointer user_data)
@@ -3345,6 +3316,11 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.183  2005/09/28 20:29:56  gshi
+ * change the variable debug to debug_level
+ * define it in cl_log
+ * move a common function definition from lrmd/mgmtd/stonithd to cl_log
+ *
  * Revision 1.182  2005/09/26 02:06:49  sunjd
  * Bug 894:decrease the debug log in debug 1 mode; polish some logs
  *
