@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.183 2005/09/28 20:29:56 gshi Exp $ */
+/* $Id: lrmd.c,v 1.184 2005/09/29 02:30:41 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -284,7 +284,6 @@ static void on_ra_proc_registered(ProcTrack* p);
 static void on_ra_proc_finished(ProcTrack* p, int status
 ,			int signo, int exitcode, int waslogged);
 static const char* on_ra_proc_query_name(ProcTrack* p);
-static int debug_level = 0;
 
 ProcTrack_ops ManagedChildTrackOps = {
 	on_ra_proc_finished,
@@ -3316,6 +3315,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.184  2005/09/29 02:30:41  zhenh
+ * remove local debug_level in lrmd
+ *
  * Revision 1.183  2005/09/28 20:29:56  gshi
  * change the variable debug to debug_level
  * define it in cl_log
