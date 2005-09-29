@@ -41,7 +41,7 @@ int main(void)
 	 * RFC 1321 - The MD5 Message-Digest Algorithm
 	 */
 	const char * data1 = "message digest";
-	const unsigned char digest_rfc1321[(MD5LEN+1)*2+1] 
+	const char digest_rfc1321[(MD5LEN+1)*2+1] 
 			= "f96b697d7cb7938d525a2f31aaf161d0";
 	
 	/* A test case from 
@@ -49,7 +49,7 @@ int main(void)
 	 */
   	const char *key =   "Jefe";
 	const char *data2 =  "what do ya want for nothing?";
-	const unsigned char digest_rfc2104[(MD5LEN+1)*2+1] 
+	const char digest_rfc2104[(MD5LEN+1)*2+1] 
 			= "750c783e6ab0b503eaa86e310a5db738";
 
 	char buffer_tmp[BASE64_BUF_LEN];
@@ -78,7 +78,7 @@ int main(void)
 		error_count++;
 	}
 
-	rc = MD5(data1, strlen(data1), digest);
+	rc = MD5((const unsigned char *)data1, strlen(data1), digest);
 
 	md_tmp = md;
         for (i = 0; i < MD5LEN; i++) {
@@ -93,7 +93,8 @@ int main(void)
 		error_count++;
 	}
 
-	rc = HMAC(key, strlen(key), data2, strlen(data2), digest);
+	rc = HMAC((const unsigned char *)key, strlen(key)
+		  , (const unsigned char *)data2, strlen(data2), digest);
 	md_tmp = md;
         for (i = 0; i < MD5LEN; i++) {
                 sprintf(md_tmp,"%02x", digest[i]);
