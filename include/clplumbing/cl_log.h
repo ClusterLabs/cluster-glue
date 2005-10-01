@@ -1,4 +1,4 @@
-/* $Id: cl_log.h,v 1.21 2005/09/28 20:29:55 gshi Exp $ */
+/* $Id: cl_log.h,v 1.22 2005/10/01 01:48:37 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,6 +26,13 @@
 #define MAXMSG		MAXDATASIZE
 
 struct IPC_CHANNEL;
+
+#define	ANYDEBUG	(debug_level)
+#define	DEBUGDETAILS	(debug_level >= 2)
+#define	DEBUGAUTH	(debug_level >=3)
+#define	DEBUGMODULE	(debug_level >=3)
+#define	DEBUGPKT	(debug_level >= 4)
+#define	DEBUGPKTCONT	(debug_level >= 5)
 
 void		cl_direct_log(int priority, const char* buf, gboolean, const char*, int, TIME_T);
 void            cl_log(int priority, const char * fmt, ...) G_GNUC_PRINTF(2,3);
