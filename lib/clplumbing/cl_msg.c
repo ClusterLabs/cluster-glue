@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.78 2005/09/20 23:45:03 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.79 2005/10/04 22:06:58 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1130,40 +1130,88 @@ cl_msg_get_list(struct ha_msg* msg, const char* name)
 
 
 int
-cl_msg_add_list_int(struct ha_msg* msg, const char* name,
-		    int* buf, size_t n)
-{
-	
+cl_msg_add_list_str(struct ha_msg* msg, const char* name,
+		    char** buf, size_t n)
+{		
 	GList*		list = NULL;
 	size_t		i;
-	int		ret;
+	int		ret = HA_FAIL;
 	
 	if (n <= 0  || buf == NULL|| name ==NULL ||msg == NULL){
-		cl_log(LOG_ERR, "cl_msg_get_list_int:"
+		cl_log(LOG_ERR, "%s:"
 		       "invalid parameter(%s)", 
 		       !n <= 0?"n is negative or zero": 
 		       !buf?"buf is NULL":
 		       !name?"name is NULL":
-		       "msg is NULL");
+		       "msg is NULL",__FUNCTION__);
 		return HA_FAIL;
 	}
 	
 	for ( i = 0; i < n; i++){
-		char intstr[MAX_INT_LEN];		
-		sprintf(intstr,"%d", buf[i]);
-		list = g_list_append(list, cl_strdup(intstr));
+		if (buf[i] == NULL){
+			cl_log(LOG_ERR, "%s: %dth element in buf is null",
+			       __FUNCTION__, i);
+			goto free_and_out;
+		}
+		list = g_list_append(list, buf[i]);
 		if (list == NULL){
-			cl_log(LOG_ERR, "cl_msg_add_list_int:"
-			       "adding integer to list failed");
-			return HA_FAIL;
+			cl_log(LOG_ERR, "%s:adding integer to list failed",
+			       __FUNCTION__);
+			goto free_and_out;
 		}
 	}
 	
 	ret = ha_msg_addraw(msg, name, strlen(name), list, 
 			    string_list_pack_length(list),
 			    FT_LIST, 0);
-	g_list_free(list);
 	
+ free_and_out:
+	if (list){
+		g_list_free(list);
+		list = NULL;
+	}
+	return ret;
+}
+
+int
+cl_msg_add_list_int(struct ha_msg* msg, const char* name,
+		    int* buf, size_t n)
+{
+	
+	GList*		list = NULL;
+	size_t		i;
+	int		ret = HA_FAIL;
+	
+	if (n <= 0  || buf == NULL|| name ==NULL ||msg == NULL){
+		cl_log(LOG_ERR, "cl_msg_add_list_int:"
+		       "invalid parameter(%s)", 
+		       !n <= 0?"n is negative or zero": 
+		       !buf?"buf is NULL":
+		       !name?"name is NULL":
+		       "msg is NULL");
+		goto free_and_out;
+	}
+	
+	for ( i = 0; i < n; i++){
+		char intstr[MAX_INT_LEN];		
+		sprintf(intstr,"%d", buf[i]);
+		list = g_list_append(list, intstr);
+		if (list == NULL){
+			cl_log(LOG_ERR, "cl_msg_add_list_int:"
+			       "adding integer to list failed");
+			goto free_and_out;
+		}
+	}
+	
+	ret = ha_msg_addraw(msg, name, strlen(name), list, 
+			    string_list_pack_length(list),
+			    FT_LIST, 0);
+ free_and_out:
+	if (list){
+		g_list_free(list);
+		list = NULL;
+	}
+
 	return ret;
 }
 int
@@ -2121,6 +2169,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.79  2005/10/04 22:06:58  gshi
+ * *** empty log message ***
+ *
  * Revision 1.78  2005/09/20 23:45:03  gshi
  * bug 267: remove ont set of uuid add/remove functions
  *
