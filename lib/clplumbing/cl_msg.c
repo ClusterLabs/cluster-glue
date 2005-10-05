@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.79 2005/10/04 22:06:58 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.80 2005/10/05 17:12:34 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1173,6 +1173,14 @@ cl_msg_add_list_str(struct ha_msg* msg, const char* name,
 	return ret;
 }
 
+static void
+list_element_free(gpointer data, gpointer userdata)
+{
+	if (data){
+		g_free(data);
+	}	
+}
+
 int
 cl_msg_add_list_int(struct ha_msg* msg, const char* name,
 		    int* buf, size_t n)
@@ -1195,7 +1203,7 @@ cl_msg_add_list_int(struct ha_msg* msg, const char* name,
 	for ( i = 0; i < n; i++){
 		char intstr[MAX_INT_LEN];		
 		sprintf(intstr,"%d", buf[i]);
-		list = g_list_append(list, intstr);
+		list = g_list_append(list, g_strdup(intstr));
 		if (list == NULL){
 			cl_log(LOG_ERR, "cl_msg_add_list_int:"
 			       "adding integer to list failed");
@@ -1208,6 +1216,7 @@ cl_msg_add_list_int(struct ha_msg* msg, const char* name,
 			    FT_LIST, 0);
  free_and_out:
 	if (list){
+		g_list_foreach(list,list_element_free , NULL);
 		g_list_free(list);
 		list = NULL;
 	}
@@ -2169,6 +2178,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.80  2005/10/05 17:12:34  gshi
+ * We need to dup the string and free it later
+ *
  * Revision 1.79  2005/10/04 22:06:58  gshi
  * *** empty log message ***
  *
