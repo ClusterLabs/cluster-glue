@@ -37,7 +37,6 @@
 #include <stonith/stonith.h>
 #include <stonith/stonith_plugin.h>
 
-#define COMPRESS_MAXBUF (64*1024)
 #define COMPRESSED_FIELD "_compressed_payload"
 #define COMPRESS_NAME "_compression_algorithm"
 
@@ -176,7 +175,7 @@ char*
 cl_compressmsg(const struct ha_msg*m, size_t* len)
 {
 	char*	src;
-	char	dest[COMPRESS_MAXBUF];
+	char	dest[MAXMSG];
 	size_t	destlen;
 	int rc;
 	char* ret;
@@ -188,8 +187,8 @@ cl_compressmsg(const struct ha_msg*m, size_t* len)
 		       __FUNCTION__);
 		return NULL;
 	}
-	if ( get_netstringlen(m) > COMPRESS_MAXBUF
-	     || get_stringlen(m) > COMPRESS_MAXBUF){
+	if ( get_netstringlen(m) > MAXMSG
+	     || get_stringlen(m) > MAXMSG){
 		cl_log(LOG_ERR, "%s: msg too big(stringlen=%d,"
 		       "netstringlen=%d)", 
 		       __FUNCTION__, 
@@ -204,7 +203,7 @@ cl_compressmsg(const struct ha_msg*m, size_t* len)
 		return NULL;
 	}
 	
-	destlen = COMPRESS_MAXBUF;
+	destlen = MAXMSG;
 
 	rc = msg_compress_fns->compress(dest, &destlen, 
 					src, datalen);
@@ -271,8 +270,8 @@ cl_decompressmsg(const struct ha_msg* m)
 {
 	const char* src;
 	size_t srclen;
-	char dest[COMPRESS_MAXBUF];
-	size_t destlen = COMPRESS_MAXBUF;
+	char dest[MAXMSG];
+	size_t destlen = MAXMSG;
 	int rc;
 	struct ha_msg* ret;
 	const char* compress_name;
@@ -289,7 +288,7 @@ cl_decompressmsg(const struct ha_msg* m)
 		return NULL;
 	}
 
-	if (srclen > COMPRESS_MAXBUF){
+	if (srclen > MAXMSG){
 		cl_log(LOG_ERR, "%s: field too long(%d)", 
 		       __FUNCTION__, (int)srclen);
 		return NULL;
