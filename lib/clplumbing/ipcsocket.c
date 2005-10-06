@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.160 2005/07/25 20:43:12 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.161 2005/10/06 22:17:41 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1705,7 +1705,8 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   }
 
   if (unlink(path_name) < 0 && errno != ENOENT) {
-    cl_perror("socket_wait_conn_new: unlink failure");
+	  cl_perror("socket_wait_conn_new: unlink failure(%s)",
+		    path_name);
   }
   memset(&my_addr, 0, sizeof(my_addr));
   my_addr.sun_family = AF_LOCAL;         /* host byte order */
