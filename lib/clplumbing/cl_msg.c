@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.80 2005/10/05 17:12:34 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.81 2005/10/13 22:57:13 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1134,7 +1134,7 @@ cl_msg_add_list_str(struct ha_msg* msg, const char* name,
 		    char** buf, size_t n)
 {		
 	GList*		list = NULL;
-	size_t		i;
+	int		i;
 	int		ret = HA_FAIL;
 	
 	if (n <= 0  || buf == NULL|| name ==NULL ||msg == NULL){
@@ -2178,6 +2178,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.81  2005/10/13 22:57:13  gshi
+ * fix a compiling error in ia64
+ *
  * Revision 1.80  2005/10/05 17:12:34  gshi
  * We need to dup the string and free it later
  *
