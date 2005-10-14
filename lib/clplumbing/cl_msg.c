@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.81 2005/10/13 22:57:13 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.82 2005/10/14 18:51:06 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -169,7 +169,6 @@ ha_msg_new(nfields)
 		ret->nlens     = (size_t *)ha_calloc(sizeof(size_t), nalloc);
 		ret->values    = (void **)ha_calloc(sizeof(void *), nalloc);
 		ret->vlens     = (size_t *)ha_calloc(sizeof(size_t), nalloc);
-		ret->stringlen = sizeof(MSG_START)+sizeof(MSG_END)-1;
 		ret->types	= (int*)ha_calloc(sizeof(int), nalloc);
 
 		if (ret->names == NULL || ret->values == NULL
@@ -239,7 +238,6 @@ ha_msg_del(struct ha_msg *msg)
 		}
 		msg->nfields = -1;
 		msg->nalloc = -1;
-		msg->stringlen = -1;
 		ha_free(msg);
 	}
 }
@@ -256,7 +254,6 @@ ha_msg_copy(const struct ha_msg *msg)
 	} 
 
 	ret->nfields	= msg->nfields;
-	ret->stringlen	= msg->stringlen;
 
 	memcpy(ret->nlens, msg->nlens, sizeof(msg->nlens[0])*msg->nfields);
 	memcpy(ret->vlens, msg->vlens, sizeof(msg->vlens[0])*msg->nfields);
@@ -314,13 +311,6 @@ ha_msg_audit(const struct ha_msg* msg)
 	if (msg->nalloc < 0) {
 		cl_log(LOG_CRIT, "Message @ %p has negative nalloc (%d)"
 		,	msg, msg->nalloc);
-		doabort = TRUE;
-	}
-	if (msg->stringlen <=0 ){
-		cl_log(LOG_CRIT,
-		       "Message @ %p has non-positive net/stringlen field"
-		       "stringlen=(%ld)",
-		       msg,(long)msg->stringlen);
 		doabort = TRUE;
 	}
 
@@ -488,30 +478,12 @@ cl_msg_remove_offset(struct ha_msg* msg, int offset)
 {
 	int j = offset;
 	int i;
-	int tmplen;
 	
 	if (j == msg->nfields){		
 		cl_log(LOG_ERR, "cl_msg_remove: field %d not found", j);
 		return HA_FAIL;
 	}
-	
-
-	
-	if (msg->types[j] != FT_STRUCT){
-		tmplen = msg->stringlen;
-		msg->stringlen -=  fieldtypefuncs[msg->types[j]].stringlen(msg->nlens[j],
-									   msg->vlens[j],
-									   msg->values[j]);
-		if (msg->stringlen <=0){
-			cl_log(LOG_ERR, "cl_msg_remove: stringlen <= 0 after removing"
-			       "field %s. Return failure", msg->names[j]);
-			msg->stringlen =tmplen;
-			return HA_FAIL;
-		}
 		
-	}
-
-	
 	ha_free(msg->names[j]);
 	fieldtypefuncs[msg->types[j]].memfree(msg->values[j]);
 	
@@ -1309,8 +1281,7 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 			
 			char *	newv ;
 			int	newlen = vlen;
-			int	string_sizediff = 0;
-			
+
 			newv = fieldtypefuncs[type].dup(value,vlen);
 			if (!newv){
 				cl_log(LOG_ERR, "duplicating message fields failed"
@@ -1318,15 +1289,7 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 				       value, (int)vlen, msg->names[j]);
 				return HA_FAIL;
 			}
-			
-			if (type != FT_STRUCT){
-				string_sizediff = fieldtypefuncs[type].stringlen(strlen(name), vlen, value)
-					- fieldtypefuncs[type].stringlen(strlen(name), 
-									 msg->vlens[j], msg->values[j]);
-				msg->stringlen += string_sizediff;
-			}
-			
-			
+						
 			fieldtypefuncs[type].memfree(msg->values[j]);
 			msg->values[j] = newv;
 			msg->vlens[j] = newlen;
@@ -2178,6 +2141,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.82  2005/10/14 18:51:06  gshi
+ * remove stringlen in struct ha_msg
+ * every time string length for an ha_msg is computed on the fly
+ *
  * Revision 1.81  2005/10/13 22:57:13  gshi
  * fix a compiling error in ia64
  *

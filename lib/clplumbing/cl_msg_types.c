@@ -129,15 +129,13 @@ get_stringlen(const struct ha_msg *m)
 		return 0;
 	}
 	
-	for (i = 0; i < m->nfields; i++){		
-		if (m->types[i] == FT_STRUCT){			
-			total_len += struct_stringlen(m->nlens[i], 
-						      m->vlens[i],
-						      m->values[i]);
-		}
-	}
+	total_len = sizeof(MSG_START)+sizeof(MSG_END)-1;	
 	
-	total_len += m->stringlen;
+	for (i = 0; i < m->nfields; i++){				
+		total_len += fieldtypefuncs[m->types[i]].stringlen(m->nlens[i], 
+								   m->vlens[i],
+								   m->values[i]);	
+	}
 	
 	return total_len;
 }
@@ -863,10 +861,7 @@ add_binary_field(struct ha_msg* msg, char* name, size_t namelen,
 	msg->names[next] = name;
 	msg->nlens[next] = namelen;
 	msg->values[next] = value;
-	msg->vlens[next] = vallen;
-	
-	msg->stringlen += binary_stringlen(namelen, vallen, value);
-	
+	msg->vlens[next] = vallen;       	
 	msg->types[next] = FT_BINARY;
 	msg->nfields++;	
 	
@@ -944,7 +939,6 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 		msg->values[next] = value;
 		msg->vlens[next] =  vallen;
 		msg->types[next] = FT_LIST;
-		msg->stringlen += stringlen_add;
 		msg->nfields++;
 		
 	}  else if(  msg->types[j] == FT_LIST ){
@@ -969,7 +963,6 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 
 		msg->values[j] = list;
 		msg->vlens[j] =  string_list_pack_length(list);
-		msg->stringlen +=  stringlen_add;
 		g_list_free((GList*)value); /*we don't free each element
 					      because they are used in new list*/
 		
@@ -1460,11 +1453,6 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 	msg->vlens[next] = cp_vallen;
 	msg->names[next] = cp_name;
 	msg->nlens[next] = cp_namelen;
-	
-	if (internal_type != FT_STRUCT){
-		msg->stringlen += stringlen_add;	
-	}
-	
 	msg->types[next] = internal_type;
 	msg->nfields++;
 	
