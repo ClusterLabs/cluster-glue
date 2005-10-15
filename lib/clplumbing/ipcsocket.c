@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.161 2005/10/06 22:17:41 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.162 2005/10/15 02:47:17 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -359,7 +359,7 @@ socket_chan_audit(const struct IPC_CHANNEL* ch)
 		cl_log(LOG_CRIT, "Negative remaining_data");
 		badch = TRUE;
 	}
-	if (chp->remaining_data < 0 || chp->remaining_data > MAXDATASIZE) {
+	if (chp->remaining_data < 0 || chp->remaining_data > MAXMSG) {
 		cl_log(LOG_CRIT, "Excessive/bad remaining_data");
 		badch = TRUE;
 	}
@@ -838,7 +838,7 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 	int diff;
 	struct IPC_MESSAGE* newmsg;
 	
-	if (msg->msg_len < 0 || msg->msg_len > MAXDATASIZE) {
+	if (msg->msg_len < 0 || msg->msg_len > MAXMSG) {
 		cl_log(LOG_ERR, "socket_send: "
 		       "invalid message");		       
 		return IPC_FAIL;

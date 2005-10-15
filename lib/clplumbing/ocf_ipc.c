@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.37 2005/08/06 04:25:42 alan Exp $ */
+/* $Id: ocf_ipc.c,v 1.38 2005/10/15 02:47:44 gshi Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -319,7 +319,7 @@ ipc_bufpool_new(int size)
 		totalsize = POOL_SIZE;
 	}
 	
-	if (totalsize > MAXDATASIZE){
+	if (totalsize > MAXMSG){
 		cl_log(LOG_INFO, "ipc_bufpool_new: "
 		       "asking for buffer with size %d"
 		       "corrupted data len???", totalsize);
@@ -491,7 +491,7 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 			abort();
 		}
 
-		if ( head->msg_len > MAXDATASIZE){
+		if ( head->msg_len > MAXMSG){
 			cl_log(LOG_ERR, "ipc_update_bufpool:"
 			       "msg length is corruptted(%d)",
 			       head->msg_len);
