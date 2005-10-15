@@ -465,6 +465,17 @@ list_dup( const void* value, size_t len)
 	return dupvalue;
 }
 
+
+static void 
+general_display(int log_level, int seq, char* name, void* value, int type)
+{
+	HA_MSG_ASSERT(value);	
+	HA_MSG_ASSERT(name);
+	cl_log(log_level, "MSG[%d] : [(%s)%s=%p]",
+	       seq,	FT_strings[type],
+	       name,	value);	
+	
+}
 static void
 string_display(int log_level, int seq, char* name, void* value)
 {
@@ -478,20 +489,22 @@ string_display(int log_level, int seq, char* name, void* value)
 static void
 binary_display(int log_level, int seq, char* name, void* value)
 {
-	HA_MSG_ASSERT(value);	
-	HA_MSG_ASSERT(name);
-	cl_log(log_level, "MSG[%d] : [(%s)%s=%p]",
-	       seq,	FT_strings[FT_BINARY],
-	       name,	value);
+	return general_display(log_level, seq, name, value, FT_BINARY);
 }
 
 static void
-struct_display(int log_level, int seq, char* name, void* value)
+compress_display(int log_level, int seq, char* name, void* value){
+	return general_display(log_level, seq, name, value, FT_COMPRESS);
+}
+
+
+static void
+general_struct_display(int log_level, int seq, char* name, void* value, int type)
 {
 	HA_MSG_ASSERT(name);
 	HA_MSG_ASSERT(value);	
 	cl_log(log_level, "MSG[%d] : [(%s)%s=%p]",
-	       seq,	FT_strings[FT_STRUCT],
+	       seq,	FT_strings[type],
 	       name,	value);
 	if(cl_get_string((struct ha_msg*) value, F_XML_TAGNAME) == NULL) {
 		cl_log_message(log_level, (struct ha_msg*) value);
@@ -499,6 +512,17 @@ struct_display(int log_level, int seq, char* name, void* value)
 		/* use a more friendly output format for nested messages */
 		struct_display_as_xml(log_level, 0, value, NULL, TRUE);
 	}
+}
+static void
+struct_display(int log_level, int seq, char* name, void* value)
+{
+	return general_struct_display(log_level, seq, name, value, FT_STRUCT);
+
+}
+static void
+uncompress_display(int log_level, int seq, char* name, void* value)
+{
+	return general_struct_display(log_level, seq, name, value, FT_UNCOMPRESS);
 }
 
 #define update_buffer_head(buffer, len) if(len < 0) {	\
@@ -976,6 +1000,64 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 }
 
 
+static int 
+add_compress_field(struct ha_msg* msg, char* name, size_t namelen,
+		 void* value, size_t vallen, int depth)
+{
+
+	int next;
+
+	if ( !msg || !name || !value
+	     || depth < 0){
+		cl_log(LOG_ERR, "add_binary_field:"
+		       " invalid input argument");
+		return HA_FAIL;
+	}
+		
+
+	next = msg->nfields;
+	msg->names[next] = name;
+	msg->nlens[next] = namelen;
+	msg->values[next] = value;
+	msg->vlens[next] = vallen;
+	msg->types[next] = FT_COMPRESS;
+	msg->nfields++;	
+	
+	return HA_OK;
+}
+
+
+
+
+static int 
+add_uncompress_field(struct ha_msg* msg, char* name, size_t namelen,
+		 void* value, size_t vallen, int depth)
+{	
+	int next;
+	struct ha_msg* childmsg;
+
+	if ( !msg || !name || !value
+	     || depth < 0){
+		cl_log(LOG_ERR, "add_struct_field:"
+		       " invalid input argument");
+		return HA_FAIL;
+	}
+	
+	childmsg = (struct ha_msg*)value; 
+	
+	next = msg->nfields;
+	msg->names[next] = name;
+	msg->nlens[next] = namelen;
+	msg->values[next] = value;
+	msg->vlens[next] = vallen;			
+	msg->types[next] = FT_UNCOMPRESS;
+	
+	msg->nfields++;	
+	
+	return HA_OK;
+}
+
+
 
 /*print a string to a string,
   pretty simple one :)
@@ -1113,25 +1195,45 @@ string2str(void* value, size_t len, int depth, void** nv, size_t* nlen )
 static int
 string2binary(void* value, size_t len, int depth, void** nv, size_t* nlen)
 {
-	char	tmpbuf[MAXMSG];
-
+	char	tmpbuf[MAXLINE];
+	char*	buf = NULL;
+	int	buf_malloced = 0;
+	int	ret = HA_FAIL;
+	if (len > MAXLINE){
+		buf = cl_malloc(len);
+		if (buf == NULL){
+			cl_log(LOG_ERR, "%s: malloc failed",
+			       __FUNCTION__);
+			goto out;
+		}
+		buf_malloced = 1;
+	}else {
+		buf = &tmpbuf[0];		
+	}
+	
 	if (value == NULL && len == 0){
 		*nv = NULL;
 		*nlen = 0;
-		return HA_OK;
+		ret = HA_OK;
+		goto out;
 	}
 
 	if ( !value || !nv || depth < 0){
 		cl_log(LOG_ERR, "string2binary:invalid input");
-		return HA_FAIL;
+		ret = HA_FAIL;
+		goto out;
 	}
 	
-	memcpy(tmpbuf, value, len);
-	*nlen = base64_to_binary(tmpbuf, len, value, len);				
+	memcpy(buf, value, len);
+	*nlen = base64_to_binary(buf, len, value, len);				
 	
 	*nv = value;
-	
-	return HA_OK;
+	ret = HA_OK;
+ out:
+	if (buf_malloced && buf){
+		cl_free(buf);
+	}
+	return ret;
 }
 
 static int
@@ -1211,6 +1313,7 @@ fields2netstring(char* sp, char* smax, char* name, size_t nlen,
 
 	case FT_STRING:
 	case FT_BINARY:
+	case FT_COMPRESS:
 		memcpy(sp, value, vallen);
 		slen = vallen;
 		break;
@@ -1288,7 +1391,7 @@ netstring2string(const void* value, size_t vlen, void** retvalue, size_t* ret_vl
 		return HA_FAIL;
 	}
 	
-	dupvalue = string_dup(value, vlen);
+	dupvalue = binary_dup(value, vlen);
 	if (!dupvalue){
 		cl_log(LOG_ERR, "netstring2string:"
 		       "duplicating value failed");
@@ -1460,20 +1563,75 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 	
 }
 
+static int
+uncompress2compress(struct ha_msg* msg, int index)
+{
+	char	buf[MAXMSG];
+	size_t	buflen = MAXMSG;
+	
+	if (msg->types[index] != FT_UNCOMPRESS){
+		cl_log(LOG_ERR, "%s: the %dth field is not FT_UNCOMPRESS type",
+		       __FUNCTION__, index);
+		return HA_FAIL;
+	}
+	
 
+	if (cl_compress_field(msg, index, buf, &buflen) != HA_OK){
+		cl_log(LOG_ERR, "%s: compressing %dth field failed", __FUNCTION__, index);
+		return HA_FAIL;
+	}
+	
+	return cl_msg_replace(msg, index, buf, buflen, FT_COMPRESS);
 
-struct fieldtypefuncs_s fieldtypefuncs[4]=
+}
+
+static int
+compress2uncompress(struct ha_msg* msg, int index)
+{
+	char		buf[MAXMSG];
+	size_t		buflen = MAXMSG;	
+	struct ha_msg*  msgfield;
+	
+	if (cl_decompress_field(msg, index, buf, &buflen) != HA_OK){
+		cl_log(LOG_ERR, "%s: compress field failed",
+		       __FUNCTION__);
+		return HA_FAIL;
+	}
+	
+	msgfield = wirefmt2msg(buf, buflen, 0);
+	if (msgfield == NULL){
+		cl_log(LOG_ERR, "%s: wirefmt to msg failed",
+		       __FUNCTION__);
+		return HA_FAIL;
+	}
+	
+	return cl_msg_replace(msg, index, (char*)msgfield, 0, FT_UNCOMPRESS);		
+}
+
+struct fieldtypefuncs_s fieldtypefuncs[NUM_MSG_TYPES]=
 	{ {string_memfree, string_dup, string_display, add_string_field, 
-	   string_stringlen,string_netstringlen, str2string,fields2netstring, string2str, netstring2string},
+	   string_stringlen,string_netstringlen, str2string,fields2netstring, 
+	   string2str, netstring2string, NULL, NULL},
 	  
 	  {binary_memfree, binary_dup, binary_display, add_binary_field,
-	   binary_stringlen,binary_netstringlen, binary2string,fields2netstring, string2binary, netstring2binary},
+	   binary_stringlen,binary_netstringlen, binary2string,fields2netstring, 
+	   string2binary, netstring2binary, NULL, NULL},
 	  
 	  {struct_memfree, struct_dup, struct_display, add_struct_field, 
-	   struct_stringlen, struct_netstringlen, struct2string, fields2netstring, string2struct, netstring2struct},
+	   struct_stringlen, struct_netstringlen, struct2string, fields2netstring, \
+	   string2struct, netstring2struct, NULL, NULL},
 	  
 	  {list_memfree, list_dup, list_display, add_list_field, 
-	   list_stringlen, list_netstringlen, list2string, fields2netstring, string2list, netstring2list},
+	   list_stringlen, list_netstringlen, list2string, fields2netstring, 
+	   string2list, netstring2list, NULL, NULL},
+	  
+	  {binary_memfree, binary_dup, compress_display, add_compress_field,
+	   binary_stringlen,binary_netstringlen, NULL ,fields2netstring, 
+	   NULL , netstring2binary, NULL, compress2uncompress}, /*FT_COMPRESS*/
+	  
+	  {struct_memfree, struct_dup, uncompress_display, add_uncompress_field, 
+	   struct_stringlen, struct_netstringlen, NULL , fields2netstring, 
+	   NULL , netstring2struct, uncompress2compress, NULL}, /*FT_UNCOMPRSS*/
 	};
 
 

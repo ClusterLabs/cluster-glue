@@ -42,7 +42,9 @@
 
 #define HA_PLUGIN_D HALIB "/plugins"
 
+#define HACOMPRESSNAME "HA_COMPRESSION"
 static struct hb_compress_fns* msg_compress_fns = NULL;
+static char*  compress_name = NULL;
 GHashTable*		CompressFuncs = NULL;
 
 static PILGenericIfMgmtRqst	Reqs[] =
@@ -172,7 +174,7 @@ get_compress_fns(const char* pluginname)
 void cl_realtime_malloc_check(void);
 
 char* 
-cl_compressmsg(const struct ha_msg*m, size_t* len)
+cl_compressmsg(struct ha_msg*m, size_t* len)
 {
 	char*	src;
 	char	dest[MAXMSG];
@@ -196,6 +198,7 @@ cl_compressmsg(const struct ha_msg*m, size_t* len)
 		       get_netstringlen(m));
 		return NULL;
 	}
+	
 	
 	if ((src = msg2wirefmt_noac(m, &datalen)) == NULL){
 		cl_log(LOG_ERR,"%s: converting msg"
@@ -237,7 +240,7 @@ cl_compressmsg(const struct ha_msg*m, size_t* len)
 	ret = msg2netstring(tmpmsg, len);
 	ha_msg_del(tmpmsg);
 	
-#if 0
+#if 1
 	cl_log(LOG_INFO, "------original stringlen=%d, netstringlen=%d,"
 	       "compressed_datalen=%d,current len=%d",
 	       get_stringlen(m), get_netstringlen(m),destlen,  *len);
@@ -249,7 +252,7 @@ cl_compressmsg(const struct ha_msg*m, size_t* len)
 
 
 gboolean 
-is_compressed_msg(const struct ha_msg* m)
+is_compressed_msg(struct ha_msg* m)
 {
 	if( cl_get_binary(m, COMPRESSED_FIELD, NULL) /*discouraged function*/
 	    != NULL){
@@ -266,7 +269,7 @@ is_compressed_msg(const struct ha_msg* m)
  */
 
 struct ha_msg*
-cl_decompressmsg(const struct ha_msg* m)
+cl_decompressmsg(struct ha_msg* m)
 {
 	const char* src;
 	size_t srclen;
@@ -327,4 +330,121 @@ cl_decompressmsg(const struct ha_msg* m)
 #endif
 
 	return ret;
+}
+
+
+int
+cl_decompress_field(struct ha_msg* msg, int index, char* buf, size_t* buflen)
+{
+	char*		value;
+	int		vallen;
+	int		rc;
+	const char*	compress_name;
+	struct hb_compress_fns* funcs;
+	
+	if ( msg == NULL|| index >= msg->nfields){
+		cl_log(LOG_ERR, "%s: wrong argument",
+		       __FUNCTION__);
+		return HA_FAIL;
+	}
+	
+	
+	value = msg->values[index];
+	vallen = msg->vlens[index];	
+	
+	compress_name = ha_msg_value(msg, COMPRESS_NAME);
+	if (compress_name == NULL){
+		cl_log(LOG_ERR, "compress name not found");
+		return HA_FAIL;
+	}
+	
+	
+	funcs = get_compress_fns(compress_name);
+	
+	if (funcs == NULL){
+		cl_log(LOG_ERR, "%s: compress method(%s) is not"
+		       " supported in this machine",		       
+		       __FUNCTION__, compress_name);
+		return HA_FAIL;
+	}
+	
+	rc = funcs->decompress(buf, buflen, value, vallen);		
+	if (rc != HA_OK){
+		cl_log(LOG_ERR, "%s: decompression failed",
+		       __FUNCTION__);
+		return HA_FAIL;
+	}
+	
+	return HA_OK;
+}
+
+
+int 
+cl_compress_field(struct ha_msg* msg, int index, char* buf, size_t* buflen)
+{
+	char*   src;
+	size_t	srclen;
+	int	rc;
+
+	if ( msg == NULL|| index >= msg->nfields 
+	     || msg->types[index] != FT_UNCOMPRESS){
+		cl_log(LOG_ERR, "%s: wrong argument",
+		       __FUNCTION__);
+		return HA_FAIL;
+	}
+	
+	if (msg_compress_fns== NULL){
+		if (compress_name == NULL){
+			compress_name = getenv(HACOMPRESSNAME);
+		}
+		
+		if (compress_name == NULL){
+			cl_log(LOG_ERR, "%s: no compression module name found",
+			       __FUNCTION__);
+			return HA_FAIL;			
+		}
+
+		if(cl_set_compress_fns(compress_name) != HA_OK){
+			cl_log(LOG_ERR, "%s: loading compression module failed",
+			       __FUNCTION__);
+			return HA_FAIL;
+		}
+	}
+	
+	if (msg_compress_fns == NULL){
+		cl_log(LOG_ERR, "%s: msg_compress_fns is NULL!",
+		       __FUNCTION__);
+		return HA_FAIL;
+	}
+	
+	src = msg2wirefmt_noac(msg->values[index], &srclen);
+	if (src == NULL){
+		 cl_log(LOG_ERR,"%s: converting msg"
+			" to wirefmt failed", __FUNCTION__);
+		 return HA_FAIL;
+	}
+	
+	rc = msg_compress_fns->compress(buf, buflen, 
+					src, srclen);
+	if (rc != HA_OK){
+		cl_log(LOG_ERR, "%s: compression failed",
+		       __FUNCTION__);
+		return HA_FAIL;
+	}
+	
+	
+	rc = ha_msg_mod(msg, COMPRESS_NAME, 
+			msg_compress_fns->getname());
+	
+	if (rc != HA_OK){
+		cl_log(LOG_ERR, "%s: adding compress name to msg failed",
+		       __FUNCTION__);
+		return HA_FAIL;;
+	}
+	
+	ha_free(src);
+	src = NULL;
+	
+	return HA_OK;
+	
 }

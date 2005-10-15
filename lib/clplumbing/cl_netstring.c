@@ -170,8 +170,8 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 	int	len;
 	char*	s;
 	int	authnum;
-	char	authtoken[MAXMSG];
-	char	authstring[MAXMSG];
+	char	authtoken[MAXLINE];
+	char	authstring[MAXLINE];
 	char*	sp;
 	size_t	payload_len;
 
@@ -217,12 +217,20 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 char *
 msg2netstring(const struct ha_msg *m, size_t * slen)
 {
-	return msg2netstring_ll(m, slen, TRUE);
+	char* ret;
+	ret = msg2netstring_ll(m, slen, TRUE);
+	
+	return ret;
+	
 }
 char *
 msg2netstring_noauth(const struct ha_msg *m, size_t * slen)
 {
-	return msg2netstring_ll(m, slen, FALSE);
+	char * ret;
+	
+	ret =  msg2netstring_ll(m, slen, FALSE);
+	
+	return ret;
 }
 
 
@@ -415,7 +423,7 @@ netstring2msg(const char* s, size_t length, int needauth)
 	
 	msg = netstring2msg_rec(s, length, &slen);
 	
-	if (needauth == FALSE){
+	if (needauth == FALSE || !authmethod){
 		goto out;
 	} 
 	
@@ -426,7 +434,6 @@ netstring2msg(const char* s, size_t length, int needauth)
 		       "peel_netstring() error in getting auth string");		
 		cl_log(LOG_ERR, "sp=%s", sp);
 		cl_log(LOG_ERR, "s=%s", s);
-		
 		ha_msg_del(msg);
 		return(NULL);
 	}
@@ -461,9 +468,9 @@ is_auth_netstring(const char * datap, size_t datalen,
 		  const char * authstring, size_t authlen)
 {
 
-	char	authstr[MAXMSG];	/* A copy of authstring */
+	char	authstr[MAXLINE];	/* A copy of authstring */
 	int	authwhich;
-	char	authtoken[MAXMSG];
+	char	authtoken[MAXLINE];
 
 
 	/*
@@ -472,7 +479,7 @@ is_auth_netstring(const char * datap, size_t datalen,
 	if (!authmethod) {
 		return TRUE;
 	}
-	strncpy(authstr, authstring, MAXMSG);
+	strncpy(authstr, authstring, MAXLINE);
 	authstr[authlen] = 0;
 	if (sscanf(authstr, "%d %s", &authwhich, authtoken) != 2) {
 		if (!cl_msg_quiet_fmterr) {
@@ -482,8 +489,8 @@ is_auth_netstring(const char * datap, size_t datalen,
 		return(0);
 	}
 
-	memset(authstr, 0, MAXMSG);
-	if (authmethod(authwhich, datap, datalen, authstr, MAXMSG)
+	memset(authstr, 0, MAXLINE);
+	if (authmethod(authwhich, datap, datalen, authstr, MAXLINE)
 	    !=	authwhich) {
 	  
 		if (!cl_msg_quiet_fmterr) {

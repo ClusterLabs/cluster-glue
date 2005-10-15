@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.82 2005/10/14 18:51:06 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.83 2005/10/15 02:52:34 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -40,7 +40,7 @@
 #include <clplumbing/cl_uuid.h>
 #include <compress.h>
 
-#define		MAXMSGLINE	MAXMSG
+#define		MAXMSGLINE	512
 #define		MINFIELDS	30
 #define		NEWLINE		"\n"
 
@@ -53,8 +53,7 @@
 static int	compression_threshold = (2*1024);
 
 static enum cl_msgfmt msgfmt = MSGFMT_NVPAIR;
-
-
+int	cl_max_msg_size = (512*1024);
 
 const char*
 FT_strings[]={
@@ -98,7 +97,7 @@ struct ha_msg* string2msg_ll(const char * s, size_t length, int need_auth, int d
 extern int struct_stringlen(size_t namlen, size_t vallen, const void* value);
 extern int struct_netstringlen(size_t namlen, size_t vallen, const void* value);
 extern int process_netstring_nvpair(struct ha_msg* m, const char* nvpair, int nvlen);
-static char*	msg2wirefmt_ll(const struct ha_msg*m, size_t* len, gboolean need_compress);
+static char*	msg2wirefmt_ll(struct ha_msg*m, size_t* len, gboolean need_compress);
 
 void
 cl_set_compression_threshold(size_t threadhold)
@@ -555,6 +554,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 	if (!addfield || 
 	    addfield(msg, name, namelen, value, vallen,depth) != HA_OK){
 		cl_log(LOG_ERR, "ha_msg_addraw_ll: addfield failed");
+		abort();
 		return(HA_FAIL);
 	}
 	
@@ -632,6 +632,13 @@ ha_msg_addstruct(struct ha_msg * msg, const char * name, const void * value)
 			     sizeof(struct ha_msg), FT_STRUCT, 0);
 }
 
+int
+ha_msg_addstruct_compress(struct ha_msg * msg, const char * name, const void * value)
+{
+	
+	return ha_msg_addraw(msg, name, strlen(name), value, 
+			     sizeof(struct ha_msg), FT_UNCOMPRESS, 0);
+}
 
 int
 ha_msg_add_int(struct ha_msg * msg, const char * name, int value)
@@ -904,10 +911,11 @@ static void *
 cl_get_value(const struct ha_msg * msg, const char * name,
 	     size_t * vallen, int *type)
 {
-
+	
 	int	j;
 	if (!msg || !msg->names || !msg->values) {
-		cl_log(LOG_ERR, "ha_msg_value: NULL msg");
+		cl_log(LOG_ERR, "%s: wrong arugment",
+		       __FUNCTION__);
 		return(NULL);
 	}
 
@@ -919,7 +927,39 @@ cl_get_value(const struct ha_msg * msg, const char * name,
 			}
 			if (type){
 				*type = msg->types[j];
+			}			
+			return(msg->values[j]);
+		}
+	}
+	return(NULL);
+}
+
+static void *
+cl_get_value_mutate(struct ha_msg * msg, const char * name,
+	     size_t * vallen, int *type)
+{
+	
+	int	j;
+	if (!msg || !msg->names || !msg->values) {
+		cl_log(LOG_ERR, "%s: wrong arugment",
+		       __FUNCTION__);
+		return(NULL);
+	}
+	
+	AUDITMSG(msg);
+	for (j=0; j < msg->nfields; ++j) {
+		if (strcmp(name, msg->names[j]) == 0) {
+			int tp = msg->types[j];
+			if (fieldtypefuncs[tp].pregetaction){
+				fieldtypefuncs[tp].pregetaction(msg, j);
 			}
+			
+			if (vallen){
+				*vallen = msg->vlens[j];
+			}
+			if (type){
+				*type = msg->types[j];
+			}			
 			return(msg->values[j]);
 		}
 	}
@@ -1018,17 +1058,58 @@ cl_get_type(const struct ha_msg *msg, const char *name)
 struct ha_msg *
 cl_get_struct(const struct ha_msg *msg, const char* name)
 {
-	struct ha_msg	*ret;
+	struct ha_msg*	ret;
 	int		type;
 	size_t		vallen;
 
-	ret = (struct ha_msg *)cl_get_value(msg, name, &vallen, &type);
+	ret = cl_get_value(msg, name, &vallen, &type);
 	
-	if (ret == NULL || type != FT_STRUCT){
+	if (ret == NULL ){
 		return(NULL);
 	}
-	return(ret);
+	
+	switch(type){
+		
+	case FT_STRUCT:
+		break;
+		
+	default:
+		cl_log(LOG_ERR, "%s: field %s is not a struct (%d)",
+		       __FUNCTION__, name, type);
+		return NULL;
+	}
+	
+	return ret;
 }
+
+
+struct ha_msg *
+cl_get_struct_compress(struct ha_msg *msg, const char* name)
+{
+	struct ha_msg*	ret;
+	int		type = -1;
+	size_t		vallen;
+	
+	ret = cl_get_value_mutate(msg, name, &vallen, &type);
+	
+	if (ret == NULL ){
+		return(NULL);
+	}
+	
+	switch(type){
+		
+	case FT_UNCOMPRESS:
+		break;
+		
+	default:
+		cl_log(LOG_ERR, "%s: field %s is not a struct (%d)",
+		       __FUNCTION__, name, type);
+		return NULL;
+	}
+	
+	return ret;
+}
+
 
 int
 cl_msg_list_length(struct ha_msg* msg, const char* name)
@@ -1255,6 +1336,52 @@ cl_msg_get_list_int(struct ha_msg* msg, const char* name,
 	return HA_OK;
 }
 
+/*this function is for internal use only*/
+int 
+cl_msg_replace(struct ha_msg* msg, int index,
+		const char* value, size_t vlen, int type)
+{
+	char *	newv ;
+	int	newlen = vlen;
+	int	oldtype;
+	
+	AUDITMSG(msg);
+	if (msg == NULL || value == NULL) {
+		cl_log(LOG_ERR, "%s: NULL input.", __FUNCTION__);
+		return HA_FAIL;
+	}
+	
+	if(type >= DIMOF(fieldtypefuncs)){
+		cl_log(LOG_ERR, "%s:"
+		       "invalid type(%d)",__FUNCTION__, type);
+		return HA_FAIL;
+	}
+	
+	if (index >= msg->nfields){
+		cl_log(LOG_ERR, "%s: index(%d) out of range(%d)",
+		       __FUNCTION__,index, msg->nfields);
+		return HA_FAIL;
+	}
+	
+	oldtype = msg->types[index];
+	
+	newv = fieldtypefuncs[type].dup(value,vlen);
+	if (!newv){
+		cl_log(LOG_ERR, "%s: duplicating message fields failed"
+		       "value=%p, vlen=%d, msg->names[i]=%s", 
+		       __FUNCTION__,value, (int)vlen, msg->names[index]);
+		return HA_FAIL;
+	}
+	
+	fieldtypefuncs[oldtype].memfree(msg->values[index]);
+	
+	msg->values[index] = newv;
+	msg->vlens[index] = newlen;
+	msg->types[index] = type;
+	AUDITMSG(msg);
+	return(HA_OK);
+	
+}
 
 
 static int
@@ -1281,7 +1408,13 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 			
 			char *	newv ;
 			int	newlen = vlen;
-
+			
+			if (type != msg->types[j]){
+				cl_log(LOG_ERR, "%s: type mismatch(%d %d)",
+				       __FUNCTION__, type, msg->types[j]);
+				return HA_FAIL;
+			}
+			
 			newv = fieldtypefuncs[type].dup(value,vlen);
 			if (!newv){
 				cl_log(LOG_ERR, "duplicating message fields failed"
@@ -1298,7 +1431,7 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 		}
 	}
 	
-     rc = ha_msg_nadd_type(msg, name,strlen(name), value, vlen, type);
+	rc = ha_msg_nadd_type(msg, name,strlen(name), value, vlen, type);
   
 	AUDITMSG(msg);
 	return rc;
@@ -1684,7 +1817,6 @@ hamsg2ipcmsg(struct ha_msg* m, IPC_Channel* ch)
 	char *		s  = msg2wirefmt_ll(m, &len, FALSE);
 	IPC_Message*	ret = NULL;
 
-
 	if (s == NULL) {
 		return ret;
 	}
@@ -1987,34 +2119,67 @@ msg2string(const struct ha_msg *m)
 	return(buf);
 }
 
+gboolean
+must_use_netstring(const struct ha_msg* msg)
+{
+	int	i; 
+	
+	for ( i = 0; i < msg->nfields; i++){
+		if (msg->types[i] == FT_COMPRESS
+		    || msg->types[i] == FT_UNCOMPRESS
+		    || msg->types[i] ==  FT_STRUCT){
+			return TRUE;
+		}
+	}
+	
+	return FALSE;
+
+}
+
 
 static char*
-msg2wirefmt_ll(const struct ha_msg*m, size_t* len, int flag)
+msg2wirefmt_ll(struct ha_msg*m, size_t* len, int flag)
 {
 	
-	int wirefmtlen;
+	int	wirefmtlen;
+	int	i;
+	char*	ret;
 	
-	if (msgfmt  ==  MSGFMT_NETSTRING){
-		wirefmtlen = get_netstringlen(m);
-	}else{
-		wirefmtlen =  get_stringlen(m);
-	}
-
-	if ((flag & MSG_NEEDCOMPRESS)
-	    && (wirefmtlen> compression_threshold)
-	    && cl_get_compress_fns() != NULL){
-		return cl_compressmsg(m, len);		
+	for (i=0 ;i < m->nfields; i++){
+		int type = m->types[i];
+		if (fieldtypefuncs[type].prepackaction){
+			fieldtypefuncs[type].prepackaction(m,i);
+		}
 	}
 	
-	if (msgfmt == MSGFMT_NETSTRING) {
+	
+	if (msgfmt == MSGFMT_NETSTRING || must_use_netstring(m)){
+		wirefmtlen = get_netstringlen(m);		
+		if (wirefmtlen >= MAXMSG){
+			cl_log(LOG_ERR, "%s: msg too big(%d)"
+			       "for netstring fmt",
+			       __FUNCTION__, wirefmtlen);
+			return NULL;
+		}
 		if (flag& MSG_NEEDAUTH){
 			return msg2netstring(m, len);
 		}else{
-			return msg2netstring_noauth(m, len);
+			ret =  msg2netstring_noauth(m, len);
+			return ret;
+
 		}
-	}
-	else{
+		
+		
+	}else{
 		char	*tmp;
+		
+		wirefmtlen =  get_stringlen(m);
+		if (wirefmtlen >= MAXMSG){
+			cl_log(LOG_ERR, "%s: msg too big(%d)"
+			       " for string fmt",
+			       __FUNCTION__, wirefmtlen);
+			return NULL;
+		}
 		
 		tmp = msg2string(m);
 		
@@ -2026,17 +2191,25 @@ msg2wirefmt_ll(const struct ha_msg*m, size_t* len, int flag)
 		*len = strlen(tmp) + 1;
 		return(tmp);
 	}
+	
+/* 	if ((flag & MSG_NEEDCOMPRESS) */
+/* 	    && (wirefmtlen> compression_threshold) */
+/* 	    && cl_get_compress_fns() != NULL){ */
+/* 		return cl_compressmsg(m, len);		 */
+/* 	} */
+	
 }
 
 
 char*
-msg2wirefmt(const struct ha_msg*m, size_t* len){
+msg2wirefmt(struct ha_msg*m, size_t* len){
 	return msg2wirefmt_ll(m, len, MSG_NEEDAUTH|MSG_NEEDCOMPRESS);
 }
 
 
 char*
-msg2wirefmt_noac(const struct ha_msg*m, size_t* len){
+msg2wirefmt_noac(struct ha_msg*m, size_t* len){
+	
 	return msg2wirefmt_ll(m, len, 0);
 }
 
@@ -2096,6 +2269,7 @@ wirefmt2msg(const char* s, size_t length, int flag)
 
 }
 
+
 void
 cl_log_message (int log_level, const struct ha_msg *m)
 {
@@ -2141,6 +2315,20 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.83  2005/10/15 02:52:34  gshi
+ * added two APIs
+ *
+ * ha_msg_addstruct_compress()
+ * cl_get_struct_compress()
+ *
+ * these two APIs must be used in pair to put/get fields in a message
+ *
+ * Internally two message types are added in order to make the compression
+ * only happens in child process instead of the master control process.
+ *
+ * If transparently comperssing messages is desired, it can be done in interface without
+ * internal structure change.
+ *
  * Revision 1.82  2005/10/14 18:51:06  gshi
  * remove stringlen in struct ha_msg
  * every time string length for an ha_msg is computed on the fly
