@@ -78,7 +78,6 @@
 #define READ_PROC_CHAN	1
 #define LOGD_QUEUE_LEN  128
 
-#define MAXLINE 128
 #define EOS '\0'
 #define	nullchk(a)	((a) ? (a) : "<null>")
 
