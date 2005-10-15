@@ -1,4 +1,4 @@
-/* $Id: cl_log.h,v 1.22 2005/10/01 01:48:37 gshi Exp $ */
+/* $Id: cl_log.h,v 1.23 2005/10/15 02:46:24 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,7 @@
 #define TIME_T  unsigned long
 #define	HA_FAIL		0
 #define	HA_OK		1
-#define MAXMSG		MAXDATASIZE
+#define	MAXLINE		512
 
 struct IPC_CHANNEL;
 
