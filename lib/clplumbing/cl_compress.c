@@ -240,10 +240,10 @@ cl_compressmsg(struct ha_msg*m, size_t* len)
 	ret = msg2netstring(tmpmsg, len);
 	ha_msg_del(tmpmsg);
 	
-#if 1
+#if 0
 	cl_log(LOG_INFO, "------original stringlen=%d, netstringlen=%d,"
 	       "compressed_datalen=%d,current len=%d",
-	       get_stringlen(m), get_netstringlen(m),destlen,  *len);
+	       get_stringlen(m), get_netstringlen(m),(int)destlen,  (int)*len);
 	
 #endif
 
