@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.84 2005/10/17 19:13:48 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.85 2005/10/17 19:47:44 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -99,6 +99,13 @@ extern int struct_stringlen(size_t namlen, size_t vallen, const void* value);
 extern int struct_netstringlen(size_t namlen, size_t vallen, const void* value);
 extern int process_netstring_nvpair(struct ha_msg* m, const char* nvpair, int nvlen);
 static char*	msg2wirefmt_ll(struct ha_msg*m, size_t* len, gboolean need_compress);
+
+
+void
+cl_set_traditional_compression(gboolean value)
+{
+	use_traditional_compression = value;
+}
 
 void
 cl_set_compression_threshold(size_t threadhold)
@@ -2334,6 +2341,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.85  2005/10/17 19:47:44  gshi
+ * add an option to use "traditional" compression method
+ * traditional_compression yes/no
+ * in ha.cf
+ *
  * Revision 1.84  2005/10/17 19:13:48  gshi
  *  change cl_get_struct(const char* msg, ...) to cl_get_struct(char* msg, ...)
  *
