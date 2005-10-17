@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.83 2005/10/15 02:52:34 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.84 2005/10/17 19:13:48 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -54,6 +54,7 @@ static int	compression_threshold = (2*1024);
 
 static enum cl_msgfmt msgfmt = MSGFMT_NVPAIR;
 int	cl_max_msg_size = (512*1024);
+static	gboolean use_traditional_compression = FALSE;
 
 const char*
 FT_strings[]={
@@ -636,8 +637,13 @@ int
 ha_msg_addstruct_compress(struct ha_msg * msg, const char * name, const void * value)
 {
 	
-	return ha_msg_addraw(msg, name, strlen(name), value, 
-			     sizeof(struct ha_msg), FT_UNCOMPRESS, 0);
+	if (use_traditional_compression){
+		return ha_msg_addraw(msg, name, strlen(name), value, 
+				     sizeof(struct ha_msg), FT_STRUCT, 0);
+	}else{
+		return ha_msg_addraw(msg, name, strlen(name), value, 
+				     sizeof(struct ha_msg), FT_UNCOMPRESS, 0);
+	}
 }
 
 int
@@ -1055,6 +1061,7 @@ cl_get_type(const struct ha_msg *msg, const char *name)
 
 }
 
+/*
 struct ha_msg *
 cl_get_struct(const struct ha_msg *msg, const char* name)
 {
@@ -1081,10 +1088,11 @@ cl_get_struct(const struct ha_msg *msg, const char* name)
 	
 	return ret;
 }
+*/
 
 
 struct ha_msg *
-cl_get_struct_compress(struct ha_msg *msg, const char* name)
+cl_get_struct(struct ha_msg *msg, const char* name)
 {
 	struct ha_msg*	ret;
 	int		type = -1;
@@ -1099,6 +1107,7 @@ cl_get_struct_compress(struct ha_msg *msg, const char* name)
 	switch(type){
 		
 	case FT_UNCOMPRESS:
+	case FT_STRUCT:
 		break;
 		
 	default:
@@ -2145,6 +2154,21 @@ msg2wirefmt_ll(struct ha_msg*m, size_t* len, int flag)
 	int	i;
 	char*	ret;
 	
+
+	if (msgfmt == MSGFMT_NETSTRING){
+		wirefmtlen = get_netstringlen(m);		
+	}else{
+		wirefmtlen =  get_stringlen(m);	
+	}
+	
+	if (use_traditional_compression
+	    &&(flag & MSG_NEEDCOMPRESS) 
+ 	    && (wirefmtlen> compression_threshold) 
+ 	    && cl_get_compress_fns() != NULL){ 
+ 		return cl_compressmsg(m, len);		 
+ 	} 
+	
+	
 	for (i=0 ;i < m->nfields; i++){
 		int type = m->types[i];
 		if (fieldtypefuncs[type].prepackaction){
@@ -2192,12 +2216,7 @@ msg2wirefmt_ll(struct ha_msg*m, size_t* len, int flag)
 		return(tmp);
 	}
 	
-/* 	if ((flag & MSG_NEEDCOMPRESS) */
-/* 	    && (wirefmtlen> compression_threshold) */
-/* 	    && cl_get_compress_fns() != NULL){ */
-/* 		return cl_compressmsg(m, len);		 */
-/* 	} */
-	
+
 }
 
 
@@ -2315,6 +2334,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.84  2005/10/17 19:13:48  gshi
+ *  change cl_get_struct(const char* msg, ...) to cl_get_struct(char* msg, ...)
+ *
+ *  make cl_get_struct() handles three types(FT_STRUCT, FT_COMPRESS, FT_UMCOMPRESS)
+ *
  * Revision 1.83  2005/10/15 02:52:34  gshi
  * added two APIs
  *
