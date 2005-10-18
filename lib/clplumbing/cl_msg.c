@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.85 2005/10/17 19:47:44 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.86 2005/10/18 17:35:11 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -54,7 +54,7 @@ static int	compression_threshold = (2*1024);
 
 static enum cl_msgfmt msgfmt = MSGFMT_NVPAIR;
 int	cl_max_msg_size = (512*1024);
-static	gboolean use_traditional_compression = FALSE;
+static	gboolean use_traditional_compression = TRUE;
 
 const char*
 FT_strings[]={
@@ -2341,6 +2341,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.86  2005/10/18 17:35:11  gshi
+ * make the default compression traditional
+ *
  * Revision 1.85  2005/10/17 19:47:44  gshi
  * add an option to use "traditional" compression method
  * traditional_compression yes/no
