@@ -51,7 +51,7 @@ extern const char* FT_strings[];
 #define		NL_TO_SYM	0
 #define		SYM_TO_NL	1
 
-int		SPECIAL_SYMS[]={
+int		SPECIAL_SYMS[MAXDEPTH]={
 	20,
 	21,
 	22,
@@ -61,7 +61,13 @@ int		SPECIAL_SYMS[]={
 	26,
 	27,
 	28,
-	29
+	29,
+	30,
+	31,
+	15,
+	16,
+	17,
+	18,
 };
 
 #define	       SPECIAL_SYM	19
@@ -713,8 +719,13 @@ convert_nl_sym(char* s, int len, char sym, int direction)
 
 			if (s[i] == sym){
 				cl_log(LOG_ERR
-				, "convert_nl_sym(): special symbol \'0x%x\' found"
-				" in string at %d (len=%d)", s[i], i, len);
+				, "convert_nl_sym(): special symbol \'0x%x\' (%c) found"
+				" in string at %d (len=%d)", s[i], s[i], i, len);
+				i -= 10;
+				if(i < 0) {
+					i = 0;
+				}
+				cl_log(LOG_ERR, "convert_nl_sym(): %s", s + i);
 				return(HA_FAIL);
 			}
 
@@ -753,7 +764,7 @@ convert(char* s, int len, int depth, int direction)
 	
 	
 	if (depth >= MAXDEPTH ){
-		cl_log(LOG_ERR, "convert(): MAXDEPTH exceeded");
+		cl_log(LOG_ERR, "convert(): MAXDEPTH exceeded: %d", depth);
 		return(HA_FAIL);
 	}
 	
