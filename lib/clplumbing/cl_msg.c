@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.87 2005/10/20 00:47:52 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.88 2005/10/20 17:40:24 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -163,7 +163,7 @@ cl_msg_stats_add(longclock_t time, int size)
 	}
 
 	
-	sprintf(buf, "%lld %d\n", time, size);
+	sprintf(buf, "%lld %d\n", (long long)time, size);
 	len = strnlen(buf, MAXLINE);
 	if (write(msg_stats_fd, buf, len) ==  len){
 		cl_msg_stats_close();
@@ -2398,6 +2398,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.88  2005/10/20 17:40:24  gshi
+ * fix a 64bit compiling problem
+ *
  * Revision 1.87  2005/10/20 00:47:52  gshi
  * add the function to dump msg stats into a file
  *
