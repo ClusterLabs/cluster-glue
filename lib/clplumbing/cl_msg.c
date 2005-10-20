@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.86 2005/10/18 17:35:11 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.87 2005/10/20 00:47:52 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -113,11 +113,69 @@ cl_set_compression_threshold(size_t threadhold)
 	compression_threshold = threadhold;
 
 }
+
 void
 cl_msg_setstats(volatile hb_msg_stats_t* stats)
 {
 	msgstats = stats;
 }
+
+static int msg_stats_fd = -1;
+
+static int
+cl_msg_stats_open(const char* filename)
+{
+	if (filename == NULL){
+		cl_log(LOG_ERR, "%s: filename is NULL", __FUNCTION__);
+		return -1;
+	}
+	
+	return open(filename, O_WRONLY|O_CREAT|O_APPEND);
+
+}
+
+static int
+cl_msg_stats_close(void)
+{
+	if (msg_stats_fd > 0){
+		close(msg_stats_fd);
+	}
+	
+	msg_stats_fd = -1;
+	
+	return HA_OK;
+}
+
+#define STATSFILE "/var/log/ha_msg_stats"
+int
+cl_msg_stats_add(longclock_t time, int size)
+{
+	char	buf[MAXLINE];
+	int	len;
+
+	if (msg_stats_fd < 0){
+		msg_stats_fd = cl_msg_stats_open(STATSFILE);
+		if (msg_stats_fd < 0){
+			cl_log(LOG_ERR, "%s:opening file failed",
+			       __FUNCTION__);
+			return HA_FAIL;
+		}
+	}
+
+	
+	sprintf(buf, "%lld %d\n", time, size);
+	len = strnlen(buf, MAXLINE);
+	if (write(msg_stats_fd, buf, len) ==  len){
+		cl_msg_stats_close();
+		return HA_OK;
+	}
+
+	cl_msg_stats_close();
+	
+	return HA_FAIL;;
+	
+}
+
 
 /* Set default messaging format */
 void
@@ -562,7 +620,6 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 	if (!addfield || 
 	    addfield(msg, name, namelen, value, vallen,depth) != HA_OK){
 		cl_log(LOG_ERR, "ha_msg_addraw_ll: addfield failed");
-		abort();
 		return(HA_FAIL);
 	}
 	
@@ -2341,6 +2398,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.87  2005/10/20 00:47:52  gshi
+ * add the function to dump msg stats into a file
+ *
  * Revision 1.86  2005/10/18 17:35:11  gshi
  * make the default compression traditional
  *
