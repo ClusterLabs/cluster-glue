@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.66 2005/09/28 20:29:56 gshi Exp $ */
+/* $Id: cl_log.c,v 1.67 2005/10/28 00:07:09 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -130,6 +130,7 @@ cl_log_set_logdtime(int logdtime)
 	return;
 }
 
+
 gboolean
 cl_inherit_use_logd(const char* param_name, int sendq_length) 
 {
@@ -156,10 +157,10 @@ cl_inherit_use_logd(const char* param_name, int sendq_length)
 	
 }     
 
-#define HADEBUGVAL	"HA_DEBUG"
-#define LOGFENV		"HA_LOGFILE"	/* well-formed log file :-) */
-#define DEBUGFENV	"HA_DEBUGLOG"	/* Debug log file */
-#define LOGFACILITY	"HA_LOGFACILITY"/* Facility to use for logger */
+#define HADEBUGVAL	"HA_debug"
+#define LOGFENV		"HA_logfile"	/* well-formed log file :-) */
+#define DEBUGFENV	"HA_debuglogfile"	/* Debug log file */
+#define LOGFACILITY	"HA_logfacility"/* Facility to use for logger */
 void
 inherit_logconfig_from_environment(void)
 {
