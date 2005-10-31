@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.88 2005/10/20 17:40:24 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.89 2005/10/31 17:36:30 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -50,6 +50,8 @@
 #define		MAX_INT_LEN 	64
 #define		MAX_NAME_LEN 	255
 #define		UUID_SLEN	64
+#define		MAXCHILDMSGLEN  512
+
 static int	compression_threshold = (2*1024);
 
 static enum cl_msgfmt msgfmt = MSGFMT_NVPAIR;
@@ -692,6 +694,15 @@ ha_msg_adduuid(struct ha_msg* msg, const char *name, const cl_uuid_t* u)
 int
 ha_msg_addstruct(struct ha_msg * msg, const char * name, const void * value)
 {
+	const struct ha_msg* childmsg = (const struct ha_msg*) value;
+	
+	if (get_netstringlen(childmsg) > MAXCHILDMSGLEN
+	    || get_stringlen(childmsg) > MAXCHILDMSGLEN){
+		cl_log(LOG_WARNING, "%s: childmsg too long)(%d %d), You should use"
+		       " ha_msg_addstruct_compress() instead",__FUNCTION__, 
+		       get_netstringlen(childmsg), 
+		       get_stringlen(childmsg));
+	}
 	
 	return ha_msg_addraw(msg, name, strlen(name), value, 
 			     sizeof(struct ha_msg), FT_STRUCT, 0);
@@ -2398,6 +2409,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.89  2005/10/31 17:36:30  gshi
+ * print out a warning if a big child msg is added
+ * without using the compression method
+ *
  * Revision 1.88  2005/10/20 17:40:24  gshi
  * fix a 64bit compiling problem
  *
