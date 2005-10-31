@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.89 2005/10/31 17:36:30 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.90 2005/10/31 22:12:29 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -698,8 +698,9 @@ ha_msg_addstruct(struct ha_msg * msg, const char * name, const void * value)
 	
 	if (get_netstringlen(childmsg) > MAXCHILDMSGLEN
 	    || get_stringlen(childmsg) > MAXCHILDMSGLEN){
-		cl_log(LOG_WARNING, "%s: childmsg too long)(%d %d), You should use"
+		cl_log(LOG_WARNING, "%s: childmsg too big(name=%s)(len=%d %d), You should use"
 		       " ha_msg_addstruct_compress() instead",__FUNCTION__, 
+			name,
 		       get_netstringlen(childmsg), 
 		       get_stringlen(childmsg));
 	}
@@ -2409,6 +2410,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.90  2005/10/31 22:12:29  gshi
+ * include name in the warning
+ *
  * Revision 1.89  2005/10/31 17:36:30  gshi
  * print out a warning if a big child msg is added
  * without using the compression method
