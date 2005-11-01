@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.93 2005/11/01 06:18:23 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.94 2005/11/01 15:07:14 andrew Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -697,11 +697,11 @@ ha_msg_addstruct(struct ha_msg * msg, const char * name, const void * value)
 	const struct ha_msg* childmsg = (const struct ha_msg*) value;
 	
 	if (get_netstringlen(childmsg) > MAXCHILDMSGLEN
-	    || get_stringlen(childmsg) > MAXCHILDMSGLEN){
-		cl_log(LOG_WARNING, "%s: childmsg too big(name=%s)(len=%d %d), You should use"
-		       " ha_msg_addstruct_compress() instead",__FUNCTION__, 
-			name,
-		       get_netstringlen(childmsg), 
+	    || get_stringlen(childmsg) > MAXCHILDMSGLEN) {
+		cl_log(LOG_WARNING,
+		       "%s: childmsg too big (name=%s, nslen=%d, len=%d)."
+		       "   Use ha_msg_addstruct_compress() instead.",
+		       __FUNCTION__, name, get_netstringlen(childmsg), 
 		       get_stringlen(childmsg));
 	}
 	
@@ -2422,6 +2422,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.94  2005/11/01 15:07:14  andrew
+ * small log message tweak
+ *
  * Revision 1.93  2005/11/01 06:18:23  gshi
  * bp == maxp is fine :)
  *
