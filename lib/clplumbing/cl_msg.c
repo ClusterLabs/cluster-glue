@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.92 2005/11/01 03:50:58 alan Exp $ */
+/* $Id: cl_msg.c,v 1.93 2005/11/01 06:18:23 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -2096,7 +2096,7 @@ string2msg(const char * s, size_t length)
 #define	CHECKROOM_STRING(s)		CHECKROOM_INT(strnlen(s, len))
 #define	CHECKROOM_STRING_INT(s,i)	CHECKROOM_INT(strnlen(s, len)+(i))
 #define	CHECKROOM_INT(i)	{		\
-		if ((bp + (i)) >= maxp) {	\
+		if ((bp + (i)) > maxp) {	\
 			NOROOM;			\
 		}				\
 	}
@@ -2422,6 +2422,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.93  2005/11/01 06:18:23  gshi
+ * bp == maxp is fine :)
+ *
  * Revision 1.92  2005/11/01 03:50:58  alan
  * Changed some of gshi's string code to be a little more cautious about buffer
  * overruns.
