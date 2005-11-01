@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.94 2005/11/01 15:07:14 andrew Exp $ */
+/* $Id: cl_msg.c,v 1.95 2005/11/01 21:50:23 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -698,11 +698,12 @@ ha_msg_addstruct(struct ha_msg * msg, const char * name, const void * value)
 	
 	if (get_netstringlen(childmsg) > MAXCHILDMSGLEN
 	    || get_stringlen(childmsg) > MAXCHILDMSGLEN) {
-		cl_log(LOG_WARNING,
+		/*cl_log(LOG_WARNING,
 		       "%s: childmsg too big (name=%s, nslen=%d, len=%d)."
 		       "   Use ha_msg_addstruct_compress() instead.",
 		       __FUNCTION__, name, get_netstringlen(childmsg), 
 		       get_stringlen(childmsg));
+		*/
 	}
 	
 	return ha_msg_addraw(msg, name, strlen(name), value, 
@@ -2394,7 +2395,8 @@ cl_log_message (int log_level, const struct ha_msg *m)
 		if(m->types[j] < DIMOF(fieldtypefuncs)){					
 			fieldtypefuncs[m->types[j]].display(log_level, j, 
 							    m->names[j],
-							    m->values[j]);
+							    m->values[j],
+							    m->vlens[j]);
 		}
 	}
 }
@@ -2422,6 +2424,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.95  2005/11/01 21:50:23  gshi
+ * print out len info in cl_log_message() for non-string non-list field
+ *
  * Revision 1.94  2005/11/01 15:07:14  andrew
  * small log message tweak
  *
