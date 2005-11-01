@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.90 2005/10/31 22:12:29 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.91 2005/11/01 03:05:20 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -2149,8 +2149,6 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 		bp += strlen(MSG_END);
 	}
 
-	bp[0] = 0;
-
 	if (bp > buf + len){
 
 		cl_log(LOG_ERR, "msg2string_buf: out of memory bound"
@@ -2162,6 +2160,7 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 		return(HA_FAIL);
 
 	}
+	bp[0] = EOS;
 
 	return(HA_OK);
 }
@@ -2410,6 +2409,12 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.91  2005/11/01 03:05:20  alan
+ * Fixed what looks like a bug in cl_msg.c
+ * The code sets an end of string marker, and then after it does it looks
+ * to see if it was out of bounds.
+ * I reversed the order.
+ *
  * Revision 1.90  2005/10/31 22:12:29  gshi
  * include name in the warning
  *
