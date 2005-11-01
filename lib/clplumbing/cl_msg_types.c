@@ -473,17 +473,22 @@ list_dup( const void* value, size_t len)
 
 
 static void 
-general_display(int log_level, int seq, char* name, void* value, int type)
+general_display(int log_level, int seq, char* name, void* value, int vlen, int type)
 {
+	int netslen;
+	int slen;
 	HA_MSG_ASSERT(value);	
 	HA_MSG_ASSERT(name);
-	cl_log(log_level, "MSG[%d] : [(%s)%s=%p]",
+	
+	slen = fieldtypefuncs[type].stringlen(strlen(name), vlen, value);
+	netslen = fieldtypefuncs[type].netstringlen(strlen(name), vlen, value);
+	cl_log(log_level, "MSG[%d] : [(%s)%s=%p(%d %d)]",
 	       seq,	FT_strings[type],
-	       name,	value);	
+	       name,	value, slen, netslen);	
 	
 }
 static void
-string_display(int log_level, int seq, char* name, void* value)
+string_display(int log_level, int seq, char* name, void* value, int vlen)
 {
 	HA_MSG_ASSERT(name);
 	HA_MSG_ASSERT(value);
@@ -493,25 +498,32 @@ string_display(int log_level, int seq, char* name, void* value)
 }
 
 static void
-binary_display(int log_level, int seq, char* name, void* value)
+binary_display(int log_level, int seq, char* name, void* value, int vlen)
 {
-	return general_display(log_level, seq, name, value, FT_BINARY);
+	return general_display(log_level, seq, name, value, vlen, FT_BINARY);
 }
 
 static void
-compress_display(int log_level, int seq, char* name, void* value){
-	return general_display(log_level, seq, name, value, FT_COMPRESS);
+compress_display(int log_level, int seq, char* name, void* value, int vlen){
+	return general_display(log_level, seq, name, value, vlen, FT_COMPRESS);
 }
 
 
 static void
-general_struct_display(int log_level, int seq, char* name, void* value, int type)
+general_struct_display(int log_level, int seq, char* name, void* value, int vlen, int type)
 {
+	int slen;
+	int netslen;
+
 	HA_MSG_ASSERT(name);
 	HA_MSG_ASSERT(value);	
-	cl_log(log_level, "MSG[%d] : [(%s)%s=%p]",
+	
+	slen = fieldtypefuncs[type].stringlen(strlen(name), vlen, value);
+	netslen = fieldtypefuncs[type].netstringlen(strlen(name), vlen, value);
+	
+	cl_log(log_level, "MSG[%d] : [(%s)%s=%p(%d %d)]",
 	       seq,	FT_strings[type],
-	       name,	value);
+	       name,	value, slen, netslen);
 	if(cl_get_string((struct ha_msg*) value, F_XML_TAGNAME) == NULL) {
 		cl_log_message(log_level, (struct ha_msg*) value);
 	} else {
@@ -520,15 +532,15 @@ general_struct_display(int log_level, int seq, char* name, void* value, int type
 	}
 }
 static void
-struct_display(int log_level, int seq, char* name, void* value)
+struct_display(int log_level, int seq, char* name, void* value, int vlen)
 {
-	return general_struct_display(log_level, seq, name, value, FT_STRUCT);
+	return general_struct_display(log_level, seq, name, value, vlen,  FT_STRUCT);
 
 }
 static void
-uncompress_display(int log_level, int seq, char* name, void* value)
+uncompress_display(int log_level, int seq, char* name, void* value, int vlen)
 {
-	return general_struct_display(log_level, seq, name, value, FT_UNCOMPRESS);
+	return general_struct_display(log_level, seq, name, value, vlen, FT_UNCOMPRESS);
 }
 
 #define update_buffer_head(buffer, len) if(len < 0) {	\
@@ -669,7 +681,7 @@ liststring(GList* list, char* buf, int maxlen)
 }
 
 static void
-list_display(int log_level, int seq, char* name, void* value)
+list_display(int log_level, int seq, char* name, void* value, int vlen)
 {
 	GList* list;
 	char buf[MAXLENGTH];
