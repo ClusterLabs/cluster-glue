@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.91 2005/11/01 03:05:20 alan Exp $ */
+/* $Id: cl_msg.c,v 1.92 2005/11/01 03:50:58 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -2083,6 +2083,24 @@ string2msg(const char * s, size_t length)
 
 */
 
+#define	NOROOM						{	\
+		cl_log(LOG_ERR, "%s:%d: out of memory bound"	\
+		", bp=%p, buf + len=%p, len=%ld"		\
+		,	__FUNCTION__, __LINE__		\
+		,	bp, buf + len, (long)len);		\
+		cl_log_message(LOG_ERR, m);			\
+		return(HA_FAIL);				\
+	}
+
+#define	CHECKROOM_CONST(c)		CHECKROOM_INT(STRLEN_CONST(c))
+#define	CHECKROOM_STRING(s)		CHECKROOM_INT(strnlen(s, len))
+#define	CHECKROOM_STRING_INT(s,i)	CHECKROOM_INT(strnlen(s, len)+(i))
+#define	CHECKROOM_INT(i)	{		\
+		if ((bp + (i)) >= maxp) {	\
+			NOROOM;			\
+		}				\
+	}
+
 
 int
 msg2string_buf(const struct ha_msg *m, char* buf, size_t len
@@ -2097,8 +2115,9 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 	bp = buf;
 
 	if (needhead){
+		CHECKROOM_CONST(MSG_START);
 		strcpy(bp, MSG_START);
-		bp += strlen(MSG_START);
+		bp += STRLEN_CONST(MSG_START);
 	}
 
 	for (j=0; j < m->nfields; ++j) {
@@ -2111,14 +2130,16 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 		}
 
 		if (m->types[j] != FT_STRING){
+			CHECKROOM_STRING_INT(FT_strings[m->types[j]],2);
 			strcat(bp, "(");
 			bp++;
-			strcat(bp,FT_strings[m->types[j]]);
+			strcat(bp, FT_strings[m->types[j]]);
 			bp++;
 			strcat(bp,")");
 			bp++;
 		}
 
+		CHECKROOM_STRING_INT(m->names[j],1);
 		strcat(bp, m->names[j]);
 		bp += m->nlens[j];
 		strcat(bp, "=");
@@ -2137,6 +2158,7 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 			return HA_FAIL;			
 		}
 		
+		CHECKROOM_INT(truelen+1);
 		bp +=truelen;
 		
 		strcat(bp,"\n");
@@ -2145,21 +2167,12 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 
 	}
 	if (needhead){
+		CHECKROOM_CONST(MSG_END);
 		strcat(bp, MSG_END);
 		bp += strlen(MSG_END);
 	}
 
-	if (bp > buf + len){
-
-		cl_log(LOG_ERR, "msg2string_buf: out of memory bound"
-		", bp=%p, buf + len=%p, len=%ld"
-		,	bp, buf + len, (long)len);
-
-		cl_log_message(LOG_ERR, m);
-
-		return(HA_FAIL);
-
-	}
+	CHECKROOM_INT(1);
 	bp[0] = EOS;
 
 	return(HA_OK);
@@ -2409,6 +2422,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.92  2005/11/01 03:50:58  alan
+ * Changed some of gshi's string code to be a little more cautious about buffer
+ * overruns.
+ *
  * Revision 1.91  2005/11/01 03:05:20  alan
  * Fixed what looks like a bug in cl_msg.c
  * The code sets an end of string marker, and then after it does it looks
