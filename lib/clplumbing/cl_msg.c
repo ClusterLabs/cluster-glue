@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.95 2005/11/01 21:50:23 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.96 2005/11/02 19:12:40 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -2258,10 +2258,12 @@ msg2wirefmt_ll(struct ha_msg*m, size_t* len, int flag)
  	} 
 	
 	
-	for (i=0 ;i < m->nfields; i++){
-		int type = m->types[i];
-		if (fieldtypefuncs[type].prepackaction){
-			fieldtypefuncs[type].prepackaction(m,i);
+	if (flag & MSG_NEEDCOMPRESS){
+		for (i=0 ;i < m->nfields; i++){
+			int type = m->types[i];
+			if (fieldtypefuncs[type].prepackaction){
+				fieldtypefuncs[type].prepackaction(m,i);
+			}
 		}
 	}
 	
@@ -2424,6 +2426,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.96  2005/11/02 19:12:40  gshi
+ * prepackaction only happen when compression is needed,
+ * this will make sure compression only happen in top level field
+ *
  * Revision 1.95  2005/11/01 21:50:23  gshi
  * print out len info in cl_log_message() for non-string non-list field
  *
