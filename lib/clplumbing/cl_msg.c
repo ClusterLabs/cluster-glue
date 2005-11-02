@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.96 2005/11/02 19:12:40 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.97 2005/11/02 21:34:44 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1995,15 +1995,18 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 
 
 	if ((ret = ha_msg_new(0)) == NULL) {
+		cl_log(LOG_ERR, "%s: creating new msg failed", __FUNCTION__);
 		return(NULL);
 	}
-
+	
 	startlen = sizeof(MSG_START)-1;
 	if (strncmp(sp, MSG_START, startlen) != 0) {
 		/* This can happen if the sender gets killed */
 		/* at just the wrong time... */
 		if (!cl_msg_quiet_fmterr) {
 			cl_log(LOG_WARNING, "string2msg_ll: no MSG_START");
+			cl_log(LOG_WARNING, "%s: s=%s", __FUNCTION__, s);
+			cl_log(LOG_WARNING,  "depth=%d", depth);
 		}
 		ha_msg_del(ret);
 		return(NULL);
@@ -2018,11 +2021,15 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 	while (*sp != EOS && strncmp(sp, MSG_END, endlen) != 0) {
 
 		if (sp >= smax)	{
+			cl_log(LOG_ERR, "%s: buffer overflow(sp=%p, smax=%p)",
+			       __FUNCTION__, sp, smax);
 			return(NULL);
 		}
 		/* Skip over initial CR/NL things */
 		sp += strspn(sp, NEWLINE);
 		if (sp >= smax)	{
+			cl_log(LOG_ERR, "%s: buffer overflow after NEWLINE(sp=%p, smax=%p)",
+			       __FUNCTION__, sp, smax);
 			return(NULL);
 		}
 		/* End of message marker? */
@@ -2035,22 +2042,25 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 				cl_log(LOG_ERR, "NV failure (string2msg_ll):");
 				cl_log(LOG_ERR, "Input string: [%s]", s);
 				cl_log(LOG_ERR, "sp=%s", sp);
+				cl_log(LOG_ERR, "depth=%d", depth);
 			}
 			ha_msg_del(ret);
 			return(NULL);
 		}
 		if (sp >= smax) {
+			cl_log(LOG_ERR, "%s: buffer overflow after adding field(sp=%p, smax=%p)",
+			       __FUNCTION__, sp, smax);
 			return(NULL);
 		}
 		sp += strcspn(sp, NEWLINE);
 	}
-
+	
 	if (need_auth && msg_authentication_method
-	&&		!msg_authentication_method(ret)) {
+	    &&		!msg_authentication_method(ret)) {
 		const char* from = ha_msg_value(ret, F_ORIG);
 		if (!cl_msg_quiet_fmterr) {
-			cl_log(LOG_WARNING
-		       ,       "string2msg_ll: node [%s]"
+			cl_log(LOG_WARNING,
+			       "string2msg_ll: node [%s]"
 		       " failed authentication", from ? from : "?");
 		}
 		ha_msg_del(ret);
@@ -2426,6 +2436,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.97  2005/11/02 21:34:44  gshi
+ * Add debug messages
+ * increase cl_log buf to 5k
+ *
  * Revision 1.96  2005/11/02 19:12:40  gshi
  * prepackaction only happen when compression is needed,
  * this will make sure compression only happen in top level field
