@@ -1,4 +1,4 @@
-/* $Id: ipmilan_command.c,v 1.10 2005/08/03 14:26:32 horms Exp $ */
+/* $Id: ipmilan_command.c,v 1.11 2005/11/02 03:30:53 horms Exp $ */
 /*
  * This program is largely based on the ipmicmd.c program that's part of OpenIPMI package.
  * 
@@ -353,48 +353,5 @@ int
 do_ipmi_cmd(struct ipmilanHostInfo * host, int request)
 {
 	return setup_ipmi_conn(host, request);
-}
-
-void
-posix_vlog(char *format, enum ipmi_log_type_e log_type, va_list ap)
-{
-    int do_nl = 1; 
-
-    switch(log_type)
-    {
-        case IPMI_LOG_INFO:
-            PILCallLog(PluginImports->log,PIL_INFO, "INFO: ");
-            break;
-                                                                                                                                                             
-        case IPMI_LOG_WARNING:
-            PILCallLog(PluginImports->log,PIL_INFO, "WARN: ");
-            break;
-                                                                                                                                                             
-        case IPMI_LOG_SEVERE:
-            PILCallLog(PluginImports->log,PIL_INFO, "SEVR: ");
-            break;
-                                                                                                                                                             
-        case IPMI_LOG_FATAL:
-            PILCallLog(PluginImports->log,PIL_INFO, "FATL: ");
-            break;
-                                                                                                                                                             
-        case IPMI_LOG_ERR_INFO:
-            PILCallLog(PluginImports->log,PIL_INFO, "EINF: ");
-            break;
-                                                                                                                                                             
-        case IPMI_LOG_DEBUG_START:
-            do_nl = 0;
-            /* FALLTHROUGH */
-        case IPMI_LOG_DEBUG:
-            PILCallLog(PluginImports->log,PIL_INFO, "DEBG: ");
-            break;
-                                                                                                                                                             
-        case IPMI_LOG_DEBUG_CONT:
-            do_nl = 0;
-            /* FALLTHROUGH */
-        case IPMI_LOG_DEBUG_END:
-            break;
-    }
-                                                                                                                                                             
 }
 
