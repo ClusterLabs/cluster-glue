@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.97 2005/11/02 21:34:44 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.98 2005/11/02 22:22:51 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -2042,8 +2042,9 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 				cl_log(LOG_ERR, "NV failure (string2msg_ll):");
 				cl_log(LOG_ERR, "Input string: [%s]", s);
 				cl_log(LOG_ERR, "sp=%s", sp);
-				cl_log(LOG_ERR, "depth=%d", depth);
-			}
+				cl_log(LOG_ERR, "depth=%d", depth);				
+				cl_log_message(LOG_ERR,ret);
+			}			
 			ha_msg_del(ret);
 			return(NULL);
 		}
@@ -2436,6 +2437,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.98  2005/11/02 22:22:51  gshi
+ * log the message if failure happens
+ *
  * Revision 1.97  2005/11/02 21:34:44  gshi
  * Add debug messages
  * increase cl_log buf to 5k
