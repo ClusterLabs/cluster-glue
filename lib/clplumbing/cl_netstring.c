@@ -117,7 +117,7 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 
 	for (i=0; i < m->nfields; i++) {
 		size_t flen;
-		
+		int	tmplen;
 		
 		ret = fieldtypefuncs[m->types[i]].tonetstring(sp, 
 							      smax,
@@ -134,6 +134,14 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 			return ret;
 		}
 		
+		tmplen = netstring_extra(fieldtypefuncs[m->types[i]].netstringlen(m->nlens[i],
+										  m->vlens[i],
+										  m->values[i]));
+		
+		if (flen != tmplen ){
+			cl_log(LOG_ERR,"netstring len discrepency: actual usage is %d bytes"
+			       "it should use %d", flen, tmplen);			       
+		}
 		sp +=flen;
 		
 	}
