@@ -42,7 +42,6 @@
 #	define MAX(a,b)	(((a) > (b)) ? (a) : (b))
 #endif
 
-#define NETSTRING_EXTRA(x) (intlen(x) + x + 2)
 
 extern const char* FT_strings[];
 
@@ -90,6 +89,11 @@ intlen(int x)
 	return snprintf(buf, sizeof(buf), "%d", x);
 }
 
+int
+netstring_extra(int x)
+{
+	return (intlen(x) + x + 2);
+}
 
 int
 get_netstringlen(const struct ha_msg *m)
@@ -112,7 +116,7 @@ get_netstringlen(const struct ha_msg *m)
 		len = fieldtypefuncs[m->types[i]].netstringlen(m->nlens[i], 
 							       m->vlens[i],
 							       m->values[i]);
-		total_len += NETSTRING_EXTRA(len);
+		total_len += netstring_extra(len);
 	}
 	
 	
