@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.98 2005/11/02 22:22:51 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.99 2005/11/03 21:11:43 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -641,6 +641,11 @@ ha_msg_addraw(struct ha_msg * msg, const char * name, size_t namelen,
 	char	*cpname = NULL;
 	int	ret;
 
+	if (namelen == 0){
+		cl_log(LOG_ERR, "%s: Adding a field with 0 name length", __FUNCTION__);
+		return HA_FAIL;
+	}
+	
 	if ((cpname = ha_malloc(namelen+1)) == NULL) {
 		cl_log(LOG_ERR, "ha_msg_addraw: no memory for string (name)");
 		return(HA_FAIL);
@@ -2437,6 +2442,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.99  2005/11/03 21:11:43  gshi
+ * adding a field with 0 namlen is not allowed
+ *
  * Revision 1.98  2005/11/02 22:22:51  gshi
  * log the message if failure happens
  *
