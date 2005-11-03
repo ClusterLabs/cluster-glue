@@ -209,7 +209,7 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 		sp += sprintf(sp, "%ld:%s,", (long)strlen(authstring), authstring);	
 		
 	}
-	*slen = sp - s + 1;
+	*slen = sp - s;
 
 	return(s);
 }
