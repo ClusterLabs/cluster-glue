@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.99 2005/11/03 21:11:43 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.100 2005/11/03 21:21:32 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -411,6 +411,10 @@ ha_msg_audit(const struct ha_msg* msg)
 	}
 	for (j=0; j < msg->nfields; ++j) {
 		
+		if (msg->nlens[j] == 0){
+			cl_log(LOG_ERR, "zero namelen found in msg");
+			abort();
+		}
 		
 		if (msg->types[j] == FT_STRING){
 			if (msg->vlens[j] != strlen(msg->values[j])){
@@ -2442,6 +2446,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.100  2005/11/03 21:21:32  gshi
+ * audit for namelen == 0 error
+ *
  * Revision 1.99  2005/11/03 21:11:43  gshi
  * adding a field with 0 namlen is not allowed
  *
