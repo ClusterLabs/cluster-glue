@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.100 2005/11/03 21:21:32 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.101 2005/11/03 22:28:32 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -481,7 +481,7 @@ ha_msg_expand(struct ha_msg* msg )
 	}
 	
 	memcpy(msg->names, names, msg->nalloc*sizeof(char *));
-	memcpy(msg->nlens, nlens, msg->nalloc*sizeof(int));
+	memcpy(msg->nlens, nlens, msg->nalloc*sizeof(size_t));
 	memcpy(msg->values, values, msg->nalloc*sizeof(void *));
 	memcpy(msg->vlens, vlens, msg->nalloc*sizeof(size_t));
 	memcpy(msg->types, types, msg->nalloc*sizeof(int));
@@ -644,6 +644,7 @@ ha_msg_addraw(struct ha_msg * msg, const char * name, size_t namelen,
 	char	*cpvalue = NULL;
 	char	*cpname = NULL;
 	int	ret;
+
 
 	if (namelen == 0){
 		cl_log(LOG_ERR, "%s: Adding a field with 0 name length", __FUNCTION__);
@@ -2446,6 +2447,10 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.101  2005/11/03 22:28:32  gshi
+ * nlens are size_t*.We should use size_t to do malloc.
+ * It could cause ia64 to mess up memory otherwise
+ *
  * Revision 1.100  2005/11/03 21:21:32  gshi
  * audit for namelen == 0 error
  *
