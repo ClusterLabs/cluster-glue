@@ -1,4 +1,4 @@
-/* $Id: proctrack.c,v 1.21 2005/07/30 02:33:08 alan Exp $ */
+/* $Id: proctrack.c,v 1.22 2005/11/03 10:28:50 sunjd Exp $ */
 /*
  * Process tracking object.
  *
@@ -151,7 +151,7 @@ ReportProcHasDied(int pid, int status)
 			 * Processes being killed isn't an error if
 			 * we're only logging because of debugging.
 			 */
-			cl_log((debugreporting ? LOG_DEBUG : LOG_ERR)
+			cl_log((debugreporting ? LOG_DEBUG : LOG_WARNING)
 			,	"Exiting %s process %d killed by signal %d."
 			,	type, pid, signo);
 		}else{
