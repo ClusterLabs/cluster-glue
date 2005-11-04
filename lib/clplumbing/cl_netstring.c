@@ -140,7 +140,7 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 		
 		if (flen != tmplen ){
 			cl_log(LOG_ERR,"netstring len discrepency: actual usage is %d bytes"
-			       "it should use %d", flen, tmplen);			       
+			       "it should use %d", (int)flen, tmplen);			       
 		}
 		sp +=flen;
 		
