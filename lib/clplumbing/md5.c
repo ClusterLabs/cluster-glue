@@ -17,10 +17,15 @@
  * Cleaned up for heartbeat by 
  *	Mitja Sarp <mitja@lysator.liu.se>
  *	Sun Jiang Dong <sunjd@cn.ibm.com>
+ *	Pan Jia Ming <jmltc@cn.ibm.com>
  *
  */
 
 #include <portability.h>
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
 #endif
@@ -53,7 +58,27 @@ void MD5Update(MD5Context *context, md5byte const *buf, unsigned len);
 void MD5Final(unsigned char digest[16], MD5Context *context);
 void MD5Transform(uint32_t buf[4], uint32_t const in[16]);
 
-#define byteSwap(buf,words)
+
+#ifdef CONFIG_BIG_ENDIAN
+static inline void byteSwap(uint32_t * buf, uint32_t len);
+
+static inline void
+byteSwap(uint32_t * buf, uint32_t len)
+{
+	int i;
+	for (i = 0; i < len; i ++) {
+		uint32_t tmp = buf[i]; 
+ 		buf[i] = ( (uint32_t) ((unsigned char *) &tmp)[0] ) | 
+		 	 (((uint32_t) ((unsigned char *) &tmp)[1]) << 8) |
+   			 (((uint32_t) ((unsigned char *) &tmp)[2]) << 16) | 
+			 (((uint32_t) ((unsigned char *) &tmp)[3]) << 24);	
+	}
+}
+#elif defined(CONFIG_LITTLE_ENDIAN)
+	#define byteSwap(buf,words)
+#else
+	#error "Neither CONFIG_BIG_ENDIAN nor CONFIG_LITTLE_ENDIAN defined!" 
+#endif
 
 /*
  * Start MD5 accumulation.  Set bit count to 0 and buffer to mysterious
@@ -142,7 +167,7 @@ MD5Final(md5byte digest[16], MD5Context *ctx)
 	ctx->in[15] = ctx->bytes[1] << 3 | ctx->bytes[0] >> 29;
 	MD5Transform(ctx->buf, ctx->in);
 
-	byteSwap(ctx->buf, 4);
+	byteSwap(ctx->buf, 16);
 	memcpy(digest, ctx->buf, 16);
 	memset(ctx, 0, sizeof(ctx));	/* In case it's sensitive */
 }
@@ -301,6 +326,7 @@ int HMAC( const unsigned char * key
 	MD5Update(&context, k_ipad, MD5_BLOCKSIZE);     /* start with inner pad */
 	MD5Update(&context, text, textlen); /* then text of datagram */
 	MD5Final(digest, &context);          /* finish up 1st pass */
+
 	/* perform outer MD5 */
 	MD5Init(&context);                   /* init context for 2nd pass */
 	MD5Update(&context, k_opad, MD5_BLOCKSIZE);     /* start with outer pad */
