@@ -37,6 +37,18 @@ REBOOT_COMMAND="echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/nu
 # POWEROFF_COMMAND="echo 'sleep 2; /sbin/poweroff -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
 POWEROFF_COMMAND="echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
 
+CheckIfDead() {
+	for j in 1 2 3
+        do
+          if
+            ping -w0.5 -c1 "$1" >/dev/null 2>&1
+          then
+            return 1
+          fi
+        done
+        return 0
+}
+
 case $1 in
 gethosts)
 	for h in $ST_HOSTLIST ; do
@@ -55,24 +67,35 @@ off)
 	exit 1
 	;;
 reset)
-	for h in $ST_HOSTLIST ; do
-		if [ "$h" = "$2" ] ; then
-			$SSH_COMMAND $2 $REBOOT_COMMAND
-			rc=$?
-			if [ $rc == 0 ]; then 
-				sleep 2
-			fi
-			exit $rc
-		fi
+	for h in $ST_HOSTLIST
+	do
+	  if
+            [ "$h" != "$2" ]
+          then
+            continue
+          fi
+	  $SSH_COMMAND "$2" "$REBOOT_COMMAND"
+	  # Good thing this is only for testing...
+          for j in 1 2 3 4 5
+          do
+            if
+              CheckIfDead "$2"
+            then
+	      exit 0
+            fi
+            sleep 1
+          done
 	done
 	exit 1
 	;;
 status)
-	for h in $ST_HOSTLIST ; do
-		host $h | grep "not found:"
-		if [ $? == 0 ]; then
-			exit 1
-		fi
+	for h in $ST_HOSTLIST
+	do
+	  if
+	    host $h 2>&1 | grep "not found:"
+          then
+	    exit 1
+	  fi
 	done
 	exit 0
 	;;
