@@ -1,4 +1,4 @@
-/* $Id: cl_log.h,v 1.24 2005/11/02 21:34:44 gshi Exp $ */
+/* $Id: cl_log.h,v 1.25 2005/11/08 06:27:38 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -47,6 +47,7 @@ void		cl_log_set_entity(const char *	entity);
 void		cl_log_set_logfile(const char *	path);
 void		cl_log_set_debugfile(const char * path);
 gboolean	cl_inherit_use_logd(const char*, int);
+void		inherit_compress(void);
 void		inherit_logconfig_from_environment(void);
 int		cl_log_set_logd_channel_source( void (*create_callback)(struct IPC_CHANNEL* chan),
 						GDestroyNotify destroy_callback);

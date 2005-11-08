@@ -1345,6 +1345,7 @@ fields2netstring(char* sp, char* smax, char* name, size_t nlen,
 		slen = vallen;
 		break;
 
+	case FT_UNCOMPRESS:
 	case FT_STRUCT:
 		{
 			struct ha_msg* msg = (struct ha_msg*) value;

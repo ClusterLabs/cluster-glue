@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.68 2005/10/28 00:13:42 gshi Exp $ */
+/* $Id: cl_log.c,v 1.69 2005/11/08 06:27:38 gshi Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -37,6 +37,7 @@
 #include <clplumbing/GSource.h>
 #include <clplumbing/cl_misc.h>
 #include <clplumbing/cl_syslog.h>
+#include <ha_msg.h>
 
 #ifndef MAXLINE
 #	define MAXLINE	512
@@ -161,6 +162,27 @@ cl_inherit_use_logd(const char* param_name, int sendq_length)
 #define LOGFENV		"HA_logfile"	/* well-formed log file :-) */
 #define DEBUGFENV	"HA_debugfile"	/* Debug log file */
 #define LOGFACILITY	"HA_logfacility"/* Facility to use for logger */
+#define TRADITIONAL_COMPRESSION "HA_traditional_compression"
+#define COMPRESSION "HA_compression"
+
+void
+inherit_compress(void)
+{
+	char* inherit_env = NULL;
+	
+	inherit_env = getenv(TRADITIONAL_COMPRESSION);
+	if (inherit_env != NULL) {
+		gboolean value;
+		
+		if (cl_str_to_boolean(inherit_env, &value)!= HA_OK){
+			cl_log(LOG_ERR, "inherit traditional_compression failed");
+		}else{
+			cl_set_traditional_compression(value);
+		}
+	}
+	
+}
+
 void
 inherit_logconfig_from_environment(void)
 {
@@ -194,6 +216,11 @@ inherit_logconfig_from_environment(void)
 		}
 		inherit_env = NULL;
 	}
+
+
+	inherit_compress();
+	
+	return;
 }
 
 
