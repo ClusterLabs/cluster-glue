@@ -126,7 +126,7 @@ main(int argc, char** argv)
 				if (p != buf){
 					*p++ = ' ';
 				}
-				bcopy(*argv++, p, len);
+				memcpy(p, *argv++, len);
 				*(p += len) = '\0';
 			}
 		}
