@@ -1,4 +1,4 @@
-/* $Id: ocf_ipc.c,v 1.38 2005/10/15 02:47:44 gshi Exp $ */
+/* $Id: ocf_ipc.c,v 1.39 2005/11/09 16:09:39 davidlee Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.
@@ -88,7 +88,7 @@ gnametonum(const char * gname, int gnlen)
 	char	grpname[64];
 	struct group*	grp;
 
-	if (isdigit(gname[0])) {
+	if (isdigit((int) gname[0])) {
 		return atoi(gname);
 	}
 	if (gnlen >= (int)sizeof(grpname)) {
@@ -118,7 +118,7 @@ unametonum(const char * lname, int llen)
 	strncpy(loginname, lname, llen);
 	loginname[llen] = EOS;
 
-	if (isdigit(loginname[0])) {
+	if (isdigit((int) loginname[0])) {
 		return atoi(loginname);
 	}
 	if ((pwd = getpwnam(loginname)) == NULL) {
