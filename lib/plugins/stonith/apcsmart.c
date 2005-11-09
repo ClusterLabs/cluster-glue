@@ -1,4 +1,4 @@
-/* $Id: apcsmart.c,v 1.29 2005/04/22 14:22:16 blaschke Exp $ */
+/* $Id: apcsmart.c,v 1.30 2005/11/09 20:15:35 blaschke Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>
@@ -245,7 +245,7 @@ APC_open_serialport(const char *port, speed_t speed)
 		return -1;
 	}
 
-	if ((fflags = fcntl(fd, F_GETFL, 0)) < 0
+	if ((fflags = fcntl(fd, F_GETFL)) < 0
 	||	fcntl(fd, F_SETFL, (fflags & ~O_NONBLOCK)) < 0) {
 		LOG(PIL_CRIT, "%s: Setting flags on %s failed [%s]."
 		,	__FUNCTION__
