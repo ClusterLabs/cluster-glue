@@ -1,4 +1,4 @@
-/* $Id: apcmaster.c,v 1.26 2005/11/09 08:42:24 sunjd Exp $ */
+/* $Id: apcmaster.c,v 1.27 2005/11/10 16:52:46 blaschke Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.
@@ -51,7 +51,7 @@
 /*
  * Version string that is filled in by CVS
  */
-static const char *version __attribute__ ((unused)) = "$Revision: 1.26 $"; 
+static const char *version __attribute__ ((unused)) = "$Revision: 1.27 $"; 
 
 #define	DEVICE	"APC MasterSwitch"
 
@@ -321,7 +321,6 @@ MSReset(struct pluginDevice* ms, int outletNum, const char *host)
 		case 1: /* Got that annoying command confirmation :-( */
 			SEND(ms->wrfd, "YES\r");
 			goto retry;
-			break;
 
 		default: 
 			return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
@@ -406,7 +405,6 @@ apcmaster_onoff(struct pluginDevice* ms, int outletNum, const char * unitid, int
 		case 1: /* Got that annoying command confirmation :-( */
 			SEND(ms->wrfd, "YES\r");
 			goto retry;
-			break; /* make BEAM happy */
 
 		default: 
 			return(errno == ETIMEDOUT ? S_RESETFAIL : S_OOPS);
