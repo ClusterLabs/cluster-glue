@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.162 2005/10/15 02:47:17 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.163 2005/11/11 20:39:44 gshi Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1739,7 +1739,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     close(s);
     return NULL;
   }
-  flags = fcntl(s, F_GETFL, O_NONBLOCK);
+  flags = fcntl(s, F_GETFL);
   if (flags == -1) {
     cl_perror("socket_wait_conn_new: cannot read file descriptor flags");
     close(s);
@@ -1857,7 +1857,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   }
 #endif
   
-  flags = fcntl(sockfd, F_GETFL, O_NONBLOCK);
+  flags = fcntl(sockfd, F_GETFL);
   if (flags == -1) {
 	  cl_perror("socket_client_channel_new: cannot read file descriptor flags");
 	  g_free(conn_info); conn_info = NULL;
@@ -1915,7 +1915,7 @@ socket_server_channel_new(int sockfd){
   
   conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
   
-  flags = fcntl(sockfd, F_GETFL, O_NONBLOCK);
+  flags = fcntl(sockfd, F_GETFL);
   if (flags == -1) {
 	  cl_perror("socket_server_channel_new: cannot read file descriptor flags");
 	  g_free(conn_info); conn_info = NULL;
