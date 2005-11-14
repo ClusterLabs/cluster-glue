@@ -1636,7 +1636,7 @@ compress2uncompress(struct ha_msg* msg, int index)
 	/* BEAM think this is a memory leak, but actually it is handle nicely
 	 * in cl_msg_replace: old value is freed and new value is saved
 	 */
-	return cl_msg_replace(msg, index, (char*)msgfield, 0, FT_UNCOMPRESS);/* memory leak */  		
+	return cl_msg_replace(msg, index, (char*)msgfield, 0, FT_UNCOMPRESS);/* resource leak */  		
 }
 
 struct fieldtypefuncs_s fieldtypefuncs[NUM_MSG_TYPES]=
