@@ -51,7 +51,7 @@ CheckIfDead() {
 
 case $1 in
 gethosts)
-	for h in $ST_HOSTLIST ; do
+	for h in $hostlist ; do
 		echo $h
 	done
 	exit 0
@@ -67,7 +67,7 @@ off)
 	exit 1
 	;;
 reset)
-	for h in $ST_HOSTLIST
+	for h in $hostlist
 	do
 	  if
             [ "$h" != "$2" ]
@@ -89,7 +89,12 @@ reset)
 	exit 1
 	;;
 status)
-	for h in $ST_HOSTLIST
+	if
+	  [ -z "$hostlist" ]
+	then
+	  exit 1
+	fi
+	for h in $hostlist
 	do
 	  if
 	    host $h 2>&1 | grep "not found:"
@@ -100,7 +105,7 @@ status)
 	exit 0
 	;;
 getconfignames)
-	echo "ST_HOSTLIST"
+	echo "hostlist"
 	exit 0
 	;;
 getinfo-devid)
@@ -123,7 +128,7 @@ getinfo-devurl)
 getinfo-xml)
 	cat << SSHXML
 "<parameters>"
-"<parameter name=\"ST_HOSTLIST\" unique=\"1\">"
+"<parameter name=\"hostlist\" unique=\"1\">"
 "<content type=\"string\" />"
 "<shortdesc lang=\"en\">"
 "Hostlist"
