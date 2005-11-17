@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.186 2005/11/17 07:00:27 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.187 2005/11/17 10:32:56 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3287,6 +3287,7 @@ read_pipe(int fd, char ** data, void * user_data)
 	char buffer[BUFFLEN];
 	int readlen;
 	GString * gstr_tmp;
+	const char* op_type = NULL; 
 	int rc = 0;
 	lrmd_rsc_t* rsc = NULL;
 	lrmd_op_t* op = (lrmd_op_t *)user_data;
@@ -3316,13 +3317,15 @@ read_pipe(int fd, char ** data, void * user_data)
 
 		if (errno == EAGAIN) {
 			rsc = lookup_rsc(op->rsc_id);
-			lrmd_log(LOG_ERR, "RA %s:%s (process %d) failed to "
+			op_type = ha_msg_value(op->msg, F_LRM_OP);
+			lrmd_log(LOG_ERR, "RA %s:%s:%s (process %d) failed to "
 				"redirect %s for its background child (daemon) "
 				"processes. This will likely cause those "
 				"processes to die mysteriously at some later "
 				"time (terminated by signal SIGPIPE)."
 				, (rsc!=NULL)?rsc->class:"<NULL>"
 				, (rsc!=NULL)?rsc->type:"<NULL>"
+				, (op_type!=NULL)?op_type:"<NULL>"
 				, op->exec_pid
 				, (op->ra_stdout_fd==fd)?"stdout":"stderr");
 		}
@@ -3432,6 +3435,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.187  2005/11/17 10:32:56  sunjd
+ * Polish the log message to be more detailed
+ *
  * Revision 1.186  2005/11/17 07:00:27  sunjd
  * The fix for bug756
  *
