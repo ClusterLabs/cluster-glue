@@ -1,4 +1,4 @@
-/* $Id: realtime.c,v 1.29 2005/08/09 20:42:13 gshi Exp $ */
+/* $Id: realtime.c,v 1.30 2005/11/22 02:48:57 andrew Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -40,6 +40,7 @@
 #include <clplumbing/realtime.h>
 #include <clplumbing/uids.h>
 #include <time.h>
+#include <errno.h>
 
 static gboolean	cl_realtimepermitted = TRUE;
 static void cl_rtmalloc_setup(void);
@@ -179,7 +180,7 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 	}
 #endif
 
-#if defined _POSIX_MEMLOCK /* && !defined(ON_DARWIN) Wrong way to do this -- add an autoconf test ...*/
+#if defined _POSIX_MEMLOCK
 #	ifdef RLIMIT_MEMLOCK
 #	define	THRESHOLD(lim)	(((lim))/2)
 	{
@@ -209,10 +210,16 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 		}
 	}
 #	endif	/*RLIMIT_MEMLOCK*/
-	if (mlockall(MCL_CURRENT|MCL_FUTURE) < 0) {
-		cl_perror("Unable to lock pid %d in memory", (int) getpid());
-	}else{
+	if (mlockall(MCL_CURRENT|MCL_FUTURE) >= 0) {
 		cl_log(LOG_INFO, "pid %d locked in memory.", (int) getpid());
+
+	} else if(errno == ENOSYS) {
+		const char *err = strerror(errno);
+		cl_log(LOG_WARNING, "Unable to lock pid %d in memory: %s",
+		       (int) getpid(), err);
+
+	} else {
+		cl_perror("Unable to lock pid %d in memory", (int) getpid());
 	}
 #endif
 }
