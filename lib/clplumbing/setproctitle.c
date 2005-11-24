@@ -1,4 +1,4 @@
-/* $Id: setproctitle.c,v 1.1 2005/04/20 23:42:17 gshi Exp $ */
+/* $Id: setproctitle.c,v 1.2 2005/11/24 14:05:11 davidlee Exp $ */
 /*
  * setproctitle.c
  *
@@ -75,8 +75,11 @@
 
 #include <clplumbing/setproctitle.h>
 
+#if PF_ARGV_TYPE != PF_ARGV_NONE
 static char **Argv = NULL;
 static char *LastArgv = NULL;
+#endif /* PF_ARGV_TYPE != PF_ARGV_NONE */
+
 extern char **environ;
 
 #ifdef HAVE___PROGNAME
@@ -87,6 +90,9 @@ extern char *__progname_full;
 int 
 init_set_proc_title(int argc, char *argv[], char *envp[])
 {
+#if PF_ARGV_TYPE == PF_ARGV_NONE
+	return 0;
+#else
 	int i;
 	int envpsize;
 	char **p;
@@ -148,10 +154,12 @@ error_environ:
 	}
 	ha_free(environ);
 	return -1;
+#endif /* PF_ARGV_TYPE == PF_ARGV_NONE */
 }    
 
 void set_proc_title(const char *fmt,...)
 {
+#if PF_ARGV_TYPE != PF_ARGV_NONE
   va_list msg;
   static char statbuf[BUFSIZ];
   
@@ -224,4 +232,6 @@ void set_proc_title(const char *fmt,...)
 #endif /* PF_ARGV_PSSTRINGS */
 
 #endif /* HAVE_SETPROCTITLE */
+
+#endif /* PF_ARGV_TYPE != PF_ARGV_NONE */
 }
