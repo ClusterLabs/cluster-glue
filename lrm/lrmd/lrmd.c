@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.187 2005/11/17 10:32:56 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.188 2005/11/24 10:27:01 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -79,10 +79,14 @@
 		cl_log(priority, fmt); \
 
 #define lrmd_debug(priority, fmt...); \
-        if ( debug_level >= 1 ) { \
+        if ( debug_level == 1 ) { \
                 cl_log(priority, fmt); \
         }
 
+#define lrmd_debug2(priority, fmt...); \
+        if ( debug_level >= 2 ) { \
+                cl_log(priority, fmt); \
+        }
 
 #define	lrmd_nullcheck(p)	((p) ? (p) : "<null>")
 #define	lrm_str(p)	(lrmd_nullcheck(p))
@@ -442,7 +446,7 @@ lrmd_op_destroy(lrmd_op_t* op)
 	}
 	memset(op->first_line_ra_stdout, 0, sizeof(op->first_line_ra_stdout));
 
-	lrmd_debug(LOG_DEBUG, "lrmd_op_destroy: free the op whose address is %p"
+	lrmd_debug2(LOG_DEBUG, "lrmd_op_destroy: free the op whose address is %p"
 		  , op);
 	cl_free(op);
 }
@@ -1626,7 +1630,7 @@ on_repeat_op_readytorun(gpointer data)
 		return FALSE;
 	}
 
-	lrmd_debug(LOG_DEBUG
+	lrmd_debug2(LOG_DEBUG
 	, 	"%s: remove an operation %s from the repeat operation list and "
 		"add it to the operation list."
 	, 	__FUNCTION__, op_info(op));
@@ -2578,8 +2582,8 @@ on_op_done(lrmd_op_t* op)
 	}
 	op->t_done = time_longclock();
 	
-	lrmd_debug(LOG_DEBUG, "on_op_done: %s", op_info(op));
-	lrmd_debug(LOG_DEBUG
+	lrmd_debug2(LOG_DEBUG, "on_op_done: %s", op_info(op));
+	lrmd_debug2(LOG_DEBUG
 		 ,"TimeStamp:  Recv:%ld,Add to List:%ld,Perform:%ld, Done %ld"
 		 ,longclockto_ms(op->t_recv)
 		 ,longclockto_ms(op->t_addtolist)
@@ -2769,7 +2773,7 @@ on_op_done(lrmd_op_t* op)
 					on_repeat_op_readytorun, repeat_op);
 		rsc->repeat_op_list = 
 			g_list_append (rsc->repeat_op_list, repeat_op);
-		lrmd_debug(LOG_DEBUG
+		lrmd_debug2(LOG_DEBUG
 		, "on_op_done:repeat %s is added to repeat op list to wait" 
 		, op_info(op));
 		
@@ -2817,7 +2821,7 @@ perform_op(lrmd_rsc_t* rsc)
 	}
 	
 	if (NULL == rsc->op_list) {
-		lrmd_debug(LOG_DEBUG,"perform_op: no op to perform");
+		lrmd_debug2(LOG_DEBUG,"perform_op: no op to perform");
 		return HA_OK;
 	}
 
@@ -3018,7 +3022,7 @@ perform_ra_op(lrmd_op_t* op)
 			/* Name of the resource and some others also
 			 * need to be passed in. Maybe pass through the
 			 * entire lrm_op_t too? */
-			lrmd_debug(LOG_DEBUG
+			lrmd_debug2(LOG_DEBUG
 			,	"perform_ra_op:call RA plugin to perform %s, pid: [%d]"
 			,	op_info(op), getpid());		
 			RAExec->execra (rsc->id,
@@ -3056,7 +3060,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 
 	CHECK_ALLOCATED(p, "ProcTrack p", );
 	op = p->privatedata;
-	lrmd_debug(LOG_DEBUG, "on_ra_proc_finished: accessing the op whose "
+	lrmd_debug2(LOG_DEBUG, "on_ra_proc_finished: accessing the op whose "
 		  "address is %p", op);
 	CHECK_ALLOCATED(op, "op", );
 	if (op->exec_pid == 0) {
@@ -3292,6 +3296,8 @@ read_pipe(int fd, char ** data, void * user_data)
 	lrmd_rsc_t* rsc = NULL;
 	lrmd_op_t* op = (lrmd_op_t *)user_data;
 
+	lrmd_debug2(LOG_DEBUG, "%s begin.", __FUNCTION__);
+
 	*data = NULL;
 	gstr_tmp = g_string_new("");
 	
@@ -3338,6 +3344,8 @@ read_pipe(int fd, char ** data, void * user_data)
 		*data = gstr_tmp->str;
 		g_string_free(gstr_tmp, FALSE);
 	}
+
+	lrmd_debug2(LOG_DEBUG, "%s end.", __FUNCTION__);
 	return rc;
 }
 
@@ -3435,6 +3443,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.188  2005/11/24 10:27:01  sunjd
+ * add a log output function for level2 debug
+ *
  * Revision 1.187  2005/11/17 10:32:56  sunjd
  * Polish the log message to be more detailed
  *
