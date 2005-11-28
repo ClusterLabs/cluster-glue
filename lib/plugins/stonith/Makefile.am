@@ -37,7 +37,7 @@ AM_CFLAGS		= @NON_FATAL_CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 			-DLOCALEDIR='"@LOCALE@"' 		
 
 
-EXTRA_DIST = README.meatware README.rcd_serial README.vacm README.drac3 README.ipmilan
+EXTRA_DIST = README.meatware README.rcd_serial README.vacm README.drac3 README.ipmilan README.cyclades
 
 #
 #       We need "vacmclient_api.h" and -lvacmclient to make the VACM
