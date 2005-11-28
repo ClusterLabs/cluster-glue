@@ -1,4 +1,4 @@
- /* $Id: cyclades.c,v 1.11 2005/04/26 17:08:24 blaschke Exp $ */
+ /* $Id: cyclades.c,v 1.12 2005/11/28 16:52:08 blaschke Exp $ */
 /*
  * Stonith module for Cyclades AlterPath PM
  * Bases off the SSH plugin
@@ -117,7 +117,8 @@ struct pluginDevice {
 };
 
 static struct Etoken StatusOutput[] = { 
-	{ "Outlet\t\tName\t\tStatus\t\tUsers\t\tInterval (s)", 0, 0},
+	{ "Outlet\t\tName\t\tStatus\t\tUsers\t\tInterval (s)", 1, 0},
+	{ "Outlet\tName\t\t\tStatus\t\tInterval (s)\tUsers", 2, 0},
 	{ NULL, 0, 0} 
 };
 
@@ -234,7 +235,7 @@ static int CYCNametoOutlet(struct pluginDevice *sd, const char *host, int *outle
 	char    savebuf[MAXSAVE];
 	int err;
 	int outlet, numoutlet = 0;
-	char name[10], locked[10], on[4];
+	char name[17], locked[10], on[4];
 
 	if (CYC_robust_cmd(sd, cmd) != S_OK) {
 		LOG(PIL_CRIT, "can't run status all command");
@@ -255,10 +256,10 @@ static int CYCNametoOutlet(struct pluginDevice *sd, const char *host, int *outle
 		err = CYCScanLine(sd, 2, savebuf, sizeof(savebuf));
 
 		if ((err == S_OK) &&
-		    (sscanf(savebuf,"%3d %10s %10s %3s", &outlet, 
+		    (sscanf(savebuf,"%3d %16s %10s %3s", &outlet, 
 			name, locked, on) > 0)) {
 			if (strstr(locked, "ocked")
-			&& !strcasecmp(name, host)) {
+			&& !strncasecmp(name, host, strlen(host))) {
 				if (numoutlet >= maxoutlet) {
 					LOG(PIL_CRIT, "too many outlets");
 					return 0;
@@ -286,7 +287,7 @@ cyclades_hostlist(StonithPlugin  *s)
 	int err, i;
 	int outlet;
 	int numnames = 0;
-	char name[10], locked[10], on[4];
+	char name[17], locked[10], on[4];
 	char *NameList[MAX_OUTLETS];
 	char **ret = NULL;
 
@@ -316,7 +317,7 @@ cyclades_hostlist(StonithPlugin  *s)
 		err = CYCScanLine(sd, 2, savebuf, sizeof(savebuf));
 
 		if ((err == S_OK) &&
-		    (sscanf(savebuf,"%3d %10s %10s %3s", &outlet, 
+		    (sscanf(savebuf,"%3d %16s %10s %3s", &outlet, 
 			name, locked, on) > 0)) {
 			if (strstr(locked, "ocked")) {
 				nm = (char *) STRDUP (name);
@@ -401,8 +402,6 @@ static int cyclades_onoff(struct pluginDevice *sd, int *outlet, int numoutlet,
 		return(S_OOPS);
 	}
 
-	EXPECT(sd->rdfd, CRNL, 50);
-
 	for (i = 0; i < numoutlet; i++) {
 		memset(expstring, 0, sizeof(expstring));
 		snprintf(expstring, sizeof(expstring), "%d: Outlet turned %s."
@@ -446,8 +445,6 @@ static int cyclades_reset(struct pluginDevice *sd, int *outlet, int numoutlet,
 		FREE(outletstr);
 		return(S_OOPS);
 	}
-
-	RESETEXPECT(sd->rdfd, CRNL, 50);
 
 	for (i = 0; i < numoutlet; i++) {
 		memset(expstring, 0, sizeof(expstring));
