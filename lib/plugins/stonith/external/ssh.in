@@ -41,7 +41,7 @@ CheckIfDead() {
 	for j in 1 2 3
         do
           if
-            ping -w0.5 -c1 "$1" >/dev/null 2>&1
+            ping -w1 -c1 "$1" >/dev/null 2>&1
           then
             return 1
           fi
@@ -97,7 +97,7 @@ status)
 	for h in $hostlist
 	do
 	  if
-	    host $h 2>&1 | grep "not found:"
+            ping -w1 -c1 "$h" 2>&1 | grep "unknown host"
           then
 	    exit 1
 	  fi
