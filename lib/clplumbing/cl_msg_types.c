@@ -1639,6 +1639,33 @@ compress2uncompress(struct ha_msg* msg, int index)
 	return cl_msg_replace(msg, index, (char*)msgfield, 0, FT_UNCOMPRESS);/* resource leak */  		
 }
 
+/*
+ * string	FT_STRING
+ *		string is the basic type used in heartbeat, it is used for printable ascii value
+ *
+ * binary	FT_BINARY
+ *		binary means the value can be any binary value, including non-printable ascii value
+ *
+ * struct	FT_STRUCT
+ *		struct means the value is also an ha_msg (actually it is a pointer to an ha message)
+ *
+ * list		FT_LIST
+ *		LIST means the value is a GList. Right now we only suppport a Glist of strings
+ *
+ * compress	FT_COMPRESS
+ *		This field and the next one(FT_UNCOMPRESS) is designed to optimize compression in message
+ *		(see cl_compression.c for more about compression). This field is similar to the binary field.
+ *		It stores a compressed field, which will be an ha_msg if uncompressed. Most of time this field
+ *		act like a binary field until compress2uncompress() is called. That function will be called 
+ *		when someone calls cl_get_struct() to get this field value. After that this field is converted
+ *		to a new type FT_UNCOMPRESS
+ *
+ * uncompress	FT_UNCOMPRESS
+ *		As said above, this field is used to optimize compression. This field is similar to the struct 
+ *		field. It's value is a pointer to an ha_msg. This field will be converted to a new type FT_COMPRESS
+ *		when msg2wirefmt() is called, where uncompress2compress is called to do the field compression
+ */
+
 struct fieldtypefuncs_s fieldtypefuncs[NUM_MSG_TYPES]=
 	{ {string_memfree, string_dup, string_display, add_string_field, 
 	   string_stringlen,string_netstringlen, str2string,fields2netstring, 

@@ -18,6 +18,39 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
+
+/*
+ * Compression is designed to handle big messages, right now with 4 nodes
+ * cib message can go up to 64 KB or more. I expect much larger messages
+ * when the number of node increase. This makes message compression necessary.
+ *
+ *
+ * Compression is handled in field level. One can add a struct field using
+ * ha_msg_addstruct() -- the field will not get compressed, or using 
+ * ha_msg_addstruct_compress(), and the field will get compressed when
+ * the message is converted to wire format, i.e. when msg2wirefmt() is called.
+ * The compressed field will stay compressed until it reached the desination.
+ * It will finally decompressed when the user start to get the field value.
+ * It is designed this way so that the compression/decompression only happens
+ * in end users so that heartbeat itself can save cpu cycle and memory.
+ * (more info about compression can be found in cl_msg_types.c about FT_COMPRESS
+ * FT_UNCOMPRESS types)
+ *
+ * compression has another legacy mode, which is there so it can be compatible 
+ * to old ways of compression. In the old way, no field is compressed individually
+ * and the messages is compressed before it is sent out, and it will be decompressed
+ * in the receiver side immediately. So in each IPC channel, the message is compressed
+ * and decompressed once. This way will cost a lot of cpu time and memory and it is 
+ * discouraged.
+ *
+ * If use_traditional_compression is true, then it is using the legacy mode, otherwise
+ * it is using the new compression. For back compatibility, the default is legacy mode.
+ *
+ * The real compression work is done by compression plugins. There are two plugins right
+ * now: zlib and bz2, they are in lib/plugins/HBcompress
+ *
+ */
+
 #include <portability.h>
 #include <stdlib.h>
 #include <stdio.h>
