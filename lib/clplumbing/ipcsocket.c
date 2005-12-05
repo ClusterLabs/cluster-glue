@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.163 2005/11/11 20:39:44 gshi Exp $ */
+/* $Id: ipcsocket.c,v 1.164 2005/12/05 14:54:31 sunjd Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -2091,7 +2091,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 	||	(size_t)n != sizeof(cred)) {
 		return IPC_FAIL;
 	}
-#if 1
+#if 0
 	cl_log(LOG_DEBUG, "SO_PEERCRED returned [%d, (%ld:%ld)]"
 	,	cred.pid, (long)cred.uid, (long)cred.uid);
 	cl_log(LOG_DEBUG, "Verifying authentication: cred.uid=%d cred.gid=%d"
