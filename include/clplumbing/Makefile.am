@@ -50,4 +50,8 @@ include_HEADERS	=	\
 	timers.h	\
 	uids.h		\
 	cl_misc.h	\
-	md5.h
+	md5.h		\
+	cl_plugin.h	\
+	cl_tiebreaker.h	\
+	cl_quorum.h	
+	
