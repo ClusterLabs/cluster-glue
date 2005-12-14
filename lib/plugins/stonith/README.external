@@ -25,7 +25,7 @@ and place it in the /usr/lib/stonith/plugins/external directory - the
 script must be a regular executable file that is NOT writable by group
 or others in order to be recognized as an external plugin.  If the
 action requires information to be returned, such as the list of hosts
-or config names or any of the getinfo-* calls, simply write the 
+or config names or any of the getinfo calls, simply write the 
 information to stdout.  When complete, return zero to indicate the
 action succeeded or non-zero to indicate the action failed.  You can
 use the ssh (sh) and riloe (pyhton) scripts already in that directory
@@ -42,7 +42,7 @@ to the following to /etc/ha.d/ha.cf:
 	stonith external/yourplugin /etc/ha.d/yourplugin.cfg
 
 where /etc/ha.d/yourplugin.cfg contains a single line with all of your
-plugin's required parameters and any optional ones as well:
+plugin's parameters:
 
 	parm1-value parm2-value ...
 
@@ -89,3 +89,5 @@ Whatever <nvpair> parameters specified in the <attributes> section of
 the CIB are passed to the script as environment variables.  For the
 example above, the parameters are passed as parm1-name=parm1-value,
 parm2-name=parm2-value and so on.
+
+Additional information can be found at http://www.linux-ha.org/ExternalStonithPlugins.
