@@ -1,4 +1,4 @@
-/* $Id: stonith_expect_helpers.h,v 1.5 2005/08/17 04:26:26 alan Exp $ */
+/* $Id: stonith_expect_helpers.h,v 1.6 2005/12/14 18:19:20 blaschke Exp $ */
 /*
  * stonith_expect_helpers.h: Some common expect defines.
  *
@@ -74,11 +74,13 @@ static int
 StonithLookFor(int fd, struct Etoken * tlist, int timeout)
 {
 	int	rc;
+	char	savebuf[512];
 
-	if ((rc = EXPECT_TOK(fd, tlist, timeout, NULL, 0, Debug)) < 0) {
-		LOG(PIL_CRIT, "%s %s %s"
-		,	"Did not find string", tlist[0].string
-		,	"from " DEVICE ".");
+	if ((rc = EXPECT_TOK(fd, tlist, timeout, savebuf, sizeof(savebuf)
+			, Debug)) < 0) {
+		LOG(PIL_CRIT, "Did not find string %s from " DEVICE "."
+		,	tlist[0].string);
+		LOG(PIL_CRIT, "Received [%s]", savebuf);
 	}
 	return(rc);
 }
