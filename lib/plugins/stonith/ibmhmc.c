@@ -613,7 +613,7 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 		mansyspats = OurImports->GetValue(list, ST_MANSYSPAT);
 		if (mansyspats != NULL) {
 			if (get_hmc_mansyspats(dev, mansyspats) != S_OK) {
-				FREE(namestocopy[1].s_value);
+				FREE(namestocopy[0].s_value);
 				return S_OOPS;
 			}
 		}
@@ -624,7 +624,7 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 		/* -p or -F option with args "ipaddr [managedsyspat]..." */
 		char *pch = namestocopy[0].s_value;
 
-		/* skip over password and null-terminate */
+		/* skip over ipaddr and null-terminate */
 		pch += strcspn(pch, WHITESPACE);
 		*pch = EOS;
 
@@ -727,7 +727,15 @@ ibmhmc_getinfo(StonithPlugin* s, int reqtype)
 			"Optional parameter name " ST_MANSYSPAT " is "
 			"white-space delimited list of patterns used to match "
 			"managed system names; if last character is '*', all "
-			"names that begin with the pattern are matched\n";
+			"names that begin with the pattern are matched.\n"
+			"Optional parameter name " ST_PASSWD " is password "
+			"for " HMCROOT " if passwordless ssh access to HMC "
+			"has NOT been setup (to do so, it is necessary to "
+			"create a public/private key pair with empty "
+			"passphrase - see \"Configure the OpenSSH Client\" in "
+			"the redbook at " HMCURL " for more details); note "
+			"that passwordless ssh access to HMC must be setup "
+			"for R1 clusters.";
 			break;
 
 		case ST_DEVICEURL:
