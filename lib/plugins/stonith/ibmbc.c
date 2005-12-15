@@ -41,7 +41,7 @@
 #define SYSTEM_CHASSIS_FMT	"{SYSTEM_CHASSIS,%d}"
 #define OPENHPIURL		"http://openhpi.sourceforge.net/"
 
-/* OPENHPI_RETURN_ERROR - This constant has to do with the problem that
+/* IBMBC_WAIT_FOR_OFF - This constant has to do with the problem that
    saHpiResourcePowerStateSet can return before the desired state has been
    achieved by the blade.  In the SAHPI_POWER_OFF case this is not good,
    as whoever calls this plugin assumes that the power is actually off
@@ -49,18 +49,24 @@
    constant to build code that loops in one second intervals after calling
    saHpiResourcePowerStateSet(SAHPI_POWER_OFF) to make sure the power is
    really off. */
-#define OPENHPI_RETURN_ERROR	1
+#define IBMBC_WAIT_FOR_OFF
 
-/* OPENHPI_RESET_ERROR - This constant has to do with the problems that
-   a) saHpiResourcePowerStateSet(SAHPI_POWER_CYCLE) does not turn the
-   power off, then on as described in the spec but rather triggers a cold
-   reset, and b) calling the HPI in this manner causes communications with
-   the blade to cease in such a manner that all subsequent HPI calls
-   return with error -1012 (SA_ERR_HPI_NO_RESPONSE).  Define this constant
-   to build code that replaces the SAHPI_POWER_CYCLE invocation with
-   SAHPI_POWER_OFF, followed by a loop to make sure it is really off,
-   followed by SAHPI_POWER_ON. */
-#define OPENHPI_RESET_ERROR	1
+/* IBMBC_DO_OWN_RESET - This constant has to do with the problem that
+   saHpiResourcePowerStateSet(SAHPI_POWER_CYCLE) does not turn the power
+   off, then on as described in the spec but rather triggers a cold reset.
+   Define this constant to build code that replaces the SAHPI_POWER_CYCLE
+   invocation with SAHPI_POWER_OFF, followed by a loop to make sure it is
+   really off, followed by SAHPI_POWER_ON. */
+#define IBMBC_DO_OWN_RESET
+
+/* IBMBC_OPENHPI_PSS_BUG - This constant has to do with the problem that
+   calling saHpiResourcePowerStateSet causes communications with the blade
+   to cease in such a manner that all subsequent HPI calls return with
+   error -1012 (SA_ERR_HPI_NO_RESPONSE).  Define this constant to clear
+   the event log via saHpiEventLogClear before and after setting the power
+   state. NOTE: This bug is present in OpenHPI versions between Sep 05 and
+   Dec 05. */
+#define IBMBC_OPENHPI_PSS_BUG
 
 static StonithPlugin *	ibmbc_new(const char *);
 static void		ibmbc_destroy(StonithPlugin *);
@@ -126,6 +132,10 @@ struct pluginDevice {
 	GList*		 	hostlist;
 	SaHpiVersionT		ohver;
 	SaHpiSessionIdT		ohsession;
+#ifdef IBMBC_OPENHPI_PSS_BUG
+	SaHpiResourceIdT	eventlogId1;
+	SaHpiResourceIdT	eventlogId2;
+#endif
 };
 
 static const char * pluginid = "BladeCenterDevice-Stonith";
@@ -177,7 +187,7 @@ ibmbc_status(StonithPlugin  *s)
 	SaHpiUint32T		ohupdate;
 	
 	if(Debug){
-		LOG(PIL_DEBUG, "%s: called\n", __FUNCTION__);
+		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
 	}
 
 	ERRIFWRONGDEV(s,S_OOPS);
@@ -230,7 +240,7 @@ ibmbc_hostlist(StonithPlugin  *s)
 	GList*			node = NULL;
 
 	if(Debug){
-		LOG(PIL_DEBUG, "%s: called\n", __FUNCTION__);
+		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
 	}
 
 	ERRIFWRONGDEV(s,NULL);
@@ -285,6 +295,28 @@ ibmbc_get_confignames(StonithPlugin* p)
 }
 
 
+#ifdef IBMBC_OPENHPI_PSS_BUG
+static int
+ibmbc_clear_bladecenter_eventlog(struct pluginDevice* dev)
+{
+	SaErrorT	ohrc;
+
+	/* There is at least one, maximum two management modules */
+	if ((ohrc = saHpiEventLogClear(dev->ohsession
+			, dev->eventlogId1)) != SA_OK) {
+		LOG(PIL_CRIT, "Unable to clear event log (%d)", ohrc);
+		return (S_OOPS);
+	}
+	if (dev->eventlogId2 && (ohrc = saHpiEventLogClear(dev->ohsession
+			, dev->eventlogId2)) != SA_OK) {
+		LOG(PIL_CRIT, "Unable to clear event log (%d)", ohrc);
+		return (S_OOPS);
+	}
+	return S_OK;
+}
+#endif
+
+
 /*
  *	Reset the given host, and obey the request type.
  *	We should reset without power cycle for the non-partitioned case
@@ -300,7 +332,7 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 	struct blade_info*	bi = NULL;
 	
 	if(Debug){
-		LOG(PIL_DEBUG, "%s: called, host=%s\n", __FUNCTION__, host);
+		LOG(PIL_DEBUG, "%s: called, host=%s", __FUNCTION__, host);
 	}
 	
 	ERRIFWRONGDEV(s,S_OOPS);
@@ -317,7 +349,7 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 	;	node = g_list_next(node)) {
 		bi = ((struct blade_info *)node->data);
 		if(Debug){
-			LOG(PIL_DEBUG, "%s: node->data->name=%s\n"
+			LOG(PIL_DEBUG, "%s: node->data->name=%s"
 			,	__FUNCTION__, bi->name);
 		}
 		
@@ -380,9 +412,16 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 			return S_INVAL;
 	}
 
-#ifdef OPENHPI_RESET_ERROR
+#ifdef IBMBC_OPENHPI_PSS_BUG
+	if (ibmbc_clear_bladecenter_eventlog(dev) != SA_OK) {
+		return (S_OOPS);
+	}
+#endif
+
+#ifdef IBMBC_DO_OWN_RESET
 	if (ohnewstate == SAHPI_POWER_CYCLE) {
 		int	maxwait = MAX_POWEROFF_WAIT;
+
 		if ((ohrc = saHpiResourcePowerStateSet(dev->ohsession
 				, bi->resourceId, SAHPI_POWER_OFF)) != SA_OK) {
 			LOG(PIL_CRIT, "Unable to change resource %s power"
@@ -390,13 +429,25 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 			return (S_OOPS);
 		}
 
+#ifdef IBMBC_OPENHPI_PSS_BUG
+		if (ibmbc_clear_bladecenter_eventlog(dev) != SA_OK) {
+			return (S_OOPS);
+		}
+#endif
+
 		do {
+			maxwait--;
 			sleep(1);
 			ohrc = saHpiResourcePowerStateGet(dev->ohsession
 					, bi->resourceId, &ohcurstate);
 		} while ((ohrc == SA_OK)
 			&& (ohcurstate != SAHPI_POWER_OFF)
-			&& (maxwait-- > 0));
+			&& (maxwait > 0));
+
+		if(Debug){
+			LOG(PIL_DEBUG, "Waited %d seconds for power off"
+			,	MAX_POWEROFF_WAIT - maxwait);
+		}
 
 		if ((ohrc = saHpiResourcePowerStateSet(dev->ohsession
 				, bi->resourceId, SAHPI_POWER_ON)) != SA_OK) {
@@ -404,6 +455,12 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 			" state (%d)", host, ohrc);
 			return (S_OOPS);
 		}
+
+#ifdef IBMBC_OPENHPI_PSS_BUG
+		if (ibmbc_clear_bladecenter_eventlog(dev) != SA_OK) {
+			return (S_OOPS);
+		}
+#endif
 
 		/* Don't want to wait for POWEROFF */
 		ohnewstate = SAHPI_POWER_ON;
@@ -417,16 +474,28 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 		return (S_OOPS);
 	}
 
-#ifdef OPENHPI_TIMING_ERROR
+#ifdef IBMBC_OPENHPI_PSS_BUG
+	if (ibmbc_clear_bladecenter_eventlog(dev) != SA_OK) {
+		return (S_OOPS);
+	}
+#endif
+
+#ifdef IBMBC_WAIT_FOR_OFF
 	if (ohnewstate != SAHPI_POWER_ON) {
 		int	maxwait = MAX_POWEROFF_WAIT;
 		do {
+			maxwait--;
 			sleep(1);
 			ohrc = saHpiResourcePowerStateGet(dev->ohsession
 					, bi->resourceId, &ohcurstate);
 		} while ((ohrc == SA_OK)
 			&& (ohcurstate != SAHPI_POWER_OFF)
-			&& (maxwait-- > 0));
+			&& (maxwait > 0));
+
+		if(Debug){
+			LOG(PIL_DEBUG, "Waited %d seconds for power off"
+			,	MAX_POWEROFF_WAIT - maxwait);
+		}
 	}
 #endif
 
@@ -455,16 +524,30 @@ ibmbc_set_config(StonithPlugin * s, StonithNVpair* list)
 	ERRIFWRONGDEV(s,S_OOPS);
 
 	if(Debug){
-		LOG(PIL_DEBUG, "%s: called\n", __FUNCTION__);
+		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
 	}
 	
 	dev = (struct pluginDevice*) s;
 
+	if(Debug){
+		LOG(PIL_DEBUG, "%s conditionally compiled with:"
+#ifdef IBMBC_WAIT_FOR_OFF
+		" IBMBC_WAIT_FOR_OFF"
+#endif
+#ifdef IBMBC_DO_OWN_RESET
+		" IBMBC_DO_OWN_RESET"
+#endif
+#ifdef IBMBC_OPENHPI_PSS_BUG
+		" IBMBC_OPENHPI_PSS_BUG"
+#endif
+		, dev->pluginid);
+	}
+	
 	if ((rc = OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
 		return rc;
 	}
 	if(Debug){
-		LOG(PIL_DEBUG, "%s: entity_root=%s\n", __FUNCTION__
+		LOG(PIL_DEBUG, "%s: entity_root=%s", __FUNCTION__
 		,	namestocopy[0].s_value);	
 	}
 
@@ -562,7 +645,7 @@ ibmbc_destroy(StonithPlugin *s)
 	struct pluginDevice*	dev;
 
 	if(Debug){
-		LOG(PIL_DEBUG, "%s : called\n", __FUNCTION__);
+		LOG(PIL_DEBUG, "%s : called", __FUNCTION__);
 	}
 
 	VOIDERRIFWRONGDEV(s);
@@ -595,7 +678,7 @@ ibmbc_new(const char *subplugin)
 	struct pluginDevice*	dev = MALLOCT(struct pluginDevice);
 	
 	if(Debug){
-		LOG(PIL_DEBUG, "%s: called\n", __FUNCTION__);
+		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
 	}
 	
 	if (dev == NULL) {
@@ -616,7 +699,7 @@ ibmbc_new(const char *subplugin)
 	dev->sp.s_ops = &ibmbcOps;
 
 	if(Debug){
-		LOG(PIL_DEBUG, "%s: returning successfully\n", __FUNCTION__);
+		LOG(PIL_DEBUG, "%s: returning successfully", __FUNCTION__);
 	}
 
 	return((void *)dev);
@@ -660,6 +743,47 @@ is_resource_bladecenter(char *entityRoot, SaHpiRptEntryT *ohRPT)
 	/* We are only interested in bladecenter chasses on specific device */
 	return foundRoot && !foundOther;
 }
+
+#ifdef IBMBC_OPENHPI_PSS_BUG
+static int
+is_resource_bladecenter_eventlog(char *entityRoot, SaHpiRptEntryT *ohRPT)
+{
+
+	int 			i, foundRoot = 0;
+	SaHpiEntityPathT*	ohep = &ohRPT->ResourceEntity;
+	char 			rootName[64];
+
+	if (ohep == NULL || entityRoot == NULL) {
+		return 0;
+	}
+
+        for (i = 0; i < SAHPI_MAX_ENTITY_PATH; i++) {
+                if (ohep->Entry[i].EntityType == SAHPI_ENT_ROOT) {
+                            break;
+                }
+        }
+
+        for (i--; i >= 0; i--) {
+		switch (ohep->Entry[i].EntityType) {
+			case SAHPI_ENT_SYSTEM_CHASSIS:
+				snprintf(rootName, sizeof(rootName)
+				,	SYSTEM_CHASSIS_FMT
+				,	ohep->Entry[i].EntityLocation);
+				if (!strcmp(entityRoot, rootName)) {
+					foundRoot = 1;
+				}
+				break;
+
+			default:
+				break;
+		}
+	}
+
+	/* We are only interested in event log on specific device */
+	return foundRoot
+	&& (ohRPT->ResourceCapabilities & SAHPI_CAPABILITY_EVENT_LOG);
+}
+#endif
 
 static int
 is_resource_blade(char *entityRoot, SaHpiRptEntryT *ohRPT)
@@ -719,7 +843,7 @@ get_ibmbc_hostlist(struct pluginDevice* dev)
 	SaHpiUint32T		ohupdate;
 
 	if(Debug){
-		LOG(PIL_DEBUG, "%s: called, dev->device=%s\n", __FUNCTION__
+		LOG(PIL_DEBUG, "%s: called, dev->device=%s", __FUNCTION__
 		,	dev->device);
 	}
 
@@ -751,9 +875,23 @@ try_again:
 			bi->name = STRDUP(ohRPT.ResourceTag.Data);
 			bi->resourceId = ohRPT.ResourceId;
 			bi->resourceCaps = ohRPT.ResourceCapabilities;
-LOG(PIL_INFO, "Adding %s with id %d and caps %x\n", bi->name, bi->resourceId, bi->resourceCaps);
 			dev->hostlist = g_list_append(dev->hostlist, bi);
+
+			if(Debug){
+				LOG(PIL_DEBUG, "Blade %s has id %d, caps %x"
+				, bi->name, bi->resourceId, bi->resourceCaps);
+			}
 		}
+#ifdef IBMBC_OPENHPI_PSS_BUG
+		else if (ohrc == SA_OK
+		&& is_resource_bladecenter_eventlog(dev->device, &ohRPT)) {
+			if (dev->eventlogId1 == 0) {
+				dev->eventlogId1 = ohRPT.ResourceId;
+			} else {
+				dev->eventlogId2 = ohRPT.ResourceId;
+			}
+		}
+#endif
 	} while (ohrc == SA_OK && ohnextid != SAHPI_LAST_ENTRY);
 
 	if (ohupdate != ohdi.RptUpdateCount) {
