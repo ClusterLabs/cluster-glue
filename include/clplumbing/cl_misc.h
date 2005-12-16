@@ -21,4 +21,7 @@
 int	cl_str_to_boolean(const char*, int*);
 
 int	cl_file_exists(const char* filename);
+
+char*	cl_get_env(const char* env_name);
+
 #endif
