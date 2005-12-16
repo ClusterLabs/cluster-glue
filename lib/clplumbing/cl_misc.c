@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 int
 cl_str_to_boolean(const char * s, int * ret)
@@ -66,4 +67,16 @@ cl_file_exists(const char* filename)
 	}
 	
 	return FALSE;
+}
+
+char*
+cl_get_env(const char* env_name)
+{	
+	if (env_name == NULL){
+		cl_log(LOG_ERR, "%s: null name",
+		       __FUNCTION__);
+		return NULL;
+	}
+	
+	return getenv(env_name);
 }
