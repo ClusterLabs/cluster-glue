@@ -80,9 +80,9 @@ int struct_display_as_xml(int log_level, int depth, struct ha_msg *data,
 int struct_stringlen(size_t namlen, size_t vallen, const void* value);
 int struct_netstringlen(size_t namlen, size_t vallen, const void* value);
 int	convert_nl_sym(char* s, int len, char sym, int direction);
- 
+int	intlen(int x);
 
-static int
+int
 intlen(int x)
 {
 	char	buf[20];
@@ -220,9 +220,14 @@ string_list_pack(GList* list, char* buf, char* maxp)
 				, (unsigned long)i);
 			return 0;
 		}
+		if (p + 2 + element_len + intlen(element_len)> maxp){
+			cl_log(LOG_ERR, "%s: memory out of boundary",
+			       __FUNCTION__);
+			return 0;
+		}
 		p += sprintf(p, "%d:%s,", element_len,element);
 		
-		if (p >= maxp){
+		if (p > maxp){
 			cl_log(LOG_ERR, "string_list_pack: "
 			       "buffer overflowed ");
 			return 0;
@@ -674,7 +679,7 @@ liststring(GList* list, char* buf, int maxlen)
 			}
 			
 		}
-		if ( p >= maxp){
+		if ( p > maxp){
 			cl_log(LOG_ERR, "buffer overflow");
 			return HA_FAIL;
 		}
@@ -1096,6 +1101,13 @@ str2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	char* p = buf;
 	(void)maxp;
 	(void)depth;
+	
+	if (buf + len > maxp){
+		cl_log(LOG_ERR, "%s: out of boundary",
+		       __FUNCTION__);
+		return -1;
+	}
+
 	if ( strlen(s) != len){
 		cl_log(LOG_ERR, "str2string:"
 		       "the input len != string length");
@@ -1127,7 +1139,7 @@ binary2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	(void)depth;
 	baselen = B64_stringlen(len) + 1;
 	
-	if ( buf + baselen >= maxp){
+	if ( buf + baselen > maxp){
 		cl_log(LOG_ERR, "binary2string: out of bounary");
 		return -1;
 	}
@@ -1329,10 +1341,17 @@ fields2netstring(char* sp, char* smax, char* name, size_t nlen,
 	size_t slen;
 	int ret = HA_OK;
 	char* sp_save = sp;
+	char* tmpsp;
 
 	fieldlen = fieldtypefuncs[type].netstringlen(nlen, vallen, value);
 	if (fieldlen > MAXMSG){
 		cl_log(LOG_INFO, "field too big(%d)", (int)fieldlen);
+		return HA_FAIL;
+	}
+	tmpsp = sp + netstring_extra(fieldlen);
+	if (tmpsp > smax){
+		cl_log(LOG_ERR, "%s: memory out of boundary, tmpsp=%p, smax=%p", 
+		       __FUNCTION__, tmpsp, smax);
 		return HA_FAIL;
 	}
 	sp += sprintf(sp , "%d:(%d)%s=", (int)fieldlen, type, name);
