@@ -1,4 +1,4 @@
-/* $Id: cl_log.h,v 1.25 2005/11/08 06:27:38 gshi Exp $ */
+/* $Id: cl_log.h,v 1.26 2005/12/18 22:02:39 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,6 +27,7 @@
 
 struct IPC_CHANNEL;
 
+extern int		debug_level;
 #define	ANYDEBUG	(debug_level)
 #define	DEBUGDETAILS	(debug_level >= 2)
 #define	DEBUGAUTH	(debug_level >=3)

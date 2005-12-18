@@ -1,4 +1,4 @@
-/* $Id: realtime.c,v 1.30 2005/11/22 02:48:57 andrew Exp $ */
+/* $Id: realtime.c,v 1.31 2005/12/18 22:02:39 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -211,7 +211,9 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 	}
 #	endif	/*RLIMIT_MEMLOCK*/
 	if (mlockall(MCL_CURRENT|MCL_FUTURE) >= 0) {
-		cl_log(LOG_INFO, "pid %d locked in memory.", (int) getpid());
+		if (ANYDEBUG) {
+			cl_log(LOG_DEBUG, "pid %d locked in memory.", (int) getpid());
+		}
 
 	} else if(errno == ENOSYS) {
 		const char *err = strerror(errno);
