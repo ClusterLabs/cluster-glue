@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.42 2005/08/18 05:09:40 alan Exp $ */
+/* $Id: ipctest.c,v 1.43 2005/12/18 22:02:39 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,13 +17,13 @@
 
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
+#include <portability.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <glib.h>
