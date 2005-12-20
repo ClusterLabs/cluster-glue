@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 int
 cl_str_to_boolean(const char * s, int * ret)
@@ -79,4 +80,43 @@ cl_get_env(const char* env_name)
 	}
 	
 	return getenv(env_name);
+}
+
+
+int
+cl_binary_to_int(const char* data, int len)
+{
+	const char *p = data;
+	const char *pmax = p + len;
+	guint h = *p;
+	
+	if (h){
+		for (p += 1; p < pmax; p++){
+			h = (h << 5) - h + *p;
+		}
+	}
+	
+	return h;
+}
+
+
+int
+cl_random(void)
+{
+	char buf[16];
+	
+	FILE* fs = fopen("/dev/urandom", "r");
+	if (fs == NULL){
+		cl_log(LOG_ERR, "%s: Opening file failed", 
+		       __FUNCTION__);
+		return -1;
+	}
+	
+	if (fread(buf,1, sizeof(buf), fs)!= sizeof(buf)){
+		cl_log(LOG_ERR, "%s: reading file failed",
+		       __FUNCTION__);
+		return -1;
+	}	
+	
+	return cl_binary_to_int(buf, sizeof(buf));
 }
