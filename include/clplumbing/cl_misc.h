@@ -24,4 +24,8 @@ int	cl_file_exists(const char* filename);
 
 char*	cl_get_env(const char* env_name);
 
+int	cl_binary_to_int(const char* data, int len);
+
+int	cl_random(void);
+
 #endif
