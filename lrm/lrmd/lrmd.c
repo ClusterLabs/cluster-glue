@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.189 2005/12/25 03:45:00 alan Exp $ */
+/* $Id: lrmd.c,v 1.190 2005/12/25 04:33:51 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3113,10 +3113,10 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
 	rc = RAExec->map_ra_retvalue(exitcode, op_type, op->first_line_ra_stdout);
-	if (rc != EXECRA_OK) {
+	if (rc != EXECRA_OK || debug_level > 1) {
 		lrmd_debug(LOG_DEBUG, "A RA execution: process [%d], "
-			"exitcode %d, with signo %d, %s, the RA output: %s"
-			, p->pid, exitcode, signo, op_info(op)
+			"exitcode %d, rc %d, with signo %d, %s, the RA output: %s"
+			, p->pid, exitcode, rc, signo, op_info(op)
 			, op->first_line_ra_stdout);
 	}
 	if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
@@ -3448,6 +3448,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.190  2005/12/25 04:33:51  alan
+ * Made some error-only output come out when debug level is high enough
+ *
  * Revision 1.189  2005/12/25 03:45:00  alan
  * Dropped two log messages to debug level 3 because they just produce
  * WAY too much output.
