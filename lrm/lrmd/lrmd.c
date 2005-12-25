@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.191 2005/12/25 14:40:35 alan Exp $ */
+/* $Id: lrmd.c,v 1.192 2005/12/25 23:23:41 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3025,7 +3025,7 @@ perform_ra_op(lrmd_op_t* op)
 			 * need to be passed in. Maybe pass through the
 			 * entire lrm_op_t too? */
 			lrmd_debug2(LOG_DEBUG
-			,	"perform_ra_op:call RA plugin to perform %s, pid: [%d]"
+			,	"perform_ra_op:calling RA plugin to perform %s, pid: [%d]"
 			,	op_info(op), getpid());		
 			RAExec->execra (rsc->id,
 					rsc->type,
@@ -3078,6 +3078,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		lrmd_op_destroy(op);
 		p->privatedata = NULL;
 		dump_data_for_debug();
+lrmd_log(LOG_ERR, "RETURNING from %s line %d", __FUNCTION__, __LINE__);
 		return;
 	}
 
@@ -3088,16 +3089,18 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 			lrmd_op_destroy(op);
 			p->privatedata = NULL;
 			dump_data_for_debug();
+lrmd_log(LOG_ERR, "RETURNING from %s line %d", __FUNCTION__, __LINE__);
 			return;
 		}
 	}
 
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
-		lrmd_debug(LOG_DEBUG,"on_ra_proc_finished: the rsc (id=%s) does"
-			" not exist", op->rsc_id);
+		lrmd_debug(LOG_DEBUG, "on_ra_proc_finished: the rsc (id=%s) does"
+		" not exist", op->rsc_id);
 		on_op_done(op);
 		p->privatedata = NULL;
+lrmd_log(LOG_ERR, "RETURNING from %s line %d", __FUNCTION__, __LINE__);
 		return;
 	}	
 	RAExec = g_hash_table_lookup(RAExecFuncs,rsc->class);
@@ -3105,19 +3108,26 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		lrmd_log(LOG_ERR,"on_ra_proc_finished: can not find RAExec for"
 			"resource class <%s>", rsc->class);
 		dump_data_for_debug();
+lrmd_log(LOG_ERR, "RETURNING from %s line %d", __FUNCTION__, __LINE__);
 		return;
 	}
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
+lrmd_log(LOG_ERR, "Mapping return value from plugin in %s() line %d", __FUNCTION__, __LINE__);
 	rc = RAExec->map_ra_retvalue(exitcode, op_type, op->first_line_ra_stdout);
 	if (rc != EXECRA_OK || debug_level > 1) {
-		lrmd_debug(rc == EXECRA_OK ? LOG_DEBUG : LOG_ERR
+		lrmd_log(rc == EXECRA_OK ? LOG_DEBUG : LOG_ERR
 		,	"Resource Agent (%s): process [%d], "
 			"exitcode %d, rc %d, with signo %d, the RA output: %s"
 		,	op_info(op)
 		,	p->pid, exitcode, rc, signo
 		,	op->first_line_ra_stdout);
 	}
+lrmd_log(LOG_ERR, "Mapping of return value complete in %s() line %d", __FUNCTION__, __LINE__);
+lrmd_log(LOG_ERR, "Resource Agent (%s): process [%d], "
+"exitcode %d, rc %d, with signo %d, the RA output: %s"
+,	op_info(op), p->pid, exitcode, rc, signo, op->first_line_ra_stdout);
+
 	if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
 		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS,
 							LRM_OP_ERROR)) {
@@ -3444,6 +3454,10 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.192  2005/12/25 23:23:41  alan
+ * Put in some temporary debugging code to just help me figure out
+ * why the permanent debugging code I put in isn't working...
+ *
  * Revision 1.191  2005/12/25 14:40:35  alan
  * More debugging output.
  *
