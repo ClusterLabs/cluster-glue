@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.188 2005/11/24 10:27:01 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.189 2005/12/25 03:45:00 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -85,6 +85,11 @@
 
 #define lrmd_debug2(priority, fmt...); \
         if ( debug_level >= 2 ) { \
+                cl_log(priority, fmt); \
+        }
+
+#define lrmd_debug3(priority, fmt...); \
+        if ( debug_level >= 3 ) { \
                 cl_log(priority, fmt); \
         }
 
@@ -3296,7 +3301,7 @@ read_pipe(int fd, char ** data, void * user_data)
 	lrmd_rsc_t* rsc = NULL;
 	lrmd_op_t* op = (lrmd_op_t *)user_data;
 
-	lrmd_debug2(LOG_DEBUG, "%s begin.", __FUNCTION__);
+	lrmd_debug3(LOG_DEBUG, "%s begin.", __FUNCTION__);
 
 	*data = NULL;
 	gstr_tmp = g_string_new("");
@@ -3345,7 +3350,7 @@ read_pipe(int fd, char ** data, void * user_data)
 		g_string_free(gstr_tmp, FALSE);
 	}
 
-	lrmd_debug2(LOG_DEBUG, "%s end.", __FUNCTION__);
+	lrmd_debug3(LOG_DEBUG, "%s end.", __FUNCTION__);
 	return rc;
 }
 
@@ -3443,6 +3448,10 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.189  2005/12/25 03:45:00  alan
+ * Dropped two log messages to debug level 3 because they just produce
+ * WAY too much output.
+ *
  * Revision 1.188  2005/11/24 10:27:01  sunjd
  * add a log output function for level2 debug
  *
