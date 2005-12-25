@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.190 2005/12/25 04:33:51 alan Exp $ */
+/* $Id: lrmd.c,v 1.191 2005/12/25 14:40:35 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -928,9 +928,6 @@ main(int argc, char ** argv)
 	inherit_debuglevel = getenv(HADEBUGVAL);
 	if (inherit_debuglevel != NULL) {
 		debug_level = atoi(inherit_debuglevel);
-		if (debug_level > 2) {
-			debug_level = 2;
-		}
 	}
 
 	cl_log_set_entity(lrm_system_name);
@@ -3114,10 +3111,12 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
 	rc = RAExec->map_ra_retvalue(exitcode, op_type, op->first_line_ra_stdout);
 	if (rc != EXECRA_OK || debug_level > 1) {
-		lrmd_debug(LOG_DEBUG, "A RA execution: process [%d], "
-			"exitcode %d, rc %d, with signo %d, %s, the RA output: %s"
-			, p->pid, exitcode, rc, signo, op_info(op)
-			, op->first_line_ra_stdout);
+		lrmd_debug(rc == EXECRA_OK ? LOG_DEBUG : LOG_ERR
+		,	"Resource Agent (%s): process [%d], "
+			"exitcode %d, rc %d, with signo %d, the RA output: %s"
+		,	op_info(op)
+		,	p->pid, exitcode, rc, signo
+		,	op->first_line_ra_stdout);
 	}
 	if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
 		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS,
@@ -3361,9 +3360,6 @@ debug_level_adjust(int nsig, gpointer user_data)
 	switch (nsig) {
 		case SIGUSR1:
 			debug_level++;
-			if (debug_level > 2) {
-				debug_level = 2;
-			}
 			dump_data_for_debug();
 			break;
 
@@ -3448,6 +3444,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.191  2005/12/25 14:40:35  alan
+ * More debugging output.
+ *
  * Revision 1.190  2005/12/25 04:33:51  alan
  * Made some error-only output come out when debug level is high enough
  *
