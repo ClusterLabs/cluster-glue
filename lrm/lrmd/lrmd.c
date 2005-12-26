@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.192 2005/12/25 23:23:41 alan Exp $ */
+/* $Id: lrmd.c,v 1.193 2005/12/26 17:35:44 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3113,9 +3113,9 @@ lrmd_log(LOG_ERR, "RETURNING from %s line %d", __FUNCTION__, __LINE__);
 	}
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
-lrmd_log(LOG_ERR, "Mapping return value from plugin in %s() line %d", __FUNCTION__, __LINE__);
+lrmd_log(LOG_ERR, "Mapping return value from op_type [%s] plugin in %s() line %d", op_type, __FUNCTION__, __LINE__);
 	rc = RAExec->map_ra_retvalue(exitcode, op_type, op->first_line_ra_stdout);
-	if (rc != EXECRA_OK || debug_level > 1) {
+	if (rc != EXECRA_OK || debug_level > 0) {
 		lrmd_log(rc == EXECRA_OK ? LOG_DEBUG : LOG_ERR
 		,	"Resource Agent (%s): process [%d], "
 			"exitcode %d, rc %d, with signo %d, the RA output: %s"
@@ -3123,7 +3123,7 @@ lrmd_log(LOG_ERR, "Mapping return value from plugin in %s() line %d", __FUNCTION
 		,	p->pid, exitcode, rc, signo
 		,	op->first_line_ra_stdout);
 	}
-lrmd_log(LOG_ERR, "Mapping of return value complete in %s() line %d", __FUNCTION__, __LINE__);
+lrmd_log(LOG_ERR, "Mapping of return value for op [%s] complete in %s() line %d", op_type, __FUNCTION__, __LINE__);
 lrmd_log(LOG_ERR, "Resource Agent (%s): process [%d], "
 "exitcode %d, rc %d, with signo %d, the RA output: %s"
 ,	op_info(op), p->pid, exitcode, rc, signo, op->first_line_ra_stdout);
@@ -3454,6 +3454,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.193  2005/12/26 17:35:44  alan
+ * Put in a little more detail in the temporary debugging output.
+ *
  * Revision 1.192  2005/12/25 23:23:41  alan
  * Put in some temporary debugging code to just help me figure out
  * why the permanent debugging code I put in isn't working...
