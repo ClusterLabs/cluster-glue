@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.194 2005/12/26 22:58:29 alan Exp $ */
+/* $Id: lrmd.c,v 1.195 2005/12/27 10:21:45 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -79,7 +79,7 @@
 		cl_log(priority, fmt); \
 
 #define lrmd_debug(priority, fmt...); \
-        if ( debug_level == 1 ) { \
+        if ( debug_level >= 1 ) { \
                 cl_log(priority, fmt); \
         }
 
@@ -3452,6 +3452,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.195  2005/12/27 10:21:45  sunjd
+ * should be GT
+ *
  * Revision 1.194  2005/12/26 22:58:29  alan
  * Made minor reformatting changes and removed extra blanks at end of lines.
  *
