@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.196 2005/12/27 11:06:02 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.197 2005/12/27 16:12:11 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3108,7 +3108,9 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	}
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
-	handle_pipe_ra_stdout(-1, op);
+	if (op->first_line_ra_stdout[0] == EOS) {
+		handle_pipe_ra_stdout(-1, op);
+	}
 	rc = RAExec->map_ra_retvalue(exitcode, op_type, op->first_line_ra_stdout);
 	if (rc != EXECRA_OK || debug_level > 0) {
 		if (signo != 0) {
@@ -3461,6 +3463,10 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.197  2005/12/27 16:12:11  alan
+ * Put in a minor fix to only reread (overwrite) the output from stdout if
+ * we haven't already captured it.
+ *
  * Revision 1.196  2005/12/27 11:06:02  sunjd
  * Force to read the stdout of the excution of a RA
  *
