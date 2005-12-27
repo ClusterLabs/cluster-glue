@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.197 2005/12/27 16:12:11 alan Exp $ */
+/* $Id: lrmd.c,v 1.198 2005/12/27 16:59:15 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -476,7 +476,7 @@ lrmd_op_new(void)
 	op->ra_stderr_fd = -1;
 	op->ra_stdout_gsource = NULL;
 	op->ra_stderr_gsource = NULL;
-	memset(op->first_line_ra_stdout, 0, sizeof(op->first_line_ra_stdout));
+	op->first_line_ra_stdout[0] = EOS;
 	op->t_recv = time_longclock();
 	++lrm_objectstats.opcount;
 	return op;
@@ -3245,6 +3245,7 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 static gboolean
 handle_pipe_ra_stdout(int fd, gpointer user_data)
 {
+	/* FIXME!!  THIS CANNOT BE A STATIC - you need one per RA! */
 	static gboolean first_line = TRUE;
 	gboolean rc = TRUE;
 	lrmd_op_t* op = (lrmd_op_t *)user_data;
@@ -3463,6 +3464,10 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.198  2005/12/27 16:59:15  alan
+ * Put in a note about a bug in the form of a FIXME
+ * I can't fix it right this minute.  Sorry...
+ *
  * Revision 1.197  2005/12/27 16:12:11  alan
  * Put in a minor fix to only reread (overwrite) the output from stdout if
  * we haven't already captured it.
