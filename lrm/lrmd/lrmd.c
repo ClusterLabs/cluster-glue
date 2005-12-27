@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.199 2005/12/27 21:02:44 alan Exp $ */
+/* $Id: lrmd.c,v 1.200 2005/12/27 22:35:07 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3127,8 +3127,10 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 			" return code %d (mapped from %d)"
 			,	op_info(op), p->pid, rc, exitcode);
 		}
-		lrmd_log(LOG_INFO, "Resource Agent output: [%s]"
-		,	op->first_line_ra_stdout);
+		if (rc != EXECRA_OK || debug_level > 1) {
+			lrmd_log(LOG_INFO, "Resource Agent output: [%s]"
+			,	op->first_line_ra_stdout);
+		}
 	}
 	if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
 		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS,
@@ -3464,6 +3466,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.200  2005/12/27 22:35:07  alan
+ * Changed one message to not come out except at higher debug levels or in case of error.
+ *
  * Revision 1.199  2005/12/27 21:02:44  alan
  * Got rid of the static "first_line" variable - it was shared by all operations
  * which clearly won't work.
