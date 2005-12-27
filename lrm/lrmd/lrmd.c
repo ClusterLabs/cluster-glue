@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.195 2005/12/27 10:21:45 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.196 2005/12/27 11:06:02 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3108,6 +3108,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	}
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
+	handle_pipe_ra_stdout(-1, op);
 	rc = RAExec->map_ra_retvalue(exitcode, op_type, op->first_line_ra_stdout);
 	if (rc != EXECRA_OK || debug_level > 0) {
 		if (signo != 0) {
@@ -3247,6 +3248,14 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 	lrmd_op_t* op = (lrmd_op_t *)user_data;
 	const char* op_type = NULL; 
 	char * data = NULL;
+
+	if (op == NULL) {
+		lrmd_log(LOG_DEBUG, "%s:%d: op==NULL.", __FUNCTION__, __LINE__);
+	}
+
+	if (fd == -1) {
+		fd = op->ra_stdout_fd;
+	}
 
 	if (0 != read_pipe(fd, &data, op)) {
 		rc = FALSE;
@@ -3452,6 +3461,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.196  2005/12/27 11:06:02  sunjd
+ * Force to read the stdout of the excution of a RA
+ *
  * Revision 1.195  2005/12/27 10:21:45  sunjd
  * should be GT
  *
