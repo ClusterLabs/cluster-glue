@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.198 2005/12/27 16:59:15 alan Exp $ */
+/* $Id: lrmd.c,v 1.199 2005/12/27 21:02:44 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3245,8 +3245,6 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 static gboolean
 handle_pipe_ra_stdout(int fd, gpointer user_data)
 {
-	/* FIXME!!  THIS CANNOT BE A STATIC - you need one per RA! */
-	static gboolean first_line = TRUE;
 	gboolean rc = TRUE;
 	lrmd_op_t* op = (lrmd_op_t *)user_data;
 	const char* op_type = NULL; 
@@ -3274,12 +3272,14 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 			lrmd_log(LOG_INFO, "RA output: (%s:%s:stdout) %s"
 				, op->rsc_id, op_type, data);
 		}
-		if (first_line == TRUE) {
-			memset(op->first_line_ra_stdout, 0
-				, sizeof(op->first_line_ra_stdout));
+		/*
+		 * This isn't quite correct yet - there is no idea of a "line"
+		 * in the code as it's presently written...
+		 * but it probably works OK for now...
+		 */
+		if (op->first_line_ra_stdout[0] == EOS) {
 			strncpy(op->first_line_ra_stdout, data
-				, sizeof(op->first_line_ra_stdout) - 1);
-			first_line = FALSE;
+			,	sizeof(op->first_line_ra_stdout) - 1);
 		}
 		g_free(data);
 	}
@@ -3464,6 +3464,10 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.199  2005/12/27 21:02:44  alan
+ * Got rid of the static "first_line" variable - it was shared by all operations
+ * which clearly won't work.
+ *
  * Revision 1.198  2005/12/27 16:59:15  alan
  * Put in a note about a bug in the form of a FIXME
  * I can't fix it right this minute.  Sorry...
