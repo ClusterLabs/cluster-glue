@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.164 2005/12/05 14:54:31 sunjd Exp $ */
+/* $Id: ipcsocket.c,v 1.165 2006/01/08 21:47:36 lars Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -633,7 +633,7 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 
 
 /* 
- * Called by socket_destory(). Disconnect the connection 
+ * Called by socket_destroy(). Disconnect the connection 
  * and set ch_status to IPC_DISCONNECT. 
  *
  * parameters :
