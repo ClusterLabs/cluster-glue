@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.43 2005/12/18 22:02:39 alan Exp $ */
+/* $Id: ipctest.c,v 1.44 2006/01/09 12:38:14 davidlee Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,6 +26,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+/* libgen.h: for 'basename()' on Solaris */
+#include <libgen.h>
 #include <glib.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/cl_poll.h>
@@ -55,6 +57,11 @@ static void checkifblocked(IPC_Channel* channel);
 static int (*PollFunc)(struct pollfd * fds, unsigned int, int)
 =	(int (*)(struct pollfd * fds, unsigned int, int))  poll;
 static gboolean checkmsg(IPC_Message* rmsg, const char * who, int rcount);
+
+int iter_def = 10000;	/* number of iterations */
+int verbosity = 0;	/* verbosity level */
+const char *procname;
+
 static int
 channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
 {
@@ -62,18 +69,30 @@ channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
 	int		rc  = 0;
 	int		waitstat = 0;
 
+	if (verbosity >= 1) {
+		cl_log(LOG_DEBUG, "%s[%d]%d: main process",
+		  procname, (int)getpid(), __LINE__);
+	}
 	switch (fork()) {
 		case -1:
 			cl_perror("can't fork");
 			exit(1);
 			break;
 		default: /* Parent */
+			if (verbosity >= 1) {
+				cl_log(LOG_DEBUG, "%s[%d]%d: main waiting...",
+				  procname, (int)getpid(), __LINE__);
+			}
 			while (wait(&waitstat) > 0) {
 				if (WIFEXITED(waitstat)) {
 					rc += WEXITSTATUS(waitstat);
 				}else{
 					rc += 1;
 				}
+			}
+			if (verbosity >= 1) {
+				cl_log(LOG_DEBUG, "%s[%d]%d: main ended rc: %d",
+				  procname, (int)getpid(), __LINE__, rc);
 			}
 			if (rc > 127) {
 				rc = 127;
@@ -99,7 +118,15 @@ channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
 		case 0:		/* echo "client" Child */
 			channels[1]->ops->destroy(channels[1]);
 			channels[1] = NULL;
+			if (verbosity >= 1) {
+				cl_log(LOG_DEBUG, "%s[%d]%d: client starting...",
+				  procname, (int)getpid(), __LINE__);
+			}
 			rc = clientfunc(channels[0], count);
+			if (verbosity >= 1) {
+				cl_log(LOG_DEBUG, "%s[%d]%d: client ended rc:%d",
+				  procname, (int)getpid(), __LINE__, rc);
+			}
 			exit (rc > 127 ? 127 : rc);
 			break;
 
@@ -108,12 +135,20 @@ channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
 	}
 	channels[0]->ops->destroy(channels[0]);
 	channels[0] = NULL;
+	if (verbosity >= 1) {
+		cl_log(LOG_DEBUG, "%s[%d]%d: server starting...",
+		  procname, (int)getpid(), __LINE__);
+	}
 	rc = serverfunc(channels[1], count);
 	wait(&waitstat);
 	if (WIFEXITED(waitstat)) {
 		rc += WEXITSTATUS(waitstat);
 	}else{
 		rc += 1;
+	}
+	if (verbosity >= 1) {
+		cl_log(LOG_DEBUG, "%s[%d]%d: server ended rc:%d",
+		  procname, (int)getpid(), __LINE__, rc);
 	}
 	return(rc);
 }
@@ -183,16 +218,48 @@ transport_tests(int iterations)
 int
 main(int argc, char ** argv)
 {
+	int argflag, argerrs;
+	int iterations;
 	int	rc = 0;
+
+	/*
+	 * Check and process arguments.
+	 *	-v: verbose
+	 *	-i: number of iterations
+	 */
+	procname = basename(argv[0]);
+
+	argerrs = 0;
+	iterations = iter_def;
+	while ((argflag = getopt(argc, argv, "i:v")) != EOF) {
+		switch (argflag) {
+		case 'i':	/* iterations */
+			iterations = atoi(optarg);
+			break;
+		case 'v':	/* verbosity */
+			verbosity++;
+			break;
+		default:
+			argerrs++;
+			break;
+		}
+	}
+	if (argerrs) {
+		fprintf(stderr, "Usage: %s [-v] [-i iterations]\n"
+			"\t-v : verbose\n"
+			"\t-i : iterations (default %d)\n",
+		  procname, iter_def);
+		exit(1);
+	}
 
 	cl_malloc_forced_for_glib();
 
-	cl_log_set_entity("ipctest");
+	cl_log_set_entity(procname);
 	cl_log_enable_stderr(TRUE);
 
 
 
-	rc += transport_tests(10000);
+	rc += transport_tests(iterations);
 
 #if 0
 	/* Broken for the moment - need to fix it long term */
@@ -201,7 +268,7 @@ main(int argc, char ** argv)
 	g_main_set_poll_func(cl_glibpoll);
 	ipc_set_pollfunc(cl_poll);
 
-	rc += transport_tests(50000);
+	rc += transport_tests(5 * iterations);
 #endif
 	
 	cl_log(LOG_INFO, "TOTAL errors: %d", rc);
