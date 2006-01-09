@@ -1,4 +1,4 @@
-/* $Id: pils.c,v 1.47 2005/02/17 05:49:24 alan Exp $ */
+/* $Id: pils.c,v 1.48 2006/01/09 21:27:52 alan Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -2141,10 +2141,12 @@ PILCallLog(PILLogFun logfun, PILLogLevel priority, const char * fmt, ...)
 {
 	va_list		args;
 	char *		str;
+	int		err = errno;
 
 	va_start (args, fmt);
 	str = g_strdup_vprintf(fmt, args);
 	va_end (args);
 	logfun(priority, "%s", str);
 	g_free(str);
+	errno = err;
 }
