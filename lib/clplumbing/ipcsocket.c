@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.166 2006/01/10 13:29:20 andrew Exp $ */
+/* $Id: ipcsocket.c,v 1.167 2006/01/10 16:41:33 alan Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -655,6 +655,9 @@ socket_disconnect(struct IPC_CHANNEL* ch)
   		cl_log(LOG_INFO, "forced disconnect for fd %d", conn_info->s);
 	}
 #endif
+	if (ch->ch_status == IPC_CONNECT) {
+		socket_resume_io(ch);		
+	}
 	close(conn_info->s);
 	cl_poll_ignore(conn_info->s);
 	conn_info->s = -1;
