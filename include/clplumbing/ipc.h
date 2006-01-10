@@ -1,4 +1,4 @@
-/* $Id: ipc.h,v 1.54 2005/10/15 02:46:24 gshi Exp $ */
+/* $Id: ipc.h,v 1.55 2006/01/10 13:29:20 andrew Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *
@@ -586,7 +586,9 @@ struct IPC_OPS{
 	 */
 	
 	int (*get_conntype)(struct IPC_CHANNEL* ch);
-	
+
+	int (*disconnect)(struct IPC_CHANNEL* ch);
+		
 };
 
 
