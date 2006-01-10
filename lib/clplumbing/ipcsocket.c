@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.165 2006/01/08 21:47:36 lars Exp $ */
+/* $Id: ipcsocket.c,v 1.166 2006/01/10 13:29:20 andrew Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -2485,4 +2485,5 @@ static struct IPC_OPS socket_ops = {
 	is_sendq_full:		socket_is_sendq_full,
 	is_recvq_full:		socket_is_recvq_full,
 	get_conntype:		socket_get_conntype,
+	disconnect:		socket_disconnect,
 };
