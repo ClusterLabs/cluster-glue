@@ -1,4 +1,4 @@
-/* $Id: wti_nps.c,v 1.28 2005/07/03 22:15:50 alan Exp $ */
+/* $Id: wti_nps.c,v 1.29 2006/01/12 03:23:18 alan Exp $ */
 /*
  *
  *  Copyright 2001 Mission Critical Linux, Inc.
@@ -428,7 +428,7 @@ NPSNametoOutlet(struct pluginDevice* nps, const char * name, char **outlets)
   					break;
   				}
   			}
-  			if (strcasecmp(name, sockname) == 0) {
+  			if (strncasecmp(name, sockname, 16) == 0) {
   				ret = sockno;
   				snprintf(buf, sizeof(buf), "%d ", sockno);
   				strncat(*outlets, buf, left);
