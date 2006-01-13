@@ -650,7 +650,6 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	}
 	/* get the return code of return message */
 	if (HA_OK != get_ret_from_msg(ret)) {
-		LOG_GOT_FAIL_RET(LOG_WARNING, GETRSC);
 		ha_msg_del(ret);
 		return NULL;
 	}
