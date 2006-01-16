@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.200 2005/12/27 22:35:07 alan Exp $ */
+/* $Id: lrmd.c,v 1.201 2006/01/16 10:05:56 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1073,6 +1073,7 @@ register_pid(gboolean do_fork,
 	}
 	CL_IGNORE_SIG(SIGINT);
 	CL_IGNORE_SIG(SIGHUP);
+	CL_DEFAULT_SIG(SIGPIPE);
 	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGTERM
 	,	 	shutdown, NULL, NULL);
 	cl_signal_set_interrupt(SIGTERM, 1);
@@ -3466,6 +3467,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.201  2006/01/16 10:05:56  sunjd
+ * reset SIGPIPE to SIG_DFL. I think it should be. One related issue is found by Peter Kruse <pk@q-leap.com>, while the solution is proposed by Francis.Montagnac@sophia.inria.fr.
+ *
  * Revision 1.200  2005/12/27 22:35:07  alan
  * Changed one message to not come out except at higher debug levels or in case of error.
  *
