@@ -1,4 +1,4 @@
-/* $Id: main.c,v 1.20 2005/04/06 18:58:42 blaschke Exp $ */
+/* $Id: main.c,v 1.21 2006/01/17 09:21:12 sunjd Exp $ */
 /*
  * Stonith: simple test program for exercising the Stonith API code
  *
@@ -31,7 +31,7 @@
 #include <pils/plugin.h>
 #include <glib.h>
 
-#define	OPTIONS	"F:p:t:T:sSlLvhd"
+#define	OPTIONS	"F:p:t:T:snSlLvhd"
 #define	EQUAL	'='
 
 extern char *	optarg;
@@ -60,6 +60,8 @@ usage(const char * cmd, int exit_status)
 	fprintf(stream, "\t %s [-svh] "
 	"-L\n"
 	, cmd);
+	fprintf(stream, "\t %s -n -t stonith-device-type\n"
+	, cmd);
 	fprintf(stream, "\t %s [-svh] "
 	"-t stonith-device-type "
 	"[-p stonith-device-parameters | "
@@ -79,6 +81,7 @@ usage(const char * cmd, int exit_status)
 	fprintf(stream, "\t-S\treport stonith device status\n");
 	fprintf(stream, "\t-s\tsilent\n");
 	fprintf(stream, "\t-v\tverbose\n");
+	fprintf(stream, "\t-n\toutput the config names of stonith-device-parameters\n");
 	fprintf(stream, "\t-h\tdisplay detailed help message with stonith device desriptions\n");
 
 	if (exit_status == 0) {
@@ -184,6 +187,7 @@ main(int argc, char** argv)
 	int		silent = 0;
 	int		listhosts = 0;
 	int		listtypes = 0;
+	int 		listparanames = 0;
 
 	int		c;
 	int		errors = 0;
@@ -243,6 +247,9 @@ main(int argc, char** argv)
 			
 				break;
 
+		case 'n':	++listparanames;
+				break;
+
 		case 'v':	++verbose;
 				break;
 
@@ -293,7 +300,7 @@ main(int argc, char** argv)
 	argcount = argc - optind;
 
 	if (!(argcount == 1 || (argcount < 1
-	&&	(status||listhosts||listtypes)))) {
+	&&	(status||listhosts||listtypes||listparanames)))) {
 		++errors;
 	}
 
@@ -317,7 +324,7 @@ main(int argc, char** argv)
 		return(0);
 	}
 
-	if (optfile == NULL && parameters == NULL && nvcount == 0) {
+	if (!listparanames && optfile == NULL && parameters == NULL && nvcount == 0) {
 		fprintf(stderr
 		,	"Must specify either -p option, -F option or "
 		" name=value style arguments\n");
@@ -338,6 +345,22 @@ main(int argc, char** argv)
 	}
 	if (debug) {
 		stonith_set_debug(s, debug);
+	}
+
+	if (listparanames) {
+		const char**	names;
+		int		i;
+		names = stonith_get_confignames(s);
+
+		if (names != NULL) {
+			for (i=0; names[i]; ++i) {
+				printf("%s  ", names[i]);
+			}
+		}
+		printf("\n");
+		stonith_delete(s); 
+		s=NULL;
+		exit(0);
 	}
 
 	/* Old STONITH version 1 stuff... */
