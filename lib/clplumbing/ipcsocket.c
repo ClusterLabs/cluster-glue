@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.167 2006/01/10 16:41:33 alan Exp $ */
+/* $Id: ipcsocket.c,v 1.168 2006/01/18 09:18:44 davidlee Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1297,7 +1297,7 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 
 		GList *				element;
 		struct IPC_MESSAGE *		msg;
-		struct SOCKET_MSG_HEAD*		head;
+		struct SOCKET_MSG_HEAD		head;
                 struct IPC_MESSAGE* 		oldmsg = NULL;
 		int				sendrc = 0;
                 struct IPC_MESSAGE* 		newmsg;
@@ -1337,9 +1337,9 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 			msg = newmsg;
 		}
 		
-		head = (struct SOCKET_MSG_HEAD*) msg->msg_buf;
-                head->msg_len = msg->msg_len;
-		head->magic = HEADMAGIC;
+                head.msg_len = msg->msg_len;
+		head.magic = HEADMAGIC;
+		memcpy(msg->msg_buf, &head, sizeof(struct SOCKET_MSG_HEAD));
 		
 		if (ch->bytes_remaining == 0){
 			/*we start to send a new message*/
