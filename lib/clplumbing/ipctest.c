@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.44 2006/01/09 12:38:14 davidlee Exp $ */
+/* $Id: ipctest.c,v 1.45 2006/01/20 14:22:51 davidlee Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -36,6 +36,7 @@
 #include <clplumbing/cl_malloc.h>
 
 #define	MAXERRORS	1000
+#define	MAXERRORS_RECV	10
 
 typedef int (*TestFunc_t)(IPC_Channel*chan, int count);
 
@@ -58,9 +59,22 @@ static int (*PollFunc)(struct pollfd * fds, unsigned int, int)
 =	(int (*)(struct pollfd * fds, unsigned int, int))  poll;
 static gboolean checkmsg(IPC_Message* rmsg, const char * who, int rcount);
 
+const char *procname;
+
 int iter_def = 10000;	/* number of iterations */
 int verbosity = 0;	/* verbosity level */
-const char *procname;
+
+/*
+ * The ipc interface can be invoked as either:
+ * 1. pair (pipe/socketpair);
+ * 2. separate connect/accept (like server with multiple independent clients).
+ *
+ * If number of clients is given as 0, the "pair" mechanism is used,
+ * otherwise the client/server mechanism.
+ */
+/* *** CLIENTS_MAX currently 1 while coding *** */
+#define CLIENTS_MAX 1	/* max. number of independent clients */
+int clients_def = 0;	/* number of independent clients */
 
 static int
 channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
@@ -153,32 +167,174 @@ channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
 	return(rc);
 }
 
-#if 0
-/*
- *	FIX commpath to non/tmp before enabling this code.
- *
- */
-static void
-clientserverpair(IPC_Channel* channels[2])
+/* server with many clients */
+static int
+clientserver(TestFunc_t clientfunc, TestFunc_t serverfunc, int count, int clients)
 {
-	char			path[] = IPC_PATH_ATTR;
-	char			commpath[] = "/tmp/foobar"
-	GHashTable *		wattrs;
-	IPC_WAIT_CONNECTION*	wconn;
+	IPC_Channel* channel;
+	int rc  = 0;
+	int waitstat = 0;
+	struct IPC_WAIT_CONNECTION *wconn;
+	char path[] = IPC_PATH_ATTR;
+	char commpath[] = "/tmp/foobar";	/* *** CHECK/FIX: Is this OK? */
+	GHashTable * wattrs;
+	int i;
+	pid_t pid;
 
+	if (verbosity >= 1) {
+		cl_log(LOG_DEBUG, "%s[%d]%d: main process",
+		  procname, (int)getpid(), __LINE__);
+	}
+
+	switch (fork()) {
+		case -1:
+			cl_perror("can't fork");
+			exit(1);
+			break;
+		default: /* Parent */
+			if (verbosity >= 1) {
+				cl_log(LOG_DEBUG, "%s[%d]%d: main waiting...",
+				  procname, (int)getpid(), __LINE__);
+			}
+			while ((pid = wait(&waitstat)) > 0) {
+				if (WIFEXITED(waitstat)) {
+					rc += WEXITSTATUS(waitstat);
+				}else{
+					rc += 1;
+				}
+			}
+			if (verbosity >= 1) {
+				cl_log(LOG_DEBUG, "%s[%d]%d: main ended rc: %d",
+				  procname, (int)getpid(), __LINE__, rc);
+			}
+			if (rc > 127) {
+				rc = 127;
+			}
+			exit(rc);
+			break;
+		case 0: /* Child */
+			break;
+	}
+
+	if (verbosity >= 1) {
+		cl_log(LOG_DEBUG, "%s[%d]%d:",
+		  procname, (int)getpid(), __LINE__);
+	}
+
+	/* set up a server */
 	wattrs = g_hash_table_new(g_str_hash, g_str_equal);
-
+	if (! wattrs) {
+		cl_perror("g_hash_table_new() failed");
+		exit(1);
+	}
 	g_hash_table_insert(wattrs, path, commpath);
 
-	wconn = ipc_wait_conn_constructor(IPC_ANYTYPE, wconnattrs);
+	if (verbosity >= 1) {
+		cl_log(LOG_DEBUG, "%s[%d]%d:",
+		  procname, (int)getpid(), __LINE__);
+	}
 
-	if (wconn == NULL) {
-		cl_perror("Can't create wait connection");
+	wconn = ipc_wait_conn_constructor(IPC_ANYTYPE, wattrs);
+	if (! wconn) {
+		cl_perror("could not establish server");
 		exit(1);
 	}
 
+	if (verbosity >= 1) {
+		cl_log(LOG_DEBUG, "%s[%d]%d:",
+		  procname, (int)getpid(), __LINE__);
+	}
+
+	/* spawn the clients */
+	for (i = 1; i <= clients; i++) {
+		if (verbosity >= 1) {
+			cl_log(LOG_DEBUG, "%s[%d]%d: fork client %d of %d",
+			  procname, (int)getpid(), __LINE__, i, clients);
+		}
+		switch (fork()) {
+			case -1:
+				cl_perror("can't fork");
+				exit(1);
+				break;
+
+			case 0:	/* echo "client" Child */
+				if (verbosity >= 1) {
+					cl_log(LOG_DEBUG, "%s[%d]%d: client %d starting...",
+					  procname, (int)getpid(), __LINE__, i);
+				}
+				channel = ipc_channel_constructor(IPC_ANYTYPE, wattrs);
+				if (channel == NULL) {
+					cl_perror("client: channel creation failed");
+				}
+
+				rc = channel->ops->initiate_connection(channel);
+				if (rc != IPC_OK) {
+					cl_perror("channel[1] failed to connect");
+				}
+				checksock(channel);
+				rc = clientfunc(channel, count);
+				if (verbosity >= 1) {
+					cl_log(LOG_DEBUG, "%s[%d]%d: client %d ended rc:%d",
+					  procname, (int)getpid(), __LINE__, rc, i);
+				}
+				exit (rc > 127 ? 127 : rc);
+				break;
+
+			default:
+				break;
+		}
+	}
+
+	if (verbosity >= 1) {
+		cl_log(LOG_DEBUG, "%s[%d]%d: server starting...",
+		  procname, (int)getpid(), __LINE__);
+	}
+	/* accept on server */
+	/* ***
+	 * Two problems (or more) here:
+	 * 1. What to do if no incoming call pending?
+	 *    At present, fudge by sleeping a little so client gets started.
+	 * 2. How to handle multiple clients?
+	 *    Would need to be able to await both new connections and
+	 *    data on existing connections.
+	 *    At present, fudge CLIENTS_MAX as 1.
+	 * ***
+	 */
+	sleep(1); /* *** */
+	channel = wconn->ops->accept_connection(wconn, NULL);
+	if (channel == NULL) {
+		cl_perror("server: acceptance failed");
+	}
+
+	checksock(channel);
+
+	rc = serverfunc(channel, count);
+
+	if (verbosity >= 1) {
+		cl_log(LOG_DEBUG, "%s[%d]%d: server ended rc:%d",
+		  procname, (int)getpid(), __LINE__, rc);
+	}
+
+	/* reap the clients */
+	for (i = 1; i <= clients; i++) {
+		pid_t pid;
+
+		pid = wait(&waitstat);
+		if (verbosity >= 1) {
+			cl_log(LOG_DEBUG, "%s[%d]%d: client %d reaped:%d",
+			  procname, (int)getpid(), __LINE__,
+			  (int) pid, WIFEXITED(waitstat));
+		}
+		if (WIFEXITED(waitstat)) {
+			rc += WEXITSTATUS(waitstat);
+		}else{
+			rc += 1;
+		}
+	}
+
+	return(rc);
 }
-#endif
+
 static void
 checkifblocked(IPC_Channel* chan)
 {
@@ -193,24 +349,30 @@ extern long	SeqNums[32];
 #endif
 
 static int
-transport_tests(int iterations)
+transport_tests(int iterations, int clients)
 {
 	int	rc = 0;
 
 #ifdef CHEAT_CHECKS
 	memset(SeqNums, 0, sizeof(SeqNums));
 #endif
-	rc += channelpair(echoclient, echoserver, iterations);
+	rc += (clients <= 0)
+	  ? channelpair(echoclient, echoserver, iterations)
+	  : clientserver(echoclient, echoserver, iterations, clients);
 
 #ifdef CHEAT_CHECKS
 	memset(SeqNums, 0, sizeof(SeqNums));
 #endif
-	rc += channelpair(asyn_echoclient, asyn_echoserver, iterations);
+	rc += (clients <= 0)
+	  ? channelpair(asyn_echoclient, asyn_echoserver, iterations)
+	  : clientserver(asyn_echoclient, asyn_echoserver, iterations, clients);
 
 #ifdef CHEAT_CHECKS
 	memset(SeqNums, 0, sizeof(SeqNums));
 #endif
-	rc += channelpair(mainloop_client, mainloop_server, iterations);
+	rc += (clients <= 0)
+	  ? channelpair(mainloop_client, mainloop_server, iterations)
+	  : clientserver(mainloop_client, mainloop_server, iterations, clients);
 
 	return rc;
 }
@@ -220,18 +382,21 @@ main(int argc, char ** argv)
 {
 	int argflag, argerrs;
 	int iterations;
+	int clients;
 	int	rc = 0;
 
 	/*
 	 * Check and process arguments.
 	 *	-v: verbose
 	 *	-i: number of iterations
+	 *	-c: number of clients (invokes client/server mechanism)
 	 */
 	procname = basename(argv[0]);
 
 	argerrs = 0;
 	iterations = iter_def;
-	while ((argflag = getopt(argc, argv, "i:v")) != EOF) {
+	clients = clients_def;
+	while ((argflag = getopt(argc, argv, "i:vuc:")) != EOF) {
 		switch (argflag) {
 		case 'i':	/* iterations */
 			iterations = atoi(optarg);
@@ -239,16 +404,25 @@ main(int argc, char ** argv)
 		case 'v':	/* verbosity */
 			verbosity++;
 			break;
+		case 'c':	/* number of clients */
+			clients = atoi(optarg);
+			if (clients < 1 || clients > CLIENTS_MAX) {
+				fprintf(stderr, "number of clients out of range"
+				  "(1 to %d)\n", CLIENTS_MAX);
+				argerrs++;
+			}
+			break;
 		default:
 			argerrs++;
 			break;
 		}
 	}
 	if (argerrs) {
-		fprintf(stderr, "Usage: %s [-v] [-i iterations]\n"
+		fprintf(stderr, "Usage: %s [-v] [-i iterations] [-c clients]\n"
 			"\t-v : verbose\n"
-			"\t-i : iterations (default %d)\n",
-		  procname, iter_def);
+			"\t-i : iterations (default %d)\n"
+			"\t-c : number of clients (default %d; nonzero invokes client/server)\n",
+		  procname, iter_def, clients_def);
 		exit(1);
 	}
 
@@ -259,7 +433,7 @@ main(int argc, char ** argv)
 
 
 
-	rc += transport_tests(iterations);
+	rc += transport_tests(iterations, clients);
 
 #if 0
 	/* Broken for the moment - need to fix it long term */
@@ -268,7 +442,7 @@ main(int argc, char ** argv)
 	g_main_set_poll_func(cl_glibpoll);
 	ipc_set_pollfunc(cl_poll);
 
-	rc += transport_tests(5 * iterations);
+	rc += transport_tests(5 * iterations, clients);
 #endif
 	
 	cl_log(LOG_INFO, "TOTAL errors: %d", rc);
@@ -280,6 +454,10 @@ static int
 checksock(IPC_Channel* channel)
 {
 
+	if (!channel) {
+		cl_log(LOG_ERR, "Channel null");
+		return 1;
+	}
 	if (!IPC_ISRCONN(channel)) {
 		cl_log(LOG_ERR, "Channel status is %d"
 		", not IPC_CONNECT", channel->ch_status);
@@ -470,6 +648,12 @@ echoclient(IPC_Channel* rchan, int repcount)
 			,	rc, j, errno);
 			cl_perror("recv");
 			++errcount;
+			if (errcount > MAXERRORS_RECV) {
+				cl_log(LOG_ERR,
+				  "echoclient: errcount excessive: %d: abandoning",
+				  errcount);
+				exit(1);
+			}
 			--j;
 			rmsg=NULL;
 			continue;
