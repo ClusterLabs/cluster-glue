@@ -1,8 +1,12 @@
-/* $Id: ipcsocket.c,v 1.168 2006/01/18 09:18:44 davidlee Exp $ */
+/* $Id: ipcsocket.c,v 1.169 2006/01/20 17:01:32 davidlee Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
  * Copyright (c) 2002 Xiaoxiang Liu <xiliu@ncsa.uiuc.edu>
+ *
+ * Stream support (c) 2004,2006 David Lee <t.d.lee@durham.ac.uk>
+ *	Note: many of the variable/function names "*socket*" should be
+ *	interpreted as having a more generic "ipc-channel-type" meaning.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -54,10 +58,47 @@
 #ifdef HAVE_SYS_UCRED_H
 #	include <sys/ucred.h>
 #endif
-#include <sys/socket.h>
-#include <sys/poll.h>
-#include <netinet/in.h>
-#include <sys/un.h>
+
+#ifdef HAVE_SYS_SOCKET_H
+# include <sys/socket.h>
+#endif
+
+/*
+ * Normally use "socket" code.  But on some OSes alternatives may be
+ * preferred (or necessary).
+ */
+#define HB_IPC_SOCKET	1
+#define HB_IPC_STREAM	2
+/* #define HB_IPC_ANOTHER	3 */
+
+#ifndef HB_IPC_METHOD
+# if defined(SO_PEERCRED) || defined(HAVE_GETPEEREID) \
+	|| defined(SCM_CREDS) || defined(HAVE_GETPEERUCRED)
+#  define HB_IPC_METHOD	HB_IPC_SOCKET
+# elif defined(HAVE_STROPTS_H)
+#  define HB_IPC_METHOD	HB_IPC_STREAM
+# else
+#  error.  Surely we have sockets or streams...
+# endif
+#endif
+
+
+#if HB_IPC_METHOD == HB_IPC_SOCKET
+
+# include <sys/poll.h>
+# include <netinet/in.h>
+# include <sys/un.h>
+
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+
+# include <stropts.h>
+
+#else
+
+# error "IPC type invalid"
+
+#endif
+
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -68,8 +109,10 @@
 #endif
 #define MAX_LISTEN_NUM 10
 
+#ifdef USE_BINDSTAT_CREDS
 #ifndef SUN_LEN
 #    define SUN_LEN(ptr) ((size_t) (offsetof (sockaddr_un, sun_path) + strlen ((ptr)->sun_path))
+#endif
 #endif
 
 #ifndef MSG_NOSIGNAL
@@ -92,6 +135,10 @@
 #	define USE_GETPEEREID
 #elif defined(SCM_CREDS)
 #	define	USE_SCM_CREDS
+/* #elif HAVE_GETPEERUCRED */		/* e.g. Solaris 10 upwards */
+/* #	define USE_GETPEERUCRED */
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+#	define USE_STREAM_CREDS
 #else
 #	define	USE_DUMMY_CREDS
 /* This will make it compile, but attempts to authenticate
@@ -116,10 +163,15 @@ struct SOCKET_CH_PRIVATE{
   /* the size of expecting data for below buffered message buf_msg */
   int remaining_data;
 
+#if HB_IPC_METHOD == HB_IPC_SOCKET
   /* The address of our peer - used by USE_BINDSTAT_CREDS version of
    *   socket_verify_auth()
    */
   struct sockaddr_un *peer_addr;
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+  uid_t farside_uid;
+  gid_t farside_gid;
+#endif
 		
   /* the buf used to save unfinished message */
   struct IPC_MESSAGE *buf_msg;
@@ -566,31 +618,49 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 	/* make peer_addr a pointer so it can be used by the
 	 *   USE_BINDSTAT_CREDS implementation of socket_verify_auth()
 	 */
-	struct sockaddr_un *			peer_addr;
 	struct IPC_CHANNEL *			ch = NULL;
-	socklen_t				sin_size;
 	int					s;
 	int					new_sock;
 	struct SOCKET_WAIT_CONN_PRIVATE*	conn_private;
 	struct SOCKET_CH_PRIVATE *		ch_private ;
 	int auth_result = IPC_FAIL;
 	gboolean was_error = FALSE;
+#if HB_IPC_METHOD == HB_IPC_SOCKET
+	struct sockaddr_un *			peer_addr;
+	socklen_t				sin_size;
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+	struct strrecvfd strrecvfd;
+#endif
 	
+#if HB_IPC_METHOD == HB_IPC_SOCKET
 	peer_addr = g_new(struct sockaddr_un, 1);
+#endif
 
 	/* get select fd */
 
 	s = wait_conn->ops->get_select_fd(wait_conn); 
 	if (s < 0) {
 		cl_log(LOG_ERR, "get_select_fd: invalid fd");
+#if HB_IPC_METHOD == HB_IPC_SOCKET
 		g_free(peer_addr);
 		peer_addr = NULL;
+#endif
 		return NULL;
 	}
 
 	/* Get client connection. */
+#if HB_IPC_METHOD == HB_IPC_SOCKET
 	sin_size = sizeof(struct sockaddr_un);
-	if ((new_sock = accept(s, (struct sockaddr *)peer_addr, &sin_size)) == -1){
+	new_sock = accept(s, (struct sockaddr *)peer_addr, &sin_size);
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+	if (ioctl(s, I_RECVFD, &strrecvfd) == -1) {
+		new_sock = -1;
+	}
+	else {
+		new_sock = strrecvfd.fd;
+	}
+#endif
+	if (new_sock == -1){
 		if (errno != EAGAIN && errno != EWOULDBLOCK) {
 			cl_perror("socket_accept_connection: accept");
 		}
@@ -609,7 +679,12 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 			strncpy(ch_private->path_name,conn_private->path_name
 			,		sizeof(conn_private->path_name));
 
+#if HB_IPC_METHOD == HB_IPC_SOCKET
 			ch_private->peer_addr = peer_addr;
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+			ch_private->farside_uid = strrecvfd.uid;
+			ch_private->farside_gid = strrecvfd.gid;
+#endif
 		}
 	}
 
@@ -624,8 +699,10 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 		}
 	}
   
+#if HB_IPC_METHOD == HB_IPC_SOCKET
 	g_free(peer_addr);
 	peer_addr = NULL;
+#endif
 	return NULL;
 
 }
@@ -701,12 +778,14 @@ socket_destroy_channel(struct IPC_CHANNEL * ch)
 	}
 
 	if (ch->ch_private != NULL) {
+#if HB_IPC_METHOD == HB_IPC_SOCKET
 		struct SOCKET_CH_PRIVATE *priv = (struct SOCKET_CH_PRIVATE *)
 			ch->ch_private;
 		if(priv->peer_addr != NULL) {
 			unlink(priv->peer_addr->sun_path);
 			g_free((void*)(priv->peer_addr));
 		}
+#endif
     		g_free((void*)(ch->ch_private));		
 	}
 	memset(ch, 0xff, sizeof(*ch));
@@ -764,10 +843,14 @@ static int
 socket_initiate_connection(struct IPC_CHANNEL * ch)
 {
 	struct SOCKET_CH_PRIVATE* conn_info;  
+#if HB_IPC_METHOD == HB_IPC_SOCKET
 	struct sockaddr_un peer_addr; /* connector's address information */
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+#endif
   
 	conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
   
+#if HB_IPC_METHOD == HB_IPC_SOCKET
 	/* Prepare the socket */
 	memset(&peer_addr, 0, sizeof(peer_addr));
 	peer_addr.sun_family = AF_LOCAL;    /* host byte order */ 
@@ -782,6 +865,9 @@ socket_initiate_connection(struct IPC_CHANNEL * ch)
 	, 	sizeof(struct sockaddr_un)) == -1) {
 		return IPC_FAIL;
 	}
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+
+#endif
 
 	ch->ch_status = IPC_CONNECT;
 	ch->farside_pid = socket_get_farside_pid(conn_info->s);
@@ -1197,6 +1283,10 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 		int				msg_len;
 		int				len;
 
+#if HB_IPC_METHOD == HB_IPC_STREAM
+		struct strbuf d;
+		int flags, rc;
+#endif
 
 		CHANAUDIT(ch);
 		++debug_loopcount;
@@ -1208,7 +1298,16 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 		
 		/* Now try to receive some data */
 
+#if HB_IPC_METHOD == HB_IPC_SOCKET
 		msg_len = recv(conn_info->s, msg_begin, len, MSG_DONTWAIT);
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+		d.maxlen = len;
+		d.len = 0;
+		d.buf = msg_begin;
+		flags = 0;
+		rc = getmsg(conn_info->s, NULL, &d, &flags);
+		msg_len = (rc < 0) ? rc : d.len;
+#endif
 		SocketIPCStats.last_recv_rc = msg_len;
 		SocketIPCStats.last_recv_errno = errno;
 		++SocketIPCStats.recv_count;
@@ -1360,11 +1459,23 @@ socket_resume_io_write(struct IPC_CHANNEL *ch, int* nmsg)
 		sendrc = 0;
 		
                 do {
+#if HB_IPC_METHOD == HB_IPC_STREAM
+			struct strbuf d;
+			int msglen, putmsgrc;
+#endif
+
                         CHANAUDIT(ch);
 
-			
-                       sendrc = send(conn_info->s, p
-                       ,       bytes_remaining, (MSG_DONTWAIT|MSG_NOSIGNAL));
+#if HB_IPC_METHOD == HB_IPC_SOCKET
+			sendrc = send(conn_info->s, p
+			,       bytes_remaining, (MSG_DONTWAIT|MSG_NOSIGNAL));
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+			d.maxlen = 0;
+			d.len = msglen = bytes_remaining;
+			d.buf = p;
+			putmsgrc = putmsg(conn_info->s, NULL, &d, 0);
+			sendrc = putmsgrc == 0 ? msglen : -1; 
+#endif
                         SocketIPCStats.last_send_rc = sendrc;
                         SocketIPCStats.last_send_errno = errno;
                         ++SocketIPCStats.send_count;
@@ -1677,6 +1788,10 @@ socket_queue_new(void)
  *     attrs = g_hash_table_new(g_str_hash, g_str_equal); 
  *     g_hash_table_insert(attrs, PATH_ATTR, path_name);   
  *     here PATH_ATTR is defined as "path". 
+ *
+ * NOTE :
+ *   The streams implementation uses "Streams Programming Guide", Solaris 8,
+ *   as its guide (sample code near end of "Configuration" chapter 11).
  */
 struct IPC_WAIT_CONNECTION *
 socket_wait_conn_new(GHashTable *ch_attrs)
@@ -1684,11 +1799,16 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   struct IPC_WAIT_CONNECTION * temp_ch;
   char *path_name;
   char *mode_attr;
-  struct sockaddr_un my_addr;
   int s, flags;
   struct SOCKET_WAIT_CONN_PRIVATE *wait_private;
   mode_t s_mode;
-  
+#if HB_IPC_METHOD == HB_IPC_SOCKET
+  struct sockaddr_un my_addr;
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+  int pathfd;
+  int pipefds[2];
+#endif
+
   path_name = (char *) g_hash_table_lookup(ch_attrs, IPC_PATH_ATTR);
   mode_attr = (char *) g_hash_table_lookup(ch_attrs, IPC_MODE_ATTR);
 
@@ -1701,6 +1821,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     return NULL;
   }
 
+#if HB_IPC_METHOD == HB_IPC_SOCKET
   /* prepare the unix domain socket */
   if ((s = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
     cl_perror("socket_wait_conn_new: socket() failure");
@@ -1727,6 +1848,38 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     close(s);
     return NULL;
   }
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+  /* Set up the communication channel the clients will use to us (server) */
+  if (pipe(pipefds) == -1) {
+    cl_perror("pipe() failure");
+    return NULL;
+  }
+
+  /* Let clients have unique connections to us */
+  if (ioctl(pipefds[1], I_PUSH, "connld") == -1) {
+    cl_perror("ioctl(%d, I_PUSH, \"connld\") failure", pipefds[1]);
+    return NULL;
+  }
+
+  if (unlink(path_name) < 0 && errno != ENOENT) {
+	  cl_perror("socket_wait_conn_new: unlink failure(%s)",
+		    path_name);
+  }
+
+  if ((pathfd = creat(path_name, 0666)) == -1) {
+    cl_perror("socket_wait_conn_new: creat(%s, ...) failure", path_name);
+    return NULL;
+  }
+  close(pathfd);
+
+  if (fattach(pipefds[1], path_name) == -1) {
+    cl_perror("socket_wait_conn_new: fattach(..., %s) failure", path_name);
+    return NULL;
+  }
+
+  /* the pseudo-socket is the other part of the pipe */
+  s = pipefds[0];
+#endif
 
   /* Change the permission of the socket */
   if (chmod(path_name,s_mode) < 0){
@@ -1736,12 +1889,17 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     return NULL;
   }
 
+#if HB_IPC_METHOD == HB_IPC_SOCKET
   /* listen to the socket */
   if (listen(s, MAX_LISTEN_NUM) == -1) {
     cl_perror("socket_wait_conn_new: listen(MAX_LISTEN_NUM)");
     close(s);
     return NULL;
   }
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+
+#endif
+
   flags = fcntl(s, F_GETFL);
   if (flags == -1) {
     cl_perror("socket_wait_conn_new: cannot read file descriptor flags");
@@ -1816,11 +1974,19 @@ socket_client_channel_new(GHashTable *ch_attrs) {
 	  if (strlen(path_name) >= sizeof(conn_info->path_name)) {
 	    return NULL;
     }
+#if HB_IPC_METHOD == HB_IPC_SOCKET
     /* prepare the socket */
     if ((sockfd = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
       cl_perror("socket_client_channel_new: socket");
       return NULL;
     }
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+    sockfd = open(path_name, O_RDWR|O_NONBLOCK);
+    if (sockfd == -1) {
+      cl_perror("socket_client_channel_new: open(%s, ...) failure", path_name);
+      return NULL;
+    }
+#endif
   }else{
     return NULL;
   }
@@ -1836,7 +2002,9 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   
   
   conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
+#if HB_IPC_METHOD == HB_IPC_SOCKET
   conn_info->peer_addr = NULL;
+#endif
   
 #ifdef USE_BINDSTAT_CREDS
   /* Prepare the socket */
@@ -1936,7 +2104,9 @@ socket_server_channel_new(int sockfd){
   conn_info->s = sockfd;
   conn_info->remaining_data = 0;
   conn_info->buf_msg = NULL;
+#if HB_IPC_METHOD == HB_IPC_SOCKET
   conn_info->peer_addr = NULL;
+#endif
   strcpy(conn_info->path_name, "?");
 
 #ifdef DEBUG
@@ -1969,10 +2139,34 @@ ipc_channel_pair(IPC_Channel* channels[2])
 	int	sockets[2];
 	int	rc;
 	int	j;
+	const char *pname;
+
+#if HB_IPC_METHOD == HB_IPC_SOCKET
+	pname = "[socketpair]";
 
 	if ((rc = socketpair(AF_LOCAL, SOCK_STREAM, 0, sockets)) < 0) {
 		return IPC_FAIL;
 	}
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+	pname = "[pipe]";
+
+	if ((rc = pipe(sockets)) < 0) {
+		return IPC_FAIL;
+	}
+	rc = 0;
+	for (j=0; j < 2; ++j) {
+		if (fcntl(sockets[j], F_SETFL, O_NONBLOCK) < 0) {
+			cl_perror("ipc_channel_pair: cannot set O_NONBLOCK");
+			rc = -1;
+		}
+	}
+	if (rc < 0) {
+		close(sockets[0]);
+		close(sockets[1]);
+		return IPC_FAIL;
+	}
+#endif
+
 	if ((channels[0] = socket_server_channel_new(sockets[0])) == NULL) {
 		close(sockets[0]);
 		close(sockets[1]);
@@ -1990,7 +2184,7 @@ ipc_channel_pair(IPC_Channel* channels[2])
 		channels[j]->conntype = IPC_PEER;
 		/* Valid, but not terribly meaningful */
 		channels[j]->farside_pid = getpid();
-  		strncpy(p->path_name, "[socketpair]", sizeof(p->path_name));
+  		strncpy(p->path_name, pname, sizeof(p->path_name));
 	}
 	
 	return IPC_OK;
@@ -2427,6 +2621,68 @@ socket_get_farside_pid(int sock)
 	return -1;
 }
 #endif /* Bind/stat version */
+
+/***********************************************************************
+ * USE_STREAM_CREDS VERSION... (e.g. Solaris)
+ ***********************************************************************/
+#ifdef USE_STREAM_CREDS
+static int 
+socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
+{
+	struct SOCKET_CH_PRIVATE *conn_info;
+
+	if (ch == NULL || ch->ch_private == NULL) {
+		return IPC_FAIL;
+	}
+
+	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
+
+	if (auth_info == NULL
+	  || (auth_info->uid == NULL && auth_info->gid == NULL)) {
+		return IPC_OK;	/* no restriction for authentication */
+	}
+
+	/* verify the credential information. */
+	if (	auth_info->uid
+	&&	(g_hash_table_lookup(auth_info->uid,
+		  GUINT_TO_POINTER((guint)conn_info->farside_uid)) != NULL)) {
+		return IPC_OK;
+	}else if (auth_info->gid
+	&&	(g_hash_table_lookup(auth_info->gid,
+		  GUINT_TO_POINTER((guint)conn_info->farside_gid)) != NULL)) {
+		return IPC_OK;
+	}
+	return IPC_FAIL;
+}
+
+pid_t
+socket_get_farside_pid(int sock)
+{
+	return -1;
+}
+#endif
+
+/***********************************************************************
+ * GETPEERUCRED VERSION... (e.g. Solaris 10 upwards)
+ *
+ * *** Not yet implemented ***
+ ***********************************************************************/
+
+#ifdef USE_GETPEERUCRED
+/* verify the authentication information. */
+static int 
+socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
+{
+# error getpeerucred() not yet implemeted
+	return IPC_FAIL;
+}
+
+pid_t
+socket_get_farside_pid(int sock)
+{
+	return -1;
+}
+#endif
 
 /***********************************************************************
  * DUMMY VERSION... (other systems...)
