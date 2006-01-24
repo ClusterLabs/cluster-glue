@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.170 2006/01/24 12:28:11 davidlee Exp $ */
+/* $Id: ipcsocket.c,v 1.171 2006/01/24 12:35:10 davidlee Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -150,8 +150,13 @@
 struct SOCKET_WAIT_CONN_PRIVATE{
   /* the path name wich the connection will be built on. */
   char path_name[UNIX_PATH_MAX];
+#if HB_IPC_METHOD == HB_IPC_SOCKET
   /* the domain socket. */
   int s;
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+  /* the streams pipe */
+  int pipefds[2];
+#endif
 };
 
 /* channel private data. */
@@ -592,9 +597,16 @@ socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn)
 	struct SOCKET_WAIT_CONN_PRIVATE * wc = wait_conn->ch_private;
 
 	if (wc != NULL) {
+#if HB_IPC_METHOD == HB_IPC_SOCKET
 		close(wc->s);
 		cl_poll_ignore(wc->s);
 		unlink(wc->path_name);
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+		close(wc->pipefds[0]);
+		close(wc->pipefds[1]);
+		cl_poll_ignore(wc->pipefds[0]);
+		unlink(wc->path_name);
+#endif
 		g_free(wc);
 	}
 	g_free((void*) wait_conn);
@@ -606,7 +618,11 @@ socket_wait_selectfd(struct IPC_WAIT_CONNECTION *wait_conn)
 {
 	struct SOCKET_WAIT_CONN_PRIVATE * wc = wait_conn->ch_private;
 
+#if HB_IPC_METHOD == HB_IPC_SOCKET
 	return (wc == NULL ? -1 : wc->s);
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+	return (wc == NULL ? -1 : wc->pipefds[0]);
+#endif
 
 }
 
@@ -1912,7 +1928,12 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   }
   
   wait_private =  g_new(struct SOCKET_WAIT_CONN_PRIVATE, 1);
+#if HB_IPC_METHOD == HB_IPC_SOCKET
   wait_private->s = s;
+#elif HB_IPC_METHOD == HB_IPC_STREAM
+  wait_private->pipefds[0] = pipefds[0];
+  wait_private->pipefds[1] = pipefds[1];
+#endif
   strncpy(wait_private->path_name, path_name, sizeof(wait_private->path_name));
   temp_ch = g_new(struct IPC_WAIT_CONNECTION, 1);
   temp_ch->ch_private = (void *) wait_private;
