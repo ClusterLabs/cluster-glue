@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.169 2006/01/20 17:01:32 davidlee Exp $ */
+/* $Id: ipcsocket.c,v 1.170 2006/01/24 12:28:11 davidlee Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -1805,7 +1805,6 @@ socket_wait_conn_new(GHashTable *ch_attrs)
 #if HB_IPC_METHOD == HB_IPC_SOCKET
   struct sockaddr_un my_addr;
 #elif HB_IPC_METHOD == HB_IPC_STREAM
-  int pathfd;
   int pipefds[2];
 #endif
 
@@ -1866,11 +1865,10 @@ socket_wait_conn_new(GHashTable *ch_attrs)
 		    path_name);
   }
 
-  if ((pathfd = creat(path_name, 0666)) == -1) {
-    cl_perror("socket_wait_conn_new: creat(%s, ...) failure", path_name);
+  if (mkfifo(path_name, s_mode) == -1) {
+    cl_perror("socket_wait_conn_new: mkfifo(%s, ...) failure", path_name);
     return NULL;
   }
-  close(pathfd);
 
   if (fattach(pipefds[1], path_name) == -1) {
     cl_perror("socket_wait_conn_new: fattach(..., %s) failure", path_name);
