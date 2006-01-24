@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.171 2006/01/24 12:35:10 davidlee Exp $ */
+/* $Id: ipcsocket.c,v 1.172 2006/01/24 14:58:41 davidlee Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -761,7 +761,7 @@ socket_disconnect(struct IPC_CHANNEL* ch)
 
 
 /* 
- * destory a ipc queue and clean all memory space assigned to this queue.
+ * destroy a ipc queue and clean all memory space assigned to this queue.
  * parameters:
  *      q  (IN) the pointer to the queue which should be destroied.
  *
@@ -2012,7 +2012,7 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   
   temp_ch = g_new(struct IPC_CHANNEL, 1);
   if (temp_ch == NULL){
-	  cl_log(LOG_ERR, "socket_server_channel_new:"
+	  cl_log(LOG_ERR, "socket_client_channel_new:"
 		 " allocating memory for channel failed");
 	  return NULL;	  
   }
