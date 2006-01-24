@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.45 2006/01/20 14:22:51 davidlee Exp $ */
+/* $Id: ipctest.c,v 1.46 2006/01/24 11:31:49 davidlee Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -309,6 +309,9 @@ clientserver(TestFunc_t clientfunc, TestFunc_t serverfunc, int count, int client
 	checksock(channel);
 
 	rc = serverfunc(channel, count);
+
+	/* server finished: tidy up */
+	wconn->ops->destroy(wconn);
 
 	if (verbosity >= 1) {
 		cl_log(LOG_DEBUG, "%s[%d]%d: server ended rc:%d",
