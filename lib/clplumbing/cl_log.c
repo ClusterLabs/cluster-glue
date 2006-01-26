@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.69 2005/11/08 06:27:38 gshi Exp $ */
+/* $Id: cl_log.c,v 1.70 2006/01/26 22:35:59 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -149,9 +149,6 @@ cl_inherit_use_logd(const char* param_name, int sendq_length)
 		if (sendq_length > 0){
 			cl_set_logging_wqueue_maxlen(sendq_length);
 		}
-		cl_log(LOG_INFO, "Enable using logging daemon");
-	}else {
-		cl_log(LOG_INFO, "Disable using logging daemon");
 	}
 	
 	return truefalse;
