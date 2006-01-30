@@ -1,4 +1,4 @@
-/* $Id: GSource.h,v 1.13 2005/07/28 08:20:05 sunjd Exp $ */
+/* $Id: GSource.h,v 1.14 2006/01/30 18:41:59 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -25,6 +25,9 @@ typedef struct GWCSource_s	GWCSource;
 typedef struct GSIGSource_s	GSIGSource;
 typedef struct GTRIGSource_s	GTRIGSource;
 
+
+void G_main_setmaxdispatchdelay(GSource* s, unsigned long delayms);
+void G_main_setmaxdispatchtime(GSource* s, unsigned long dispatchms);
 
 
 /***********************************************************************

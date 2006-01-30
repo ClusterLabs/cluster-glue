@@ -1,4 +1,4 @@
-/* $Id: Gmain_timeout.h,v 1.4 2004/02/17 22:11:58 lars Exp $ */
+/* $Id: Gmain_timeout.h,v 1.5 2006/01/30 18:41:59 alan Exp $ */
 #ifndef _CLPLUMBING_GMAIN_TIMEOUT_H
 #define _CLPLUMBING_GMAIN_TIMEOUT_H
 #include <glib.h>
@@ -42,4 +42,6 @@ guint Gmain_timeout_add_full(gint priority
 ,	GDestroyNotify	notify);
 
 void Gmain_timeout_remove(guint tag);
+void Gmain_timeout_setmaxdispatchtime(GSource* src, long dispatchms);
+void Gmain_timeout_setmaxdispatchdelay(GSource* src, long delayms);
 #endif
