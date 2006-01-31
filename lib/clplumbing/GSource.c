@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.56 2006/01/31 13:55:22 alan Exp $ */
+/* $Id: GSource.c,v 1.57 2006/01/31 15:23:38 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -52,9 +52,9 @@
 struct GFDSource_s {
 	GSource source;
 	unsigned	magno;	/* MAG_GFDSOURCE */
-	long		maxdispatchms;	/* Maximum time to spend in the dispatch function */
-	long		maxdispatchdelayms;	/* Max delay before processing */
-	longclock_t	detecttime;
+	long		maxdispatchms;	/* Time limit for dispatch function */
+	long		maxdispatchdelayms; /* Max delay before processing */
+	longclock_t	detecttime;	/* Time last input detected */
 	void*		udata;
 	gboolean	(*dispatch)(int fd, gpointer user_data);
 	GPollFD		gpfd;
@@ -65,66 +65,48 @@ struct GFDSource_s {
 
 typedef gboolean 	(*GCHdispatch)(IPC_Channel* ch, gpointer user_data);
 
+#define	COMMON_STRUCTSTART						\
+GSource		source;		/* Common glib struct -  must be 1st */	\
+unsigned	magno;		/* Magic number */			\
+long		maxdispatchms;	/* Time limit for dispatch function */	\
+long		maxdispatchdelayms; /* Max delay before processing */	\
+longclock_t	detecttime;	/* Time last input detected */		\
+void*		udata;		/* User-defined data */			\
+guint		gsourceid;	/* Source id of this source */		\
+GDestroyNotify	dnotify
+
 struct GCHSource_s {
-	GSource source;
-	unsigned	magno;	/* MAG_GCHSOURCE */
-	long		maxdispatchms;	/* Maximum time to spend in the dispatch function */
-	long		maxdispatchdelayms;	/* Max delay before processing */
-	longclock_t	detecttime;
-	void*		udata;
+	COMMON_STRUCTSTART;
 	IPC_Channel*	ch;
-	gboolean 	(*dispatch)(IPC_Channel* ch, gpointer user_data);
-	GDestroyNotify	dnotify;
 	gboolean	fd_fdx;
 	GPollFD		infd;
 	GPollFD		outfd;
-	guint		gsourceid;
 	gboolean	dontread;	/* TRUE when we don't want to read
 					 * more input for a while - we're
 					 * flow controlling the writer off
 					 */
+	gboolean 	(*dispatch)(IPC_Channel* ch, gpointer user_data);
 };
 
 struct GWCSource_s {
-	GSource source;
-	unsigned		magno;	/* MAG_GWCSOURCE */
-	long			maxdispatchms;	/* Maximum time to spend in the dispatch function */
-	long			maxdispatchdelayms;	/* Max delay before processing */
-	longclock_t		detecttime;
-	void*			udata;
+	COMMON_STRUCTSTART;
 	GPollFD			gpfd;
-	GDestroyNotify		dnotify;
 	IPC_WaitConnection*	wch;
 	IPC_Auth*		auth_info;
 	gboolean (*dispatch)(IPC_Channel* accept_ch, gpointer udata);
-	guint			gsourceid;
 };
 
 struct GSIGSource_s {
-	GSource source;
-	unsigned	magno;	/* MAG_GCHSOURCE */
-	long		maxdispatchms;	/* Maximum time to spend in the dispatch function */
-	long		maxdispatchdelayms;	/* Max delay before processing */
-	longclock_t	detecttime;
-	void*		udata;
+	COMMON_STRUCTSTART;
 	int		signal;
 	gboolean	signal_triggered;
 	gboolean 	(*dispatch)(int signal, gpointer user_data);
-	GDestroyNotify	dnotify;
-	guint		gsourceid;
 };
 
 struct GTRIGSource_s {
-	GSource source;
-	unsigned	magno;	/* MAG_GCHSOURCE */
-	long		maxdispatchms;	/* Maximum time to spend in the dispatch function */
-	long		maxdispatchdelayms;	/* Max delay before processing */
-	longclock_t	detecttime;
-	void*		udata;
+	COMMON_STRUCTSTART;
 	gboolean	manual_trigger;
 	gboolean 	(*dispatch)(gpointer user_data);
-	GDestroyNotify	dnotify;
-	guint		gsourceid;
 };
 
 #define	ERR_EVENTS	(G_IO_ERR|G_IO_NVAL)
@@ -1300,12 +1282,21 @@ void
 G_main_setmaxdispatchdelay(GSource* s, unsigned long delayms)
 {
 	GFDSource*	fdp =  (GFDSource*)s;
-	g_assert(IS_ONEOFOURS(fdp));
+	if (!IS_ONEOFOURS(fdp)) {
+		cl_log(LOG_ERR
+		,	"Attempt to set max dispatch delay on wrong object");
+		return;
+	}
 	fdp->maxdispatchdelayms = delayms;
 }
 void
 G_main_setmaxdispatchtime(GSource* s, unsigned long dispatchms)
 {
 	GFDSource*	fdp =  (GFDSource*)s;
+	if (!IS_ONEOFOURS(fdp)) {
+		cl_log(LOG_ERR
+		,	"Attempt to set max dispatch time on wrong object");
+		return;
+	}
 	fdp->maxdispatchms = dispatchms;
 }
