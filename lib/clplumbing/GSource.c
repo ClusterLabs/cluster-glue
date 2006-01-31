@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.54 2006/01/30 18:41:59 alan Exp $ */
+/* $Id: GSource.c,v 1.55 2006/01/31 04:50:30 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -223,6 +223,7 @@ G_main_add_fd(int priority, int fd, gboolean can_recurse
 	ret->gpfd.events = DEF_EVENTS;
 	ret->gpfd.revents = 0;
 	ret->dnotify = notify;
+	ret->detecttime = time_longclock();
 	
 	g_source_add_poll(source, &ret->gpfd);
 	
@@ -293,11 +294,8 @@ G_fd_check(GSource* source)
 {
 	GFDSource*	fdp =  (GFDSource*)source;
 	g_assert(IS_FDSOURCE(fdp));
-	if (fdp->gpfd.revents != 0) {
-		fdp->detecttime = time_longclock();
-		return TRUE;
-	}
-	return FALSE;
+	fdp->detecttime = time_longclock();
+	return  fdp->gpfd.revents != 0;
 }
 
 /*
@@ -404,6 +402,7 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 	chp->magno = MAG_GCHSOURCE;
 	chp->maxdispatchdelayms = 0;
 	chp->maxdispatchms = 0;
+	chp->detecttime = time_longclock();
 	chp->ch = ch;
 	chp->dispatch = dispatch;
 	chp->udata=userdata;
@@ -522,7 +521,8 @@ G_CH_prepare(GSource* source,
 		 */
 		chp->infd.events &= ~INPUT_EVENTS;
 	}
-	
+
+	chp->detecttime = time_longclock();
 	if (chp->dontread){
 		return FALSE;
 	}
@@ -552,9 +552,7 @@ G_CH_check(GSource* source)
 	ret = (chp->infd.revents != 0
 		||	(!chp->fd_fdx && chp->outfd.revents != 0)
 		||	chp->ch->ops->is_message_pending(chp->ch));
-	if (ret) {
-		chp->detecttime = time_longclock();
-	}
+	chp->detecttime = time_longclock();
 	return ret;
 }
 
@@ -611,8 +609,8 @@ G_CH_dispatch(GSource * source,
 			CHECK_DISPATCH_TIME(chp);
 			return FALSE;
 		}
-		CHECK_DISPATCH_TIME(chp);
 	}
+	CHECK_DISPATCH_TIME(chp);
 
 	if (chp->ch->ch_status == IPC_DISCONNECT){
 		return FALSE;
@@ -681,6 +679,7 @@ G_main_add_IPC_WaitConnection(int priority
 	wcp->magno = MAG_GWCSOURCE;
 	wcp->maxdispatchdelayms = 0;
 	wcp->maxdispatchms = 0;
+	wcp->detecttime = time_longclock();
 	wcp->udata = userdata;
 	wcp->gpfd.fd = wch->ops->get_select_fd(wch);
 	wcp->gpfd.events = DEF_EVENTS;
@@ -754,8 +753,8 @@ G_WC_check(GSource * source)
 	GWCSource* wcp = (GWCSource*)source;
 	g_assert(IS_WCSOURCE(wcp));
 
+	wcp->detecttime = time_longclock();
 	if (wcp->gpfd.revents != 0) {
-		wcp->detecttime = time_longclock();
 		return TRUE;
 	}
 	return FALSE;
@@ -791,13 +790,13 @@ G_WC_dispatch(GSource* source,
 		}
 
 		rc = wcp->dispatch(ch, wcp->udata);
-		CHECK_DISPATCH_TIME(wcp);
 		if(!rc) {
 			g_source_remove_poll(source, &wcp->gpfd);
 			g_source_unref(source);
 			break;
 		}
 	}
+	CHECK_DISPATCH_TIME(wcp);
 	return rc;
 }
 
@@ -950,6 +949,7 @@ G_SIG_prepare(GSource* source, gint* timeoutms)
 	
 	/* Don't let a timing window keep us in poll() forever */
 	*timeoutms = 1000;
+	sig_src->detecttime = time_longclock();
 	return sig_src->signal_triggered;
 }
 
@@ -987,11 +987,11 @@ G_SIG_dispatch(GSource * source,
 	if(sig_src->dispatch) {
 		if(!(sig_src->dispatch(sig_src->signal, sig_src->udata))){
 			G_main_del_SignalHandler(sig_src);
-			return FALSE;
 			CHECK_DISPATCH_TIME(sig_src);
+			return FALSE;
 		}
-		CHECK_DISPATCH_TIME(sig_src);
 	}
+	CHECK_DISPATCH_TIME(sig_src);
 	
 	return TRUE;
 }
@@ -1111,8 +1111,11 @@ child_death_dispatch(int sig, gpointer notused)
 void
 set_sigchld_proctrack(int priority)
 {
-	G_main_add_SignalHandler(priority, SIGCHLD
+	GSIGSource* src = G_main_add_SignalHandler(priority, SIGCHLD
 	,	child_death_dispatch, NULL, NULL);
+
+	G_main_setmaxdispatchdelay((GSource*) src, 100);
+	G_main_setmaxdispatchtime((GSource*) src, 10);
 	return;
 }
 
@@ -1227,6 +1230,7 @@ G_TRIG_prepare(GSource* source, gint* timeout)
 	
 	g_assert(IS_TRIGSOURCE(trig_src));
 	
+	trig_src->detecttime = time_longclock();
 	return trig_src->manual_trigger;
 }
 
