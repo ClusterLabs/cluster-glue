@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.55 2006/01/31 04:50:30 alan Exp $ */
+/* $Id: GSource.c,v 1.56 2006/01/31 13:55:22 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -965,6 +965,7 @@ G_SIG_check(GSource* source)
 
 	g_assert(IS_SIGSOURCE(sig_src));
 	
+	sig_src->detecttime = time_longclock();
 	return sig_src->signal_triggered;
 }
 
@@ -1031,7 +1032,6 @@ G_main_signal_handler(int nsig)
 	}
 	
 	g_assert(IS_SIGSOURCE(sig_src));
-	sig_src->detecttime = time_longclock();
 	sig_src->signal_triggered = TRUE;
 }
 
