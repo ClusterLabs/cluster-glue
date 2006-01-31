@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.57 2006/01/31 15:23:38 alan Exp $ */
+/* $Id: GSource.c,v 1.58 2006/01/31 19:59:50 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -49,22 +49,6 @@
 # define _NSIG 2*NSIG
 #endif
 
-struct GFDSource_s {
-	GSource source;
-	unsigned	magno;	/* MAG_GFDSOURCE */
-	long		maxdispatchms;	/* Time limit for dispatch function */
-	long		maxdispatchdelayms; /* Max delay before processing */
-	longclock_t	detecttime;	/* Time last input detected */
-	void*		udata;
-	gboolean	(*dispatch)(int fd, gpointer user_data);
-	GPollFD		gpfd;
-	GDestroyNotify	dnotify;
-	guint		gsourceid;
-};
-
-
-typedef gboolean 	(*GCHdispatch)(IPC_Channel* ch, gpointer user_data);
-
 #define	COMMON_STRUCTSTART						\
 GSource		source;		/* Common glib struct -  must be 1st */	\
 unsigned	magno;		/* Magic number */			\
@@ -73,7 +57,18 @@ long		maxdispatchdelayms; /* Max delay before processing */	\
 longclock_t	detecttime;	/* Time last input detected */		\
 void*		udata;		/* User-defined data */			\
 guint		gsourceid;	/* Source id of this source */		\
+const char *	description;	/* Description of this source */	\
 GDestroyNotify	dnotify
+
+
+struct GFDSource_s {
+	COMMON_STRUCTSTART;
+	gboolean	(*dispatch)(int fd, gpointer user_data);
+	GPollFD		gpfd;
+};
+
+
+typedef gboolean 	(*GCHdispatch)(IPC_Channel* ch, gpointer user_data);
 
 struct GCHSource_s {
 	COMMON_STRUCTSTART;
@@ -114,15 +109,17 @@ struct GTRIGSource_s {
 #define	OUTPUT_EVENTS	(G_IO_OUT)
 #define	DEF_EVENTS	(INPUT_EVENTS|ERR_EVENTS)
 
-#define	WARN_DELAY(ms, input)	cl_log(LOG_WARNING	\
-	,	"%s: Dispatch function was delayed"	\
-	" %ld ms before being called (GSource: 0x%lx)"		\
-	,	__FUNCTION__,	ms, POINTER_TO_ULONG(input))
+#define	WARN_DELAY(ms, input)	cl_log(LOG_WARNING			\
+	,	"%s: Dispatch function for %s was delayed"		\
+	" %ld ms before being called (GSource: 0x%lx)"			\
+	,	__FUNCTION__,	(input)->description, ms		\
+	,	POINTER_TO_ULONG(input))
 
 #define	WARN_TOOLONG(ms, input)	cl_log(LOG_WARNING			\
-	,	"%s: Dispatch function took too long to execute"	\
+	,	"%s: Dispatch function for %s took too long to execute"	\
 	": %ld ms (GSource: 0x%lx)"					\
-	,	__FUNCTION__,	ms, POINTER_TO_ULONG(input))
+	,	__FUNCTION__,	(input)->description, ms		\
+	,	POINTER_TO_ULONG(input))
 
 #define CHECK_DISPATCH_DELAY(input)	{ 				\
 	unsigned long	ms;						\
@@ -215,6 +212,7 @@ G_main_add_fd(int priority, int fd, gboolean can_recurse
 	g_source_set_can_recurse(source, can_recurse);	
 	
 	ret->gsourceid = g_source_attach(source, NULL);
+	ret->description = "file descriptor";
 	
 	if (ret->gsourceid == 0) {
 		g_source_remove_poll(source, &ret->gpfd);
@@ -410,6 +408,7 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 	g_source_set_can_recurse(source, can_recurse);
 	
 	chp->gsourceid = g_source_attach(source, NULL);
+	chp->description = "IPC channel";
 	
 
 	if (chp->gsourceid == 0) {
@@ -678,6 +677,7 @@ G_main_add_IPC_WaitConnection(int priority
 	g_source_set_can_recurse(source, can_recurse);
 	
 	wcp->gsourceid = g_source_attach(source, NULL);
+	wcp->description = "IPC wait for connection";
 	
 	if (wcp->gsourceid == 0) {
 		g_source_remove_poll(source, &wcp->gpfd);
@@ -863,6 +863,7 @@ G_main_add_SignalHandler(int priority, int signal,
 	}
 	if(!failed) {
 		sig_src->gsourceid = g_source_attach(source, NULL);
+		sig_src->description = "signal";
 		if (sig_src->gsourceid < 1) {
 			cl_log(LOG_ERR
 			,	"%s: Could not attach source for signal %d (%d)"
@@ -1098,6 +1099,7 @@ set_sigchld_proctrack(int priority)
 
 	G_main_setmaxdispatchdelay((GSource*) src, 100);
 	G_main_setmaxdispatchtime((GSource*) src, 10);
+	G_main_setdescription((GSource*)src, "SIGCHLD");
 	return;
 }
 
@@ -1155,6 +1157,7 @@ G_main_add_TriggerHandler(int priority,
 
 	if(!failed) {
 		trig_src->gsourceid = g_source_attach(source, NULL);
+		trig_src->description = "trigger";
 		if (trig_src->gsourceid < 1) {
 			cl_log(LOG_ERR, "G_main_add_TriggerHandler: Could not attach new source (%d)",
 			       trig_src->gsourceid);
@@ -1299,4 +1302,15 @@ G_main_setmaxdispatchtime(GSource* s, unsigned long dispatchms)
 		return;
 	}
 	fdp->maxdispatchms = dispatchms;
+}
+void
+G_main_setdescription(GSource* s, const char * description)
+{
+	GFDSource*	fdp =  (GFDSource*)s;
+	if (!IS_ONEOFOURS(fdp)) {
+		cl_log(LOG_ERR
+		,	"Attempt to set max dispatch time on wrong object");
+		return;
+	}
+	fdp->description = description;
 }
