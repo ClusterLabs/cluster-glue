@@ -1,4 +1,4 @@
-/* $Id: realtime.c,v 1.33 2006/02/01 13:01:59 alan Exp $ */
+/* $Id: realtime.c,v 1.34 2006/02/01 17:24:25 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -98,7 +98,7 @@ cl_malloc_hogger(int kbytes)
 #endif
 #	ifdef M_TRIM_THRESHOLD
 	/* Keep malloc from giving memory back to the system */
-	mallopt(M_TRIM_THRESHOLD, 4*kbytes);
+	mallopt(M_TRIM_THRESHOLD, 4*size);
 #endif
 #endif
 	chunks=malloc(chunkbytes);
@@ -165,7 +165,6 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 	}
 
 #ifdef DEFAULT_REALTIME
-
 	if (spolicy <= 0) {
 		spolicy = DEFAULT_REALTIME;
 	}
