@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.19 2005/07/29 10:19:02 sunjd Exp $ */
+/* $Id: cl_malloc.c,v 1.20 2006/02/01 18:55:17 alan Exp $ */
 /*
  * Copyright (C) 2000 Alan Robertson <alanr@unix.sh>
  *
@@ -280,7 +280,8 @@ cl_malloc(size_t size)
 	}
 
 	if (ret && memstats) {
-#ifdef HAVE_MALLINFO
+#if 0 && defined(HAVE_MALLINFO)
+		/* mallinfo is too expensive to use :-( */
 		struct mallinfo	i = mallinfo();
 		memstats->arena = i.arena;
 #endif
