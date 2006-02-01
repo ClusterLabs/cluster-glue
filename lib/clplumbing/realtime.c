@@ -1,4 +1,4 @@
-/* $Id: realtime.c,v 1.31 2005/12/18 22:02:39 alan Exp $ */
+/* $Id: realtime.c,v 1.32 2006/02/01 05:35:24 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -88,9 +88,20 @@ cl_malloc_hogger(int kbytes)
 	int	chunksize	= 1024;
 	long	nchunks		= (int)(size / chunksize);
 	int	chunkbytes 	= nchunks * sizeof(void *);
-	void**	chunks		= malloc(chunkbytes);
+	void**	chunks;
 	int	j;
 
+#ifdef HAVE_MALLOPT
+#	ifdef M_MMAP_MAX
+	/* Keep malloc from using mmap */
+	mallopt(M_MMAP_MAX, 0);
+#endif
+#	ifdef M_TRIM_THRESHOLD
+	/* Keep malloc from giving memory back to the system */
+	mallopt(M_TRIM_THRESHOLD, 1024*1024);
+#endif
+#endif
+	chunks=malloc(chunkbytes);
 	if (chunks == NULL) {
 		cl_log(LOG_INFO, "Could not preallocate (%d) bytes" 
 		,	chunkbytes);
