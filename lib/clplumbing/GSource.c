@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.60 2006/02/02 16:43:40 alan Exp $ */
+/* $Id: GSource.c,v 1.61 2006/02/02 16:45:00 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -40,12 +40,12 @@
 #define	MAG_GTRIGSOURCE	0xfeed0005U
 #define	MAG_GTIMEOUTSRC	0xfeed0006U
 
-#define	IS_FDSOURCE(p)	((p)->magno == MAG_GFDSOURCE)
-#define	IS_CHSOURCE(p)	((p)->magno == MAG_GCHSOURCE)
-#define	IS_WCSOURCE(p)	((p)->magno == MAG_GWCSOURCE)
-#define	IS_SIGSOURCE(p)	((p)->magno == MAG_GSIGSOURCE)
-#define	IS_TRIGSOURCE(p) ((p)->magno == MAG_GTRIGSOURCE)
-#define	IS_TIMEOUTSRC(p) ((p)->magno == MAG_GTIMEOUTSRC)
+#define	IS_FDSOURCE(p)	(p && (p)->magno == MAG_GFDSOURCE)
+#define	IS_CHSOURCE(p)	(p && (p)->magno == MAG_GCHSOURCE)
+#define	IS_WCSOURCE(p)	(p && (p)->magno == MAG_GWCSOURCE)
+#define	IS_SIGSOURCE(p)	(p && (p)->magno == MAG_GSIGSOURCE)
+#define	IS_TRIGSOURCE(p) (p && (p)->magno == MAG_GTRIGSOURCE)
+#define	IS_TIMEOUTSRC(p) (p && (p)->magno == MAG_GTIMEOUTSRC)
 
 #define IS_ONEOFOURS(p)	(IS_CHSOURCE(p)|IS_FDSOURCE(p)|IS_WCSOURCE(p)||	\
 			IS_SIGSOURCE(p)|IS_TRIGSOURCE(p)||IS_TIMEOUTSRC(p))
