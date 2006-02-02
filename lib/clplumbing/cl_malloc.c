@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.21 2006/02/02 04:55:50 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.22 2006/02/02 05:09:19 alan Exp $ */
 /*
  * Copyright (C) 2000 Alan Robertson <alanr@unix.sh>
  *
@@ -131,7 +131,7 @@ struct cl_bucket {
 };
 
 
-#define	NUMBUCKS	8
+#define	NUMBUCKS	11
 #define	NOBUCKET	(NUMBUCKS)
 
 static struct cl_bucket*	cl_malloc_buckets[NUMBUCKS];
