@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.202 2006/02/02 17:28:38 alan Exp $ */
+/* $Id: lrmd.c,v 1.203 2006/02/02 17:47:07 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -420,12 +420,12 @@ lrmd_op_destroy(lrmd_op_t* op)
 
 	if ((int)op->repeat_timeout_tag > 0) {
 		Gmain_timeout_remove(op->repeat_timeout_tag);
-		op->repeat_timeout_tag = -1;
+		op->repeat_timeout_tag =(guint)-1;
 	}
 
 	if ((int)op->timeout_tag > 0) {
 		Gmain_timeout_remove(op->timeout_tag);
-		op->timeout_tag = -1;
+		op->timeout_tag = (guint)-1;
 	}
 
 	ha_msg_del(op->msg);
@@ -1644,7 +1644,7 @@ on_repeat_op_readytorun(gpointer data)
 	rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
 	if ((int)op->repeat_timeout_tag > 0) {
 		Gmain_timeout_remove(op->repeat_timeout_tag);
-		op->repeat_timeout_tag = -1;
+		op->repeat_timeout_tag = (guint)-1;
 	}
 
 	op->repeat_timeout_tag = -1;
@@ -2598,8 +2598,9 @@ on_op_done(lrmd_op_t* op)
 	/*  we should check if the resource exists. */
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
-		if( op->timeout_tag > 0 ) {
+		if((int)op->timeout_tag > 0 ) {
 			Gmain_timeout_remove(op->timeout_tag);
+			op->timeout_tag = (guint)-1;
 		}
 		lrmd_log(LOG_ERR
 		,	"%s: the resource for the operation %s does not exist."
@@ -2746,9 +2747,9 @@ on_op_done(lrmd_op_t* op)
 	, 	"on_op_done:%s is removed from op list" 
 	,	op_info(op));
 
-	if( op->timeout_tag > 0 ) {
+	if( (int)op->timeout_tag > 0 ) {
 		Gmain_timeout_remove(op->timeout_tag);
-		op->timeout_tag = -1;
+		op->timeout_tag = (guint)-1;
 	}
 	
 	
@@ -3470,6 +3471,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.203  2006/02/02 17:47:07  alan
+ * Fixed some cast errors in reference timer tags.
+ *
  * Revision 1.202  2006/02/02 17:28:38  alan
  * Put in a check for a timeout actually being set before removing it...
  *
