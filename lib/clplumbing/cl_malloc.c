@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.20 2006/02/01 18:55:17 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.21 2006/02/02 04:55:50 alan Exp $ */
 /*
  * Copyright (C) 2000 Alan Robertson <alanr@unix.sh>
  *
@@ -191,7 +191,7 @@ static void	cl_dump_item(const struct cl_bucket*b);
 #	define CHECK_GUARD_BYTES(cp, msg)	/* */
 #endif
 
-
+#define	MALLOCROUND	4096	/* Round big mallocs up to a multiple of this size */
 
 /*
  * cl_malloc: malloc clone
@@ -534,6 +534,9 @@ cl_new_mem(size_t size, int numbuck)
 	}
 
 	mallocsize = MALLOCSIZE(allocsize);
+	if (numbuck == NOBUCKET) {
+		mallocsize = (((mallocsize + (MALLOCROUND-1))/MALLOCROUND)*MALLOCROUND);
+	}
 
 	if ((hdrret = malloc(mallocsize)) == NULL) {
 		return NULL;
