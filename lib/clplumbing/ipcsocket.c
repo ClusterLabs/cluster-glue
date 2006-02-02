@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.172 2006/01/24 14:58:41 davidlee Exp $ */
+/* $Id: ipcsocket.c,v 1.173 2006/02/02 15:58:00 alan Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -2454,6 +2454,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 #	define crEgid	sc_egid
 #	define crngrp	sc_ngroups
 #	define crgrps	sc_groups
+#	undef EXTRASPACE
 #	define EXTRASPACE	SOCKCREDSIZE(ngroups)
 
 #elif HAVE_STRUCT_CRED
