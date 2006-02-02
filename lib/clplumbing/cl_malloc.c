@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.23 2006/02/02 05:15:22 alan Exp $ */
+/* $Id: cl_malloc.c,v 1.24 2006/02/02 21:01:37 alan Exp $ */
 /*
  * Copyright (C) 2000 Alan Robertson <alanr@unix.sh>
  *
@@ -51,6 +51,7 @@ static volatile cl_mem_stats_t *	memstats = &default_memstats;
  */
 
 #define	MARK_PRISTINE	1	/* Expensive in CPU time */
+#undef	MARK_PRISTINE
 #define	MAKE_GUARD	1	/* Adds 'n' bytes memory - cheap in CPU*/
 #define	USE_ASSERTS	1
 #define	DUMPONERR	1
