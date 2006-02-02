@@ -1,4 +1,4 @@
-/* $Id: Gmain_timeout.c,v 1.15 2006/01/30 18:41:59 alan Exp $ */
+/* $Id: Gmain_timeout.c,v 1.16 2006/02/02 14:58:23 alan Exp $ */
 /*
  * Glib mainloop timeout handling code.
  *
@@ -28,6 +28,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
+#if 0
 #include <glib.h>
 #include <clplumbing/longclock.h>
 #include <clplumbing/cl_log.h>
@@ -195,3 +196,4 @@ Gmain_timeout_setmaxdispatchdelay(GSource* src, long delayms)
 	struct GTimeoutAppend* append = GTIMEOUT(src);
 	append->maxdispatchdelayms = delayms;
 }
+#endif

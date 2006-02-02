@@ -1,5 +1,7 @@
-/* $Id: GSource.c,v 1.58 2006/01/31 19:59:50 alan Exp $ */
+/* $Id: GSource.c,v 1.59 2006/02/02 14:58:23 alan Exp $ */
 /*
+ * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -28,6 +30,7 @@
 #include <clplumbing/cl_signal.h>
 #include <clplumbing/GSource.h>
 #include <clplumbing/proctrack.h>
+#include <clplumbing/Gmain_timeout.h>
 #include <clplumbing/timers.h>
 
 #define	MAG_GFDSOURCE	0xfeed0001U
@@ -35,19 +38,25 @@
 #define	MAG_GWCSOURCE	0xfeed0003U
 #define	MAG_GSIGSOURCE	0xfeed0004U
 #define	MAG_GTRIGSOURCE	0xfeed0005U
+#define	MAG_GTIMEOUTSRC	0xfeed0006U
 
 #define	IS_FDSOURCE(p)	((p)->magno == MAG_GFDSOURCE)
 #define	IS_CHSOURCE(p)	((p)->magno == MAG_GCHSOURCE)
 #define	IS_WCSOURCE(p)	((p)->magno == MAG_GWCSOURCE)
 #define	IS_SIGSOURCE(p)	((p)->magno == MAG_GSIGSOURCE)
 #define	IS_TRIGSOURCE(p) ((p)->magno == MAG_GTRIGSOURCE)
+#define	IS_TIMEOUTSRC(p) ((p)->magno == MAG_GTIMEOUTSRC)
 
-#define IS_ONEOFOURS(p)	(IS_CHSOURCE(p)|IS_FDSOURCE(p)|IS_WCSOURCE(p)|	\
-			IS_SIGSOURCE(p)|IS_TRIGSOURCE(p))
+#define IS_ONEOFOURS(p)	(IS_CHSOURCE(p)|IS_FDSOURCE(p)|IS_WCSOURCE(p)||	\
+			IS_SIGSOURCE(p)|IS_TRIGSOURCE(p)||IS_TIMEOUTSRC(p))
 
 #ifndef _NSIG
 # define _NSIG 2*NSIG
 #endif
+
+#define		DEFAULT_MAXDISPATCH	100
+#define		DEFAULT_MAXDELAY	500
+#define		OTHER_MAXDELAY		100
 
 #define	COMMON_STRUCTSTART						\
 GSource		source;		/* Common glib struct -  must be 1st */	\
@@ -121,24 +130,39 @@ struct GTRIGSource_s {
 	,	__FUNCTION__,	(input)->description, ms		\
 	,	POINTER_TO_ULONG(input))
 
-#define CHECK_DISPATCH_DELAY(input)	{ 				\
+#define CHECK_DISPATCH_DELAY(i)	{ 					\
 	unsigned long	ms;						\
 	dispstart = time_longclock();					\
-	ms = sub_longclock(dispstart, (input)->detecttime);		\
-	if ((input)->maxdispatchdelayms > 0				\
-	&&	ms > input->maxdispatchdelayms) {			\
-		WARN_DELAY(ms, input);					\
+	ms = longclockto_ms(sub_longclock(dispstart,(i)->detecttime));	\
+	if ((i)->maxdispatchdelayms > 0					\
+	&&	ms > (i)->maxdispatchdelayms) {				\
+		WARN_DELAY(ms, (i));					\
 	}								\
 }
 
-#define CHECK_DISPATCH_TIME(input)	{ 				\
+#define CHECK_DISPATCH_TIME(i)	{ 					\
 	unsigned long	ms;						\
 	longclock_t	dispend = time_longclock();			\
-	ms = sub_longclock(dispend, dispstart);				\
-	if ((input)->maxdispatchms > 0 && ms > input->maxdispatchms) {	\
-		WARN_TOOLONG(ms, input);				\
+	ms = longclockto_ms(sub_longclock(dispend, dispstart));		\
+	if ((i)->maxdispatchms > 0 && ms > (i)->maxdispatchms) {	\
+		WARN_TOOLONG(ms, (i));					\
 	}								\
 }
+
+#define	WARN_TOOMUCH(ms, input)	cl_log(LOG_WARNING			\
+	,	"%s: working on %s took %ld ms"				\
+	,	__FUNCTION__,	(input)->description, ms);
+
+#define	SAVESTART	{funstart = time_longclock();}
+
+#define	CHECKEND(input)	{						\
+	longclock_t	funend = time_longclock();			\
+	long		ms;						\
+	ms = longclockto_ms(sub_longclock(funend, funstart));		\
+	if (ms > OTHER_MAXDELAY){					\
+		WARN_TOOMUCH(ms, input);				\
+	}								\
+}									\
 
 
 static gboolean G_fd_prepare(GSource* source,
@@ -194,8 +218,8 @@ G_main_add_fd(int priority, int fd, gboolean can_recurse
 	GFDSource* ret = (GFDSource*)source;
 	
 	ret->magno = MAG_GFDSOURCE;
-	ret->maxdispatchdelayms = 0;
-	ret->maxdispatchms = 0;
+	ret->maxdispatchdelayms = DEFAULT_MAXDELAY;
+	ret->maxdispatchms = DEFAULT_MAXDISPATCH;
 	ret->udata = userdata;
 	ret->dispatch = dispatch;
 	ret->gpfd.fd = fd;
@@ -380,8 +404,8 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 	chp = (GCHSource*)source;
 	
 	chp->magno = MAG_GCHSOURCE;
-	chp->maxdispatchdelayms = 0;
-	chp->maxdispatchms = 0;
+	chp->maxdispatchdelayms = DEFAULT_MAXDELAY;
+	chp->maxdispatchms = DEFAULT_MAXDISPATCH;
 	chp->detecttime = time_longclock();
 	chp->ch = ch;
 	chp->dispatch = dispatch;
@@ -480,8 +504,11 @@ G_CH_prepare(GSource* source,
 	     gint* timeout)
 {
 	GCHSource* chp = (GCHSource*)source;
+	longclock_t	funstart;
+	gboolean	ret;
 	
 	g_assert(IS_CHSOURCE(chp));
+	SAVESTART;
 	
 	
 	if (chp->ch->ops->is_sending_blocked(chp->ch)) {
@@ -507,7 +534,9 @@ G_CH_prepare(GSource* source,
 	if (chp->dontread){
 		return FALSE;
 	}
-	return chp->ch->ops->is_message_pending(chp->ch);
+	ret = chp->ch->ops->is_message_pending(chp->ch);
+	CHECKEND(chp);
+	return ret;
 }
 
 /*
@@ -520,8 +549,10 @@ G_CH_check(GSource* source)
 
 	GCHSource* chp = (GCHSource*)source;
 	gboolean	ret;
+	longclock_t	funstart;
 
 	g_assert(IS_CHSOURCE(chp));
+	SAVESTART;
 	
 
 	if (chp->dontread){
@@ -534,6 +565,7 @@ G_CH_check(GSource* source)
 		||	(!chp->fd_fdx && chp->outfd.revents != 0)
 		||	chp->ch->ops->is_message_pending(chp->ch));
 	chp->detecttime = time_longclock();
+	CHECKEND(chp);
 	return ret;
 }
 
@@ -658,8 +690,8 @@ G_main_add_IPC_WaitConnection(int priority
 	wcp = (GWCSource*)source;
 	
 	wcp->magno = MAG_GWCSOURCE;
-	wcp->maxdispatchdelayms = 0;
-	wcp->maxdispatchms = 0;
+	wcp->maxdispatchdelayms = DEFAULT_MAXDELAY;
+	wcp->maxdispatchms = DEFAULT_MAXDISPATCH;
 	wcp->detecttime = time_longclock();
 	wcp->udata = userdata;
 	wcp->gpfd.fd = wch->ops->get_select_fd(wch);
@@ -843,8 +875,8 @@ G_main_add_SignalHandler(int priority, int signal,
 	sig_src = (GSIGSource*)source;
 	
 	sig_src->magno		= MAG_GSIGSOURCE;
-	sig_src->maxdispatchdelayms = 0;
-	sig_src->maxdispatchms	= 0;
+	sig_src->maxdispatchdelayms = DEFAULT_MAXDELAY;
+	sig_src->maxdispatchms	= DEFAULT_MAXDISPATCH;
 	sig_src->signal		= signal;
 	sig_src->dispatch	= dispatch;
 	sig_src->udata		= userdata;
@@ -948,7 +980,6 @@ G_SIG_check(GSource* source)
 
 	g_assert(IS_SIGSOURCE(sig_src));
 	
-	sig_src->detecttime = time_longclock();
 	return sig_src->signal_triggered;
 }
 
@@ -1015,6 +1046,7 @@ G_main_signal_handler(int nsig)
 	}
 	
 	g_assert(IS_SIGSOURCE(sig_src));
+	sig_src->detecttime = time_longclock();
 	sig_src->signal_triggered = TRUE;
 }
 
@@ -1144,8 +1176,8 @@ G_main_add_TriggerHandler(int priority,
 	trig_src = (GTRIGSource*)source;
 	
 	trig_src->magno		= MAG_GTRIGSOURCE;
-	trig_src->maxdispatchdelayms = 0;
-	trig_src->maxdispatchms	= 0;
+	trig_src->maxdispatchdelayms = DEFAULT_MAXDELAY;
+	trig_src->maxdispatchms	= DEFAULT_MAXDISPATCH;
 	trig_src->dispatch	= dispatch;
 	trig_src->udata		= userdata;
 	trig_src->dnotify	= notify;
@@ -1280,7 +1312,163 @@ G_TRIG_destroy(GSource* source)
 		trig_src->dnotify(trig_src->udata);
 	}	
 }
+/*
+ * Glib mainloop timeout handling code.
+ *
+ * These functions work correctly even if someone resets the 
+ * time-of-day clock.  The g_main_timeout_add() function does not have
+ * this property, since it relies on gettimeofday().
+ *
+ * Our functions have the same semantics - except they always work ;-)
+ *
+ * This is because we use longclock_t for our time values.
+ *
+ */
 
+
+static gboolean
+Gmain_timeout_prepare(GSource* src,  gint* timeout);
+
+static gboolean
+Gmain_timeout_check(GSource* src);
+
+static gboolean
+Gmain_timeout_dispatch(GSource* src, GSourceFunc func, gpointer user_data);
+
+static GSourceFuncs Gmain_timeout_funcs = {
+	prepare: Gmain_timeout_prepare,
+	check: Gmain_timeout_check,
+	dispatch: Gmain_timeout_dispatch,
+};
+
+
+struct GTimeoutAppend {
+	COMMON_STRUCTSTART;
+	longclock_t	nexttime;
+	guint		interval;
+};
+
+#define        GTIMEOUT(GS)    ((struct GTimeoutAppend*)((void*)(GS)))
+
+guint
+Gmain_timeout_add(guint interval
+,	GSourceFunc	function
+,	gpointer	data)
+{
+	return Gmain_timeout_add_full(G_PRIORITY_DEFAULT
+	,	interval, function, data, NULL);
+}
+
+guint
+Gmain_timeout_add_full(gint priority
+,	guint interval
+,	GSourceFunc	function
+,	gpointer	data
+,	GDestroyNotify	notify)
+{
+	
+	struct GTimeoutAppend* append;
+	
+	GSource* source = g_source_new( &Gmain_timeout_funcs, 
+					sizeof(struct GTimeoutAppend));
+	
+	append = GTIMEOUT(source);
+	append->magno = MAG_GTIMEOUTSRC;
+	append->maxdispatchms = DEFAULT_MAXDISPATCH;
+	append->maxdispatchdelayms = DEFAULT_MAXDELAY;
+	append->description = "(timeout)";
+	append->detecttime = 0;
+	append->udata = NULL;
+	
+	append->nexttime = add_longclock(time_longclock()
+					 ,msto_longclock(interval));
+  	append->interval = interval; 
+	
+	g_source_set_priority(source, priority);
+	
+	g_source_set_can_recurse(source, FALSE);
+	
+	g_source_set_callback(source, function, data, notify); 
+
+	append->gsourceid = g_source_attach(source, NULL);
+	return append->gsourceid;
+
+}
+
+void
+Gmain_timeout_remove(guint tag)
+{
+	GSource* source = g_main_context_find_source_by_id(NULL,tag);
+	struct GTimeoutAppend* append = GTIMEOUT(source);
+	
+	g_assert(IS_TIMEOUTSRC(append));
+	g_source_remove(tag);
+	
+	if (source != NULL){
+		g_source_unref(source);
+	}
+	
+	return;
+}
+
+/* g_main_loop-style prepare function */
+static gboolean
+Gmain_timeout_prepare(GSource* src,  gint* timeout)
+{
+	
+	struct GTimeoutAppend* append = GTIMEOUT(src);
+	longclock_t	lnow = time_longclock();
+	longclock_t	remain;
+	
+	g_assert(IS_TIMEOUTSRC(append));
+	if (cmp_longclock(lnow, append->nexttime) >= 0) {
+		*timeout = 0L;
+		return TRUE;
+	}
+	/* This is safe - we will always have a positive result */
+	remain = sub_longclock(append->nexttime, lnow);
+	/* This is also safe - we started out in 'ms' */
+	*timeout = longclockto_ms(remain);
+	return ((*timeout) == 0);
+}
+
+/* g_main_loop-style check function */
+static gboolean
+Gmain_timeout_check    (GSource* src)
+{
+	struct GTimeoutAppend* append = GTIMEOUT(src);
+	longclock_t	lnow = time_longclock();
+	
+	g_assert(IS_TIMEOUTSRC(append));
+	if (cmp_longclock(lnow, append->nexttime) >= 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/* g_main_loop-style dispatch function */
+static gboolean
+Gmain_timeout_dispatch(GSource* src, GSourceFunc func, gpointer user_data)
+{
+	struct GTimeoutAppend* append = GTIMEOUT(src);
+	longclock_t	dispstart;
+	gboolean	ret;
+
+	g_assert(IS_TIMEOUTSRC(append));
+	append->detecttime = append->nexttime;
+	CHECK_DISPATCH_DELAY(append);
+	
+
+	/* Schedule our next dispatch */
+	append->nexttime = add_longclock(time_longclock()
+					  , msto_longclock(append->interval));
+
+	/* Then call the user function */
+	ret = func(user_data);
+
+	CHECK_DISPATCH_TIME(append);
+	return ret;
+}
 void
 G_main_setmaxdispatchdelay(GSource* s, unsigned long delayms)
 {
@@ -1313,4 +1501,39 @@ G_main_setdescription(GSource* s, const char * description)
 		return;
 	}
 	fdp->description = description;
+}
+void
+G_main_setmaxdispatchdelay_id(guint id, unsigned long delayms)
+{
+	GSource* source = g_main_context_find_source_by_id(NULL,id);
+	
+	if (source) {
+		G_main_setmaxdispatchdelay(source, delayms);
+	}
+}
+void
+G_main_setmaxdispatchtime_id(guint id, unsigned long dispatchms)
+{
+	GSource* source = g_main_context_find_source_by_id(NULL,id);
+	
+	if (source) {
+		G_main_setmaxdispatchtime(source, dispatchms);
+	}
+}
+void
+G_main_setdescription_id(guint id, const char * description)
+{
+	GSource* source = g_main_context_find_source_by_id(NULL,id);
+	
+	if (source) {
+		G_main_setdescription(source, description);
+	}
+}
+void
+G_main_setall_id(guint id, const char * description, unsigned long delay
+,	unsigned long elapsed)
+{
+	G_main_setdescription_id(id, description);
+	G_main_setmaxdispatchdelay_id(id, delay);
+	G_main_setmaxdispatchtime_id(id, delay);
 }
