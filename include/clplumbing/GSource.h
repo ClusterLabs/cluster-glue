@@ -1,4 +1,4 @@
-/* $Id: GSource.h,v 1.15 2006/01/31 19:59:50 alan Exp $ */
+/* $Id: GSource.h,v 1.16 2006/02/02 15:12:27 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,6 +29,11 @@ typedef struct GTRIGSource_s	GTRIGSource;
 void G_main_setmaxdispatchdelay(GSource* s, unsigned long delayms);
 void G_main_setmaxdispatchtime(GSource* s, unsigned long dispatchms);
 void G_main_setdescription(GSource* s, const char * description);
+
+void G_main_setmaxdispatchdelay_id(guint id, unsigned long delayms);
+void G_main_setmaxdispatchtime_id(guint id, unsigned long dispatchms);
+void G_main_setdescription_id(guint id, const char * description);
+void G_main_setall_id(guint id, const char * description, unsigned long delayms, unsigned long dispatchms);
 
 
 /***********************************************************************
