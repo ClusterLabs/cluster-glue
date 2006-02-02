@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.61 2006/02/02 16:45:00 alan Exp $ */
+/* $Id: GSource.c,v 1.62 2006/02/02 17:04:20 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -1404,7 +1404,7 @@ Gmain_timeout_remove(guint tag)
 	g_source_remove(tag);
 	
 	if (source == NULL){
-		cl_log(LOG_ERR, "Attempt to remove timeout (%ud)"
+		cl_log(LOG_ERR, "Attempt to remove timeout (%u)"
 		"with NULL source",	tag);
 	}else{
 		g_assert(IS_TIMEOUTSRC(append));
