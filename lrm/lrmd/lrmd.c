@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.201 2006/01/16 10:05:56 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.202 2006/02/02 17:28:38 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1642,7 +1642,10 @@ on_repeat_op_readytorun(gpointer data)
 		return FALSE;
 	}
 	rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
-	Gmain_timeout_remove(op->repeat_timeout_tag);
+	if ((int)op->repeat_timeout_tag > 0) {
+		Gmain_timeout_remove(op->repeat_timeout_tag);
+		op->repeat_timeout_tag = -1;
+	}
 
 	op->repeat_timeout_tag = -1;
 	op->exec_pid = -1;
@@ -3467,6 +3470,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.202  2006/02/02 17:28:38  alan
+ * Put in a check for a timeout actually being set before removing it...
+ *
  * Revision 1.201  2006/01/16 10:05:56  sunjd
  * reset SIGPIPE to SIG_DFL. I think it should be. One related issue is found by Peter Kruse <pk@q-leap.com>, while the solution is proposed by Francis.Montagnac@sophia.inria.fr.
  *
