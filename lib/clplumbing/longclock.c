@@ -1,4 +1,4 @@
-/* $Id: longclock.c,v 1.17 2006/02/03 15:27:30 alan Exp $ */
+/* $Id: longclock.c,v 1.18 2006/02/03 15:47:17 alan Exp $ */
 /*
  * Longclock operations
  *
@@ -106,6 +106,14 @@ time_longclock(void)
 	if (calledbefore && timesval < lasttimes)  {
 		if ((lasttimes - timesval) <= 2UL) {
 			/* Some kind of (SMP) kernel weirdness */
+			cl_log(LOG_CRIT
+			,	"%s: clock_t from times(2) appears to"
+			" have jumped backwards just a few ticks!"
+			,	__FUNCTION__);
+			cl_log(LOG_CRIT
+			,	"%s: old value was %lu"
+			", new value is %lu, callcount %lu"
+			,	__FUNCTION__, lasttimes, timesval, callcount);
 			timesval = lasttimes;
 		}else{
 			++wrapcount;
