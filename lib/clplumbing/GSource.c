@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.63 2006/02/02 17:05:03 alan Exp $ */
+/* $Id: GSource.c,v 1.64 2006/02/03 02:21:10 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -120,13 +120,13 @@ struct GTRIGSource_s {
 
 #define	WARN_DELAY(ms, input)	cl_log(LOG_WARNING			\
 	,	"%s: Dispatch function for %s was delayed"		\
-	" %ld ms before being called (GSource: 0x%lx)"			\
+	" %lu ms before being called (GSource: 0x%lx)"			\
 	,	__FUNCTION__,	(input)->description, ms		\
 	,	POINTER_TO_ULONG(input))
 
 #define	WARN_TOOLONG(ms, input)	cl_log(LOG_WARNING			\
 	,	"%s: Dispatch function for %s took too long to execute"	\
-	": %ld ms (GSource: 0x%lx)"					\
+	": %lu ms (GSource: 0x%lx)"					\
 	,	__FUNCTION__,	(input)->description, ms		\
 	,	POINTER_TO_ULONG(input))
 
