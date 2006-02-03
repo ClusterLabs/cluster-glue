@@ -1,4 +1,4 @@
-/* $Id: longclock.c,v 1.16 2006/02/03 14:08:49 alan Exp $ */
+/* $Id: longclock.c,v 1.17 2006/02/03 15:27:30 alan Exp $ */
 /*
  * Longclock operations
  *
@@ -76,7 +76,8 @@ time_longclock(void)
 #define	BITSPERBYTE	8
 #define	WRAPSHIFT	(BITSPERBYTE*sizeof(clock_t))
 #define MAXIMUMULONG	((unsigned long)~(0UL))
-#define ENDTIMES	((MAXIMUMULONG/100UL)*95UL)
+#define ENDTIMES	((MAXIMUMULONG/100UL)*99UL)
+#define NEWERA		(MAXIMUMULONG/100UL)
 
 longclock_t
 time_longclock(void)
@@ -87,33 +88,40 @@ time_longclock(void)
 	static	longclock_t	lc_wrapcount	= 0L;
 	static	unsigned long	callcount	= 0L;
 	unsigned long		timesval;
-	
-	
+
 	++callcount;
 	/*
 	 * times(2) really returns an unsigned value ...
 	 *
 	 * We don't check to see if we got back the error value (-1), because
 	 * the only possibility for an error would be if the address of 
-	 * longclock_dummy_tms_struct was invalid.  Since it's a compiler-generated
-	 * address, we assume that errors are impossible.  And, unfortunately, it is
-	 * quite possible for the correct return from times(2) to be exactly
-	 * (clock_t)-1.  Sigh...
+	 * longclock_dummy_tms_struct was invalid.  Since it's a
+	 * compiler-generated address, we assume that errors are impossible.
+	 * And, unfortunately, it is quite possible for the correct return
+	 * from times(2) to be exactly (clock_t)-1.  Sigh...
 	 *
 	 */
 	timesval = (unsigned long) times(&longclock_dummy_tms_struct);
 
 	if (calledbefore && timesval < lasttimes)  {
-		++wrapcount;
-		lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
-		if (lasttimes < (unsigned long)ENDTIMES) {
-			/* This means it jumped by an improbably long amount... */
-			cl_log(LOG_CRIT
-			,	"%s: clock_t from times(2) appears to have jumped backwards!"
-			,	__FUNCTION__);
-			cl_log(LOG_CRIT
-			,	"%s: old value was %lu, new value is %lu, callcount %lu"
-			,	__FUNCTION__, lasttimes, timesval, callcount);
+		if ((lasttimes - timesval) <= 2UL) {
+			/* Some kind of (SMP) kernel weirdness */
+			timesval = lasttimes;
+		}else{
+			++wrapcount;
+			lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
+			if (lasttimes < ENDTIMES || timesval >= NEWERA) {
+				/* Clock jumped a long way(!) */
+				cl_log(LOG_CRIT
+				,	"%s: clock_t from times(2) appears to"
+				" have jumped backwards!"
+				,	__FUNCTION__);
+				cl_log(LOG_CRIT
+				,	"%s: old value was %lu"
+				", new value is %lu, callcount %lu"
+				,	__FUNCTION__, lasttimes, timesval
+				,	callcount);
+			}
 		}
 	}
 	lasttimes = timesval;
