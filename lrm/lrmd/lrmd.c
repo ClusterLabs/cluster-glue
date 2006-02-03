@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.203 2006/02/02 17:47:07 alan Exp $ */
+/* $Id: lrmd.c,v 1.204 2006/02/03 16:38:07 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -350,7 +350,6 @@ static void usage(const char* cmd, int exit_status);
 static int init_start(void);
 static int init_stop(const char *pid_file);
 static int init_status(const char *pid_file, const char *client_name);
-static lrmd_op_t* lrmd_op_copy(const lrmd_op_t* op);
 static void lrmd_rsc_dump(char* rsc_id, const char * text);
 
 static struct {
@@ -492,6 +491,14 @@ lrmd_op_copy(const lrmd_op_t* op)
 	}
 	/* Do a "shallow" copy */
 	*ret = *op;
+	/*
+	 * Some things, like timer ids and child pids are duplicated here
+	 * but can be destroyed in one copy, but kept intact
+	 * in the other, to later be destroyed.
+	 * This isn't a complete disaster, since the timer ids aren't
+	 * pointers, but it's still untidy at the least.
+	 * Be sure and care of this situation when using this function.
+	 */
 	/* Do a "deep" copy of the message structure */
 	ret->msg = ha_msg_copy(op->msg);
 	ret->rsc_id = cl_strdup(op->rsc_id);
@@ -2365,7 +2372,7 @@ getout:
 	*/
 	ha_msg_del(op->msg);
 	op->msg = NULL;
-	if (op->rsc_id !=NULL ) {
+	if (op->rsc_id != NULL ) {
 		cl_free(op->rsc_id);
 		op->rsc_id = NULL;
 	}
@@ -2554,9 +2561,12 @@ record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
 		g_hash_table_replace(client_last_op
 		, 	cl_strdup(op_type)
 		,	(gpointer)new_op);
+		/* Don't let the timers go away */
 		lrmd_op_destroy(old_op);
-	}
-	else {
+	}else{
+		new_op->timeout_tag = (guint)-1;
+		new_op->repeat_timeout_tag = (guint)-1;
+		new_op->exec_pid = -1;
 		g_hash_table_insert(client_last_op
 		, 	cl_strdup(op_type)
 		,	(gpointer)new_op);
@@ -3471,6 +3481,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.204  2006/02/03 16:38:07  alan
+ * Made a minor fix to make sure we don't try and destroy a timer multiple times.
+ *
  * Revision 1.203  2006/02/02 17:47:07  alan
  * Fixed some cast errors in reference timer tags.
  *
