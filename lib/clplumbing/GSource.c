@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.64 2006/02/03 02:21:10 alan Exp $ */
+/* $Id: GSource.c,v 1.65 2006/02/03 02:49:28 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -124,6 +124,11 @@ struct GTRIGSource_s {
 	,	__FUNCTION__,	(input)->description, ms		\
 	,	POINTER_TO_ULONG(input))
 
+#define EXPLAINDELAY(started, detected) cl_log(LOG_INFO		\
+	,	"%s: started at %llu should have started at %llu"	\
+	,	__FUNCTION__, started, detected)
+	
+
 #define	WARN_TOOLONG(ms, input)	cl_log(LOG_WARNING			\
 	,	"%s: Dispatch function for %s took too long to execute"	\
 	": %lu ms (GSource: 0x%lx)"					\
@@ -137,6 +142,7 @@ struct GTRIGSource_s {
 	if ((i)->maxdispatchdelayms > 0					\
 	&&	ms > (i)->maxdispatchdelayms) {				\
 		WARN_DELAY(ms, (i));					\
+		EXPLAINDELAY(dispstart, (i)->detecttime);		\
 	}								\
 }
 
@@ -1377,11 +1383,11 @@ Gmain_timeout_add_full(gint priority
 	append->maxdispatchms = DEFAULT_MAXDISPATCH;
 	append->maxdispatchdelayms = DEFAULT_MAXDELAY;
 	append->description = "(timeout)";
-	append->detecttime = 0;
+	append->detecttime = time_longclock();
 	append->udata = NULL;
 	
-	append->nexttime = add_longclock(time_longclock()
-					 ,msto_longclock(interval));
+	append->nexttime = add_longclock(append->detecttime
+	,	msto_longclock(interval));
   	append->interval = interval; 
 	
 	g_source_set_priority(source, priority);
@@ -1464,7 +1470,7 @@ Gmain_timeout_dispatch(GSource* src, GSourceFunc func, gpointer user_data)
 
 	/* Schedule our next dispatch */
 	append->nexttime = add_longclock(time_longclock()
-					  , msto_longclock(append->interval));
+	,	msto_longclock(append->interval));
 
 	/* Then call the user function */
 	ret = func(user_data);
