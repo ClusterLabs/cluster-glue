@@ -1,4 +1,4 @@
-/* $Id: longclock.c,v 1.15 2005/06/01 03:34:32 alan Exp $ */
+/* $Id: longclock.c,v 1.16 2006/02/03 14:08:49 alan Exp $ */
 /*
  * Longclock operations
  *
@@ -25,18 +25,12 @@
 #include <unistd.h>
 #include <sys/times.h>
 #include <clplumbing/longclock.h>
-
-#ifndef CLOCK_T_IS_LONG_ENOUGH
-static	unsigned long	lasttimes = 0L;
-static	unsigned long	wrapcount = 0;
-static	longclock_t	lc_wrapcount;
-#endif
+#include <clplumbing/cl_log.h>
 
 static	unsigned 	Hz = 0;
 static	longclock_t 	Lc_Hz;
 static	double		d_Hz;
 
-#define	WRAPSHIFT	(8*sizeof(clock_t))
 
 const longclock_t	zero_longclock = 0UL;
 
@@ -79,12 +73,23 @@ time_longclock(void)
 
 #else	/* clock_t is shorter than 64 bits */
 
+#define	BITSPERBYTE	8
+#define	WRAPSHIFT	(BITSPERBYTE*sizeof(clock_t))
+#define MAXIMUMULONG	((unsigned long)~(0UL))
+#define ENDTIMES	((MAXIMUMULONG/100UL)*95UL)
+
 longclock_t
 time_longclock(void)
 {
+	static	gboolean	calledbefore	= FALSE;
+	static	unsigned long	lasttimes	= 0L;
+	static	unsigned long	wrapcount	= 0L;
+	static	longclock_t	lc_wrapcount	= 0L;
+	static	unsigned long	callcount	= 0L;
 	unsigned long		timesval;
 	
 	
+	++callcount;
 	/*
 	 * times(2) really returns an unsigned value ...
 	 *
@@ -92,23 +97,27 @@ time_longclock(void)
 	 * the only possibility for an error would be if the address of 
 	 * longclock_dummy_tms_struct was invalid.  Since it's a compiler-generated
 	 * address, we assume that errors are impossible.  And, unfortunately, it is
-	 * theoretically possible for the correct return from times(2) to be exactly
+	 * quite possible for the correct return from times(2) to be exactly
 	 * (clock_t)-1.  Sigh...
 	 *
 	 */
 	timesval = (unsigned long) times(&longclock_dummy_tms_struct);
 
-	if (!lasttimes) {
-		lasttimes = timesval;
-	}
-
-
-	if (timesval < lasttimes)  {
+	if (calledbefore && timesval < lasttimes)  {
 		++wrapcount;
 		lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
+		if (lasttimes < (unsigned long)ENDTIMES) {
+			/* This means it jumped by an improbably long amount... */
+			cl_log(LOG_CRIT
+			,	"%s: clock_t from times(2) appears to have jumped backwards!"
+			,	__FUNCTION__);
+			cl_log(LOG_CRIT
+			,	"%s: old value was %lu, new value is %lu, callcount %lu"
+			,	__FUNCTION__, lasttimes, timesval, callcount);
+		}
 	}
-	
 	lasttimes = timesval;
+	calledbefore = TRUE;
 	return (lc_wrapcount | (longclock_t)timesval);
 }
 #endif	/* ! CLOCK_T_IS_LONG_ENOUGH */
