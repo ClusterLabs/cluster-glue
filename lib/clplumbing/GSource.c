@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.66 2006/02/04 16:39:58 alan Exp $ */
+/* $Id: GSource.c,v 1.67 2006/02/04 17:25:27 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -1436,7 +1436,7 @@ Gmain_timeout_add_full(gint priority
 	append->detecttime = zero_longclock;
 	append->udata = NULL;
 	
-	append->nexttime = add_longclock(append->detecttime
+	append->nexttime = add_longclock(time_longclock()
 	,	msto_longclock(interval));
   	append->interval = interval; 
 	
