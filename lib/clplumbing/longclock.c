@@ -1,4 +1,4 @@
-/* $Id: longclock.c,v 1.18 2006/02/03 15:47:17 alan Exp $ */
+/* $Id: longclock.c,v 1.19 2006/02/04 16:39:58 alan Exp $ */
 /*
  * Longclock operations
  *
@@ -55,7 +55,7 @@ hz_longclock(void)
 		/* Compute various hz-related constants */
 
 		Hz = sysconf(_SC_CLK_TCK);
-		Lc_Hz = Hz;
+		Lc_Hz = (longclock_t)Hz;
 		d_Hz = (double) Hz;
 	}
 	return Hz;
@@ -76,8 +76,7 @@ time_longclock(void)
 #define	BITSPERBYTE	8
 #define	WRAPSHIFT	(BITSPERBYTE*sizeof(clock_t))
 #define MAXIMUMULONG	((unsigned long)~(0UL))
-#define ENDTIMES	((MAXIMUMULONG/100UL)*99UL)
-#define NEWERA		(MAXIMUMULONG/100UL)
+#define MINJUMP		((MAXIMUMULONG/100UL)*99UL)
 
 longclock_t
 time_longclock(void)
@@ -104,32 +103,26 @@ time_longclock(void)
 	timesval = (unsigned long) times(&longclock_dummy_tms_struct);
 
 	if (calledbefore && timesval < lasttimes)  {
-		if ((lasttimes - timesval) <= 2UL) {
-			/* Some kind of (SMP) kernel weirdness */
+		clock_t		jumpbackby = lasttimes - timesval;
+
+		if (jumpbackby < MINJUMP) {
+			/* Kernel weirdness */
 			cl_log(LOG_CRIT
 			,	"%s: clock_t from times(2) appears to"
-			" have jumped backwards just a few ticks!"
+			" have jumped backwards (in error)!"
 			,	__FUNCTION__);
 			cl_log(LOG_CRIT
 			,	"%s: old value was %lu"
-			", new value is %lu, callcount %lu"
-			,	__FUNCTION__, lasttimes, timesval, callcount);
+			", new value is %lu, diff is %lu, callcount %lu"
+			,	__FUNCTION__, lasttimes, timesval
+			,	jumpbackby, callcount);
+			/* Assume jump back was the error and ignore it */
+			/* (i.e., hope it goes away) */
 			timesval = lasttimes;
 		}else{
+			/* Normal looking wraparound */
 			++wrapcount;
 			lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
-			if (lasttimes < ENDTIMES || timesval >= NEWERA) {
-				/* Clock jumped a long way(!) */
-				cl_log(LOG_CRIT
-				,	"%s: clock_t from times(2) appears to"
-				" have jumped backwards!"
-				,	__FUNCTION__);
-				cl_log(LOG_CRIT
-				,	"%s: old value was %lu"
-				", new value is %lu, callcount %lu"
-				,	__FUNCTION__, lasttimes, timesval
-				,	callcount);
-			}
 		}
 	}
 	lasttimes = timesval;

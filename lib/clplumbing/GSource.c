@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.65 2006/02/03 02:49:28 alan Exp $ */
+/* $Id: GSource.c,v 1.66 2006/02/04 16:39:58 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -102,6 +102,7 @@ struct GWCSource_s {
 
 struct GSIGSource_s {
 	COMMON_STRUCTSTART;
+	clock_t		sh_detecttime;
 	int		signal;
 	gboolean	signal_triggered;
 	gboolean 	(*dispatch)(int signal, gpointer user_data);
@@ -153,6 +154,7 @@ struct GTRIGSource_s {
 	if ((i)->maxdispatchms > 0 && ms > (i)->maxdispatchms) {	\
 		WARN_TOOLONG(ms, (i));					\
 	}								\
+	(i)->detecttime = zero_longclock;				\
 }
 
 #define	WARN_TOOMUCH(ms, input)	cl_log(LOG_WARNING			\
@@ -232,7 +234,7 @@ G_main_add_fd(int priority, int fd, gboolean can_recurse
 	ret->gpfd.events = DEF_EVENTS;
 	ret->gpfd.revents = 0;
 	ret->dnotify = notify;
-	ret->detecttime = time_longclock();
+	ret->detecttime = zero_longclock;
 	
 	g_source_add_poll(source, &ret->gpfd);
 	
@@ -304,8 +306,11 @@ G_fd_check(GSource* source)
 {
 	GFDSource*	fdp =  (GFDSource*)source;
 	g_assert(IS_FDSOURCE(fdp));
-	fdp->detecttime = time_longclock();
-	return  fdp->gpfd.revents != 0;
+	if (fdp->gpfd.revents) {
+		fdp->detecttime = time_longclock();
+		return TRUE;
+	}
+	return FALSE;
 }
 
 /*
@@ -323,7 +328,8 @@ G_fd_dispatch(GSource* source,
 	CHECK_DISPATCH_DELAY(fdp);
 	
 
-	/* Is output now unblocked? 
+	/*
+	 * Is output now unblocked? 
 	 *
 	 * If so, turn off OUTPUT_EVENTS to avoid going into
 	 * a tight poll(2) loop.
@@ -412,7 +418,7 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 	chp->magno = MAG_GCHSOURCE;
 	chp->maxdispatchdelayms = DEFAULT_MAXDELAY;
 	chp->maxdispatchms = DEFAULT_MAXDISPATCH;
-	chp->detecttime = time_longclock();
+	chp->detecttime = zero_longclock;
 	chp->ch = ch;
 	chp->dispatch = dispatch;
 	chp->udata=userdata;
@@ -536,11 +542,13 @@ G_CH_prepare(GSource* source,
 		chp->infd.events &= ~INPUT_EVENTS;
 	}
 
-	chp->detecttime = time_longclock();
 	if (chp->dontread){
 		return FALSE;
 	}
 	ret = chp->ch->ops->is_message_pending(chp->ch);
+	if (ret) {
+		chp->detecttime = time_longclock();
+	}
 	CHECKEND(chp);
 	return ret;
 }
@@ -570,7 +578,9 @@ G_CH_check(GSource* source)
 	ret = (chp->infd.revents != 0
 		||	(!chp->fd_fdx && chp->outfd.revents != 0)
 		||	chp->ch->ops->is_message_pending(chp->ch));
-	chp->detecttime = time_longclock();
+	if (ret) {
+		chp->detecttime = time_longclock();
+	}
 	CHECKEND(chp);
 	return ret;
 }
@@ -698,7 +708,7 @@ G_main_add_IPC_WaitConnection(int priority
 	wcp->magno = MAG_GWCSOURCE;
 	wcp->maxdispatchdelayms = DEFAULT_MAXDELAY;
 	wcp->maxdispatchms = DEFAULT_MAXDISPATCH;
-	wcp->detecttime = time_longclock();
+	wcp->detecttime = zero_longclock;
 	wcp->udata = userdata;
 	wcp->gpfd.fd = wch->ops->get_select_fd(wch);
 	wcp->gpfd.events = DEF_EVENTS;
@@ -773,8 +783,8 @@ G_WC_check(GSource * source)
 	GWCSource* wcp = (GWCSource*)source;
 	g_assert(IS_WCSOURCE(wcp));
 
-	wcp->detecttime = time_longclock();
 	if (wcp->gpfd.revents != 0) {
+		wcp->detecttime = time_longclock();
 		return TRUE;
 	}
 	return FALSE;
@@ -968,10 +978,34 @@ G_SIG_prepare(GSource* source, gint* timeoutms)
 	
 	g_assert(IS_SIGSOURCE(sig_src));
 	
-	/* Don't let a timing window keep us in poll() forever */
-	*timeoutms = 1000;
-	sig_src->detecttime = time_longclock();
-	return sig_src->signal_triggered;
+	/* Don't let a timing window keep us in poll() forever
+	 *
+	 * The timing window in question looks like this:
+	 * No signal has occurred up to the point of prepare being called.
+	 * Signal comes in _after_ prepare was called, but _before_ poll.
+	 * signal_detected gets set, but no one checks it before going into poll
+	 * We wait in poll forever...  It's not a pretty sight :-(.
+	 */
+	*timeoutms = 1000;	/* Sigh... */
+
+	if (sig_src->signal_triggered) {
+		static struct tms	dummy_tms_struct;
+		clock_t			now;
+		clock_t			diff;
+
+		/* detecttime is reset in the dispatch function */
+		if (cmp_longclock(sig_src->detecttime, zero_longclock) != 0) {
+			cl_log(LOG_ERR, "%s: detecttime already set?", __FUNCTION__);
+			return TRUE;
+		}
+		/* Otherwise, this is when it was first detected */
+		now = times(&dummy_tms_struct);
+		diff = now - sig_src->sh_detecttime;	/* How long since signal occurred? */
+		sig_src->detecttime
+		=	sub_longclock(time_longclock(), (longclock_t)diff);
+		return TRUE;
+	}
+	return FALSE;
 }
 
 /*
@@ -986,7 +1020,21 @@ G_SIG_check(GSource* source)
 
 	g_assert(IS_SIGSOURCE(sig_src));
 	
-	return sig_src->signal_triggered;
+	if (sig_src->signal_triggered) {
+		static struct tms	dummy_tms_struct;
+		clock_t			now;
+		clock_t			diff;
+		if (cmp_longclock(sig_src->detecttime, zero_longclock) != 0){
+			return TRUE;
+		}
+		/* Otherwise, this is when it was first detected */
+		now = times(&dummy_tms_struct);
+		diff = now - sig_src->sh_detecttime;
+		sig_src->detecttime
+		=	sub_longclock(time_longclock(), (longclock_t)diff);
+		return TRUE;
+	}
+	return FALSE;
 }
 
 /*
@@ -1003,6 +1051,7 @@ G_SIG_dispatch(GSource * source,
 	g_assert(IS_SIGSOURCE(sig_src));
 	CHECK_DISPATCH_DELAY(sig_src);
 
+	sig_src->sh_detecttime = 0UL;
 	sig_src->signal_triggered = FALSE;
 
 	if(sig_src->dispatch) {
@@ -1038,6 +1087,7 @@ G_SIG_destroy(GSource* source)
 static void
 G_main_signal_handler(int nsig)
 {
+	static struct tms	dummy_tms_struct;
 	GSIGSource* sig_src = NULL;
 
 	g_assert(G_main_signal_list != NULL);
@@ -1045,14 +1095,17 @@ G_main_signal_handler(int nsig)
 	
 	sig_src = G_main_signal_list[nsig];
 
-/* 	g_assert(sig_src != NULL); */
 	if(sig_src == NULL) {
 		/* cl_log(LOG_CRIT, "No handler for signal -%d", nsig); */
 		return;
 	}
 	
 	g_assert(IS_SIGSOURCE(sig_src));
-	sig_src->detecttime = time_longclock();
+	/* Time from first occurance of signal */
+	if (!sig_src->signal_triggered) {
+		/* Avoid calling longclock_time() on a signal */
+		sig_src->sh_detecttime=times(&dummy_tms_struct);
+	}
 	sig_src->signal_triggered = TRUE;
 }
 
@@ -1224,6 +1277,7 @@ G_main_set_trigger(GTRIGSource* source)
 	g_assert(IS_TRIGSOURCE(trig_src));
 	
 	trig_src->manual_trigger = TRUE;
+	trig_src->detecttime = time_longclock();
 }
 
 
@@ -1253,7 +1307,7 @@ G_TRIG_prepare(GSource* source, gint* timeout)
 	
 	g_assert(IS_TRIGSOURCE(trig_src));
 	
-	trig_src->detecttime = time_longclock();
+
 	return trig_src->manual_trigger;
 }
 
@@ -1268,11 +1322,7 @@ G_TRIG_check(GSource* source)
 	GTRIGSource* trig_src = (GTRIGSource*)source;
 
 	g_assert(IS_TRIGSOURCE(trig_src));
-	if (trig_src->manual_trigger) {
-		trig_src->detecttime = time_longclock();
-		return TRUE;
-	}
-	return FALSE;
+	return trig_src->manual_trigger;
 }
 
 /*
@@ -1383,7 +1433,7 @@ Gmain_timeout_add_full(gint priority
 	append->maxdispatchms = DEFAULT_MAXDISPATCH;
 	append->maxdispatchdelayms = DEFAULT_MAXDELAY;
 	append->description = "(timeout)";
-	append->detecttime = time_longclock();
+	append->detecttime = zero_longclock;
 	append->udata = NULL;
 	
 	append->nexttime = add_longclock(append->detecttime
