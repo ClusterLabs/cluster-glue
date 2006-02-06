@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.69 2006/02/06 13:10:00 alan Exp $ */
+/* $Id: GSource.c,v 1.70 2006/02/06 13:15:17 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -649,12 +649,8 @@ G_CH_dispatch(GSource * source,
 	
 	
 #endif
-	if (!chp->ch->ops->is_message_pending(chp->ch)) {
-		CHECK_DISPATCH_TIME(chp);
-		return TRUE;
-	}
 
-	if(chp->dispatch) {
+	if(chp->dispatch && chp->ch->ops->is_message_pending(chp->ch)) {
 		if(!(chp->dispatch(chp->ch, chp->udata))){
 			g_source_remove_poll(source, &chp->infd);
 			if (!chp->fd_fdx) {
