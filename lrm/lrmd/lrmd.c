@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.204 2006/02/03 16:38:07 alan Exp $ */
+/* $Id: lrmd.c,v 1.205 2006/02/06 07:14:45 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -146,7 +146,7 @@ static	gboolean	in_alloc_dump = FALSE;
  *			op_list - operations to be run as soon as they're ready
  *			repeat_op_list - operations to be run later
  *		It maintains the following tracking structures:
- *			last_op        Last operation performed on this resource
+ *			last_op_done   Last operation performed on this resource
  *			last_op_table  Last operations of each type done per client
  *
  *	lrmd_op_t:
@@ -203,6 +203,7 @@ struct lrmd_rsc
 	GList*		repeat_op_list;	/* Unordered list of repeating	*/
 					/* ops They will run later	*/
 	GHashTable*	last_op_table;	/* Last operation of each type	*/
+	lrmd_op_t*	last_op_done;	/* The last finished op of the resource */
 };
 
 struct lrmd_op
@@ -289,6 +290,7 @@ static void send_last_op(gpointer key, gpointer value, gpointer user_data);
 static void record_op_completion(lrmd_client_t* client, lrmd_op_t* op);
 static void hash_to_str(GHashTable * , GString *);
 static void hash_to_str_foreach(gpointer key, gpointer value, gpointer userdata);
+static void warning_on_active_rsc(gpointer key, gpointer value, gpointer user_data);
 
 /*
  * following functions are used to monitor the exit of ra proc
@@ -381,33 +383,6 @@ lrmd_op_destroy(lrmd_op_t* op)
 	CHECK_ALLOCATED(op, "op", );
 	--lrm_objectstats.opcount;
 
-	/*
-	 * FIXME!
-	 * This seems WAY dangerous as a way to process this.
-	 * If we expect this to really be freed, then we should
-	 * wipe out ALL references to this data - and then
-	 * we will have a memory leak.
-	 * If we expect this *might* be freed, then we need
-	 * to leave it around for someone else to free
-	 * and hopefully they'll really free it.
-	 * But if these events happen in the other order
-	 * and the process dies before we remove it from our tables
-	 * then we are leaving it in our tables after it really exists.
-	 *
-	 * Some kind of a reference count strategy seems like a better
-	 * deal - and then I think we *probably* wouldn't have to copy it
-	 * for our various purposes, and it wouldn't matter what order
-	 * the various events happened in.
-	 *
-	 * Although reference counts would work fine for this code,
-	 * where it would really work well would be for the resources
-	 * since we copy the operations whenever we need to.
-	 *
-	 * On the other hand if we switched from a pointer to an rsc_id
-	 * then we would eliminate all possibilities of dangling pointers
-	 * This idea has some merit.  If we do that, then switch
-	 * the resource table to be hashed on rsc_id.
-	 */
 	if (op->exec_pid > 1) {
 		return_to_orig_privs();
 		if (kill(-op->exec_pid, SIGKILL) < 0 && errno != ESRCH) {
@@ -749,6 +724,10 @@ lrmd_rsc_destroy(lrmd_rsc_t* rsc)
 		g_hash_table_destroy(rsc->last_op_table);
 		rsc->last_op_table = NULL;
 	}
+	if (rsc->last_op_done) {
+		lrmd_op_destroy(rsc->last_op_done);
+		rsc->last_op_done = NULL;
+	}
 	cl_free(rsc);
 }
 
@@ -826,6 +805,14 @@ lrmd_rsc_dump(char* rsc_id, const char * text)
 	oplist = g_list_first(rsc->repeat_op_list);
 	for(; NULL!=oplist; oplist=g_list_next(oplist)) {
 		lrmd_op_dump(oplist->data, "rsc->repeat_op_list");
+	}
+	
+	if (rsc->last_op_done != NULL) {
+		lrmd_debug(LOG_DEBUG, "%s: rsc->last_op_done...", text);
+		lrmd_op_dump(rsc->last_op_done, "rsc->last_op_done");
+	}
+	else {
+		lrmd_debug(LOG_DEBUG, "%s: rsc->last_op_done==NULL", text);
 	}
 	lrmd_debug(LOG_DEBUG, "%s: END resource dump", text);
 	incall = FALSE;
@@ -1024,12 +1011,70 @@ usage(const char* cmd, int exit_status)
 
 	exit(exit_status);
 }
+/*
+ * In design, the lrmd should not know the meaning of operation type
+ * and the meaning of rc. This function is just for logging.
+ */
+static void
+warning_on_active_rsc(gpointer key, gpointer value, gpointer user_data)
+{
+	int op_status, rc;
+	const char* op_type;
+	
+	lrmd_rsc_t* rsc = (lrmd_rsc_t*)value;
+	if (rsc->last_op_done != NULL) {
+		if (HA_OK != ha_msg_value_int(rsc->last_op_done->msg
+				,	F_LRM_OPSTATUS, &op_status)) {
+			lrmd_debug(LOG_WARNING
+			,"resource %s is left in UNKNOWN status." \
+			 "(last op done is damaged..)"
+			,rsc->id);
+			return;
+		}		
+		op_type = ha_msg_value(rsc->last_op_done->msg, F_LRM_OP);
+		if (op_status != LRM_OP_DONE) {
+			lrmd_debug(LOG_WARNING
+			,"resource %s is left in UNKNOWN status." \
+			 "(last op %s finished without LRM_OP_DONE status.)"
+			,rsc->id, op_type);
+			return;
+		}
+		if (HA_OK != ha_msg_value_int(rsc->last_op_done->msg
+				,	F_LRM_RC, &rc)) {
+			lrmd_debug(LOG_WARNING
+			,"resource %s is left in UNKNOWN status." \
+			 "(last op done is damaged..)"
+			,rsc->id);
+			return;
+		}		
+		if((rc == 0) &&
+		   (STRNCMP_CONST(op_type,"start") ==0
+		    ||STRNCMP_CONST(op_type,"monitor") ==0
+		    ||STRNCMP_CONST(op_type,"status") ==0)) {
+			lrmd_debug(LOG_WARNING
+			,"resource %s is left in RUNNING status." \
+			 "(last op %s finished with rc 0.)"
+			,rsc->id, op_type);
+			return;
+		}
+		if ((rc !=0 ) &&
+		    (STRNCMP_CONST(op_type,"start") ==0
+		     ||STRNCMP_CONST(op_type,"stop") ==0)) {
+			lrmd_debug(LOG_WARNING
+			,"resource %s is left in UNKNOWN status." \
+			 "(last op %s finished with rc %d.)"
+			,rsc->id, op_type, rc);
+			return;
+		}
+	}
+}
 
 static gboolean
 lrm_shutdown(void)
 {
 	lrmd_log(LOG_INFO,"lrmd is shutting down");
 	if (mainloop != NULL && g_main_is_running(mainloop)) {
+		g_hash_table_foreach(resources, warning_on_active_rsc, NULL);
 		g_main_quit(mainloop);
 	}else {
 		exit(LSB_EXIT_OK);
@@ -2195,7 +2240,8 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		rsc = NULL;
 		return HA_FAIL;
 	}
-
+	
+	rsc->last_op_done = NULL;
 	rsc->params = ha_msg_value_str_table(msg,F_LRM_PARAM);
 	rsc->last_op_table = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(resources, cl_strdup(rsc->id), rsc);
@@ -2763,19 +2809,17 @@ on_op_done(lrmd_op_t* op)
 	}
 	
 	
-	/*
-	 * I SUGGEST MOVING THIS CODE TO A SEPARATE FUNCTION FIXME
-	 * perhaps name it record_op_completion() or something
-	 *
-	 * if (null != client) {
-	 *	record_op_completion(client, op);
-	 * }
-	 */
 	/*save the op in the last op hash table*/
 	client = lookup_client(op->client_id);
 	if (NULL != client) {
 		record_op_completion(client, op);
 	}
+	
+	/*save the op in the last op finished*/
+	if (rsc->last_op_done != NULL) {
+		lrmd_op_destroy(rsc->last_op_done);
+	}
+	rsc->last_op_done = lrmd_op_copy(op);
 	
 	/*copy the repeat op to repeat list to wait next perform */
 	if ( 0 != op->interval && NULL != lookup_client(op->client_id)
@@ -3481,6 +3525,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.205  2006/02/06 07:14:45  zhenh
+ * log the active resoruces when lrmd exit
+ *
  * Revision 1.204  2006/02/03 16:38:07  alan
  * Made a minor fix to make sure we don't try and destroy a timer multiple times.
  *
