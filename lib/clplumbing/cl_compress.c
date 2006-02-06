@@ -310,7 +310,7 @@ cl_decompressmsg(struct ha_msg* m)
 	size_t destlen = MAXMSG;
 	int rc;
 	struct ha_msg* ret;
-	const char* compress_name;
+	const char* decompress_name;
 	struct hb_compress_fns* funcs = NULL;
 
 	if (m == NULL){
@@ -330,19 +330,19 @@ cl_decompressmsg(struct ha_msg* m)
 		return NULL;
 	}
 	
-	compress_name = ha_msg_value(m, COMPRESS_NAME);
-	if (compress_name == NULL){
+	decompress_name = ha_msg_value(m, COMPRESS_NAME);
+	if (decompress_name == NULL){
 		cl_log(LOG_ERR, "compress name not found");
 		return NULL;
 	}
 
 	
-	funcs = get_compress_fns(compress_name);
+	funcs = get_compress_fns(decompress_name);
 	
 	if (funcs == NULL){
 		cl_log(LOG_ERR, "%s: compress method(%s) is not"
 		       " supported in this machine",		       
-		       __FUNCTION__, compress_name);
+		       __FUNCTION__, decompress_name);
 		return NULL;
 	}
 	
@@ -372,7 +372,7 @@ cl_decompress_field(struct ha_msg* msg, int index, char* buf, size_t* buflen)
 	char*		value;
 	int		vallen;
 	int		rc;
-	const char*	compress_name;
+	const char*	decompress_name;
 	struct hb_compress_fns* funcs;
 	
 	if ( msg == NULL|| index >= msg->nfields){
@@ -385,19 +385,19 @@ cl_decompress_field(struct ha_msg* msg, int index, char* buf, size_t* buflen)
 	value = msg->values[index];
 	vallen = msg->vlens[index];	
 	
-	compress_name = ha_msg_value(msg, COMPRESS_NAME);
-	if (compress_name == NULL){
+	decompress_name = ha_msg_value(msg, COMPRESS_NAME);
+	if (decompress_name == NULL){
 		cl_log(LOG_ERR, "compress name not found");
 		return HA_FAIL;
 	}
 	
 	
-	funcs = get_compress_fns(compress_name);
+	funcs = get_compress_fns(decompress_name);
 	
 	if (funcs == NULL){
 		cl_log(LOG_ERR, "%s: compress method(%s) is not"
 		       " supported in this machine",		       
-		       __FUNCTION__, compress_name);
+		       __FUNCTION__, decompress_name);
 		return HA_FAIL;
 	}
 	
@@ -426,7 +426,7 @@ cl_compress_field(struct ha_msg* msg, int index, char* buf, size_t* buflen)
 		return HA_FAIL;
 	}
 	
-	if (msg_compress_fns== NULL){
+	if (msg_compress_fns == NULL){
 		if (compress_name == NULL){
 			compress_name = getenv(HACOMPRESSNAME);
 		}
