@@ -33,6 +33,7 @@ include_HEADERS	=	\
 	cl_poll.h	\
 	cl_signal.h	\
 	cl_pidfile.h	\
+	cl_random.h	\
 	cl_syslog.h	\
 	cl_uuid.h	\
 	coredumps.h	\

@@ -1,5 +1,7 @@
+
 /*							
  * Copyright (C) 2005 Guochun Shi <gshi@ncsa.uiuc.edu>
+ * Copyright (C) 2005 International Business Machines Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -16,14 +18,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef _CLPLUMBING_CL_MISC_H
-#define _CLPLUMBING_CL_MISC_H
-int	cl_str_to_boolean(const char*, int*);
 
-int	cl_file_exists(const char* filename);
-
-char*	cl_get_env(const char* env_name);
-
-int	cl_binary_to_int(const char* data, int len);
-
-#endif
+int	cl_randseed(void);
+int	get_next_random(void);	 /* Assumes mainloop setup */
