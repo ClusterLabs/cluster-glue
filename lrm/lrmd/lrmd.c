@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.205 2006/02/06 07:14:45 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.206 2006/02/06 10:01:27 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2820,6 +2820,8 @@ on_op_done(lrmd_op_t* op)
 		lrmd_op_destroy(rsc->last_op_done);
 	}
 	rsc->last_op_done = lrmd_op_copy(op);
+	rsc->last_op_done->timeout_tag = (guint)-1;
+	rsc->last_op_done->repeat_timeout_tag = (guint)-1;
 	
 	/*copy the repeat op to repeat list to wait next perform */
 	if ( 0 != op->interval && NULL != lookup_client(op->client_id)
@@ -3525,6 +3527,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.206  2006/02/06 10:01:27  zhenh
+ * initial the timeout tag with -1 in the copy
+ *
  * Revision 1.205  2006/02/06 07:14:45  zhenh
  * log the active resoruces when lrmd exit
  *
