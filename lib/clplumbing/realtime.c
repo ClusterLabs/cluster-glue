@@ -1,4 +1,4 @@
-/* $Id: realtime.c,v 1.35 2006/02/01 17:42:08 alan Exp $ */
+/* $Id: realtime.c,v 1.36 2006/02/06 06:08:48 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -165,7 +165,7 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 	}
 
 #ifdef DEFAULT_REALTIME
-	if (spolicy <= 0) {
+	if (spolicy < 0) {
 		spolicy = DEFAULT_REALTIME;
 	}
 
