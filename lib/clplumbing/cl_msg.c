@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.101 2005/11/03 22:28:32 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.102 2006/02/06 16:42:14 alan Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -101,12 +101,21 @@ extern int struct_stringlen(size_t namlen, size_t vallen, const void* value);
 extern int struct_netstringlen(size_t namlen, size_t vallen, const void* value);
 extern int process_netstring_nvpair(struct ha_msg* m, const char* nvpair, int nvlen);
 static char*	msg2wirefmt_ll(struct ha_msg*m, size_t* len, gboolean need_compress);
+extern GHashTable*		CompressFuncs;
 
 
 void
 cl_set_traditional_compression(gboolean value)
 {
 	use_traditional_compression = value;
+	if (use_traditional_compression && CompressFuncs) {
+		cl_log(LOG_WARNING
+		,	"Traditional compression selected"
+		". Realtime behavior will likely be impacted(!)");
+		cl_log(LOG_INFO
+		,	"See %s for more information."
+		,	HAURL("ha.cf/TraditionalCompressionDirective"));
+	}
 }
 
 void
@@ -2447,6 +2456,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.102  2006/02/06 16:42:14  alan
+ * Put in a warning about selecting traditional_compression...
+ *
  * Revision 1.101  2005/11/03 22:28:32  gshi
  * nlens are size_t*.We should use size_t to do malloc.
  * It could cause ia64 to mess up memory otherwise
