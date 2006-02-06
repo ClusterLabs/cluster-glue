@@ -1,4 +1,4 @@
-/* $Id: longclock.c,v 1.19 2006/02/04 16:39:58 alan Exp $ */
+/* $Id: longclock.c,v 1.20 2006/02/06 13:53:53 alan Exp $ */
 /*
  * Longclock operations
  *
@@ -121,6 +121,9 @@ time_longclock(void)
 			timesval = lasttimes;
 		}else{
 			/* Normal looking wraparound */
+			cl_log(LOG_INFO
+			,	"%s: clock_t wrapped around (uptime)."
+			,	__FUNCTION__);
 			++wrapcount;
 			lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
 		}
