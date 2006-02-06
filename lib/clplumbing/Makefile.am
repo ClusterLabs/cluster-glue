@@ -48,6 +48,7 @@ libplumb_la_SOURCES	= 		\
 			cl_msg_types.c  \
 			cl_netstring.c	\
 			cl_poll.c	\
+			cl_random.c	\
 			cl_signal.c	\
 			cl_syslog.c	\
 			coredumps.c	\
