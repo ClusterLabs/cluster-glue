@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.70 2006/02/06 13:15:17 alan Exp $ */
+/* $Id: GSource.c,v 1.71 2006/02/06 13:53:28 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -1262,6 +1262,7 @@ G_main_add_TriggerHandler(int priority,
 	trig_src->dispatch	= dispatch;
 	trig_src->udata		= userdata;
 	trig_src->dnotify	= notify;
+	trig_src->detecttime	= zero_longclock;
 
 	trig_src->manual_trigger = FALSE;
 
@@ -1362,6 +1363,7 @@ G_TRIG_dispatch(GSource * source,
 	CHECK_DISPATCH_DELAY(trig_src);
 
 	trig_src->manual_trigger = FALSE;
+	trig_src->detecttime = zero_longclock;
 
 	if(trig_src->dispatch) {
 		if(!(trig_src->dispatch(trig_src->udata))){
