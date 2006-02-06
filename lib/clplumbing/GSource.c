@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.67 2006/02/04 17:25:27 alan Exp $ */
+/* $Id: GSource.c,v 1.68 2006/02/06 04:13:20 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -625,7 +625,29 @@ G_CH_dispatch(GSource * source,
 		chp->ch->ops->resume_io(chp->ch);
 	}
 #else
-	chp->ch->ops->resume_io(chp->ch);
+	{
+		longclock_t	resume_start;
+		if (ANYDEBUG) {
+			resume_start = time_longclock();
+		}
+
+		chp->ch->ops->resume_io(chp->ch);
+
+		if (ANYDEBUG) {
+			longclock_t resume_end = time_longclock();
+			unsigned long	ms;
+			ms = longclockto_ms(sub_longclock(resume_end
+			,	resume_start));
+			if (ms > 10) {
+				cl_log(LOG_WARNING
+				,	"%s: resume_io() for %s took %lu ms"
+				,	__FUNCTION__
+				,	chp->description, ms);
+			}
+		}
+	}
+	
+	
 #endif
 
 	if(chp->dispatch) {
