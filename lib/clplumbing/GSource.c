@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.72 2006/02/07 10:06:45 sunjd Exp $ */
+/* $Id: GSource.c,v 1.73 2006/02/07 15:44:33 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -626,11 +626,8 @@ G_CH_dispatch(GSource * source,
 	}
 #else
 	{
-		longclock_t	resume_start;
+		longclock_t	resume_start = zero_longclock;
 		
-		/* Just make the compiler not complain */
-		memset(&resume_start, 0, sizeof(resume_start));
-
 		if (ANYDEBUG) {
 			resume_start = time_longclock();
 		}
@@ -650,8 +647,7 @@ G_CH_dispatch(GSource * source,
 			}
 		}
 	}
-	
-	
+
 #endif
 
 	if(chp->dispatch && chp->ch->ops->is_message_pending(chp->ch)) {
@@ -1367,7 +1363,6 @@ G_TRIG_dispatch(GSource * source,
 	CHECK_DISPATCH_DELAY(trig_src);
 
 	trig_src->manual_trigger = FALSE;
-	trig_src->detecttime = zero_longclock;
 
 	if(trig_src->dispatch) {
 		if(!(trig_src->dispatch(trig_src->udata))){
@@ -1377,6 +1372,7 @@ G_TRIG_dispatch(GSource * source,
 		}
 		CHECK_DISPATCH_TIME(trig_src);
 	}
+	trig_src->detecttime = zero_longclock;
 	
 	return TRUE;
 }
