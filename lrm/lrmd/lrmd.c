@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.206 2006/02/06 10:01:27 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.207 2006/02/07 17:48:39 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -481,6 +481,9 @@ lrmd_op_copy(const lrmd_op_t* op)
 	ret->ra_stderr_fd = -1;
 	ret->ra_stdout_gsource = NULL;
 	ret->ra_stderr_gsource = NULL;
+	ret->timeout_tag = -1;
+	ret->repeat_timeout_tag = -1;
+	ret->exec_pid = -1;
 	memset(ret->first_line_ra_stdout, 0, sizeof(ret->first_line_ra_stdout));
 	ret->is_copy = TRUE;
 	return ret;
@@ -3527,6 +3530,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.207  2006/02/07 17:48:39  alan
+ * Changed lrmd_op_copy to not copy the timeout tags and the pid.
+ *
  * Revision 1.206  2006/02/06 10:01:27  zhenh
  * initial the timeout tag with -1 in the copy
  *
