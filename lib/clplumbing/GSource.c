@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.71 2006/02/06 13:53:28 alan Exp $ */
+/* $Id: GSource.c,v 1.72 2006/02/07 10:06:45 sunjd Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -627,6 +627,10 @@ G_CH_dispatch(GSource * source,
 #else
 	{
 		longclock_t	resume_start;
+		
+		/* Just make the compiler not complain */
+		memset(&resume_start, 0, sizeof(resume_start));
+
 		if (ANYDEBUG) {
 			resume_start = time_longclock();
 		}
