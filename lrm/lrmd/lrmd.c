@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.207 2006/02/07 17:48:39 alan Exp $ */
+/* $Id: lrmd.c,v 1.208 2006/02/08 10:22:32 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -879,7 +879,6 @@ main(int argc, char ** argv)
 
 	int argerr = 0;
 	int flag;
-	char * inherit_debuglevel;
 
 	cl_malloc_forced_for_glib();
 	while ((flag = getopt(argc, argv, OPTARGS)) != EOF) {
@@ -920,11 +919,6 @@ main(int argc, char ** argv)
 
 	if (argerr) {
 		usage(lrm_system_name, LSB_EXIT_GENERIC);
-	}
-
-	inherit_debuglevel = getenv(HADEBUGVAL);
-	if (inherit_debuglevel != NULL) {
-		debug_level = atoi(inherit_debuglevel);
 	}
 
 	cl_log_set_entity(lrm_system_name);
@@ -3530,6 +3524,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.208  2006/02/08 10:22:32  sunjd
+ * remove the redundant code
+ *
  * Revision 1.207  2006/02/07 17:48:39  alan
  * Changed lrmd_op_copy to not copy the timeout tags and the pid.
  *
