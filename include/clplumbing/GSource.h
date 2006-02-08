@@ -1,4 +1,4 @@
-/* $Id: GSource.h,v 1.16 2006/02/02 15:12:27 alan Exp $ */
+/* $Id: GSource.h,v 1.17 2006/02/08 05:25:15 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -188,4 +188,47 @@ void	set_TriggerHandler_dnotify(GTRIGSource* chp, GDestroyNotify notify);
 
 void G_main_set_trigger(GTRIGSource* man_src);
 
+/*
+ *	Create a trigger for triggering an action in a short-lived (temporary)
+ *	child process.
+ *
+ *	The name isn't wonderful, but we couldn't think of a better one.
+ */
+GTRIGSource* G_main_add_tempproc_trigger(int priority
+,	int		(*fun)(gpointer p)	/* What to do? */
+						/* Called in child process */
+,	const char *	procname	/* What do we call this process? */
+,	gpointer	userdata	/* Passed to 'triggerfun' */
+,	void		(*prefork)(gpointer p)	  /* Called before fork */
+,	void		(*postfork)(gpointer p)); /* Called by parent process
+						   * after fork(2) call.
+						   * Each has 'userdata'
+						   * passed to it.
+						   */
+/*
+ *	Special notes:
+ *	- No more than one child process will be active at a time per trigger
+ *		object.
+ *
+ *	- If you trigger the action while this object has a child active,
+ *		then it will be re-triggered after the currently running child
+ *		completes.  There is no necessary correlation between the
+ *		number of times a the action is triggered and how many
+ *		times it is executed.  What is guaranteed is that after you
+ *		trigger the action, it will happen (at least) once - as soon
+ *		as the scheduler gets around to it at the priority you've
+ *		assigned it.  But if several are triggered while a child
+ *		process is running, only one process will be instantiated to
+ *		take the action requested by all the trigger calls.
+ *
+ *	- Child processes are forked off at the priority of the trigger,
+ *		not the priority of the SIGCHLD handler.
+ *
+ *	- This is useful for writing out updates to a file for example.
+ *		While we're writing one copy out, subsequent updates are
+ *		held off until this one completes.  When it completes, then
+ *		the file is written again - but not "n" times - just the
+ *		latest version available at the time the trigger is
+ *		activated (run).
+ */
 #endif

@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.73 2006/02/07 15:44:33 alan Exp $ */
+/* $Id: GSource.c,v 1.74 2006/02/08 05:25:15 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <unistd.h>
 #include <errno.h>
 
 #include <clplumbing/cl_log.h>
@@ -1331,6 +1332,10 @@ G_TRIG_prepare(GSource* source, gint* timeout)
 	g_assert(IS_TRIGSOURCE(trig_src));
 	
 
+	if (trig_src->manual_trigger
+	&&	cmp_longclock(trig_src->detecttime, zero_longclock) == 0) {
+		trig_src->detecttime = time_longclock();
+	}
 	return trig_src->manual_trigger;
 }
 
@@ -1345,6 +1350,10 @@ G_TRIG_check(GSource* source)
 	GTRIGSource* trig_src = (GTRIGSource*)source;
 
 	g_assert(IS_TRIGSOURCE(trig_src));
+	if (trig_src->manual_trigger
+	&&	cmp_longclock(trig_src->detecttime, zero_longclock) == 0) {
+		trig_src->detecttime = time_longclock();
+	}
 	return trig_src->manual_trigger;
 }
 
@@ -1619,4 +1628,186 @@ G_main_setall_id(guint id, const char * description, unsigned long delay
 	G_main_setdescription_id(id, description);
 	G_main_setmaxdispatchdelay_id(id, delay);
 	G_main_setmaxdispatchtime_id(id, delay);
+}
+
+static void		TempProcessRegistered(ProcTrack* p);
+static void		TempProcessDied(ProcTrack* p, int status, int signo
+,			int exitcode, int waslogged);
+static const char*	TempProcessName(ProcTrack* p);
+
+/***********************************************************************
+ * Track our temporary child processes...
+ *
+ * We run no more than one of each type at once.
+ * If we need to run some and one is still running we run another one
+ * when this one exits.
+ *
+ * Requests to run a child process don't add up.  So, 3 requests to run
+ * a child while one is running only cause it to be run once more, not
+ * three times.
+ * 
+ * The only guarantee is that a new child process will run after a request
+ * was made.
+ *
+ * To create the possibility of running a particular type of child process
+ * call G_main_add_tempproc_trigger().
+ *
+ * To cause it to be run, call G_main_set_trigger().
+ *
+ ***********************************************************************/
+
+static ProcTrack_ops		TempProcessTrackOps = {
+	TempProcessDied,
+	TempProcessRegistered,
+	TempProcessName
+};
+
+/*
+ *	Information for tracking our generic temporary child processes.
+ */
+struct tempproc_track {
+	const char *	procname;	/* name of the process*/
+	GTRIGSource*	trigger;	/* Trigger for this event */
+	int		(*fun)(gpointer userdata); /* Function to call
+					 * in child process */
+	void		(*prefork)(gpointer userdata);/* Call before fork */
+	void		(*postfork)(gpointer userdata);/* Call after fork */
+	gpointer	userdata;	/* Info to pass 'fun' */
+	gboolean	isrunning;	/* TRUE if child is running */
+	gboolean	runagain;	/* TRUE if we need to run
+						 * again after child process
+						 * finishes.
+						 */
+};
+static void
+TempProcessRegistered(ProcTrack* p)
+{
+	return;	 /* Don't need to do much here... */
+}
+
+static void
+TempProcessDied(ProcTrack* p, int status, int signo, int exitcode
+,	int waslogged)
+{
+	struct tempproc_track *	pt = p->privatedata;
+ 
+	pt->isrunning=FALSE;
+	if (pt->runagain) {
+		pt->runagain=FALSE;
+
+ 		/*  Do it again, Sam! */
+		G_main_set_trigger(pt->trigger);
+
+		/* Note that we set the trigger for this, we don't
+		 * fork or call the function now.
+		 *
+		 * This allows the mainloop scheduler to decide
+		 * when the fork should happen according to the priority
+		 * of this trigger event - NOT according to the priority
+		 * of general SIGCHLD handling.
+		 */
+	}
+	p->privatedata = NULL;	/* Don't free until trigger is destroyed */
+	return;
+}
+
+static const char *
+TempProcessName(ProcTrack* p)
+{
+	struct tempproc_track *	pt = p->privatedata;
+	return pt->procname;
+}
+/*
+ *	 Make sure only one copy is running at a time...
+ */
+static gboolean
+TempProcessTrigger(gpointer ginfo)
+{
+	struct tempproc_track*	info = ginfo;
+	int			pid;
+
+ 	/* Make sure only one copy is running at a time. */
+	/* This avoids concurrency problems. */
+	if (info->isrunning) {
+		info->runagain = TRUE;
+		return TRUE;
+	}
+	info->isrunning = TRUE;
+
+	if (info->prefork) {
+		info->prefork(info->userdata);
+	}
+	switch ((pid=fork())) {
+		int		rc;
+		case -1:	cl_perror("%s: Can't fork temporary child"
+				" process [%s]!",	__FUNCTION__
+				,	info->procname);
+				info->isrunning = FALSE;
+				break;
+
+		case 0:		/* Child */
+				if ((rc=info->fun(info->userdata)) == HA_OK) {
+					exit(0);
+				}
+				cl_log(LOG_WARNING
+				,	"%s: %s returns %d", __FUNCTION__
+				,	info->procname, rc);
+				exit(1);
+				break;
+		default:
+				/* Fall out */;
+
+	}
+	if (pid > 0) {
+		NewTrackedProc(pid,0,PT_LOGNORMAL,ginfo,&TempProcessTrackOps);
+	}
+	if (info->postfork) {
+		info->postfork(info->userdata);
+	}
+	return TRUE;
+}
+
+static void
+tempproc_destroy_notify(gpointer userdata)
+{
+	if (userdata != NULL) {
+		cl_free(userdata);
+		userdata = NULL;
+	}
+}
+
+GTRIGSource*
+G_main_add_tempproc_trigger(int priority
+,	int		(*triggerfun) (gpointer p)
+,	const char *	procname
+,	gpointer	userdata
+,	void		(*prefork)(gpointer p)
+,	void		(*postfork)(gpointer p))
+{
+
+	struct tempproc_track* 	p;
+	GTRIGSource*		ret;
+
+	p = (struct tempproc_track *) cl_malloc(sizeof(struct tempproc_track));
+	if (p == NULL) {
+		return NULL;
+	}
+
+	memset(p, 0, sizeof(*p));
+	p->procname = procname;
+	p->fun = triggerfun;
+	p->userdata = userdata;
+	p->prefork = prefork;
+	p->postfork = postfork;
+
+	ret = G_main_add_TriggerHandler(priority
+	,	TempProcessTrigger, p,	tempproc_destroy_notify);
+
+	if (ret == NULL) {
+		cl_free(p);
+		p = NULL;
+	}else{
+		p->trigger = ret;
+	}
+	return ret;
 }
