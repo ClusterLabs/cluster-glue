@@ -1,4 +1,4 @@
-/* $Id: apcmastersnmp.c,v 1.24 2005/05/20 17:50:32 msoffen Exp $ */
+/* $Id: apcmastersnmp.c,v 1.25 2006/02/09 09:50:55 sunjd Exp $ */
 /*
  * Stonith module for APC Masterswitch (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
@@ -161,7 +161,7 @@ struct pluginDevice {
 };
 
 /* for checking hardware (issue a warning if mismatch) */
-static const char* APC_tested_ident[] = {"AP9606","AP7920","AP_other_well_tested"};
+static const char* APC_tested_ident[] = {"AP9606","AP7920","AP7921","AP_other_well_tested"};
 
 /* constant strings */
 static const char *pluginid = "APCMS-SNMP-Stonith";
