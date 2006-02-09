@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.208 2006/02/08 10:22:32 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.209 2006/02/09 08:46:57 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -407,14 +407,7 @@ lrmd_op_destroy(lrmd_op_t* op)
 	cl_free(op->rsc_id);
 	op->rsc_id = NULL;
 	op->exec_pid = 0;
-	if (op->ra_stdout_fd != -1) {
-		close(op->ra_stdout_fd);
-		op->ra_stdout_fd = -1;
-	}
-	if (op->ra_stderr_fd != -1) {
-		close(op->ra_stderr_fd);
-		op->ra_stderr_fd = -1;
-	}
+
 	if ( NULL != op->ra_stdout_gsource) {
 		G_main_del_fd(op->ra_stdout_gsource);
 		op->ra_stdout_gsource = NULL;
@@ -423,6 +416,16 @@ lrmd_op_destroy(lrmd_op_t* op)
 		G_main_del_fd(op->ra_stderr_gsource);
 		op->ra_stderr_gsource = NULL;
 	}
+
+	if (op->ra_stdout_fd != -1) {
+		close(op->ra_stdout_fd);
+		op->ra_stdout_fd = -1;
+	}
+	if (op->ra_stderr_fd != -1) {
+		close(op->ra_stderr_fd);
+		op->ra_stderr_fd = -1;
+	}
+
 	memset(op->first_line_ra_stdout, 0, sizeof(op->first_line_ra_stdout));
 
 	lrmd_debug2(LOG_DEBUG, "lrmd_op_destroy: free the op whose address is %p"
@@ -3311,7 +3314,8 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 	char * data = NULL;
 
 	if (op == NULL) {
-		lrmd_log(LOG_DEBUG, "%s:%d: op==NULL.", __FUNCTION__, __LINE__);
+		lrmd_log(LOG_ERR, "%s:%d: op==NULL.", __FUNCTION__, __LINE__);
+		return FALSE;
 	}
 
 	if (fd == -1) {
@@ -3319,8 +3323,17 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 	}
 
 	if (0 != read_pipe(fd, &data, op)) {
+		if ( NULL != op->ra_stdout_gsource) {
+			G_main_del_fd(op->ra_stdout_gsource);
+			op->ra_stdout_gsource = NULL;
+		}
+		if (op->ra_stdout_fd != -1) {
+			close(op->ra_stdout_fd);
+			op->ra_stdout_fd = -1;
+		}
 		rc = FALSE;
 	}
+
 	if (data!=NULL) { 
 		op_type = ha_msg_value(op->msg, F_LRM_OP);
 		if (  (0==STRNCMP_CONST(op_type, "meta-data"))
@@ -3356,8 +3369,17 @@ handle_pipe_ra_stderr(int fd, gpointer user_data)
 	char * data = NULL;
 
 	if (0 != read_pipe(fd, &data, op)) {
+		if ( NULL != op->ra_stderr_gsource) {
+			G_main_del_fd(op->ra_stderr_gsource);
+			op->ra_stderr_gsource = NULL;
+		}
+		if (op->ra_stderr_fd != -1) {
+			close(op->ra_stderr_fd);
+			op->ra_stderr_fd = -1;
+		}
 		rc = FALSE;
 	}
+
 	if (data!=NULL) { 
 		op_type = ha_msg_value(op->msg, F_LRM_OP);
 		lrmd_log(LOG_INFO, "RA output: (%s:%s:stderr) %s", op->rsc_id
@@ -3385,7 +3407,6 @@ read_pipe(int fd, char ** data, void * user_data)
 	*data = NULL;
 	gstr_tmp = g_string_new("");
 
-	/* the log is only for analysing bug 475, or should remove it. */
 	do {
 		errno = 0;
 		readlen = read(fd, buffer, BUFFLEN - 1);
@@ -3398,6 +3419,12 @@ read_pipe(int fd, char ** data, void * user_data)
 	if (errno == EINTR) {
 		errno = 0;
 	}
+	
+	/* Reach the EOF */
+	if (readlen == 0) { 
+		rc = -1;
+	}
+
 	if ((readlen < 0) && (errno !=0)) {
 		rc = -1;
 		if (errno != EAGAIN) {
@@ -3420,7 +3447,6 @@ read_pipe(int fd, char ** data, void * user_data)
 				, (op->ra_stdout_fd==fd)?"stdout":"stderr");
 		}
 	}
-	/* the log is only for analysing bug 475, or should remove it. */
 
 	if ( gstr_tmp->len == 0 ) {
 		g_string_free(gstr_tmp, TRUE);
@@ -3524,6 +3550,10 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.209  2006/02/09 08:46:57  sunjd
+ * Fix bug 1008 ( LRMd consumes too much CPU )
+ * But, donnot know the root casue yet. :-(
+ *
  * Revision 1.208  2006/02/08 10:22:32  sunjd
  * remove the redundant code
  *
