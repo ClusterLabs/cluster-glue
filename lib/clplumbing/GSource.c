@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.75 2006/02/09 18:48:09 alan Exp $ */
+/* $Id: GSource.c,v 1.76 2006/02/09 23:21:45 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -267,6 +267,7 @@ G_main_del_fd(GFDSource* fdp)
 		return FALSE;
 	}
 	
+	g_source_remove_poll(source, &fdp->gpfd);
 	g_source_remove(fdp->gsourceid);
 	fdp->gsourceid = 0;
 	g_source_unref(source);
