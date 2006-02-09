@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.74 2006/02/08 05:25:15 alan Exp $ */
+/* $Id: GSource.c,v 1.75 2006/02/09 18:48:09 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -55,8 +55,8 @@
 # define _NSIG 2*NSIG
 #endif
 
-#define		DEFAULT_MAXDISPATCH	100
-#define		DEFAULT_MAXDELAY	500
+#define		DEFAULT_MAXDISPATCH	0
+#define		DEFAULT_MAXDELAY	0
 #define		OTHER_MAXDELAY		100
 
 #define	COMMON_STRUCTSTART						\
