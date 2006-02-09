@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.209 2006/02/09 08:46:57 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.210 2006/02/09 23:24:13 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -242,6 +242,8 @@ static gboolean on_receive_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_op_timeout_expired(gpointer data);
 static gboolean on_repeat_op_readytorun(gpointer data);
 static void on_remove_client(gpointer user_data);
+static void destroy_pipe_ra_stderr(gpointer user_data);
+static void destroy_pipe_ra_stdout(gpointer user_data);
 
 /* message handlers */
 static int on_msg_register(lrmd_client_t* client, struct ha_msg* msg);
@@ -408,25 +410,53 @@ lrmd_op_destroy(lrmd_op_t* op)
 	op->rsc_id = NULL;
 	op->exec_pid = 0;
 
+	/*
+	 * This action prohibits capturing output after the
+	 * process has died.  FIXME!
+	 * Note that really fixing this would require that
+	 * the GSource become a semi-independent object
+	 * whose lifetime is potentially greater than that 
+	 * of the operation which spawned it as described
+	 * by bug 756.
+	 * Note that if you simply remove the _del_fd()
+	 * call below that bad things will happen, because
+	 * the Gsource code refers directly to this operation
+	 * structure which will have been freed in
+	 * just a few lines below...
+	 */
 	if ( NULL != op->ra_stdout_gsource) {
 		G_main_del_fd(op->ra_stdout_gsource);
 		op->ra_stdout_gsource = NULL;
 	}
+	/*
+	 * This action prohibits capturing output after the
+	 * process has died.  FIXME!
+	 * Note that really fixing this would require that
+	 * the GSource become a semi-independent object
+	 * whose lifetime is potentially greater than that 
+	 * of the operation which spawned it as described
+	 * by bug 756.
+	 * Note that if you simply remove the _del_fd()
+	 * call below that bad things will happen, because
+	 * the Gsource code refers directly to this operation
+	 * structure which will have been freed in just a
+	 * few lines below...
+	 */
 	if ( NULL != op->ra_stderr_gsource) {
 		G_main_del_fd(op->ra_stderr_gsource);
 		op->ra_stderr_gsource = NULL;
 	}
 
-	if (op->ra_stdout_fd != -1) {
+	if (op->ra_stdout_fd >= 0) {
 		close(op->ra_stdout_fd);
 		op->ra_stdout_fd = -1;
 	}
-	if (op->ra_stderr_fd != -1) {
+	if (op->ra_stderr_fd >= 0) {
 		close(op->ra_stderr_fd);
 		op->ra_stderr_fd = -1;
 	}
 
-	memset(op->first_line_ra_stdout, 0, sizeof(op->first_line_ra_stdout));
+	op->first_line_ra_stdout[0] = EOS;
 
 	lrmd_debug2(LOG_DEBUG, "lrmd_op_destroy: free the op whose address is %p"
 		  , op);
@@ -3040,10 +3070,10 @@ perform_ra_op(lrmd_op_t* op)
 			op->ra_stderr_fd = stderr_fd[0];
 			op->ra_stdout_gsource = G_main_add_fd(G_PRIORITY_HIGH
 				, stdout_fd[0], FALSE, handle_pipe_ra_stdout
-				, op, NULL);
+				, op, destroy_pipe_ra_stdout);
 			op->ra_stderr_gsource = G_main_add_fd(G_PRIORITY_HIGH
 				, stderr_fd[0], FALSE, handle_pipe_ra_stderr
-				, op, NULL);
+				, op, destroy_pipe_ra_stderr);
 			
 			op->exec_pid = pid;
 			
@@ -3304,7 +3334,26 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 	return rsc;
 }
 
+static void
+destroy_pipe_ra_stdout(gpointer user_data)
+{
+	lrmd_op_t* op = (lrmd_op_t *)user_data;
 
+	if (op->ra_stdout_fd >= 0) {
+		close(op->ra_stdout_fd);
+		op->ra_stdout_fd = -1;
+	}
+}
+static void
+destroy_pipe_ra_stderr(gpointer user_data)
+{
+	lrmd_op_t* op = (lrmd_op_t *)user_data;
+
+	if (op->ra_stderr_fd >= 0) {
+		close(op->ra_stderr_fd);
+		op->ra_stderr_fd = -1;
+	}
+}
 static gboolean
 handle_pipe_ra_stdout(int fd, gpointer user_data)
 {
@@ -3320,6 +3369,13 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 
 	if (fd == -1) {
 		fd = op->ra_stdout_fd;
+	}
+
+	if (fd < 0) {
+		lrmd_log(LOG_CRIT
+		,	"%s:%d: Attempt to read from closed file descriptor."
+		,	__FUNCTION__, __LINE__);
+		return FALSE;
 	}
 
 	if (0 != read_pipe(fd, &data, op)) {
@@ -3346,9 +3402,14 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 				, op->rsc_id, op_type, data);
 		}
 		/*
-		 * This isn't quite correct yet - there is no idea of a "line"
+		 * This code isn't correct - there is no idea of a "line"
 		 * in the code as it's presently written...
-		 * but it probably works OK for now...
+		 * It produces erratic and hard-to read messages in the logs.
+		 * And possibly causes errors in interpreting 'heartbeat' style
+		 * resource agents.  FIXME
+		 * And, it's not obvious how the meta-data (which is _many_
+		 * lines long) is handled by this...
+		 * I suspect multi-line metadata hasn't been tested :-(.
 		 */
 		if (op->first_line_ra_stdout[0] == EOS) {
 			strncpy(op->first_line_ra_stdout, data
@@ -3373,7 +3434,7 @@ handle_pipe_ra_stderr(int fd, gpointer user_data)
 			G_main_del_fd(op->ra_stderr_gsource);
 			op->ra_stderr_gsource = NULL;
 		}
-		if (op->ra_stderr_fd != -1) {
+		if (op->ra_stderr_fd >= 0) {
 			close(op->ra_stderr_fd);
 			op->ra_stderr_fd = -1;
 		}
@@ -3427,12 +3488,21 @@ read_pipe(int fd, char ** data, void * user_data)
 
 	if ((readlen < 0) && (errno !=0)) {
 		rc = -1;
-		if (errno != EAGAIN) {
-			cl_perror("%s::%d errno=%d, read"
-				,	__FUNCTION__, __LINE__, errno);
-		}
+		switch (errno) {
+		default:
+			cl_perror("%s::%d fd %d errno=%d, read"
+			,	__FUNCTION__, __LINE__
+			,	fd, errno);
+			break;
 
-		if (errno == EAGAIN) {
+		case EBADFD:
+			lrmd_log(LOG_CRIT
+			,	"%s:%d"
+			" Attempt to read from closed file descriptor %d."
+			,	__FUNCTION__, __LINE__,	fd);
+			break;
+			
+		case EAGAIN:
 			rsc = lookup_rsc(op->rsc_id);
 			op_type = ha_msg_value(op->msg, F_LRM_OP);
 			lrmd_log(LOG_ERR, "RA %s:%s:%s (process %d) failed to "
@@ -3550,6 +3620,10 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.210  2006/02/09 23:24:13  alan
+ * Put in some more error messages and more comments better explaining the bugs
+ * in the code.
+ *
  * Revision 1.209  2006/02/09 08:46:57  sunjd
  * Fix bug 1008 ( LRMd consumes too much CPU )
  * But, donnot know the root casue yet. :-(
