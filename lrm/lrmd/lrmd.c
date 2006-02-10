@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.211 2006/02/10 03:20:01 alan Exp $ */
+/* $Id: lrmd.c,v 1.212 2006/02/10 04:06:34 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3200,7 +3200,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	}
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
-	if (op->first_line_ra_stdout[0] == EOS) {
+	if (op->first_line_ra_stdout[0] == EOS && op->ra_stdout_fd >= 0) {
 		handle_pipe_ra_stdout(-1, op);
 	}
 	rc = RAExec->map_ra_retvalue(exitcode, op_type, op->first_line_ra_stdout);
@@ -3376,14 +3376,14 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 		return FALSE;
 	}
 
-	if (fd == -1) {
+	if (fd < 0) {
 		fd = op->ra_stdout_fd;
 	}
 
 	if (fd < 0) {
 		lrmd_log(LOG_CRIT
-		,	"%s:%d: Attempt to read from closed file descriptor."
-		,	__FUNCTION__, __LINE__);
+		,	"%s:%d: Attempt to read from closed file descriptor %d."
+		,	__FUNCTION__, __LINE__, fd);
 		lrmd_op_dump(op, "op w/closed fd");
 		return FALSE;
 	}
@@ -3645,6 +3645,10 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.212  2006/02/10 04:06:34  alan
+ * Put in a fix suggested by Sun Jiang Dong for an lrm problem where
+ * we try and read from a closed file descriptor.
+ *
  * Revision 1.211  2006/02/10 03:20:01  alan
  * Put in checks for unallocated (freed) operation structures.
  * Also print out more information in the cases where I/O fails
