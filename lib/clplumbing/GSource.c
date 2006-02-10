@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.77 2006/02/10 17:14:20 alan Exp $ */
+/* $Id: GSource.c,v 1.78 2006/02/10 17:19:49 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -128,7 +128,7 @@ struct GTRIGSource_s {
 
 #define EXPLAINDELAY(started, detected) cl_log(LOG_INFO			\
 	,	"%s: started at %llu should have started at %llu"	\
-	,	__FUNCTION__, (unsigned long long)started, 		\
+	,	__FUNCTION__, (unsigned long long)started 		\
 	,	(unsigned long long)detected)
 	
 
