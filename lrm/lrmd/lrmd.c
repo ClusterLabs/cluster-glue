@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.214 2006/02/10 05:55:14 alan Exp $ */
+/* $Id: lrmd.c,v 1.215 2006/02/10 06:31:46 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3357,6 +3357,12 @@ destroy_pipe_ra_stdout(gpointer user_data)
 {
 	lrmd_op_t* op = (lrmd_op_t *)user_data;
 
+	if (!cl_is_allocated(op)) {
+		lrmd_log(LOG_CRIT, "%s:%d: Unallocated op 0x%lx!!"
+		,	__FUNCTION__, __LINE__
+		,	(unsigned long)op);
+		return;
+	}
 	if (op->ra_stdout_fd > STDERR_FILENO) {
 		close(op->ra_stdout_fd);
 		op->ra_stdout_fd = -1;
@@ -3372,6 +3378,12 @@ destroy_pipe_ra_stderr(gpointer user_data)
 {
 	lrmd_op_t* op = (lrmd_op_t *)user_data;
 
+	if (!cl_is_allocated(op)) {
+		lrmd_log(LOG_CRIT, "%s:%d: Unallocated op 0x%lx!!"
+		,	__FUNCTION__, __LINE__
+		,	(unsigned long)op);
+		return;
+	}
 	if (op->ra_stderr_fd > STDERR_FILENO) {
 		close(op->ra_stderr_fd);
 		op->ra_stderr_fd = -1;
@@ -3681,6 +3693,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.215  2006/02/10 06:31:46  alan
+ * Put in an is_allocated() check in the code for the destructor...
+ *
  * Revision 1.214  2006/02/10 05:55:14  alan
  * Put more code in to catch the invalid file descriptor earlier on.
  *
