@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.212 2006/02/10 04:06:34 alan Exp $ */
+/* $Id: lrmd.c,v 1.213 2006/02/10 05:00:35 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1151,7 +1151,7 @@ register_pid(gboolean do_fork,
 
 	for (j=0; j < 3; ++j) {
 		close(j);
-		(void)open("/dev/null", j == 0 ? O_RDONLY : O_RDONLY);
+		(void)open("/dev/null", j == 0 ? O_RDONLY : O_WRONLY);
 	}
 	CL_IGNORE_SIG(SIGINT);
 	CL_IGNORE_SIG(SIGHUP);
@@ -3094,15 +3094,15 @@ perform_ra_op(lrmd_op_t* op)
 					cl_perror("%s::%d: dup2"
 						, __FUNCTION__, __LINE__);
 				}
+				close(stdout_fd[1]);
 			}
 			if (STDERR_FILENO != stderr_fd[1]) {
 				if (dup2(stderr_fd[1], STDERR_FILENO)!=STDERR_FILENO) {
 					cl_perror("%s::%d: dup2"
 						, __FUNCTION__, __LINE__);
 				}
+				close(stderr_fd[1]);
 			}
-			close(stdout_fd[1]);
-			close(stderr_fd[1]);
 			RAExec = g_hash_table_lookup(RAExecFuncs,rsc->class);
 			if (NULL == RAExec) {
 				lrmd_log(LOG_ERR,"perform_ra_op: can not find RAExec");
@@ -3380,9 +3380,9 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 		fd = op->ra_stdout_fd;
 	}
 
-	if (fd < 0) {
+	if (fd <= 0) {
 		lrmd_log(LOG_CRIT
-		,	"%s:%d: Attempt to read from closed file descriptor %d."
+		,	"%s:%d: Attempt to read from closed/invalid file descriptor %d."
 		,	__FUNCTION__, __LINE__, fd);
 		lrmd_op_dump(op, "op w/closed fd");
 		return FALSE;
@@ -3393,7 +3393,7 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 			G_main_del_fd(op->ra_stdout_gsource);
 			op->ra_stdout_gsource = NULL;
 		}
-		if (op->ra_stdout_fd != -1) {
+		if (op->ra_stdout_fd >= 0) {
 			close(op->ra_stdout_fd);
 			op->ra_stdout_fd = -1;
 		}
@@ -3443,6 +3443,14 @@ handle_pipe_ra_stderr(int fd, gpointer user_data)
 		lrmd_log(LOG_CRIT, "%s:%d: Unallocated op 0x%lx!!"
 		,	__FUNCTION__, __LINE__
 		,	(unsigned long)op);
+		return FALSE;
+	}
+
+	if (fd <= 0) {
+		lrmd_log(LOG_CRIT
+		,	"%s:%d: Attempt to read from closed/invalid file descriptor %d."
+		,	__FUNCTION__, __LINE__, fd);
+		lrmd_op_dump(op, "op w/closed fd");
 		return FALSE;
 	}
 
@@ -3645,6 +3653,10 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.213  2006/02/10 05:00:35  alan
+ * Fixed two very small lrmd errors.
+ * Improved checking for bad lrmd file descriptors - hopefully catching things sooner.
+ *
  * Revision 1.212  2006/02/10 04:06:34  alan
  * Put in a fix suggested by Sun Jiang Dong for an lrm problem where
  * we try and read from a closed file descriptor.
