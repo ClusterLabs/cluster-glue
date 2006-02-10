@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.76 2006/02/09 23:21:45 alan Exp $ */
+/* $Id: GSource.c,v 1.77 2006/02/10 17:14:20 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -126,9 +126,10 @@ struct GTRIGSource_s {
 	,	__FUNCTION__,	(input)->description, ms		\
 	,	POINTER_TO_ULONG(input))
 
-#define EXPLAINDELAY(started, detected) cl_log(LOG_INFO		\
+#define EXPLAINDELAY(started, detected) cl_log(LOG_INFO			\
 	,	"%s: started at %llu should have started at %llu"	\
-	,	__FUNCTION__, started, detected)
+	,	__FUNCTION__, (unsigned long long)started, 		\
+	,	(unsigned long long)detected)
 	
 
 #define	WARN_TOOLONG(ms, input)	cl_log(LOG_WARNING			\
