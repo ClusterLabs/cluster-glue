@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.210 2006/02/09 23:24:13 alan Exp $ */
+/* $Id: lrmd.c,v 1.211 2006/02/10 03:20:01 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1607,7 +1607,8 @@ remove_repeat_op_from_client(gpointer key, gpointer value, gpointer user_data)
 		}
 		else if (op->client_id == pid) {
 			op_node = g_list_next(op_node);
-			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
+			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list
+			,	op);
 			lrmd_op_destroy(op);
 		}
 		else {
@@ -3344,6 +3345,7 @@ destroy_pipe_ra_stdout(gpointer user_data)
 		op->ra_stdout_fd = -1;
 	}
 }
+
 static void
 destroy_pipe_ra_stderr(gpointer user_data)
 {
@@ -3354,6 +3356,7 @@ destroy_pipe_ra_stderr(gpointer user_data)
 		op->ra_stderr_fd = -1;
 	}
 }
+
 static gboolean
 handle_pipe_ra_stdout(int fd, gpointer user_data)
 {
@@ -3366,6 +3369,12 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 		lrmd_log(LOG_ERR, "%s:%d: op==NULL.", __FUNCTION__, __LINE__);
 		return FALSE;
 	}
+	if (!cl_is_allocated(op)) {
+		lrmd_log(LOG_CRIT, "%s:%d: Unallocated op 0x%lx!!"
+		,	__FUNCTION__, __LINE__
+		,	(unsigned long)op);
+		return FALSE;
+	}
 
 	if (fd == -1) {
 		fd = op->ra_stdout_fd;
@@ -3375,6 +3384,7 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 		lrmd_log(LOG_CRIT
 		,	"%s:%d: Attempt to read from closed file descriptor."
 		,	__FUNCTION__, __LINE__);
+		lrmd_op_dump(op, "op w/closed fd");
 		return FALSE;
 	}
 
@@ -3405,9 +3415,9 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 		 * This code isn't correct - there is no idea of a "line"
 		 * in the code as it's presently written...
 		 * It produces erratic and hard-to read messages in the logs.
-		 * And possibly causes errors in interpreting 'heartbeat' style
-		 * resource agents.  FIXME
-		 * And, it's not obvious how the meta-data (which is _many_
+		 * Under the right circumstances, it will cause errors in
+		 * interpreting 'heartbeat' style resource agents.  FIXME
+		 * It's not obvious how the meta-data (which is _many_
 		 * lines long) is handled by this...
 		 * I suspect multi-line metadata hasn't been tested :-(.
 		 */
@@ -3428,6 +3438,13 @@ handle_pipe_ra_stderr(int fd, gpointer user_data)
 	lrmd_op_t* op = (lrmd_op_t *)user_data;
 	const char* op_type = NULL; 
 	char * data = NULL;
+
+	if (!cl_is_allocated(op)) {
+		lrmd_log(LOG_CRIT, "%s:%d: Unallocated op 0x%lx!!"
+		,	__FUNCTION__, __LINE__
+		,	(unsigned long)op);
+		return FALSE;
+	}
 
 	if (0 != read_pipe(fd, &data, op)) {
 		if ( NULL != op->ra_stderr_gsource) {
@@ -3465,6 +3482,12 @@ read_pipe(int fd, char ** data, void * user_data)
 
 	lrmd_debug3(LOG_DEBUG, "%s begin.", __FUNCTION__);
 
+	if (!cl_is_allocated(op)) {
+		lrmd_log(LOG_CRIT, "%s:%d: Unallocated op 0x%lx!!"
+		,	__FUNCTION__, __LINE__
+		,	(unsigned long)op);
+		return FALSE;
+	}
 	*data = NULL;
 	gstr_tmp = g_string_new("");
 
@@ -3490,16 +3513,18 @@ read_pipe(int fd, char ** data, void * user_data)
 		rc = -1;
 		switch (errno) {
 		default:
-			cl_perror("%s::%d fd %d errno=%d, read"
+			cl_perror("%s:%d read error: fd %d errno=%d"
 			,	__FUNCTION__, __LINE__
 			,	fd, errno);
+			lrmd_op_dump(op, "op w/bad errno");
 			break;
 
-		case EBADFD:
+		case EBADF:
 			lrmd_log(LOG_CRIT
 			,	"%s:%d"
 			" Attempt to read from closed file descriptor %d."
 			,	__FUNCTION__, __LINE__,	fd);
+			lrmd_op_dump(op, "op w/closed fd");
 			break;
 			
 		case EAGAIN:
@@ -3620,6 +3645,11 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.211  2006/02/10 03:20:01  alan
+ * Put in checks for unallocated (freed) operation structures.
+ * Also print out more information in the cases where I/O fails
+ * or file descriptors are invalid.
+ *
  * Revision 1.210  2006/02/09 23:24:13  alan
  * Put in some more error messages and more comments better explaining the bugs
  * in the code.
