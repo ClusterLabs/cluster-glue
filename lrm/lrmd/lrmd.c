@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.213 2006/02/10 05:00:35 alan Exp $ */
+/* $Id: lrmd.c,v 1.214 2006/02/10 05:55:14 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -447,13 +447,19 @@ lrmd_op_destroy(lrmd_op_t* op)
 		op->ra_stderr_gsource = NULL;
 	}
 
-	if (op->ra_stdout_fd >= 0) {
+	if (op->ra_stdout_fd >= STDERR_FILENO) {
 		close(op->ra_stdout_fd);
 		op->ra_stdout_fd = -1;
+	}else if (op->ra_stdout_fd >= 0) {
+		lrmd_log(LOG_ERR, "%s: invalid stdout fd %d"
+		,	__FUNCTION__, op->ra_stdout_fd);
 	}
-	if (op->ra_stderr_fd >= 0) {
+	if (op->ra_stderr_fd >= STDERR_FILENO) {
 		close(op->ra_stderr_fd);
 		op->ra_stderr_fd = -1;
+	}else if (op->ra_stderr_fd >= 0) {
+		lrmd_log(LOG_ERR, "%s: invalid stderr fd %d"
+		,	__FUNCTION__, op->ra_stderr_fd);
 	}
 
 	op->first_line_ra_stdout[0] = EOS;
@@ -3069,6 +3075,17 @@ perform_ra_op(lrmd_op_t* op)
 	
 			op->ra_stdout_fd = stdout_fd[0];
 			op->ra_stderr_fd = stderr_fd[0];
+			if (op->ra_stdout_fd <= STDERR_FILENO) {
+				lrmd_log(LOG_ERR
+				,	"%s: invalid stdout fd [%d]"
+				,	__FUNCTION__, op->ra_stdout_fd);
+			}
+			if (op->ra_stderr_fd <= STDERR_FILENO) {
+				lrmd_log(LOG_ERR
+				,	"%s: invalid stderr fd [%d]"
+				,	__FUNCTION__, op->ra_stderr_fd);
+			}
+				
 			op->ra_stdout_gsource = G_main_add_fd(G_PRIORITY_HIGH
 				, stdout_fd[0], FALSE, handle_pipe_ra_stdout
 				, op, destroy_pipe_ra_stdout);
@@ -3340,10 +3357,14 @@ destroy_pipe_ra_stdout(gpointer user_data)
 {
 	lrmd_op_t* op = (lrmd_op_t *)user_data;
 
-	if (op->ra_stdout_fd >= 0) {
+	if (op->ra_stdout_fd > STDERR_FILENO) {
 		close(op->ra_stdout_fd);
 		op->ra_stdout_fd = -1;
+	}else if (op->ra_stdout_fd >= 0) {
+		lrmd_log(LOG_ERR, "%s:Attempt to close file descriptor %d"
+		,	__FUNCTION__, op->ra_stdout_fd);
 	}
+		
 }
 
 static void
@@ -3351,9 +3372,12 @@ destroy_pipe_ra_stderr(gpointer user_data)
 {
 	lrmd_op_t* op = (lrmd_op_t *)user_data;
 
-	if (op->ra_stderr_fd >= 0) {
+	if (op->ra_stderr_fd > STDERR_FILENO) {
 		close(op->ra_stderr_fd);
 		op->ra_stderr_fd = -1;
+	}else if (op->ra_stderr_fd >= 0) {
+		lrmd_log(LOG_ERR, "%s:Attempt to close file descriptor %d"
+		,	__FUNCTION__, op->ra_stderr_fd);
 	}
 }
 
@@ -3380,7 +3404,7 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 		fd = op->ra_stdout_fd;
 	}
 
-	if (fd <= 0) {
+	if (fd <= STDERR_FILENO) {
 		lrmd_log(LOG_CRIT
 		,	"%s:%d: Attempt to read from closed/invalid file descriptor %d."
 		,	__FUNCTION__, __LINE__, fd);
@@ -3393,9 +3417,11 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 			G_main_del_fd(op->ra_stdout_gsource);
 			op->ra_stdout_gsource = NULL;
 		}
-		if (op->ra_stdout_fd >= 0) {
-			close(op->ra_stdout_fd);
-			op->ra_stdout_fd = -1;
+		if (fd > STDERR_FILENO) {
+			close(fd);
+			if (fd == op->ra_stdout_fd) {
+				op->ra_stdout_fd = -1;
+			}
 		}
 		rc = FALSE;
 	}
@@ -3446,7 +3472,7 @@ handle_pipe_ra_stderr(int fd, gpointer user_data)
 		return FALSE;
 	}
 
-	if (fd <= 0) {
+	if (fd <= STDERR_FILENO) {
 		lrmd_log(LOG_CRIT
 		,	"%s:%d: Attempt to read from closed/invalid file descriptor %d."
 		,	__FUNCTION__, __LINE__, fd);
@@ -3459,9 +3485,11 @@ handle_pipe_ra_stderr(int fd, gpointer user_data)
 			G_main_del_fd(op->ra_stderr_gsource);
 			op->ra_stderr_gsource = NULL;
 		}
-		if (op->ra_stderr_fd >= 0) {
-			close(op->ra_stderr_fd);
-			op->ra_stderr_fd = -1;
+		if (fd >= STDERR_FILENO) {
+			close(fd);
+			if (fd == op->ra_stderr_fd) {
+				op->ra_stderr_fd = -1;
+			}
 		}
 		rc = FALSE;
 	}
@@ -3653,6 +3681,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.214  2006/02/10 05:55:14  alan
+ * Put more code in to catch the invalid file descriptor earlier on.
+ *
  * Revision 1.213  2006/02/10 05:00:35  alan
  * Fixed two very small lrmd errors.
  * Improved checking for bad lrmd file descriptors - hopefully catching things sooner.
