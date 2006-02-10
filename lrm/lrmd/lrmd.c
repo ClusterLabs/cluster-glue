@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.215 2006/02/10 06:31:46 alan Exp $ */
+/* $Id: lrmd.c,v 1.216 2006/02/10 06:50:23 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -242,8 +242,10 @@ static gboolean on_receive_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_op_timeout_expired(gpointer data);
 static gboolean on_repeat_op_readytorun(gpointer data);
 static void on_remove_client(gpointer user_data);
+#if 0
 static void destroy_pipe_ra_stderr(gpointer user_data);
 static void destroy_pipe_ra_stdout(gpointer user_data);
+#endif
 
 /* message handlers */
 static int on_msg_register(lrmd_client_t* client, struct ha_msg* msg);
@@ -3088,10 +3090,10 @@ perform_ra_op(lrmd_op_t* op)
 				
 			op->ra_stdout_gsource = G_main_add_fd(G_PRIORITY_HIGH
 				, stdout_fd[0], FALSE, handle_pipe_ra_stdout
-				, op, destroy_pipe_ra_stdout);
+				, op, NULL);
 			op->ra_stderr_gsource = G_main_add_fd(G_PRIORITY_HIGH
 				, stderr_fd[0], FALSE, handle_pipe_ra_stderr
-				, op, destroy_pipe_ra_stderr);
+				, op, NULL);
 			
 			op->exec_pid = pid;
 			
@@ -3352,6 +3354,7 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 	return rsc;
 }
 
+#if 0
 static void
 destroy_pipe_ra_stdout(gpointer user_data)
 {
@@ -3393,6 +3396,7 @@ destroy_pipe_ra_stderr(gpointer user_data)
 	}
 }
 
+#endif
 static gboolean
 handle_pipe_ra_stdout(int fd, gpointer user_data)
 {
@@ -3410,6 +3414,7 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 		,	__FUNCTION__, __LINE__
 		,	(unsigned long)op);
 		return FALSE;
+
 	}
 
 	if (fd < 0) {
@@ -3693,6 +3698,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.216  2006/02/10 06:50:23  alan
+ * Removed destroy_pipe_ra_* functions.
+ *
  * Revision 1.215  2006/02/10 06:31:46  alan
  * Put in an is_allocated() check in the code for the destructor...
  *
