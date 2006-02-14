@@ -11,3 +11,4 @@ ipctransientserver
 *.beam
 parser-messages
 MISC_ERRORS
+base64_md5_test
