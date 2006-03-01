@@ -18,6 +18,7 @@
  */
 
 
+#include <portability.h>
 #include <strings.h>
 #include  <clplumbing/cl_misc.h>
 #include  <clplumbing/cl_log.h>
