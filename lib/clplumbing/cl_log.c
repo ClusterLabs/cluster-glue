@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.70 2006/01/26 22:35:59 alan Exp $ */
+/* $Id: cl_log.c,v 1.71 2006/03/08 22:22:51 andrew Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -722,6 +722,16 @@ LogToDaemon(int priority, const char * buf,
 }
 
 static int		drop_msg_num = 0;
+
+void
+cl_flush_logs(void) 
+{
+	if(logging_daemon_chan == NULL) {
+		return;
+	}
+	logging_daemon_chan->ops->waitout(logging_daemon_chan);
+	sleep(2);
+}
 
 int
 LogToLoggingDaemon(int priority, const char * buf, 
