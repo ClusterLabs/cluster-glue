@@ -1,4 +1,4 @@
-/* $Id: cl_log.h,v 1.26 2005/12/18 22:02:39 alan Exp $ */
+/* $Id: cl_log.h,v 1.27 2006/03/08 22:22:51 andrew Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -59,6 +59,8 @@ char *		ha_timestamp(TIME_T t);
 void		cl_glib_msg_handler(const gchar *log_domain
 ,		GLogLevelFlags log_level, const gchar *message
 ,		gpointer user_data);
+
+void		cl_flush_logs(void);
 
 
 typedef struct CircularBuffer_s 
