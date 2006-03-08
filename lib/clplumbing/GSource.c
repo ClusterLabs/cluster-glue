@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.78 2006/02/10 17:19:49 alan Exp $ */
+/* $Id: GSource.c,v 1.79 2006/03/08 22:22:01 andrew Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -1674,6 +1674,7 @@ struct tempproc_track {
 					 * in child process */
 	void		(*prefork)(gpointer userdata);/* Call before fork */
 	void		(*postfork)(gpointer userdata);/* Call after fork */
+	void		(*complete)(gpointer userdata, int status, int signo, int exitcode);/* Call after complete */
 	gpointer	userdata;	/* Info to pass 'fun' */
 	gboolean	isrunning;	/* TRUE if child is running */
 	gboolean	runagain;	/* TRUE if we need to run
@@ -1693,6 +1694,10 @@ TempProcessDied(ProcTrack* p, int status, int signo, int exitcode
 {
 	struct tempproc_track *	pt = p->privatedata;
  
+	if (pt->complete) {
+		pt->complete(pt->userdata, status, signo, exitcode);
+	}
+
 	pt->isrunning=FALSE;
 	if (pt->runagain) {
 		pt->runagain=FALSE;
@@ -1784,7 +1789,8 @@ G_main_add_tempproc_trigger(int priority
 ,	const char *	procname
 ,	gpointer	userdata
 ,	void		(*prefork)(gpointer p)
-,	void		(*postfork)(gpointer p))
+,	void		(*postfork)(gpointer p)
+,	void		(*complete)(gpointer userdata, int status, int signo, int exitcode))
 {
 
 	struct tempproc_track* 	p;
@@ -1801,6 +1807,7 @@ G_main_add_tempproc_trigger(int priority
 	p->userdata = userdata;
 	p->prefork = prefork;
 	p->postfork = postfork;
+	p->complete = complete;
 
 	ret = G_main_add_TriggerHandler(priority
 	,	TempProcessTrigger, p,	tempproc_destroy_notify);

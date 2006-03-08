@@ -1,4 +1,4 @@
-/* $Id: GSource.h,v 1.17 2006/02/08 05:25:15 alan Exp $ */
+/* $Id: GSource.h,v 1.18 2006/03/08 22:22:01 andrew Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -200,11 +200,13 @@ GTRIGSource* G_main_add_tempproc_trigger(int priority
 ,	const char *	procname	/* What do we call this process? */
 ,	gpointer	userdata	/* Passed to 'triggerfun' */
 ,	void		(*prefork)(gpointer p)	  /* Called before fork */
-,	void		(*postfork)(gpointer p)); /* Called by parent process
+,	void		(*postfork)(gpointer p)   /* Called by parent process
 						   * after fork(2) call.
 						   * Each has 'userdata'
 						   * passed to it.
 						   */
+,	void		(*complete)(gpointer p, int status, int signo, int exitcode)); /* called after the child process completes */
+
 /*
  *	Special notes:
  *	- No more than one child process will be active at a time per trigger
