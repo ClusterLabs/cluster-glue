@@ -1,4 +1,4 @@
-/* $Id: cl_log.c,v 1.71 2006/03/08 22:22:51 andrew Exp $ */
+/* $Id: cl_log.c,v 1.72 2006/03/09 10:05:19 andrew Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -730,7 +730,6 @@ cl_flush_logs(void)
 		return;
 	}
 	logging_daemon_chan->ops->waitout(logging_daemon_chan);
-	sleep(2);
 }
 
 int
