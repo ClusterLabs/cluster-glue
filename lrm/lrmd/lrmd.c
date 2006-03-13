@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.216 2006/02/10 06:50:23 alan Exp $ */
+/* $Id: lrmd.c,v 1.217 2006/03/13 08:35:13 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -189,6 +189,7 @@ typedef struct
 
 typedef struct lrmd_rsc lrmd_rsc_t;
 typedef struct lrmd_op	lrmd_op_t;
+typedef struct ra_pipe_op  ra_pipe_op_t;
 
 
 struct lrmd_rsc
@@ -213,22 +214,36 @@ struct lrmd_op
 	pid_t		client_id;
 	int		call_id;
 	int		exec_pid;
-	char		first_line_ra_stdout[80]; /* only for heartbeat RAs */
 	guint		timeout_tag;
 	guint		repeat_timeout_tag;
 	int		interval;
 	int		delay;
 	struct ha_msg*	msg;
-	/* For read the output from RAs */
-	int		ra_stdout_fd;
-	int		ra_stderr_fd;
-	GFDSource *	ra_stdout_gsource;
-	GFDSource *	ra_stderr_gsource;
+	ra_pipe_op_t *	rapop;
+	char		first_line_ra_stdout[80]; /* only for heartbeat RAs */
 	/*time stamp*/
 	longclock_t	t_recv;
 	longclock_t	t_addtolist;
 	longclock_t	t_perform;
 	longclock_t	t_done;
+};
+
+
+/* For read the output from RAs' execution ( its children ) */
+struct ra_pipe_op
+{
+	/* The same value of the one in corresponding lrmd_op */
+	lrmd_op_t *	lrmd_op;
+	int		ra_stdout_fd;
+	int		ra_stderr_fd;
+	GFDSource *	ra_stdout_gsource;
+	GFDSource *	ra_stderr_gsource;
+	gboolean	first_line_read;
+
+	/* For providing more detailed information in log */
+	char *		rsc_id;
+	char *		op_type;
+	char *		rsc_class;
 };
 
 /* Debug oriented funtions */
@@ -242,10 +257,8 @@ static gboolean on_receive_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_op_timeout_expired(gpointer data);
 static gboolean on_repeat_op_readytorun(gpointer data);
 static void on_remove_client(gpointer user_data);
-#if 0
 static void destroy_pipe_ra_stderr(gpointer user_data);
 static void destroy_pipe_ra_stdout(gpointer user_data);
-#endif
 
 /* message handlers */
 static int on_msg_register(lrmd_client_t* client, struct ha_msg* msg);
@@ -380,6 +393,132 @@ dump_mem_stats(void)
 	,	lrm_objectstats.rsccount);
 }
 
+static ra_pipe_op_t *
+ra_pipe_op_new(int child_stdout, int child_stderr, lrmd_op_t * lrmd_op)
+{
+	int flag;
+	ra_pipe_op_t * rapop;
+	lrmd_rsc_t* rsc = NULL;
+
+	if ( NULL == lrmd_op ) {
+		lrmd_log(LOG_WARNING
+			, "%s:%d: lrmd_op==NULL, no need to malloc ra_pipe_op"
+			, __FUNCTION__, __LINE__);
+		return NULL;
+	}
+	rapop = cl_calloc(sizeof(ra_pipe_op_t), 1);
+	if ( rapop == NULL) {
+		lrmd_log(LOG_ERR, "%s:%d out of memory." 
+			, __FUNCTION__, __LINE__);
+		return NULL;
+	}
+	rapop->first_line_read = FALSE;
+
+	/*
+	 * No any obviouse proof of lrmd hang in pipe read yet.
+	 * Bug 475 may be a duplicate of bug 499.
+	 * Anyway, via test, it's proved that NOBLOCK read will
+	 * obviously reduce the RA execution time (bug 553).
+	 */
+	/* Let the read operation be NONBLOCK */ 
+	if ((flag = fcntl(child_stdout, F_GETFL)) >= 0) {
+		if (fcntl(child_stdout, F_SETFL, flag|O_NONBLOCK) < 0) {
+			cl_perror("%s::%d: fcntl", __FUNCTION__
+				, __LINE__);
+		}
+	} else {
+		cl_perror("%s::%d: fcntl", __FUNCTION__, __LINE__);
+	}
+
+	if ((flag = fcntl(child_stderr, F_GETFL)) >= 0) {
+		if (fcntl(child_stderr, F_SETFL, flag|O_NONBLOCK) < 0) {
+			cl_perror("%s::%d: fcntl", __FUNCTION__, __LINE__);
+		}
+	} else {
+		cl_perror("%s::%d: fcntl", __FUNCTION__, __LINE__);
+	}
+
+	rapop->ra_stdout_fd = child_stdout;
+	rapop->ra_stderr_fd = child_stderr;
+	if (rapop->ra_stdout_fd <= STDERR_FILENO) {
+		lrmd_log(LOG_ERR, "%s: invalid stdout fd [%d]"
+			, __FUNCTION__, rapop->ra_stdout_fd);
+	}
+	if (rapop->ra_stderr_fd <= STDERR_FILENO) {
+		lrmd_log(LOG_ERR, "%s: invalid stderr fd [%d]"
+			, __FUNCTION__, rapop->ra_stderr_fd);
+	}
+				
+	rapop->ra_stdout_gsource = G_main_add_fd(G_PRIORITY_HIGH
+				, child_stdout, FALSE, handle_pipe_ra_stdout
+				, rapop, destroy_pipe_ra_stdout);
+	rapop->ra_stderr_gsource = G_main_add_fd(G_PRIORITY_HIGH
+				, child_stderr, FALSE, handle_pipe_ra_stderr
+				, rapop, destroy_pipe_ra_stderr);
+			
+	rapop->lrmd_op = lrmd_op;
+
+	rapop->op_type = cl_strdup(ha_msg_value(lrmd_op->msg, F_LRM_OP));
+	rapop->rsc_id = cl_strdup(lrmd_op->rsc_id);
+	rsc = lookup_rsc(lrmd_op->rsc_id);
+	if (rsc == NULL) {
+		lrmd_debug(LOG_WARNING
+			, "%s::%d: the rsc (id=%s) does not exist"
+			, __FUNCTION__, __LINE__, lrmd_op->rsc_id);
+		rapop->rsc_class = NULL;
+	} else {
+		rapop->rsc_class = cl_strdup(rsc->class);
+	} 
+
+	return rapop;
+}
+
+static void
+ra_pipe_op_destroy(ra_pipe_op_t * op)
+{
+	CHECK_ALLOCATED(op, "ra_pipe_op", );
+
+	if ( NULL != op->ra_stdout_gsource) {
+		G_main_del_fd(op->ra_stdout_gsource);
+		op->ra_stdout_gsource = NULL;
+	}
+
+	if ( NULL != op->ra_stderr_gsource) {
+		G_main_del_fd(op->ra_stderr_gsource);
+		op->ra_stderr_gsource = NULL;
+	}
+
+	if (op->ra_stdout_fd >= STDERR_FILENO) {
+		close(op->ra_stdout_fd);
+		op->ra_stdout_fd = -1;
+	}else if (op->ra_stdout_fd >= 0) {
+		lrmd_log(LOG_ERR, "%s: invalid stdout fd %d"
+		,	__FUNCTION__, op->ra_stdout_fd);
+	}
+	if (op->ra_stderr_fd >= STDERR_FILENO) {
+		close(op->ra_stderr_fd);
+		op->ra_stderr_fd = -1;
+	}else if (op->ra_stderr_fd >= 0) {
+		lrmd_log(LOG_ERR, "%s: invalid stderr fd %d"
+		,	__FUNCTION__, op->ra_stderr_fd);
+	}
+	op->first_line_read = FALSE;
+
+	cl_free(op->rsc_id);
+	op->rsc_id = NULL;
+	cl_free(op->op_type);
+	op->op_type = NULL;
+	cl_free(op->rsc_class);
+	op->rsc_class = NULL;
+
+	if (op->lrmd_op != NULL) {
+		op->lrmd_op->rapop = NULL;
+		op->lrmd_op = NULL;
+	}
+
+	cl_free(op);
+}
+
 static void
 lrmd_op_destroy(lrmd_op_t* op)
 {
@@ -411,59 +550,10 @@ lrmd_op_destroy(lrmd_op_t* op)
 	cl_free(op->rsc_id);
 	op->rsc_id = NULL;
 	op->exec_pid = 0;
-
-	/*
-	 * This action prohibits capturing output after the
-	 * process has died.  FIXME!
-	 * Note that really fixing this would require that
-	 * the GSource become a semi-independent object
-	 * whose lifetime is potentially greater than that 
-	 * of the operation which spawned it as described
-	 * by bug 756.
-	 * Note that if you simply remove the _del_fd()
-	 * call below that bad things will happen, because
-	 * the Gsource code refers directly to this operation
-	 * structure which will have been freed in
-	 * just a few lines below...
-	 */
-	if ( NULL != op->ra_stdout_gsource) {
-		G_main_del_fd(op->ra_stdout_gsource);
-		op->ra_stdout_gsource = NULL;
+	if ( op->rapop != NULL ) {
+		op->rapop->lrmd_op = NULL;
+		op->rapop = NULL;
 	}
-	/*
-	 * This action prohibits capturing output after the
-	 * process has died.  FIXME!
-	 * Note that really fixing this would require that
-	 * the GSource become a semi-independent object
-	 * whose lifetime is potentially greater than that 
-	 * of the operation which spawned it as described
-	 * by bug 756.
-	 * Note that if you simply remove the _del_fd()
-	 * call below that bad things will happen, because
-	 * the Gsource code refers directly to this operation
-	 * structure which will have been freed in just a
-	 * few lines below...
-	 */
-	if ( NULL != op->ra_stderr_gsource) {
-		G_main_del_fd(op->ra_stderr_gsource);
-		op->ra_stderr_gsource = NULL;
-	}
-
-	if (op->ra_stdout_fd >= STDERR_FILENO) {
-		close(op->ra_stdout_fd);
-		op->ra_stdout_fd = -1;
-	}else if (op->ra_stdout_fd >= 0) {
-		lrmd_log(LOG_ERR, "%s: invalid stdout fd %d"
-		,	__FUNCTION__, op->ra_stdout_fd);
-	}
-	if (op->ra_stderr_fd >= STDERR_FILENO) {
-		close(op->ra_stderr_fd);
-		op->ra_stderr_fd = -1;
-	}else if (op->ra_stderr_fd >= 0) {
-		lrmd_log(LOG_ERR, "%s: invalid stderr fd %d"
-		,	__FUNCTION__, op->ra_stderr_fd);
-	}
-
 	op->first_line_ra_stdout[0] = EOS;
 
 	lrmd_debug2(LOG_DEBUG, "lrmd_op_destroy: free the op whose address is %p"
@@ -487,10 +577,7 @@ lrmd_op_new(void)
 	op->exec_pid = -1;
 	op->timeout_tag = -1;
 	op->repeat_timeout_tag = -1;
-	op->ra_stdout_fd = -1;
-	op->ra_stderr_fd = -1;
-	op->ra_stdout_gsource = NULL;
-	op->ra_stderr_gsource = NULL;
+	op->rapop = NULL;
 	op->first_line_ra_stdout[0] = EOS;
 	op->t_recv = time_longclock();
 	++lrm_objectstats.opcount;
@@ -516,16 +603,12 @@ lrmd_op_copy(const lrmd_op_t* op)
 	 * Be sure and care of this situation when using this function.
 	 */
 	/* Do a "deep" copy of the message structure */
+	ret->rapop = NULL;
 	ret->msg = ha_msg_copy(op->msg);
 	ret->rsc_id = cl_strdup(op->rsc_id);
-	ret->ra_stdout_fd = -1;
-	ret->ra_stderr_fd = -1;
-	ret->ra_stdout_gsource = NULL;
-	ret->ra_stderr_gsource = NULL;
 	ret->timeout_tag = -1;
 	ret->repeat_timeout_tag = -1;
 	ret->exec_pid = -1;
-	memset(ret->first_line_ra_stdout, 0, sizeof(ret->first_line_ra_stdout));
 	ret->is_copy = TRUE;
 	return ret;
 }
@@ -1820,7 +1903,7 @@ on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg)
 	CHECK_ALLOCATED(client, "client", HA_FAIL);
 	CHECK_ALLOCATED(msg, "message", HA_FAIL);
 
- lrmd_debug(LOG_DEBUG
+	lrmd_debug(LOG_DEBUG
 	, 	"on_msg_get_rsc_classes:client [%d] wants to get rsc classes"
 	,	client->pid);
 
@@ -2993,7 +3076,7 @@ perform_ra_op(lrmd_op_t* op)
         GHashTable* op_params = NULL;
 	unsigned long t_stay_in_list = 0;
 	lrmd_rsc_t* rsc = NULL;
-	int flag;
+	ra_pipe_op_t * rapop;
 	
 	CHECK_ALLOCATED(op, "op", HA_FAIL);
 	rsc = (lrmd_rsc_t*)lookup_rsc(op->rsc_id);
@@ -3049,55 +3132,18 @@ perform_ra_op(lrmd_op_t* op)
 
 		default:	/* Parent */
 			NewTrackedProc(pid, 1, PT_LOGNONE, op, &ManagedChildTrackOps);
+
 			close(stdout_fd[1]);
 			close(stderr_fd[1]);
-			/*
-			 * No any obviouse proof of lrmd hang in pipe read yet.
-			 * Bug 475 may be a duplicate of bug 499.
-			 * Anyway, via test, it's proved that NOBLOCK read will
-			 * obviously reduce the RA execution time (bug 553).
-			 */
-			/* Let the read operation be NONBLOCK */ 
-			if ((flag = fcntl(stdout_fd[0], F_GETFL)) >= 0) {
-				if (fcntl(stdout_fd[0], F_SETFL, flag|O_NONBLOCK) < 0) {
-					cl_perror("%s::%d: fcntl", __FUNCTION__
-						, __LINE__);
-				}
-			} else {
-				cl_perror("%s::%d: fcntl", __FUNCTION__, __LINE__);
-			}
-			if ((flag = fcntl(stderr_fd[0], F_GETFL)) >= 0) {
-				if (fcntl(stderr_fd[0], F_SETFL, flag|O_NONBLOCK) < 0) {
-					cl_perror("%s::%d: fcntl", __FUNCTION__
-						, __LINE__);
-				}
-			} else {
-				cl_perror("%s::%d: fcntl", __FUNCTION__, __LINE__);
-			}
-	
-			op->ra_stdout_fd = stdout_fd[0];
-			op->ra_stderr_fd = stderr_fd[0];
-			if (op->ra_stdout_fd <= STDERR_FILENO) {
-				lrmd_log(LOG_ERR
-				,	"%s: invalid stdout fd [%d]"
-				,	__FUNCTION__, op->ra_stdout_fd);
-			}
-			if (op->ra_stderr_fd <= STDERR_FILENO) {
-				lrmd_log(LOG_ERR
-				,	"%s: invalid stderr fd [%d]"
-				,	__FUNCTION__, op->ra_stderr_fd);
-			}
-				
-			op->ra_stdout_gsource = G_main_add_fd(G_PRIORITY_HIGH
-				, stdout_fd[0], FALSE, handle_pipe_ra_stdout
-				, op, NULL);
-			op->ra_stderr_gsource = G_main_add_fd(G_PRIORITY_HIGH
-				, stderr_fd[0], FALSE, handle_pipe_ra_stderr
-				, op, NULL);
-			
+			rapop = ra_pipe_op_new(stdout_fd[0], stderr_fd[0], op);
+			op->rapop = rapop;
 			op->exec_pid = pid;
-			
+
 			return_to_dropped_privs();
+
+			if ( rapop == NULL) {
+				return HA_FAIL;
+			}
 			return HA_OK;
 
 		case 0:		/* Child */
@@ -3219,10 +3265,25 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	}
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
-	if (op->first_line_ra_stdout[0] == EOS && op->ra_stdout_fd >= 0) {
-		handle_pipe_ra_stdout(-1, op);
+
+	if ( (NULL == strchr(op->first_line_ra_stdout, '\n')) 
+	    && (0==STRNCMP_CONST(rsc->class, "heartbeat"))
+	    && (   (0==STRNCMP_CONST(op_type, "monitor")) 
+		 ||(0==STRNCMP_CONST(op_type, "status")))  ) {
+		if ( ( op->rapop != NULL ) 
+		    && (op->rapop->ra_stdout_fd >= 0) ) {
+			handle_pipe_ra_stdout(op->rapop->ra_stdout_fd
+						, op->rapop);
+		} else {
+			lrmd_log(LOG_WARNING, "There is something wrong: the "
+				"first line isn't read in. Maybe the heartbeat "
+				"does not ouput string correctly for status "
+				"operation. Or the code (myself) is wrong.");
+		}
 	}
-	rc = RAExec->map_ra_retvalue(exitcode, op_type, op->first_line_ra_stdout);
+
+	rc = RAExec->map_ra_retvalue(exitcode, op_type
+				     , op->first_line_ra_stdout);
 	if (rc != EXECRA_OK || debug_level > 0) {
 		if (signo != 0) {
 			lrmd_log(rc == EXECRA_OK ? LOG_DEBUG : LOG_WARNING
@@ -3354,120 +3415,110 @@ lookup_rsc_by_msg (struct ha_msg* msg)
 	return rsc;
 }
 
-#if 0
 static void
 destroy_pipe_ra_stdout(gpointer user_data)
 {
-	lrmd_op_t* op = (lrmd_op_t *)user_data;
+	ra_pipe_op_t * rapop = (ra_pipe_op_t *)user_data;
 
-	if (!cl_is_allocated(op)) {
-		lrmd_log(LOG_CRIT, "%s:%d: Unallocated op 0x%lx!!"
-		,	__FUNCTION__, __LINE__
-		,	(unsigned long)op);
-		return;
+	CHECK_ALLOCATED(rapop, "ra_pipe_op",);
+	if (rapop->ra_stderr_fd < 0) {
+		ra_pipe_op_destroy(rapop);
 	}
-	if (op->ra_stdout_fd > STDERR_FILENO) {
-		close(op->ra_stdout_fd);
-		op->ra_stdout_fd = -1;
-	}else if (op->ra_stdout_fd >= 0) {
-		lrmd_log(LOG_ERR, "%s:Attempt to close file descriptor %d"
-		,	__FUNCTION__, op->ra_stdout_fd);
-	}
-		
 }
 
 static void
 destroy_pipe_ra_stderr(gpointer user_data)
 {
-	lrmd_op_t* op = (lrmd_op_t *)user_data;
+	ra_pipe_op_t * rapop = (ra_pipe_op_t *)user_data;
 
-	if (!cl_is_allocated(op)) {
-		lrmd_log(LOG_CRIT, "%s:%d: Unallocated op 0x%lx!!"
-		,	__FUNCTION__, __LINE__
-		,	(unsigned long)op);
-		return;
-	}
-	if (op->ra_stderr_fd > STDERR_FILENO) {
-		close(op->ra_stderr_fd);
-		op->ra_stderr_fd = -1;
-	}else if (op->ra_stderr_fd >= 0) {
-		lrmd_log(LOG_ERR, "%s:Attempt to close file descriptor %d"
-		,	__FUNCTION__, op->ra_stderr_fd);
+	CHECK_ALLOCATED(rapop, "ra_pipe_op",);
+	if (rapop->ra_stdout_fd < 0) {
+		ra_pipe_op_destroy(rapop);
 	}
 }
 
-#endif
 static gboolean
 handle_pipe_ra_stdout(int fd, gpointer user_data)
 {
 	gboolean rc = TRUE;
-	lrmd_op_t* op = (lrmd_op_t *)user_data;
-	const char* op_type = NULL; 
+	ra_pipe_op_t * rapop = (ra_pipe_op_t *)user_data;
 	char * data = NULL;
+	lrmd_op_t* lrmd_op = NULL;
 
-	if (op == NULL) {
-		lrmd_log(LOG_ERR, "%s:%d: op==NULL.", __FUNCTION__, __LINE__);
-		return FALSE;
-	}
-	if (!cl_is_allocated(op)) {
-		lrmd_log(LOG_CRIT, "%s:%d: Unallocated op 0x%lx!!"
+	CHECK_ALLOCATED(rapop, "ra_pipe_op", FALSE);
+
+	if (rapop->lrmd_op == NULL) {
+		lrmd_debug(LOG_DEBUG, "%s:%d: Unallocated lrmd_op 0x%lx!!"
 		,	__FUNCTION__, __LINE__
-		,	(unsigned long)op);
-		return FALSE;
-
-	}
-
-	if (fd < 0) {
-		fd = op->ra_stdout_fd;
+		,	(unsigned long)rapop->lrmd_op);
+	} else {
+		lrmd_op = rapop->lrmd_op;
 	}
 
 	if (fd <= STDERR_FILENO) {
-		lrmd_log(LOG_CRIT
-		,	"%s:%d: Attempt to read from closed/invalid file descriptor %d."
+		lrmd_log(LOG_CRIT, "%s:%d: Attempt to read from "
+			"closed/invalid file descriptor %d."
 		,	__FUNCTION__, __LINE__, fd);
-		lrmd_op_dump(op, "op w/closed fd");
 		return FALSE;
 	}
 
-	if (0 != read_pipe(fd, &data, op)) {
-		if ( NULL != op->ra_stdout_gsource) {
-			G_main_del_fd(op->ra_stdout_gsource);
-			op->ra_stdout_gsource = NULL;
-		}
+	if (0 != read_pipe(fd, &data, rapop)) {
+		/* error or reach the EOF */
 		if (fd > STDERR_FILENO) {
 			close(fd);
-			if (fd == op->ra_stdout_fd) {
-				op->ra_stdout_fd = -1;
+			if (fd == rapop->ra_stdout_fd) {
+				rapop->ra_stdout_fd = -1;
 			}
+		}
+		if ( NULL != rapop->ra_stdout_gsource) {
+			/* Don't try to optimize it */
+			GFDSource * tmp;
+			tmp = rapop->ra_stdout_gsource;
+			rapop->ra_stdout_gsource = NULL;
+			G_main_del_fd(tmp);
 		}
 		rc = FALSE;
 	}
 
-	if (data!=NULL) { 
-		op_type = ha_msg_value(op->msg, F_LRM_OP);
-		if (  (0==STRNCMP_CONST(op_type, "meta-data"))
-		    ||(0==STRNCMP_CONST(op_type, "monitor")) 
-		    ||(0==STRNCMP_CONST(op_type, "status")) ) {
+	if ( data!=NULL ) {
+		if (  (0==STRNCMP_CONST(rapop->op_type, "meta-data"))
+		    ||(0==STRNCMP_CONST(rapop->op_type, "monitor")) 
+		    ||(0==STRNCMP_CONST(rapop->op_type, "status")) ) {
 			lrmd_debug(LOG_DEBUG, "RA output: (%s:%s:stdout) %s"
-				, op->rsc_id, op_type, data);
+				, rapop->rsc_id, rapop->op_type, data);
 		} else {
 			lrmd_log(LOG_INFO, "RA output: (%s:%s:stdout) %s"
-				, op->rsc_id, op_type, data);
+				, rapop->rsc_id, rapop->op_type, data);
 		}
+
 		/*
-		 * This code isn't correct - there is no idea of a "line"
-		 * in the code as it's presently written...
-		 * It produces erratic and hard-to read messages in the logs.
-		 * Under the right circumstances, it will cause errors in
-		 * interpreting 'heartbeat' style resource agents.  FIXME
-		 * It's not obvious how the meta-data (which is _many_
-		 * lines long) is handled by this...
-		 * I suspect multi-line metadata hasn't been tested :-(.
+		 * This code isn't good enough, it produces erratic and hard-to
+		 * read messages in the logs. But this does not affect the 
+		 * function correctness, since the first line output is ensured
+		 * to be collected into the buffer completely.
+		 * Anyway, the meta-data (which is _many_  lines long) can be 
+		 * handled by another function, see raexec.h
 		 */
-		if (op->first_line_ra_stdout[0] == EOS) {
-			strncpy(op->first_line_ra_stdout, data
-			,	sizeof(op->first_line_ra_stdout) - 1);
+		if ( (rapop->first_line_read == FALSE)
+                    && (0==STRNCMP_CONST(rapop->rsc_class, "heartbeat"))
+		    && ( lrmd_op != NULL )
+	    	    && ( (0==STRNCMP_CONST(rapop->op_type, "monitor")) 
+			  ||(0==STRNCMP_CONST(rapop->op_type, "status")) )) {
+			if (lrmd_op != NULL) {
+				strncat(lrmd_op->first_line_ra_stdout, data
+				  , sizeof(lrmd_op->first_line_ra_stdout) -
+				    strlen(lrmd_op->first_line_ra_stdout)-1);
+				if (strchr(lrmd_op->first_line_ra_stdout, '\n')
+					!= NULL) {
+					rapop->first_line_read = TRUE;
+				}
+			} else {
+				lrmd_log(LOG_CRIT
+				   , "Before read the first line, the RA "
+				   "execution child quitted and waited.");
+			}
 		}
+		
 		g_free(data);
 	}
 
@@ -3478,43 +3529,44 @@ static gboolean
 handle_pipe_ra_stderr(int fd, gpointer user_data)
 {
 	gboolean rc = TRUE;
-	lrmd_op_t* op = (lrmd_op_t *)user_data;
-	const char* op_type = NULL; 
 	char * data = NULL;
+	ra_pipe_op_t * rapop = (ra_pipe_op_t *)user_data;
 
-	if (!cl_is_allocated(op)) {
-		lrmd_log(LOG_CRIT, "%s:%d: Unallocated op 0x%lx!!"
-		,	__FUNCTION__, __LINE__
-		,	(unsigned long)op);
-		return FALSE;
-	}
+	CHECK_ALLOCATED(rapop, "ra_pipe_op", FALSE);
 
 	if (fd <= STDERR_FILENO) {
-		lrmd_log(LOG_CRIT
-		,	"%s:%d: Attempt to read from closed/invalid file descriptor %d."
+		lrmd_log(LOG_CRIT, "%s:%d: Attempt to read from "
+			" closed/invalid file descriptor %d."
 		,	__FUNCTION__, __LINE__, fd);
-		lrmd_op_dump(op, "op w/closed fd");
 		return FALSE;
 	}
 
-	if (0 != read_pipe(fd, &data, op)) {
-		if ( NULL != op->ra_stderr_gsource) {
-			G_main_del_fd(op->ra_stderr_gsource);
-			op->ra_stderr_gsource = NULL;
-		}
-		if (fd >= STDERR_FILENO) {
+	if (0 != read_pipe(fd, &data, rapop)) {
+		/* error or reach the EOF */
+		if (fd > STDERR_FILENO) {
 			close(fd);
-			if (fd == op->ra_stderr_fd) {
-				op->ra_stderr_fd = -1;
+			if (fd == rapop->ra_stderr_fd) {
+				rapop->ra_stderr_fd = -1;
 			}
+		}
+		if ( NULL != rapop->ra_stderr_gsource) {
+			/*
+			 * Don't try to optimize it.
+			 * G_main_del_fd will trigger
+			 *	destroy_pipe_ra_stderr
+			 *	ra_pipe_op_destroy
+			 */
+			GFDSource * tmp;
+			tmp = rapop->ra_stderr_gsource;
+			rapop->ra_stderr_gsource = NULL;
+			G_main_del_fd(tmp);
 		}
 		rc = FALSE;
 	}
 
 	if (data!=NULL) { 
-		op_type = ha_msg_value(op->msg, F_LRM_OP);
-		lrmd_log(LOG_INFO, "RA output: (%s:%s:stderr) %s", op->rsc_id
-			, op_type, data);
+		lrmd_log(LOG_INFO, "RA output: (%s:%s:stderr) %s"
+			, rapop->rsc_id, rapop->op_type, data);
 		g_free(data);
 	}
 
@@ -3528,25 +3580,32 @@ read_pipe(int fd, char ** data, void * user_data)
 	char buffer[BUFFLEN];
 	int readlen;
 	GString * gstr_tmp;
-	const char* op_type = NULL; 
 	int rc = 0;
-	lrmd_rsc_t* rsc = NULL;
-	lrmd_op_t* op = (lrmd_op_t *)user_data;
+	lrmd_op_t * op = NULL;
+	ra_pipe_op_t * rapop = (ra_pipe_op_t *)user_data;
 
 	lrmd_debug3(LOG_DEBUG, "%s begin.", __FUNCTION__);
 
-	if (!cl_is_allocated(op)) {
-		lrmd_log(LOG_CRIT, "%s:%d: Unallocated op 0x%lx!!"
+	CHECK_ALLOCATED(rapop, "ra_pipe_op", FALSE);
+
+	op = (lrmd_op_t *)rapop->lrmd_op;
+	if (NULL == op) {
+		lrmd_debug2(LOG_DEBUG, "%s:%d: Unallocated lrmd_op 0x%lx!!"
 		,	__FUNCTION__, __LINE__
 		,	(unsigned long)op);
-		return FALSE;
 	}
+
 	*data = NULL;
 	gstr_tmp = g_string_new("");
 
 	do {
 		errno = 0;
 		readlen = read(fd, buffer, BUFFLEN - 1);
+		if (NULL == op) {
+			lrmd_debug2(LOG_NOTICE
+				, "read's ret: %d when lrmd_op finished"
+				, readlen);
+		}
 		if ( readlen > 0 ) {
 			buffer[readlen] = EOS;
 			g_string_append(gstr_tmp, buffer);
@@ -3569,7 +3628,13 @@ read_pipe(int fd, char ** data, void * user_data)
 			cl_perror("%s:%d read error: fd %d errno=%d"
 			,	__FUNCTION__, __LINE__
 			,	fd, errno);
-			lrmd_op_dump(op, "op w/bad errno");
+			if (NULL != op) {
+				lrmd_op_dump(op, "op w/bad errno");
+			} else {
+				lrmd_log(LOG_NOTICE
+					, "%s::%d: lrmd_op has been freed"
+					, __FUNCTION__, __LINE__);
+			}
 			break;
 
 		case EBADF:
@@ -3577,22 +3642,33 @@ read_pipe(int fd, char ** data, void * user_data)
 			,	"%s:%d"
 			" Attempt to read from closed file descriptor %d."
 			,	__FUNCTION__, __LINE__,	fd);
-			lrmd_op_dump(op, "op w/closed fd");
+			if (NULL != op) {
+				lrmd_op_dump(op, "op w/bad errno");
+			} else {
+				lrmd_log(LOG_NOTICE
+					, "%s::%d: lrmd_op has been freed"
+					, __FUNCTION__, __LINE__);
+			}
 			break;
 			
 		case EAGAIN:
-			rsc = lookup_rsc(op->rsc_id);
-			op_type = ha_msg_value(op->msg, F_LRM_OP);
+			if (NULL==op) {
+				lrmd_log(LOG_WARNING
+					, "%s::%d: Shouldn't come here: "
+					  "lrmd_op = NULL"
+					, __FUNCTION__, __LINE__);
+				break;
+			}
 			lrmd_log(LOG_ERR, "RA %s:%s:%s (process %d) failed to "
 				"redirect %s for its background child (daemon) "
 				"processes. This will likely cause those "
 				"processes to die mysteriously at some later "
 				"time (terminated by signal SIGPIPE)."
-				, (rsc!=NULL)?rsc->class:"<NULL>"
-				, (rsc!=NULL)?rsc->type:"<NULL>"
-				, (op_type!=NULL)?op_type:"<NULL>"
+				, rapop->rsc_class
+				, rapop->rsc_id
+				, rapop->op_type
 				, op->exec_pid
-				, (op->ra_stdout_fd==fd)?"stdout":"stderr");
+				, (rapop->ra_stdout_fd==fd)?"stdout":"stderr");
 		}
 	}
 
@@ -3698,6 +3774,10 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.217  2006/03/13 08:35:13  sunjd
+ * Reworkcl with new implementation for
+ * bug756: All output from resource agents should be logged
+ *
  * Revision 1.216  2006/02/10 06:50:23  alan
  * Removed destroy_pipe_ra_* functions.
  *
@@ -4335,3 +4415,4 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
  * Added missing Id and Log
  *
  */
+
