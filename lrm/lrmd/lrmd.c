@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.217 2006/03/13 08:35:13 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.218 2006/03/15 02:54:28 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -556,7 +556,7 @@ lrmd_op_destroy(lrmd_op_t* op)
 	}
 	op->first_line_ra_stdout[0] = EOS;
 
-	lrmd_debug2(LOG_DEBUG, "lrmd_op_destroy: free the op whose address is %p"
+	lrmd_debug3(LOG_DEBUG, "lrmd_op_destroy: free the op whose address is %p"
 		  , op);
 	cl_free(op);
 }
@@ -2480,7 +2480,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		op->msg = ha_msg_copy(msg);
 		op->t_recv = time_longclock();
 		
-		lrmd_debug(LOG_DEBUG
+		lrmd_debug2(LOG_DEBUG
 		, "%s: client [%d] want to add an operation %s on resource %s."
 		,	__FUNCTION__
 		,	client->pid
@@ -2813,22 +2813,22 @@ on_op_done(lrmd_op_t* op)
 	if (LRM_OP_DONE != op_status) {
 		need_notify = 1;
 	} else if (HA_OK != ha_msg_value_int(op->msg,F_LRM_RC,&op_rc)){
-		lrmd_debug(LOG_DEBUG, "on_op_done: will callback due to not "
+		lrmd_debug2(LOG_DEBUG, "on_op_done: will callback due to not "
 			"finding F_LRM_RC field in the message op->msg.");
 		need_notify = 1;
 	} else if (EVERYTIME == target_rc) {
-		lrmd_debug(LOG_DEBUG, "on_op_done: will callback for being "
+		lrmd_debug2(LOG_DEBUG, "on_op_done: will callback for being "
 			"asked to callback everytime.");
 		need_notify = 1;
 	} else if (CHANGED == target_rc) {
 		if (HA_OK != ha_msg_value_int(op->msg,F_LRM_LASTRC,
 						&last_rc)){
-			lrmd_debug(LOG_DEBUG ,"on_op_done: will callback because "
+			lrmd_debug2(LOG_DEBUG ,"on_op_done: will callback because "
 				"this is first execution [rc: %d].", op_rc);
 			need_notify = 1;
 		} else {
 			if (last_rc != op_rc) {
-				lrmd_debug(LOG_DEBUG, "on_op_done: will callback "
+				lrmd_debug2(LOG_DEBUG, "on_op_done: will callback "
 					" for this rc %d != last rc %d"
 				, 	op_rc, last_rc);
 				need_notify = 1;
@@ -3448,7 +3448,7 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 	CHECK_ALLOCATED(rapop, "ra_pipe_op", FALSE);
 
 	if (rapop->lrmd_op == NULL) {
-		lrmd_debug(LOG_DEBUG, "%s:%d: Unallocated lrmd_op 0x%lx!!"
+		lrmd_debug2(LOG_DEBUG, "%s:%d: Unallocated lrmd_op 0x%lx!!"
 		,	__FUNCTION__, __LINE__
 		,	(unsigned long)rapop->lrmd_op);
 	} else {
@@ -3774,6 +3774,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.218  2006/03/15 02:54:28  sunjd
+ * log output level tweak
+ *
  * Revision 1.217  2006/03/13 08:35:13  sunjd
  * Reworkcl with new implementation for
  * bug756: All output from resource agents should be logged
