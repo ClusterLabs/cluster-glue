@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.79 2006/03/08 22:22:01 andrew Exp $ */
+/* $Id: GSource.c,v 1.80 2006/03/21 14:01:15 davidlee Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -64,12 +64,35 @@ GSource		source;		/* Common glib struct -  must be 1st */	\
 unsigned	magno;		/* Magic number */			\
 long		maxdispatchms;	/* Time limit for dispatch function */	\
 long		maxdispatchdelayms; /* Max delay before processing */	\
-longclock_t	detecttime;	/* Time last input detected */		\
+char		detecttime[sizeof(longclock_t)];			\
+				/* Time last input detected */		\
 void*		udata;		/* User-defined data */			\
 guint		gsourceid;	/* Source id of this source */		\
 const char *	description;	/* Description of this source */	\
 GDestroyNotify	dnotify
 
+/*
+ * On architectures with alignment constraints, our casting between
+ * "(GSource*)" and "(GFDSource_s*)" etc. causes trouble, because of
+ * the massive alignment requirements of "longclock_t".
+ *
+ * Use the following to store and fetch.
+ */
+static
+void
+lc_store(char *destptr, longclock_t value) {
+	longclock_t _ltt;
+	_ltt = value;
+	memcpy((destptr), &_ltt, sizeof(longclock_t));
+}
+
+static
+longclock_t
+lc_fetch(char *ptr) {
+	longclock_t _ltt;
+	memcpy(&_ltt, (ptr), sizeof(longclock_t));
+	return _ltt;
+}
 
 struct GFDSource_s {
 	COMMON_STRUCTSTART;
@@ -140,12 +163,14 @@ struct GTRIGSource_s {
 
 #define CHECK_DISPATCH_DELAY(i)	{ 					\
 	unsigned long	ms;						\
+	longclock_t dettime;						\
 	dispstart = time_longclock();					\
-	ms = longclockto_ms(sub_longclock(dispstart,(i)->detecttime));	\
+	dettime = lc_fetch((i)->detecttime);				\
+	ms = longclockto_ms(sub_longclock(dispstart,dettime));		\
 	if ((i)->maxdispatchdelayms > 0					\
 	&&	ms > (i)->maxdispatchdelayms) {				\
 		WARN_DELAY(ms, (i));					\
-		EXPLAINDELAY(dispstart, (i)->detecttime);		\
+		EXPLAINDELAY(dispstart, dettime);			\
 	}								\
 }
 
@@ -156,7 +181,7 @@ struct GTRIGSource_s {
 	if ((i)->maxdispatchms > 0 && ms > (i)->maxdispatchms) {	\
 		WARN_TOOLONG(ms, (i));					\
 	}								\
-	(i)->detecttime = zero_longclock;				\
+	lc_store(((i)->detecttime), zero_longclock);		\
 }
 
 #define	WARN_TOOMUCH(ms, input)	cl_log(LOG_WARNING			\
@@ -236,7 +261,7 @@ G_main_add_fd(int priority, int fd, gboolean can_recurse
 	ret->gpfd.events = DEF_EVENTS;
 	ret->gpfd.revents = 0;
 	ret->dnotify = notify;
-	ret->detecttime = zero_longclock;
+	lc_store((ret->detecttime), zero_longclock);
 	
 	g_source_add_poll(source, &ret->gpfd);
 	
@@ -310,7 +335,7 @@ G_fd_check(GSource* source)
 	GFDSource*	fdp =  (GFDSource*)source;
 	g_assert(IS_FDSOURCE(fdp));
 	if (fdp->gpfd.revents) {
-		fdp->detecttime = time_longclock();
+		lc_store((fdp->detecttime), time_longclock());
 		return TRUE;
 	}
 	return FALSE;
@@ -421,7 +446,7 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 	chp->magno = MAG_GCHSOURCE;
 	chp->maxdispatchdelayms = DEFAULT_MAXDELAY;
 	chp->maxdispatchms = DEFAULT_MAXDISPATCH;
-	chp->detecttime = zero_longclock;
+	lc_store((chp->detecttime), zero_longclock);
 	chp->ch = ch;
 	chp->dispatch = dispatch;
 	chp->udata=userdata;
@@ -550,7 +575,7 @@ G_CH_prepare(GSource* source,
 	}
 	ret = chp->ch->ops->is_message_pending(chp->ch);
 	if (ret) {
-		chp->detecttime = time_longclock();
+		lc_store((chp->detecttime), time_longclock());
 	}
 	CHECKEND(chp);
 	return ret;
@@ -582,7 +607,7 @@ G_CH_check(GSource* source)
 		||	(!chp->fd_fdx && chp->outfd.revents != 0)
 		||	chp->ch->ops->is_message_pending(chp->ch));
 	if (ret) {
-		chp->detecttime = time_longclock();
+		lc_store((chp->detecttime), time_longclock());
 	}
 	CHECKEND(chp);
 	return ret;
@@ -733,7 +758,7 @@ G_main_add_IPC_WaitConnection(int priority
 	wcp->magno = MAG_GWCSOURCE;
 	wcp->maxdispatchdelayms = DEFAULT_MAXDELAY;
 	wcp->maxdispatchms = DEFAULT_MAXDISPATCH;
-	wcp->detecttime = zero_longclock;
+	lc_store((wcp->detecttime), zero_longclock);
 	wcp->udata = userdata;
 	wcp->gpfd.fd = wch->ops->get_select_fd(wch);
 	wcp->gpfd.events = DEF_EVENTS;
@@ -809,7 +834,7 @@ G_WC_check(GSource * source)
 	g_assert(IS_WCSOURCE(wcp));
 
 	if (wcp->gpfd.revents != 0) {
-		wcp->detecttime = time_longclock();
+		lc_store((wcp->detecttime), time_longclock());
 		return TRUE;
 	}
 	return FALSE;
@@ -1019,15 +1044,17 @@ G_SIG_prepare(GSource* source, gint* timeoutms)
 		clock_t			diff;
 
 		/* detecttime is reset in the dispatch function */
-		if (cmp_longclock(sig_src->detecttime, zero_longclock) != 0) {
+		if (cmp_longclock(lc_fetch(sig_src->detecttime), zero_longclock) != 0) {
 			cl_log(LOG_ERR, "%s: detecttime already set?", __FUNCTION__);
 			return TRUE;
 		}
 		/* Otherwise, this is when it was first detected */
 		now = times(&dummy_tms_struct);
 		diff = now - sig_src->sh_detecttime;	/* How long since signal occurred? */
-		sig_src->detecttime
-		=	sub_longclock(time_longclock(), (longclock_t)diff);
+		lc_store(
+			sig_src->detecttime,
+			sub_longclock(time_longclock(), (longclock_t)diff)
+		);
 		return TRUE;
 	}
 	return FALSE;
@@ -1049,14 +1076,16 @@ G_SIG_check(GSource* source)
 		static struct tms	dummy_tms_struct;
 		clock_t			now;
 		clock_t			diff;
-		if (cmp_longclock(sig_src->detecttime, zero_longclock) != 0){
+		if (cmp_longclock(lc_fetch(sig_src->detecttime), zero_longclock) != 0){
 			return TRUE;
 		}
 		/* Otherwise, this is when it was first detected */
 		now = times(&dummy_tms_struct);
 		diff = now - sig_src->sh_detecttime;
-		sig_src->detecttime
-		=	sub_longclock(time_longclock(), (longclock_t)diff);
+		lc_store(
+			sig_src->detecttime,
+			sub_longclock(time_longclock(), (longclock_t)diff)
+		);
 		return TRUE;
 	}
 	return FALSE;
@@ -1265,7 +1294,7 @@ G_main_add_TriggerHandler(int priority,
 	trig_src->dispatch	= dispatch;
 	trig_src->udata		= userdata;
 	trig_src->dnotify	= notify;
-	trig_src->detecttime	= zero_longclock;
+	lc_store((trig_src->detecttime), zero_longclock);
 
 	trig_src->manual_trigger = FALSE;
 
@@ -1303,7 +1332,7 @@ G_main_set_trigger(GTRIGSource* source)
 	g_assert(IS_TRIGSOURCE(trig_src));
 	
 	trig_src->manual_trigger = TRUE;
-	trig_src->detecttime = time_longclock();
+	lc_store((trig_src->detecttime), time_longclock());
 }
 
 
@@ -1335,8 +1364,8 @@ G_TRIG_prepare(GSource* source, gint* timeout)
 	
 
 	if (trig_src->manual_trigger
-	&&	cmp_longclock(trig_src->detecttime, zero_longclock) == 0) {
-		trig_src->detecttime = time_longclock();
+	&&	cmp_longclock(lc_fetch(trig_src->detecttime), zero_longclock) == 0) {
+		lc_store((trig_src->detecttime), time_longclock());
 	}
 	return trig_src->manual_trigger;
 }
@@ -1353,8 +1382,8 @@ G_TRIG_check(GSource* source)
 
 	g_assert(IS_TRIGSOURCE(trig_src));
 	if (trig_src->manual_trigger
-	&&	cmp_longclock(trig_src->detecttime, zero_longclock) == 0) {
-		trig_src->detecttime = time_longclock();
+	&&	cmp_longclock(lc_fetch(trig_src->detecttime), zero_longclock) == 0) {
+		lc_store((trig_src->detecttime), time_longclock());
 	}
 	return trig_src->manual_trigger;
 }
@@ -1383,7 +1412,7 @@ G_TRIG_dispatch(GSource * source,
 		}
 		CHECK_DISPATCH_TIME(trig_src);
 	}
-	trig_src->detecttime = zero_longclock;
+	lc_store((trig_src->detecttime), zero_longclock);
 	
 	return TRUE;
 }
@@ -1468,7 +1497,7 @@ Gmain_timeout_add_full(gint priority
 	append->maxdispatchms = DEFAULT_MAXDISPATCH;
 	append->maxdispatchdelayms = DEFAULT_MAXDELAY;
 	append->description = "(timeout)";
-	append->detecttime = zero_longclock;
+	lc_store((append->detecttime), zero_longclock);
 	append->udata = NULL;
 	
 	append->nexttime = add_longclock(time_longclock()
@@ -1549,7 +1578,7 @@ Gmain_timeout_dispatch(GSource* src, GSourceFunc func, gpointer user_data)
 	gboolean	ret;
 
 	g_assert(IS_TIMEOUTSRC(append));
-	append->detecttime = append->nexttime;
+	lc_store(append->detecttime, append->nexttime);
 	CHECK_DISPATCH_DELAY(append);
 	
 
