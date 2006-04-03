@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.219 2006/04/03 15:44:42 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.220 2006/04/03 15:49:27 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -607,8 +607,8 @@ lrmd_op_copy(const lrmd_op_t* op)
 	ret->msg = ha_msg_copy(op->msg);
 	ret->rsc_id = cl_strdup(op->rsc_id);
 	ret->timeout_tag = -1;
-	op->rapop = NULL;
-	op->first_line_ra_stdout[0] = EOS;
+	ret->rapop = NULL;
+	ret->first_line_ra_stdout[0] = EOS;
 	ret->repeat_timeout_tag = -1;
 	ret->exec_pid = -1;
 	ret->is_copy = TRUE;
@@ -3776,6 +3776,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.220  2006/04/03 15:49:27  sunjd
+ * sorry for typo
+ *
  * Revision 1.219  2006/04/03 15:44:42  sunjd
  * should fix bug 1163
  *
