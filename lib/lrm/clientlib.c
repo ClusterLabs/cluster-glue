@@ -938,7 +938,7 @@ compare_call_id(gconstpointer a, gconstpointer b)
 static GList*
 rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 {
-	GList* op_list = NULL;
+	GList* op_list = NULL, * tmplist = NULL;
 	struct ha_msg* msg = NULL;
 	struct ha_msg* ret = NULL;
 	struct ha_msg* op_msg = NULL;
@@ -1015,6 +1015,39 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 		ha_msg_del(op_msg);
 	}
 	g_list_sort(op_list, compare_call_id);
+
+	/* Delete the duplicate op for call_id */
+#if 0	
+	cl_log(LOG_WARNING, "Before uniquing");
+	tmplist = g_list_first(op_list);
+	while (tmplist != NULL) {
+		cl_log(LOG_WARNING, "call_id=%d", ((lrm_op_t*)(tmplist->data))->call_id);
+		tmplist = g_list_next(tmplist);
+	}
+#endif
+
+	tmplist = g_list_first(op_list);
+	while (tmplist != NULL) {
+		if (NULL != g_list_previous(tmplist)) {
+			if (((lrm_op_t*)(g_list_previous(tmplist)->data))->call_id
+			     == ((lrm_op_t*)(tmplist->data))->call_id) {
+				op_list = g_list_remove_link (op_list, tmplist);
+				free_op((lrm_op_t *)tmplist->data);
+				g_list_free_1(tmplist);
+				tmplist = g_list_first(op_list);
+			}
+		}
+		tmplist = g_list_next(tmplist);
+	}
+
+#if 0
+	cl_log(LOG_WARNING, "After uniquing");
+	while (tmplist != NULL) {
+		cl_log(LOG_WARNING, "call_id=%d", ((lrm_op_t*)(tmplist->data))->call_id);
+		tmplist = g_list_next(tmplist);
+	}
+#endif
+
 	return op_list;
 }
 
