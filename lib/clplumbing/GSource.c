@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.80 2006/03/21 14:01:15 davidlee Exp $ */
+/* $Id: GSource.c,v 1.81 2006/04/06 10:45:49 andrew Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -684,8 +684,8 @@ G_CH_dispatch(GSource * source,
 			if (!chp->fd_fdx) {
 				g_source_remove_poll(source, &chp->outfd);
 			}
-			g_source_unref(source);
 			CHECK_DISPATCH_TIME(chp);
+			g_source_unref(source);
 			return FALSE;
 		}
 	}
