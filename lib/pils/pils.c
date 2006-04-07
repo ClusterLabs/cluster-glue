@@ -1,4 +1,4 @@
-/* $Id: pils.c,v 1.48 2006/01/09 21:27:52 alan Exp $ */
+/* $Id: pils.c,v 1.49 2006/04/07 13:24:05 lars Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.
@@ -796,12 +796,12 @@ NewPILInterface(PILInterfaceType*	interfacetype
 	}
 	ret = NEW(PILInterface);
 	STATNEW(interface);
-	ret->MagicNum = PIL_MAGIC_INTERFACE;
 	if (DEBUGPLUGIN) {
 		PILLog(PIL_DEBUG, "NewPILInterface(0x%x)", (unsigned long)ret);
 	}
 
 	if (ret) {
+		ret->MagicNum = PIL_MAGIC_INTERFACE;
 		ret->interfacetype = interfacetype;
 		ret->exports = exports;
 		ret->ud_interface = ud_interface;
