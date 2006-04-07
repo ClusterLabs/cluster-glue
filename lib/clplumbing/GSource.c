@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.81 2006/04/06 10:45:49 andrew Exp $ */
+/* $Id: GSource.c,v 1.82 2006/04/07 15:48:12 andrew Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -1008,8 +1008,11 @@ G_main_del_SignalHandler(GSIGSource* sig_src)
 	if (sig_src->gsourceid <= 0) {
 		return FALSE;
 	}
-	g_assert(_NSIG > sig_src->signal);
-
+	if(_NSIG <= sig_src->signal) {
+		g_assert(_NSIG > sig_src->signal);
+		return FALSE;
+	}
+	
 	CL_SIGNAL(sig_src->signal, NULL);
 
 	sig_src->gsourceid = 0;
@@ -1144,8 +1147,14 @@ G_main_signal_handler(int nsig)
 	static struct tms	dummy_tms_struct;
 	GSIGSource* sig_src = NULL;
 
-	g_assert(G_main_signal_list != NULL);
-	g_assert(_NSIG > nsig);
+	if(G_main_signal_list == NULL) {
+		g_assert(G_main_signal_list != NULL);
+		return;
+	}
+	if(_NSIG <= nsig) {
+		g_assert(_NSIG > nsig);
+		return;
+	}
 	
 	sig_src = G_main_signal_list[nsig];
 
