@@ -1,4 +1,4 @@
-/* $Id: stonith.c,v 1.24 2005/11/02 18:41:14 blaschke Exp $ */
+/* $Id: stonith.c,v 1.25 2006/04/07 13:26:59 lars Exp $ */
 /*
  * Stonith API infrastructure.
  *
@@ -396,9 +396,11 @@ stonith_set_config_file(Stonith* s, const char * configname)
 		}else{
 			line[len] = '\0';
 		}
-		
+	
+		fclose(cfgfile);
 		return stonith_set_config_info(s, line);
 	}
+	fclose(cfgfile);
 	return S_BADCONFIG;
 }
 
