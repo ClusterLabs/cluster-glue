@@ -211,15 +211,16 @@ string_list_pack(GList* list, char* buf, char* maxp)
 	char* p =  buf;
 
 	for (i = 0; i < g_list_length(list) ; i++){
-		
 		char * element = g_list_nth_data(list, i);
-		int element_len = strlen(element);
+		int element_len;
+
 		if (element == NULL){
 			cl_log(LOG_ERR, "string_list_pack: "
 			       "%luth element of the string list is NULL"
 				, (unsigned long)i);
 			return 0;
 		}
+		element_len = strlen(element);
 		if (p + 2 + element_len + intlen(element_len)> maxp){
 			cl_log(LOG_ERR, "%s: memory out of boundary",
 			       __FUNCTION__);
