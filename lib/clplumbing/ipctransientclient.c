@@ -1,4 +1,4 @@
-/* $Id: ipctransientclient.c,v 1.15 2004/12/05 19:13:01 andrew Exp $ */
+/* $Id: ipctransientclient.c,v 1.16 2006/04/09 22:20:15 lars Exp $ */
 /* 
  * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
  * 
@@ -134,6 +134,7 @@ init_client_ipctest_comms(const char *child,
 	
 	if (ch == NULL) {
 		cl_log(LOG_ERR, "[Client] Could not access channel on: %s", commpath);
+		return NULL;
 	} else if(ch->ops->initiate_connection(ch) != IPC_OK) {
 		cl_log(LOG_ERR, "[Client] Could not init comms on: %s", commpath);
 		return NULL;
