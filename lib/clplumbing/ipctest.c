@@ -1,4 +1,4 @@
-/* $Id: ipctest.c,v 1.46 2006/01/24 11:31:49 davidlee Exp $ */
+/* $Id: ipctest.c,v 1.47 2006/04/09 22:23:28 lars Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -265,11 +265,13 @@ clientserver(TestFunc_t clientfunc, TestFunc_t serverfunc, int count, int client
 				channel = ipc_channel_constructor(IPC_ANYTYPE, wattrs);
 				if (channel == NULL) {
 					cl_perror("client: channel creation failed");
+					exit(1);
 				}
 
 				rc = channel->ops->initiate_connection(channel);
 				if (rc != IPC_OK) {
 					cl_perror("channel[1] failed to connect");
+					exit(1);
 				}
 				checksock(channel);
 				rc = clientfunc(channel, count);
