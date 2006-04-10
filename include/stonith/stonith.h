@@ -1,4 +1,4 @@
-/* $Id: stonith.h,v 1.15 2005/11/02 18:41:14 blaschke Exp $ */
+/* $Id: stonith.h,v 1.16 2006/04/10 08:13:11 sunjd Exp $ */
 /*
  *	S hoot
  *	T he
@@ -102,7 +102,7 @@ const char*			/* static/global return - lots of things! */
 
 void	stonith_set_debug	(Stonith* s, int debuglevel);
 void	stonith_set_log		(Stonith* s
-				, void (*logfun)(int priority, const char * fmt, ...));
+				, PILLogFun);
 			
 int	stonith_set_config	(Stonith* s, StonithNVpair* list);
 int	stonith_set_config_file(Stonith* s, const char * configname);
