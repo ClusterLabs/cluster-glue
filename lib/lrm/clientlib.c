@@ -1014,7 +1014,7 @@ rsc_get_cur_state (lrm_rsc_t* rsc, state_flag_t* cur_state)
 		}
 		ha_msg_del(op_msg);
 	}
-	g_list_sort(op_list, compare_call_id);
+	op_list = g_list_sort(op_list, compare_call_id);
 
 	/* Delete the duplicate op for call_id */
 #if 0	
