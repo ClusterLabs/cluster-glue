@@ -1,4 +1,4 @@
-/* $Id: stonith.c,v 1.25 2006/04/07 13:26:59 lars Exp $ */
+/* $Id: stonith.c,v 1.26 2006/04/10 09:07:21 sunjd Exp $ */
 /*
  * Stonith API infrastructure.
  *
@@ -343,12 +343,12 @@ stonith_set_debug	(Stonith* s, int debuglevel)
 }
 
 void
-stonith_set_log(Stonith* s, void (*logfun)(int priority, const char * fmt, ...))
+stonith_set_log(Stonith* s, PILLogFun logfun)
 {
 	if (StonithPIsys == NULL) {
 		return;
 	}
-	PilPluginUnivSetLog(StonithPIsys, (PILLogFun)logfun);
+	PilPluginUnivSetLog(StonithPIsys, logfun);
 }
 
 int
