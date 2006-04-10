@@ -1,4 +1,4 @@
-/* $Id: stonith.h,v 1.16 2006/04/10 08:13:11 sunjd Exp $ */
+/* $Id: stonith.h,v 1.17 2006/04/10 09:03:52 sunjd Exp $ */
 /*
  *	S hoot
  *	T he
@@ -45,6 +45,7 @@
 #	define __STONITH_H
 #include <glib.h>
 
+#include <pils/plugin.h>
 #define	STONITH_VERS	2
 
 /*
