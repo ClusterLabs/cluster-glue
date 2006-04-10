@@ -1,4 +1,4 @@
-/* $Id: ipctransientserver.c,v 1.13 2004/11/22 19:03:01 gshi Exp $ */
+/* $Id: ipctransientserver.c,v 1.14 2006/04/10 07:50:14 lars Exp $ */
 /* 
  * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
  * 
@@ -170,6 +170,10 @@ transient_server_callback(IPC_Channel *client, gpointer user_data)
 			cl_log(LOG_DEBUG, "[Server] Got xml [text=%s]", buffer);
 			
 			reply = create_simple_message(strdup(buffer), client);
+			if (!reply) {
+				cl_log(LOG_ERR, "[Server] Could allocate reply msg.");
+				return FALSE;
+			}
 			
 			llpc = 0;
 			while(llpc++ < MAX_IPC_FAIL && client->ops->send(client, reply) == IPC_FAIL) {
@@ -179,6 +183,7 @@ transient_server_callback(IPC_Channel *client, gpointer user_data)
 			
 			if(lpc == MAX_IPC_FAIL) {
 				cl_log(LOG_ERR, "[Server] Could not send IPC, message.  Channel is dead.");
+				free(reply);
 				return FALSE;
 			}
 			
