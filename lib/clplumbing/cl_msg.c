@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.102 2006/02/06 16:42:14 alan Exp $ */
+/* $Id: cl_msg.c,v 1.103 2006/04/21 07:11:42 andrew Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1016,8 +1016,8 @@ cl_get_value(const struct ha_msg * msg, const char * name,
 	
 	int	j;
 	if (!msg || !msg->names || !msg->values) {
-		cl_log(LOG_ERR, "%s: wrong arugment",
-		       __FUNCTION__);
+		cl_log(LOG_ERR, "%s: wrong arugment (%s)",
+		       __FUNCTION__, name);
 		return(NULL);
 	}
 
@@ -2456,6 +2456,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.103  2006/04/21 07:11:42  andrew
+ * Give some indication of what we were looking for at the time
+ *
  * Revision 1.102  2006/02/06 16:42:14  alan
  * Put in a warning about selecting traditional_compression...
  *
