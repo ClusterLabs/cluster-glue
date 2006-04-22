@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.220 2006/04/03 15:49:27 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.221 2006/04/22 10:31:51 andrew Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2695,15 +2695,38 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	return HA_OK;
 }
+
+static char *
+lrm_concat(const char *prefix, const char *suffix, char join) 
+{
+	int len = 2;
+	char *new_str = NULL;
+	if(prefix != NULL) {
+		len += strlen(prefix);
+	}
+		
+	if(suffix != NULL) {
+		len += strlen(suffix);
+	}
+
+	new_str = cl_malloc(sizeof(char)*len);
+	memset(new_str, 0, len);
+	sprintf(new_str, "%s%c%s", prefix?prefix:"", join, suffix?suffix:"");
+	new_str[len-1] = 0;
+	return new_str;
+}
+
 /* /////////////////////op functions//////////////////////////////////////////// */
 static void 
 record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
 {
+	char *op_hash_key = NULL;
 	lrmd_rsc_t* rsc = NULL;
 	lrmd_op_t* old_op = NULL;
 	lrmd_op_t* new_op = NULL;
 	GHashTable* client_last_op = NULL;
 	const char* op_type = NULL;
+	const char* op_interval = NULL;
 	
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
@@ -2725,11 +2748,14 @@ record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
 		
 	/* Insert the op into the hash table for the client*/
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
-	old_op = g_hash_table_lookup(client_last_op, op_type);
+	op_interval = ha_msg_value(op->msg, F_LRM_INTERVAL);
+	op_hash_key = lrm_concat(op_type, op_interval, '_');
+	
+	old_op = g_hash_table_lookup(client_last_op, op_hash_key);
 	new_op = lrmd_op_copy(op);
 	if (NULL != old_op) {
 		g_hash_table_replace(client_last_op
-		, 	cl_strdup(op_type)
+		, 	op_hash_key
 		,	(gpointer)new_op);
 		/* Don't let the timers go away */
 		lrmd_op_destroy(old_op);
@@ -2738,7 +2764,7 @@ record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
 		new_op->repeat_timeout_tag = (guint)-1;
 		new_op->exec_pid = -1;
 		g_hash_table_insert(client_last_op
-		, 	cl_strdup(op_type)
+		, 	op_hash_key
 		,	(gpointer)new_op);
 	}
 
@@ -3776,6 +3802,10 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.221  2006/04/22 10:31:51  andrew
+ * There can (and will) be multiple monitor operations, the LRM needs to track
+ *   the last occurance of *all* of them
+ *
  * Revision 1.220  2006/04/03 15:49:27  sunjd
  * sorry for typo
  *
