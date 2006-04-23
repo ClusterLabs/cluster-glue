@@ -26,6 +26,7 @@ includedir=$(base_includedir)/clplumbing
 include_HEADERS	=	\
 	Gmain_timeout.h	\
 	GSource.h	\
+	GSource_internal.h	\
 	apphb_cs.h	\
 	base64.h	\
 	cl_log.h	\
