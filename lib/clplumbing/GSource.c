@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.82 2006/04/07 15:48:12 andrew Exp $ */
+/* $Id: GSource.c,v 1.83 2006/04/23 20:39:01 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -29,47 +29,14 @@
 #include <clplumbing/cl_log.h>
 #include <clplumbing/cl_malloc.h>
 #include <clplumbing/cl_signal.h>
-#include <clplumbing/GSource.h>
+#include <clplumbing/GSource_internal.h>
 #include <clplumbing/proctrack.h>
 #include <clplumbing/Gmain_timeout.h>
 #include <clplumbing/timers.h>
 
-#define	MAG_GFDSOURCE	0xfeed0001U
-#define	MAG_GCHSOURCE	0xfeed0002U
-#define	MAG_GWCSOURCE	0xfeed0003U
-#define	MAG_GSIGSOURCE	0xfeed0004U
-#define	MAG_GTRIGSOURCE	0xfeed0005U
-#define	MAG_GTIMEOUTSRC	0xfeed0006U
-
-#define	IS_FDSOURCE(p)	(p && (p)->magno == MAG_GFDSOURCE)
-#define	IS_CHSOURCE(p)	(p && (p)->magno == MAG_GCHSOURCE)
-#define	IS_WCSOURCE(p)	(p && (p)->magno == MAG_GWCSOURCE)
-#define	IS_SIGSOURCE(p)	(p && (p)->magno == MAG_GSIGSOURCE)
-#define	IS_TRIGSOURCE(p) (p && (p)->magno == MAG_GTRIGSOURCE)
-#define	IS_TIMEOUTSRC(p) (p && (p)->magno == MAG_GTIMEOUTSRC)
-
-#define IS_ONEOFOURS(p)	(IS_CHSOURCE(p)|IS_FDSOURCE(p)|IS_WCSOURCE(p)||	\
-			IS_SIGSOURCE(p)|IS_TRIGSOURCE(p)||IS_TIMEOUTSRC(p))
-
-#ifndef _NSIG
-# define _NSIG 2*NSIG
-#endif
-
 #define		DEFAULT_MAXDISPATCH	0
 #define		DEFAULT_MAXDELAY	0
 #define		OTHER_MAXDELAY		100
-
-#define	COMMON_STRUCTSTART						\
-GSource		source;		/* Common glib struct -  must be 1st */	\
-unsigned	magno;		/* Magic number */			\
-long		maxdispatchms;	/* Time limit for dispatch function */	\
-long		maxdispatchdelayms; /* Max delay before processing */	\
-char		detecttime[sizeof(longclock_t)];			\
-				/* Time last input detected */		\
-void*		udata;		/* User-defined data */			\
-guint		gsourceid;	/* Source id of this source */		\
-const char *	description;	/* Description of this source */	\
-GDestroyNotify	dnotify
 
 /*
  * On architectures with alignment constraints, our casting between
@@ -93,50 +60,6 @@ lc_fetch(char *ptr) {
 	memcpy(&_ltt, (ptr), sizeof(longclock_t));
 	return _ltt;
 }
-
-struct GFDSource_s {
-	COMMON_STRUCTSTART;
-	gboolean	(*dispatch)(int fd, gpointer user_data);
-	GPollFD		gpfd;
-};
-
-
-typedef gboolean 	(*GCHdispatch)(IPC_Channel* ch, gpointer user_data);
-
-struct GCHSource_s {
-	COMMON_STRUCTSTART;
-	IPC_Channel*	ch;
-	gboolean	fd_fdx;
-	GPollFD		infd;
-	GPollFD		outfd;
-	gboolean	dontread;	/* TRUE when we don't want to read
-					 * more input for a while - we're
-					 * flow controlling the writer off
-					 */
-	gboolean 	(*dispatch)(IPC_Channel* ch, gpointer user_data);
-};
-
-struct GWCSource_s {
-	COMMON_STRUCTSTART;
-	GPollFD			gpfd;
-	IPC_WaitConnection*	wch;
-	IPC_Auth*		auth_info;
-	gboolean (*dispatch)(IPC_Channel* accept_ch, gpointer udata);
-};
-
-struct GSIGSource_s {
-	COMMON_STRUCTSTART;
-	clock_t		sh_detecttime;
-	int		signal;
-	gboolean	signal_triggered;
-	gboolean 	(*dispatch)(int signal, gpointer user_data);
-};
-
-struct GTRIGSource_s {
-	COMMON_STRUCTSTART;
-	gboolean	manual_trigger;
-	gboolean 	(*dispatch)(gpointer user_data);
-};
 
 #define	ERR_EVENTS	(G_IO_ERR|G_IO_NVAL)
 #define	INPUT_EVENTS	(G_IO_IN|G_IO_PRI|G_IO_HUP)
@@ -199,6 +122,10 @@ struct GTRIGSource_s {
 	}								\
 }									\
 
+
+#ifndef _NSIG
+# define _NSIG 2*NSIG
+#endif
 
 static gboolean G_fd_prepare(GSource* source,
 			     gint* timeout);
@@ -397,21 +324,21 @@ G_fd_destroy(GSource* source)
 /************************************************************
  *		Functions for IPC_Channels
  ***********************************************************/
-static gboolean G_CH_prepare(GSource* source,
+gboolean G_CH_prepare_int(GSource* source,
 			     gint* timeout);
-static gboolean G_CH_check(GSource* source);
+gboolean G_CH_check_int(GSource* source);
 
-static gboolean G_CH_dispatch(GSource* source,
+gboolean G_CH_dispatch_int(GSource* source,
 			      GSourceFunc callback,
 			      gpointer user_data);
-static void G_CH_destroy(GSource* source);
+void G_CH_destroy_int(GSource* source);
 
 
 static GSourceFuncs G_CH_SourceFuncs = {
-	G_CH_prepare,
-	G_CH_check,
-	G_CH_dispatch,
-	G_CH_destroy,
+	G_CH_prepare_int,
+	G_CH_check_int,
+	G_CH_dispatch_int,
+	G_CH_destroy_int,
 };
 
 
@@ -427,20 +354,13 @@ set_IPC_Channel_dnotify(GCHSource* chp,
  *	Add an IPC_channel to the gmainloop world...
  */
 GCHSource*
-G_main_add_IPC_Channel(int priority, IPC_Channel* ch
-		       ,	gboolean can_recurse
-		       ,	gboolean (*dispatch)(IPC_Channel* source_data,
-						     gpointer        user_data)
-		       ,	gpointer userdata
-		       ,	GDestroyNotify notify)
+G_main_IPC_Channel_constructor(GSource* source, IPC_Channel* ch
+	       ,	gpointer userdata
+	       ,	GDestroyNotify notify)
 {
 	int		rfd, wfd;
 	
 	GCHSource* chp;
-	
-	GSource * source = g_source_new(&G_CH_SourceFuncs, 
-					sizeof(GCHSource));
-	
 	chp = (GCHSource*)source;
 	
 	chp->magno = MAG_GCHSOURCE;
@@ -448,7 +368,6 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 	chp->maxdispatchms = DEFAULT_MAXDISPATCH;
 	lc_store((chp->detecttime), zero_longclock);
 	chp->ch = ch;
-	chp->dispatch = dispatch;
 	chp->udata=userdata;
 	chp->dnotify = notify;
 	chp->dontread = FALSE;
@@ -466,9 +385,30 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 		chp->outfd.events  = DEF_EVENTS;
 		g_source_add_poll(source, &chp->outfd);
 	}
+	chp->dispatch = NULL;
+	chp->description = "IPC channel(base)";
+	chp->gsourceid = 0;
+	return chp;
+}
 
-	g_source_set_priority(source, priority);
+GCHSource*
+G_main_add_IPC_Channel(int priority, IPC_Channel* ch
+		       ,	gboolean can_recurse
+		       ,	gboolean (*dispatch)(IPC_Channel* source_data,
+						     gpointer        user_data)
+		       ,	gpointer userdata
+		       ,	GDestroyNotify notify)
+{
+	GCHSource* chp;
 	
+	GSource * source = g_source_new(&G_CH_SourceFuncs, 
+					sizeof(GCHSource));
+	G_main_IPC_Channel_constructor(source,ch,userdata,notify);
+	
+	chp = (GCHSource*)source;
+	chp->dispatch = dispatch;
+	
+	g_source_set_priority(source, priority);
 	g_source_set_can_recurse(source, can_recurse);
 	
 	chp->gsourceid = g_source_attach(source, NULL);
@@ -539,8 +479,8 @@ G_main_del_IPC_Channel(GCHSource* chp)
  *
  *	Note that we don't modify 'timeout' either.
  */
-static gboolean
-G_CH_prepare(GSource* source,
+gboolean
+G_CH_prepare_int(GSource* source,
 	     gint* timeout)
 {
 	GCHSource* chp = (GCHSource*)source;
@@ -585,8 +525,8 @@ G_CH_prepare(GSource* source,
  *	Did we notice any I/O events?
  */
 
-static gboolean
-G_CH_check(GSource* source)
+gboolean
+G_CH_check_int(GSource* source)
 {
 
 	GCHSource* chp = (GCHSource*)source;
@@ -616,13 +556,14 @@ G_CH_check(GSource* source)
 /*
  *	Some kind of event occurred - notify the user.
  */
-static gboolean
-G_CH_dispatch(GSource * source,
+gboolean
+G_CH_dispatch_int(GSource * source,
 	      GSourceFunc callback,
 	      gpointer user_data)
 {
 	GCHSource* chp = (GCHSource*)source;
 	longclock_t	dispstart;
+	longclock_t	resume_start = zero_longclock;
 
 	g_assert(IS_CHSOURCE(chp));
 	CHECK_DISPATCH_DELAY(chp);
@@ -644,39 +585,26 @@ G_CH_dispatch(GSource * source,
 	}else if (chp->outfd.revents & OUTPUT_EVENTS) {
 		chp->outfd.events &= ~OUTPUT_EVENTS;
 	}
-#if 0
-	/* If we got a HUP then mark channel as disconnected */
-	if ((apend->infd.revents|chp->outfd.revents) & G_IO_HUP) {
-		/* CHEAT!! */
-		chp->ch->ch_status = IPC_DISCONNECT;
-	}else{
-		chp->ch->ops->resume_io(chp->ch);
-	}
-#else
-	{
-		longclock_t	resume_start = zero_longclock;
 		
-		if (ANYDEBUG) {
-			resume_start = time_longclock();
-		}
+	if (ANYDEBUG) {
+		resume_start = time_longclock();
+	}
 
-		chp->ch->ops->resume_io(chp->ch);
+	chp->ch->ops->resume_io(chp->ch);
 
-		if (ANYDEBUG) {
-			longclock_t resume_end = time_longclock();
-			unsigned long	ms;
-			ms = longclockto_ms(sub_longclock(resume_end
-			,	resume_start));
-			if (ms > 10) {
-				cl_log(LOG_WARNING
-				,	"%s: resume_io() for %s took %lu ms"
-				,	__FUNCTION__
-				,	chp->description, ms);
-			}
+	if (ANYDEBUG) {
+		longclock_t resume_end = time_longclock();
+		unsigned long	ms;
+		ms = longclockto_ms(sub_longclock(resume_end
+		,	resume_start));
+		if (ms > 10) {
+			cl_log(LOG_WARNING
+			,	"%s: resume_io() for %s took %lu ms"
+			,	__FUNCTION__
+			,	chp->description, ms);
 		}
 	}
 
-#endif
 
 	if(chp->dispatch && chp->ch->ops->is_message_pending(chp->ch)) {
 		if(!(chp->dispatch(chp->ch, chp->udata))){
@@ -700,8 +628,8 @@ G_CH_dispatch(GSource * source,
 /*
  *	Free up our data, and notify the user process...
  */
-static void
-G_CH_destroy(GSource* source)
+void
+G_CH_destroy_int(GSource* source)
 {
 	GCHSource* chp = (GCHSource*)source;
 	
