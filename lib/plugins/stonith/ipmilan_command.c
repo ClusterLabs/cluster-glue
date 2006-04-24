@@ -1,4 +1,4 @@
-/* $Id: ipmilan_command.c,v 1.11 2005/11/02 03:30:53 horms Exp $ */
+/* $Id: ipmilan_command.c,v 1.12 2006/04/24 10:10:04 lars Exp $ */
 /*
  * This program is largely based on the ipmicmd.c program that's part of OpenIPMI package.
  * 
@@ -97,18 +97,15 @@ dump_msg_data(ipmi_msg_t *msg, ipmi_addr_t *addr, char *type)
 	if (addr->addr_type == IPMI_SYSTEM_INTERFACE_ADDR_TYPE) {
 		smi_addr = (struct ipmi_system_interface_addr *) addr;
 
-	} else if ((addr->addr_type == IPMI_IPMB_ADDR_TYPE) 
-			|| (addr->addr_type == IPMI_IPMB_BROADCAST_ADDR_TYPE)) {
-		ipmb_addr = (struct ipmi_ipmb_addr *) addr;
-	}
-
-	if (smi_addr) {
 		fprintf(stderr, "%2.2x %2.2x %2.2x %2.2x ", 
 			addr->channel,
 			msg->netfn,
 			smi_addr->lun,
 			msg->cmd);
-	} else {
+	} else if ((addr->addr_type == IPMI_IPMB_ADDR_TYPE) 
+			|| (addr->addr_type == IPMI_IPMB_BROADCAST_ADDR_TYPE)) {
+		ipmb_addr = (struct ipmi_ipmb_addr *) addr;
+		
 		fprintf(stderr, "%2.2x %2.2x %2.2x %2.2x ", 
 			addr->channel,
 			msg->netfn,
