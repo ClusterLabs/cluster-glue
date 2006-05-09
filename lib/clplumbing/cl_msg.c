@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.103 2006/04/21 07:11:42 andrew Exp $ */
+/* $Id: cl_msg.c,v 1.104 2006/05/09 06:34:05 andrew Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -1441,12 +1441,35 @@ cl_msg_get_list_int(struct ha_msg* msg, const char* name,
 	return HA_OK;
 }
 
+int 
+cl_msg_replace_value(struct ha_msg* msg, const void *old_value,
+		     const void* value, size_t vlen, int type)
+{
+	int j;
+	
+	if (msg == NULL || old_value == NULL) {
+		cl_log(LOG_ERR, "cl_msg_replace: invalid argument");
+		return HA_FAIL;
+	}
+	
+	for (j = 0; j < msg->nfields; ++j){
+		if (old_value == msg->values[j]){
+			break;			
+		}
+	}
+	if (j == msg->nfields){		
+		cl_log(LOG_ERR, "cl_msg_replace: field %p not found", old_value);
+		return HA_FAIL;
+	}
+	return cl_msg_replace(msg, j, value, vlen, type);
+}
+
 /*this function is for internal use only*/
 int 
 cl_msg_replace(struct ha_msg* msg, int index,
-		const char* value, size_t vlen, int type)
+	       const void* value, size_t vlen, int type)
 {
-	char *	newv ;
+	void *	newv ;
 	int	newlen = vlen;
 	int	oldtype;
 	
@@ -2456,6 +2479,11 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.104  2006/05/09 06:34:05  andrew
+ * Support a generic replace operation on HA_Message objects
+ * Use it to preserve the internal XML ordering (which makes DTD validation
+ *   more liekly to be possible)
+ *
  * Revision 1.103  2006/04/21 07:11:42  andrew
  * Give some indication of what we were looking for at the time
  *
