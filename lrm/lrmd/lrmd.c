@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.221 2006/04/22 10:31:51 andrew Exp $ */
+/* $Id: lrmd.c,v 1.222 2006/05/15 09:06:21 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2010,7 +2010,9 @@ on_msg_get_rsc_providers(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	else {
 		if (0 <= RAExec->get_provider_list(rtype, &providers)) {
-			cl_msg_add_list(ret, F_LRM_RPROVIDERS, providers);
+			if (providers != NULL) {
+				cl_msg_add_list(ret, F_LRM_RPROVIDERS, providers);
+			}
 			while (NULL != (provider = g_list_first(providers))) {
 				providers = g_list_remove_link(providers, provider);
 				g_free(provider->data);
@@ -3802,6 +3804,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.222  2006/05/15 09:06:21  sunjd
+ * prevent null object to be added
+ *
  * Revision 1.221  2006/04/22 10:31:51  andrew
  * There can (and will) be multiple monitor operations, the LRM needs to track
  *   the last occurance of *all* of them
