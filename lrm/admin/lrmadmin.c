@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.35 2005/06/22 06:53:41 sunjd Exp $ */
+/* $Id: lrmadmin.c,v 1.36 2006/05/15 03:35:43 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -116,8 +116,8 @@ const char * simple_help_screen =
 "         {-I|--information} <rsc_id>\n"
 "         {-C|--raclass_supported}\n"
 "         {-T|--ratype_supported} <raclss>\n"
-"         {-M|--metadata} <raclss> <ratype> <provider|NULL>\n"
-"         {-P|--provider} <raclss> <ratype>\n"
+"         {-M|--metadata} <raclass> <ratype> <provider|NULL>\n"
+"         {-P|--provider} <raclass> <ratype>\n"
 "         {-h|--help}\n";
 
 #define OPTION_OBSCURE_CHECK \
@@ -629,7 +629,7 @@ ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 
 	metadata = lrmd->lrm_ops->get_rsc_type_metadata(lrmd, class, type, provider);
 	if (NULL!=metadata) {
-		printf ("metadata of %s(%s) is: %s\n",type,class,metadata);
+		printf ("metadata of %s(%s) is:\n %s\n",type,class,metadata);
 		g_free (metadata);
 	}
 	return 0;
@@ -939,6 +939,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.36  2006/05/15 03:35:43  sunjd
+ * minor changes: typoes and formats
+ *
  * Revision 1.35  2005/06/22 06:53:41  sunjd
  * handling for no parameter
  *
