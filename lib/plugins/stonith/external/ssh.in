@@ -127,17 +127,17 @@ getinfo-devurl)
 	;;
 getinfo-xml)
 	cat << SSHXML
-"<parameters>"
-"<parameter name=\"hostlist\" unique=\"1\">"
-"<content type=\"string\" />"
-"<shortdesc lang=\"en\">"
-"Hostlist"
-"</shortdesc>"
-"<longdesc lang=\"en\">"
-"The list of hosts that the STONITH device controls"
-"</longdesc>"
-"</parameter>"
-"</parameters>"
+<parameters>
+<parameter name="hostlist" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Hostlist
+</shortdesc>
+<longdesc lang="en">
+The list of hosts that the STONITH device controls
+</longdesc>
+</parameter>
+</parameters>
 SSHXML
 	exit 0
 	;;
