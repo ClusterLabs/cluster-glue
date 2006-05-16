@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.36 2006/05/15 03:35:43 sunjd Exp $ */
+/* $Id: lrmadmin.c,v 1.37 2006/05/16 09:40:37 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -115,7 +115,7 @@ const char * simple_help_screen =
 "         {-L|--listall}\n"
 "         {-I|--information} <rsc_id>\n"
 "         {-C|--raclass_supported}\n"
-"         {-T|--ratype_supported} <raclss>\n"
+"         {-T|--ratype_supported} <raclass>\n"
 "         {-M|--metadata} <raclass> <ratype> <provider|NULL>\n"
 "         {-P|--provider} <raclass> <ratype>\n"
 "         {-h|--help}\n";
@@ -629,7 +629,7 @@ ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 
 	metadata = lrmd->lrm_ops->get_rsc_type_metadata(lrmd, class, type, provider);
 	if (NULL!=metadata) {
-		printf ("metadata of %s(%s) is:\n %s\n",type,class,metadata);
+		printf ("%s\n", metadata);
 		g_free (metadata);
 	}
 	return 0;
@@ -939,6 +939,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.37  2006/05/16 09:40:37  sunjd
+ * fix a minor typo; remove the hint for metadata output
+ *
  * Revision 1.36  2006/05/15 03:35:43  sunjd
  * minor changes: typoes and formats
  *
