@@ -1,4 +1,4 @@
-/* $Id: drac3.c,v 1.15 2005/04/20 20:18:16 blaschke Exp $ */
+/* $Id: drac3.c,v 1.16 2006/05/16 09:01:51 sunjd Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *
@@ -119,7 +119,7 @@ static const char *NOTpluginID = "Dell DRACIII device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_HOST_PARM \
-	XML_PARAMETER_BEGIN(ST_HOST, "string") \
+	XML_PARAMETER_BEGIN(ST_HOST, "string", "1") \
 	  XML_HOST_SHORTDESC \
 	  XML_HOST_LONGDESC \
 	XML_PARAMETER_END

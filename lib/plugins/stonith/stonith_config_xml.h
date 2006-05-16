@@ -35,20 +35,20 @@
 #define XML_PARAMETERS_END "</parameters>"
 
 /* <parameter name="ipaddr" unique="1">?<content type="string" /></parameter> */
-#define XML_PARAMETER_BEGIN(name,type) \
-	"<parameter name=\"" name "\" unique=\"1\">" \
-	"<content type=\"" type "\" />"
-#define XML_PARAMETER_END "</parameter>"
+#define XML_PARAMETER_BEGIN(name,type,req) \
+	"<parameter name=\"" name "\" unique=\"1\" required=\"" req "\">" \
+	"<content type=\"" type "\" />\n"
+#define XML_PARAMETER_END "</parameter>\n"
 
 /* <shortdesc lang="en">?</shortdesc> */
 #define XML_PARM_SHORTDESC_BEGIN(lang) \
-	"<shortdesc lang=\"" lang "\">"
-#define XML_PARM_SHORTDESC_END "</shortdesc>"
+	"<shortdesc lang=\"" lang "\">\n"
+#define XML_PARM_SHORTDESC_END "</shortdesc>\n"
 
 /* <longdesc lang="en">?</longdesc> */
 #define XML_PARM_LONGDESC_BEGIN(lang) \
-	"<longdesc lang=\"" lang "\">"
-#define XML_PARM_LONGDESC_END "</longdesc>"
+	"<longdesc lang=\"" lang "\">\n"
+#define XML_PARM_LONGDESC_END "</longdesc>\n"
 
 /*
  * The short and long descriptions for the few standardized parameter names;
@@ -120,37 +120,37 @@
  * Complete parameter descriptions for the few standardized parameter names
  */
 #define XML_HOSTLIST_PARM \
-	XML_PARAMETER_BEGIN(ST_HOSTLIST, "string") \
+	XML_PARAMETER_BEGIN(ST_HOSTLIST, "string", "1") \
 	  XML_HOSTLIST_SHORTDESC \
 	  XML_HOSTLIST_LONGDESC \
 	XML_PARAMETER_END
 
 #define XML_IPADDR_PARM \
-	XML_PARAMETER_BEGIN(ST_IPADDR, "string") \
+	XML_PARAMETER_BEGIN(ST_IPADDR, "string", "1") \
 	  XML_IPADDR_SHORTDESC \
 	  XML_IPADDR_LONGDESC \
 	XML_PARAMETER_END
 
 #define XML_LOGIN_PARM \
-	XML_PARAMETER_BEGIN(ST_LOGIN, "string") \
+	XML_PARAMETER_BEGIN(ST_LOGIN, "string", "1") \
 	  XML_LOGIN_SHORTDESC \
 	  XML_LOGIN_LONGDESC \
 	XML_PARAMETER_END
 
 #define XML_PASSWD_PARM \
-	XML_PARAMETER_BEGIN(ST_PASSWD, "string") \
+	XML_PARAMETER_BEGIN(ST_PASSWD, "string", "1") \
 	  XML_PASSWD_SHORTDESC \
 	  XML_PASSWD_LONGDESC \
 	XML_PARAMETER_END
 
 #define XML_COMMUNITY_PARM \
-	XML_PARAMETER_BEGIN(ST_COMMUNITY, "string") \
+	XML_PARAMETER_BEGIN(ST_COMMUNITY, "string", "1") \
 	  XML_COMMUNITY_SHORTDESC \
 	  XML_COMMUNITY_LONGDESC \
 	XML_PARAMETER_END
 
 #define XML_TTYDEV_PARM \
-	XML_PARAMETER_BEGIN(ST_TTYDEV, "string") \
+	XML_PARAMETER_BEGIN(ST_TTYDEV, "string", "1") \
 	  XML_TTYDEV_SHORTDESC \
 	  XML_TTYDEV_LONGDESC \
 	XML_PARAMETER_END

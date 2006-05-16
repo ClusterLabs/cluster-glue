@@ -1,4 +1,4 @@
-/* $Id: rcd_serial.c,v 1.29 2005/04/22 12:23:05 blaschke Exp $ */
+/* $Id: rcd_serial.c,v 1.30 2006/05/16 09:01:51 sunjd Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *
@@ -267,7 +267,7 @@ static const char * NOTrcd_serialID = "RCD_Serial device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_DTRRTS_PARM \
-	XML_PARAMETER_BEGIN(ST_DTRRTS, "string") \
+	XML_PARAMETER_BEGIN(ST_DTRRTS, "string", "1") \
 	  XML_DTRRTS_SHORTDESC \
 	  XML_DTRRTS_LONGDESC \
 	XML_PARAMETER_END
@@ -283,7 +283,7 @@ static const char * NOTrcd_serialID = "RCD_Serial device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_MSDURATION_PARM \
-	XML_PARAMETER_BEGIN(ST_MSDURATION, "string") \
+	XML_PARAMETER_BEGIN(ST_MSDURATION, "string", "1") \
 	  XML_MSDURATION_SHORTDESC \
 	  XML_MSDURATION_LONGDESC \
 	XML_PARAMETER_END
