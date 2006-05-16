@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.24 2005/04/22 12:23:05 blaschke Exp $ */
+/* $Id: rps10.c,v 1.25 2006/05/16 09:01:51 sunjd Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -195,7 +195,7 @@ static const char * NOTwtiid = "OBJECT DESTROYED: (WTI RPS-10)";
 	XML_PARM_LONGDESC_END
 
 #define XML_RPS10_PARM \
-	XML_PARAMETER_BEGIN(ST_RPS10, "string") \
+	XML_PARAMETER_BEGIN(ST_RPS10, "string", "1") \
 	  XML_RPS10_SHORTDESC \
 	  XML_RPS10_LONGDESC \
 	XML_PARAMETER_END

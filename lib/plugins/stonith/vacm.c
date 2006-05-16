@@ -1,5 +1,5 @@
 
-/* $Id: vacm.c,v 1.15 2005/07/29 08:15:48 sunjd Exp $ */
+/* $Id: vacm.c,v 1.16 2006/05/16 09:01:51 sunjd Exp $ */
 /******************************************************************************
 *
 *    Copyright 2000 Sistina Software, Inc.
@@ -139,7 +139,7 @@ static const char * NOTpluginid = "VACM device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_NEXXUS_PARM \
-	XML_PARAMETER_BEGIN(ST_NEXXUS, "string") \
+	XML_PARAMETER_BEGIN(ST_NEXXUS, "string", "1") \
 	  XML_NEXXUS_SHORTDESC \
 	  XML_NEXXUS_LONGDESC \
 	XML_PARAMETER_END

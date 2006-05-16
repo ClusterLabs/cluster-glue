@@ -1,4 +1,4 @@
-/* $Id: ipmilan.c,v 1.16 2005/04/20 20:18:16 blaschke Exp $ */
+/* $Id: ipmilan.c,v 1.17 2006/05/16 09:01:51 sunjd Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
@@ -134,7 +134,7 @@ static const char * NOTpluginid = "IPMI-LAN device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_HOSTNAME_PARM \
-	XML_PARAMETER_BEGIN(ST_HOSTNAME, "string") \
+	XML_PARAMETER_BEGIN(ST_HOSTNAME, "string", "1") \
 	  XML_HOSTNAME_SHORTDESC \
 	  XML_HOSTNAME_LONGDESC \
 	XML_PARAMETER_END
@@ -150,7 +150,7 @@ static const char * NOTpluginid = "IPMI-LAN device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_PORT_PARM \
-	XML_PARAMETER_BEGIN(ST_PORT, "string") \
+	XML_PARAMETER_BEGIN(ST_PORT, "string", "1") \
 	  XML_PORT_SHORTDESC \
 	  XML_PORT_LONGDESC \
 	XML_PARAMETER_END
@@ -166,7 +166,7 @@ static const char * NOTpluginid = "IPMI-LAN device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_AUTH_PARM \
-	XML_PARAMETER_BEGIN(ST_AUTH, "string") \
+	XML_PARAMETER_BEGIN(ST_AUTH, "string", "1") \
 	  XML_AUTH_SHORTDESC \
 	  XML_AUTH_LONGDESC \
 	XML_PARAMETER_END
@@ -182,7 +182,7 @@ static const char * NOTpluginid = "IPMI-LAN device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_PRIV_PARM \
-	XML_PARAMETER_BEGIN(ST_PRIV, "string") \
+	XML_PARAMETER_BEGIN(ST_PRIV, "string", "1") \
 	  XML_PRIV_SHORTDESC \
 	  XML_PRIV_LONGDESC \
 	XML_PARAMETER_END
