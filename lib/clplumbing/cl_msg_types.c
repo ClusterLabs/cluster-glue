@@ -1704,8 +1704,8 @@ struct fieldtypefuncs_s fieldtypefuncs[NUM_MSG_TYPES]=
 	   string2list, netstring2list, NULL, NULL},
 	  
 	  {binary_memfree, binary_dup, compress_display, add_compress_field,
-	   binary_stringlen,binary_netstringlen, NULL ,fields2netstring, 
-	   NULL , netstring2binary, NULL, compress2uncompress}, /*FT_COMPRESS*/
+	   binary_stringlen,binary_netstringlen, binary2string ,fields2netstring, 
+	   string2binary , netstring2binary, NULL, compress2uncompress}, /*FT_COMPRESS*/
 	  
 	  {struct_memfree, struct_dup, uncompress_display, add_uncompress_field, 
 	   struct_stringlen, struct_netstringlen, NULL , fields2netstring, 
