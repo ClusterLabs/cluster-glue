@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.104 2006/05/09 06:34:05 andrew Exp $ */
+/* $Id: cl_msg.c,v 1.105 2006/05/17 23:22:33 gshi Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -2208,7 +2208,7 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 		if (!tostring ||
 		    (truelen = tostring(bp, maxp, m->values[j], m->vlens[j], depth))
 		    < 0){
-			cl_log(LOG_ERR, "tostring failed");
+			cl_log(LOG_ERR, "tostring failed for field %d", j);
 			return HA_FAIL;			
 		}
 		
@@ -2479,6 +2479,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.105  2006/05/17 23:22:33  gshi
+ * a compressed field can still be coded as a string, e.g in serial
+ *
  * Revision 1.104  2006/05/09 06:34:05  andrew
  * Support a generic replace operation on HA_Message objects
  * Use it to preserve the internal XML ordering (which makes DTD validation
