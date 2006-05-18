@@ -1,4 +1,4 @@
-/* $Id: rps10.c,v 1.25 2006/05/16 09:01:51 sunjd Exp $ */
+/* $Id: rps10.c,v 1.26 2006/05/18 02:50:19 sunjd Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *
@@ -35,7 +35,7 @@
 #define PIL_PLUGIN_S            "rps10"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
-#define	ST_RPS10		"<serial_device> <node> <outlet> [ <node> <outlet> ]..."
+#define	ST_RPS10		"serial_to_targets"
 #define MAX_PRSID		256
 #include <pils/plugin.h>
 
@@ -186,12 +186,12 @@ static const char * NOTwtiid = "OBJECT DESTROYED: (WTI RPS-10)";
 
 #define XML_RPS10_SHORTDESC \
 	XML_PARM_SHORTDESC_BEGIN("en") \
-	ST_RPS10 \
+	"Value in the format \"serial_device remotenode outlet [remotenode outlet]...\"" \
 	XML_PARM_SHORTDESC_END
 
 #define XML_RPS10_LONGDESC \
 	XML_PARM_LONGDESC_BEGIN("en") \
-	"The RPS-10 STONITH device configuration information in the format \"<serial_device> <remotenode> <outlet> [<remotenode> <outlet>]...\"" \
+	"The RPS-10 STONITH device configuration information in the format \"serial_device remotenode outlet [remotenode outlet]...\"" \
 	XML_PARM_LONGDESC_END
 
 #define XML_RPS10_PARM \
