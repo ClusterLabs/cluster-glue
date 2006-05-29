@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.25 2005/06/02 01:07:33 zhenh Exp $ */
+/* $Id: lrm_msg.c,v 1.26 2006/05/29 11:55:53 andrew Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -59,31 +59,31 @@ copy_str_table(GHashTable* src_table)
 static void
 merge_pair(gpointer key, gpointer value, gpointer user_data)
 {
-	gpointer oldvalue;
-	gpointer oldkey;
-	GHashTable* ret = (GHashTable*)user_data;
+	GHashTable *merged = (GHashTable*)user_data;
 
-	if (g_hash_table_lookup_extended(ret, key, &oldkey, &oldvalue)){
-		g_hash_table_remove(ret, oldkey);
-		g_free(oldvalue);
-		g_free(oldkey);
-	}
-	g_hash_table_insert(ret, g_strdup(key), g_strdup(value));
+	if (g_hash_table_lookup(merged, key)) {
+		return;
+
+	} else if(strncmp(key, "CRM_meta_" /*CRM_META*/, 9) == 0) {
+		/* Never repopulate CRM meta attributes */
+		return;
+	}	
+	g_hash_table_insert(merged, g_strdup(key), g_strdup(value));
 }
 
 GHashTable*
 merge_str_tables(GHashTable* old, GHashTable* new)
 {
-	GHashTable* ret = NULL;
+	GHashTable* merged = NULL;
 	if ( NULL == old ) {
 		return copy_str_table(new);
 	}
 	if ( NULL == new ) {
 		return copy_str_table(old);
 	}
-	ret = copy_str_table(old);
-	g_hash_table_foreach(new, merge_pair, ret);
-	return ret;
+	merged = copy_str_table(new);
+	g_hash_table_foreach(old, merge_pair, merged);
+	return merged;
 }
 
 static gboolean
@@ -217,6 +217,11 @@ create_lrm_ret(int ret, int fields)
 
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.26  2006/05/29 11:55:53  andrew
+ * Fix for OSDL #1273
+ *   This patch reverses the copy order for better performance and never
+ *   (re)populates the hashtable with attributes starting with "CRM_meta_"
+ *
  * Revision 1.25  2005/06/02 01:07:33  zhenh
  * 1. improve some names of internal functions.
  * 2. remove the useless "unregister" message.
