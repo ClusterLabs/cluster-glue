@@ -31,7 +31,9 @@
  *	List of functions provided by implementations of the quorum interface.
  */
 struct hb_quorum_fns {
-	int (*getquorum) (int, int);
+	int (*getquorum) (const char* cluster
+	,		int member_count, int member_quorum_votes
+	,		int total_node_count, int total_quorum_votes);
 };
 
 
