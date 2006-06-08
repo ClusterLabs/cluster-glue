@@ -37,6 +37,9 @@ REBOOT_COMMAND="echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/nu
 # POWEROFF_COMMAND="echo 'sleep 2; /sbin/poweroff -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
 POWEROFF_COMMAND="echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
 
+# Rewrite the hostlist to accept "," as a delimeter for hostnames too.
+hostlist=`echo $hostlist | tr ',' ' '`
+
 CheckIfDead() {
 	for j in 1 2 3
         do
