@@ -1,4 +1,4 @@
-/* $Id: cl_msg.c,v 1.105 2006/05/17 23:22:33 gshi Exp $ */
+/* $Id: cl_msg.c,v 1.106 2006/06/09 05:29:53 sunjd Exp $ */
 /*
  * Heartbeat messaging object.
  *
@@ -885,17 +885,33 @@ ha_msg_add_str_table(struct ha_msg * msg, const char * name,
 	hash_msg = str_table_to_msg(hash_table);
 	if( HA_OK != ha_msg_addstruct(msg, name, hash_msg)) {
 		ha_msg_del(hash_msg);
-		cl_log(LOG_ERR, "ha_msg_add in ha_msg_add_str_table failed");
+		cl_log(LOG_ERR
+		       , "ha_msg_addstruct in ha_msg_add_str_table failed");
 		return HA_FAIL;
 	}
 	ha_msg_del(hash_msg);
 	return HA_OK;
 }
 
+int
+ha_msg_mod_str_table(struct ha_msg * msg, const char * name,
+			GHashTable* hash_table)
+{
+	struct ha_msg* hash_msg;
+	if (NULL == msg || NULL == name || NULL == hash_table) {
+		return HA_FAIL;
+	}
 
-
-
-
+	hash_msg = str_table_to_msg(hash_table);
+	if( HA_OK != cl_msg_modstruct(msg, name, hash_msg)) {
+		ha_msg_del(hash_msg);
+		cl_log(LOG_ERR
+		       , "ha_msg_modstruct in ha_msg_mod_str_table failed");
+		return HA_FAIL;
+	}
+	ha_msg_del(hash_msg);
+	return HA_OK;
+}
 
 int
 cl_msg_list_add_string(struct ha_msg* msg, const char* name, const char* value)
@@ -2479,6 +2495,9 @@ main(int argc, char ** argv)
 #endif
 /*
  * $Log: cl_msg.c,v $
+ * Revision 1.106  2006/06/09 05:29:53  sunjd
+ * add a msg updating function for string hashtable
+ *
  * Revision 1.105  2006/05/17 23:22:33  gshi
  * a compressed field can still be coded as a string, e.g in serial
  *
