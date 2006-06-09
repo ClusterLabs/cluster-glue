@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.223 2006/06/09 05:36:55 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.224 2006/06/09 06:28:19 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3128,8 +3128,7 @@ perform_ra_op(lrmd_op_t* op)
 	op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
 	params = merge_str_tables(rsc->params,op_params);
 	free_str_table(op_params);
-	free_str_table(rsc->params);
-	ha_msg_mod_str_table(op->msg, F_LRM_PARAM, op_params);
+	ha_msg_mod_str_table(op->msg, F_LRM_PARAM, params);
 
 	op->t_perform = time_longclock();
 	t_stay_in_list = longclockto_ms(op->t_perform - op->t_addtolist);
@@ -3805,6 +3804,9 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.224  2006/06/09 06:28:19  sunjd
+ * bug1301
+ *
  * Revision 1.223  2006/06/09 05:36:55  sunjd
  * bug1301: donn't update rsc->params while update op->params
  *
