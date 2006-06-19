@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.224 2006/06/09 06:28:19 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.225 2006/06/19 05:49:42 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -308,6 +308,7 @@ static void record_op_completion(lrmd_client_t* client, lrmd_op_t* op);
 static void hash_to_str(GHashTable * , GString *);
 static void hash_to_str_foreach(gpointer key, gpointer value, gpointer userdata);
 static void warning_on_active_rsc(gpointer key, gpointer value, gpointer user_data);
+static void check_queue_duration(lrmd_op_t* op);
 
 /*
  * following functions are used to monitor the exit of ra proc
@@ -359,6 +360,8 @@ static GList* ra_class_list		= NULL;
 static gboolean shutdown_in_progress	= FALSE;
 static unsigned long apphb_interval 	= 2000; /* Millisecond */
 static gboolean reg_to_apphbd		= FALSE;
+static int MAX_CHILD_NUMBER		= 16;
+static int child_number			= 0;
 
 /*
  * Daemon functions
@@ -2524,7 +2527,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			rsc->op_list = g_list_append(rsc->op_list, op);
 
 			if (g_list_length(rsc->op_list) >= 4) {
-				lrmd_log(LOG_ERR
+				lrmd_log(LOG_WARNING
 				,	"%s: Operations list for %s is suspicously"
 				" long [%d]"
 				,	__FUNCTION__, rsc->id
@@ -3048,6 +3051,17 @@ perform_op(lrmd_rsc_t* rsc)
 			,	  op_info(op));
 			break;
 		}
+
+		if (child_number >= MAX_CHILD_NUMBER) {
+			lrmd_log(LOG_NOTICE
+				, "Because the child number reachs the maximum"
+				  " %d, the operations are postponed to execute"
+				  " behind and including this: %s "
+				, MAX_CHILD_NUMBER
+				, op_info(op));
+			break;
+		}
+
 		if ( HA_OK != perform_ra_op(op)) {
 			lrmd_log(LOG_ERR
 			,	"unable to perform_ra_op on %s"
@@ -3104,7 +3118,6 @@ perform_ra_op(lrmd_op_t* op)
 	const char* op_type = NULL;
         GHashTable* params = NULL;
         GHashTable* op_params = NULL;
-	unsigned long t_stay_in_list = 0;
 	lrmd_rsc_t* rsc = NULL;
 	ra_pipe_op_t * rapop;
 	
@@ -3129,19 +3142,8 @@ perform_ra_op(lrmd_op_t* op)
 	params = merge_str_tables(rsc->params,op_params);
 	free_str_table(op_params);
 	ha_msg_mod_str_table(op->msg, F_LRM_PARAM, params);
+	check_queue_duration(op);
 
-	op->t_perform = time_longclock();
-	t_stay_in_list = longclockto_ms(op->t_perform - op->t_addtolist);
-	if ( t_stay_in_list > WARNINGTIME_IN_LIST) 
-	{
-		lrmd_log(LOG_ERR
-		,	"perform_ra_op: the operation %s stayed in operation "
-			"list for %lu ms (longer than %d ms)"
-		,	op_info(op), t_stay_in_list
-		,	WARNINGTIME_IN_LIST
-		);
-		dump_data_for_debug();
-	}
 	if(HA_OK != ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)){
 		timeout = 0;
 		lrmd_log(LOG_ERR,"perform_ra_op: failed to get timeout from "
@@ -3161,6 +3163,7 @@ perform_ra_op(lrmd_op_t* op)
 			return HA_FAIL;
 
 		default:	/* Parent */
+			child_number++;
 			NewTrackedProc(pid, 1, PT_LOGNONE, op, &ManagedChildTrackOps);
 
 			close(stdout_fd[1]);
@@ -3245,6 +3248,11 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
         int rc;
         int ret;
 	int op_status;
+
+	if (--child_number < 0) {
+		lrmd_log(LOG_ERR, "%s:%d: child number is less than zero: %d"
+			, __FUNCTION__, __LINE__, child_number);
+	}
 
 	CHECK_ALLOCATED(p, "ProcTrack p", );
 	op = p->privatedata;
@@ -3802,8 +3810,30 @@ hash_to_str_foreach(gpointer key, gpointer value, gpointer user_data)
 		, (char *)key, (char *)value);
 	str = g_string_append(str, buffer_tmp);
 }
+
+static void 
+check_queue_duration(lrmd_op_t* op)
+{
+	unsigned long t_stay_in_list = 0;
+	CHECK_ALLOCATED(op, "op", );
+	op->t_perform = time_longclock();
+	t_stay_in_list = longclockto_ms(op->t_perform - op->t_addtolist);
+	if ( t_stay_in_list > WARNINGTIME_IN_LIST) 
+	{
+		lrmd_log(LOG_WARNING
+		,	"perform_ra_op: the operation %s stayed in operation "
+			"list for %lu ms (longer than %d ms)"
+		,	op_info(op), t_stay_in_list
+		,	WARNINGTIME_IN_LIST
+		);
+		dump_data_for_debug();
+	}
+}
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.225  2006/06/19 05:49:42  sunjd
+ * (bug1204)set child number limit as 16; degrade some related logs
+ *
  * Revision 1.224  2006/06/09 06:28:19  sunjd
  * bug1301
  *
