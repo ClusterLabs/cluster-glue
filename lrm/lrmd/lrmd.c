@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.225 2006/06/19 05:49:42 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.226 2006/06/20 08:49:42 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3140,8 +3140,11 @@ perform_ra_op(lrmd_op_t* op)
 
 	op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
 	params = merge_str_tables(rsc->params,op_params);
-	free_str_table(op_params);
 	ha_msg_mod_str_table(op->msg, F_LRM_PARAM, params);
+	free_str_table(op_params);
+	op_params = NULL;
+	free_str_table(params);
+	params = NULL;
 	check_queue_duration(op);
 
 	if(HA_OK != ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)){
@@ -3216,6 +3219,7 @@ perform_ra_op(lrmd_op_t* op)
 			lrmd_debug2(LOG_DEBUG
 			,	"perform_ra_op:calling RA plugin to perform %s, pid: [%d]"
 			,	op_info(op), getpid());		
+			params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
 			RAExec->execra (rsc->id,
 					rsc->type,
 					rsc->provider,
@@ -3509,11 +3513,11 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 			}
 		}
 		if ( NULL != rapop->ra_stdout_gsource) {
-			/* Don't try to optimize it */
-			GFDSource * tmp;
-			tmp = rapop->ra_stdout_gsource;
+			/*
+			 * Returning FALSE will trigger ipc code to release
+			 * the GFDSource, so donn't release it here.
+			 */
 			rapop->ra_stdout_gsource = NULL;
-			G_main_del_fd(tmp);
 		}
 		rc = FALSE;
 	}
@@ -3589,15 +3593,14 @@ handle_pipe_ra_stderr(int fd, gpointer user_data)
 		}
 		if ( NULL != rapop->ra_stderr_gsource) {
 			/*
-			 * Don't try to optimize it.
 			 * G_main_del_fd will trigger
 			 *	destroy_pipe_ra_stderr
 			 *	ra_pipe_op_destroy
+			 *
+			 * Returning FALSE will trigger ipc code to release
+			 * the GFDSource, so donn't release it here.
 			 */
-			GFDSource * tmp;
-			tmp = rapop->ra_stderr_gsource;
 			rapop->ra_stderr_gsource = NULL;
-			G_main_del_fd(tmp);
 		}
 		rc = FALSE;
 	}
@@ -3831,6 +3834,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.226  2006/06/20 08:49:42  sunjd
+ * fix the 'MEMORY NOT PRISTINE' issue; fix a memory leak
+ *
  * Revision 1.225  2006/06/19 05:49:42  sunjd
  * (bug1204)set child number limit as 16; degrade some related logs
  *
