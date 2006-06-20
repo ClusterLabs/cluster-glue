@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.226 2006/06/20 08:49:42 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.227 2006/06/20 09:11:34 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2715,6 +2715,12 @@ lrm_concat(const char *prefix, const char *suffix, char join)
 	}
 
 	new_str = cl_malloc(sizeof(char)*len);
+	if (NULL == new_str) {
+		lrmd_log(LOG_ERR,"%s:%d: cl_malloc failed"
+			 , __FUNCTION__, __LINE__);
+		return NULL;
+	}
+
 	memset(new_str, 0, len);
 	sprintf(new_str, "%s%c%s", prefix?prefix:"", join, suffix?suffix:"");
 	new_str[len-1] = 0;
@@ -3834,6 +3840,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.227  2006/06/20 09:11:34  sunjd
+ * BEAM: add a check for memory allocation
+ *
  * Revision 1.226  2006/06/20 08:49:42  sunjd
  * fix the 'MEMORY NOT PRISTINE' issue; fix a memory leak
  *
