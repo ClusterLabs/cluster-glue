@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.227 2006/06/20 09:11:34 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.228 2006/06/20 10:40:03 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3771,7 +3771,13 @@ op_info(const lrmd_op_t* op)
 	lrmd_rsc_t* rsc = NULL;
 	const char * op_type;
 	GString * param_gstr;
+	GHashTable* op_params = NULL;
 
+	if (NULL == op) {
+		lrmd_log(LOG_ERR, "%s:%d: op==NULL"
+			 , __FUNCTION__, __LINE__);
+		return NULL;
+	}
 	rsc = lookup_rsc(op->rsc_id);
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
 
@@ -3784,7 +3790,10 @@ op_info(const lrmd_op_t* op)
 
 	}else{
 		param_gstr = g_string_new("");
-		hash_to_str(rsc->params, param_gstr);
+		op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
+		hash_to_str(op_params, param_gstr);
+		free_str_table(op_params);
+		op_params = NULL;
 
 		snprintf(info, sizeof(info)
 		,"operation %s[%d] on %s::%s::%s for client %d, its parameters: %s"
@@ -3840,6 +3849,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.228  2006/06/20 10:40:03  sunjd
+ * Make debug log output the real operation parameters
+ *
  * Revision 1.227  2006/06/20 09:11:34  sunjd
  * BEAM: add a check for memory allocation
  *
