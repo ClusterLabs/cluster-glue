@@ -1,4 +1,4 @@
-/* $Id: lrm_msg.c,v 1.26 2006/05/29 11:55:53 andrew Exp $ */
+/* $Id: lrm_msg.c,v 1.27 2006/06/22 10:29:05 sunjd Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -63,11 +63,8 @@ merge_pair(gpointer key, gpointer value, gpointer user_data)
 
 	if (g_hash_table_lookup(merged, key)) {
 		return;
+	} 
 
-	} else if(strncmp(key, "CRM_meta_" /*CRM_META*/, 9) == 0) {
-		/* Never repopulate CRM meta attributes */
-		return;
-	}	
 	g_hash_table_insert(merged, g_strdup(key), g_strdup(value));
 }
 
@@ -217,6 +214,9 @@ create_lrm_ret(int ret, int fields)
 
 /* 
  * $Log: lrm_msg.c,v $
+ * Revision 1.27  2006/06/22 10:29:05  sunjd
+ * remove the filter as Andrew's advice
+ *
  * Revision 1.26  2006/05/29 11:55:53  andrew
  * Fix for OSDL #1273
  *   This patch reverses the copy order for better performance and never
