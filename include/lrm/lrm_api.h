@@ -52,8 +52,8 @@
  * "rc" is the return code of an opertioan. it's value is in following enum 
  * which is defined in "raexec.h"
   * enum UNIFORM_RET_EXECRA {
- *	EXECRA_EXEC_UNKNOWN_ERROR = 152,
- *	EXECRA_NO_RA = 151,
+ *	EXECRA_EXEC_UNKNOWN_ERROR = -2,
+ *	EXECRA_NO_RA = -1,
  *	EXECRA_OK = 0,
  *	EXECRA_UNKNOWN_ERROR = 1,
  *	EXECRA_INVALID_PARAM = 2,
@@ -253,6 +253,15 @@ struct lrm_ops
 	int		(*set_lrm_callback) (ll_lrm_t*,
 			lrm_op_done_callback_t op_done_callback_func);
 
+/*
+	int		(*set_parameters)(ll_lrm_t*, const GHashTable* option);
+
+	GHashTable*     (*get_all_parameters)(ll_lrm_t*);
+
+	char * 		(*get_parameter)(ll_lrm_t *, const char * paramname);
+
+	char *		(*get_parameter_description)(ll_lrm_t*);
+*/
 
 /*
  *get_rsc_class_supported:
