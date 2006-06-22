@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.38 2006/06/22 05:56:31 sunjd Exp $ */
+/* $Id: lrmadmin.c,v 1.39 2006/06/22 10:33:22 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -92,13 +92,36 @@ typedef enum {
 } lrmadmin_cmd_t;
 
 #define nullcheck(p)       ((p) ? (p) : "<null>")
-static const char * status_msg[5] = {
+static const char * status_msg[6] = {
+	"pending",		  /* LRM_OP_PENDING	 */
 	"succeed", 		  /* LRM_OP_DONE         */
         "cancelled", 		  /* LRM_OP_CANCELLED    */
         "timeout",		  /* LRM_OP_TIMEOUT 	 */
         "not Supported",	  /* LRM_OP_NOTSUPPORTED */
-        "failed due to an error"   /* LRM_OP_ERROR	 */
+        "failed due to an error"  /* LRM_OP_ERROR	 */
 };
+
+static const char * rc_msg[] = {
+        "unknown error",
+        "no ra",
+        "ok",
+        "unknown error",
+        "invalid parameter",
+        "unimplement feature",
+        "insufficient priority",
+        "not installed",
+        "not configured",
+        "not running",
+        "running master",
+        "failed master",
+	"invalid rc",
+        /* For status command only */
+        "daemon dead1",
+        "daemon dead2",
+        "daemon stopped",
+        "status unknow"
+};
+
 
 static gboolean QUIT_GETOPT = FALSE;
 static lrmadmin_cmd_t lrmadmin_cmd = NULL_OP;
@@ -542,7 +565,7 @@ lrm_op_done_callback(lrm_op_t* op)
 		printf("operation status:%s\n", status_msg[LRM_OP_DONE]);
 	} else {
 		printf("operation status:%s\n", status_msg[(op->op_status 
-			- LRM_OP_DONE) % DIMOF(status_msg)]);
+			- LRM_OP_PENDING) % DIMOF(status_msg)]);
 	}
 	printf("op_status: %d\n", op->op_status);
 	printf("return code: %d\n", op->rc);
@@ -841,8 +864,17 @@ g_print_ops_and_free(gpointer data, gpointer user_data)
 	param_gstr = g_string_new("");
 	g_hash_table_foreach(op->params, ocf_params_hash_to_str, &param_gstr);
 
-	printf("  operation %s [call_id=%d], its parameters: %s\n"
-		, nullcheck(op->op_type), op->call_id, param_gstr->str);
+	printf("   operation %s [call_id=%d]:\n"
+	       "      start_delay=%d, interval=%d, timeout=%d, app_name=%s\n"
+	       "      rc=%d (%s), op_status=%d (%s)\n"
+	       "      parameters: %s\n"
+		, nullcheck(op->op_type), op->call_id
+		, op->start_delay, op->interval, op->timeout
+		, nullcheck(op->app_name), op->rc
+		, rc_msg[(op->rc-EXECRA_EXEC_UNKNOWN_ERROR) % DIMOF(rc_msg)]
+		, op->op_status
+		, status_msg[(op->op_status-LRM_OP_PENDING) % DIMOF(status_msg)]
+		, param_gstr->str);
 	g_string_free(param_gstr, TRUE);
 	lrm_free_op(op);
 }
@@ -950,6 +982,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.39  2006/06/22 10:33:22  sunjd
+ * (bug1301): make a better output
+ *
  * Revision 1.38  2006/06/22 05:56:31  sunjd
  * (bug1301): add the capacity of get_cur_state; polish on memory free
  *
