@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.39 2006/06/22 10:33:22 sunjd Exp $ */
+/* $Id: lrmadmin.c,v 1.40 2006/06/22 21:00:57 davidlee Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -569,7 +569,7 @@ lrm_op_done_callback(lrm_op_t* op)
 	}
 	printf("op_status: %d\n", op->op_status);
 	printf("return code: %d\n", op->rc);
-	printf("output data: \n%s\n", op->output);
+	printf("output data: \n%s\n", (op->output ? op->output : "[null]"));
 	printf("---------------------------------------\n\n");
 	ret_value = op->op_status;	
 }
@@ -982,6 +982,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.40  2006/06/22 21:00:57  davidlee
+ * Beware null pointer in printf(%s)
+ *
  * Revision 1.39  2006/06/22 10:33:22  sunjd
  * (bug1301): make a better output
  *
