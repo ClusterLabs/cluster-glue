@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.37 2006/05/16 09:40:37 sunjd Exp $ */
+/* $Id: lrmadmin.c,v 1.38 2006/06/22 05:56:31 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -91,6 +91,7 @@ typedef enum {
 	HELP
 } lrmadmin_cmd_t;
 
+#define nullcheck(p)       ((p) ? (p) : "<null>")
 static const char * status_msg[5] = {
 	"succeed", 		  /* LRM_OP_DONE         */
         "cancelled", 		  /* LRM_OP_CANCELLED    */
@@ -132,9 +133,9 @@ static int resource_operation(ll_lrm_t * lrmd, int argc, int optind,
 static int add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
 static int transfer_cmd_params(int amount, int start, char * argv[], 
 			   const char * class, GHashTable ** params_ht);
-static void g_print_stringitem(gpointer data, gpointer user_data);
-static void g_print_rainfo_item(gpointer data, gpointer user_data);
-static void g_print_ops(gpointer data, gpointer user_data);
+static void g_print_stringitem_and_free(gpointer data, gpointer user_data);
+static void g_print_rainfo_item_and_free(gpointer data, gpointer user_data);
+static void g_print_ops_and_free(gpointer data, gpointer user_data);
 static void g_get_rsc_description(gpointer data, gpointer user_data);
 static void print_rsc_inf(lrm_rsc_t * lrmrsc);
 static char * params_hashtable_to_str(const char * class, GHashTable * ht);
@@ -272,7 +273,6 @@ int main(int argc, char **argv)
 
 			case 'h':
 				OPTION_OBSCURE_CHECK 
-				/* print detailed help screen? */
 				printf("%s",simple_help_screen);
 				return 0;
 
@@ -392,6 +392,7 @@ int main(int argc, char **argv)
 					printf("Failed to flush.\n");
 					ret_value = -3;
 				}
+				lrm_free_rsc(lrm_rsc);
 			}
 
 			ASYN_OPS = FALSE;
@@ -403,7 +404,7 @@ int main(int argc, char **argv)
 			printf("Support %d RA classes\n", 
 					g_list_length(raclass_list));
 			if (raclass_list) {
-				g_list_foreach(raclass_list, g_print_stringitem,
+				g_list_foreach(raclass_list, g_print_stringitem_and_free,
 						NULL);
 				g_list_free(raclass_list);
 				ret_value = LSB_EXIT_OK;
@@ -418,14 +419,11 @@ int main(int argc, char **argv)
 		case RATYPE_SUPPORTED:
 		     	ratype_list = lrmd->lrm_ops->
 				get_rsc_type_supported(lrmd, raclass);
-			printf("List size: %d\n", g_list_length(ratype_list));
+			printf("The are %d RAs:\n", g_list_length(ratype_list));
 			if (ratype_list) {
-				g_list_foreach(ratype_list, g_print_rainfo_item,
+				g_list_foreach(ratype_list, g_print_rainfo_item_and_free,
 						NULL);
-				/* g_list_free(ratype_list); */
-			} else {
-				printf("For this RA class, no any RA type is "
-					"supported\n");
+				g_list_free(ratype_list);
 			}
 
 			ASYN_OPS = FALSE;
@@ -450,7 +448,7 @@ int main(int argc, char **argv)
 				ret_value = -3;
 			} else {
 				print_rsc_inf(lrm_rsc);
-				g_free(lrm_rsc);
+				lrm_free_rsc(lrm_rsc);
 			}
 
 			ASYN_OPS = FALSE;
@@ -469,11 +467,14 @@ int main(int argc, char **argv)
 					 cur_state==LRM_RSC_IDLE?
 					 "LRM_RSC_IDLE":"LRM_RSC_BUSY");
 								
+				printf("The resource operation information:\n");
 				if (ops_queue) {
-					g_list_foreach(ops_queue, g_print_ops, 
-							NULL);
+					g_list_foreach(ops_queue,
+						       g_print_ops_and_free, 
+						       NULL);
 					g_list_free(ops_queue);
 				}
+				lrm_free_rsc(lrm_rsc);
 			}
 
 			ASYN_OPS = FALSE;
@@ -603,7 +604,7 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	op.params = params_ht;
 
 	call_id = lrm_rsc->ops->perform_op(lrm_rsc, &op);
-	/* g_free(lrm_rsc);   don't need to free it ? */
+	lrm_free_rsc(lrm_rsc);
 	if (params_ht) {
 		g_hash_table_foreach(params_ht, free_stritem_of_hashtable, NULL);
 		g_hash_table_destroy(params_ht);
@@ -811,29 +812,39 @@ params_hashtable_to_str(const char * class, GHashTable * ht)
 }
 
 static void
-g_print_stringitem(gpointer data, gpointer user_data)
+g_print_stringitem_and_free(gpointer data, gpointer user_data)
 {
 	printf("%s\n", (char*)data);
-	g_free(data);  /*  ?  */
+	g_free(data);
 }
 
 static void
-g_print_rainfo_item(gpointer data, gpointer user_data)
+g_print_rainfo_item_and_free(gpointer data, gpointer user_data)
 {
-/*	rsc_info_t * rsc_info = (rsc_info_t *) data; */
-	printf("RA type name: %s\n", (char *)data);
-/*
-	printf("RA type name: %s  Version: %s\n", 
-		rsc_info->rsc_type, rsc_info->version);
-*/
-	g_free(data); /*  ?  */
+	printf("%s\n", (char *)data);
+	g_free(data);
 }
 
+
 static void
-g_print_ops(gpointer data, gpointer user_data)
+g_print_ops_and_free(gpointer data, gpointer user_data)
 {
-	printf("%s  ", (char*)data);
-	g_free(data);  /*  ?  */
+	lrm_op_t* op = (lrm_op_t*)data;
+	GString * param_gstr;
+
+	if (NULL == op) {
+		cl_log(LOG_ERR, "%s:%d: op==NULL"
+			, __FUNCTION__, __LINE__);
+		return;
+	}
+
+	param_gstr = g_string_new("");
+	g_hash_table_foreach(op->params, ocf_params_hash_to_str, &param_gstr);
+
+	printf("  operation %s [call_id=%d], its parameters: %s\n"
+		, nullcheck(op->op_type), op->call_id, param_gstr->str);
+	g_string_free(param_gstr, TRUE);
+	lrm_free_op(op);
 }
 
 static void
@@ -853,12 +864,12 @@ g_get_rsc_description(gpointer data, gpointer user_data)
 	lrm_rsc = lrmd->lrm_ops->get_rsc(lrmd, rsc_id_tmp);
 	if (lrm_rsc) {
 		print_rsc_inf(lrm_rsc);
-		g_free(lrm_rsc);   /* ? */
+		lrm_free_rsc(lrm_rsc); 
 	} else
 		cl_log(LOG_ERR, "There is a invalid resource id %s.", 
 			rsc_id_tmp);
 	
-	g_free(data); /* ? */
+	g_free(data);
 }
 
 static void
@@ -939,6 +950,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.38  2006/06/22 05:56:31  sunjd
+ * (bug1301): add the capacity of get_cur_state; polish on memory free
+ *
  * Revision 1.37  2006/05/16 09:40:37  sunjd
  * fix a minor typo; remove the hint for metadata output
  *
