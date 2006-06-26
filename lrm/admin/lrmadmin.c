@@ -1,4 +1,4 @@
-/* $Id: lrmadmin.c,v 1.40 2006/06/22 21:00:57 davidlee Exp $ */
+/* $Id: lrmadmin.c,v 1.41 2006/06/26 01:48:20 sunjd Exp $ */
 /* File: lrmadmin.c
  * Description: A adminstration tool for Local Resource Manager
  *
@@ -46,7 +46,7 @@
 #include <clplumbing/GSource.h>
 #include <clplumbing/Gmain_timeout.h>
 
-const char * optstring = "AD:dEF:d:sg:M:P:c:S:LI:CT:h";
+const char * optstring = "AD:dEF:d:sg:M:P:c:S:LI:CT:n:h";
 
 #ifdef HAVE_GETOPT_H
 static struct option long_options[] = {
@@ -70,6 +70,7 @@ static struct option long_options[] = {
 
 GMainLoop *mainloop = NULL;
 const char * lrmadmin_name = "lrmadmin";
+const char * fake_name = NULL;
 /* 20 is the length limit for a argv[x] */
 const int ARGVI_MAX_LEN = 48;
 
@@ -135,7 +136,7 @@ const char * simple_help_screen =
 "         {-D|--delete} <rscid>\n"
 "         {-F|--flush} <rscid>\n"
 "         {-E|--execute} <rscid> <operator> <timeout> <interval> <target_rc|EVERYTIME|CHANGED> [<operator_parameters_list>]\n"
-"         {-S|--state} <rscid>\n"
+"         {-S|--state} <rscid> [-n <fake_name>]\n"
 "         {-L|--listall}\n"
 "         {-I|--information} <rsc_id>\n"
 "         {-C|--raclass_supported}\n"
@@ -158,7 +159,7 @@ static int transfer_cmd_params(int amount, int start, char * argv[],
 			   const char * class, GHashTable ** params_ht);
 static void g_print_stringitem_and_free(gpointer data, gpointer user_data);
 static void g_print_rainfo_item_and_free(gpointer data, gpointer user_data);
-static void g_print_ops_and_free(gpointer data, gpointer user_data);
+static void g_print_ops(gpointer data, gpointer user_data);
 static void g_get_rsc_description(gpointer data, gpointer user_data);
 static void print_rsc_inf(lrm_rsc_t * lrmrsc);
 static char * params_hashtable_to_str(const char * class, GHashTable * ht);
@@ -190,6 +191,7 @@ int main(int argc, char **argv)
 		*ratype_list = 0,
 		*rscid_list;
 	char raclass[20];
+	const char * login_name = lrmadmin_name;
 
 	/* Prevent getopt_long to print error message on stderr isself */
 	/*opterr = 0; */  
@@ -294,6 +296,12 @@ int main(int argc, char **argv)
 				lrmadmin_cmd = INF_RSC;
 				break;
 
+			case 'n':
+				if (optarg) {
+					fake_name = optarg;
+				}
+				break;
+
 			case 'h':
 				OPTION_OBSCURE_CHECK 
 				printf("%s",simple_help_screen);
@@ -322,7 +330,10 @@ int main(int argc, char **argv)
 
 	lrmd->lrm_ops->set_lrm_callback(lrmd, lrm_op_done_callback);
 
-        if (lrmd->lrm_ops->signon(lrmd, lrmadmin_name) != 1) { /* != HA_OK */
+	if (fake_name != NULL) {
+		login_name = fake_name;
+	}
+        if (lrmd->lrm_ops->signon(lrmd, login_name) != 1) { /* != HA_OK */
 		printf("lrmd daemon is not running.\n");
 		if (lrmadmin_cmd == DAEMON_OP) { 
 			return LSB_STATUS_STOPPED;
@@ -490,12 +501,14 @@ int main(int argc, char **argv)
 					 cur_state==LRM_RSC_IDLE?
 					 "LRM_RSC_IDLE":"LRM_RSC_BUSY");
 								
-				printf("The resource operation information:\n");
+				printf("The resource %d operations' "
+					"information:\n"
+					, g_list_length(ops_queue));
 				if (ops_queue) {
 					g_list_foreach(ops_queue,
-						       g_print_ops_and_free, 
+						       g_print_ops, 
 						       NULL);
-					g_list_free(ops_queue);
+					lrm_free_op_list(ops_queue);
 				}
 				lrm_free_rsc(lrm_rsc);
 			}
@@ -850,7 +863,7 @@ g_print_rainfo_item_and_free(gpointer data, gpointer user_data)
 
 
 static void
-g_print_ops_and_free(gpointer data, gpointer user_data)
+g_print_ops(gpointer data, gpointer user_data)
 {
 	lrm_op_t* op = (lrm_op_t*)data;
 	GString * param_gstr;
@@ -864,7 +877,7 @@ g_print_ops_and_free(gpointer data, gpointer user_data)
 	param_gstr = g_string_new("");
 	g_hash_table_foreach(op->params, ocf_params_hash_to_str, &param_gstr);
 
-	printf("   operation %s [call_id=%d]:\n"
+	printf("   operation '%s' [call_id=%d]:\n"
 	       "      start_delay=%d, interval=%d, timeout=%d, app_name=%s\n"
 	       "      rc=%d (%s), op_status=%d (%s)\n"
 	       "      parameters: %s\n"
@@ -876,7 +889,6 @@ g_print_ops_and_free(gpointer data, gpointer user_data)
 		, status_msg[(op->op_status-LRM_OP_PENDING) % DIMOF(status_msg)]
 		, param_gstr->str);
 	g_string_free(param_gstr, TRUE);
-	lrm_free_op(op);
 }
 
 static void
@@ -982,6 +994,9 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 
 /*
  * $Log: lrmadmin.c,v $
+ * Revision 1.41  2006/06/26 01:48:20  sunjd
+ * (bug#1301) Support fake login name; adjust memory freeing
+ *
  * Revision 1.40  2006/06/22 21:00:57  davidlee
  * Beware null pointer in printf(%s)
  *
