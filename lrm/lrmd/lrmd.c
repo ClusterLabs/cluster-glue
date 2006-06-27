@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.228 2006/06/20 10:40:03 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.229 2006/06/27 03:27:57 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3166,8 +3166,11 @@ perform_ra_op(lrmd_op_t* op)
 	return_to_orig_privs();
 	switch(pid=fork()) {
 		case -1:
-			lrmd_log(LOG_ERR
-			,	"perform_ra_op:start_a_child_client: Cannot fork.");
+			cl_perror("perform_ra_op:fork failure");
+			close(stdout_fd[0]);
+			close(stdout_fd[1]);
+			close(stderr_fd[0]);
+			close(stderr_fd[1]);
 			return_to_dropped_privs();
 			return HA_FAIL;
 
@@ -3849,6 +3852,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.229  2006/06/27 03:27:57  sunjd
+ * bug1349: close pipe FDs when fork failed
+ *
  * Revision 1.228  2006/06/20 10:40:03  sunjd
  * Make debug log output the real operation parameters
  *
