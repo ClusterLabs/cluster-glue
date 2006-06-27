@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.229 2006/06/27 03:27:57 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.230 2006/06/27 05:33:50 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3215,8 +3215,10 @@ perform_ra_op(lrmd_op_t* op)
 			}
 			RAExec = g_hash_table_lookup(RAExecFuncs,rsc->class);
 			if (NULL == RAExec) {
+				close(stdout_fd[1]);
+				close(stderr_fd[1]);
 				lrmd_log(LOG_ERR,"perform_ra_op: can not find RAExec");
-				return HA_FAIL;
+				exit(EXECRA_EXEC_UNKNOWN_ERROR);
 			}
 			op_type = ha_msg_value(op->msg, F_LRM_OP);
 			/*should we use logging daemon or not in script*/
@@ -3852,6 +3854,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.230  2006/06/27 05:33:50  sunjd
+ * close pipe FDs when error happens
+ *
  * Revision 1.229  2006/06/27 03:27:57  sunjd
  * bug1349: close pipe FDs when fork failed
  *
