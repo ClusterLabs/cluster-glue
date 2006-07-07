@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.25 2006/07/07 10:27:15 lars Exp $ */
+/* $Id: cl_malloc.c,v 1.26 2006/07/07 10:57:39 lars Exp $ */
 /*
  * Copyright (C) 2000 Alan Robertson <alanr@unix.sh>
  *
@@ -702,7 +702,9 @@ cl_calloc(size_t nmemb, size_t size)
 	
 	if (ret != NULL) {
 		memset(ret, 0, nmemb*size);
+#ifdef HA_MALLOC_TRACK
 		cl_ptr_tag(ret, "cl_malloc.c", "cl_calloc", 0);
+#endif
 	}
 		
 	return(ret);
