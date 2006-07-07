@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.h,v 1.5 2006/07/07 10:27:15 lars Exp $ */
+/* $Id: cl_malloc.h,v 1.6 2006/07/07 20:36:31 andrew Exp $ */
 /*
  * ha_malloc.h: malloc utilities for the Linux-HA heartbeat program
  *
@@ -68,7 +68,7 @@ void		cl_malloc_forced_for_glib(void);
 		/* Call before using any glib functions(!) */
 		/* See also: g_mem_set_vtable() */
 #ifdef HA_MALLOC_TRACK
-void		 cl_malloc_dump_allocated(void);
+void		 cl_malloc_dump_allocated(int log_level, int filter_seen);
 #endif
 
 #define	MALLOCT(t)	((t *) cl_malloc(sizeof(t)))

@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.26 2006/07/07 10:57:39 lars Exp $ */
+/* $Id: cl_malloc.c,v 1.27 2006/07/07 20:36:31 andrew Exp $ */
 /*
  * Copyright (C) 2000 Alan Robertson <alanr@unix.sh>
  *
@@ -276,7 +276,7 @@ cl_ptr_init(void)
 }
 
 void
-cl_malloc_dump_allocated(void)
+cl_malloc_dump_allocated(int log_level, gboolean filter)
 {
 	struct cl_bucket*	cursor = cl_malloc_track_root;
 	longclock_t		time_diff;
@@ -284,12 +284,22 @@ cl_malloc_dump_allocated(void)
 	cl_log(LOG_INFO, "Dumping allocated memory buffers:");
 	
 	while (cursor != NULL) {
-		time_diff = sub_longclock(time_longclock(), cursor->hdr.mtime);
-		cl_log(LOG_INFO, "cl_malloc_dump: owner %s, size %d, dumped %d, age %lu ms"
-		,	cursor->hdr.owner
-		,	cursor->hdr.reqsize
-		,	cursor->hdr.dumped
-		,	longclockto_long(time_diff));
+		if(filter && cursor->hdr.dumped) {
+
+		} else if(filter) {
+			cl_log(log_level, "cl_malloc_dump: %p owner %s, size %d"
+			,	cursor+cl_malloc_hdr_offset
+			,	cursor->hdr.owner
+			,	cursor->hdr.reqsize);
+		} else {
+			time_diff = sub_longclock(time_longclock(), cursor->hdr.mtime);
+			cl_log(log_level, "cl_malloc_dump: %p owner %s, size %d, dumped %d, age %lu ms"
+			,	cursor+cl_malloc_hdr_offset
+			,	cursor->hdr.owner
+			,	cursor->hdr.reqsize
+			,	cursor->hdr.dumped
+			,	longclockto_long(time_diff));
+		}
 		cursor->hdr.dumped = 1;
 		cursor = cursor->hdr.right;
 	}
