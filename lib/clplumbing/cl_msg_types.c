@@ -1639,6 +1639,7 @@ compress2uncompress(struct ha_msg* msg, int index)
 	char		buf[MAXMSG];
 	size_t		buflen = MAXMSG;	
 	struct ha_msg*  msgfield;
+	int err;
 	
 	if (cl_decompress_field(msg, index, buf, &buflen) != HA_OK){
 		cl_log(LOG_ERR, "%s: compress field failed",
@@ -1656,7 +1657,11 @@ compress2uncompress(struct ha_msg* msg, int index)
 	/* BEAM think this is a memory leak, but actually it is handle nicely
 	 * in cl_msg_replace: old value is freed and new value is saved
 	 */
-	return cl_msg_replace(msg, index, (char*)msgfield, 0, FT_UNCOMPRESS);/* resource leak */  		
+	err = cl_msg_replace(msg, index, (char*)msgfield, 0, FT_UNCOMPRESS);/* resource leak */
+
+	ha_msg_del(msgfield);
+	
+	return err;
 }
 
 /*
