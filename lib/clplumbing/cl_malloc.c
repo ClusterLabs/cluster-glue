@@ -1,4 +1,4 @@
-/* $Id: cl_malloc.c,v 1.27 2006/07/07 20:36:31 andrew Exp $ */
+/* $Id: cl_malloc.c,v 1.28 2006/07/12 09:32:28 andrew Exp $ */
 /*
  * Copyright (C) 2000 Alan Robertson <alanr@unix.sh>
  *
@@ -286,6 +286,7 @@ cl_malloc_dump_allocated(int log_level, gboolean filter)
 	while (cursor != NULL) {
 		if(filter && cursor->hdr.dumped) {
 
+		} else if(log_level > LOG_DEBUG) {
 		} else if(filter) {
 			cl_log(log_level, "cl_malloc_dump: %p owner %s, size %d"
 			,	cursor+cl_malloc_hdr_offset
