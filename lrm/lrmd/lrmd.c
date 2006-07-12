@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.230 2006/06/27 05:33:50 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.231 2006/07/12 16:19:00 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -360,7 +360,7 @@ static GList* ra_class_list		= NULL;
 static gboolean shutdown_in_progress	= FALSE;
 static unsigned long apphb_interval 	= 2000; /* Millisecond */
 static gboolean reg_to_apphbd		= FALSE;
-static int MAX_CHILD_NUMBER		= 16;
+static int MAX_CHILD_NUMBER		= 512;
 static int child_number			= 0;
 
 /*
@@ -3854,6 +3854,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.231  2006/07/12 16:19:00  alan
+ * Disabled the process throttling code in the LRM - to let us get the release out.
+ *
  * Revision 1.230  2006/06/27 05:33:50  sunjd
  * close pipe FDs when error happens
  *
