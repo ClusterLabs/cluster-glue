@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.231 2006/07/12 16:19:00 alan Exp $ */
+/* $Id: lrmd.c,v 1.232 2006/07/13 02:21:42 sunjd Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -205,6 +205,7 @@ struct lrmd_rsc
 					/* ops They will run later	*/
 	GHashTable*	last_op_table;	/* Last operation of each type	*/
 	lrmd_op_t*	last_op_done;	/* The last finished op of the resource */
+	guint		delay_timeout;  /* The delay value of op_list execution */
 };
 
 struct lrmd_op
@@ -284,6 +285,7 @@ static gboolean emit_apphb(gpointer data);
 
 /* Utility functions */
 static int flush_op(lrmd_op_t* op);
+static gboolean rsc_execution_freeze_timeout(gpointer data);
 static int perform_op(lrmd_rsc_t* rsc);
 static int unregister_client(lrmd_client_t* client);
 static int on_op_done(lrmd_op_t* op);
@@ -360,7 +362,8 @@ static GList* ra_class_list		= NULL;
 static gboolean shutdown_in_progress	= FALSE;
 static unsigned long apphb_interval 	= 2000; /* Millisecond */
 static gboolean reg_to_apphbd		= FALSE;
-static int MAX_CHILD_NUMBER		= 512;
+static int MAX_CHILD_NUMBER		= 16;
+static int INTERVAL_RETRY		= 1000; /* Millisecond */
 static int child_number			= 0;
 
 /*
@@ -860,6 +863,12 @@ lrmd_rsc_destroy(lrmd_rsc_t* rsc)
 		lrmd_op_destroy(rsc->last_op_done);
 		rsc->last_op_done = NULL;
 	}
+
+	if ((int)rsc->delay_timeout > 0) {
+		Gmain_timeout_remove(rsc->delay_timeout);
+		rsc->delay_timeout = (guint)-1;
+	}
+
 	cl_free(rsc);
 }
 
@@ -874,6 +883,7 @@ lrmd_rsc_new(const char * id, struct ha_msg* msg)
 		dump_mem_stats();
 		return NULL;
 	}
+	rsc->delay_timeout = (guint)-1;
 	if (id) {
 		rsc->id = cl_strdup(id);
 	}
@@ -3031,6 +3041,24 @@ flush_op(lrmd_op_t* op)
 	return HA_OK;
 }
 
+/* Resume the execution of ops of the resource */
+static gboolean
+rsc_execution_freeze_timeout(gpointer data)
+{
+	lrmd_rsc_t* rsc = (lrmd_rsc_t*)data;
+
+	if ((int)rsc->delay_timeout > 0) {
+		Gmain_timeout_remove(rsc->delay_timeout);
+		rsc->delay_timeout = (guint)-1;
+	}
+
+	if (rsc != NULL) {
+		perform_op(rsc);
+	}
+
+	return FALSE;
+}
+
 /* this function gets the first op in the rsc op list and execute it*/
 int
 perform_op(lrmd_rsc_t* rsc)
@@ -3065,6 +3093,8 @@ perform_op(lrmd_rsc_t* rsc)
 				  " behind and including this: %s "
 				, MAX_CHILD_NUMBER
 				, op_info(op));
+			rsc->delay_timeout = Gmain_timeout_add(INTERVAL_RETRY
+					, rsc_execution_freeze_timeout, rsc);
 			break;
 		}
 
@@ -3854,6 +3884,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.232  2006/07/13 02:21:42  sunjd
+ * bug1346: resolve the hangup issue
+ *
  * Revision 1.231  2006/07/12 16:19:00  alan
  * Disabled the process throttling code in the LRM - to let us get the release out.
  *
