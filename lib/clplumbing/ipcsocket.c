@@ -1,4 +1,4 @@
-/* $Id: ipcsocket.c,v 1.173 2006/02/02 15:58:00 alan Exp $ */
+/* $Id: ipcsocket.c,v 1.174 2006/07/17 17:02:46 davidlee Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *
@@ -57,6 +57,11 @@
 #endif
 #ifdef HAVE_SYS_UCRED_H
 #	include <sys/ucred.h>
+#endif
+
+/* For 'getpeerucred()' (Solaris 10 upwards) */
+#ifdef HAVE_UCRED_H
+#	include <ucred.h>
 #endif
 
 #ifdef HAVE_SYS_SOCKET_H
@@ -135,8 +140,8 @@
 #	define USE_GETPEEREID
 #elif defined(SCM_CREDS)
 #	define	USE_SCM_CREDS
-/* #elif HAVE_GETPEERUCRED */		/* e.g. Solaris 10 upwards */
-/* #	define USE_GETPEERUCRED */
+#elif HAVE_GETPEERUCRED		/* e.g. Solaris 10 upwards */
+#	define USE_GETPEERUCRED
 #elif HB_IPC_METHOD == HB_IPC_STREAM
 #	define USE_STREAM_CREDS
 #else
@@ -2333,6 +2338,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 
 /* get farside pid for our peer process */
 
+static
 pid_t
 socket_get_farside_pid(int sockfd)
 {
@@ -2398,6 +2404,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 	return ret;
 }
 
+static
 pid_t
 socket_get_farside_pid(int sock)
 {
@@ -2547,6 +2554,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
  * information.
  */
 
+static
 pid_t
 socket_get_farside_pid(int sock)
 {
@@ -2559,8 +2567,8 @@ socket_get_farside_pid(int sock)
 /***********************************************************************
  * Bind/Stat VERSION... (Supported on OSX/Darwin and 4.3+BSD at least...)
  *
- * This is for use on systems such as OSX-Darwin and maybe Solaris where
- *   none of the other options are available.
+ * This is for use on systems such as OSX-Darwin where
+ *   none of the other options is available.
  *
  * This implementation has been adapted from "Advanced Programming
  *   in the Unix Environment", Section 15.5.2, by W. Richard Stevens.
@@ -2635,6 +2643,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 }
 
 
+static
 pid_t
 socket_get_farside_pid(int sock)
 {
@@ -2643,7 +2652,7 @@ socket_get_farside_pid(int sock)
 #endif /* Bind/stat version */
 
 /***********************************************************************
- * USE_STREAM_CREDS VERSION... (e.g. Solaris)
+ * USE_STREAM_CREDS VERSION... (e.g. Solaris pre-10)
  ***********************************************************************/
 #ifdef USE_STREAM_CREDS
 static int 
@@ -2675,6 +2684,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 	return IPC_FAIL;
 }
 
+static
 pid_t
 socket_get_farside_pid(int sock)
 {
@@ -2684,8 +2694,6 @@ socket_get_farside_pid(int sock)
 
 /***********************************************************************
  * GETPEERUCRED VERSION... (e.g. Solaris 10 upwards)
- *
- * *** Not yet implemented ***
  ***********************************************************************/
 
 #ifdef USE_GETPEERUCRED
@@ -2693,26 +2701,68 @@ socket_get_farside_pid(int sock)
 static int 
 socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 {
-# error getpeerucred() not yet implemeted
-	return IPC_FAIL;
+	struct SOCKET_CH_PRIVATE *conn_info;
+	ucred_t *ucred = NULL;
+	int rc = IPC_FAIL;
+
+	if (ch == NULL || ch->ch_private == NULL) {
+		return IPC_FAIL;
+	}
+
+	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
+
+	if (auth_info == NULL
+	  || (auth_info->uid == NULL && auth_info->gid == NULL)) {
+		return IPC_OK;	/* no restriction for authentication */
+	}
+
+	if (getpeerucred(conn_info->s, &ucred) < 0) {
+		cl_perror("getpeereid() failure");
+		return IPC_FAIL;
+	}
+
+	/* Check credentials against authorization information */
+
+	if (auth_info->uid
+	  && (g_hash_table_lookup(auth_info->uid,
+		  GUINT_TO_POINTER((guint)ucred_geteuid(ucred))) != NULL)) {
+		rc = IPC_OK;
+	}else if (auth_info->gid
+	  && (g_hash_table_lookup(auth_info->gid,
+		  GUINT_TO_POINTER((guint)ucred_getegid(ucred))) != NULL)) {
+		rc = IPC_OK;
+  	}
+
+	ucred_free(ucred);
+
+	return rc;
 }
 
+static
 pid_t
-socket_get_farside_pid(int sock)
+socket_get_farside_pid(int sockfd)
 {
-	return -1;
+	ucred_t *ucred = NULL;
+	pid_t pid;
+
+	if (getpeerucred(sockfd, &ucred) < 0) {
+		cl_perror("getpeereid() failure");
+		return IPC_FAIL;
+	}
+
+	pid = ucred_getpid(ucred);
+
+	ucred_free(ucred);
+
+	return pid;
 }
 #endif
 
 /***********************************************************************
  * DUMMY VERSION... (other systems...)
  *
- * I'm afraid Solaris falls into this category :-(
  * Other options that seem to be out there include
  * SCM_CREDENTIALS and LOCAL_CREDS
- * Or maybe something called doors for Solaris
- * Unfortunately, it looks like Doors is tied to threads :-(
- * Can the streams credentials code be used with local domain sockets?
  * There are some kludgy things you can do with SCM_RIGHTS
  * to pass an fd which could only be opened by the user id to
  * validate the user id, but I don't know of a similar kludge which
@@ -2731,6 +2781,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 	return IPC_FAIL;
 }
 
+static
 pid_t
 socket_get_farside_pid(int sock)
 {
