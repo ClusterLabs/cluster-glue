@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.83 2006/04/23 20:39:01 alan Exp $ */
+/* $Id: GSource.c,v 1.84 2006/07/17 16:56:47 davidlee Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -66,10 +66,10 @@ lc_fetch(char *ptr) {
 #define	OUTPUT_EVENTS	(G_IO_OUT)
 #define	DEF_EVENTS	(INPUT_EVENTS|ERR_EVENTS)
 
-#define	WARN_DELAY(ms, input)	cl_log(LOG_WARNING			\
+#define	WARN_DELAY(ms, mx, input)	cl_log(LOG_WARNING		\
 	,	"%s: Dispatch function for %s was delayed"		\
-	" %lu ms before being called (GSource: 0x%lx)"			\
-	,	__FUNCTION__,	(input)->description, ms		\
+	" %lu ms (> %lu ms) before being called (GSource: 0x%lx)"	\
+	,	__FUNCTION__,	(input)->description, ms, mx		\
 	,	POINTER_TO_ULONG(input))
 
 #define EXPLAINDELAY(started, detected) cl_log(LOG_INFO			\
@@ -78,10 +78,10 @@ lc_fetch(char *ptr) {
 	,	(unsigned long long)detected)
 	
 
-#define	WARN_TOOLONG(ms, input)	cl_log(LOG_WARNING			\
+#define	WARN_TOOLONG(ms, mx, input)	cl_log(LOG_WARNING		\
 	,	"%s: Dispatch function for %s took too long to execute"	\
-	": %lu ms (GSource: 0x%lx)"					\
-	,	__FUNCTION__,	(input)->description, ms		\
+	": %lu ms (> %lu ms) (GSource: 0x%lx)"				\
+	,	__FUNCTION__,	(input)->description, ms, mx		\
 	,	POINTER_TO_ULONG(input))
 
 #define CHECK_DISPATCH_DELAY(i)	{ 					\
@@ -92,7 +92,7 @@ lc_fetch(char *ptr) {
 	ms = longclockto_ms(sub_longclock(dispstart,dettime));		\
 	if ((i)->maxdispatchdelayms > 0					\
 	&&	ms > (i)->maxdispatchdelayms) {				\
-		WARN_DELAY(ms, (i));					\
+		WARN_DELAY(ms, (i)->maxdispatchdelayms, (i));		\
 		EXPLAINDELAY(dispstart, dettime);			\
 	}								\
 }
@@ -102,14 +102,14 @@ lc_fetch(char *ptr) {
 	longclock_t	dispend = time_longclock();			\
 	ms = longclockto_ms(sub_longclock(dispend, dispstart));		\
 	if ((i)->maxdispatchms > 0 && ms > (i)->maxdispatchms) {	\
-		WARN_TOOLONG(ms, (i));					\
+		WARN_TOOLONG(ms, (i)->maxdispatchms, (i));		\
 	}								\
 	lc_store(((i)->detecttime), zero_longclock);		\
 }
 
-#define	WARN_TOOMUCH(ms, input)	cl_log(LOG_WARNING			\
-	,	"%s: working on %s took %ld ms"				\
-	,	__FUNCTION__,	(input)->description, ms);
+#define	WARN_TOOMUCH(ms, mx, input)	cl_log(LOG_WARNING		\
+	,	"%s: working on %s took %ld ms (> %ld ms)"		\
+	,	__FUNCTION__,	(input)->description, ms, mx);
 
 #define	SAVESTART	{funstart = time_longclock();}
 
@@ -118,7 +118,7 @@ lc_fetch(char *ptr) {
 	long		ms;						\
 	ms = longclockto_ms(sub_longclock(funend, funstart));		\
 	if (ms > OTHER_MAXDELAY){					\
-		WARN_TOOMUCH(ms, input);				\
+		WARN_TOOMUCH(ms, ((long) OTHER_MAXDELAY), input);	\
 	}								\
 }									\
 
