@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.232 2006/07/13 02:21:42 sunjd Exp $ */
+/* $Id: lrmd.c,v 1.233 2006/07/19 21:44:17 lars Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3047,14 +3047,16 @@ rsc_execution_freeze_timeout(gpointer data)
 {
 	lrmd_rsc_t* rsc = (lrmd_rsc_t*)data;
 
+	if (rsc == NULL) {
+		return FALSE;
+	}
+
 	if ((int)rsc->delay_timeout > 0) {
 		Gmain_timeout_remove(rsc->delay_timeout);
 		rsc->delay_timeout = (guint)-1;
 	}
 
-	if (rsc != NULL) {
-		perform_op(rsc);
-	}
+	perform_op(rsc);
 
 	return FALSE;
 }
@@ -3884,6 +3886,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.233  2006/07/19 21:44:17  lars
+ * Coverity #48: rsc was dereferenced before NULL check.
+ *
  * Revision 1.232  2006/07/13 02:21:42  sunjd
  * bug1346: resolve the hangup issue
  *
