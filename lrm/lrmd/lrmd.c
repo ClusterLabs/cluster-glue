@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.233 2006/07/19 21:44:17 lars Exp $ */
+/* $Id: lrmd.c,v 1.234 2006/08/07 15:07:29 alan Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -362,7 +362,7 @@ static GList* ra_class_list		= NULL;
 static gboolean shutdown_in_progress	= FALSE;
 static unsigned long apphb_interval 	= 2000; /* Millisecond */
 static gboolean reg_to_apphbd		= FALSE;
-static int MAX_CHILD_NUMBER		= 16;
+static int MAX_CHILD_NUMBER		= 4;
 static int INTERVAL_RETRY		= 1000; /* Millisecond */
 static int child_number			= 0;
 
@@ -3886,6 +3886,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.234  2006/08/07 15:07:29  alan
+ * Lowered limit on maximum number of simultaneous child processes in the lrmd.
+ *
  * Revision 1.233  2006/07/19 21:44:17  lars
  * Coverity #48: rsc was dereferenced before NULL check.
  *
