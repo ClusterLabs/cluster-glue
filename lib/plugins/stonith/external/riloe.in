@@ -145,7 +145,7 @@ except KeyError:
 try:
         for cmds in acmds:
 
-                c=HTTPSConnection(host)
+                c=HTTPSConnection(rihost)
                 c.send('<?xml version="1.0"?>\r\n')
                 c.sock.recv(1024)
 
