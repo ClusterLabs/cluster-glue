@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.234 2006/08/07 15:07:29 alan Exp $ */
+/* $Id: lrmd.c,v 1.235 2006/08/11 00:11:59 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1918,7 +1918,7 @@ on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg)
 	CHECK_ALLOCATED(client, "client", HA_FAIL);
 	CHECK_ALLOCATED(msg, "message", HA_FAIL);
 
-	lrmd_debug(LOG_DEBUG
+	lrmd_debug2(LOG_DEBUG
 	, 	"on_msg_get_rsc_classes:client [%d] wants to get rsc classes"
 	,	client->pid);
 
@@ -1957,7 +1957,7 @@ on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg)
 		return HA_FAIL;
 	}
 
-	lrmd_debug(LOG_DEBUG, "on_msg_get_rsc_types: the client [pid:%d] "
+	lrmd_debug2(LOG_DEBUG, "on_msg_get_rsc_types: the client [pid:%d] "
 		 "wants to get resource types of resource class %s"
 		, client->pid, rclass);
 
@@ -2006,7 +2006,7 @@ on_msg_get_rsc_providers(lrmd_client_t* client, struct ha_msg* msg)
 	rclass = ha_msg_value(msg, F_LRM_RCLASS);
 	rtype = ha_msg_value(msg, F_LRM_RTYPE);
 
-	lrmd_debug(LOG_DEBUG
+	lrmd_debug2(LOG_DEBUG
 	,	"%s: the client [%d] wants to get rsc privider of %s::%s"
 	,	__FUNCTION__
 	,	client->pid
@@ -2060,7 +2060,7 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 	rclass = ha_msg_value(msg, F_LRM_RCLASS);
 	provider = ha_msg_value(msg, F_LRM_RPROVIDER);
 
-	lrmd_debug(LOG_DEBUG
+	lrmd_debug2(LOG_DEBUG
 	,	"%s: the client [pid:%d] want to get rsc metadata of %s::%s."
 	,	__FUNCTION__
 	,	client->pid
@@ -2112,7 +2112,7 @@ on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg)
 	CHECK_ALLOCATED(client, "client", HA_FAIL);
 	CHECK_ALLOCATED(msg, "message", HA_FAIL);
 
-	lrmd_debug(LOG_DEBUG
+	lrmd_debug2(LOG_DEBUG
 	,	"on_msg_get_all:client [%d] want to get all rsc information."
 	,	client->pid);
 
@@ -2140,14 +2140,14 @@ on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg)
 
 	id = ha_msg_value(msg, F_LRM_RID);
 
-	lrmd_debug(LOG_DEBUG
+	lrmd_debug2(LOG_DEBUG
 	,	"on_msg_get_rsc: the client [pid:%d] wants to get "
 		"the information of the resource [rsc_id: %s]"
 	,	client->pid, lrmd_nullcheck(id));
 
 	rsc = lookup_rsc_by_msg(msg);
 	if (NULL == rsc) {
-		lrmd_debug(LOG_DEBUG
+		lrmd_debug2(LOG_DEBUG
 		,	"on_msg_get_rsc: no rsc with id %s."
 		,	lrmd_nullcheck(id));
 		ret = create_lrm_ret(HA_FAIL, 1);
@@ -2204,7 +2204,7 @@ on_msg_get_last_op(lrmd_client_t* client, struct ha_msg* msg)
 	rid = ha_msg_value(msg, F_LRM_RID);
 	op_type = ha_msg_value(msg, F_LRM_OP);
 
-	lrmd_debug(LOG_DEBUG
+	lrmd_debug2(LOG_DEBUG
 	,	"on_msg_get_last_op:client %s[%d] want to get the information "
 		"regarding last %s op on %s"
 	,	client->app_name, client->pid
@@ -2271,7 +2271,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 
 	id = ha_msg_value(msg, F_LRM_RID);
 
-	lrmd_debug(LOG_DEBUG
+	lrmd_debug2(LOG_DEBUG
 	,	"on_msg_del_rsc: client [%d] want to delete rsc %s"
 	,	client->pid, lrmd_nullcheck(id));
 
@@ -2411,9 +2411,9 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	type = ha_msg_value(msg, F_LRM_TYPE);
 	/* when a flush request arrived, flush all pending ops */
 	if (0 == STRNCMP_CONST(type, FLUSHOPS)) {
-	lrmd_debug(LOG_DEBUG
-		,	"on_msg_perform_op:client [%d] flush operations"
-		,	client->pid);
+		lrmd_debug2(LOG_DEBUG
+			,	"on_msg_perform_op:client [%d] flush operations"
+			,	client->pid);
 		
 		node = g_list_first(rsc->op_list);
 		while (NULL != node ) {
@@ -2436,7 +2436,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		int cancel_op_id;
 		ha_msg_value_int(msg, F_LRM_CALLID, &cancel_op_id);
 		
-		lrmd_debug(LOG_DEBUG
+		lrmd_debug2(LOG_DEBUG
 		,	"%s:client [pid:%d] cancel the operation [callid:%d]"
 		,	__FUNCTION__
 		,	client->pid
@@ -2603,7 +2603,7 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	CHECK_ALLOCATED(msg, "message", HA_FAIL);
 
 	id = ha_msg_value(msg,F_LRM_RID);
-	lrmd_debug(LOG_DEBUG
+	lrmd_debug2(LOG_DEBUG
 	,	"%s: client [%d] want to get the state of resource %s"
 	,	__FUNCTION__, client->pid, lrmd_nullcheck(id));
 
@@ -2970,7 +2970,7 @@ on_op_done(lrmd_op_t* op)
 	
 	/* remove the op from op_list and copy to last_op */
 	rsc->op_list = g_list_remove(rsc->op_list,op);
-	lrmd_debug(LOG_DEBUG
+	lrmd_debug2(LOG_DEBUG
 	, 	"on_op_done:%s is removed from op list" 
 	,	op_info(op));
 
@@ -3089,7 +3089,7 @@ perform_op(lrmd_rsc_t* rsc)
 		}
 
 		if (child_number >= MAX_CHILD_NUMBER) {
-			lrmd_log(LOG_NOTICE
+			lrmd_debug2(LOG_NOTICE
 				, "Because the child number reachs the maximum"
 				  " %d, the operations are postponed to execute"
 				  " behind and including this: %s "
@@ -3371,21 +3371,21 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 				     , op->first_line_ra_stdout);
 	if (rc != EXECRA_OK || debug_level > 0) {
 		if (signo != 0) {
-			lrmd_log(rc == EXECRA_OK ? LOG_DEBUG : LOG_WARNING
+			lrmd_debug(rc == EXECRA_OK ? LOG_DEBUG : LOG_WARNING
 			,	"Resource Agent (%s): pid [%d] killed by"
 			" signal %d",	op_info(op), p->pid, signo);
 		}else if (rc == exitcode) {
-			lrmd_log(rc == EXECRA_OK ? LOG_DEBUG : LOG_INFO
+			lrmd_debug2(rc == EXECRA_OK ? LOG_DEBUG : LOG_INFO
 			,	"Resource Agent (%s): pid [%d] exited with"
 			" return code %d", op_info(op), p->pid, rc);
 		}else{
-			lrmd_log(rc == EXECRA_OK ? LOG_DEBUG : LOG_INFO
+			lrmd_debug2(rc == EXECRA_OK ? LOG_DEBUG : LOG_INFO
 			,	"Resource Agent (%s): pid [%d] exited with"
 			" return code %d (mapped from %d)"
 			,	op_info(op), p->pid, rc, exitcode);
 		}
 		if (rc != EXECRA_OK || debug_level > 1) {
-			lrmd_log(LOG_INFO, "Resource Agent output: [%s]"
+			lrmd_debug2(LOG_INFO, "Resource Agent output: [%s]"
 			,	op->first_line_ra_stdout);
 		}
 	}
@@ -3569,7 +3569,7 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 		if (  (0==STRNCMP_CONST(rapop->op_type, "meta-data"))
 		    ||(0==STRNCMP_CONST(rapop->op_type, "monitor")) 
 		    ||(0==STRNCMP_CONST(rapop->op_type, "status")) ) {
-			lrmd_debug(LOG_DEBUG, "RA output: (%s:%s:stdout) %s"
+			lrmd_debug2(LOG_DEBUG, "RA output: (%s:%s:stdout) %s"
 				, rapop->rsc_id, rapop->op_type, data);
 		} else {
 			lrmd_log(LOG_INFO, "RA output: (%s:%s:stdout) %s"
@@ -3886,6 +3886,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.235  2006/08/11 00:11:59  zhenh
+ * downgrade some general log
+ *
  * Revision 1.234  2006/08/07 15:07:29  alan
  * Lowered limit on maximum number of simultaneous child processes in the lrmd.
  *
