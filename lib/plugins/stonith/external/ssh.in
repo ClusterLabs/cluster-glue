@@ -24,10 +24,10 @@
 # Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
 #
 
-#SSH_COMMAND "ssh -q -x -o PasswordAuthentication=no StrictHostKeyChecking=no" 
-SSH_COMMAND="ssh -q -x -n -l root"
+#SSH_COMMAND "@SSH@ -q -x -o PasswordAuthentication=no StrictHostKeyChecking=no" 
+SSH_COMMAND="@SSH@ -q -x -n -l root"
 
-REBOOT_COMMAND="echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
+REBOOT_COMMAND="echo 'sleep 2; @REBOOT@ @REBOOT_OPTIONS@' | SHELL=/bin/sh at now >/dev/null 2>&1"
 
 # Warning: If you select this poweroff command, it'll physically
 # power-off the machine, and quite a number of systems won't be remotely
@@ -35,7 +35,7 @@ REBOOT_COMMAND="echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/nu
 # TODO: Probably should touch a file on the server instead to just
 # prevent heartbeat et al from being started after the reboot.
 # POWEROFF_COMMAND="echo 'sleep 2; /sbin/poweroff -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
-POWEROFF_COMMAND="echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
+POWEROFF_COMMAND="echo 'sleep 2; @REBOOT@ @REBOOT_OPTIONS@' | SHELL=/bin/sh at now >/dev/null 2>&1"
 
 # Rewrite the hostlist to accept "," as a delimeter for hostnames too.
 hostlist=`echo $hostlist | tr ',' ' '`
