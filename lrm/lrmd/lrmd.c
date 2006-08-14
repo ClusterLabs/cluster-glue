@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.235 2006/08/11 00:11:59 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.236 2006/08/14 20:19:20 lars Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -58,6 +58,7 @@
 #include <lrm/lrm_msg.h>
 #include <lrm/raexec.h>
 
+/* TODO: move to internal header */
 #define	MAX_PID_LEN 256
 #define	MAX_PROC_NAME 256
 #define	MAX_MSGTYPELEN 32
@@ -71,6 +72,8 @@
 
 /* Donnot directly use the definition in heartbeat.h/hb_api.h for fewer
  * dependency, but need to keep identical with them.
+ *
+ * TODO: If it is common, it should come from a common header.
  */
 #define ENV_PREFIX "HA_"
 #define KEY_LOGDAEMON   "use_logd"
@@ -114,14 +117,14 @@ static	gboolean	in_alloc_dump = FALSE;
 #define CHECK_RETURN_OF_CREATE_LRM_RET					\
 	if (NULL == msg) {						\
 		lrmd_log(LOG_ERR					\
-		, 	"%s: can not create a ret message with create_lrm_ret."	\
+		, 	"%s: cannot create a ret message with create_lrm_ret."	\
 		, 	__FUNCTION__);					\
 		return HA_FAIL;						\
 	}
 
 #define LOG_FAILED_TO_ADD_FIELD(field)					\
 			lrmd_log(LOG_ERR				\
-			,	"%s:%d: can not add the field %s to a message." \
+			,	"%s:%d: cannot add the field %s to a message." \
 			,	__FUNCTION__				\
 			,	__LINE__				\
 			,	field);
@@ -230,7 +233,7 @@ struct lrmd_op
 };
 
 
-/* For read the output from RAs' execution ( its children ) */
+/* For reading the output from executing the RA */
 struct ra_pipe_op
 {
 	/* The same value of the one in corresponding lrmd_op */
@@ -246,6 +249,9 @@ struct ra_pipe_op
 	char *		op_type;
 	char *		rsc_class;
 };
+
+/* TODO: This ought to be broken up into several source files for easier
+ * reading and debugging. */
 
 /* Debug oriented funtions */
 static gboolean debug_level_adjust(int nsig, gpointer user_data);
@@ -362,9 +368,9 @@ static GList* ra_class_list		= NULL;
 static gboolean shutdown_in_progress	= FALSE;
 static unsigned long apphb_interval 	= 2000; /* Millisecond */
 static gboolean reg_to_apphbd		= FALSE;
-static int MAX_CHILD_NUMBER		= 4;
-static int INTERVAL_RETRY		= 1000; /* Millisecond */
-static int child_number			= 0;
+static int max_children			= 4;
+static int retry_interval		= 1000; /* Millisecond */
+static int child_count			= 0;
 
 /*
  * Daemon functions
@@ -1798,6 +1804,8 @@ on_op_timeout_expired(gpointer data)
 
 	rsc = lookup_rsc(op->rsc_id);
 	on_op_done(op);
+	/* TODO: This seems to always execute the next operation queued
+	 * for the resource when the previous one expired - why? */
 	if (rsc != NULL) {
 		perform_op(rsc);
 	}
@@ -1835,6 +1843,10 @@ on_repeat_op_readytorun(gpointer data)
 		Gmain_timeout_remove(op->repeat_timeout_tag);
 		op->repeat_timeout_tag = (guint)-1;
 	}
+
+	/* FIXME: Is there a special reason for setting
+	 * op->repeat_timeout_tag twice, and if so, why does the cast to
+	 * (guint) matter once but not twice? */
 
 	op->repeat_timeout_tag = -1;
 	op->exec_pid = -1;
@@ -3068,39 +3080,37 @@ perform_op(lrmd_rsc_t* rsc)
 	GList* node = NULL;
 	lrmd_op_t* op = NULL;
 
-	CHECK_ALLOCATED(rsc, "resource", HA_FAIL );
+	CHECK_ALLOCATED(rsc, "resource", HA_FAIL);
 	if (TRUE == shutdown_in_progress && can_shutdown()) {
 		lrm_shutdown();
 	}
 	
 	if (NULL == rsc->op_list) {
-		lrmd_debug2(LOG_DEBUG,"perform_op: no op to perform");
+		lrmd_debug2(LOG_DEBUG,"perform_op: no op to perform?");
 		return HA_OK;
 	}
 
 	node = g_list_first(rsc->op_list);
-	while ( NULL != node ) {
+	while (NULL != node) {
 		op = node->data;
-		if (-1 != op->exec_pid )	{
-			lrmd_debug(LOG_DEBUG, "perform_op: current op is performing.");
-			lrmd_debug(LOG_DEBUG, "perform_op: its information: %s."
+		if (-1 != op->exec_pid)	{
+			lrmd_debug(LOG_DEBUG, "perform_op: current op for rsc is already running.");
+			lrmd_debug(LOG_DEBUG, "perform_op: its information: %s"
 			,	  op_info(op));
 			break;
 		}
 
-		if (child_number >= MAX_CHILD_NUMBER) {
+		if (child_count >= max_children) {
 			lrmd_debug2(LOG_NOTICE
-				, "Because the child number reachs the maximum"
-				  " %d, the operations are postponed to execute"
-				  " behind and including this: %s "
-				, MAX_CHILD_NUMBER
-				, op_info(op));
-			rsc->delay_timeout = Gmain_timeout_add(INTERVAL_RETRY
+				, "max_child_count (%d) reached, postponing "
+				  "execution of %s by %d ms",
+				, max_children, op_info(op), retry_interval);
+			rsc->delay_timeout = Gmain_timeout_add(retry_interval
 					, rsc_execution_freeze_timeout, rsc);
 			break;
 		}
 
-		if ( HA_OK != perform_ra_op(op)) {
+		if (HA_OK != perform_ra_op(op)) {
 			lrmd_log(LOG_ERR
 			,	"unable to perform_ra_op on %s"
 			,	op_info(op));
@@ -3207,7 +3217,7 @@ perform_ra_op(lrmd_op_t* op)
 			return HA_FAIL;
 
 		default:	/* Parent */
-			child_number++;
+			child_count++;
 			NewTrackedProc(pid, 1, PT_LOGNONE, op, &ManagedChildTrackOps);
 
 			close(stdout_fd[1]);
@@ -3296,9 +3306,9 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
         int ret;
 	int op_status;
 
-	if (--child_number < 0) {
+	if (--child_count < 0) {
 		lrmd_log(LOG_ERR, "%s:%d: child number is less than zero: %d"
-			, __FUNCTION__, __LINE__, child_number);
+			, __FUNCTION__, __LINE__, child_count);
 	}
 
 	CHECK_ALLOCATED(p, "ProcTrack p", );
@@ -3886,6 +3896,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.236  2006/08/14 20:19:20  lars
+ * Minor code cleanups.
+ *
  * Revision 1.235  2006/08/11 00:11:59  zhenh
  * downgrade some general log
  *
