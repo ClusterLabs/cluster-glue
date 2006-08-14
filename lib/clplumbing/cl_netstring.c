@@ -284,7 +284,7 @@ peel_netstring(const char * s, const char * smax, int* len,
 		sp ++;
 	}
 
-	if (sp >= smax ){
+	if (sp >= smax) {
 		return(HA_FAIL);
 	}
 
@@ -293,6 +293,9 @@ peel_netstring(const char * s, const char * smax, int* len,
 	*data = sp;
 	
 	sp += (*len);
+	if (sp >= smax) {
+		return(HA_FAIL);
+	}
 	if (*sp != ','){
 		return(HA_FAIL);
 	}
