@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.239 2006/08/15 08:51:31 lars Exp $ */
+/* $Id: lrmd.c,v 1.240 2006/08/15 08:51:59 lars Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3110,7 +3110,7 @@ perform_op(lrmd_rsc_t* rsc)
 			lrmd_debug2(LOG_NOTICE
 			, 	"max_child_count (%d) reached, postponing "
 				"execution of %s by %d ms"
-			, 	max_children, op_info(op), retry_interval);
+			, 	max_child_count, op_info(op), retry_interval);
 			rsc->delay_timeout = Gmain_timeout_add(retry_interval
 					, rsc_execution_freeze_timeout, rsc);
 			break;
@@ -3902,6 +3902,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.240  2006/08/15 08:51:59  lars
+ * Conflict resolution artifact.
+ *
  * Revision 1.239  2006/08/15 08:51:31  lars
  * If the resource has already been postponed once, don't overwrite the
  * existing timer.
