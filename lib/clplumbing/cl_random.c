@@ -36,6 +36,7 @@
 #include <time.h>
 #endif
 #include <sys/time.h>
+#include <sys/times.h>
 
 #define	MAXRAND 100	/* How many do we try and keep around? */
 
