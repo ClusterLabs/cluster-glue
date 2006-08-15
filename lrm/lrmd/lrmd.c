@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.237 2006/08/15 01:48:55 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.238 2006/08/15 06:56:02 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -547,14 +547,14 @@ lrmd_op_destroy(lrmd_op_t* op)
 		return;
 	}
 
-	if ((int)op->repeat_timeout_tag > 0) {
+	if (op->repeat_timeout_tag > 0) {
 		Gmain_timeout_remove(op->repeat_timeout_tag);
-		op->repeat_timeout_tag =(guint)-1;
+		op->repeat_timeout_tag =(guint)0;
 	}
 
-	if ((int)op->timeout_tag > 0) {
+	if (op->timeout_tag > 0) {
 		Gmain_timeout_remove(op->timeout_tag);
-		op->timeout_tag = (guint)-1;
+		op->timeout_tag = (guint)0;
 	}
 
 	ha_msg_del(op->msg);
@@ -587,8 +587,8 @@ lrmd_op_new(void)
 	op->rsc_id = NULL;
 	op->msg = NULL;
 	op->exec_pid = -1;
-	op->timeout_tag = -1;
-	op->repeat_timeout_tag = -1;
+	op->timeout_tag = 0;
+	op->repeat_timeout_tag = 0;
 	op->rapop = NULL;
 	op->first_line_ra_stdout[0] = EOS;
 	op->t_recv = time_longclock();
@@ -618,10 +618,10 @@ lrmd_op_copy(const lrmd_op_t* op)
 	ret->rapop = NULL;
 	ret->msg = ha_msg_copy(op->msg);
 	ret->rsc_id = cl_strdup(op->rsc_id);
-	ret->timeout_tag = -1;
+	ret->timeout_tag = 0;
 	ret->rapop = NULL;
 	ret->first_line_ra_stdout[0] = EOS;
-	ret->repeat_timeout_tag = -1;
+	ret->repeat_timeout_tag = 0;
 	ret->exec_pid = -1;
 	ret->is_copy = TRUE;
 	return ret;
@@ -870,9 +870,9 @@ lrmd_rsc_destroy(lrmd_rsc_t* rsc)
 		rsc->last_op_done = NULL;
 	}
 
-	if ((int)rsc->delay_timeout > 0) {
+	if (rsc->delay_timeout > 0) {
 		Gmain_timeout_remove(rsc->delay_timeout);
-		rsc->delay_timeout = (guint)-1;
+		rsc->delay_timeout = (guint)0;
 	}
 
 	cl_free(rsc);
@@ -889,7 +889,7 @@ lrmd_rsc_new(const char * id, struct ha_msg* msg)
 		dump_mem_stats();
 		return NULL;
 	}
-	rsc->delay_timeout = (guint)-1;
+	rsc->delay_timeout = (guint)0;
 	if (id) {
 		rsc->id = cl_strdup(id);
 	}
@@ -1322,7 +1322,6 @@ emit_apphb(gpointer data)
 int
 init_start ()
 {
-	long pid;
 	DIR* dir = NULL;
 	PILPluginUniv * PluginLoadingSystem = NULL;
 	struct dirent* subdir;
@@ -1347,7 +1346,7 @@ init_start ()
 		{"RAExec", &RAExecFuncs, NULL, NULL, NULL},
 		{ NULL, NULL, NULL, NULL, NULL} };
 
-	if ((pid = cl_lock_pidfile(PID_FILE)) < 0) {
+	if (cl_lock_pidfile(PID_FILE) < 0) {
 		lrmd_log(LOG_ERR, "already running: [pid %d].", cl_read_pidfile(PID_FILE));
 		lrmd_log(LOG_ERR, "Startup aborted (already running).  Shutting down."); 
 		exit(100);
@@ -1839,18 +1838,18 @@ on_repeat_op_readytorun(gpointer data)
 		return FALSE;
 	}
 	rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
-	if ((int)op->repeat_timeout_tag > 0) {
+	if (op->repeat_timeout_tag > 0) {
 		Gmain_timeout_remove(op->repeat_timeout_tag);
-		op->repeat_timeout_tag = (guint)-1;
+		op->repeat_timeout_tag = (guint)0;
 	}
 
 	/* FIXME: Is there a special reason for setting
 	 * op->repeat_timeout_tag twice, and if so, why does the cast to
 	 * (guint) matter once but not twice? */
 
-	op->repeat_timeout_tag = -1;
+	op->repeat_timeout_tag = 0;
 	op->exec_pid = -1;
-	op->timeout_tag = -1;
+	op->timeout_tag = 0;
 
 	if (!shutdown_in_progress) {
 		op->t_addtolist = time_longclock();
@@ -2504,7 +2503,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		op->call_id = call_id;
 		op->exec_pid = -1;
 		op->client_id = client->pid;
-		op->timeout_tag = -1;
+		op->timeout_tag = 0;
 		op->rsc_id = cl_strdup(rsc->id);
 		op->msg = ha_msg_copy(msg);
 		op->t_recv = time_longclock();
@@ -2793,8 +2792,8 @@ record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
 		/* Don't let the timers go away */
 		lrmd_op_destroy(old_op);
 	}else{
-		new_op->timeout_tag = (guint)-1;
-		new_op->repeat_timeout_tag = (guint)-1;
+		new_op->timeout_tag = (guint)0;
+		new_op->repeat_timeout_tag = (guint)0;
 		new_op->exec_pid = -1;
 		g_hash_table_insert(client_last_op
 		, 	op_hash_key
@@ -2837,9 +2836,9 @@ on_op_done(lrmd_op_t* op)
 	/*  we should check if the resource exists. */
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
-		if((int)op->timeout_tag > 0 ) {
+		if(op->timeout_tag > 0 ) {
 			Gmain_timeout_remove(op->timeout_tag);
-			op->timeout_tag = (guint)-1;
+			op->timeout_tag = (guint)0;
 		}
 		lrmd_log(LOG_ERR
 		,	"%s: the resource for the operation %s does not exist."
@@ -2986,9 +2985,9 @@ on_op_done(lrmd_op_t* op)
 	, 	"on_op_done:%s is removed from op list" 
 	,	op_info(op));
 
-	if( (int)op->timeout_tag > 0 ) {
+	if( op->timeout_tag > 0 ) {
 		Gmain_timeout_remove(op->timeout_tag);
-		op->timeout_tag = (guint)-1;
+		op->timeout_tag = (guint)0;
 	}
 	
 	
@@ -3003,15 +3002,15 @@ on_op_done(lrmd_op_t* op)
 		lrmd_op_destroy(rsc->last_op_done);
 	}
 	rsc->last_op_done = lrmd_op_copy(op);
-	rsc->last_op_done->timeout_tag = (guint)-1;
-	rsc->last_op_done->repeat_timeout_tag = (guint)-1;
+	rsc->last_op_done->timeout_tag = (guint)0;
+	rsc->last_op_done->repeat_timeout_tag = (guint)0;
 	
 	/*copy the repeat op to repeat list to wait next perform */
 	if ( 0 != op->interval && NULL != lookup_client(op->client_id)
 	&&   LRM_OP_CANCELLED != op_status) {
 		lrmd_op_t* repeat_op = lrmd_op_copy(op);
 		repeat_op->exec_pid = -1;
-		repeat_op->timeout_tag = -1;
+		repeat_op->timeout_tag = 0;
 		repeat_op->is_copy = FALSE;
 		repeat_op->repeat_timeout_tag = 
 			Gmain_timeout_add(op->interval,	
@@ -3063,9 +3062,9 @@ rsc_execution_freeze_timeout(gpointer data)
 		return FALSE;
 	}
 
-	if ((int)rsc->delay_timeout > 0) {
+	if (rsc->delay_timeout > 0) {
 		Gmain_timeout_remove(rsc->delay_timeout);
-		rsc->delay_timeout = (guint)-1;
+		rsc->delay_timeout = (guint)0;
 	}
 
 	perform_op(rsc);
@@ -3896,6 +3895,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.238  2006/08/15 06:56:02  zhenh
+ * use zero as unset tag of gloop instead of -1. avoid beam complain
+ *
  * Revision 1.237  2006/08/15 01:48:55  zhenh
  * remove the more comma
  *
