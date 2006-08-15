@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.236 2006/08/14 20:19:20 lars Exp $ */
+/* $Id: lrmd.c,v 1.237 2006/08/15 01:48:55 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -3103,7 +3103,7 @@ perform_op(lrmd_rsc_t* rsc)
 		if (child_count >= max_children) {
 			lrmd_debug2(LOG_NOTICE
 				, "max_child_count (%d) reached, postponing "
-				  "execution of %s by %d ms",
+				  "execution of %s by %d ms"
 				, max_children, op_info(op), retry_interval);
 			rsc->delay_timeout = Gmain_timeout_add(retry_interval
 					, rsc_execution_freeze_timeout, rsc);
@@ -3896,6 +3896,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.237  2006/08/15 01:48:55  zhenh
+ * remove the more comma
+ *
  * Revision 1.236  2006/08/14 20:19:20  lars
  * Minor code cleanups.
  *
