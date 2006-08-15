@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.240 2006/08/15 08:51:59 lars Exp $ */
+/* $Id: lrmd.c,v 1.241 2006/08/15 10:06:19 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -2096,6 +2096,9 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 			}
 			g_free(meta);
 		}
+		else {
+			ha_msg_mod_int(ret, F_LRM_RET, HA_FAIL);
+		}
 	}
 
 	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
@@ -3902,6 +3905,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.241  2006/08/15 10:06:19  zhenh
+ * return fail when we can't get the metadata
+ *
  * Revision 1.240  2006/08/15 08:51:59  lars
  * Conflict resolution artifact.
  *
