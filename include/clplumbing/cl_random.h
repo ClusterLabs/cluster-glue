@@ -19,5 +19,5 @@
  */
 
 
-int	cl_randseed(void);
-int	get_next_random(void);	 /* Assumes mainloop setup */
+unsigned int	cl_randseed(void);
+int		get_next_random(void);	 /* Assumes mainloop setup */

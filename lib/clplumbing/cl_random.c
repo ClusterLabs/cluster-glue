@@ -129,13 +129,18 @@ cl_init_random(void)
 
 
 /* Used to provide seed to the random number generator */
-int
+unsigned int
 cl_randseed(void)
 {
 	char buf[16];
 	FILE* fs;
 	struct timeval tv;
+	static struct tms	dummy_tms_struct;
+	const char * randdevname [] = {"/dev/urandom", "/dev/random"};
+	int			idev;
+#if 0
 	long horrid;
+#endif
 
 	/*
 	 * Notes, based on reading of man pages of Solaris, FreeBSD and Linux,
@@ -180,19 +185,21 @@ cl_randseed(void)
 	 */
 
 	/*
-	 * Does "/dev/urandom" work?
+	 * Does any of the random device names work?
 	 */
-	fs = fopen("/dev/urandom", "r");
-	if (fs == NULL) {
-		cl_log(LOG_INFO, "%s: Opening file /dev/urandom failed", 
-		       __FUNCTION__);
-	}else{
-		if (fread(buf, 1, sizeof(buf), fs)!= sizeof(buf)){
-			cl_log(LOG_INFO, "%s: reading file /dev/urandom failed",
-			       __FUNCTION__);
+	for (idev=0; idev < DIMOF(randdevname); ++idev) {
+		fs = fopen(randdevname[idev], "r");
+		if (fs == NULL) {
+			cl_log(LOG_INFO, "%s: Opening file %s failed"
+		       	,	__FUNCTION__, randdevname[idev]);
 		}else{
-			return cl_binary_to_int(buf, sizeof(buf));
-		}	
+			if (fread(buf, 1, sizeof(buf), fs)!= sizeof(buf)){
+				cl_log(LOG_INFO, "%s: reading file %s failed"
+		       	,	__FUNCTION__, randdevname[idev]);
+			}else{
+				return (unsigned int)cl_binary_to_int(buf, sizeof(buf));
+			}	
+		}
 	}
 
 	/*
@@ -204,14 +211,28 @@ cl_randseed(void)
 		cl_log(LOG_INFO, "%s: gettimeofday failed", 
 		       __FUNCTION__);
 	}else{
-		return tv.tv_usec;
+		return (unsigned int) tv.tv_usec;
 	}
+	/*
+	 * times(2) returns the number of clock ticks since
+	 * boot.  Fairly predictable, but not completely so...
+	 *
+	 * The man page claims times(2) can fail, but the
+	 * correct return result also might include -1 so
+	 * in practice it's impossible to tell, and since
+	 * dummy_tms_struct can't be invalid there is no
+	 * known reason why it should fail.
+	 */
+	return (unsigned int) times(&dummy_tms_struct);
 
+
+#if 0
 	/*
 	 * If all else has failed, return (as a number) the address of
 	 * something on the stack.
 	 * Poor, but at least it has a chance of some sort of variability.
 	 */
 	horrid = (long) &tv;
-	return (int) horrid;
+	return (unsigned int) horrid; /* pointer to local variable exposed */
+#endif
 }
