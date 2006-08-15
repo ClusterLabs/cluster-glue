@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.238 2006/08/15 06:56:02 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.239 2006/08/15 08:51:31 lars Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -368,7 +368,7 @@ static GList* ra_class_list		= NULL;
 static gboolean shutdown_in_progress	= FALSE;
 static unsigned long apphb_interval 	= 2000; /* Millisecond */
 static gboolean reg_to_apphbd		= FALSE;
-static int max_children			= 4;
+static int max_child_count		= 4;
 static int retry_interval		= 1000; /* Millisecond */
 static int child_count			= 0;
 
@@ -3099,11 +3099,18 @@ perform_op(lrmd_rsc_t* rsc)
 			break;
 		}
 
-		if (child_count >= max_children) {
+		if ((int)rsc->delay_timeout > 0) {
+			lrmd_log(LOG_INFO
+			,	"Operation is already delayed: %s"
+			,	op_info(op));
+			break;
+		}
+
+		if (child_count >= max_child_count) {
 			lrmd_debug2(LOG_NOTICE
-				, "max_child_count (%d) reached, postponing "
-				  "execution of %s by %d ms"
-				, max_children, op_info(op), retry_interval);
+			, 	"max_child_count (%d) reached, postponing "
+				"execution of %s by %d ms"
+			, 	max_children, op_info(op), retry_interval);
 			rsc->delay_timeout = Gmain_timeout_add(retry_interval
 					, rsc_execution_freeze_timeout, rsc);
 			break;
@@ -3895,6 +3902,10 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.239  2006/08/15 08:51:31  lars
+ * If the resource has already been postponed once, don't overwrite the
+ * existing timer.
+ *
  * Revision 1.238  2006/08/15 06:56:02  zhenh
  * use zero as unset tag of gloop instead of -1. avoid beam complain
  *
