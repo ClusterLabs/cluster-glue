@@ -1,4 +1,4 @@
-/* $Id: GSource.c,v 1.84 2006/07/17 16:56:47 davidlee Exp $ */
+/* $Id: GSource.c,v 1.85 2006/08/16 14:37:08 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *
@@ -970,7 +970,6 @@ G_SIG_prepare(GSource* source, gint* timeoutms)
 	*timeoutms = 1000;	/* Sigh... */
 
 	if (sig_src->signal_triggered) {
-		static struct tms	dummy_tms_struct;
 		clock_t			now;
 		clock_t			diff;
 
@@ -980,7 +979,7 @@ G_SIG_prepare(GSource* source, gint* timeoutms)
 			return TRUE;
 		}
 		/* Otherwise, this is when it was first detected */
-		now = times(&dummy_tms_struct);
+		now = cl_times();
 		diff = now - sig_src->sh_detecttime;	/* How long since signal occurred? */
 		lc_store(
 			sig_src->detecttime,
@@ -1004,14 +1003,13 @@ G_SIG_check(GSource* source)
 	g_assert(IS_SIGSOURCE(sig_src));
 	
 	if (sig_src->signal_triggered) {
-		static struct tms	dummy_tms_struct;
 		clock_t			now;
 		clock_t			diff;
 		if (cmp_longclock(lc_fetch(sig_src->detecttime), zero_longclock) != 0){
 			return TRUE;
 		}
 		/* Otherwise, this is when it was first detected */
-		now = times(&dummy_tms_struct);
+		now = cl_times();
 		diff = now - sig_src->sh_detecttime;
 		lc_store(
 			sig_src->detecttime,
@@ -1072,7 +1070,6 @@ G_SIG_destroy(GSource* source)
 static void
 G_main_signal_handler(int nsig)
 {
-	static struct tms	dummy_tms_struct;
 	GSIGSource* sig_src = NULL;
 
 	if(G_main_signal_list == NULL) {
@@ -1095,7 +1092,7 @@ G_main_signal_handler(int nsig)
 	/* Time from first occurance of signal */
 	if (!sig_src->signal_triggered) {
 		/* Avoid calling longclock_time() on a signal */
-		sig_src->sh_detecttime=times(&dummy_tms_struct);
+		sig_src->sh_detecttime=cl_times();
 	}
 	sig_src->signal_triggered = TRUE;
 }
