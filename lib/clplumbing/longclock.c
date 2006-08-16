@@ -1,4 +1,4 @@
-/* $Id: longclock.c,v 1.21 2006/08/16 14:37:08 alan Exp $ */
+/* $Id: longclock.c,v 1.22 2006/08/16 21:55:04 alan Exp $ */
 /*
  * Longclock operations
  *
@@ -72,8 +72,9 @@ hz_longclock(void)
 unsigned long
 cl_times(void)	/* Make times(2) behave rationally on Linux */
 {
+	clock_t		ret;
+#ifndef DISABLE_TIMES_KLUDGE
 	int		save_errno = errno;
-	clock_t	ret;
 
 	/*
 	 * times(2) really returns an unsigned value ...
@@ -87,8 +88,10 @@ cl_times(void)	/* Make times(2) behave rationally on Linux */
 	 *
 	 */
 	errno	= 0;
+#endif /* DISABLE_TIMES_KLUDGE */
 	ret	= times(TIMES_PARAM);
 
+#ifndef DISABLE_TIMES_KLUDGE
 /*
  *	This is to work around a bug in the system call interface
  *	for times(2) found in glibc on Linux (and maybe elsewhere)
@@ -105,6 +108,7 @@ cl_times(void)	/* Make times(2) behave rationally on Linux */
 		ret = (clock_t) (-errno);
 	}
 	errno = save_errno;
+#endif /* DISABLE_TIMES_KLUDGE */
 	return (unsigned long)ret;
 }
 

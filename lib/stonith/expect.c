@@ -1,4 +1,4 @@
-/* $Id: expect.c,v 1.22 2006/08/16 14:37:08 alan Exp $ */
+/* $Id: expect.c,v 1.23 2006/08/16 21:55:04 alan Exp $ */
 /*
  * Simple expect module for the STONITH library
  *
@@ -76,22 +76,28 @@ extern 	PILPluginUniv*	StonithPIsys;
 static unsigned long
 our_times(void)	/* Make times(2) behave rationally on Linux */
 {
+	clock_t		ret;
+#ifndef DISABLE_TIMES_KLUDGE
 	int		save_errno;
-	clock_t	ret;
 
 	/*
 	 * This code copied from clplumbing/longclock.c to avoid
 	 * making STONITH depend on clplumbing.  See it for an explanation
 	 */
 	errno	= 0;
+#endif /* DISABLE_TIMES_KLUDGE */
+
 	ret	= times(TIMES_PARAM);
 
+#ifndef DISABLE_TIMES_KLUDGE
 	if (errno != 0) {
 		ret = (clock_t) (-errno);
 	}
 	errno = save_errno;
+#endif /* DISABLE_TIMES_KLUDGE */
 	return (unsigned long)ret;
 }
+
 /*
  *	Look for ('expect') any of a series of tokens in the input
  *	Return the token type for the given token or -1 on error.
