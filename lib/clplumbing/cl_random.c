@@ -136,7 +136,6 @@ cl_randseed(void)
 	char buf[16];
 	FILE* fs;
 	struct timeval tv;
-	static struct tms	dummy_tms_struct;
 	const char * randdevname [] = {"/dev/urandom", "/dev/random"};
 	int			idev;
 #if 0
@@ -217,14 +216,8 @@ cl_randseed(void)
 	/*
 	 * times(2) returns the number of clock ticks since
 	 * boot.  Fairly predictable, but not completely so...
-	 *
-	 * The man page claims times(2) can fail, but the
-	 * correct return result also might include -1 so
-	 * in practice it's impossible to tell, and since
-	 * dummy_tms_struct can't be invalid there is no
-	 * known reason why it should fail.
 	 */
-	return (unsigned int) times(&dummy_tms_struct);
+	return (unsigned int) cl_times();
 
 
 #if 0

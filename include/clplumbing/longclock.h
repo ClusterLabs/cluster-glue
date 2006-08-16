@@ -1,4 +1,4 @@
-/* $Id: longclock.h,v 1.9 2005/06/22 14:01:34 davidlee Exp $ */
+/* $Id: longclock.h,v 1.10 2006/08/16 14:37:07 alan Exp $ */
 /*
  * Longclock operations
  *
@@ -39,6 +39,10 @@
  *
  *	The functions provided here are:
  *
+ *	unsigned long	cl_times(void);
+ *			A rational wrapper for the times(2) call
+ *			for those cases where only the return value
+ *			is wanted.
  *	longclock_t	time_longclock(void);
  *			Returns current time as a longclock_t.
  *
@@ -77,6 +81,7 @@
  *
  *	extern const longclock_t	zero_longclock;
  */
+extern unsigned long cl_times(void);
 
 #ifdef CLOCK_T_IS_LONG_ENOUGH
 #	ifndef	HAVE_LONGCLOCK_ARITHMETIC

@@ -1,4 +1,4 @@
-/* $Id: longclock.c,v 1.20 2006/02/06 13:53:53 alan Exp $ */
+/* $Id: longclock.c,v 1.21 2006/08/16 14:37:08 alan Exp $ */
 /*
  * Longclock operations
  *
@@ -24,6 +24,7 @@
 #include <portability.h>
 #include <unistd.h>
 #include <sys/times.h>
+#include <errno.h>
 #include <clplumbing/longclock.h>
 #include <clplumbing/cl_log.h>
 
@@ -61,14 +62,59 @@ hz_longclock(void)
 	return Hz;
 }
 
-static struct tms	longclock_dummy_tms_struct;
+#ifdef	TIMES_ALLOWS_NULL_PARAM
+#	define	TIMES_PARAM	NULL
+#else
+	static struct tms	dummy_longclock_tms_struct;
+#	define	TIMES_PARAM	&dummy_longclock_tms_struct
+#endif
+
+unsigned long
+cl_times(void)	/* Make times(2) behave rationally on Linux */
+{
+	int		save_errno = errno;
+	clock_t	ret;
+
+	/*
+	 * times(2) really returns an unsigned value ...
+	 *
+	 * We don't check to see if we got back the error value (-1), because
+	 * the only possibility for an error would be if the address of 
+	 * longclock_dummy_tms_struct was invalid.  Since it's a
+	 * compiler-generated address, we assume that errors are impossible.
+	 * And, unfortunately, it is quite possible for the correct return
+	 * from times(2) to be exactly (clock_t)-1.  Sigh...
+	 *
+	 */
+	errno	= 0;
+	ret	= times(TIMES_PARAM);
+
+/*
+ *	This is to work around a bug in the system call interface
+ *	for times(2) found in glibc on Linux (and maybe elsewhere)
+ *	It changes the return values from -1 to -4096 all into
+ *	-1 and then dumps the -(return value) into errno.
+ *
+ *	This totally bizarre behavior seems to be widespread in
+ *	versions of Linux and glibc.
+ *
+ *	Many thanks to Wolfgang Dumhs <wolfgang.dumhs (at) gmx.at>
+ *	for finding and documenting this bizarre behavior.
+ */
+	if (errno != 0) {
+		ret = (clock_t) (-errno);
+	}
+	errno = save_errno;
+	return (unsigned long)ret;
+}
+
 #ifdef CLOCK_T_IS_LONG_ENOUGH
 longclock_t
 time_longclock(void)
 {
 
 	/* See note below about deliberately ignoring errors... */
-	return (longclock_t)times(&longclock_dummy_tms_struct);
+	return (longclock_t)cl_times();
 }
 
 #else	/* clock_t is shorter than 64 bits */
@@ -89,18 +135,8 @@ time_longclock(void)
 	unsigned long		timesval;
 
 	++callcount;
-	/*
-	 * times(2) really returns an unsigned value ...
-	 *
-	 * We don't check to see if we got back the error value (-1), because
-	 * the only possibility for an error would be if the address of 
-	 * longclock_dummy_tms_struct was invalid.  Since it's a
-	 * compiler-generated address, we assume that errors are impossible.
-	 * And, unfortunately, it is quite possible for the correct return
-	 * from times(2) to be exactly (clock_t)-1.  Sigh...
-	 *
-	 */
-	timesval = (unsigned long) times(&longclock_dummy_tms_struct);
+
+	timesval = (unsigned long) cl_times();
 
 	if (calledbefore && timesval < lasttimes)  {
 		clock_t		jumpbackby = lasttimes - timesval;
