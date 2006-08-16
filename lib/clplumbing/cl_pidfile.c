@@ -119,6 +119,7 @@ DoLock(const char *filename)
 			}
 		}
 		unlink(lf_name);
+		close(fd);
 	}
 	if ((fd = open(tf_name, O_CREAT | O_WRONLY | O_EXCL, 0644)) < 0) {
 		/* Hmmh, why did we fail? Anyway, nothing we can do about it */
@@ -202,17 +203,20 @@ cl_read_pidfile_no_checking(const char*filename)
 	}
 	
 	if (read(fd, buf, sizeof(buf)) < 1) {
+		close(fd);
 		return -1;
 	} 
 	
 	if (sscanf(buf, "%lu", &pid) <= 0) {
+		close(fd);
 		return -1;
 	}
 	
 	if (pid <= 0){
+		close(fd);
 		return -1;
 	}
-
+	close(fd);
 	return pid;
 }
 
