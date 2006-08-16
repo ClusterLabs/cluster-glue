@@ -1,4 +1,4 @@
-/* $Id: lrmd.c,v 1.241 2006/08/15 10:06:19 zhenh Exp $ */
+/* $Id: lrmd.c,v 1.242 2006/08/16 07:13:37 zhenh Exp $ */
 /*
  * Local Resource Manager Daemon
  *
@@ -1678,6 +1678,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 			int ret;
 
 			strncpy(client->lastrequest, type, sizeof(client->lastrequest));
+			client->lastrequest[sizeof(client->lastrequest)-1]='\0';
 			client->lastreqstart = time(NULL);
 			/*call the handler of the message*/
 			ret = msg_maps[i].handler(client, msg);
@@ -3905,6 +3906,9 @@ check_queue_duration(lrmd_op_t* op)
 }
 /*
  * $Log: lrmd.c,v $
+ * Revision 1.242  2006/08/16 07:13:37  zhenh
+ * strncpy doesn't add the tail zero if the src is longer than the dest buf. This patch fixes this issue. found by dvlt(Yan Rong Ge)
+ *
  * Revision 1.241  2006/08/15 10:06:19  zhenh
  * return fail when we can't get the metadata
  *
