@@ -1,4 +1,4 @@
-/* $Id: expect.c,v 1.23 2006/08/16 21:55:04 alan Exp $ */
+/* $Id: expect.c,v 1.24 2006/08/17 08:26:29 zhenh Exp $ */
 /*
  * Simple expect module for the STONITH library
  *
@@ -78,12 +78,13 @@ our_times(void)	/* Make times(2) behave rationally on Linux */
 {
 	clock_t		ret;
 #ifndef DISABLE_TIMES_KLUDGE
-	int		save_errno;
+	int		save_errno = errno;
 
 	/*
 	 * This code copied from clplumbing/longclock.c to avoid
 	 * making STONITH depend on clplumbing.  See it for an explanation
 	 */
+	
 	errno	= 0;
 #endif /* DISABLE_TIMES_KLUDGE */
 
