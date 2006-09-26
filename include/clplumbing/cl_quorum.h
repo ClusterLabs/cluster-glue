@@ -27,13 +27,17 @@
 #define QUORUM_YES		0
 #define QUORUM_NO		1
 #define QUORUM_TIE		2
+typedef void(*callback_t)(void);
 /*
  *	List of functions provided by implementations of the quorum interface.
  */
 struct hb_quorum_fns {
+	
 	int (*getquorum) (const char* cluster
 	,		int member_count, int member_quorum_votes
 	,		int total_node_count, int total_quorum_votes);
+	int (*init) (callback_t notify, const char* cluster, const char* quorum_server);
+	void (*stop) (void);
 };
 
 
