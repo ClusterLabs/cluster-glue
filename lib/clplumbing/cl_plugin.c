@@ -53,6 +53,7 @@ static PILGenericIfMgmtRqst	reqs[] =
 		{"RAExec", &funcstable[3], NULL, NULL, NULL},
 		{"quorum", &funcstable[4], NULL, NULL, NULL},
 		{"tiebreaker", &funcstable[5], NULL, NULL, NULL},
+		{"quorumd", &funcstable[6], NULL, NULL, NULL},
 		{NULL, NULL, NULL, NULL, NULL}
 	};
 
