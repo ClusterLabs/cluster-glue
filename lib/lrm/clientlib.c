@@ -808,6 +808,7 @@ lrm_rcvmsg (ll_lrm_t* lrm, int blocking)
 		if (NULL!=op && NULL!=op_done_callback) {
 			(*op_done_callback)(op);
 		}
+		free_op(op);
 		ha_msg_del(msg);
 	}
 
@@ -820,6 +821,7 @@ rsc_perform_op (lrm_rsc_t* rsc, lrm_op_t* op)
 {
 	int rc = 0;
 	struct ha_msg* msg = NULL;
+	char* rsc_id;
 
 	/* check whether the channel to lrmd is available */
 	if (NULL == ch_cmd
@@ -832,8 +834,10 @@ rsc_perform_op (lrm_rsc_t* rsc, lrm_op_t* op)
 		return HA_FAIL;
 	}
 	/* create the msg of perform op */
+	rsc_id = op->rsc_id;
 	op->rsc_id = rsc->id;
 	msg = op_to_msg(op);
+	op->rsc_id = rsc_id;
 	if ( NULL == msg) {
 		cl_log(LOG_ERR, "rsc_perform_op: failed to create a message "
 			"with function op_to_msg");
@@ -849,7 +853,6 @@ rsc_perform_op (lrm_rsc_t* rsc, lrm_op_t* op)
 
 	/* check return code, the return code is the call_id of the op */
 	rc = get_ret_from_ch(ch_cmd);
-	op->rsc_id = NULL;
 	return rc;
 }
 
@@ -1327,9 +1330,13 @@ free_op (lrm_op_t* op)
 	if (NULL != op->app_name) {
 		g_free(op->app_name);
 	}
+	if (NULL != op->user_data) {
+		g_free(op->user_data);
+	}
 	if (NULL != op->params) {
 		free_str_table(op->params);
 	}
+	g_free(op);
 }
 
 void lrm_free_op(lrm_op_t* op) {
