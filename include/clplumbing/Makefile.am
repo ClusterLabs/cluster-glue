@@ -55,5 +55,6 @@ include_HEADERS	=	\
 	md5.h		\
 	cl_plugin.h	\
 	cl_tiebreaker.h	\
-	cl_quorum.h	
+	cl_quorum.h	\
+	cl_quorumd.h
 	
