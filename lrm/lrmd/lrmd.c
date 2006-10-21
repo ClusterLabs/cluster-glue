@@ -3716,7 +3716,7 @@ read_pipe(int fd, char ** data, void * user_data)
 		}
 	} while (readlen == BUFFLEN - 1 || errno == EINTR);
 
-	if (errno == EINTR) {
+	if (errno == EINTR || errno == EAGAIN) {
 		errno = 0;
 	}
 	
@@ -3754,26 +3754,7 @@ read_pipe(int fd, char ** data, void * user_data)
 					, __FUNCTION__, __LINE__);
 			}
 			break;
-			
-		case EAGAIN:
-			if (NULL==op) {
-				lrmd_log(LOG_WARNING
-					, "%s::%d: Shouldn't come here: "
-					  "lrmd_op = NULL"
-					, __FUNCTION__, __LINE__);
-				break;
-			}
-			lrmd_log(LOG_ERR, "RA %s:%s:%s (process %d) failed to "
-				"redirect %s for its background child (daemon) "
-				"processes. This will likely cause those "
-				"processes to die mysteriously at some later "
-				"time (terminated by signal SIGPIPE)."
-				, rapop->rsc_class
-				, rapop->rsc_id
-				, rapop->op_type
-				, op->exec_pid
-				, (rapop->ra_stdout_fd==fd)?"stdout":"stderr");
-		}
+		}	
 	}
 
 	if ( gstr_tmp->len == 0 ) {
