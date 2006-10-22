@@ -474,26 +474,45 @@ lrm_get_rsc_provider_supported (ll_lrm_t* lrm, const char* class, const char* ty
 	
 /*
  * lrm_get_all_type_metadatas():
- * For OCF RAs, they may have more than one providers so they may have more than
- * one metadata. The hash table is not suitable for this. Fix Me
+ * The key of the hash table is in the format "type:provider"
+ * The value of the hash table is the metadata.
  */
 static GHashTable*
 lrm_get_all_type_metadata (ll_lrm_t* lrm, const char* rclass)
 {
-	GHashTable* metas = g_hash_table_new(g_str_hash, g_str_equal);
+	GHashTable* metas = g_hash_table_new_full(g_str_hash, g_str_equal
+						  , g_free, g_free);
 	GList* types = lrm_get_rsc_type_supported (lrm, rclass);
-	GList* node = NULL;
-        const char* meta;
+	GList* providers = NULL;
+	GList* cur_type = NULL;
+	GList* cur_provider = NULL;
 
-	for (node = g_list_first(types); NULL!=node; node=g_list_next(node)) {
-		meta = lrm_get_rsc_type_metadata(lrm,rclass,node->data,NULL);
-		if (NULL == meta) {
-			continue;
+	cur_type = g_list_first(types);
+	while (cur_type != NULL)
+	{
+	        const char* type;
+	        char key[MAXLENGTH];
+		type = (const char*) cur_type->data;
+		providers = lrm_get_rsc_provider_supported(lrm, rclass, type);
+		cur_provider = g_list_first(providers);
+		while (cur_provider != NULL) {
+		        const char* meta;
+		        const char* provider;
+			provider = (const char*) cur_provider->data;
+			meta = lrm_get_rsc_type_metadata(lrm,rclass,type,provider);
+			if (NULL == meta) {
+				cur_provider = g_list_next(cur_provider);
+				continue;
+			}
+			snprintf(key,MAXLENGTH, "%s:%s",type,provider);
+			key[MAXLENGTH-1]='\0';
+			g_hash_table_insert(metas,g_strdup(key),g_strdup(meta));
+			cur_provider = g_list_next(cur_provider);
 		}
-		g_hash_table_insert(metas, node->data,g_strdup(meta));
+		lrm_free_str_list(providers);
+		cur_type=g_list_next(cur_type);
 	}
-	g_list_free(types);
-	
+	lrm_free_str_list(types);
 	return metas;
 }
 

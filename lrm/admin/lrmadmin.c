@@ -46,7 +46,7 @@
 #include <clplumbing/GSource.h>
 #include <clplumbing/Gmain_timeout.h>
 
-const char * optstring = "AD:dEF:d:sg:M:P:c:S:LI:CT:n:h";
+const char * optstring = "AD:dEF:d:sg:M:O:P:c:S:LI:CT:n:h";
 
 #ifdef HAVE_GETOPT_H
 static struct option long_options[] = {
@@ -61,6 +61,7 @@ static struct option long_options[] = {
 	{"delete",1,0,'D'},
 	{"raclass_supported",1,0,'C'},
 	{"ratype_supported",1,0,'T'},
+	{"all_type_metadata",1,0,'O'},
 	{"metadata",1,0,'M'},
 	{"provider",1,0,'P'},
 	{"help",0,0,'h'},
@@ -89,6 +90,7 @@ typedef enum {
 	RATYPE_SUPPORTED,
 	RA_METADATA,
 	RA_PROVIDER,
+	ALL_RA_METADATA,
 	HELP
 } lrmadmin_cmd_t;
 
@@ -141,6 +143,7 @@ const char * simple_help_screen =
 "         {-I|--information} <rsc_id>\n"
 "         {-C|--raclass_supported}\n"
 "         {-T|--ratype_supported} <raclass>\n"
+"         {-O|--all metadata of this class} <raclass>\n"
 "         {-M|--metadata} <raclass> <ratype> <provider|NULL>\n"
 "         {-P|--provider} <raclass> <ratype>\n"
 "         {-h|--help}\n";
@@ -161,6 +164,8 @@ static void g_print_stringitem_and_free(gpointer data, gpointer user_data);
 static void g_print_rainfo_item_and_free(gpointer data, gpointer user_data);
 static void g_print_ops(gpointer data, gpointer user_data);
 static void g_get_rsc_description(gpointer data, gpointer user_data);
+static void g_print_meta(gpointer key, gpointer value, gpointer user_data);
+
 static void print_rsc_inf(lrm_rsc_t * lrmrsc);
 static char * params_hashtable_to_str(const char * class, GHashTable * ht);
 static void free_stritem_of_hashtable(gpointer key, gpointer value, 
@@ -190,6 +195,7 @@ int main(int argc, char **argv)
 	GList 	*raclass_list = 0, 
 		*ratype_list = 0,
 		*rscid_list;
+	GHashTable *all_meta = NULL;
 	char raclass[20];
 	const char * login_name = lrmadmin_name;
 
@@ -247,6 +253,14 @@ int main(int argc, char **argv)
 			case 'T':
 				OPTION_OBSCURE_CHECK 
 				lrmadmin_cmd = RATYPE_SUPPORTED;
+				if (optarg) {
+					strncpy(raclass, optarg, 19);
+				}
+				break;
+			
+			case 'O':
+				OPTION_OBSCURE_CHECK 
+				lrmadmin_cmd = ALL_RA_METADATA;
 				if (optarg) {
 					strncpy(raclass, optarg, 19);
 				}
@@ -462,7 +476,14 @@ int main(int argc, char **argv)
 
 			ASYN_OPS = FALSE;
 			break;
-
+		case ALL_RA_METADATA:
+			all_meta = lrmd->lrm_ops->get_all_type_metadata(lrmd, raclass);
+			if (all_meta) {
+				g_hash_table_foreach(all_meta, g_print_meta, NULL);
+				g_hash_table_destroy(all_meta);
+			}
+			ASYN_OPS = FALSE;
+			break;
 		case LIST_ALLRSC:
 			rscid_list = lrmd->lrm_ops->get_all_rscs(lrmd);
 			if (rscid_list) {
@@ -915,7 +936,12 @@ g_get_rsc_description(gpointer data, gpointer user_data)
 	
 	g_free(data);
 }
-
+static void
+g_print_meta(gpointer key, gpointer value, gpointer user_data)
+{
+	printf("%s\n", (const char*)key);
+	printf("%s\n", (const char*)value);
+}
 static void
 print_rsc_inf(lrm_rsc_t * lrm_rsc)
 {
