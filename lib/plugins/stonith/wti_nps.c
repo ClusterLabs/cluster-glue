@@ -432,7 +432,7 @@ NPSNametoOutlet(struct pluginDevice* nps, const char * name, char **outlets)
   				ret = sockno;
   				snprintf(buf, sizeof(buf), "%d ", sockno);
   				strncat(*outlets, buf, left);
-  				left = left - 2;
+  				left = left - strlen(buf);
   			}
   		}
   	} while (strlen(NameMapping) > 2 && left > 0);
