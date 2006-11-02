@@ -111,8 +111,8 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * savebuf
 	unsigned long	starttime;
 	unsigned long	endtime;
 	int		wraparound=0;
-	unsigned	hz =  sysconf(_SC_CLK_TCK);
-	int		tickstousec = (1000000/hz);
+	unsigned	Hertz = sysconf(_SC_CLK_TCK);
+	int		tickstousec = (1000000/Hertz);
 	unsigned long	now;
 	unsigned long	ticks;
 	int		nchars = 1; /* reserve space for an EOS */
@@ -124,7 +124,7 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * savebuf
 	/* Figure out when to give up.  Handle lbolt wraparound */
 
 	starttime = our_times();
-	ticks = (to_secs*hz);
+	ticks = (to_secs*Hertz);
 	endtime = starttime + ticks;
 
 	if (endtime < starttime) {
@@ -151,8 +151,8 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * savebuf
 
 		timeleft = endtime - now;
 
-		tv.tv_sec = timeleft / hz;
-		tv.tv_usec = (timeleft % hz) * tickstousec;
+		tv.tv_sec = timeleft / Hertz;
+		tv.tv_usec = (timeleft % Hertz) * tickstousec;
 
 		if (tv.tv_sec == 0 && tv.tv_usec < tickstousec) {
 			/* Give 'em a little chance */
