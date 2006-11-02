@@ -39,7 +39,7 @@ AM_CFLAGS			= @CFLAGS@
 #main_LDADD		= libpils.la @LIBLTDL@ \
 #			$(GLIBLIB) \
 #			$(top_builddir)/replace/libreplace.la
-#main_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self
+#main_LDFLAGS		= @LIBADD_DL@ @LIBLTDL@ -export-dynamic @DLOPEN_FORCE_FLAGS@
 
 
 ## libraries

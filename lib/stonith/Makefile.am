@@ -36,8 +36,8 @@ sbin_PROGRAMS		= stonith meatclient
 
 stonith_SOURCES		= main.c
 
-stonith_LDADD		= libstonith.la $(GLIBLIB)
-stonith_LDFLAGS		=  @LIBADD_DL@ @LIBLTDL@ -export-dynamic -dlopen force -dlopen self @LIBADD_INTL@
+stonith_LDADD		= libstonith.la $(top_builddir)/lib/pils/libpils.la $(GLIBLIB)
+stonith_LDFLAGS		=  @LIBADD_DL@ @LIBLTDL@ -export-dynamic @DLOPEN_FORCE_FLAGS@ @LIBADD_INTL@ 
 
 meatclient_SOURCES	= meatclient.c 
 meatclient_LDADD	= $(GLIBLIB)
@@ -48,10 +48,9 @@ lib_LTLIBRARIES		= libstonith.la
 
 libstonith_la_SOURCES	= expect.c stonith.c st_ttylock.c
 libstonith_la_LDFLAGS	= -version-info 1:0:0
-libstonith_la_LIBADD	= -L$(top_builddir)/lib/pils/		\
-			-L$(top_builddir)/lib/pils/.libs/	\
+libstonith_la_LIBADD	= $(top_builddir)/lib/pils/libpils.la	\
 			$(top_builddir)/replace/libreplace.la	\
-			-lpils $(GLIBLIB)
+			$(GLIBLIB)
 
 ## Man pages
 
