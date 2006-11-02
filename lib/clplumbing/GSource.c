@@ -34,6 +34,13 @@
 #include <clplumbing/Gmain_timeout.h>
 #include <clplumbing/timers.h>
 
+#ifdef events
+#  undef events
+#endif
+#ifdef revents
+#  undef revents
+#endif
+
 #define		DEFAULT_MAXDISPATCH	0
 #define		DEFAULT_MAXDELAY	0
 #define		OTHER_MAXDELAY		100
