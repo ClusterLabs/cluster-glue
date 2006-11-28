@@ -1,0 +1,31 @@
+The STONITH module (a.k.a. STOMITH) provides an extensible interface
+for remotely powering down a node in the cluster.  The idea is quite simple:
+When the software running on one machine wants to make sure another
+machine in the cluster is not using a resource, pull the plug on the other 
+machine. It's simple and reliable, albiet admittedly brutal.
+
+Here's an example command line invocation used to power off a machine 
+named 'nodeb'. The parameters are dependent on the type of device you 
+are using for this capability.
+
+stonith -t rps10 -p "/dev/ttyS5 nodeb 0 " nodeb
+
+Currently supported devices:
+
+ apcsmart:     APCSmart (tested with 2 old 900XLI)
+ baytech:      Baytech RPC5
+ meatware:     Alerts an operator to manually turn off a device.
+ nw_rpc100s:   Micro Energetics Night/Ware RPC100S
+ rps10:        Western Telematics RPS10
+ vacm_stonith: VA Linux Cluster Manager (see README.vacm)
+
+
+To see the parameter syntax for a module, run the 'stonith' command and omit the 
+-p parameter.  For example:
+
+$ /usr/sbin/stonith -t rps10 test
+
+stonith: Invalid config file for rps10 device.
+stonith: Config file syntax: <serial_device> <node> <outlet> [ <node> <outlet> [...] ]
+All tokens are white-space delimited.
+Blank lines and lines beginning with # are ignored
