@@ -791,7 +791,7 @@ lrmd_client_dump(gpointer key, gpointer value, gpointer user_data)
 		,	ctime(&client->lastrcsent)
 		);
 	if (!client->ch_cmd) {
-		lrmd_debug(LOG_DEBUG, "NULL client ch_cmd in dump_data_for_debug()");
+		lrmd_debug(LOG_DEBUG, "NULL client ch_cmd in %s()", __FUNCTION__);
 	}else{
 		lrmd_debug(LOG_DEBUG
 		,	"Command channel status: %d, read queue addr: %p, write queue addr: %p"
@@ -3338,7 +3338,9 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 			, op_info(op));
 		lrmd_op_destroy(op);
 		p->privatedata = NULL;
-		dump_data_for_debug();
+		if (debug_level >= 2) {	
+			dump_data_for_debug();
+		}
 		return;
 	}
 
@@ -3348,7 +3350,10 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 				"this op %s is cancelled.", op_info(op));
 			lrmd_op_destroy(op);
 			p->privatedata = NULL;
-			dump_data_for_debug();
+			if (debug_level >= 2) {	
+				dump_data_for_debug();
+			}
+	
 			return;
 		}
 	}
@@ -3779,6 +3784,7 @@ debug_level_adjust(int nsig, gpointer user_data)
 			break;
 
 		case SIGUSR2:
+			dump_data_for_debug();
 			debug_level--;
 			if (debug_level < 0) {
 				debug_level = 0;
@@ -3882,7 +3888,9 @@ check_queue_duration(lrmd_op_t* op)
 		,	op_info(op), t_stay_in_list
 		,	WARNINGTIME_IN_LIST
 		);
-		dump_data_for_debug();
+		if (debug_level >= 2) {
+			dump_data_for_debug();
+		}
 	}
 }
 /*
