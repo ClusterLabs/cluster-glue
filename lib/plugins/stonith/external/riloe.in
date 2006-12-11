@@ -29,8 +29,9 @@ from time import sleep
 
 argv = sys.argv
 
-#	We assume the device name for node X.foo.bar.com is X-rm
-#	and is accessible as a local (non-FQDN) DNS name.
+#   If device name is not set,	We assume the device name for node 
+#   X.foo.bar.com is X-rm and is accessible as a local (non-FQDN) 
+#   DNS name.
 try:
         cmd = argv[1]
 except IndexError:
@@ -45,12 +46,11 @@ except KeyError:
         password = ""
         anypass=0
 
-try:
-        host = os.environ['RI_HOST']
+loginname = os.environ.get('RO_LOGIN', "Administrator")		
+rihost = os.environ.get('RI_HOSTRI', "")
+host = os.environ.get('RI_HOST', "<unconfigured>")
+if rihost == "" and host != "<unconfigured>":
         rihost = host.split('.')[0]+'-rm'
-except KeyError:
-        rihost = ""
-        host = "<unconfigured>"
 
 #	Some old RILOE devices don't support the reset command
 #	This variable is 1 if it does.
@@ -61,8 +61,7 @@ try:
 except KeyError:
         reset_ok = None
 login = [ '<RIBCL VERSION="1.2">',
-          '<LOGIN USER_LOGIN="Administrator" PASSWORD="'
-	  + password + '">' ]
+          '<LOGIN USER_LOGIN="' + loginname + '" PASSWORD="' + password + '">' ]
 
 
 logout = [ '</LOGIN>', '</RIBCL>' ]
@@ -86,13 +85,40 @@ on = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "Y"/>',
 todo = { 'reset':reset, 'on':on, 'off':off, 'status':status }
 
 xmlinfo = '''<parameters>
-<parameter name="hostlist" unique="1">
+<parameter name="RI_HOST" unique="1">
 <content type="string" />
 <shortdesc lang="en">
-Hostlist
+Host
 </shortdesc>
 <longdesc lang="en">
-The list of hosts that the STONITH device controls
+The host that the STONITH device controls
+</longdesc>
+</parameter>
+<parameter name="RI_HOSTRI" unique="1">
+<content type="string" />
+<shortdesc lang="en">
+Host riLo device
+</shortdesc>
+<longdesc lang="en">
+The address of the STONITH device 
+</longdesc>
+</parameter>
+<parameter name="RI_LOGIN" unique="1">
+<content type="string" />
+<shortdesc lang="en">
+Login accout
+</shortdesc>
+<longdesc lang="en">
+The login accout for control the STONITH device
+</longdesc>
+</parameter>
+<parameter name="RI_PASSWORD" unique="1">
+<content type="string" />
+<shortdesc lang="en">
+Login password
+</shortdesc>
+<longdesc lang="en">
+The password for login into the STONITH device
 </longdesc>
 </parameter>
 </parameters>'''
@@ -102,7 +128,7 @@ info = {
         'getinfo-devname':	'riloe ' + rihost,
         'getinfo-devdescr':	'COMPAQ RILOE STONITH device',
         'getinfo-devurl':	'http://www.hp.com/',
-	'gethosts':		host,
+        'gethosts':			host,
         'getinfo-xml':		xmlinfo
 }
 
@@ -113,7 +139,7 @@ except KeyError:
         None
 
 if cmd == 'getconfignames':
-        for arg in ['RI_HOST', 'RI_PASSWORD']:
+        for arg in ['RI_HOST', 'RI_HOSTRI', 'RI_LOGIN', 'RI_PASSWORD']:
             print arg
         sys.exit(0)
 
