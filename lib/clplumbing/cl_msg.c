@@ -72,18 +72,23 @@ FT_strings[]={
 	"9"
 };
 
-
-
-
 #undef DOAUDITS
 #define DOAUDITS
+
+#undef DOPARANOIDAUDITS
+/* #define DOPARANOIDAUDITS */
+
 #ifdef DOAUDITS
-
 void ha_msg_audit(const struct ha_msg* msg);
-
-#	define	AUDITMSG(msg)	ha_msg_audit(msg)
+#	define	AUDITMSG(msg)		ha_msg_audit(msg)
+#  ifdef DOPARANOIDAUDITS
+#	define	PARANOIDAUDITMSG(msg)	ha_msg_audit(msg)
+#  else
+#	define	PARANOIDAUDITMSG(msg)	/*nothing*/
+#  endif
 #else
-#	define	AUDITMSG(msg)	/*nothing*/
+#	define	AUDITMSG(msg)		/*nothing*/
+#	define	PARANOIDAUDITMSG(msg)	/*nothing*/
 #endif
 
 
@@ -272,7 +277,7 @@ ha_msg_del(struct ha_msg *msg)
 {
 	if (msg) {
 		int	j;
-		AUDITMSG(msg);
+		PARANOIDAUDITMSG(msg);
 		if (msgstats) {
 			msgstats->allocmsgs--;
 		}
@@ -324,7 +329,7 @@ ha_msg_copy(const struct ha_msg *msg)
 	int			j;
 
 	
-	AUDITMSG(msg);
+	PARANOIDAUDITMSG(msg);
 	if (msg == NULL || (ret = ha_msg_new(msg->nalloc)) == NULL) {   
 		return NULL;   
 	} 
@@ -638,7 +643,7 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		return(HA_FAIL);
 	}
 	
-	AUDITMSG(msg);
+	PARANOIDAUDITMSG(msg);
 
 	return(HA_OK);
 
@@ -1037,7 +1042,7 @@ cl_get_value(const struct ha_msg * msg, const char * name,
 		return(NULL);
 	}
 
-	AUDITMSG(msg);
+	PARANOIDAUDITMSG(msg);
 	for (j=0; j < msg->nfields; ++j) {
 		if (strcmp(name, msg->names[j]) == 0) {
 			if (vallen){
@@ -1489,7 +1494,7 @@ cl_msg_replace(struct ha_msg* msg, int index,
 	int	newlen = vlen;
 	int	oldtype;
 	
-	AUDITMSG(msg);
+	PARANOIDAUDITMSG(msg);
 	if (msg == NULL || value == NULL) {
 		cl_log(LOG_ERR, "%s: NULL input.", __FUNCTION__);
 		return HA_FAIL;
@@ -1522,7 +1527,7 @@ cl_msg_replace(struct ha_msg* msg, int index,
 	msg->values[index] = newv;
 	msg->vlens[index] = newlen;
 	msg->types[index] = type;
-	AUDITMSG(msg);
+	PARANOIDAUDITMSG(msg);
 	return(HA_OK);
 	
 }
@@ -1535,7 +1540,7 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
   	int j;
 	int rc;	
 
-	AUDITMSG(msg);
+	PARANOIDAUDITMSG(msg);
 	if (msg == NULL || name == NULL || value == NULL) {
 		cl_log(LOG_ERR, "cl_msg_mod: NULL input.");
 		return HA_FAIL;
@@ -1570,14 +1575,14 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 			fieldtypefuncs[type].memfree(msg->values[j]);
 			msg->values[j] = newv;
 			msg->vlens[j] = newlen;
-			AUDITMSG(msg);
+			PARANOIDAUDITMSG(msg);
 			return(HA_OK);
 		}
 	}
 	
 	rc = ha_msg_nadd_type(msg, name,strlen(name), value, vlen, type);
   
-	AUDITMSG(msg);
+	PARANOIDAUDITMSG(msg);
 	return rc;
 }
 
