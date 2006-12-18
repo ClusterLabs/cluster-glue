@@ -49,7 +49,7 @@ int compose_netstring(char*, const char*, const char*, size_t, size_t*);
 int is_auth_netstring(const char*, size_t, const char*, size_t);
 char* msg2netstring(const struct ha_msg*, size_t*);
 int process_netstring_nvpair(struct ha_msg* m, const char* nvpair, int nvlen);
-extern int	intlen(int x);
+extern int	bytes_for_int(int x);
 extern const char *	FT_strings[];
 
 static int (*authmethod)(int whichauth
@@ -102,7 +102,7 @@ compose_netstring(char * s, const char * smax, const char* data,
 	char *	sp = s;
 
 	/* 2 == ":" + "," */
-	if (s + len + 2 + intlen(len) > smax) {
+	if (s + len + 2 + bytes_for_int(len) > smax) {
 		cl_log(LOG_ERR,
 		       "netstring pointer out of boundary(compose_netstring)");
 		return(HA_FAIL);
@@ -251,7 +251,7 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 		
 		sprintf(authstring, "%d %s", authnum, authtoken);
 		auth_strlen = strlen(authstring);
-		if (sp  + 2 + auth_strlen + intlen(auth_strlen)  >= smax){
+		if (sp  + 2 + auth_strlen + bytes_for_int(auth_strlen)  >= smax){
 			cl_log(LOG_ERR, "%s: out of boundary for auth", __FUNCTION__);
 			ha_free(s);
 			return NULL;
