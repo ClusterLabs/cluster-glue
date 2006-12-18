@@ -33,6 +33,7 @@
 #include <clplumbing/netstring.h>
 #include <clplumbing/base64.h>
 #include <assert.h>
+#include <ctype.h>
 
 /*
  * Avoid sprintf.  Use snprintf instead, even if you count your bytes.
@@ -48,7 +49,7 @@ int compose_netstring(char*, const char*, const char*, size_t, size_t*);
 int is_auth_netstring(const char*, size_t, const char*, size_t);
 char* msg2netstring(const struct ha_msg*, size_t*);
 int process_netstring_nvpair(struct ha_msg* m, const char* nvpair, int nvlen);
-extern int	intlen(int x);
+extern int	bytes_for_int(int x);
 extern const char *	FT_strings[];
 
 static int (*authmethod)(int whichauth
@@ -67,6 +68,31 @@ cl_set_authentication_computation_method(int (*method)(int whichauth
 	authmethod = method;
 }
 
+int cl_parse_int(const char *sp, const char *smax, int* len);
+
+int
+cl_parse_int(const char *sp, const char *smax, int* len) 
+{
+	char ch = 0;
+	int offset = 0;
+	*len = 0;
+
+	errno = 0;
+	for( ; sp+offset < smax; offset++) {
+		ch = sp[offset] - '0';
+		if(ch > 9) { /* ch >= 0 is implied by the data type*/
+			break;
+		}
+		*len *= 10;
+		*len += ch;
+	}
+	
+	if(offset == 0) {
+		cl_log(LOG_ERR,
+		       "cl_parse_int: Couldn't parse an int from: %.5s", sp);
+	} 
+	return offset;
+}
 
 int
 compose_netstring(char * s, const char * smax, const char* data,
@@ -76,7 +102,7 @@ compose_netstring(char * s, const char * smax, const char* data,
 	char *	sp = s;
 
 	/* 2 == ":" + "," */
-	if (s + len + 2 + intlen(len) > smax) {
+	if (s + len + 2 + bytes_for_int(len) > smax) {
 		cl_log(LOG_ERR,
 		       "netstring pointer out of boundary(compose_netstring)");
 		return(HA_FAIL);
@@ -225,7 +251,7 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 		
 		sprintf(authstring, "%d %s", authnum, authtoken);
 		auth_strlen = strlen(authstring);
-		if (sp  + 2 + auth_strlen + intlen(auth_strlen)  >= smax){
+		if (sp  + 2 + auth_strlen + bytes_for_int(auth_strlen)  >= smax){
 			cl_log(LOG_ERR, "%s: out of boundary for auth", __FUNCTION__);
 			ha_free(s);
 			return NULL;
@@ -266,20 +292,20 @@ static int
 peel_netstring(const char * s, const char * smax, int* len,
 	       const char ** data, int* parselen )
 {
+	int offset = 0;
 	const char *	sp = s;
 
 	if (sp >= smax){
 		return(HA_FAIL);
 	}
 
-	if (sscanf(sp,"%d", len) != 1){
+	offset = cl_parse_int(sp, smax, len);
+	if (*len < 0 || offset <= 0){
+		cl_log(LOG_ERR, "peel_netstring: Couldn't parse an int starting at: %.5s", sp);
 		return(HA_FAIL);
 	}
 
-	if (*len < 0){
-		return(HA_FAIL);
-	}
-
+	sp = sp+offset;
 	while (*sp != ':' && sp < smax) {
 		sp ++;
 	}
@@ -323,16 +349,17 @@ process_netstring_nvpair(struct ha_msg* m, const char* nvpair, int nvlen)
 
 	assert(*nvpair == '(');
 	nvpair++;
-	if (sscanf(nvpair, "%d", &type) != 1){
-		cl_log(LOG_ERR, " sscaning for type failed in %s", 
-		       __FUNCTION__);
-		return HA_FAIL;
-	}
-	
+
+	type = nvpair[0] - '0';
 	nvpair++;
+
+	/* if this condition is no longer true, change the above to:
+	 *   nvpair += cl_parse_int(nvpair, nvpair+nvlen, &type)
+	 */
+	assert(type >= 0 && type < 10);
+
 	assert(*nvpair == ')');
 	nvpair++;
-	
 	
 	if ((nlen = strcspn(nvpair, EQUAL)) <= 0
 	    ||	nvpair[nlen] != '=') {
