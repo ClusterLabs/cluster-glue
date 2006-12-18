@@ -811,8 +811,8 @@ string_stringlen(size_t namlen, size_t vallen, const void* value)
 {
 	
 	HA_MSG_ASSERT(value);
-	HA_MSG_ASSERT( vallen == strlen(value));
-	return namlen + vallen+ 2;
+/* 	HA_MSG_ASSERT( vallen == strlen(value)); */
+	return namlen + vallen + 2;
 }
 
 static int
