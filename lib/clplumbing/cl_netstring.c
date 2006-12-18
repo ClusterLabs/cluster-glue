@@ -33,6 +33,7 @@
 #include <clplumbing/netstring.h>
 #include <clplumbing/base64.h>
 #include <assert.h>
+#include <ctype.h>
 
 /*
  * Avoid sprintf.  Use snprintf instead, even if you count your bytes.
@@ -67,6 +68,31 @@ cl_set_authentication_computation_method(int (*method)(int whichauth
 	authmethod = method;
 }
 
+int cl_parse_int(const char *sp, const char *smax, int* len);
+
+int
+cl_parse_int(const char *sp, const char *smax, int* len) 
+{
+	char ch = 0;
+	int offset = 0;
+	*len = 0;
+
+	errno = 0;
+	for( ; sp+offset < smax; offset++) {
+		ch = sp[offset] - '0';
+		if(ch > 9) { /* ch >= 0 is implied by the data type*/
+			break;
+		}
+		*len *= 10;
+		*len += ch;
+	}
+	
+	if(offset == 0) {
+		cl_log(LOG_ERR,
+		       "cl_parse_int: Couldn't parse an int from: %.5s", sp);
+	} 
+	return offset;
+}
 
 int
 compose_netstring(char * s, const char * smax, const char* data,
@@ -266,20 +292,20 @@ static int
 peel_netstring(const char * s, const char * smax, int* len,
 	       const char ** data, int* parselen )
 {
+	int offset = 0;
 	const char *	sp = s;
 
 	if (sp >= smax){
 		return(HA_FAIL);
 	}
 
-	if (sscanf(sp,"%d", len) != 1){
+	offset = cl_parse_int(sp, smax, len);
+	if (*len < 0 || offset <= 0){
+		cl_log(LOG_ERR, "peel_netstring: Couldn't parse an int starting at: %.5s", sp);
 		return(HA_FAIL);
 	}
 
-	if (*len < 0){
-		return(HA_FAIL);
-	}
-
+	sp = sp+offset;
 	while (*sp != ':' && sp < smax) {
 		sp ++;
 	}
@@ -323,16 +349,17 @@ process_netstring_nvpair(struct ha_msg* m, const char* nvpair, int nvlen)
 
 	assert(*nvpair == '(');
 	nvpair++;
-	if (sscanf(nvpair, "%d", &type) != 1){
-		cl_log(LOG_ERR, " sscaning for type failed in %s", 
-		       __FUNCTION__);
-		return HA_FAIL;
-	}
-	
+
+	type = nvpair[0] - '0';
 	nvpair++;
+
+	/* if this condition is no longer true, change the above to:
+	 *   nvpair += cl_parse_int(nvpair, nvpair+nvlen, &type)
+	 */
+	assert(type >= 0 && type < 10);
+
 	assert(*nvpair == ')');
 	nvpair++;
-	
 	
 	if ((nlen = strcspn(nvpair, EQUAL)) <= 0
 	    ||	nvpair[nlen] != '=') {
