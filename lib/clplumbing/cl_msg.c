@@ -456,7 +456,7 @@ ha_msg_audit(const struct ha_msg* msg)
 
 
 
-static int
+int
 ha_msg_expand(struct ha_msg* msg )
 {	
 	char **	names ;
@@ -618,7 +618,9 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		
 	}
 	
-	if (namelen >= startlen && strncmp(name, MSG_START, startlen) == 0) {
+	if (namelen >= startlen
+	    && name[0] == '>'
+	    && strncmp(name, MSG_START, startlen) == 0) {
 		if(!cl_msg_quiet_fmterr) {
 			cl_log(LOG_ERR, "ha_msg_addraw_ll: illegal field");
 		}
