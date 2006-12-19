@@ -1046,7 +1046,9 @@ cl_get_value(const struct ha_msg * msg, const char * name,
 
 	PARANOIDAUDITMSG(msg);
 	for (j=0; j < msg->nfields; ++j) {
-		if (strcmp(name, msg->names[j]) == 0) {
+		const char *local_name = msg->names[j];
+		if (name[0] == local_name[0]
+		    && strcmp(name, local_name) == 0) {
 			if (vallen){
 				*vallen = msg->vlens[j];
 			}
