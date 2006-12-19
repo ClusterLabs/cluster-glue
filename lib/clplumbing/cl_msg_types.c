@@ -620,11 +620,7 @@ struct_display_as_xml(
 			continue;
 		} else if(prop_name == NULL) {
 			continue;
-			
-		/* hide the next two */
-		} else if(strcmp(F_XML_TAGNAME, prop_name) == 0) {
-			continue;
-		} else if(strcmp(F_XML_PARENT, prop_name) == 0) {
+		} else if(prop_name[0] == '_' && prop_name[1] == '_') {
 			continue;
 		}
 		printed = sprintf(buffer, " %s=\"%s\"", prop_name, prop_value);
