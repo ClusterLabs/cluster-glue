@@ -57,7 +57,9 @@ static volatile cl_mem_stats_t *	memstats = &default_memstats;
 #define	MAKE_GUARD	1	/* Adds 'n' bytes memory - cheap in CPU*/
 #define	USE_ASSERTS	1
 #define	DUMPONERR	1
-#undef	RETURN_TO_MALLOC
+#define	NATIVE_ALLOC	1	/* Use the native memory funcs instead 
+				   of our bucket allocator */
+#undef  NATIVE_ALLOC
 
 #ifndef DUMPONERR
 #	define	DUMPIFASKED()	/* nothing */
@@ -137,7 +139,9 @@ struct cl_mhdr {
 	longclock_t		mtime;
 #endif
 	size_t		reqsize;
+#	ifndef NATIVE_ALLOC
 	int		bucket;
+#endif
 };
 
 struct cl_bucket {
@@ -145,16 +149,23 @@ struct cl_bucket {
 	struct cl_bucket *	next;
 };
 
+#ifndef NATIVE_ALLOC
 #define	NUMBUCKS	12
 #define	NOBUCKET	(NUMBUCKS)
 
 static struct cl_bucket*	cl_malloc_buckets[NUMBUCKS];
 static size_t	cl_bucket_sizes[NUMBUCKS];
+#endif
 
 static int cl_malloc_inityet = 0;
 static size_t cl_malloc_hdr_offset = sizeof(struct cl_mhdr);
 
+#ifndef NATIVE_ALLOC
 static void*	cl_new_mem(size_t size, int numbuck);
+#else
+static void*	cl_new_mem(size_t size);
+#endif
+
 static void	cl_malloc_init(void);
 static void	cl_dump_item(const struct cl_bucket*b);
 
@@ -316,15 +327,20 @@ cl_malloc_dump_allocated(int log_level, gboolean filter)
 void *
 cl_malloc(size_t size)
 {
+#ifndef NATIVE_ALLOC
 	int			j;
 	int			numbuck = NOBUCKET;
 	struct cl_bucket*	buckptr = NULL;
+#endif
 	void*			ret;
 
 	if (!cl_malloc_inityet) {
 		cl_malloc_init();
 	}
 
+#ifdef NATIVE_ALLOC
+	ret = cl_new_mem(size);
+#else
 	/*
 	 * Find which bucket would have buffers of the requested size
 	 */
@@ -394,6 +410,7 @@ cl_malloc(size_t size)
 		}
 		
 	}
+#endif /* NATIVE_ALLOC */
 
 	if (ret && memstats) {
 #if 0 && defined(HAVE_MALLINFO)
@@ -443,8 +460,10 @@ cl_is_allocated(const void *ptr)
 void
 cl_free(void *ptr)
 {
-	int			bucket;
 	struct cl_bucket*	bhdr;
+#ifndef NATIVE_ALLOC
+	int			bucket;
+#endif
 
 	if (!cl_malloc_inityet) {
 		cl_malloc_init();
@@ -495,7 +514,9 @@ cl_free(void *ptr)
 #ifdef HA_MALLOC_TRACK
 	cl_ptr_release(ptr);
 #endif
+#ifndef NATIVE_ALLOC
 	bucket = bhdr->hdr.bucket;
+#endif
 #ifdef HA_MALLOC_MAGIC
 	bhdr->hdr.magic = HA_FREE_MAGIC;
 #endif
@@ -505,7 +526,7 @@ cl_free(void *ptr)
 	 * it if it didn't come from one of our lists...
 	 */
 
-#ifndef RETURN_TO_MALLOC
+#ifndef NATIVE_ALLOC
 	if (bucket >= NUMBUCKS) {
 #endif
 #ifdef	MARK_PRISTINE
@@ -518,7 +539,7 @@ cl_free(void *ptr)
 			memstats->mallocbytes  -= MALLOCSIZE(bhdr->hdr.reqsize);
 		}
 		free(bhdr);
-#ifndef RETURN_TO_MALLOC
+#ifndef NATIVE_ALLOC
 	}else{
 		int	bucksize = cl_bucket_sizes[bucket];
 #if	defined(USE_ASSERTS)
@@ -534,7 +555,7 @@ cl_free(void *ptr)
 		cl_mark_pristine(ptr, bucksize);
 #	endif
 	}
-#endif /* RETURN_TO_MALLOC */
+#endif /* NATIVE_ALLOC */
 	if (memstats) {
 		memstats->numfree++;
 	}
@@ -544,8 +565,10 @@ void*
 cl_realloc(void *ptr, size_t newsize)
 {
 	struct cl_bucket*	bhdr;
+#ifndef NATIVE_ALLOC
 	int			bucket;
 	size_t			bucksize;
+#endif
 
 	if (!cl_malloc_inityet) {
 		cl_malloc_init();
@@ -593,7 +616,8 @@ cl_realloc(void *ptr, size_t newsize)
 	}
 #endif
 	CHECK_GUARD_BYTES(ptr, "cl_realloc");
-	
+
+#ifndef NATIVE_ALLOC
 	bucket = bhdr->hdr.bucket;
 
 	/*
@@ -601,6 +625,7 @@ cl_realloc(void *ptr, size_t newsize)
 	 */
 
 	if (bucket >= NUMBUCKS) {
+#endif /* NATIVE_ALLOC */
 		/* Not from our bucket-area... Call realloc... */
 		if (memstats) {
 			memstats->nbytes_req   -= bhdr->hdr.reqsize;
@@ -627,6 +652,7 @@ cl_realloc(void *ptr, size_t newsize)
 		CHECK_GUARD_BYTES(ptr, "cl_realloc - real realloc return value");
 		/* Not really a  memory leak...  BEAM thinks so though... */
 		return ptr; /*memory leak*/
+#ifndef NATIVE_ALLOC
 	}
 	bucksize = cl_bucket_sizes[bucket];
 #if defined(USE_ASSERTS)
@@ -652,6 +678,7 @@ cl_realloc(void *ptr, size_t newsize)
 	ADD_GUARD(ptr);
 	CHECK_GUARD_BYTES(ptr, "cl_realloc - fits in existing space");
 	return ptr;
+#endif /* NATIVE_ALLOC */
 }
 
 /*
@@ -659,11 +686,16 @@ cl_realloc(void *ptr, size_t newsize)
  */
 
 static void*
+#ifndef NATIVE_ALLOC
 cl_new_mem(size_t size, int numbuck)
+#else
+cl_new_mem(size_t size)
+#endif
 {
 	struct cl_bucket*	hdrret;
-	size_t			allocsize;
 	size_t			mallocsize;
+#ifndef NATIVE_ALLOC
+	size_t			allocsize;
 
 	if (numbuck < NUMBUCKS) {
 		allocsize = cl_bucket_sizes[numbuck];
@@ -675,13 +707,19 @@ cl_new_mem(size_t size, int numbuck)
 	if (numbuck == NOBUCKET) {
 		mallocsize = (((mallocsize + (MALLOCROUND-1))/MALLOCROUND)*MALLOCROUND);
 	}
+#else
+	mallocsize = MALLOCSIZE(size);
+	/* XXX: Should we round here as well or not? */
+#endif
 
 	if ((hdrret = malloc(mallocsize)) == NULL) {
 		return NULL;
 	}
 
 	hdrret->hdr.reqsize = size;
+#ifndef NATIVE_ALLOC
 	hdrret->hdr.bucket = numbuck;
+#endif
 #ifdef HA_MALLOC_MAGIC
 	hdrret->hdr.magic = HA_MALLOC_MAGIC;
 #endif
@@ -799,6 +837,7 @@ cl_strdup(const char *s)
 static void
 cl_malloc_init()
 {
+#ifndef NATIVE_ALLOC
 	int	j;
 	size_t	cursize = 32;
 	int	llcount = 1;
@@ -818,6 +857,7 @@ cl_malloc_init()
 		cl_bucket_sizes[j] = cursize;
 		cursize <<= 1;
 	}
+#endif /* NATIVE_ALLOC */
 #ifdef MARK_PRISTINE
 	{
 		struct cl_bucket	b;
@@ -859,17 +899,29 @@ cl_dump_item(const struct cl_bucket*b)
 #endif
 #ifdef HA_MALLOC_MAGIC
 	cl_log(LOG_INFO, "Magic number: 0x%lx reqsize=%ld"
+#ifndef NATIVE_ALLOC
 	", bucket=%d, bucksize=%ld"
+#endif
 	,	b->hdr.magic
-	,	(long)b->hdr.reqsize, b->hdr.bucket
+	,	(long)b->hdr.reqsize
+#ifndef NATIVE_ALLOC
+	,	b->hdr.bucket
 	,	(long)(b->hdr.bucket >= NUMBUCKS ? 0 
-	:	cl_bucket_sizes[b->hdr.bucket]));
+	:	cl_bucket_sizes[b->hdr.bucket])
+#endif
+	);
 #else
 	cl_log(LOG_INFO, "reqsize=%ld"
+#ifndef NATIV_ALLOC
 	", bucket=%d, bucksize=%ld"
-	,	(long)b->hdr.reqsize, b->hdr.bucket
+#endif
+	,	(long)b->hdr.reqsize
+#ifndef NATIVE_ALLOC
+	,	b->hdr.bucket
 	,	(long)(b->hdr.bucket >= NUMBUCKS ? 0 
-	:	cl_bucket_sizes[b->hdr.bucket]));
+	:	cl_bucket_sizes[b->hdr.bucket])
+#endif
+	);
 #endif
 	cbeg = ((const unsigned char *)b)+cl_malloc_hdr_offset;
 	cend = cbeg+b->hdr.reqsize+GUARDSIZE;
