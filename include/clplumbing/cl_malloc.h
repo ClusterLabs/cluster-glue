@@ -73,13 +73,4 @@ void		 cl_malloc_dump_allocated(int log_level, int filter_seen);
 
 #define	MALLOCT(t)	((t *) cl_malloc(sizeof(t)))
 
-/* Obsolescent names for cl_malloc, et al... */
-#define	ha_malloc	cl_malloc
-#define	ha_calloc	cl_calloc
-#define	ha_strdup	cl_strdup
-#define	ha_free		cl_free
-#define	ha_is_allocated	cl_is_allocated
-#define	ha_malloc_report	cl_malloc_report
-#define	ha_malloc_setstats	cl_malloc_setstats
-
 #endif /* _CLPLUMBING_CLMALLOC_H */
