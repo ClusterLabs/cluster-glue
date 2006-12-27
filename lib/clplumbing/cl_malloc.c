@@ -150,6 +150,7 @@ struct cl_bucket {
 
 static struct cl_bucket*	cl_malloc_buckets[NUMBUCKS];
 static size_t	cl_bucket_sizes[NUMBUCKS];
+static size_t	buckminpow2 = 0L;
 
 static int cl_malloc_inityet = 0;
 static size_t cl_malloc_hdr_offset = sizeof(struct cl_mhdr);
@@ -308,6 +309,51 @@ cl_malloc_dump_allocated(int log_level, gboolean filter)
 	cl_log(LOG_INFO, "End dump.");
 }
 #endif
+static const int LogTable256[] = 
+{
+  0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
+  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+  5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+  5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+  6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+  6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+  6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+  6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7
+};
+#define	POW2BYTE(b)	(LogTable256[b])
+#define BYTE3(i)	(((i)&0xFF000000)>>24)
+#define BYTE2(i)	(((i)&0x00FF0000)>>16)
+#define BYTE1(i)	(((i)&0x0000FF00)>>8)
+#define BYTE0(i)	 ((i)&0x000000FF)
+
+/* Works for malloc bucket sizes up to 2^8 */
+#define POW21BYTE(i)	(POW2BYTE(BYTE0(i)))
+
+/* Works for malloc bucket sizes up to 2^16 */
+#define POW22BYTE(i)	((BYTE1(i) != 0x00)? (POW2BYTE(BYTE1(i))+8)	\
+			:	(POW21BYTE(i)))
+
+/* Works for malloc bucket sizes up to 2^24 */
+#define POW23BYTE(i)	((BYTE2(i) != 0x00)? (POW2BYTE(BYTE2(i))+16)	\
+			:	POW22BYTE(i))
+
+/* Works for malloc bucket sizes up to 2^32 */
+#define POW24BYTE(i)	((BYTE3(i) != 0x00)? (POW2BYTE(BYTE3(i))+24)	\
+			:	POW23BYTE(i))
+
+/* #define	INT2POW2(i)	POW24BYTE(i)	/ * This would allow 2G in our largest malloc chain */
+						/* which I don't think we need */
+#define	INT2POW2(i)	POW23BYTE(i)	/* This allows up to about 16 Mbytes in our largest malloc chain */
+					/* and it's a little faster than the one above */
+
 
 /*
  * cl_malloc: malloc clone
@@ -316,7 +362,9 @@ cl_malloc_dump_allocated(int log_level, gboolean filter)
 void *
 cl_malloc(size_t size)
 {
+#if 0
 	int			j;
+#endif
 	int			numbuck = NOBUCKET;
 	struct cl_bucket*	buckptr = NULL;
 	void*			ret;
@@ -325,6 +373,28 @@ cl_malloc(size_t size)
 		cl_malloc_init();
 	}
 
+#if 1
+	/*
+	 * NOTE: This restricts bucket sizes to be powers of two
+	 * - which is OK with me - and how the code has always worked :-D
+	 */
+	numbuck = INT2POW2(size-1)-buckminpow2;
+	numbuck = MAX(0, numbuck);
+	if (numbuck < NUMBUCKS) {
+		if (size <= cl_bucket_sizes[numbuck]
+		||	(numbuck > 0 && size <= (cl_bucket_sizes[numbuck]/2))) {
+			buckptr = cl_malloc_buckets[numbuck];
+		}else{
+			cl_log(LOG_ERR
+			,	"%s: bucket size bug: %lu bytes in %lu byte bucket #%d"
+			,	__FUNCTION__
+			,	(unsigned long)size
+			,	(unsigned long)cl_bucket_sizes[numbuck]
+			,	numbuck);
+		
+		}
+	}
+#else
 	/*
 	 * Find which bucket would have buffers of the requested size
 	 */
@@ -335,6 +405,7 @@ cl_malloc(size_t size)
 			break;
 		}
 	}
+#endif
 
 	/*
 	 * Pull it out of the linked list of free buffers if we can...
@@ -818,6 +889,7 @@ cl_malloc_init()
 		cl_bucket_sizes[j] = cursize;
 		cursize <<= 1;
 	}
+ 	buckminpow2 = INT2POW2(cl_bucket_sizes[0]-1);
 #ifdef MARK_PRISTINE
 	{
 		struct cl_bucket	b;
