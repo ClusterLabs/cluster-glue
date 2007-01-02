@@ -599,7 +599,7 @@ cl_log(int priority, const char * fmt, ...)
 	}
 	
 	if ( use_logging_daemon && cl_log_depth <= 1) {
-		LogToLoggingDaemon(priority, buf, nbytes + 1, TRUE);
+		LogToLoggingDaemon(priority, buf, nbytes, TRUE);
 	}else {
 		/* this may cause blocking... maybe should make it optional? */ 
 		cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);
@@ -896,14 +896,14 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	memset(ret, 0, sizeof(IPC_Message));
 	
 	/* Compute msg len: including room for the EOS byte */
-	msglen = sizeof(LogDaemonMsg)+bufstrlen;
-	bodybuf = cl_malloc(msglen + ch->msgpad + 1);
+	msglen = sizeof(LogDaemonMsg)+bufstrlen + 1;
+	bodybuf = cl_malloc(msglen + ch->msgpad);
 	if (bodybuf == NULL) {
 		cl_free(ret);
 		return NULL;
 	}
 	
-	memset(bodybuf, 0, msglen + ch->msgpad + 1);
+	memset(bodybuf, 0, msglen + ch->msgpad);
 	memset(&logbuf, 0, sizeof(logbuf));
 	logbuf.msgtype = LD_LOGIT;
 	logbuf.facility = cl_log_facility;
