@@ -103,7 +103,7 @@ init_set_proc_title(int argc, char *argv[], char *envp[])
 		envpsize += strlen(envp[i]) + 1;
 	}
   
-	p = (char **) ha_malloc((i + 1) * sizeof(char *));
+	p = (char **) cl_malloc((i + 1) * sizeof(char *));
 	if (p == NULL) {
 		return -1;
 	}
@@ -111,7 +111,7 @@ init_set_proc_title(int argc, char *argv[], char *envp[])
 	environ = p;
 
 	for(i = 0; envp[i] != NULL; i++) {
-		environ[i] = ha_strdup(envp[i]);
+		environ[i] = cl_strdup(envp[i]);
 		if(environ[i] == NULL) {
 			goto error_environ;
 		}
@@ -136,11 +136,11 @@ init_set_proc_title(int argc, char *argv[], char *envp[])
 	 * company don't go nuts. - MacGyver
 	 */
 	
-	__progname = ha_strdup("heartbeat");
+	__progname = cl_strdup("heartbeat");
 	if (__progname == NULL) {
 		goto error_environ;
 	}
-	__progname_full = ha_strdup(argv[0]);
+	__progname_full = cl_strdup(argv[0]);
 	if (__progname_full == NULL) {
 		goto error_environ;
 	}
@@ -150,9 +150,9 @@ init_set_proc_title(int argc, char *argv[], char *envp[])
 
 error_environ:
 	for(i = 0; environ[i] != NULL; i++) {
-      		ha_free(environ[i]);
+      		cl_free(environ[i]);
 	}
-	ha_free(environ);
+	cl_free(environ);
 	return -1;
 #endif /* PF_ARGV_TYPE == PF_ARGV_NONE */
 }    
