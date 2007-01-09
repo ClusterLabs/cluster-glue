@@ -1,0 +1,62 @@
+
+STONITH module for IBM BladeCenter via OpenHPI
+----------------------------------------------
+
+This STONITH module talks to IBM BladeCenters via SNMP through use of
+the OpenHPI BladeCenter plugin (snmp_bc).  For more information about
+installing OpenHPI, setting up the BladeCenter SNMP agent, etc. please
+visit http://openhpi.sourceforge.net/.  Once OpenHPI is installed
+properly, the STONITH plugin will automatically be built the next time
+Linux-HA is built.
+
+Use the OpenHPI configuration file (i.e. /etc/openhpi/openhpi.conf)
+to configure the BladeCenters of interest to STONITH.  For example, 
+the following excerpt:
+
+	plugin libsnmp_bc
+
+	handler libsnmp_bc {
+        	entity_root = "{SYSTEM_CHASSIS,1}" # Required
+	        host = "9.254.253.252" # Required
+        	community = "community" # Version 1 Required.
+	        version = "3" # Required. SNMP protocol version (1|3)
+        	security_name = "userid" # Version 3 Required.
+	        passphrase = "userpass" # Version 3. Required if security_level is authNoPriv or authPriv.
+        	auth_type = "MD5" # Version 3. Passphrase encoding (MD5|SHA)
+	        security_level = "authNoPriv" # Version 3. (noAuthNoPriv|authNoPriv|authPriv)
+	}
+
+defines how to access the BladeCenter at 9.254.253.252 using SNMPV3
+with an ID/password of userid/userpass.  The entity_root must be
+passed to the STONITH ibmbc plugin as its single required parameter.
+For example, to query the list of blades present in the BladeCenter
+configured above, run:
+
+	stonith -t ibmbc -p "{SYSTEM_CHASSIS,1}" -l
+
+which is the same as:
+
+	stonith -t ibmbc "entity_root={SYSTEM_CHASSIS,1}" -l
+
+Use the BladeCenter Management Module web interface to set the Blade
+Information to match "uname -n" for each blade in the cluster.  For
+example, with the BladeCeter configured above use a brower to access 
+http://9.254.253.252, login with userid/userpass, and then go to
+Blade Tasks -> Configuration -> Blade Information, enter the proper
+names, and select Save.
+
+More than one BladeCenter can be placed in the OpenHPI configuration
+file by using different numbers with the entity_root.  For example,
+
+	plugin libsnmp_bc
+
+	handler libsnmp_bc {
+        	entity_root = "{SYSTEM_CHASSIS,1}" # Required
+	        host = "9.254.253.252" # Required
+		:
+	}
+	handler libsnmp_bc {
+        	entity_root = "{SYSTEM_CHASSIS,2}" # Required
+	        host = "9.254.253.251" # Required
+		:
+	}
