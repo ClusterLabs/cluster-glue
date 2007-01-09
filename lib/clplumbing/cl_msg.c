@@ -230,7 +230,7 @@ list_cleanup(GList* list)
 
 /* Create a new (empty) message */
 struct ha_msg *
-ha_msg_new(nfields)
+ha_msg_new(int nfields)
 {
 	struct ha_msg *	ret;
 	int	nalloc;
