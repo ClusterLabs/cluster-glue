@@ -293,7 +293,7 @@ string_list_unpack(const char* packed_str_list, size_t length)
 		
 		psl++;
 		
-		buf = ha_malloc(len + 1);
+		buf = cl_malloc(len + 1);
 		if (buf == NULL){
 			cl_log(LOG_ERR, "unpack_string_list:"
 			       "unable to allocate buf");
@@ -324,7 +324,7 @@ static void
 string_memfree(void* value)
 {
 	if (value){
-		ha_free(value);
+		cl_free(value);
 	}else {
 		cl_log(LOG_ERR, "string_memfree: "
 		       "value is NULL");
@@ -387,10 +387,10 @@ binary_dup(const void* value, size_t len)
 		return NULL;
 	}
 	
-	dupvalue = ha_malloc(len + 1);
+	dupvalue = cl_malloc(len + 1);
 	if (dupvalue == NULL){
 		cl_log(LOG_ERR, "binary_dup:"
-		       "ha_malloc failed");
+		       "cl_malloc failed");
 		return NULL;
 	}
 	
@@ -454,7 +454,7 @@ list_copy(const GList* _list)
 		}
 
 		len = strlen(element);
-		dup_element= ha_malloc(len + 1);
+		dup_element= cl_malloc(len + 1);
 		if ( dup_element == NULL){
 			cl_log(LOG_ERR, "duplicate element failed");
 			continue;
@@ -1307,7 +1307,7 @@ string2struct(void* value, size_t vallen, int depth, void** nv, size_t* nlen)
 		       ": string2msg_ll failed");
 		return(HA_FAIL);
 	}
-	ha_free(value);
+	cl_free(value);
 	*nv = tmpmsg;
 	*nlen = 0;
 	
@@ -1331,7 +1331,7 @@ string2list(void* value, size_t vallen, int depth, void** nv, size_t* nlen)
 		       "unpack_string_list failed: %s", (char*)value);
 		return(HA_FAIL);
 	}
-	ha_free(value);
+	cl_free(value);
 	
 	*nv = (void*)list;
 	*nlen = string_list_pack_length(list);
