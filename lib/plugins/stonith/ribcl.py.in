@@ -1,0 +1,101 @@
+#!@PYTHON@
+
+
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+# 
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+# 
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+
+import sys
+import socket
+from httplib import *
+from time import sleep
+
+
+argv = sys.argv
+
+
+try:
+        host = argv[1].split('.')[0]+'-rm'
+        cmd = argv[2]
+except IndexError:
+        print "Not enough arguments"
+        sys.exit(1)
+
+
+login = [ '<RIBCL VERSION="1.2">',
+          '<LOGIN USER_LOGIN="Administrator" PASSWORD="********">' ]
+
+
+logout = [ '</LOGIN>', '</RIBCL>' ]
+
+
+status = [ '<SERVER_INFO MODE="read">', '<GET_HOST_POWER_STATUS/>',
+           '</SERVER_INFO>' ]
+
+
+reset = [ '<SERVER_INFO MODE="write">', '<RESET_SERVER/>', '</SERVER_INFO>' ]
+
+
+off = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "N"/>',
+          '</SERVER_INFO>' ]
+
+
+on = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "Y"/>',
+          '</SERVER_INFO>' ]
+
+
+todo = { 'reset':reset, 'on':on, 'off':off, 'status':status }
+
+
+acmds=[]
+try:
+        if cmd == 'reset' and host.startswith('gfxcl'):
+                acmds.append(login + todo['off'] + logout)
+                acmds.append(login + todo['on'] + logout)
+        else:   
+                acmds.append(login + todo[cmd] + logout)
+except KeyError:
+        print "Invalid command: "+ cmd
+        sys.exit(1)
+
+
+try:
+        for cmds in acmds:
+
+
+                c=HTTPSConnection(host)
+                c.send('<?xml version="1.0"?>\r\n')
+                c.sock.recv(1024)
+
+
+                for line in cmds:
+                        c.send(line+'\r\n')
+                        c.sock.recv(1024)
+
+
+                c.close()
+                sleep(1)
+
+
+except socket.gaierror, msg:
+        print msg
+        sys.exit(1)
+except socket.sslerror, msg:
+        print msg
+        sys.exit(1)
+except socket.error, msg:
+        print msg
+        sys.exit(1)
+
