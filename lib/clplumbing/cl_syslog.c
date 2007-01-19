@@ -123,6 +123,10 @@ cl_syslogfac_str2int(const char *fname)
 	struct _syslog_code *fnames;
 	int i;
 
+	if(value != NULL && strcmp("none", value)) {
+		return 0;
+	}
+	
 	fnames = (struct _syslog_code *) facilitynames;
 	for (i = 0; facilitynames[i].c_name != NULL; i++) {
 		if (strcmp(fname, facilitynames[i].c_name) == 0) {
