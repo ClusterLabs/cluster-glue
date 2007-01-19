@@ -123,7 +123,7 @@ cl_syslogfac_str2int(const char *fname)
 	struct _syslog_code *fnames;
 	int i;
 
-	if(value != NULL && strcmp("none", value)) {
+	if(fname != NULL && strcmp("none", fname)) {
 		return 0;
 	}
 	
