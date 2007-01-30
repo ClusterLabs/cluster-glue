@@ -31,7 +31,7 @@
 #include <pils/plugin.h>
 #include <glib.h>
 
-#define	OPTIONS	"F:p:t:T:snSlLvhd"
+#define	OPTIONS	"c:F:p:t:T:snSlLvhd"
 #define	EQUAL	'='
 
 extern char *	optarg;
@@ -71,7 +71,7 @@ usage(const char * cmd, int exit_status)
 	fprintf(stream, "\t %s [-svh] "
 	"-t stonith-device-type "
 	"[-p stonith-device-parameters | "
-	"-F stonith-device-parameters-file] "
+	"-F stonith-device-parameters-file]  [-c count]"
 	"-T {reset|on|off} nodename\n"
 	, cmd);
 
@@ -194,6 +194,8 @@ main(int argc, char** argv)
 	int		argcount;
 	StonithNVpair	nvargs[MAXNVARG];
 	int		nvcount=0;
+	int		j;
+	int		count = 1;
 
 	if ((cmdname = strrchr(argv[0], '/')) == NULL) {
 		cmdname = argv[0];
@@ -204,6 +206,16 @@ main(int argc, char** argv)
 
 	while ((c = getopt(argc, argv, OPTIONS)) != -1) {
 		switch(c) {
+
+		case 'c':	count = atoi(optarg);
+				if (count < 1) {
+					fprintf(stderr
+					,	"bad count [%s]\n"
+					,	optarg);
+					usage(cmdname, 1);
+					count=1;
+				}
+				break;
 
 		case 'd':	debug++;
 				break;
@@ -420,45 +432,48 @@ main(int argc, char** argv)
 		}
 	}
 
-	rc = stonith_get_status(s);
 
-	if ((tmp = stonith_get_info(s, ST_DEVICEID)) == NULL) {
-		SwitchType = tmp;
-	}
+	for (j=0; j < count; ++j) {
+		rc = stonith_get_status(s);
 
-	if (status && !silent) {
-		if (rc == S_OK) {
-			syslog(LOG_ERR, "%s device OK.", SwitchType);
-		}else{
-			/* Uh-Oh */
-			syslog(LOG_ERR, "%s device not accessible."
-			,	SwitchType);
+		if ((tmp = stonith_get_info(s, ST_DEVICEID)) == NULL) {
+			SwitchType = tmp;
 		}
-	}
 
-	if (listhosts) {
-		char **	hostlist;
-
-		hostlist = stonith_get_hostlist(s);
-		if (hostlist == NULL) {
-			syslog(LOG_ERR, "Could not list hosts for %s."
-			,	SwitchType);
-		}else{
-			char **	this;
-
-			for(this=hostlist; *this; ++this) {
-				printf("%s\n", *this);
+		if (status && !silent) {
+			if (rc == S_OK) {
+				syslog(LOG_ERR, "%s device OK.", SwitchType);
+			}else{
+				/* Uh-Oh */
+				syslog(LOG_ERR, "%s device not accessible."
+				,	SwitchType);
 			}
-			stonith_free_hostlist(hostlist);
 		}
-	}
 
-	if (optind < argc) {
-		char *nodename;
-		nodename = g_strdup(argv[optind]);
-		g_strdown(nodename);
-		rc = stonith_req_reset(s, reset_type, nodename);
-		g_free(nodename);
+		if (listhosts) {
+			char **	hostlist;
+
+			hostlist = stonith_get_hostlist(s);
+			if (hostlist == NULL) {
+				syslog(LOG_ERR, "Could not list hosts for %s."
+				,	SwitchType);
+			}else{
+				char **	this;
+
+				for(this=hostlist; *this; ++this) {
+					printf("%s\n", *this);
+				}
+				stonith_free_hostlist(hostlist);
+			}
+		}
+
+		if (optind < argc) {
+			char *nodename;
+			nodename = g_strdup(argv[optind]);
+			g_strdown(nodename);
+			rc = stonith_req_reset(s, reset_type, nodename);
+			g_free(nodename);
+		}
 	}
 	stonith_delete(s); s = NULL;
 	return(rc);
