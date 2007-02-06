@@ -292,13 +292,13 @@ cl_malloc_dump_allocated(int log_level, gboolean filter)
 			cl_log(log_level, "cl_malloc_dump: %p owner %s, size %d"
 			,	cursor+cl_malloc_hdr_offset
 			,	cursor->hdr.owner
-			,	cursor->hdr.reqsize);
+			,	(int)cursor->hdr.reqsize);
 		} else {
 			time_diff = sub_longclock(time_longclock(), cursor->hdr.mtime);
 			cl_log(log_level, "cl_malloc_dump: %p owner %s, size %d, dumped %d, age %lu ms"
 			,	cursor+cl_malloc_hdr_offset
 			,	cursor->hdr.owner
-			,	cursor->hdr.reqsize
+			,	(int)cursor->hdr.reqsize
 			,	cursor->hdr.dumped
 			,	longclockto_long(time_diff));
 		}
