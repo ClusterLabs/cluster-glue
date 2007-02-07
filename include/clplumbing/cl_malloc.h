@@ -68,7 +68,7 @@ void		cl_malloc_forced_for_glib(void);
 		/* Call before using any glib functions(!) */
 		/* See also: g_mem_set_vtable() */
 #ifdef HA_MALLOC_TRACK
-void		 cl_malloc_dump_allocated(int log_level, int filter_seen);
+int		 cl_malloc_dump_allocated(int log_level, int filter_seen);
 #endif
 
 #define	MALLOCT(t)	((t *) cl_malloc(sizeof(t)))
