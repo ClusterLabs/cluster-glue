@@ -1,0 +1,61 @@
+STONITH module for Cyclades AlterPath PM
+----------------------------------------
+
+This STONITH module talks to Cyclades AlterPath PM series of power managers 
+via TS, ACS or KVM equipment.
+
+Access to the frontend device (TS, ACS or KVM) is done via root user with 
+passwordless ssh. 
+
+For that, it is necessary to create a public/private keypar with _empty_
+passphrase on _each_ machine which is part of the cluster. 
+
+Small HOWTO follows:
+
+# ssh-keygen -t rsa
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa):
+Created directory '/home/root/.ssh'.
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+dc:e0:71:55:fd:2a:b0:19:d6:3c:48:e5:45:db:b4:be root@hostname.network
+
+Next step is to append the public key (/root/.ssh/id_rsa.pub) 
+to the authorized_keys file on the TS/ACS/KVM box. The authorized
+keys file location is set at the SSH daemon configuration file.  
+The default location is /etc/ssh/authorized_keys, so:
+
+[root@clusterhost]# scp /root/.ssh/id_rsa.pub root@alterpath:/tmp 
+
+login to the TS/ACS/KVM box normally and append the public key. 
+
+# ssh root@alterpath 
+Password: ....
+
+[root@CAS root]# cat /tmp/id_rsa.pub >> /etc/ssh/authorized_keys 
+
+The following entries must be present on /etc/ssh/sshd_config for the
+passwordless scheme to work properly:
+
+RSAAuthentication yes      
+PubkeyAuthentication yes        
+AuthorizedKeysFile      /etc/ssh/authorized_keys 
+
+Next step is to test if the configuration has been done successfully:
+
+[root@clusterhost root]# ssh root@alterpath
+[root@CAS root]#
+
+If it logins automatically without asking for a password, then everything
+has been done correctly!
+
+Note that such configuration procedure (including generation of the key pair) 
+has to be done for each machine in the cluster which intends to use the 
+AlterPath PM as a STONITH device.
+
+------
+Any questions please contact Cyclades support at <support@cyclades.com> 
+or <marcelo.tosatti@cyclades.com>
