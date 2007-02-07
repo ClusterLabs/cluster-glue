@@ -36,6 +36,7 @@
 
 #include <ltdl.h>
 
+#ifndef _CLPLUMBING_CLMALLOC_NATIVE_H 
 static cl_mem_stats_t			default_memstats;
 static volatile cl_mem_stats_t *	memstats = &default_memstats;
 
@@ -1025,3 +1026,5 @@ cl_mark_pristine(void* v, unsigned size)
 	memset(cp+pristoff, PRISTVALUE, size-pristoff);
 }
 #endif
+
+#endif /* _CLPLUMBING_CLMALLOC_NATIVE_H */

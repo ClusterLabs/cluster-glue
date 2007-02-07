@@ -392,6 +392,7 @@ static struct {
 static void
 dump_mem_stats(void)
 {
+#ifndef _CLPLUMBING_CLMALLOC_NATIVE_H
 	volatile cl_mem_stats_t * ms = cl_malloc_getstats();
 	lrmd_debug(LOG_DEBUG
 	,	"MEM STATS: pending alloc %ld, pending size %ld"
@@ -403,6 +404,7 @@ dump_mem_stats(void)
 	,	lrm_objectstats.opcount
 	,	lrm_objectstats.clientcount
 	,	lrm_objectstats.rsccount);
+#endif
 }
 
 static ra_pipe_op_t *
