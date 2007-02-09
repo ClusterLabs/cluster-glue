@@ -384,9 +384,6 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 	int		rc;
 	struct ipmilanHostInfo *  tmp;
 
-	ERRIFWRONGDEV(s,S_OOPS);
-	nd = (struct pluginDevice *)s;
-
 	StonithNamesToGet	namestocopy [] =
 	{	{ST_HOSTNAME,	NULL}
 	,	{ST_IPADDR,	NULL}
@@ -397,6 +394,9 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 	,	{ST_PASSWD,	NULL}
 	,	{NULL,		NULL}
 	};
+
+	ERRIFWRONGDEV(s,S_OOPS);
+	nd = (struct pluginDevice *)s;
 
 	ERRIFWRONGDEV(s, S_OOPS);
 	if (nd->sp.isconfigured) {
