@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#if 0
+#ifdef WITH_VALGRIND
 /* Use libc malloc and friends.  Useful when running valgrind etc. */
 #  ifndef _CLPLUMBING_CLMALLOC_NATIVE_H
 #  define _CLPLUMBING_CLMALLOC_NATIVE_H
