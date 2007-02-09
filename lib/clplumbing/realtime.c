@@ -98,7 +98,7 @@ cl_malloc_hogger(int kbytes)
 #endif
 #	ifdef M_TRIM_THRESHOLD
 	/* Keep malloc from giving memory back to the system */
-	mallopt(M_TRIM_THRESHOLD, 4*size);
+	mallopt(M_TRIM_THRESHOLD, -1);
 #	endif
 #endif
 	chunks=malloc(chunkbytes);
