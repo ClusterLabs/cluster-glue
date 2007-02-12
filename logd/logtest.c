@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
+#include <portability.h>
 #include <glib.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/ipc.h>
@@ -26,7 +27,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <ha_config.h>
 #include <clplumbing/loggingdaemon.h>
 #include <syslog.h>
 #include <string.h>

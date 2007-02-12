@@ -18,6 +18,7 @@
  */
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
+#include <portability.h>
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -33,7 +34,6 @@
 #include <clplumbing/ipc.h>
 #include <clplumbing/realtime.h>
 #include <clplumbing/lsb_exitcodes.h>
-#include <ha_config.h>
 #include <errno.h>
 
 #define	MAXERRORS	1000
