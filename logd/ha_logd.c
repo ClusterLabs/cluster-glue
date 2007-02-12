@@ -27,7 +27,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <ha_config.h>
 #include <clplumbing/loggingdaemon.h>
 #include <netinet/in.h>
 #include <clplumbing/lsb_exitcodes.h>
