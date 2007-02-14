@@ -838,6 +838,7 @@ get_hmc_hostlist(struct pluginDevice* dev)
 	gchar** name_mode = NULL;
 	char get_lpar[MAX_CMD_LEN];
 	gchar** lparlist = NULL;
+	char* pch;
 
 	if(Debug){
 		LOG(PIL_DEBUG, "%s: called, dev->hmc=%s\n", __FUNCTION__
@@ -937,6 +938,30 @@ get_hmc_hostlist(struct pluginDevice* dev)
 			&& !pattern_match(dev->mansyspats, syslist[i])) {
 				continue;
 			}
+
+			/* get its state */
+			snprintf(get_lpar, MAX_CMD_LEN
+			,	SSH_CMD " -l " HMCROOT
+				 " %s lssyscfg -m %s -r sys -F state"
+			,	dev->hmc, syslist[i]);
+			if(Debug){
+				LOG(PIL_DEBUG, "%s: get_lpar=%s\n"
+				,	__FUNCTION__, get_lpar);
+			}
+
+			output = do_shell_cmd(get_lpar, &status, dev->password);
+			if (output == NULL) {
+				g_strfreev(syslist);
+				return S_BADCONFIG;
+			}		
+			if ((pch = strchr(output, '\n')) != NULL) {
+				*pch = 0;
+			}
+			if (!strcmp(output, "No Connection")){
+				FREE(output);
+				continue;
+			}
+			FREE(output);
 
 			/* get its lpars */
 			snprintf(get_lpar, MAX_CMD_LEN
