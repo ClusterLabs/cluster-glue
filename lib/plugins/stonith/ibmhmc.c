@@ -1081,13 +1081,13 @@ do_shell_cmd(const char* cmd, int* status, const char* password)
 		 "if [ ! -d  " HA_VARRUNDIR "/heartbeat/rsctmp/ibmhmc ];"
 		 "then mkdir " HA_VARRUNDIR "/heartbeat/rsctmp/ibmhmc 2>/dev/null;"
 		 "fi;"
-		 "export hmc_tmp=`mktemp -p " HA_VARRUNDIR "/heartbeat/rsctmp/ibmhmc/`;" 
-		 "echo \"echo '%s'\">$hmc_tmp;" 
-		 "chmod +x $hmc_tmp;"
+		 "export ibmhmc_tmp=`mktemp -p " HA_VARRUNDIR "/heartbeat/rsctmp/ibmhmc/`;" 
+		 "echo \"echo '%s'\">$ibmhmc_tmp;" 
+		 "chmod +x $ibmhmc_tmp;"
 		 "unset SSH_AGENT_SOCK SSH_AGENT_PID;"
-		 "SSH_ASKPASS=$hmc_tmp setsid %s;"
-		 "rm $hmc_tmp -f;"
-		 "unset hmc_tmp"
+		 "SSH_ASKPASS=$ibmhmc_tmp DISPLAY=ibmhmc_foo setsid %s;"
+		 "rm $ibmhmc_tmp -f;"
+		 "unset ibmhmc_tmp"
 		,password, cmd);
 		file = popen(cmd_password, "r"); 
 	}		
