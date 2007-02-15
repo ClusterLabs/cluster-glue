@@ -1643,8 +1643,8 @@ uncompress2compress(struct ha_msg* msg, int index)
 static int
 compress2uncompress(struct ha_msg* msg, int index)
 {
-	char		buf[MAXMSG];
-	size_t		buflen = MAXMSG;	
+	char		buf[MAXUNCOMPRESSED];
+	size_t		buflen = MAXUNCOMPRESSED;	
 	struct ha_msg*  msgfield;
 	int err;
 	

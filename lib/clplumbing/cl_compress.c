@@ -207,7 +207,7 @@ get_compress_fns(const char* pluginname)
 void cl_realtime_malloc_check(void);
 
 char* 
-cl_compressmsg(struct ha_msg*m, size_t* len)
+cl_compressmsg(struct ha_msg* m, size_t* len)
 {
 	char*	src;
 	char	dest[MAXMSG];
@@ -222,8 +222,8 @@ cl_compressmsg(struct ha_msg*m, size_t* len)
 		       __FUNCTION__);
 		return NULL;
 	}
-	if ( get_netstringlen(m) > MAXMSG
-	     || get_stringlen(m) > MAXMSG){
+	if ( get_netstringlen(m) > MAXUNCOMPRESSED
+	     || get_stringlen(m) > MAXUNCOMPRESSED){
 		cl_log(LOG_ERR, "%s: msg too big(stringlen=%d,"
 		       "netstringlen=%d)", 
 		       __FUNCTION__, 
@@ -306,8 +306,8 @@ cl_decompressmsg(struct ha_msg* m)
 {
 	const char* src;
 	size_t srclen;
-	char dest[MAXMSG];
-	size_t destlen = MAXMSG;
+	char dest[MAXUNCOMPRESSED];
+	size_t destlen = MAXUNCOMPRESSED;
 	int rc;
 	struct ha_msg* ret;
 	const char* decompress_name;
