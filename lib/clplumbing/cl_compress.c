@@ -210,17 +210,26 @@ char*
 cl_compressmsg(struct ha_msg* m, size_t* len)
 {
 	char*	src;
-	char	dest[MAXMSG];
+	char*	dest;
 	size_t	destlen;
 	int rc;
-	char* ret;
+	char* ret = NULL;
 	struct ha_msg* tmpmsg;
 	size_t datalen;
+
+	destlen = MAXMSG;
+
+	dest = cl_malloc(destlen);
+	if (!dest) {
+		cl_log(LOG_ERR, "%s: failed to allocate destination buffer",
+		       __FUNCTION__);
+		return NULL;
+	}
 
 	if (msg_compress_fns == NULL){
 		cl_log(LOG_ERR, "%s: msg_compress_fns is NULL!",
 		       __FUNCTION__);
-		return NULL;
+		goto out;
 	}
 	if ( get_netstringlen(m) > MAXUNCOMPRESSED
 	     || get_stringlen(m) > MAXUNCOMPRESSED){
@@ -229,24 +238,22 @@ cl_compressmsg(struct ha_msg* m, size_t* len)
 		       __FUNCTION__, 
 		       get_stringlen(m),
 		       get_netstringlen(m));
-		return NULL;
+		goto out;
 	}
 	
 	
 	if ((src = msg2wirefmt_noac(m, &datalen)) == NULL){
 		cl_log(LOG_ERR,"%s: converting msg"
 		       " to wirefmt failed", __FUNCTION__);
-		return NULL;
+		goto out;
 	}
 	
-	destlen = MAXMSG;
-
 	rc = msg_compress_fns->compress(dest, &destlen, 
 					src, datalen);
 	if (rc != HA_OK){
 		cl_log(LOG_ERR, "%s: compression failed",
 		       __FUNCTION__);
-		return NULL;
+		goto out;
 	}
 	
 	cl_free(src);
@@ -257,7 +264,7 @@ cl_compressmsg(struct ha_msg* m, size_t* len)
 	if (rc != HA_OK){
 		cl_log(LOG_ERR, "%s: adding binary to msg failed",
 		       __FUNCTION__);
-		return NULL;
+		goto out;
 	}
 
 	rc = ha_msg_add(tmpmsg, COMPRESS_NAME, 
@@ -266,7 +273,7 @@ cl_compressmsg(struct ha_msg* m, size_t* len)
 	if (rc != HA_OK){
 		cl_log(LOG_ERR, "%s: adding compress name to msg failed",
 		       __FUNCTION__);
-		return NULL;
+		goto out;
 	}
 	
 
@@ -280,6 +287,11 @@ cl_compressmsg(struct ha_msg* m, size_t* len)
 	
 #endif
 
+out:
+	if (dest) {
+		cl_free(dest);
+	}
+	
 	return ret;
 }
 
@@ -306,34 +318,41 @@ cl_decompressmsg(struct ha_msg* m)
 {
 	const char* src;
 	size_t srclen;
-	char dest[MAXUNCOMPRESSED];
+	char *dest = NULL;
 	size_t destlen = MAXUNCOMPRESSED;
 	int rc;
-	struct ha_msg* ret;
+	struct ha_msg* ret = NULL;
 	const char* decompress_name;
 	struct hb_compress_fns* funcs = NULL;
 
-	if (m == NULL){
-		cl_log(LOG_ERR, "NULL message");
+	dest = cl_malloc(destlen);
+	
+	if (!dest) {
+		cl_log(LOG_ERR, "%s: Failed to allocate buffer.", __FUNCTION__);
 		return NULL;
+	}
+	
+	if (m == NULL){
+		cl_log(LOG_ERR, "%s: NULL message", __FUNCTION__);
+		goto out;
 	}
 	src = cl_get_binary(m, COMPRESSED_FIELD, &srclen)/*discouraged function*/;
 	if (src == NULL){
 		cl_log(LOG_ERR, "%s: compressed-field is NULL",
 		       __FUNCTION__);
-		return NULL;
+		goto out;
 	}
 
 	if (srclen > MAXMSG){
 		cl_log(LOG_ERR, "%s: field too long(%d)", 
 		       __FUNCTION__, (int)srclen);
-		return NULL;
+		goto out;
 	}
 	
 	decompress_name = ha_msg_value(m, COMPRESS_NAME);
 	if (decompress_name == NULL){
 		cl_log(LOG_ERR, "compress name not found");
-		return NULL;
+		goto out;
 	}
 
 	
@@ -343,7 +362,7 @@ cl_decompressmsg(struct ha_msg* m)
 		cl_log(LOG_ERR, "%s: compress method(%s) is not"
 		       " supported in this machine",		       
 		       __FUNCTION__, decompress_name);
-		return NULL;
+		goto out;
 	}
 	
 	rc = funcs->decompress(dest, &destlen, src, srclen);
@@ -351,7 +370,7 @@ cl_decompressmsg(struct ha_msg* m)
 	if (rc != HA_OK){
 		cl_log(LOG_ERR, "%s: decompression failed",
 		       __FUNCTION__);
-		return NULL;
+		goto out;
 	}
 	
 	ret = wirefmt2msg(dest, destlen, 0);	
@@ -362,6 +381,11 @@ cl_decompressmsg(struct ha_msg* m)
 	       srclen, destlen);
 #endif
 
+out:
+	if (dest) {
+		cl_free(dest);
+	}
+	
 	return ret;
 }
 
@@ -380,7 +404,6 @@ cl_decompress_field(struct ha_msg* msg, int index, char* buf, size_t* buflen)
 		       __FUNCTION__);
 		return HA_FAIL;
 	}
-	
 	
 	value = msg->values[index];
 	vallen = msg->vlens[index];	
