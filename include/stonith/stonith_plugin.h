@@ -1,4 +1,3 @@
-/* $Id: stonith_plugin.h,v 1.7 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  *	S hoot
  *	T he

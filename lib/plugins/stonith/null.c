@@ -1,4 +1,3 @@
-/* $Id: null.c,v 1.20 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  * Stonith module for NULL Stonith device
  *

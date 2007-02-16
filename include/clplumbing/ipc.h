@@ -1,4 +1,3 @@
-/* $Id: ipc.h,v 1.56 2006/06/23 21:39:09 alan Exp $ */
 /*
  * ipc.h IPC abstraction data structures.
  *

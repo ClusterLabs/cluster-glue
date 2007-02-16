@@ -1,4 +1,3 @@
-/* $Id: Gmain_timeout.h,v 1.6 2006/02/02 20:58:56 alan Exp $ */
 #ifndef _CLPLUMBING_GMAIN_TIMEOUT_H
 #define _CLPLUMBING_GMAIN_TIMEOUT_H
 #include <glib.h>

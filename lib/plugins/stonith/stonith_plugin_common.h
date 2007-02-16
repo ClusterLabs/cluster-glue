@@ -1,4 +1,3 @@
-/* $Id: stonith_plugin_common.h,v 1.3 2005/04/19 18:13:36 blaschke Exp $ */
 /*
  * stonith_plugin_common.h: common macros easing the writing of STONITH
  * 			    plugins. Only a STONITH plugin should

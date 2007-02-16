@@ -1,4 +1,3 @@
-/* $Id: GSource_internal.h,v 1.1 2006/04/23 20:39:01 alan Exp $ */
 /*
  * Author:	Alan Robertson <alanr@unix.sh>
  * Copyright (C) 2005 International Business Machines Inc.

@@ -1,4 +1,3 @@
-/* $Id: lrm_msg.c,v 1.27 2006/06/22 10:29:05 sunjd Exp $ */
 /*
  * Message  Functions  For Local Resource Manager
  *
@@ -212,60 +211,3 @@ create_lrm_ret(int ret, int fields)
 	return msg;
 }
 
-/* 
- * $Log: lrm_msg.c,v $
- * Revision 1.27  2006/06/22 10:29:05  sunjd
- * remove the filter as Andrew's advice
- *
- * Revision 1.26  2006/05/29 11:55:53  andrew
- * Fix for OSDL #1273
- *   This patch reverses the copy order for better performance and never
- *   (re)populates the hashtable with attributes starting with "CRM_meta_"
- *
- * Revision 1.25  2005/06/02 01:07:33  zhenh
- * 1. improve some names of internal functions.
- * 2. remove the useless "unregister" message.
- *
- * Revision 1.24  2005/06/01 09:37:16  sunjd
- * Bug 495: log message tweak
- *
- * Revision 1.23  2005/05/30 08:16:58  sunjd
- * fix the mis-use of STRLEN_CONST
- *
- * Revision 1.22  2005/04/22 06:08:50  alan
- * Put in a fix for an uninitialized variable -- added a new
- * const lrm_op_t object lrm_zero_op - which can be used as an initializer for
- * lrm_op_t objects so this doesn't happen.
- *
- * Revision 1.21  2005/04/07 07:34:50  sunjd
- * use STRLEN_CONST & STRNCMP_CONST instead
- *
- * Revision 1.20  2004/12/05 04:32:50  gshi
- * Moved some message-related functions from lrm_msg.c to cl_msg.c
- * These functions are general and shall be available to other subsystems
- *
- * Revision 1.19  2004/12/03 02:24:08  zhenh
- * make the ha_msg_value_int() endian-independence
- *
- * Revision 1.18  2004/09/27 08:33:55  zhenh
- * apply the new cl_msg_list_xxx() funcions in lrm
- *
- * Revision 1.17  2004/09/17 03:33:24  zhenh
- * in some platform(maybe 64bits), using int as size_t causes warning.
- *
- * Revision 1.16  2004/09/13 07:10:30  zhenh
- * fix a bug: the msg does not contain the request field so returning NULL is correct. not an error. remove the wrong log
- *
- * Revision 1.15  2004/09/10 10:09:43  sunjd
- * Fix a bug: duplicate keys in GHashtable, is not expected
- *
- * Revision 1.14  2004/09/10 02:07:16  zhenh
- * make names of functions more clear,fix some bug and  make it more robust
- *
- * Revision 1.13  2004/09/03 01:07:08  zhenh
- * add provider for resource
- *
- * Revision 1.12  2004/08/29 04:38:08  msoffen
- * Added log for history to end of file.
- *
- */

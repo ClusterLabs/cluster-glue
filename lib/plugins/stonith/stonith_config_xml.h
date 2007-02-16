@@ -1,4 +1,3 @@
-/* $Id */
 /*
  * stonith_config_xml.h: common macros easing the writing of config
  *			 XML for STONITH plugins.  Only a STONITH

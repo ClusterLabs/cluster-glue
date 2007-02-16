@@ -1,4 +1,3 @@
-/* $Id: ssh.c,v 1.25 2005/04/20 20:18:16 blaschke Exp $ */
 /*
  * Stonith module for SSH Stonith device
  *

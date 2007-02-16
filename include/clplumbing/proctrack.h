@@ -1,4 +1,3 @@
-/* $Id: proctrack.h,v 1.10 2004/10/24 13:00:12 lge Exp $ */
 /*
  * Process tracking object.
  *

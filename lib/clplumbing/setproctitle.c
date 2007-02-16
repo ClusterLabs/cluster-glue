@@ -1,4 +1,3 @@
-/* $Id: setproctitle.c,v 1.2 2005/11/24 14:05:11 davidlee Exp $ */
 /*
  * setproctitle.c
  *

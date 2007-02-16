@@ -1,4 +1,3 @@
-/* $Id: longclock.h,v 1.10 2006/08/16 14:37:07 alan Exp $ */
 /*
  * Longclock operations
  *

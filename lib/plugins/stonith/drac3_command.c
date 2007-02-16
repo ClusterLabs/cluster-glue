@@ -1,4 +1,3 @@
-/* $Id: drac3_command.c,v 1.5 2004/09/20 18:42:41 msoffen Exp $ */
 /*
  * Stonith module for Dell DRACIII (Dell Remote Access Card)
  *

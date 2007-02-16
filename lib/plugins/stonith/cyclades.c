@@ -1,4 +1,3 @@
- /* $Id: cyclades.c,v 1.12 2005/11/28 16:52:08 blaschke Exp $ */
 /*
  * Stonith module for Cyclades AlterPath PM
  * Bases off the SSH plugin

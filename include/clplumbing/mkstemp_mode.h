@@ -1,4 +1,3 @@
-/* $Id: mkstemp_mode.h,v 1.3 2005/07/28 08:20:05 sunjd Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

@@ -1,4 +1,3 @@
-/* $Id: meatware.c,v 1.22 2005/09/02 15:36:35 msoffen Exp $ */
 /*
  * Stonith module for Human Operator Stonith device
  *

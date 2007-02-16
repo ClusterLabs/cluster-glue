@@ -1,4 +1,3 @@
-/* $Id: cl_malloc.h,v 1.6 2006/07/07 20:36:31 andrew Exp $ */
 /*
  * ha_malloc.h: malloc utilities for the Linux-HA heartbeat program
  *

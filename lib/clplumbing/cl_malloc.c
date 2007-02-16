@@ -1,4 +1,3 @@
-/* $Id: cl_malloc.c,v 1.28 2006/07/12 09:32:28 andrew Exp $ */
 /*
  * Copyright (C) 2000 Alan Robertson <alanr@unix.sh>
  *

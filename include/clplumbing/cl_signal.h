@@ -1,4 +1,3 @@
-/* $Id: cl_signal.h,v 1.10 2004/02/17 22:11:58 lars Exp $ */
 /*
  * cl_signal.h: signal handling routines to be used by Linux-HA programmes
  *

@@ -1,4 +1,3 @@
-/* $Id: apcmaster.c,v 1.27 2005/11/10 16:52:46 blaschke Exp $ */
 /*
 *
 *  Copyright 2001 Mission Critical Linux, Inc.

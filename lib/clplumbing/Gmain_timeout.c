@@ -1,4 +1,3 @@
-/* $Id: Gmain_timeout.c,v 1.16 2006/02/02 14:58:23 alan Exp $ */
 /*
  * Glib mainloop timeout handling code.
  *

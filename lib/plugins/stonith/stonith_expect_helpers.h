@@ -1,4 +1,3 @@
-/* $Id: stonith_expect_helpers.h,v 1.6 2005/12/14 18:19:20 blaschke Exp $ */
 /*
  * stonith_expect_helpers.h: Some common expect defines.
  *

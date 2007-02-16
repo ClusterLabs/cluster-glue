@@ -1,4 +1,3 @@
-/* $Id: cpulimits.c,v 1.7 2004/09/07 15:33:12 alan Exp $ */
 /*
  * Functions to put dynamic limits on CPU consumption.
  *

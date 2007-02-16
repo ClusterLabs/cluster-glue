@@ -1,4 +1,3 @@
-/* $Id: main.c,v 1.21 2006/01/17 09:21:12 sunjd Exp $ */
 /*
  * Stonith: simple test program for exercising the Stonith API code
  *

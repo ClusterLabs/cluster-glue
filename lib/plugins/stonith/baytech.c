@@ -1,4 +1,3 @@
-/* $Id: baytech.c,v 1.28 2005/07/03 22:15:50 alan Exp $ */
 /*
  *	Stonith module for BayTech Remote Power Controllers (RPC-x devices)
  *
