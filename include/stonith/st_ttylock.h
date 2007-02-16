@@ -1,4 +1,3 @@
-/* $Id: st_ttylock.h,v 1.2 2005/07/28 09:05:45 sunjd Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

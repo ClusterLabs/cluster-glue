@@ -1,4 +1,3 @@
-/* $Id: ipctest.c,v 1.47 2006/04/09 22:23:28 lars Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

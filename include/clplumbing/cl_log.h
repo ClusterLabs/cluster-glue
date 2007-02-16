@@ -1,4 +1,3 @@
-/* $Id: cl_log.h,v 1.27 2006/03/08 22:22:51 andrew Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

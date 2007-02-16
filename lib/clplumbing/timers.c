@@ -1,4 +1,3 @@
-/* $Id: timers.c,v 1.11 2005/07/29 05:31:27 panjiam Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

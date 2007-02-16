@@ -1,4 +1,3 @@
-/* $Id: rcd_serial.c,v 1.30 2006/05/16 09:01:51 sunjd Exp $ */
 /*
  * Stonith module for RCD_SERIAL Stonith device
  *

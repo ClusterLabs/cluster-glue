@@ -1,4 +1,3 @@
-/* $Id: GSource.c,v 1.85 2006/08/16 14:37:08 alan Exp $ */
 /*
  * Copyright (c) 2002 Alan Robertson <alanr@unix.sh>
  *

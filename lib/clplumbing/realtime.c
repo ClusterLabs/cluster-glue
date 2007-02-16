@@ -1,4 +1,3 @@
-/* $Id: realtime.c,v 1.36 2006/02/06 06:08:48 alan Exp $ */
 /*
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

@@ -1,4 +1,3 @@
-/* $Id: ipmilan_command.c,v 1.12 2006/04/24 10:10:04 lars Exp $ */
 /*
  * This program is largely based on the ipmicmd.c program that's part of OpenIPMI package.
  * 

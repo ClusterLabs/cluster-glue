@@ -1,4 +1,3 @@
-/* $Id: ocf_ipc.c,v 1.39 2005/11/09 16:09:39 davidlee Exp $ */
 /*
  *
  * ocf_ipc.c: IPC abstraction implementation.

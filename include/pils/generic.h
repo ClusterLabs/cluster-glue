@@ -1,4 +1,3 @@
-/* $Id: generic.h,v 1.5 2004/02/17 22:11:58 lars Exp $ */
 #ifndef PILS_GENERIC_H
 #define PILS_GENERIC_H
 /*

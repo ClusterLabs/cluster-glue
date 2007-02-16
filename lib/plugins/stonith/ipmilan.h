@@ -1,4 +1,3 @@
-/* $Id: ipmilan.h,v 1.3 2005/01/31 09:45:31 sunjd Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *

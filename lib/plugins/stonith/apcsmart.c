@@ -1,4 +1,3 @@
-/* $Id: apcsmart.c,v 1.31 2006/05/19 06:23:16 sunjd Exp $ */
 /*
  * Stonith module for APCSmart Stonith device
  * Copyright (c) 2000 Andreas Piesk <a.piesk@gmx.net>

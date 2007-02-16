@@ -1,4 +1,3 @@
-/* $Id: stonith.h,v 1.17 2006/04/10 09:03:52 sunjd Exp $ */
 /*
  *	S hoot
  *	T he

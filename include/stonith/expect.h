@@ -1,4 +1,3 @@
-/* $Id: expect.h,v 1.3 2005/01/08 06:01:16 alan Exp $ */
 /*
  * Expect simple tokens.  Simple expect infrastructure for STONITH API
  *

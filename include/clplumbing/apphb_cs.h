@@ -1,4 +1,3 @@
-/* $Id: apphb_cs.h,v 1.10 2005/08/29 02:17:17 sunjd Exp $ */
 /*
  * Copyright (C) 2002 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.

@@ -1,4 +1,3 @@
-/* $Id: ipctransientserver.c,v 1.14 2006/04/10 07:50:14 lars Exp $ */
 /* 
  * Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
  * 

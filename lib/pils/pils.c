@@ -1,4 +1,3 @@
-/* $Id: pils.c,v 1.49 2006/04/07 13:24:05 lars Exp $ */
 /*
  * Copyright (C) 2001 Alan Robertson <alanr@unix.sh>
  * This software licensed under the GNU LGPL.

@@ -1,4 +1,3 @@
-/* $Id: ipcsocket.c,v 1.174 2006/07/17 17:02:46 davidlee Exp $ */
 /*
  * ipcsocket unix domain socket implementation of IPC abstraction.
  *

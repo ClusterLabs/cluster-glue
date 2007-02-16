@@ -1,4 +1,3 @@
-/* $Id: rps10.c,v 1.26 2006/05/18 02:50:19 sunjd Exp $ */
 /*
  *	Stonith module for WTI Remote Power Controllers (RPS-10M device)
  *

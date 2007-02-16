@@ -1,4 +1,3 @@
-/* $Id: stonith.c,v 1.26 2006/04/10 09:07:21 sunjd Exp $ */
 /*
  * Stonith API infrastructure.
  *

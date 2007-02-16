@@ -1,4 +1,3 @@
-/* $Id: setproctitle.h,v 1.1 2005/04/20 23:43:01 gshi Exp $ */
 /*
  * setproctitle.h
  *

@@ -1,4 +1,3 @@
-/* $Id: ipmilan_test.c,v 1.3 2004/08/19 22:23:30 yixiong Exp $ */
 /*
  * Stonith module for ipmi lan Stonith device
  *
