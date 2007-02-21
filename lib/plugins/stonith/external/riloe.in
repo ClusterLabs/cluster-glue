@@ -46,7 +46,7 @@ except KeyError:
         password = ""
         anypass=0
 
-loginname = os.environ.get('RO_LOGIN', "Administrator")		
+loginname = os.environ.get('RI_LOGIN', "Administrator")		
 rihost = os.environ.get('RI_HOSTRI', "")
 host = os.environ.get('RI_HOST', "<unconfigured>")
 if rihost == "" and host != "<unconfigured>":
