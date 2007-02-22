@@ -22,6 +22,8 @@
  *  Significantly mangled by Alan Robertson <alanr@unix.sh>
  */
 
+#include <lha_internal.h>
+
 #define	DEVICE	                "APCSmart"
 
 #include "stonith_plugin_common.h"

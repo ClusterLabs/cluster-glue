@@ -32,14 +32,6 @@
 #include <sys/types.h>
 #include <sys/poll.h>
 
-#ifdef HAVE_STRING_H
-#include <string.h>
-#endif
-
-#ifdef HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-
 #ifdef IPC_TIME_DEBUG
 #include <clplumbing/longclock.h>
 #define MAXIPCTIME 3000

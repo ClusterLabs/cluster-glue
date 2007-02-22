@@ -152,6 +152,6 @@ struct RAExecOps {
 };
 
 #define RA_EXEC_TYPE	RAExec
-#define RA_EXEC_TYPE_S	MKSTRING(RAExec)
+#define RA_EXEC_TYPE_S	"RAExec"
 
 #endif /* RAEXEC_H */

@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
-#include <portability.h>
+#include <lha_internal.h>
 #include <glib.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/ipc.h>
@@ -60,12 +60,8 @@
   
 
 
-#ifndef DEFAULT_CFG_FILE
-#	define DEFAULT_CFG_FILE	"/etc/logd.cf"
-#endif
-#ifndef	LOGD_PIDFILE
-#	define	LOGD_PIDFILE	VAR_RUN_D "/logd.pid"
-#endif
+#define DEFAULT_CFG_FILE	HA_SYSCONFDIR "/logd.cf"
+#define	LOGD_PIDFILE		HA_VARRUNDIR "/logd.pid"
 
 #define	FD_STDIN	0
 #define	FD_STDOUT	1

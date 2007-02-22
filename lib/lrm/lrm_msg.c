@@ -21,7 +21,7 @@
  * By Huang Zhen <zhenh@cn.ibm.com> 2004/2/13
  *
  */
-#include <portability.h>
+#include <lha_internal.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>

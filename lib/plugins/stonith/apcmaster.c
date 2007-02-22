@@ -51,6 +51,7 @@
  * Version string that is filled in by CVS
  */
 static const char *version __attribute__ ((unused)) = "$Revision: 1.27 $"; 
+#include <lha_internal.h>
 
 #define	DEVICE	"APC MasterSwitch"
 

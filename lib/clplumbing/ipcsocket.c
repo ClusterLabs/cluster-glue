@@ -23,7 +23,7 @@
  *
  */
 
-#include <portability.h>
+#include <lha_internal.h>
 
 #include <clplumbing/ipc.h>
 #include <clplumbing/cl_log.h>

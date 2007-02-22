@@ -20,8 +20,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <config.h>
-#include <portability.h>
+#include <lha_internal.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -1356,7 +1355,7 @@ init_start ()
 	register_pid(FALSE, sigterm_action);
 
 	/* load RA plugins   */
-	PluginLoadingSystem = NewPILPluginUniv (PLUGIN_DIR);
+	PluginLoadingSystem = NewPILPluginUniv (HA_PLUGIN_DIR);
 	PILLoadPlugin(PluginLoadingSystem, "InterfaceMgr", "generic",
 				  &RegisterRqsts);
 
@@ -1367,9 +1366,9 @@ init_start ()
 	 *	nicely.  And, it does it portably, too...
 	 */
 
-	dir = opendir(RA_PLUGIN_DIR);
+	dir = opendir(LRM_PLUGIN_DIR);
 	if (NULL == dir) {
-		lrmd_log(LOG_ERR, "main: can not open RA plugin dir "RA_PLUGIN_DIR);
+		lrmd_log(LOG_ERR, "main: can not open RA plugin dir "LRM_PLUGIN_DIR);
 		lrmd_log(LOG_ERR, "Startup aborted (no RA plugin).  Shutting down.");
 		exit(100);
 	}

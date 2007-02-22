@@ -23,9 +23,9 @@
 #define _QUORUMD_H_ 
 
 #define HB_QUORUMD_TYPE		quorumd
-#define HB_QUORUMD_TYPE_S	MKSTRING(quorumd)
+#define HB_QUORUMD_TYPE_S	"quorumd"
 
-#define CONFIGFILE	HB_HA_DIR"/quorumd.conf"
+#define CONFIGFILE	HA_HBCONF_DIR"/quorumd.conf"
 #define MAX_DN_LEN 256
 #define quorum_log(priority, fmt...); \
                 cl_log(priority, fmt); \

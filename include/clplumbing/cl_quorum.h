@@ -22,7 +22,7 @@
 #define _QUORUM_H_ 
 
 #define HB_QUORUM_TYPE	quorum
-#define HB_QUORUM_TYPE_S	MKSTRING(quorum)
+#define HB_QUORUM_TYPE_S	"quorum"
 
 #define QUORUM_YES		0
 #define QUORUM_NO		1

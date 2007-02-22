@@ -73,8 +73,6 @@
 #ifndef __LRM_API_H
 #define __LRM_API_H 1
 
-#include <portability.h>
-
 #include <glib.h>
 #include <lrm/raexec.h>
 #include <clplumbing/GSource.h>

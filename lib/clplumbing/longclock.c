@@ -20,7 +20,7 @@
  *
  */
 
-#include <portability.h>
+#include <lha_internal.h>
 #include <unistd.h>
 #include <sys/times.h>
 #include <errno.h>

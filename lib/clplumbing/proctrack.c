@@ -20,7 +20,7 @@
  *
  */
 
-#include <portability.h>
+#include <lha_internal.h>
 #include <errno.h>
 #include <sys/wait.h>
 #include <heartbeat.h>

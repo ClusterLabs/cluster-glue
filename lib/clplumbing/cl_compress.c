@@ -51,7 +51,8 @@
  *
  */
 
-#include <portability.h>
+#include <lha_internal.h>
+#include <heartbeat.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -72,9 +73,6 @@
 
 #define COMPRESSED_FIELD "_compressed_payload"
 #define COMPRESS_NAME "_compression_algorithm"
-
-#define HA_PLUGIN_D HALIB "/plugins"
-
 #define HACOMPRESSNAME "HA_COMPRESSION"
 static struct hb_compress_fns* msg_compress_fns = NULL;
 static char*  compress_name = NULL;

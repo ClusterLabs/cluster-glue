@@ -23,7 +23,6 @@
 #ifndef _STONITH_PLUGIN_COMMON_H
 #define _STONITH_PLUGIN_COMMON_H
 
-#include <portability.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

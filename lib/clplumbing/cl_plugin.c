@@ -18,7 +18,8 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
-#include <portability.h>
+#include <lha_internal.h>
+#include <heartbeat.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -37,7 +38,6 @@
 #include <stonith/stonith_plugin.h>
 #include <clplumbing/cl_plugin.h>
 
-#define HA_PLUGIN_D HALIB "/plugins"
 #define MAXTYPES 16
 #define MAXTYPELEN 64
  

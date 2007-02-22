@@ -14,7 +14,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include <portability.h>
+#include <lha_internal.h>
 
 #include <stdio.h>
 #include <unistd.h>
@@ -25,10 +25,6 @@
 #include <ctype.h>
 #include <clplumbing/cl_signal.h>
 #include <stonith/st_ttylock.h>
-
-#ifndef TTY_LOCK_D
-#	define TTY_LOCK_D	"/var/lock"
-#endif
 
 /*
  * The following information is from the Filesystem Hierarchy Standard
@@ -54,7 +50,7 @@
  * PERMISSIONS NOTE:
  * Different linux distributions set the mode of the lock directory differently
  * Any process which wants to create lock files must have write permissions
- * on TTY_LOCK_D (probably /var/lock).  For things like the heartbeat API
+ * on HA_VARLOCKDIR (probably /var/lock).  For things like the heartbeat API
  * code, this may mean allowing the uid of the processes that use this API
  * to join group uucp, or making the binaries setgid to uucp.
  */
@@ -144,10 +140,10 @@ DoLock(const char * prefix, const char *lockname)
 	mypid = (unsigned long) getpid();
 
 	snprintf(lf_name, sizeof(lf_name), "%s/%s%s"
-	,	TTY_LOCK_D, prefix, lockname);
+	,	HA_VARLOCKDIR, prefix, lockname);
 
 	snprintf(tf_name, sizeof(tf_name), "%s/tmp%lu-%s"
-	,	TTY_LOCK_D, mypid, lockname);
+	,	HA_VARLOCKDIR, mypid, lockname);
 
 	if ((fd = open(lf_name, O_RDONLY)) >= 0) {
 		if (fstat(fd, &sbuf) >= 0 && sbuf.st_size < LOCKSTRLEN) {
@@ -223,7 +219,7 @@ DoUnlock(const char * prefix, const char *lockname)
 {
 	char lf_name[256];
 	
-	snprintf(lf_name, sizeof(lf_name), "%s/%s%s", TTY_LOCK_D
+	snprintf(lf_name, sizeof(lf_name), "%s/%s%s", HA_VARLOCKDIR
 	,	prefix, lockname);
 	return unlink(lf_name);
 }

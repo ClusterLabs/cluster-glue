@@ -19,7 +19,7 @@
  *
  */
 
-#include <portability.h>
+#include <lha_internal.h>
 #include <heartbeat.h>
 #include <stdlib.h>
 #include <stdio.h>

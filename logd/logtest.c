@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
-#include <portability.h>
+#include <lha_internal.h>
 #include <glib.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/ipc.h>

@@ -16,7 +16,7 @@
 
 #undef _GNU_SOURCE  /* in case it was defined on the command line */
 #define _GNU_SOURCE
-#include <portability.h>
+#include <lha_internal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>

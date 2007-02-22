@@ -19,6 +19,7 @@
  *
  */
 
+#include <lha_internal.h>
 #define	DEVICE	"BayTech power switch"
 
 #define DOESNT_USE_STONITHKILLCOMM	1
