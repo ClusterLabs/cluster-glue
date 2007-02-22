@@ -92,6 +92,8 @@
  * and which ones aren't...
  */
 
+#include <lha_internal.h>
+
 #define DEVICE		"IBM HMC"
 
 #include "stonith_plugin_common.h"

@@ -53,7 +53,7 @@
  * the source code for OpenSSL in the source distribution.
  */
 
-#include <portability.h>
+#include <lha_internal.h>
 #include <clplumbing/cl_malloc.h>
 
 #include <stdlib.h>

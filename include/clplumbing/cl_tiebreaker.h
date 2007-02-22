@@ -22,7 +22,7 @@
 #define _CL_TIEBREAKER_H_ 
 
 #define HB_TIEBREAKER_TYPE	tiebreaker
-#define HB_TIEBREAKER_TYPE_S	MKSTRING(tiebreaker)
+#define HB_TIEBREAKER_TYPE_S	"tiebreaker"
 
 /*
  *	List of functions provided by implementations of tiebreaker interface.

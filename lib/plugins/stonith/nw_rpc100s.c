@@ -26,6 +26,7 @@
  *
  */
 
+#include <lha_internal.h>
 #define	DEVICE	"NW RPC100S Power Switch"
 #include "stonith_plugin_common.h"
 

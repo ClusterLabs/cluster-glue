@@ -21,7 +21,7 @@
  *
  */
 
-#include <portability.h>
+#include <lha_internal.h>
 
 #ifdef HAVE_STDINT_H
 #include <stdint.h>

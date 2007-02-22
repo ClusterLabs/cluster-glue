@@ -18,7 +18,7 @@
  */
 
 #define HA_MALLOC_ORIGINAL
-#include <portability.h>
+#include <lha_internal.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>

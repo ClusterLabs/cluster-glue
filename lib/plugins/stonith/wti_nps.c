@@ -59,6 +59,7 @@
  *    private subnet.
  */
 
+#include <lha_internal.h>
 #define	DEVICE	"WTI Network Power Switch"
 
 #define DOESNT_USE_STONITHKILLCOMM	1

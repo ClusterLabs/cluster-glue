@@ -21,8 +21,6 @@
 #ifndef _CLPLUMBING_APPHB_CS_H
 #define _CLPLUMBING_APPHB_CS_H
 
-#include <config.h>
-
 /* Internal client-server messages for APP heartbeat service */
 
 #ifndef HA_VARRUNDIR

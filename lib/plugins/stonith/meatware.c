@@ -26,6 +26,8 @@
  *
  */
 
+#include <lha_internal.h>
+
 #define	DEVICE	"Meatware STONITH device"
 #include "stonith_plugin_common.h"
 

@@ -30,7 +30,7 @@
  *
  */
 
-#include <portability.h>
+#include <lha_internal.h>
 
 #include <dirent.h>
 
