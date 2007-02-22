@@ -6,6 +6,12 @@
 #
 # Modified by Alan Robertson <alanr@unix.sh> for STONITH external compatibility.
 #
+# Extended and merged by Tijl Van den broeck <subspawn@gmail.com>
+#  with ilo-v2 script from Guy Coates
+#
+# Cleanup by Andrew Beekhof <abeekhof@suse.de>
+#
+#
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
 # License as published by the Free Software Foundation; either
@@ -29,98 +35,103 @@ from time import sleep
 
 argv = sys.argv
 
-#   If device name is not set,	We assume the device name for node 
-#   X.foo.bar.com is X-rm and is accessible as a local (non-FQDN) 
-#   DNS name.
 try:
         cmd = argv[1]
 except IndexError:
         print "Not enough arguments"
         sys.exit(1)
 
-try:
-        password = os.environ['RI_PASSWORD']
-        os.environ['RI_PASSWORD'] = "********"
-        anypass=1
-except KeyError:
-        password = ""
-        anypass=0
+legacy_RI_HOST     = os.environ.get(RI_HOST,     None)
+legacy_RI_HOSTRI   = os.environ.get(RI_HOSTRI,   None)
+legacy_RI_LOGIN    = os.environ.get(RI_LOGIN,    'Administrator')
+legacy_RI_PASSWORD = os.environ.get(RI_PASSWORD, '')
 
-loginname = os.environ.get('RO_LOGIN', "Administrator")		
-rihost = os.environ.get('RI_HOSTRI', "")
-host = os.environ.get('RI_HOST', "<unconfigured>")
-if rihost == "" and host != "<unconfigured>":
-        rihost = host.split('.')[0]+'-rm'
+reset_ok     = os.environ.get('ilo_can_reset',        '0')
+ilo_protocol = os.environ.get('ilo_protocol',         '1.2')
+power_method = os.environ.get('ilo_powerdown_method', 'power')
 
-#	Some old RILOE devices don't support the reset command
-#	This variable is 1 if it does.
-try:
-        reset_ok = os.environ["RI_CAN_RESET"]
-        if reset_ok == '':
-                reset_ok = None
-except KeyError:
-        reset_ok = None
-login = [ '<RIBCL VERSION="1.2">',
-          '<LOGIN USER_LOGIN="' + loginname + '" PASSWORD="' + password + '">' ]
+realhost = os.environ.get('hostlist',     legacy_RI_HOST)
+rihost   = os.environ.get('ilo_hostname', legacy_RI_HOSTRI)
+ilouser  = os.environ.get('ilo_user',     legacy_RI_LOGIN)
+ilopass  = os.environ.get('ilo_password', legacy_RI_PASSWORD)
 
+login = [ '<RIBCL VERSION="'+ilo_protocol+'">',
+          '<LOGIN USER_LOGIN="' + ilouser + '" PASSWORD="' + ilopass + '">' ]
 
 logout = [ '</LOGIN>', '</RIBCL>' ]
 
 
-status = [ '<SERVER_INFO MODE="read">', '<GET_HOST_POWER_STATUS/>',
-           '</SERVER_INFO>' ]
-
+status = [ '<SERVER_INFO MODE="read">', '<GET_HOST_POWER_STATUS/>', '</SERVER_INFO>' ]
 
 reset = [ '<SERVER_INFO MODE="write">', '<RESET_SERVER/>', '</SERVER_INFO>' ]
 
+if power_method == 'button':
+  off = [ '<SERVER_INFO MODE="write">', '<HOLD_PWR_BTN/>', '</SERVER_INFO>' ]
+else:
+  off = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "N"/>', '</SERVER_INFO>' ]
 
-off = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "N"/>',
-          '</SERVER_INFO>' ]
-
-
-on = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "Y"/>',
-          '</SERVER_INFO>' ]
+on = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "Y"/>', '</SERVER_INFO>' ]
 
 
 todo = { 'reset':reset, 'on':on, 'off':off, 'status':status }
 
+
 xmlinfo = '''<parameters>
-<parameter name="RI_HOST" unique="1">
-<content type="string" />
-<shortdesc lang="en">
-Host
-</shortdesc>
-<longdesc lang="en">
-The host that the STONITH device controls
-</longdesc>
-</parameter>
-<parameter name="RI_HOSTRI" unique="1">
-<content type="string" />
-<shortdesc lang="en">
-Host riLo device
-</shortdesc>
-<longdesc lang="en">
-The address of the STONITH device 
-</longdesc>
-</parameter>
-<parameter name="RI_LOGIN" unique="1">
-<content type="string" />
-<shortdesc lang="en">
-Login accout
-</shortdesc>
-<longdesc lang="en">
-The login accout for control the STONITH device
-</longdesc>
-</parameter>
-<parameter name="RI_PASSWORD" unique="1">
-<content type="string" />
-<shortdesc lang="en">
-Login password
-</shortdesc>
-<longdesc lang="en">
-The password for login into the STONITH device
-</longdesc>
-</parameter>
+ <parameter name="hostlist" unique="1">
+  <content type="string"/>
+  <shortdesc lang="en">ilo target hostname</shortdesc>
+  <longdesc lang=en>
+   Continas the hostname that the ilo controls
+  </longdesc>
+ </parameter>
+<parameter name="ilo_hostname" unique="1">
+  <content type="string"/>
+  <shortdesc lang="en">ilo device hostname</shortdesc>
+  <longdesc lang=en>
+   The hostname of the ilo device
+  </longdesc>
+ </parameter>
+<parameter name="ilo_user" unique="0">
+  <content type="string" default="Administrator"/>
+  <shortdesc lang="en">ilo user</shortdesc>
+  <longdesc lang=en>
+   The user for connecting to the ilo device
+  </longdesc>
+ </parameter>
+<parameter name="ilo_password" unique="0">
+  <content type="string" default=""/>
+  <shortdesc lang="en">password</shortdesc>
+  <longdesc lang=en>
+   The password for the ilo device user
+  </longdesc>
+ </parameter>
+</parameters>
+<parameter name="ilo_can_reset" unique="0">
+  <content type="string" default="0"/>
+  <shortdesc lang="en">Device can reset</shortdesc>
+  <longdesc lang=en>
+   Does the ILO device support RESET commands (hint: older ones cannot)
+  </longdesc>
+ </parameter>
+</parameters>
+<parameter name="ilo_protocol" unique="0">
+  <content type="string" default="1.2"/>
+  <shortdesc lang="en">ILO Protocol</shortdesc>
+  <longdesc lang=en>
+   Protocol version supported by the ILO device.
+   Known supported versions: 1.2, 2.0
+  </longdesc>
+ </parameter>
+</parameters>
+<parameter name="ilo_powerdown_method" unique="0">
+  <content type="string" default="power"/>
+  <shortdesc lang="en">Power down method</shortdesc>
+  <longdesc lang=en>
+   The method to powerdown the host in question.
+   * button - Emulate holding down the power button
+   * power  - Emulate turning off the machines power 
+  </longdesc>
+ </parameter>
 </parameters>'''
 
 info = {
@@ -128,7 +139,7 @@ info = {
         'getinfo-devname':	'riloe ' + rihost,
         'getinfo-devdescr':	'COMPAQ RILOE STONITH device',
         'getinfo-devurl':	'http://www.hp.com/',
-        'gethosts':			host,
+	      'gethosts':	 realhost,
         'getinfo-xml':		xmlinfo
 }
 
@@ -139,7 +150,7 @@ except KeyError:
         None
 
 if cmd == 'getconfignames':
-        for arg in ['RI_HOST', 'RI_HOSTRI', 'RI_LOGIN', 'RI_PASSWORD']:
+	for arg in [ "hostname", "ilo_hostname", "ilo_user", "ilo_password", "ilo_can_reset", "ilo_protocol", "ilo_powerdown_method"]:
             print arg
         sys.exit(0)
 
@@ -147,16 +158,16 @@ if cmd == 'getconfignames':
 #	All remaining commands need host and password to succeed...
 #
 
-if host == '<unconfigured>':
-        print "Missing 'RI_HOST' environment variable"
+if not rihost:
+        print "ILO device hostname not specified"
         sys.exit(1)
-if not anypass:
-        print "Missing 'RI_PASSWORD' environment variable"
+
+if not realhost:
+        print "Host controlled by this ILO device not specified"
         sys.exit(1)
+
 
 acmds=[]
-
-
 try:
         if cmd == 'reset' and not reset_ok:
                 acmds.append(login + todo['off'] + logout)
@@ -175,15 +186,12 @@ try:
                 c.send('<?xml version="1.0"?>\r\n')
                 c.sock.recv(1024)
 
-
                 for line in cmds:
                         c.send(line+'\r\n')
                         c.sock.recv(1024)
 
-
                 c.close()
                 sleep(1)
-
 
 except socket.gaierror, msg:
         print "ERROR: " + str(msg) + ": " + rihost
