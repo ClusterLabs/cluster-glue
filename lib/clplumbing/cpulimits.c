@@ -57,6 +57,7 @@
  * than four seconds, or greater than 60 seconds.
  *
  */
+#include <sys/lha_internal.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <clplumbing/longclock.h>
