@@ -32,6 +32,8 @@
  *
  */
 
+#include <lha_internal.h>
+
 #define	DEVICE	"RC Delayed Serial"
 #include "stonith_plugin_common.h"
 #include "stonith_signal.h"
