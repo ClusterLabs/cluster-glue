@@ -22,10 +22,8 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-#include <stdlib.h>
-#if HAVE_UNISTD_H
 #include <unistd.h>
-#endif
+#include <stdlib.h>
 #include <errno.h>
 
 #include <clplumbing/cl_log.h>
