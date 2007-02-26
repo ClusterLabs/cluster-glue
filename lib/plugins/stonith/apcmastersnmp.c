@@ -19,6 +19,8 @@
  *
  */
 
+#include <lha_internal.h>
+
 /* device ID */
 #define	DEVICE				"APC MasterSwitch (SNMP)"
 
