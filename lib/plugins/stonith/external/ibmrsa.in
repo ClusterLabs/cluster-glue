@@ -27,8 +27,7 @@
 
 #echo "started with: $@" | debug
 
-HA_VARRUNDIR=/var/run/heartbeat
-outf=$HA_VARRUNDIR/ibmrsa-$$
+outf=@HA_VARRUNHBDIR@/ibmrsa-$$
 touch $outf
 if [ ! -f $outf ]
 then
