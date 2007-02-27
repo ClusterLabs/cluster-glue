@@ -41,8 +41,8 @@ except IndexError:
         print "Not enough arguments"
         sys.exit(1)
 
-legacy_RI_HOST     = os.environ.get('RI_HOST',     None)
-legacy_RI_HOSTRI   = os.environ.get('RI_HOSTRI',   None)
+legacy_RI_HOST     = os.environ.get('RI_HOST',     '')
+legacy_RI_HOSTRI   = os.environ.get('RI_HOSTRI',   '')
 legacy_RI_LOGIN    = os.environ.get('RI_LOGIN',    'Administrator')
 legacy_RI_PASSWORD = os.environ.get('RI_PASSWORD', '')
 
