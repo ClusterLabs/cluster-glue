@@ -198,9 +198,38 @@ static const char * NOTpluginID = "IBM HMC device has been destroyed";
 
 #include "stonith_config_xml.h"
 
+#define XML_MANSYSPAT_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_MANSYSPAT \
+	XML_PARM_SHORTDESC_END
+
+#define XML_MANSYSPAT_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	  "White-space delimited list of patterns used to match managed system names; if last character is '*', all names that begin with the pattern are matched" \
+	XML_PARM_LONGDESC_END
+
+#define XML_MANSYSPAT_PARM \
+	XML_PARAMETER_BEGIN(ST_MANSYSPAT, "string", "0") \
+	  XML_MANSYSPAT_SHORTDESC \
+	  XML_MANSYSPAT_LONGDESC \
+	XML_PARAMETER_END
+
+#define XML_OPTPASSWD_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	  "Password for " HMCROOT " if passwordless ssh access to HMC has NOT been setup (to do so, it is necessary to create a public/private key pair with empty passphrase - see \"Configure the OpenSSH Client\" in the redbook at " HMCURL " for more details)" \
+	XML_PARM_LONGDESC_END
+
+#define XML_OPTPASSWD_PARM \
+	XML_PARAMETER_BEGIN(ST_PASSWD, "string", "0") \
+	  XML_PASSWD_SHORTDESC \
+	  XML_OPTPASSWD_LONGDESC \
+	XML_PARAMETER_END
+
 static const char *ibmhmcXML = 
   XML_PARAMETERS_BEGIN
     XML_IPADDR_PARM
+    XML_MANSYSPAT_PARM
+    XML_OPTPASSWD_PARM
   XML_PARAMETERS_END;
 
 static int get_hmc_hostlist(struct pluginDevice* dev);
@@ -634,6 +663,7 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 		pch++;
 		pch += strspn(pch, WHITESPACE);
 		if (get_hmc_mansyspats(dev, pch) != S_OK) {
+			FREE(namestocopy[0].s_value);
 			return S_OOPS;
 		}
 
@@ -726,18 +756,18 @@ ibmhmc_getinfo(StonithPlugin* s, int reqtype)
 			ret = "IBM Hardware Management Console (HMC)\n"
 			"Use for IBM i5, p5, pSeries and OpenPower systems "
 			"managed by HMC\n"
-			"Optional parameter name " ST_MANSYSPAT " is \n"
-			"white-space delimited list of patterns used to match\n"
-			"managed system names; if last character is '*', all\n"
-			"names that begin with the pattern are matched.\n"
-			"Optional parameter name " ST_PASSWD " is password\n"
-			"for " HMCROOT " if passwordless ssh access to HMC\n "
-			"has NOT been setup (to do so, it is necessary to\n "
-			"create a public/private key pair with empty\n "
-			"passphrase - see \"Configure the OpenSSH Client\" in\n"
-			"the redbook at " HMCURL " for more details); note\n"
-			"that passwordless ssh access to HMC must be setup\n "
-			"for R1 clusters.";
+			"  Optional parameter name " ST_MANSYSPAT " is "
+			"white-space delimited list of\n"
+			"patterns used to match managed system names; if last "
+			"character is '*',\n"
+			"all names that begin with the pattern are matched\n"
+			"  Optional parameter name " ST_PASSWD " is password "
+			"for " HMCROOT " if passwordless\n"
+			"ssh access to HMC has NOT been setup (to do so, it "
+			"is necessary to create\n"
+			"a public/private key pair with empty passphrase - "
+			"see \"Configure the\n"
+			"OpenSSH client\" in the redbook for more details)";
 			break;
 
 		case ST_DEVICEURL:
