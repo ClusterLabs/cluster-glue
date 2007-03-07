@@ -35,34 +35,35 @@ AM_CFLAGS		= @CFLAGS@  -DALIGNFUNC=@ALIGN@ -DMSGHDR_TYPE=@MSGHDR_TYPE@
 lib_LTLIBRARIES		= libplumb.la libplumbgpl.la
 
 libplumb_la_SOURCES	= 		\
-			Gmain_timeout.c	\
-			GSource.c	\
 			base64.c	\
-			md5.c		\
-			ipcsocket.c	\
+			cl_compress.c	\
 			cl_log.c	\
 			cl_malloc.c	\
+			cl_misc.c 	\
 			cl_msg.c	\
 			cl_msg_types.c  \
 			cl_netstring.c	\
+			cl_pidfile.c	\
 			cl_poll.c	\
 			cl_random.c	\
 			cl_signal.c	\
 			cl_syslog.c	\
+			cl_uuid.c	\
+			cl_plugin.c	\
 			coredumps.c	\
 			cpulimits.c	\
+			Gmain_timeout.c	\
+			GSource.c	\
+			ipcsocket.c	\
 			longclock.c	\
+			md5.c		\
 			mkstemp_mode.c	\
 			ocf_ipc.c	\
 			proctrack.c	\
 			realtime.c	\
+			replytrack.c	\
 			timers.c	\
-			uids.c 		\
-			cl_uuid.c	\
-			cl_pidfile.c	\
-			cl_compress.c	\
-			cl_misc.c 	\
-			cl_plugin.c
+			uids.c 	
 
 libplumb_la_LIBADD      = $(top_builddir)/replace/libreplace.la \
 			$(top_builddir)/lib/pils/libpils.la
