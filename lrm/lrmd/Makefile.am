@@ -35,6 +35,6 @@ lrmd_SOURCES 	=  lrmd.c
 
 lrmd_LDFLAGS 	=  $(top_builddir)/lib/lrm/liblrm.la 		\
 		   $(COMMONLIBS) @LIBLTDL@			\
-		   -L$(top_builddir)/lib/pils -lpils
+		   $(top_builddir)/lib/pils/libpils.la
 
 # make lrmd's owner as hacluster:haclient?
