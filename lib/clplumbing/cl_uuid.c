@@ -99,7 +99,8 @@ cl_uuid_compare(const cl_uuid_t* uu1, const cl_uuid_t* uu2)
 
 
 
-void cl_uuid_generate(cl_uuid_t* out)
+void
+cl_uuid_generate(cl_uuid_t* out)
 {
 	if (out == NULL){
 		cl_log(LOG_ERR, "cl_uuid_generate: "
@@ -150,4 +151,30 @@ cl_uuid_unparse(const cl_uuid_t* uu, char *out){
 	}
 	
 	return uuid_unparse(uu->uuid, out);
+}
+
+
+guint
+cl_uuid_g_hash(gconstpointer uuid_ptr)
+{
+	guint			ret = 0U;
+	guint32			value32;
+	int			index;
+	const unsigned char *	uuid_char = uuid_ptr;
+
+	/* It is probably not strictly necessary, but I'm trying to get the
+	 * same hash result on all platforms.  After all, the uuids are the
+	 * same on every platform.
+	 */
+
+	for (index = 0; index < sizeof(cl_uuid_t); index += sizeof(value32)) {
+		memcpy(&value32, uuid_char+index, sizeof (value32));
+		ret += g_ntohl(value32);
+	}
+	return ret;
+}
+gboolean
+cl_uuid_g_equal(gconstpointer uuid_ptr_a, gconstpointer uuid_ptr_b)
+{
+	return cl_uuid_compare(uuid_ptr_a, uuid_ptr_b) == 0;
 }
