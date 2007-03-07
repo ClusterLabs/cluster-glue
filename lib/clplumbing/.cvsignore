@@ -1,0 +1,14 @@
+Makefile.in
+Makefile
+.*.swp
+.deps
+.libs
+*.lo
+*.la
+ipctest
+ipctransientclient
+ipctransientserver
+*.beam
+parser-messages
+MISC_ERRORS
+base64_md5_test
