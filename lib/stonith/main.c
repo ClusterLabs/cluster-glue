@@ -38,8 +38,8 @@ extern int	optind, opterr, optopt;
 
 static int	debug = 0;
 
-void usage(const char * cmd, int exit_status);
-void confhelp(const char * cmd, FILE* stream);
+void usage(const char * cmd, int exit_status, const char * devtype);
+void confhelp(const char * cmd, FILE* stream, const char * devtype);
 
 /*
  * Note that we don't use the cl_log logging code because the STONITH
@@ -49,42 +49,54 @@ void confhelp(const char * cmd, FILE* stream);
  */
 
 void
-usage(const char * cmd, int exit_status)
+usage(const char * cmd, int exit_status, const char * devtype)
 {
 	FILE *stream;
 
 	stream = exit_status ? stderr : stdout;
 
-	fprintf(stream, "usage:\n");
-	fprintf(stream, "\t %s [-svh] "
-	"-L\n"
-	, cmd);
-	fprintf(stream, "\t %s -n -t stonith-device-type\n"
-	, cmd);
-	fprintf(stream, "\t %s [-svh] "
-	"-t stonith-device-type "
-	"[-p stonith-device-parameters | "
-	"-F stonith-device-parameters-file] "
-	"-lS\n"
-	, cmd);
-	fprintf(stream, "\t %s [-svh] "
-	"-t stonith-device-type "
-	"[-p stonith-device-parameters | "
-	"-F stonith-device-parameters-file]  [-c count]"
-	"-T {reset|on|off} nodename\n"
-	, cmd);
+	/* non-NULL devtype indicates help for specific device, so no usage */
+	if (devtype == NULL) {
+		fprintf(stream, "usage:\n");
+		fprintf(stream, "\t %s [-svh] "
+		"-L\n"
+		, cmd);
 
-	fprintf(stream, "\nwhere:\n");
-	fprintf(stream, "\t-L\tlist supported stonith device types\n");
-	fprintf(stream, "\t-l\tlist hosts controlled by this stonith device\n");
-	fprintf(stream, "\t-S\treport stonith device status\n");
-	fprintf(stream, "\t-s\tsilent\n");
-	fprintf(stream, "\t-v\tverbose\n");
-	fprintf(stream, "\t-n\toutput the config names of stonith-device-parameters\n");
-	fprintf(stream, "\t-h\tdisplay detailed help message with stonith device desriptions\n");
+		fprintf(stream, "\t %s [-svh] "
+		"-t stonith-device-type "
+		"-n\n"
+		, cmd);
+
+		fprintf(stream, "\t %s [-svh] "
+		"-t stonith-device-type "
+		"{-p stonith-device-parameters | "
+		"-F stonith-device-parameters-file | "
+		"name=value...} "
+		"[-c count] "
+		"-lS\n"
+		, cmd);
+
+		fprintf(stream, "\t %s [-svh] "
+		"-t stonith-device-type "
+		"{-p stonith-device-parameters | "
+		"-F stonith-device-parameters-file | "
+		"name=value...} "
+		"[-c count] "
+		"-T {reset|on|off} nodename\n"
+		, cmd);
+
+		fprintf(stream, "\nwhere:\n");
+		fprintf(stream, "\t-L\tlist supported stonith device types\n");
+		fprintf(stream, "\t-l\tlist hosts controlled by this stonith device\n");
+		fprintf(stream, "\t-S\treport stonith device status\n");
+		fprintf(stream, "\t-s\tsilent\n");
+		fprintf(stream, "\t-v\tverbose\n");
+		fprintf(stream, "\t-n\toutput the config names of stonith-device-parameters\n");
+		fprintf(stream, "\t-h\tdisplay detailed help message with stonith device description(s)\n");
+	}
 
 	if (exit_status == 0) {
-		confhelp(cmd, stream);
+		confhelp(cmd, stream, devtype);
 	}
 
 	exit(exit_status);
@@ -92,15 +104,20 @@ usage(const char * cmd, int exit_status)
 
 /* Thanks to Lorn Kay <lorn_kay@hotmail.com> for the confhelp code */
 void
-confhelp(const char * cmd, FILE* stream)
+confhelp(const char * cmd, FILE* stream, const char * devtype)
 {
 	char ** typelist;
 	char ** this;
 	Stonith *       s;
+	int	devfound = 0;
 
-	fprintf(stream
-	,	"\nSTONITH -t device types and"
-		" associated configuration details:\n");
+	
+	/* non-NULL devtype indicates help for specific device, so no header */
+	if (devtype == NULL) {
+		fprintf(stream
+		,	"\nSTONITH -t device types and"
+			" associated configuration details:\n");
+	}
 
 	typelist = stonith_types();
 	
@@ -109,15 +126,24 @@ confhelp(const char * cmd, FILE* stream)
 			"Failed to retrieve list of STONITH modules!\n");
 		return;
 	}
-	for(this=typelist; *this; ++this) {
+	for(this=typelist; *this && !devfound; ++this) {
 		const char *    SwitchType = *this;
 		const char *	cres;
 		const char **	pnames;
+
 
 		if ((s = stonith_new(SwitchType)) == NULL) {
 			fprintf(stderr, "Invalid STONITH type %s(!)\n"
 			,	SwitchType);
 			continue;
+		}
+
+		if (devtype) {
+			if (strcmp(devtype, SwitchType)) {
+				continue;
+			} else {
+				devfound = 1;
+			}
 		}
 
 		fprintf(stream, "\n\nSTONITH Device: %s - ", SwitchType);
@@ -148,8 +174,8 @@ confhelp(const char * cmd, FILE* stream)
 		,    SwitchType, stonith_get_info(s, ST_CONF_INFO_SYNTAX));
 #else
 		fprintf(stream, "For Config info [-p] syntax"
-		", give each of the above parameters in order as the"
-		" -p value.\n"
+		", give each of the above parameters in order as"
+		"\nthe -p value.\n"
 		"Arguments are separated by white space.");
 #endif
 #ifdef ST_CONFI_FILE_SYNTAX
@@ -165,6 +191,9 @@ confhelp(const char * cmd, FILE* stream)
 		stonith_delete(s); s = NULL;
 	}
 	/* Note that the type list can't/shouldn't be freed */
+	if (devtype && !devfound) {
+		fprintf(stderr, "Invalid device type: '%s'\n", devtype);
+	}
 	
 }
 
@@ -195,6 +224,7 @@ main(int argc, char** argv)
 	int		nvcount=0;
 	int		j;
 	int		count = 1;
+	int		help = 0;
 
 	if ((cmdname = strrchr(argv[0], '/')) == NULL) {
 		cmdname = argv[0];
@@ -211,8 +241,7 @@ main(int argc, char** argv)
 					fprintf(stderr
 					,	"bad count [%s]\n"
 					,	optarg);
-					usage(cmdname, 1);
-					count=1;
+					usage(cmdname, 1, NULL);
 				}
 				break;
 
@@ -222,7 +251,7 @@ main(int argc, char** argv)
 		case 'F':	optfile = optarg;
 				break;
 
-		case 'h':	usage(cmdname, 0);
+		case 'h':	help++;
 				break;
 
 		case 'l':	++listhosts;
@@ -253,9 +282,8 @@ main(int argc, char** argv)
 					fprintf(stderr
 					,	"bad reset type [%s]\n"
 					,	optarg);
-					usage(cmdname, 1);
+					usage(cmdname, 1, NULL);
 				}
-			
 				break;
 
 		case 'n':	++listparanames;
@@ -269,11 +297,16 @@ main(int argc, char** argv)
 		}
 	}
 
+	if (help && !errors) {
+		usage(cmdname, 0, SwitchType);
+	}
 	if (debug) {
 		PILpisysSetDebugLevel(debug);
 	}
 	if (optfile && parameters) {
-		++errors;
+		fprintf(stderr
+		,	"Cannot include both -F and -p options\n");
+		usage(cmdname, 1, NULL);
 	}
 
 	/*
@@ -287,17 +320,18 @@ main(int argc, char** argv)
 		if (parameters)  {
 			fprintf(stderr
 			,	"Cannot include both -p and name=value "
-			" style arguments\n");
-			usage(cmdname, 1);
+			"style arguments\n");
+			usage(cmdname, 1, NULL);
 		}
 		if (optfile)  {
 			fprintf(stderr
 			,	"Cannot include both -F and name=value "
-			" style arguments\n");
-			usage(cmdname, 1);
+			"style arguments\n");
+			usage(cmdname, 1, NULL);
 		}
 		if (nvcount >= MAXNVARG) {
-			fprintf(stderr, "Too many n=v arguments\n");
+			fprintf(stderr
+			,	"Too many name=value style arguments\n");
 			exit(1);
 		}
 		nvargs[nvcount].s_name = argv[optind];
@@ -316,7 +350,7 @@ main(int argc, char** argv)
 	}
 
 	if (errors) {
-		usage(cmdname, 1);
+		usage(cmdname, 1, NULL);
 	}
 
 	if (listtypes) {
@@ -332,18 +366,18 @@ main(int argc, char** argv)
 				printf("%s\n", *this);
 			}
 		}
-		return(0);
+		exit(0);
 	}
 
 	if (!listparanames && optfile == NULL && parameters == NULL && nvcount == 0) {
 		fprintf(stderr
 		,	"Must specify either -p option, -F option or "
-		" name=value style arguments\n");
-		usage(cmdname, 1);
+		"name=value style arguments\n");
+		usage(cmdname, 1, NULL);
 	}
 	if (SwitchType == NULL) {
 		fprintf(stderr,	"Must specify device type (-t option)\n");
-		usage(cmdname, 1);
+		usage(cmdname, 1, NULL);
 	}
 #ifndef LOG_PERROR
 #	define LOG_PERROR	0
