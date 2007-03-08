@@ -66,17 +66,17 @@ file by using different numbers with the entity_root.  For example,
 		:
 	}
 
-There is an optional parameter, soft_reset, that is 'Yes' if bladehpi
-should use soft reset (power cycle) to reset nodes or 'No' if it
+There is an optional parameter, soft_reset, that is true|1 if bladehpi
+should use soft reset (power cycle) to reset nodes or false|0 if it
 should use hard reset (power off, wait, power on); the default is
-'No'.  As an example, to override the default value the above stonith
+false.  As an example, to override the default value the above stonith
 command would become:
 
-	stonith -t bladehpi -p "{SYSTEM_CHASSIS,1} yes" -l
+	stonith -t bladehpi -p "{SYSTEM_CHASSIS,1} true" -l
 
 which is the same as:
 
-	stonith -t bladehpi "entity_root={SYSTEM_CHASSIS,1} soft_reset=yes" -l
+	stonith -t bladehpi "entity_root={SYSTEM_CHASSIS,1} soft_reset=true" -l
 
 The difference between the two is that a soft reset is much quicker
 but may return before the node has been reset because bladehpi relies
