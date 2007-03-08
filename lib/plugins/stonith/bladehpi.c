@@ -154,7 +154,7 @@ static const char *NOTpluginID = "IBM BladeCenter device has been destroyed";
 
 #define XML_SOFTRESET_LONGDESC \
 	XML_PARM_LONGDESC_BEGIN("en") \
-	"Soft reset indicator, 'Yes' if STONITH device should use soft reset (power cycle) to reset nodes, 'No' if device should use hard reset (power off, wait, power on); default is 'No'" \
+	"Soft reset indicator, true|1 if STONITH device should use soft reset (power cycle) to reset nodes, false|0 if device should use hard reset (power off, wait, power on); default is false" \
 	XML_PARM_LONGDESC_END
 
 #define XML_SOFTRESET_PARM \
@@ -541,12 +541,15 @@ bladehpi_set_config(StonithPlugin *s, StonithNVpair *list)
 		const char *softreset = 
 			OurImports->GetValue(list, ST_SOFTRESET);
 		if (softreset != NULL) {
-			if (!strcasecmp(softreset, "Yes")) {
+			if (!strcasecmp(softreset, "true") ||
+			    !strcmp(softreset, "1")) {
 				dev->softreset = 1;
-			} else if (!strcasecmp(softreset, "No")) {
+			} else if (!strcasecmp(softreset, "false") ||
+				   !strcmp(softreset, "0")) {
 				dev->softreset = 0;
 			} else {
-				LOG(PIL_CRIT, "Invalid %s %s, must be Yes or No"
+				LOG(PIL_CRIT, "Invalid %s %s, must be "
+					"true, 1, false or 0"
 				,	ST_SOFTRESET, softreset);
 				FREE(namestocopy[0].s_value);
 				return S_OOPS;
@@ -563,12 +566,13 @@ bladehpi_set_config(StonithPlugin *s, StonithNVpair *list)
 		/* skip over white-space up to next token */
 		pch++;
 		pch += strspn(pch, WHITESPACE);
-		if (!strcasecmp(pch, "Yes")) {
+		if (!strcasecmp(pch, "true") || !strcmp(pch, "1")) {
 			dev->softreset = 1;
-		} else if (!strcasecmp(pch, "No")) {
+		} else if (!strcasecmp(pch, "false") || !strcmp(pch, "0")) {
 			dev->softreset = 0;
 		} else {
-			LOG(PIL_CRIT, "Invalid %s %s, must be Yes or No"
+			LOG(PIL_CRIT, "Invalid %s %s, must be "
+				"true, 1, false or 0"
 			,	ST_SOFTRESET, pch);
 			FREE(namestocopy[0].s_value);
 			return S_OOPS;
@@ -647,16 +651,18 @@ bladehpi_getinfo(StonithPlugin *s, int reqtype)
 		case ST_DEVICEDESCR:
 			ret = "IBM BladeCenter via OpenHPI\n"
 			"Use for IBM xSeries systems managed by BladeCenter\n"
-			"Required parameter name " ST_ENTITYROOT " is "
-			"a string (no white-space) of the format " 
-			"\""SYSTEM_CHASSIS_FMT"\" "
-			"which is entity_root of BladeCenter from OpenHPI "
-			"config file, where %d is a positive integer\n"
-			"Optional parameter name " ST_SOFTRESET " is "
-			"'Yes' if STONITH device should use soft reset "
-			"(power cycle) to reset nodes or 'No' if device "
-			"should use hard reset (power off, wait, power on); "
-			"default is 'No'";
+			"  Required parameter name " ST_ENTITYROOT " is "
+			"a string (no white-space) of\n"
+			"the format \""SYSTEM_CHASSIS_FMT"\" "
+			"which is entity_root of BladeCenter\n"
+			"from OpenHPI config file, where %d is a positive "
+			"integer\n"
+			"  Optional parameter name " ST_SOFTRESET " is "
+			"true|1 if STONITH device should\n"
+			"use soft reset (power cycle) to reset nodes or "
+			"false|0 if device should\n"
+			"use hard reset (power off, wait, power on); "
+			"default is false";
 			break;
 
 		case ST_DEVICEURL:
