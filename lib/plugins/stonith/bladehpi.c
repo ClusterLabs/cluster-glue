@@ -1,6 +1,7 @@
 /*
  * Stonith module for BladeCenter via OpenHPI, an implementation of Service 
- * Availability Forum's Hardware Platfrom Interface *
+ *   Availability Forum's Hardware Platfrom Interface
+ *
  * Author: Dave Blaschke <debltc@us.ibm.com>
  *
  * Copyright (c) 2005 International Business Machines
@@ -21,25 +22,31 @@
  *
  */
 
-#define DEVICE		"IBM BladeCenter"
+#define DEVICE		"IBM BladeCenter (OpenHPI)"
 
 #include "stonith_plugin_common.h"
 
-#define PIL_PLUGIN		ibmbc
-#define PIL_PLUGIN_S            "ibmbc"
+#define PIL_PLUGIN		bladehpi
+#define PIL_PLUGIN_S            "bladehpi"
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
 
 #include <SaHpi.h>
 
-#define MAX_HOST_NAME_LEN	(256*4)
-#define MAX_CMD_LEN		2048
-#define MAX_POWERON_RETRY	10
+/* Maximum number of seconds to wait for host to power off */
 #define MAX_POWEROFF_WAIT	60
 
+/* entity_root, the one required plugin parameter */
+#define ST_ENTITYROOT		"entity_root"
+
+/* String format of entity_root */
 #define SYSTEM_CHASSIS_FMT	"{SYSTEM_CHASSIS,%d}"
-#define OPENHPIURL		"http://openhpi.sourceforge.net/"
+
+/* softreset, the one optional plugin parameter */
+#define ST_SOFTRESET		"soft_reset"
+
+#define OPENHPIURL		"http://www.openhpi.org/"
 
 /* IBMBC_WAIT_FOR_OFF - This constant has to do with the problem that
    saHpiResourcePowerStateSet can return before the desired state has been
@@ -48,60 +55,43 @@
    when the plugin returns with a successful return code.  Define this
    constant to build code that loops in one second intervals after calling
    saHpiResourcePowerStateSet(SAHPI_POWER_OFF) to make sure the power is
-   really off. */
-#define IBMBC_WAIT_FOR_OFF
+   really off.
+#define IBMBC_WAIT_FOR_OFF */
 
-/* IBMBC_DO_OWN_RESET - This constant has to do with the problem that
-   saHpiResourcePowerStateSet(SAHPI_POWER_CYCLE) does not turn the power
-   off, then on as described in the spec but rather triggers a cold reset.
-   Define this constant to build code that replaces the SAHPI_POWER_CYCLE
-   invocation with SAHPI_POWER_OFF, followed by a loop to make sure it is
-   really off, followed by SAHPI_POWER_ON. */
-#define IBMBC_DO_OWN_RESET
+static StonithPlugin *	bladehpi_new(const char *);
+static void		bladehpi_destroy(StonithPlugin *);
+static const char *	bladehpi_getinfo(StonithPlugin *, int);
+static const char **	bladehpi_get_confignames(StonithPlugin *);
+static int		bladehpi_status(StonithPlugin *);
+static int		bladehpi_reset_req(StonithPlugin *, int, const char *);
+static char **		bladehpi_hostlist(StonithPlugin *);
+static int		bladehpi_set_config(StonithPlugin *, StonithNVpair *);
 
-/* IBMBC_OPENHPI_PSS_BUG - This constant has to do with the problem that
-   calling saHpiResourcePowerStateSet causes communications with the blade
-   to cease in such a manner that all subsequent HPI calls return with
-   error -1012 (SA_ERR_HPI_NO_RESPONSE).  Define this constant to clear
-   the event log via saHpiEventLogClear before and after setting the power
-   state. NOTE: This bug is present in OpenHPI versions between Sep 05 and
-   Dec 05. */
-#define IBMBC_OPENHPI_PSS_BUG
-
-static StonithPlugin *	ibmbc_new(const char *);
-static void		ibmbc_destroy(StonithPlugin *);
-static const char *	ibmbc_getinfo(StonithPlugin * s, int InfoType);
-static const char**	ibmbc_get_confignames(StonithPlugin* p);
-static int		ibmbc_status(StonithPlugin * );
-static int		ibmbc_reset_req(StonithPlugin * s,int request,const char* host);
-static char **		ibmbc_hostlist(StonithPlugin  *);
-static int		ibmbc_set_config(StonithPlugin *, StonithNVpair*);
-
-static struct stonith_ops ibmbcOps = {
-	ibmbc_new,		/* Create new STONITH object	*/
-	ibmbc_destroy,		/* Destroy STONITH object	*/
-	ibmbc_getinfo,		/* Return STONITH info string	*/
-	ibmbc_get_confignames,	/* Return configuration parameters */
-	ibmbc_set_config,	/* Set configuration            */
-	ibmbc_status,		/* Return STONITH device status	*/
-	ibmbc_reset_req,	/* Request a reset */
-	ibmbc_hostlist,	/* Return list of supported hosts */
+static struct stonith_ops bladehpiOps = {
+	bladehpi_new,			/* Create new STONITH object	*/
+	bladehpi_destroy,		/* Destroy STONITH object	*/
+	bladehpi_getinfo,		/* Return STONITH info string	*/
+	bladehpi_get_confignames,	/* Return configuration parameters */
+	bladehpi_set_config,		/* Set configuration            */
+	bladehpi_status,		/* Return STONITH device status	*/
+	bladehpi_reset_req,		/* Request a reset */
+	bladehpi_hostlist,		/* Return list of supported hosts */
 };
 
 PIL_PLUGIN_BOILERPLATE2("1.0", Debug)
 
-static const PILPluginImports*  PluginImports;
-static PILPlugin*               OurPlugin;
-static PILInterface*		OurInterface;
-static StonithImports*		OurImports;
-static void*			interfprivate;
+static const PILPluginImports *	PluginImports;
+static PILPlugin *		OurPlugin;
+static PILInterface *		OurInterface;
+static StonithImports *		OurImports;
+static void *			interfprivate;
 
 
 PIL_rc
-PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports);
+PIL_PLUGIN_INIT(PILPlugin *us, const PILPluginImports *imports);
 
 PIL_rc
-PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
+PIL_PLUGIN_INIT(PILPlugin *us, const PILPluginImports *imports)
 {
 	/* Force the compiler to do a little type checking */
 	(void)(PILPluginInitFun)PIL_PLUGIN_INIT;
@@ -113,33 +103,29 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 	imports->register_plugin(us, &OurPIExports);  
 
 	/*  Register our interface implementation */
- 	return imports->register_interface(us, PIL_PLUGINTYPE_S
+ 	return imports->register_interface(us
+	,	PIL_PLUGINTYPE_S
 	,	PIL_PLUGIN_S
-	,	&ibmbcOps
-	,	NULL		/*close */
+	,	&bladehpiOps
+	,	NULL		/* close */
 	,	&OurInterface
-	,	(void*)&OurImports
+	,	(void *)&OurImports
 	,	&interfprivate); 
 }
-
-#define ST_ENTITYROOT "entity_root"
 
 struct pluginDevice {	
 	StonithPlugin		sp;
 	const char *		pluginid;
 	char *			idinfo;
 	char *			device;
-	GList*		 	hostlist;
+	int			softreset;
+	GList *		 	hostlist;
 	SaHpiVersionT		ohver;
 	SaHpiSessionIdT		ohsession;
-#ifdef IBMBC_OPENHPI_PSS_BUG
-	SaHpiResourceIdT	eventlogId1;
-	SaHpiResourceIdT	eventlogId2;
-#endif
 };
 
-static const char * pluginid = "BladeCenterDevice-Stonith";
-static const char * NOTpluginID = "IBM BladeCenter device has been destroyed";
+static const char *pluginid = "BladeCenterDevice-Stonith";
+static const char *NOTpluginID = "IBM BladeCenter device has been destroyed";
 
 #include "stonith_config_xml.h"
 
@@ -154,48 +140,69 @@ static const char * NOTpluginID = "IBM BladeCenter device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_ENTITYROOT_PARM \
-	XML_PARAMETER_BEGIN(ST_ENTITYROOT, "string") \
+	XML_PARAMETER_BEGIN(ST_ENTITYROOT, "string", "1") \
 	  XML_ENTITYROOT_SHORTDESC \
 	  XML_ENTITYROOT_LONGDESC \
 	XML_PARAMETER_END
 
-static const char *ibmbcXML = 
+#define XML_SOFTRESET_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_SOFTRESET \
+	XML_PARM_SHORTDESC_END
+
+#define XML_SOFTRESET_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	"Soft reset indicator, 'Yes' if STONITH device should use soft reset (power cycle) to reset nodes, 'No' if device should use hard reset (power off, wait, power on); default is 'No'" \
+	XML_PARM_LONGDESC_END
+
+#define XML_SOFTRESET_PARM \
+	XML_PARAMETER_BEGIN(ST_SOFTRESET, "string", "0") \
+	  XML_SOFTRESET_SHORTDESC \
+	  XML_SOFTRESET_LONGDESC \
+	XML_PARAMETER_END
+
+static const char *bladehpiXML = 
   XML_PARAMETERS_BEGIN
     XML_ENTITYROOT_PARM
+    XML_SOFTRESET_PARM
   XML_PARAMETERS_END;
 
-static int is_resource_bladecenter(char *entityRoot, SaHpiRptEntryT *ohRPT);
-static int is_resource_blade(char *entityRoot, SaHpiRptEntryT *ohRPT);
-static int get_ibmbc_hostlist(struct pluginDevice* dev);
-static void free_ibmbc_hostlist(struct pluginDevice* dev);
+static int is_resource_bladecenter(char *, SaHpiRptEntryT *);
+static int is_resource_blade(char *, SaHpiRptEntryT *);
+static int get_bladehpi_hostlist(struct pluginDevice *);
+static void free_bladehpi_hostlist(struct pluginDevice *);
+static int get_num_tokens(char *str);
 
 struct blade_info {
-	char*			name;
+	char *			name;
 	SaHpiResourceIdT	resourceId;
 	SaHpiCapabilitiesT	resourceCaps;
 };
 
+
 static int
-ibmbc_status(StonithPlugin  *s)
+bladehpi_status(StonithPlugin *s)
 {
-	struct pluginDevice*	dev = NULL;
+	struct pluginDevice *	dev;
+	int			status = S_BADCONFIG;
 	SaErrorT		ohrc;
 	SaHpiEntryIdT		ohnextid;
 	SaHpiRptEntryT		ohRPT;
-	int			status = S_BADCONFIG;
 	SaHpiDomainInfoT 	ohdi;
 	SaHpiUint32T		ohupdate;
 	
-	if(Debug){
+	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
 	}
 
-	ERRIFWRONGDEV(s,S_OOPS);
+	ERRIFWRONGDEV(s, S_OOPS);
 
-	dev = (struct pluginDevice*) s;
+	dev = (struct pluginDevice *)s;
 	
-	if ((ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi)) != SA_OK) {
-		LOG(PIL_CRIT, "Unable to get domain info (%d)", ohrc);
+	ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi);
+	if (ohrc != SA_OK) {
+		LOG(PIL_CRIT, "Unable to get domain info in %s (%d)"
+		,	__FUNCTION__, ohrc);
 		return S_BADCONFIG;
 	}
 	ohupdate = ohdi.RptUpdateCount;
@@ -204,25 +211,41 @@ try_again:
 	ohnextid = SAHPI_FIRST_ENTRY;
 	do {
 		ohrc = saHpiRptEntryGet(dev->ohsession, ohnextid
-				       , &ohnextid, &ohRPT);
-		if (ohrc == SA_OK && 
-		    is_resource_bladecenter(dev->device, &ohRPT)) {
+				, &ohnextid, &ohRPT);
+		if (ohrc != SA_OK) {
+			LOG(PIL_CRIT, "Unable to get RPT entry in %s (%d)"
+			,	__FUNCTION__, ohrc);
+			return S_BADCONFIG;
+		}
+
+		if (is_resource_bladecenter(dev->device, &ohRPT)) {
+			if (Debug) {
+				LOG(PIL_DEBUG, "Found system chassis %s"
+				,	ohRPT.ResourceTag.Data);
+			}
+
 			status = S_OK;
 			break;
 		}
 	} while (ohrc == SA_OK && ohnextid != SAHPI_LAST_ENTRY);
 
-	if ((ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi)) != SA_OK) {
-		LOG(PIL_CRIT, "Unable to get domain info (%d)", ohrc);
+	ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi);
+	if (ohrc != SA_OK) {
+		LOG(PIL_CRIT, "Unable to get domain info in %s (%d)"
+		,	__FUNCTION__, ohrc);
 		return S_BADCONFIG;
 	}
+
 	if (ohupdate != ohdi.RptUpdateCount) {
 		status = S_BADCONFIG;
-		if(Debug){
-			LOG(PIL_DEBUG, "Looping through entries again");
+		if (Debug) {
+			LOG(PIL_DEBUG, "Looping through entries again,"
+				" count changed from %d to %d"
+			,	ohupdate, ohdi.RptUpdateCount);
 		}
 		goto try_again;
 	}
+
 	return status;
 }
 
@@ -232,125 +255,106 @@ try_again:
  */
 
 static char **
-ibmbc_hostlist(StonithPlugin  *s)
+bladehpi_hostlist(StonithPlugin *s)
 {
-	struct pluginDevice*	dev;
+	struct pluginDevice *	dev;
 	int			numnames = 0, j;
-	char**			ret = NULL;
-	GList*			node = NULL;
+	char **			ret = NULL;
+	GList *			node = NULL;
 
-	if(Debug){
+	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
 	}
 
-	ERRIFWRONGDEV(s,NULL);
+	ERRIFWRONGDEV(s, NULL);
 
-	dev = (struct pluginDevice*) s;
+	dev = (struct pluginDevice *)s;
 
-	/* refresh the hostlist */
-	free_ibmbc_hostlist(dev);
-	if (S_OK != get_ibmbc_hostlist(dev)){
-		LOG(PIL_CRIT, "unable to obtain list of blade servers in %s"
+	/* Refresh the hostlist each and every time */
+	free_bladehpi_hostlist(dev);
+	if (get_bladehpi_hostlist(dev) != S_OK) {
+		LOG(PIL_CRIT, "Unable to obtain list of hosts in %s"
 		,	__FUNCTION__);
 		return NULL;
 	}
 
 	numnames = g_list_length(dev->hostlist);
 	if (numnames < 0) {
-		LOG(PIL_CRIT, "unconfigured stonith object in %s"
+		LOG(PIL_CRIT, "Unconfigured stonith object in %s"
 		,	__FUNCTION__);
-		return(NULL);
+		return NULL;
 	}
 
-	ret = (char **)MALLOC((numnames+1)*sizeof(char*));
+	ret = (char **)MALLOC((numnames+1) * sizeof(char *));
 	if (ret == NULL) {
-		LOG(PIL_CRIT, "out of memory");
+		LOG(PIL_CRIT, "Out of memory for malloc in %s", __FUNCTION__);
 		return ret;
 	}
 
-	memset(ret, 0, (numnames+1)*sizeof(char*));
+	memset(ret, 0, (numnames+1) * sizeof(char *));
 	for (node = g_list_first(dev->hostlist), j = 0
 	;	NULL != node
 	;	j++, node = g_list_next(node))	{
 		ret[j] = STRDUP(((struct blade_info *)node->data)->name);
 		if (ret[j] == NULL) {
-			LOG(PIL_CRIT, "out of memory");
+			LOG(PIL_CRIT, "Out of memory for strdup in %s"
+			,	__FUNCTION__);
 			stonith_free_hostlist(ret);
 			return NULL;
 		}
 		g_strdown(ret[j]);
 	}
+
 	return ret;
 }
 
 
-static const char**     
-ibmbc_get_confignames(StonithPlugin* p)
+static const char **     
+bladehpi_get_confignames(StonithPlugin *s)
 {
-	static const char* names[] = {ST_ENTITYROOT, NULL};
+	static const char *	names[] = {ST_ENTITYROOT, NULL};
+
 	if (Debug) {
-		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
 	}
+
 	return names;
 }
 
 
-#ifdef IBMBC_OPENHPI_PSS_BUG
-static int
-ibmbc_clear_bladecenter_eventlog(struct pluginDevice* dev)
-{
-	SaErrorT	ohrc;
-
-	/* There is at least one, maximum two management modules */
-	if ((ohrc = saHpiEventLogClear(dev->ohsession
-			, dev->eventlogId1)) != SA_OK) {
-		LOG(PIL_CRIT, "Unable to clear event log (%d)", ohrc);
-		return (S_OOPS);
-	}
-	if (dev->eventlogId2 && (ohrc = saHpiEventLogClear(dev->ohsession
-			, dev->eventlogId2)) != SA_OK) {
-		LOG(PIL_CRIT, "Unable to clear event log (%d)", ohrc);
-		return (S_OOPS);
-	}
-	return S_OK;
-}
-#endif
-
-
 /*
  *	Reset the given host, and obey the request type.
- *	We should reset without power cycle for the non-partitioned case
  */
 
 static int
-ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
+bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 {
-	GList*			node = NULL;
-	struct pluginDevice*	dev = NULL;
+	GList *			node = NULL;
+	struct pluginDevice *	dev = NULL;
+	struct blade_info *	bi = NULL;
 	SaHpiPowerStateT	ohcurstate, ohnewstate;
 	SaErrorT		ohrc;
-	struct blade_info*	bi = NULL;
 	
-	if(Debug){
-		LOG(PIL_DEBUG, "%s: called, host=%s", __FUNCTION__, host);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called, request=%d, host=%s"
+		,	__FUNCTION__, request, host);
 	}
 	
-	ERRIFWRONGDEV(s,S_OOPS);
+	ERRIFWRONGDEV(s, S_OOPS);
 	
-	if (NULL == host) {
-		LOG(PIL_CRIT, "invalid argument to %s", __FUNCTION__);
-		return(S_OOPS);
+	if (host == NULL) {
+		LOG(PIL_CRIT, "Invalid host argument to %s", __FUNCTION__);
+		return S_OOPS;
 	}
 
-	dev = (struct pluginDevice*) s;
+	dev = (struct pluginDevice *)s;
 
 	for (node = g_list_first(dev->hostlist)
-	;	NULL != node
+	;	node != NULL
 	;	node = g_list_next(node)) {
 		bi = ((struct blade_info *)node->data);
-		if(Debug){
-			LOG(PIL_DEBUG, "%s: node->data->name=%s"
-			,	__FUNCTION__, bi->name);
+		if (Debug) {
+			LOG(PIL_DEBUG, "Found host %s in hostlist", bi->name);
 		}
 		
 		if (!strcasecmp(bi->name, host)) {
@@ -360,9 +364,9 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 
 	if (!node || !bi) {
 		LOG(PIL_CRIT
-		,	"Host %s is not configured in this STONITH module. "
-			"Please check your configuration information.", host);
-		return (S_OOPS);
+		,	"Host %s is not configured in this STONITH module, "
+			"please check your configuration information", host);
+		return S_OOPS;
 	}
 
 	/* Make sure host has proper capabilities */
@@ -371,16 +375,17 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 	    ((request == ST_GENERIC_RESET) && 
 	     (!(bi->resourceCaps & SAHPI_CAPABILITY_RESET)))) {
 		LOG(PIL_CRIT
-		,	"Resource %s does not have capability to %s"
+		,	"Host %s does not have capability to %s"
 		,	host, request == ST_GENERIC_RESET ? "reset" : "power");
-		return (S_OOPS);
+		return S_OOPS;
 	}
 
-	if ((ohrc = saHpiResourcePowerStateGet(dev->ohsession
-			, bi->resourceId, &ohcurstate)) != SA_OK) {
-		LOG(PIL_CRIT, "Unable to obtain resource %s power state (%d)"
+	ohrc = saHpiResourcePowerStateGet(dev->ohsession, bi->resourceId
+			, &ohcurstate);
+	if (ohrc != SA_OK) {
+		LOG(PIL_CRIT, "Unable to get host %s power state (%d)"
 		,	host, ohrc);
-		return (S_OOPS);
+		return S_OOPS;
 	}
 
 	switch (request) {
@@ -392,6 +397,7 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 			ohnewstate = SAHPI_POWER_ON;
 
 			break;
+
 		case ST_POWEROFF:
 			if (ohcurstate == SAHPI_POWER_OFF) {
 				LOG(PIL_INFO, "Host %s already off", host);
@@ -400,6 +406,7 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 			ohnewstate = SAHPI_POWER_OFF;
 	
 			break;
+
 		case ST_GENERIC_RESET:
 			if (ohcurstate == SAHPI_POWER_OFF) {
 				ohnewstate = SAHPI_POWER_ON;
@@ -408,33 +415,29 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 			}
 
 			break;
+
 		default:
+			LOG(PIL_CRIT, "Invalid request argument to %s"
+			,	__FUNCTION__);
 			return S_INVAL;
 	}
 
-#ifdef IBMBC_OPENHPI_PSS_BUG
-	if (ibmbc_clear_bladecenter_eventlog(dev) != SA_OK) {
-		return (S_OOPS);
-	}
-#endif
+	if (!dev->softreset && (ohnewstate == SAHPI_POWER_CYCLE)) {
+		int maxwait;
 
-#ifdef IBMBC_DO_OWN_RESET
-	if (ohnewstate == SAHPI_POWER_CYCLE) {
-		int	maxwait = MAX_POWEROFF_WAIT;
-
-		if ((ohrc = saHpiResourcePowerStateSet(dev->ohsession
-				, bi->resourceId, SAHPI_POWER_OFF)) != SA_OK) {
-			LOG(PIL_CRIT, "Unable to change resource %s power"
-			" state (%d)", host, ohrc);
-			return (S_OOPS);
+		ohrc = saHpiResourcePowerStateSet(dev->ohsession
+				, bi->resourceId, SAHPI_POWER_OFF);
+		if (ohrc != SA_OK) {
+			LOG(PIL_CRIT, "Unable to set host %s power state to"
+				" OFF (%d)", host, ohrc);
+			return S_OOPS;
 		}
 
-#ifdef IBMBC_OPENHPI_PSS_BUG
-		if (ibmbc_clear_bladecenter_eventlog(dev) != SA_OK) {
-			return (S_OOPS);
-		}
-#endif
-
+		/* 
+		 * Must wait for power off here or subsequent power on request
+		 * may take place while power is still on and thus ignored
+		 */
+		maxwait = MAX_POWEROFF_WAIT;
 		do {
 			maxwait--;
 			sleep(1);
@@ -444,45 +447,30 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 			&& (ohcurstate != SAHPI_POWER_OFF)
 			&& (maxwait > 0));
 
-		if(Debug){
+		if (Debug) {
 			LOG(PIL_DEBUG, "Waited %d seconds for power off"
 			,	MAX_POWEROFF_WAIT - maxwait);
 		}
 
-		if ((ohrc = saHpiResourcePowerStateSet(dev->ohsession
-				, bi->resourceId, SAHPI_POWER_ON)) != SA_OK) {
-			LOG(PIL_CRIT, "Unable to change resource %s power"
-			" state (%d)", host, ohrc);
-			return (S_OOPS);
+		ohrc = saHpiResourcePowerStateSet(dev->ohsession
+				, bi->resourceId, SAHPI_POWER_ON);
+		if (ohrc != SA_OK) {
+			LOG(PIL_CRIT, "Unable to set host %s power state to"
+			" ON (%d)", host, ohrc);
+			return S_OOPS;
 		}
-
-#ifdef IBMBC_OPENHPI_PSS_BUG
-		if (ibmbc_clear_bladecenter_eventlog(dev) != SA_OK) {
-			return (S_OOPS);
-		}
-#endif
-
-		/* Don't want to wait for POWEROFF */
-		ohnewstate = SAHPI_POWER_ON;
 	}
-	else
-#endif
-	if ((ohrc = saHpiResourcePowerStateSet(dev->ohsession
+	else if ((ohrc = saHpiResourcePowerStateSet(dev->ohsession
 			, bi->resourceId, ohnewstate)) != SA_OK) {
-		LOG(PIL_CRIT, "Unable to change resource %s power state (%d)"
+		LOG(PIL_CRIT, "Unable to set host %s power state (%d)"
 		,	host, ohrc);
-		return (S_OOPS);
+		return S_OOPS;
 	}
-
-#ifdef IBMBC_OPENHPI_PSS_BUG
-	if (ibmbc_clear_bladecenter_eventlog(dev) != SA_OK) {
-		return (S_OOPS);
-	}
-#endif
 
 #ifdef IBMBC_WAIT_FOR_OFF
-	if (ohnewstate != SAHPI_POWER_ON) {
-		int	maxwait = MAX_POWEROFF_WAIT;
+	if (ohnewstate == SAHPI_POWER_OFF) {
+		int maxwait = MAX_POWEROFF_WAIT;
+
 		do {
 			maxwait--;
 			sleep(1);
@@ -492,7 +480,7 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
 			&& (ohcurstate != SAHPI_POWER_OFF)
 			&& (maxwait > 0));
 
-		if(Debug){
+		if (Debug) {
 			LOG(PIL_DEBUG, "Waited %d seconds for power off"
 			,	MAX_POWEROFF_WAIT - maxwait);
 		}
@@ -511,9 +499,9 @@ ibmbc_reset_req(StonithPlugin * s, int request, const char * host)
  */
 
 static int
-ibmbc_set_config(StonithPlugin * s, StonithNVpair* list)
+bladehpi_set_config(StonithPlugin *s, StonithNVpair *list)
 {
-	struct pluginDevice*	dev = NULL;
+	struct pluginDevice *	dev = NULL;
 	StonithNamesToGet	namestocopy [] =
 	{	{ST_ENTITYROOT,	NULL}
 	,	{NULL,		NULL}
@@ -521,24 +509,18 @@ ibmbc_set_config(StonithPlugin * s, StonithNVpair* list)
 	int			rc, i;
 	SaErrorT		ohrc;
 	
-	ERRIFWRONGDEV(s,S_OOPS);
-
-	if(Debug){
+	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
 	}
 	
-	dev = (struct pluginDevice*) s;
+	ERRIFWRONGDEV(s, S_OOPS);
 
-	if(Debug){
+	dev = (struct pluginDevice *)s;
+
+	if (Debug) {
 		LOG(PIL_DEBUG, "%s conditionally compiled with:"
 #ifdef IBMBC_WAIT_FOR_OFF
 		" IBMBC_WAIT_FOR_OFF"
-#endif
-#ifdef IBMBC_DO_OWN_RESET
-		" IBMBC_DO_OWN_RESET"
-#endif
-#ifdef IBMBC_OPENHPI_PSS_BUG
-		" IBMBC_OPENHPI_PSS_BUG"
 #endif
 		, dev->pluginid);
 	}
@@ -546,9 +528,49 @@ ibmbc_set_config(StonithPlugin * s, StonithNVpair* list)
 	if ((rc = OurImports->CopyAllValues(namestocopy, list)) != S_OK) {
 		return rc;
 	}
-	if(Debug){
-		LOG(PIL_DEBUG, "%s: entity_root=%s", __FUNCTION__
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s = %s", ST_ENTITYROOT
 		,	namestocopy[0].s_value);	
+	}
+
+	if (get_num_tokens(namestocopy[0].s_value) == 1) {
+		/* name=value pairs on command line, look for soft_reset */
+		const char *softreset = 
+			OurImports->GetValue(list, ST_SOFTRESET);
+		if (softreset != NULL) {
+			if (!strcasecmp(softreset, "Yes")) {
+				dev->softreset = 1;
+			} else if (!strcasecmp(softreset, "No")) {
+				dev->softreset = 0;
+			} else {
+				LOG(PIL_CRIT, "Invalid %s %s, must be Yes or No"
+				,	ST_SOFTRESET, softreset);
+				FREE(namestocopy[0].s_value);
+				return S_OOPS;
+			}
+		}
+	} else {
+		/* -p or -F option with args "entity_root [soft_reset]..." */
+		char *pch = namestocopy[0].s_value;
+
+		/* skip over entity_root and null-terminate */
+		pch += strcspn(pch, WHITESPACE);
+		*pch = EOS;
+
+		/* skip over white-space up to next token */
+		pch++;
+		pch += strspn(pch, WHITESPACE);
+		if (!strcasecmp(pch, "Yes")) {
+			dev->softreset = 1;
+		} else if (!strcasecmp(pch, "No")) {
+			dev->softreset = 0;
+		} else {
+			LOG(PIL_CRIT, "Invalid %s %s, must be Yes or No"
+			,	ST_SOFTRESET, pch);
+			FREE(namestocopy[0].s_value);
+			return S_OOPS;
+		}
 	}
 
 	dev->device = STRDUP(namestocopy[0].s_value);
@@ -556,46 +578,58 @@ ibmbc_set_config(StonithPlugin * s, StonithNVpair* list)
 
 	if (strcspn(dev->device, WHITESPACE) != strlen(dev->device) ||
 	    sscanf(dev->device, SYSTEM_CHASSIS_FMT, &i) != 1 || i < 0) {
-		LOG(PIL_CRIT, "Invalid entity_root %s, must be of format %s "
-		, dev->device, SYSTEM_CHASSIS_FMT);
+		LOG(PIL_CRIT, "Invalid %s %s, must be of format %s"
+		,	ST_ENTITYROOT, dev->device, SYSTEM_CHASSIS_FMT);
 		return S_BADCONFIG;
 	}
 	
-	if ((dev->ohver = saHpiVersionGet()) > SAHPI_INTERFACE_VERSION) {
-		LOG(PIL_CRIT, "Installed OpenHPI version (%x) greater than "
-		" version built for plugin (%x), incompatibilites may exist"
-		, dev->ohver, SAHPI_INTERFACE_VERSION);
+	dev->ohver = saHpiVersionGet();
+	if (dev->ohver > SAHPI_INTERFACE_VERSION) {
+		LOG(PIL_CRIT, "Installed OpenHPI interface (%x) greater than "
+			"one used by plugin (%x), incompatibilites may exist"
+		,	dev->ohver, SAHPI_INTERFACE_VERSION);
 		return S_BADCONFIG;
 	}
 
-	if ((ohrc = saHpiSessionOpen(SAHPI_UNSPECIFIED_DOMAIN_ID
-				    , &dev->ohsession, NULL)) != SA_OK) {
+	ohrc = saHpiSessionOpen(SAHPI_UNSPECIFIED_DOMAIN_ID
+				    , &dev->ohsession, NULL);
+	if (ohrc != SA_OK) {
 		LOG(PIL_CRIT, "Unable to open HPI session (%d)", ohrc);
 		return S_BADCONFIG;
 	}
 
-	if ((ohrc = saHpiDiscover(dev->ohsession)) != SA_OK) {
+	ohrc = saHpiDiscover(dev->ohsession);
+	if (ohrc != SA_OK) {
 		LOG(PIL_CRIT, "Unable to discover resources (%d)", ohrc);
 		return S_BADCONFIG;
 	}
 
-	if (S_OK != get_ibmbc_hostlist(dev)){
-		LOG(PIL_CRIT, "unable to obtain list of blade servers in %s"
+	if (get_bladehpi_hostlist(dev) != S_OK) {
+		LOG(PIL_CRIT, "Unable to obtain list of hosts in %s"
 		,	__FUNCTION__);
 		return S_BADCONFIG;
+	}
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "e_r %s, s_r %d", dev->device, dev->softreset);
 	}
 	
 	return S_OK;
 }
 
 
-static const char*
-ibmbc_getinfo(StonithPlugin* s, int reqtype)
+static const char *
+bladehpi_getinfo(StonithPlugin *s, int reqtype)
 {
-	struct pluginDevice*	dev;
-	const char*		ret;
+	struct pluginDevice *	dev;
+	const char *		ret;
 
-	ERRIFWRONGDEV(s,NULL);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called, reqtype=%d"
+		,	__FUNCTION__, reqtype);
+	}
+	
+	ERRIFWRONGDEV(s, NULL);
 
 	dev = (struct pluginDevice *)s;
 
@@ -609,14 +643,18 @@ ibmbc_getinfo(StonithPlugin* s, int reqtype)
 			break;
 
 		case ST_DEVICEDESCR:
-			ret = DEVICE;
 			ret = "IBM BladeCenter via OpenHPI\n"
 			"Use for IBM xSeries systems managed by BladeCenter\n"
 			"Required parameter name " ST_ENTITYROOT " is "
 			"a string (no white-space) of the format " 
 			"\""SYSTEM_CHASSIS_FMT"\" "
 			"which is entity_root of BladeCenter from OpenHPI "
-			"config file, where %d is a positive integer\n";
+			"config file, where %d is a positive integer\n"
+			"Optional parameter name " ST_SOFTRESET " is "
+			"'Yes' if STONITH device should use soft reset "
+			"(power cycle) to reset nodes or 'No' if device "
+			"should use hard reset (power off, wait, power on); "
+			"default is 'No'";
 			break;
 
 		case ST_DEVICEURL:
@@ -624,13 +662,14 @@ ibmbc_getinfo(StonithPlugin* s, int reqtype)
 			break;
 
 		case ST_CONF_XML:		/* XML metadata */
-			ret = ibmbcXML;
+			ret = bladehpiXML;
 			break;
 
 		default:
 			ret = NULL;
 			break;
 	}
+
 	return ret;
 }
 
@@ -640,12 +679,12 @@ ibmbc_getinfo(StonithPlugin* s, int reqtype)
  */
 
 static void
-ibmbc_destroy(StonithPlugin *s)
+bladehpi_destroy(StonithPlugin *s)
 {
-	struct pluginDevice*	dev;
+	struct pluginDevice *	dev;
 
-	if(Debug){
-		LOG(PIL_DEBUG, "%s : called", __FUNCTION__);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
 	}
 
 	VOIDERRIFWRONGDEV(s);
@@ -661,7 +700,7 @@ ibmbc_destroy(StonithPlugin *s)
 		FREE(dev->idinfo);
 		dev->idinfo = NULL;
 	}
-	free_ibmbc_hostlist(dev);
+	free_bladehpi_hostlist(dev);
 
 	if (dev->ohsession) {
 		saHpiSessionClose(dev->ohsession);
@@ -673,17 +712,17 @@ ibmbc_destroy(StonithPlugin *s)
 
 
 static StonithPlugin *
-ibmbc_new(const char *subplugin)
+bladehpi_new(const char *subplugin)
 {
 	struct pluginDevice*	dev = MALLOCT(struct pluginDevice);
 	
-	if(Debug){
+	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
 	}
 	
 	if (dev == NULL) {
-		LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
-		return(NULL);
+		LOG(PIL_CRIT, "Out of memory in %s", __FUNCTION__);
+		return NULL;
 	}
 
 	memset(dev, 0, sizeof(*dev));
@@ -694,35 +733,38 @@ ibmbc_new(const char *subplugin)
 	REPLSTR(dev->idinfo, DEVICE);
 	if (dev->idinfo == NULL) {
 		FREE(dev);
-		return(NULL);
+		return NULL;
 	}
-	dev->sp.s_ops = &ibmbcOps;
+	dev->sp.s_ops = &bladehpiOps;
 
-	if(Debug){
+	if (Debug) {
 		LOG(PIL_DEBUG, "%s: returning successfully", __FUNCTION__);
 	}
 
-	return((void *)dev);
+	return ((void *)dev);
 }
+
 
 static int
 is_resource_bladecenter(char *entityRoot, SaHpiRptEntryT *ohRPT)
 {
 
 	int 			i, foundRoot = 0, foundOther = 0;
-	SaHpiEntityPathT*	ohep = &ohRPT->ResourceEntity;
 	char 			rootName[64];
+	SaHpiEntityPathT *	ohep = &ohRPT->ResourceEntity;
 
 	if (ohep == NULL || entityRoot == NULL) {
 		return 0;
 	}
 
+	/* First find root of entity path, which is last entity in entry */
         for (i = 0; i < SAHPI_MAX_ENTITY_PATH; i++) {
                 if (ohep->Entry[i].EntityType == SAHPI_ENT_ROOT) {
                             break;
                 }
         }
 
+	/* Then back up through entries looking for bladecenter */
         for (i--; i >= 0; i--) {
 		switch (ohep->Entry[i].EntityType) {
 			case SAHPI_ENT_SYSTEM_CHASSIS:
@@ -744,65 +786,27 @@ is_resource_bladecenter(char *entityRoot, SaHpiRptEntryT *ohRPT)
 	return foundRoot && !foundOther;
 }
 
-#ifdef IBMBC_OPENHPI_PSS_BUG
-static int
-is_resource_bladecenter_eventlog(char *entityRoot, SaHpiRptEntryT *ohRPT)
-{
-
-	int 			i, foundRoot = 0;
-	SaHpiEntityPathT*	ohep = &ohRPT->ResourceEntity;
-	char 			rootName[64];
-
-	if (ohep == NULL || entityRoot == NULL) {
-		return 0;
-	}
-
-        for (i = 0; i < SAHPI_MAX_ENTITY_PATH; i++) {
-                if (ohep->Entry[i].EntityType == SAHPI_ENT_ROOT) {
-                            break;
-                }
-        }
-
-        for (i--; i >= 0; i--) {
-		switch (ohep->Entry[i].EntityType) {
-			case SAHPI_ENT_SYSTEM_CHASSIS:
-				snprintf(rootName, sizeof(rootName)
-				,	SYSTEM_CHASSIS_FMT
-				,	ohep->Entry[i].EntityLocation);
-				if (!strcmp(entityRoot, rootName)) {
-					foundRoot = 1;
-				}
-				break;
-
-			default:
-				break;
-		}
-	}
-
-	/* We are only interested in event log on specific device */
-	return foundRoot
-	&& (ohRPT->ResourceCapabilities & SAHPI_CAPABILITY_EVENT_LOG);
-}
-#endif
 
 static int
 is_resource_blade(char *entityRoot, SaHpiRptEntryT *ohRPT)
 {
 
 	int			i, foundBlade = 0, foundRoot = 0, foundExp = 0;
-	SaHpiEntityPathT *	ohep = &ohRPT->ResourceEntity;
 	char			rootName[64];
+	SaHpiEntityPathT *	ohep = &ohRPT->ResourceEntity;
 
 	if (ohep == NULL || entityRoot == NULL) {
 		return 0;
 	}
 
+	/* First find root of entity path, which is last entity in entry */
         for (i = 0; i < SAHPI_MAX_ENTITY_PATH; i++) {
                 if (ohep->Entry[i].EntityType == SAHPI_ENT_ROOT) {
                             break;
                 }
         }
 
+	/* Then back up through entries looking for blade */
         for (i--; i >= 0; i--) {
 		switch (ohep->Entry[i].EntityType) {
 			case SAHPI_ENT_SBC_BLADE:
@@ -827,14 +831,16 @@ is_resource_blade(char *entityRoot, SaHpiRptEntryT *ohRPT)
 		}
 	}
 
-	/* We are only interested in blades on the specific device that are
-	 * not expansion boards */
+	/* 
+	 * We are only interested in blades on the specific device that are
+	 * not expansion boards
+	 */
 	return foundBlade && foundRoot && !foundExp;
-
 }
 
+
 static int
-get_ibmbc_hostlist(struct pluginDevice* dev)
+get_bladehpi_hostlist(struct pluginDevice *dev)
 {
 	SaErrorT		ohrc;
 	SaHpiEntryIdT		ohnextid;
@@ -842,17 +848,21 @@ get_ibmbc_hostlist(struct pluginDevice* dev)
 	SaHpiDomainInfoT 	ohdi;
 	SaHpiUint32T		ohupdate;
 
-	if(Debug){
-		LOG(PIL_DEBUG, "%s: called, dev->device=%s", __FUNCTION__
-		,	dev->device);
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called, dev->device=%s"
+		,	__FUNCTION__,	dev->device);
 	}
 
 	if (dev->device == NULL || *dev->device == 0) {
+		LOG(PIL_CRIT, "Unconfigured stonith object in %s"
+		,	__FUNCTION__);
 		return S_BADCONFIG;
 	}
 
-	if ((ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi)) != SA_OK) {
-		LOG(PIL_CRIT, "Unable to get domain info (%d)", ohrc);
+	ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi);
+	if (ohrc != SA_OK) {
+		LOG(PIL_CRIT, "Unable to get domain info in %s (%d)"
+		,	__FUNCTION__, ohrc);
 		return S_BADCONFIG;
 	}
 	ohupdate = ohdi.RptUpdateCount;
@@ -860,19 +870,39 @@ get_ibmbc_hostlist(struct pluginDevice* dev)
 try_again:
 	ohnextid = SAHPI_FIRST_ENTRY;
 	do {
+		char blname[SAHPI_MAX_TEXT_BUFFER_LENGTH];
+		int  blnum;
+
 		ohrc = saHpiRptEntryGet(dev->ohsession, ohnextid
 				       , &ohnextid, &ohRPT);
-		if (ohrc == SA_OK && is_resource_blade(dev->device, &ohRPT)) {
+		if (ohrc != SA_OK) {
+			LOG(PIL_CRIT, "Unable to get RPT entry in %s (%d)"
+			,	__FUNCTION__, ohrc);
+			return S_BADCONFIG;
+		}
+
+		if (is_resource_blade(dev->device, &ohRPT)) {
 			struct blade_info *bi;
 
 			if ((bi = (struct blade_info *)
 				MALLOC(sizeof(struct blade_info))) == NULL) {
-			        LOG(PIL_CRIT, "%s: out of memory."
+			        LOG(PIL_CRIT, "Out of memory in %s"
 				,	__FUNCTION__);
-				free_ibmbc_hostlist(dev);
-			        return (S_OOPS);
+				free_bladehpi_hostlist(dev);
+			        return S_OOPS;
 			}
-			bi->name = STRDUP(ohRPT.ResourceTag.Data);
+
+			/*
+			 * New format consists of "Blade N - name" while older
+			 * format consists only of "name"; we only need to
+			 * stash name because ResourceID is the important info
+			 */
+			if (sscanf(ohRPT.ResourceTag.Data, "Blade %d - %s"
+					, &blnum, blname) == 2) {
+				bi->name = STRDUP(blname);
+			} else {
+				bi->name = STRDUP(ohRPT.ResourceTag.Data);
+			}
 			bi->resourceId = ohRPT.ResourceId;
 			bi->resourceCaps = ohRPT.ResourceCapabilities;
 			dev->hostlist = g_list_append(dev->hostlist, bi);
@@ -882,39 +912,55 @@ try_again:
 				, bi->name, bi->resourceId, bi->resourceCaps);
 			}
 		}
-#ifdef IBMBC_OPENHPI_PSS_BUG
-		else if (ohrc == SA_OK
-		&& is_resource_bladecenter_eventlog(dev->device, &ohRPT)) {
-			if (dev->eventlogId1 == 0) {
-				dev->eventlogId1 = ohRPT.ResourceId;
-			} else {
-				dev->eventlogId2 = ohRPT.ResourceId;
-			}
-		}
-#endif
 	} while (ohrc == SA_OK && ohnextid != SAHPI_LAST_ENTRY);
 
+	ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi);
+	if (ohrc != SA_OK) {
+		LOG(PIL_CRIT, "Unable to get domain info in %s (%d)"
+		,	__FUNCTION__, ohrc);
+		return S_BADCONFIG;
+	}
+
 	if (ohupdate != ohdi.RptUpdateCount) {
-		free_ibmbc_hostlist(dev);
+		free_bladehpi_hostlist(dev);
 		if(Debug){
-			LOG(PIL_DEBUG, "Looping through entries again");
+			LOG(PIL_DEBUG, "Looping through entries again,"
+				" count changed from %d to %d"
+			,	ohupdate, ohdi.RptUpdateCount);
 		}
 		goto try_again;
 	}
+
 	return S_OK;
 }
 
 static void
-free_ibmbc_hostlist(struct pluginDevice* dev)
+free_bladehpi_hostlist(struct pluginDevice *dev)
 {
 	if (dev->hostlist) {
-		GList* node;
+		GList *node;
 		while (NULL != (node = g_list_first(dev->hostlist))) {
-			dev->hostlist = g_list_remove_link(dev->hostlist, node);
+			dev->hostlist = 
+				g_list_remove_link(dev->hostlist, node);
 			FREE(((struct blade_info *)node->data)->name);
 			FREE(node->data);
 			g_list_free(node);
 		}
 		dev->hostlist = NULL;
 	}
+}
+
+static int
+get_num_tokens(char *str)
+{
+	int namecount = 0;
+
+	while (*str != EOS) {
+		str += strspn(str, WHITESPACE);
+		if (*str == EOS)
+			break;
+		str += strcspn(str, WHITESPACE);
+		namecount++;
+	}
+	return namecount;
 }
