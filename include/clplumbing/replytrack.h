@@ -47,14 +47,16 @@
  * them all - managing all that tedious bookwork for you.
  */
 
-typedef enum _replytrack_completion_type_t	replytrack_completion_type_t;
+typedef enum _replytrack_completion_type	replytrack_completion_type_t;
+typedef enum _nodetrack_change			nodetrack_change_t;
 typedef struct _replytrack			replytrack_t;
 typedef struct _nodetrack			nodetrack_t;
+typedef struct _nodetrack_intersection		nodetrack_intersection_t;
 
 /*
  * The levels of logging possible for our process
  */
-enum _replytrack_completion_type_t {
+enum _replytrack_completion_type {
 	REPLYT_ALLRCVD = 2,	/* All replies received */
 	REPLYT_TIMEOUT,		/* Timeout occurred with replies missing */
 };
@@ -67,6 +69,12 @@ typedef void  (*replytrack_callback_t)
 
 typedef void (*replytrack_iterator_t)
 (		replytrack_t*	rl
+,		gpointer	user_data
+,		const char*	node
+,		cl_uuid_t	uuid);
+
+typedef void (*nodetrack_iterator_t)
+(		nodetrack_t*	rl
 ,		gpointer	user_data
 ,		const char*	node
 ,		cl_uuid_t	uuid);
@@ -134,11 +142,45 @@ int	replytrack_outstanding_count(replytrack_t* rl);
  *
  */
 
-nodetrack_t*	nodetrack_new(void);
+/*
+ * The levels of logging possible for our process
+ */
+enum _nodetrack_change {
+	NODET_UP = 2,	/* This node came up */
+	NODET_DOWN,	/* This node went down */
+};
+
+typedef void  (*nodetrack_callback_t) 
+(		nodetrack_t *		mbr
+,		const char *		node
+,		cl_uuid_t		u
+,		nodetrack_change_t	reason
+,		gpointer		user_data);
+
+nodetrack_t*	nodetrack_new(nodetrack_callback_t callback
+,		gpointer user_data);
 void		nodetrack_del(nodetrack_t*);
-gboolean	nodetrack_nodeup(nodetrack_t* mbr, const char * node, cl_uuid_t u);
-gboolean	nodetrack_nodedown(nodetrack_t* mbr, const char * node, cl_uuid_t u);
-gboolean	nodetrack_ismember(nodetrack_t* mbr, const char * node, cl_uuid_t u);
+gboolean	nodetrack_nodeup(nodetrack_t* mbr, const char * node
+,		cl_uuid_t u);
+gboolean	nodetrack_nodedown(nodetrack_t* mbr, const char * node
+,		cl_uuid_t u);
+gboolean	nodetrack_ismember(nodetrack_t* mbr, const char * node
+,		cl_uuid_t u);
+int		nodetrack_iterate(nodetrack_t* mbr
+,		nodetrack_iterator_t i, gpointer user_data);
+
+/* An intesection nodetrack table
+ * A node is put into the "intersection" nodetrack_t table when it is in all
+ * the underlying constituent nodetrack_t tables, and removed when it is
+ * removed from any of them.
+ * Note that you can set a callback to be informed when these "intersection"
+ * membership changes occur.
+ */
+nodetrack_intersection_t*
+		nodetrack_intersection_new(nodetrack_t** tables, int ntables
+,		nodetrack_callback_t callback, gpointer user_data);
+void		nodetrack_intersection_del(nodetrack_intersection_t*);
+nodetrack_t*	nodetrack_intersection_table(nodetrack_intersection_t*);
 
 #if 0
 /*

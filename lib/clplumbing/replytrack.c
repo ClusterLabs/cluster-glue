@@ -58,6 +58,10 @@ struct node_tables {
 struct _nodetrack {
 	struct node_tables	nt;
 	int			refcount;
+	nodetrack_callback_t	callback;
+	gpointer		user_data;
+	nodetrack_callback_t	extra_callback;
+	gpointer		ext_data;
 };
 
 /*
@@ -73,10 +77,18 @@ struct _replytrack {
 	nodetrack_t*		membership;
 };
 
-/* Our current idea of global membership */
+struct _nodetrack_intersection {
+	nodetrack_t**		tables;
+	int			ntables;
+	nodetrack_callback_t	callback;
+	gpointer		user_data;
+	nodetrack_t*		intersection;
+};
+
 static cl_uuid_t		nulluuid;
 static int			nodetrack_t_count = 0;
 static int			replytrack_t_count = 0;
+static int			replytrack_intersection_t_count = 0;
 
 static struct rt_node_info *
 rt_node_info_new(const char * nodename, cl_uuid_t nodeid)
@@ -269,15 +281,29 @@ init_global_membership(void)
 }
 
 gboolean /* Call us when an expected replier joins / comes up */
-nodetrack_nodeup(nodetrack_t * membership, const char * node, cl_uuid_t uuid)
+nodetrack_nodeup(nodetrack_t * mbr, const char * node, cl_uuid_t uuid)
 {
-	return add_node_to_hashtables(&membership->nt, node, uuid);
+	gboolean	ret;
+	ret = add_node_to_hashtables(&mbr->nt, node, uuid);
+	if (ret && mbr->callback) {
+		mbr->callback(mbr, node, uuid, NODET_UP, mbr->user_data);
+	}
+	if (mbr->extra_callback) {
+		mbr->extra_callback(mbr, node, uuid, NODET_UP,mbr->ext_data);
+	}
+	return ret;
 }
 
 gboolean /* Call us when an expected replier goes down / away */
-nodetrack_nodedown(nodetrack_t* membership,const char* node,cl_uuid_t uuid)
+nodetrack_nodedown(nodetrack_t* mbr, const char* node, cl_uuid_t uuid)
 {
-	return del_node_from_hashtables(&membership->nt, node, uuid);
+	if (mbr->callback) {
+		mbr->callback(mbr, node, uuid, NODET_DOWN, mbr->user_data);
+	}
+	if (mbr->extra_callback) {
+		mbr->extra_callback(mbr, node,uuid,NODET_DOWN,mbr->ext_data);
+	}
+	return del_node_from_hashtables(&mbr->nt, node, uuid);
 }
 
 /* This function calls the user's timeout callback */
@@ -389,6 +415,8 @@ replytrack_iterator_helper(gpointer key_unused, gpointer entry
 	}
 }
 
+
+
 int	/* iterate through the outstanding expected replies */
 replytrack_outstanding_iterate(replytrack_t* rl
 ,		replytrack_iterator_t i, gpointer user_data)
@@ -418,7 +446,7 @@ replytrack_outstanding_count(replytrack_t* rl)
 }
 
 nodetrack_t*
-nodetrack_new(void)
+nodetrack_new(nodetrack_callback_t callback, gpointer user_data)
 {
 	nodetrack_t*	ret = MALLOCT(nodetrack_t);
 	if (!mbr_inityet) {
@@ -433,6 +461,10 @@ nodetrack_new(void)
 		cl_free(ret);
 		ret = NULL;
 	}
+	ret->user_data = user_data;
+	ret->callback = callback;
+	ret->extra_callback = NULL;
+	ret->ext_data = NULL;
 	return ret;
 }
 void
@@ -459,4 +491,153 @@ nodetrack_ismember(nodetrack_t* mbr, const char * name, cl_uuid_t u)
 		return(g_hash_table_lookup(mbr->nt.namemap, name) != NULL);
 	}
 	return (g_hash_table_lookup(mbr->nt.uuidmap, &u) != NULL);
+}
+
+struct nodetrack_iterator_data {
+	nodetrack_t*		rlist;
+	nodetrack_iterator_t	f;
+	int			count;
+	gpointer		user_data;
+};
+static void /* g_hash_table user-level iteration helper */
+nodetrack_iterator_helper(gpointer key_unused, gpointer entry
+,	gpointer user_data)
+{
+	struct nodetrack_iterator_data*	ri = user_data;
+	struct rt_node_info*		ni = entry;
+	if (ri && ri->rlist) {
+		++ri->count;
+		if (ri->f) {
+			ri->f(ri->rlist, ri->user_data
+			,	ni->nodename, ni->nodeid);
+		}
+	}
+}
+
+int	/* iterate through the outstanding expected replies */
+nodetrack_iterate(nodetrack_t* rl
+,		nodetrack_iterator_t i, gpointer user_data)
+{
+	struct nodetrack_iterator_data id;
+	id.rlist = rl;
+	id.f = i;
+	id.count = 0;
+	id.user_data = user_data;
+	g_hash_table_foreach(rl->nt.namemap, nodetrack_iterator_helper
+	,	&id);
+	g_hash_table_foreach(rl->nt.uuidmap, nodetrack_iterator_helper
+	,	&id);
+	if (id.count != (rl->nt.namecount + rl->nt.uuidcount)) {
+		cl_log(LOG_ERR
+		, "%s: iteration count %d disagrees with"
+		" (namecount %d+uuidcount %d)"
+		,	__FUNCTION__, id.count
+		,	rl->nt.namecount,rl->nt.uuidcount);
+	}
+	return id.count;
+}
+static void 
+intersection_callback
+(	nodetrack_t *		mbr
+,	const char *		node
+,	cl_uuid_t		u
+,	nodetrack_change_t	reason
+,	gpointer		user_data)
+{
+	nodetrack_intersection_t*	it = user_data;
+	int				j;
+	gboolean			allfound = TRUE;
+
+	if (reason == NODET_DOWN) {
+		if (nodetrack_ismember(it->intersection, node, u)) {
+			nodetrack_nodedown(it->intersection,node,u);
+		}
+		return;
+	}
+	for (j=0; j < it->ntables && allfound; ++j) {
+		if (nodetrack_ismember(it->tables[j], node, u)) {
+			allfound = FALSE;			
+		}
+	}
+	if (allfound) {
+		nodetrack_nodeup(it->intersection, node, u);
+	}
+}
+
+struct li_helper {
+	nodetrack_intersection_t*	i;
+	gboolean			result;
+};
+
+static void
+intersection_init_iterator(nodetrack_t* nt
+,	gpointer	ghelp
+,	const char*	node
+,	cl_uuid_t	uuid)
+{
+	struct li_helper*	help;
+	gboolean		allfound = TRUE;
+	int			j;
+
+	for (j=1; allfound && j < help->i->ntables; ++j) {
+		if (!nodetrack_ismember(help->i->tables[j]
+		,	node, uuid)) {
+			allfound = FALSE;
+		}
+	}
+	if (allfound) {
+		nodetrack_nodeup(help->i->intersection, node, uuid);
+	}
+}
+
+nodetrack_intersection_t*
+nodetrack_intersection_new(nodetrack_t** tables, int ntables
+,		nodetrack_callback_t callback, gpointer user_data)
+{
+	nodetrack_intersection_t*	ret;
+	int				j;
+	ret = MALLOCT(nodetrack_intersection_t);
+	if (!ret) {
+		return ret;
+	}
+	ret->intersection = nodetrack_new(callback, user_data);
+	if (!ret->intersection)  {
+		cl_free(ret);
+		ret = NULL;
+		return ret;
+	}
+	ret->tables = tables;
+	ret->ntables = ntables;
+	ret->callback = callback;
+	ret->user_data = user_data;
+	for (j=0; j < ntables; ++j) {
+		tables[j]->refcount ++;
+		tables[j]->ext_data = ret;
+		tables[j]->extra_callback = intersection_callback;
+	}
+	/* Initialize the intersection membership list */
+	nodetrack_iterate(tables[0], intersection_init_iterator, ret);
+	replytrack_intersection_t_count++;
+	return ret;
+}
+void
+nodetrack_intersection_del(nodetrack_intersection_t* p)
+{
+	int	j;
+
+	for (j=0; j < p->ntables; ++j) {
+		p->tables[j]->refcount ++;
+	}
+	nodetrack_del(p->intersection);
+	p->intersection = NULL;
+	memset(p, 0, sizeof(*p));
+	cl_free(p);
+	p = NULL;
+	replytrack_intersection_t_count--;
+}
+
+nodetrack_t*
+nodetrack_intersection_table(nodetrack_intersection_t*p)
+{
+	return p->intersection;
 }
