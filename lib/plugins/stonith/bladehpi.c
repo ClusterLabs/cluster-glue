@@ -22,6 +22,8 @@
  *
  */
 
+#include <lha_internal.h>
+
 #define DEVICE		"IBM BladeCenter (OpenHPI)"
 
 #include "stonith_plugin_common.h"

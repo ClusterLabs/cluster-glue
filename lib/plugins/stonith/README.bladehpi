@@ -72,7 +72,7 @@ should use hard reset (power off, wait, power on); the default is
 'No'.  As an example, to override the default value the above stonith
 command would become:
 
-	stonith -t bladehpi -p "{SYSTEM_CHASSIS,1 yes}" -l
+	stonith -t bladehpi -p "{SYSTEM_CHASSIS,1} yes" -l
 
 which is the same as:
 
