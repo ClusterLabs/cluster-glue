@@ -2,12 +2,17 @@
 STONITH module for IBM BladeCenter via OpenHPI
 ----------------------------------------------
 
+Requirements:
+	Linux-HA bladehpi STONITH plugin requires OpenHPI 2.6+
+	OpenHPI requires Net-SNMP 5.0+
+	OpenHPI requires BladeCenter Management Module 1.08+
+
 This STONITH module talks to IBM BladeCenters via SNMP through use of
 the OpenHPI BladeCenter plugin (snmp_bc).  For more information about
 installing OpenHPI, setting up the BladeCenter SNMP agent, etc. please
-visit http://openhpi.sourceforge.net/.  Once OpenHPI is installed
-properly, the STONITH plugin will automatically be built the next time
-Linux-HA is built.
+visit http://www.openhpi.org/.  Once OpenHPI is installed properly,
+the STONITH plugin will automatically be built the next time Linux-HA
+is built.
 
 Use the OpenHPI configuration file (i.e. /etc/openhpi/openhpi.conf)
 to configure the BladeCenters of interest to STONITH.  For example, 
@@ -28,15 +33,15 @@ the following excerpt:
 
 defines how to access the BladeCenter at 9.254.253.252 using SNMPV3
 with an ID/password of userid/userpass.  The entity_root must be
-passed to the STONITH ibmbc plugin as its single required parameter.
+passed to the STONITH bladehpi plugin as its single required parameter.
 For example, to query the list of blades present in the BladeCenter
 configured above, run:
 
-	stonith -t ibmbc -p "{SYSTEM_CHASSIS,1}" -l
+	stonith -t bladehpi -p "{SYSTEM_CHASSIS,1}" -l
 
 which is the same as:
 
-	stonith -t ibmbc "entity_root={SYSTEM_CHASSIS,1}" -l
+	stonith -t bladehpi "entity_root={SYSTEM_CHASSIS,1}" -l
 
 Use the BladeCenter Management Module web interface to set the Blade
 Information to match "uname -n" for each blade in the cluster.  For
@@ -60,3 +65,35 @@ file by using different numbers with the entity_root.  For example,
 	        host = "9.254.253.251" # Required
 		:
 	}
+
+There is an optional parameter, soft_reset, that is 'Yes' if bladehpi
+should use soft reset (power cycle) to reset nodes or 'No' if it
+should use hard reset (power off, wait, power on); the default is
+'No'.  As an example, to override the default value the above stonith
+command would become:
+
+	stonith -t bladehpi -p "{SYSTEM_CHASSIS,1 yes}" -l
+
+which is the same as:
+
+	stonith -t bladehpi "entity_root={SYSTEM_CHASSIS,1} soft_reset=yes" -l
+
+The difference between the two is that a soft reset is much quicker
+but may return before the node has been reset because bladehpi relies
+on BladeCenter firmware to cycle the node's power, while a hard reset
+is slower but guaranteed not to return until the node is dead because
+bladehpi powers off the node, waits until it is off, then powers it
+on again.
+
+NOTE: Set the OPENHPI_CONF environment variable to contain the
+fully-qualified path of the OpenHPI configuration file, for example:
+
+	export OPENHPI_CONF=/etc/openhpi/openhpi.conf
+
+NOTE: If OpenHPI is not configured with --disable-daemon before being
+built and installed, make sure that the OpenHPI daemon is running
+before using the bladehpi plugin.
+
+NOTE: If debugging of the environment is needed, configure OpenHPI 
+with --enable-debuggable and rebuild/reinstall, export 
+OPENHPI_DEBUG=YES, and run stonith commands with the -d option.
