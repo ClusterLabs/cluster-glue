@@ -575,7 +575,7 @@ intersection_init_iterator(nodetrack_t* nt
 ,	const char*	node
 ,	cl_uuid_t	uuid)
 {
-	struct li_helper*	help;
+	struct li_helper*	help = ghelp;
 	gboolean		allfound = TRUE;
 	int			j;
 
