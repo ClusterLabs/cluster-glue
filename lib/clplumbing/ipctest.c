@@ -340,6 +340,20 @@ clientserver(TestFunc_t clientfunc, TestFunc_t serverfunc, int count, int client
 }
 
 static void
+echomsgbody(void * body, int n, int niter, size_t * len)
+{
+	char *str = body;
+	int l;
+
+	l = snprintf(str, n-1, "String-%d", niter);
+	if (l < (n-1)) {
+		memset(&str[l], 'a', (n - (l+1)));
+	}
+	str[n-1] = '\0';
+	*len = n;
+}
+
+static void
 checkifblocked(IPC_Channel* chan)
 {
 	if (chan->ops->is_sending_blocked(chan)) {
@@ -381,6 +395,8 @@ transport_tests(int iterations, int clients)
 	return rc;
 }
 
+int data_size = 10;
+
 int
 main(int argc, char ** argv)
 {
@@ -394,13 +410,14 @@ main(int argc, char ** argv)
 	 *	-v: verbose
 	 *	-i: number of iterations
 	 *	-c: number of clients (invokes client/server mechanism)
+	 *	-s: data-size
 	 */
 	procname = basename(argv[0]);
 
 	argerrs = 0;
 	iterations = iter_def;
 	clients = clients_def;
-	while ((argflag = getopt(argc, argv, "i:vuc:")) != EOF) {
+	while ((argflag = getopt(argc, argv, "i:vuc:s:")) != EOF) {
 		switch (argflag) {
 		case 'i':	/* iterations */
 			iterations = atoi(optarg);
@@ -416,16 +433,25 @@ main(int argc, char ** argv)
 				argerrs++;
 			}
 			break;
+		case 's':	/* data size */
+			data_size = atoi(optarg);
+			if (data_size < 0) {
+				fprintf(stderr, "data size must be >=0\n");
+				argerrs++;
+			}
+			break;
 		default:
 			argerrs++;
 			break;
 		}
 	}
 	if (argerrs) {
-		fprintf(stderr, "Usage: %s [-v] [-i iterations] [-c clients]\n"
+		fprintf(stderr,
+		  "Usage: %s [-v] [-i iterations] [-c clients] [-s size]\n"
 			"\t-v : verbose\n"
 			"\t-i : iterations (default %d)\n"
-			"\t-c : number of clients (default %d; nonzero invokes client/server)\n",
+			"\t-c : number of clients (default %d; nonzero invokes client/server)\n"
+			"\t-s : data size (default 10 bytes)\n",
 		  procname, iter_def, clients_def);
 		exit(1);
 	}
@@ -531,12 +557,13 @@ EOFcheck(IPC_Channel* chan)
 static int
 echoserver(IPC_Channel* wchan, int repcount)
 {
-	char	str[256];
+	char	*str;
 	int	j;
 	int	errcount = 0;
 	IPC_Message	wmsg;
 	IPC_Message*	rmsg = NULL;
 	
+	str = malloc(data_size);
 	
 	memset(&wmsg, 0, sizeof(wmsg));
 	wmsg.msg_private = NULL;
@@ -549,8 +576,8 @@ echoserver(IPC_Channel* wchan, int repcount)
 	for (j=1; j <= repcount
 	;++j, rmsg != NULL && (rmsg->msg_done(rmsg),1)) {
 		int	rc;
-		snprintf(str, sizeof(str)-1, "String-%d", j);
-		wmsg.msg_len = strlen(str)+1;
+
+		echomsgbody(str, data_size, j, &(wmsg.msg_len));
 		if ((rc = wchan->ops->send(wchan, &wmsg)) != IPC_OK) {
 			cl_log(LOG_ERR
 			,	"echotest: send failed %d rc iter %d"
@@ -615,6 +642,8 @@ echoserver(IPC_Channel* wchan, int repcount)
 	cl_log(LOG_INFO, "destroying channel 0x%lx", (unsigned long)wchan);
 #endif
 	wchan->ops->destroy(wchan); wchan = NULL;
+
+	free(str);
 
 	return errcount;
 }
@@ -683,14 +712,6 @@ echoclient(IPC_Channel* rchan, int repcount)
 #endif
 	rchan->ops->destroy(rchan); rchan = NULL;
 	return errcount;
-}
-
-static void
-echomsgbody(void * body, int niter, size_t * len)
-{
-	char *	str = body;
-	sprintf(str, "String-%d", niter);
-	*len = strlen(str)+1;
 }
 
 void dump_ipc_info(IPC_Channel* chan);
@@ -816,8 +837,8 @@ asyn_echoserver(IPC_Channel* wchan, int repcount)
 				if (wrcount > repcount) {
 					break;
 				}
-				wmsg = wchan->ops->new_ipcmsg(wchan, NULL, 32, NULL);
-				echomsgbody(wmsg->msg_body, wrcount, &wmsg->msg_len);
+				wmsg = wchan->ops->new_ipcmsg(wchan, NULL, data_size, NULL);
+				echomsgbody(wmsg->msg_body, data_size, wrcount, &wmsg->msg_len);
 				if ((rc = wchan->ops->send(wchan, wmsg)) != IPC_OK){
 					
 					cl_log(LOG_INFO, "channel sstatus in echo server is %d",
@@ -1096,8 +1117,8 @@ s_send_msg(gpointer data)
 	
 	++i->wcount;
 	
-	wmsg = i->chan->ops->new_ipcmsg(i->chan, NULL, 32, NULL);
-	echomsgbody(wmsg->msg_body, i->wcount, &wmsg->msg_len);
+	wmsg = i->chan->ops->new_ipcmsg(i->chan, NULL, data_size, NULL);
+	echomsgbody(wmsg->msg_body, data_size, i->wcount, &wmsg->msg_len);
 	
 	/*cl_log(LOG_INFO, "s_send_msg: sending out %d", i->wcount);*/
 	
@@ -1184,10 +1205,12 @@ s_rcv_msg(IPC_Channel* chan, gpointer data)
 static gboolean
 checkmsg(IPC_Message* rmsg, const char * who, int rcount)
 {
-	char		str[256];
+	char		*str;
 	size_t		len;
+	
+	str = malloc(data_size);
 
-	echomsgbody(str, rcount, &len);
+	echomsgbody(str, data_size, rcount, &len);
 
 	if (rmsg->msg_len != len) {
 		cl_log(LOG_ERR
@@ -1228,6 +1251,9 @@ checkmsg(IPC_Message* rmsg, const char * who, int rcount)
 		,	who, rcount);
 #endif
 	}
+
+	free(str);
+
 	return TRUE;
 }
 
