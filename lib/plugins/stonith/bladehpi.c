@@ -34,7 +34,7 @@
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
 
-#include <SaHpi.h>
+#include <openhpi/SaHpi.h>
 
 /* Maximum number of seconds to wait for host to power off */
 #define MAX_POWEROFF_WAIT	60
