@@ -37,7 +37,7 @@ AM_CFLAGS		= @NON_FATAL_CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 			-DLOCALEDIR='"@LOCALE@"' 		
 
 
-EXTRA_DIST = README.meatware README.rcd_serial README.vacm README.drac3 README.ipmilan README.cyclades
+EXTRA_DIST = README.meatware README.rcd_serial README.vacm README.drac3 README.ipmilan README.cyclades README.bladehpi
 
 #
 #       We need "vacmclient_api.h" and -lvacmclient to make the VACM
@@ -79,6 +79,15 @@ else
 drac3_LIB =
 endif
 
+#
+#       We need OpenHPI to make the IBM BladeCenter plugin work.
+#
+if USE_OPENHPI
+bladehpi_LIB = bladehpi.la
+else
+bladehpi_LIB =
+endif
+
 noinst_PROGRAMS = $(ipmilan_TEST)
 ipmilantest_SOURCES = ipmilan_test.c 
 ipmilantest_LDADD = $(top_builddir)/lib/pils/libpils.la \
@@ -94,6 +103,7 @@ plugin_LTLIBRARIES =	apcmaster.la	\
 			$(apcmastersnmp_LIB)	\
 			apcsmart.la		\
 			baytech.la		\
+			$(bladehpi_LIB)		\
 			cyclades.la		\
 			$(drac3_LIB)		\
 			external.la		\
@@ -125,6 +135,10 @@ apcsmart_la_LIBADD	= $(GLIBLIB)
 baytech_la_SOURCES	= baytech.c $(INCFILES)
 baytech_la_LDFLAGS	= -export-dynamic -module -avoid-version
 baytech_la_LIBADD	= $(GLIBLIB)
+
+bladehpi_la_SOURCES	= bladehpi.c $(INCFILES)
+bladehpi_la_LDFLAGS	= -export-dynamic -module -avoid-version
+bladehpi_la_LIBADD	= $(GLIBLIB) -lopenhpi
 
 cyclades_la_SOURCES	= cyclades.c $(INCFILES)
 cyclades_la_LDFLAGS	= -export-dynamic -module -avoid-version
