@@ -15,30 +15,9 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#undef _GNU_SOURCE  /* in case it was defined on the command line */
-#define _GNU_SOURCE
-#include <lha_internal.h>
-#include <string.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <glib.h>
-#include <clplumbing/cl_log.h>
-#include <clplumbing/cl_poll.h>
-#include <clplumbing/GSource.h>
-#include <clplumbing/ipc.h>
-#include <clplumbing/realtime.h>
-#include <clplumbing/lsb_exitcodes.h>
-#include <errno.h>
 
-#define	MAXERRORS	1000
-#define MAX_IPC_FAIL    10
-#define WORKING_DIR     HA_VARLIBDIR"/heartbeat/"
-#define FIFO_LEN        1024
+#include <ipctransient.h>
+
 #define MAX_MESSAGES 3
 char *messages[MAX_MESSAGES];
 
@@ -50,7 +29,6 @@ IPC_Channel *init_client_ipctest_comms(
 gboolean transient_client_callback(IPC_Channel* server, void* private_data);
 void client_send_message(
 	const char *message_text, IPC_Channel *server_channel, int iteration);
-void default_ipctest_input_destroy(gpointer user_data);
 
 int
 main(int argc, char ** argv)
@@ -58,8 +36,10 @@ main(int argc, char ** argv)
 	int	lpc =0, iteration=0;
 	GMainLoop* client_main = NULL;
 	IPC_Channel *server_channel = NULL;
+
+	trans_getargs(argc, argv);
     
-	cl_log_set_entity("ipc_transient_client_test");
+	cl_log_set_entity(procname);
 	cl_log_enable_stderr(TRUE);
     
 	/* give the server a chance to start */
@@ -94,7 +74,7 @@ main(int argc, char ** argv)
 	cl_log(LOG_DEBUG, "Waiting for replies from the echo server");
 	g_main_run(client_main);
 	cl_log(LOG_INFO, "[Iteration %d] Client %d completed successfully", iteration, lpc);
-    
+
 	return 0;
 }
 
@@ -109,19 +89,17 @@ init_client_ipctest_comms(const char *child,
 	GHashTable * attrs;
 	int local_sock_len = 2; /* 2 = '/' + '\0' */
 	char    *commpath = NULL;
-	static char 	path[] = IPC_PATH_ATTR;
-	
+	static char path[] = IPC_PATH_ATTR;
+
 	local_sock_len += strlen(child);
-	local_sock_len += strlen(WORKING_DIR);
+	local_sock_len += strlen(commdir);
 	
 	commpath = (char*)malloc(sizeof(char)*local_sock_len);
 	if (commpath == NULL){
-		cl_log(LOG_ERR, "init_client_ipc_comms:"
-		       " allocating memory failed");
+		cl_log(LOG_ERR, "%s: allocating memory failed", __FUNCTION__);
 		return NULL;
-		
 	}
-	sprintf(commpath, WORKING_DIR "/%s", child);
+	sprintf(commpath, "%s/%s", commdir, child);
 	commpath[local_sock_len - 1] = '\0';
 	
 	cl_log(LOG_DEBUG, "[Client] Attempting to talk on: %s", commpath);
@@ -130,7 +108,7 @@ init_client_ipctest_comms(const char *child,
 	g_hash_table_insert(attrs, path, commpath);
 	ch = ipc_channel_constructor(IPC_ANYTYPE, attrs);
 	g_hash_table_destroy(attrs);
-	
+
 	if (ch == NULL) {
 		cl_log(LOG_ERR, "[Client] Could not access channel on: %s", commpath);
 		return NULL;
@@ -152,8 +130,8 @@ transient_client_callback(IPC_Channel* server, void* private_data)
 {
 	int lpc = 0;
 	IPC_Message *msg = NULL;
-	static int recieved_responses = 0;
 	char *buffer = NULL;
+	static int received_responses = 0;
 
 	GMainLoop *mainloop = (GMainLoop*)private_data;
 
@@ -169,10 +147,10 @@ transient_client_callback(IPC_Channel* server, void* private_data)
 			return FALSE;
 		}
 		
-		if(msg != NULL) {
+		if (msg != NULL) {
 			buffer = (char*)msg->msg_body;
 			cl_log(LOG_DEBUG, "[Client] Got text [text=%s]", buffer);
-			recieved_responses++;
+			received_responses++;
 
 			if(lpc < MAX_MESSAGES && strcmp(messages[lpc], buffer) != 0)
 			{
@@ -195,16 +173,16 @@ transient_client_callback(IPC_Channel* server, void* private_data)
 		return FALSE;
 	}
 
-	cl_log(LOG_DEBUG, "[Client] Processed %d IPC messages this time, %d total", lpc, recieved_responses);
+	cl_log(LOG_DEBUG, "[Client] Processed %d IPC messages this time, %d total", lpc, received_responses);
 
-	if(recieved_responses > 2) {
-		cl_log(LOG_INFO, "[Client] Processed %d IPC messages, all done.", recieved_responses);
-		recieved_responses = 0;
+	if(received_responses > 2) {
+		cl_log(LOG_INFO, "[Client] Processed %d IPC messages, all done.", received_responses);
+		received_responses = 0;
 		g_main_quit(mainloop);
 		cl_log(LOG_INFO, "[Client] Exiting.");
 		return FALSE;
 	}
-    
+
 	return TRUE;
 }
 
@@ -236,43 +214,4 @@ client_send_message(const char *message_text,
 			       iteration, server_channel->ch_status, message_text);
 		}
 	}
-}
-
-void
-default_ipctest_input_destroy(gpointer user_data)
-{
-	cl_log(LOG_INFO, "default_ipc_input_destroy:received HUP");
-}
-
-IPC_Message *
-create_simple_message(const char *text, IPC_Channel *ch)
-{
-	char *copy_text = NULL;
-	IPC_Message *ack_msg = NULL;
-	
-	if(text == NULL) {
-		cl_log(LOG_ERR, "can't create IPC_Message with no text");
-		return NULL;
-	} else if(ch == NULL) {
-		cl_log(LOG_ERR, "can't create IPC_Message with no channel");
-		return NULL;
-	}
-	
-	ack_msg = (IPC_Message *)malloc(sizeof(IPC_Message));
-	if (ack_msg == NULL){
-		cl_log(LOG_ERR, "create_simple_message:"
-		       "allocating memory for IPC_Message failed");		
-		return NULL;
-	}
-	
-	memset(ack_msg, 0, sizeof(IPC_Message));
-	copy_text = strdup(text);
-	
-	ack_msg->msg_private = NULL;
-	ack_msg->msg_done    = NULL;
-	ack_msg->msg_body    = copy_text;
-	ack_msg->msg_ch      = ch;
-	ack_msg->msg_len     = strlen(text)+1;
-	
-	return ack_msg;
 }
