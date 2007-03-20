@@ -34,7 +34,7 @@
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 #include <pils/plugin.h>
 
-#include <SaHpi.h>
+#include <openhpi/SaHpi.h>
 
 /* Maximum number of seconds to wait for host to power off */
 #define MAX_POWEROFF_WAIT	60
@@ -45,10 +45,16 @@
 /* String format of entity_root */
 #define SYSTEM_CHASSIS_FMT	"{SYSTEM_CHASSIS,%d}"
 
-/* softreset, the one optional plugin parameter */
+/* soft_reset, the one optional plugin parameter */
 #define ST_SOFTRESET		"soft_reset"
 
 #define OPENHPIURL		"http://www.openhpi.org/"
+
+/* OpenHPI resource types of interest to this plugin */
+#define OHRES_NONE		0
+#define OHRES_BLADECENT		1
+#define OHRES_MGMTMOD		2
+#define OHRES_BLADE		3
 
 /* IBMBC_WAIT_FOR_OFF - This constant has to do with the problem that
    saHpiResourcePowerStateSet can return before the desired state has been
@@ -122,8 +128,12 @@ struct pluginDevice {
 	char *			device;
 	int			softreset;
 	GList *		 	hostlist;
-	SaHpiVersionT		ohver;
-	SaHpiSessionIdT		ohsession;
+	SaHpiVersionT		ohver;		/* OpenHPI interface version */
+	SaHpiSessionIdT		ohsession;	/* session ID */
+	SaHpiUint32T		ohrptcnt;	/* RPT count for hostlist */
+	SaHpiResourceIdT	ohdevid;	/* device resource ID */
+	SaHpiResourceIdT	ohsensid;	/* sensor resource ID */
+	SaHpiSensorNumT		ohsensnum;	/* sensor number */
 };
 
 static const char *pluginid = "BladeCenterDevice-Stonith";
@@ -169,16 +179,16 @@ static const char *bladehpiXML =
     XML_SOFTRESET_PARM
   XML_PARAMETERS_END;
 
-static int is_resource_bladecenter(char *, SaHpiRptEntryT *);
-static int is_resource_blade(char *, SaHpiRptEntryT *);
+static int get_resource_type(char *, SaHpiRptEntryT *);
+static int get_sensor_num(SaHpiSessionIdT, SaHpiResourceIdT);
 static int get_bladehpi_hostlist(struct pluginDevice *);
 static void free_bladehpi_hostlist(struct pluginDevice *);
 static int get_num_tokens(char *str);
 
 struct blade_info {
-	char *			name;
-	SaHpiResourceIdT	resourceId;
-	SaHpiCapabilitiesT	resourceCaps;
+	char *			name;		/* blade name */
+	SaHpiResourceIdT	resourceId;	/* blade resource ID */
+	SaHpiCapabilitiesT	resourceCaps;	/* blade capabilities */
 };
 
 
@@ -186,12 +196,8 @@ static int
 bladehpi_status(StonithPlugin *s)
 {
 	struct pluginDevice *	dev;
-	int			status = S_BADCONFIG;
 	SaErrorT		ohrc;
-	SaHpiEntryIdT		ohnextid;
-	SaHpiRptEntryT		ohRPT;
 	SaHpiDomainInfoT 	ohdi;
-	SaHpiUint32T		ohupdate;
 	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
@@ -201,54 +207,40 @@ bladehpi_status(StonithPlugin *s)
 
 	dev = (struct pluginDevice *)s;
 	
+	/* Refresh the hostlist only if RPTs updated */
 	ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi);
 	if (ohrc != SA_OK) {
 		LOG(PIL_CRIT, "Unable to get domain info in %s (%d)"
 		,	__FUNCTION__, ohrc);
 		return S_BADCONFIG;
 	}
-	ohupdate = ohdi.RptUpdateCount;
-
-try_again:
-	ohnextid = SAHPI_FIRST_ENTRY;
-	do {
-		ohrc = saHpiRptEntryGet(dev->ohsession, ohnextid
-				, &ohnextid, &ohRPT);
-		if (ohrc != SA_OK) {
-			LOG(PIL_CRIT, "Unable to get RPT entry in %s (%d)"
-			,	__FUNCTION__, ohrc);
+	if (dev->ohrptcnt != ohdi.RptUpdateCount) {
+		free_bladehpi_hostlist(dev);
+		if (get_bladehpi_hostlist(dev) != S_OK) {
+			LOG(PIL_CRIT, "Unable to obtain list of hosts in %s"
+			,	__FUNCTION__);
 			return S_BADCONFIG;
 		}
-
-		if (is_resource_bladecenter(dev->device, &ohRPT)) {
-			if (Debug) {
-				LOG(PIL_DEBUG, "Found system chassis %s"
-				,	ohRPT.ResourceTag.Data);
-			}
-
-			status = S_OK;
-			break;
-		}
-	} while (ohrc == SA_OK && ohnextid != SAHPI_LAST_ENTRY);
-
-	ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi);
-	if (ohrc != SA_OK) {
-		LOG(PIL_CRIT, "Unable to get domain info in %s (%d)"
-		,	__FUNCTION__, ohrc);
-		return S_BADCONFIG;
 	}
 
-	if (ohupdate != ohdi.RptUpdateCount) {
-		status = S_BADCONFIG;
-		if (Debug) {
-			LOG(PIL_DEBUG, "Looping through entries again,"
-				" count changed from %d to %d"
-			,	ohupdate, ohdi.RptUpdateCount);
+	/* At this point, hostlist is up to date */
+	if (dev->ohsensid && dev->ohsensnum) {
+		/*
+		 * For accurate status, need to make a call that goes out to
+		 * BladeCenter MM because the calls made so far by this
+		 * function (and perhaps get_bladehpi_hostlist) only retrieve
+		 * information from memory cached by OpenHPI
+		 */
+		ohrc = saHpiSensorReadingGet(dev->ohsession
+			, dev->ohsensid, dev->ohsensnum, NULL, NULL);
+		if (ohrc == SA_ERR_HPI_BUSY || ohrc == SA_ERR_HPI_NO_RESPONSE) {
+			LOG(PIL_CRIT, "Unable to connect to BladeCenter in %s"
+			,	__FUNCTION__);
+			return S_OOPS;
 		}
-		goto try_again;
 	}
 
-	return status;
+	return dev->ohdevid ? S_OK : S_OOPS;
 }
 
 
@@ -263,6 +255,8 @@ bladehpi_hostlist(StonithPlugin *s)
 	int			numnames = 0, j;
 	char **			ret = NULL;
 	GList *			node = NULL;
+	SaErrorT		ohrc;
+	SaHpiDomainInfoT 	ohdi;
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
@@ -272,14 +266,23 @@ bladehpi_hostlist(StonithPlugin *s)
 
 	dev = (struct pluginDevice *)s;
 
-	/* Refresh the hostlist each and every time */
-	free_bladehpi_hostlist(dev);
-	if (get_bladehpi_hostlist(dev) != S_OK) {
-		LOG(PIL_CRIT, "Unable to obtain list of hosts in %s"
-		,	__FUNCTION__);
+	/* Refresh the hostlist only if RPTs updated */
+	ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi);
+	if (ohrc != SA_OK) {
+		LOG(PIL_CRIT, "Unable to get domain info in %s (%d)"
+		,	__FUNCTION__, ohrc);
 		return NULL;
 	}
+	if (dev->ohrptcnt != ohdi.RptUpdateCount) {
+		free_bladehpi_hostlist(dev);
+		if (get_bladehpi_hostlist(dev) != S_OK) {
+			LOG(PIL_CRIT, "Unable to obtain list of hosts in %s"
+			,	__FUNCTION__);
+			return NULL;
+		}
+	}
 
+	/* At this point, hostlist is up to date */
 	numnames = g_list_length(dev->hostlist);
 	if (numnames < 0) {
 		LOG(PIL_CRIT, "Unconfigured stonith object in %s"
@@ -371,14 +374,10 @@ bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 		return S_OOPS;
 	}
 
-	/* Make sure host has proper capabilities */
-	if (((request == ST_POWERON || request == ST_POWEROFF) && 
-	     (!(bi->resourceCaps & SAHPI_CAPABILITY_POWER))) ||
-	    ((request == ST_GENERIC_RESET) && 
-	     (!(bi->resourceCaps & SAHPI_CAPABILITY_RESET)))) {
+	/* Make sure host has proper capabilities for get */
+	if (!(bi->resourceCaps & SAHPI_CAPABILITY_POWER)) {
 		LOG(PIL_CRIT
-		,	"Host %s does not have capability to %s"
-		,	host, request == ST_GENERIC_RESET ? "reset" : "power");
+		,	"Host %s does not have power capability", host);
 		return S_OOPS;
 	}
 
@@ -461,12 +460,22 @@ bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 			" ON (%d)", host, ohrc);
 			return S_OOPS;
 		}
-	}
-	else if ((ohrc = saHpiResourcePowerStateSet(dev->ohsession
-			, bi->resourceId, ohnewstate)) != SA_OK) {
-		LOG(PIL_CRIT, "Unable to set host %s power state (%d)"
-		,	host, ohrc);
-		return S_OOPS;
+	} else {
+		/* Make sure host has proper capabilities to reset */
+		if ((ohnewstate == SAHPI_POWER_CYCLE) &&
+		    (!(bi->resourceCaps & SAHPI_CAPABILITY_RESET))) {
+			LOG(PIL_CRIT
+			,	"Host %s does not have reset capability"
+			,	host);
+			return S_OOPS;
+		}
+
+		if ((ohrc = saHpiResourcePowerStateSet(dev->ohsession
+				, bi->resourceId, ohnewstate)) != SA_OK) {
+			LOG(PIL_CRIT, "Unable to set host %s power state (%d)"
+			,	host, ohrc);
+			return S_OOPS;
+		}
 	}
 
 #ifdef IBMBC_WAIT_FOR_OFF
@@ -581,6 +590,10 @@ bladehpi_set_config(StonithPlugin *s, StonithNVpair *list)
 
 	dev->device = STRDUP(namestocopy[0].s_value);
 	FREE(namestocopy[0].s_value);
+	if (dev->device == NULL) {
+		LOG(PIL_CRIT, "Out of memory for strdup in %s", __FUNCTION__);
+		return S_OOPS;
+	}
 
 	if (strcspn(dev->device, WHITESPACE) != strlen(dev->device) ||
 	    sscanf(dev->device, SYSTEM_CHASSIS_FMT, &i) != 1 || i < 0) {
@@ -616,10 +629,6 @@ bladehpi_set_config(StonithPlugin *s, StonithNVpair *list)
 		return S_BADCONFIG;
 	}
 
-	if (Debug) {
-		LOG(PIL_DEBUG, "e_r %s, s_r %d", dev->device, dev->softreset);
-	}
-	
 	return S_OK;
 }
 
@@ -722,7 +731,7 @@ bladehpi_destroy(StonithPlugin *s)
 static StonithPlugin *
 bladehpi_new(const char *subplugin)
 {
-	struct pluginDevice*	dev = MALLOCT(struct pluginDevice);
+	struct pluginDevice *	dev = MALLOCT(struct pluginDevice);
 	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
@@ -754,11 +763,12 @@ bladehpi_new(const char *subplugin)
 
 
 static int
-is_resource_bladecenter(char *entityRoot, SaHpiRptEntryT *ohRPT)
+get_resource_type(char *entityRoot, SaHpiRptEntryT *ohRPT)
 {
-
-	int 			i, foundRoot = 0, foundOther = 0;
-	char 			rootName[64];
+	int			i, rc = OHRES_NONE;
+	int			foundBlade = 0, foundExp = 0, foundMgmt = 0;
+	int			foundRoot = 0, foundOther = 0;
+	char			rootName[64];
 	SaHpiEntityPathT *	ohep = &ohRPT->ResourceEntity;
 
 	if (ohep == NULL || entityRoot == NULL) {
@@ -772,9 +782,23 @@ is_resource_bladecenter(char *entityRoot, SaHpiRptEntryT *ohRPT)
                 }
         }
 
-	/* Then back up through entries looking for bladecenter */
+	/* Then back up through entries looking for specific entity */
         for (i--; i >= 0; i--) {
 		switch (ohep->Entry[i].EntityType) {
+			case SAHPI_ENT_SBC_BLADE:
+				foundBlade = 1;
+				break;
+
+			case SAHPI_ENT_SYS_EXPANSION_BOARD:
+				foundExp = 1;
+				break;
+
+			case SAHPI_ENT_SYS_MGMNT_MODULE:
+				if (ohep->Entry[i].EntityLocation == 0) {
+					foundMgmt = 1;
+				}
+				break;
+
 			case SAHPI_ENT_SYSTEM_CHASSIS:
 				snprintf(rootName, sizeof(rootName)
 				,	SYSTEM_CHASSIS_FMT
@@ -790,66 +814,65 @@ is_resource_bladecenter(char *entityRoot, SaHpiRptEntryT *ohRPT)
 		}
 	}
 
-	/* We are only interested in bladecenter chasses on specific device */
-	return foundRoot && !foundOther;
+	/* We are only interested in specific entities on specific device */
+	if (foundRoot) {
+		if (foundMgmt && !(foundBlade||foundExp||foundOther)) {
+			rc = OHRES_MGMTMOD;
+		} else if (!(foundMgmt||foundBlade||foundExp||foundOther)) {
+			rc = OHRES_BLADECENT;
+		} else if (foundBlade && !foundExp) {
+			rc = OHRES_BLADE;
+		}
+	}
+
+	return rc;
 }
 
 
 static int
-is_resource_blade(char *entityRoot, SaHpiRptEntryT *ohRPT)
+get_sensor_num(SaHpiSessionIdT ohsession, SaHpiResourceIdT ohresid)
 {
+	SaErrorT	ohrc = SA_OK;
+	SaHpiEntryIdT	ohnextid;
+	SaHpiRdrT	ohRDR;
 
-	int			i, foundBlade = 0, foundRoot = 0, foundExp = 0;
-	char			rootName[64];
-	SaHpiEntityPathT *	ohep = &ohRPT->ResourceEntity;
-
-	if (ohep == NULL || entityRoot == NULL) {
-		return 0;
-	}
-
-	/* First find root of entity path, which is last entity in entry */
-        for (i = 0; i < SAHPI_MAX_ENTITY_PATH; i++) {
-                if (ohep->Entry[i].EntityType == SAHPI_ENT_ROOT) {
-                            break;
-                }
-        }
-
-	/* Then back up through entries looking for blade */
-        for (i--; i >= 0; i--) {
-		switch (ohep->Entry[i].EntityType) {
-			case SAHPI_ENT_SBC_BLADE:
-				foundBlade = 1;
-				break;
-
-			case SAHPI_ENT_SYSTEM_CHASSIS:
-				snprintf(rootName, sizeof(rootName)
-				,	SYSTEM_CHASSIS_FMT
-				,	ohep->Entry[i].EntityLocation);
-				if (!strcmp(entityRoot, rootName)) {
-					foundRoot = 1;
-				}
-				break;
-
-			case SAHPI_ENT_SYS_EXPANSION_BOARD:
-				foundExp = 1;
-				break;
-
-			default:
-				break;
+	ohnextid = SAHPI_FIRST_ENTRY;
+	do {
+		ohrc = saHpiRdrGet(ohsession, ohresid, ohnextid
+				, &ohnextid, &ohRDR);
+		if (ohrc != SA_OK) {
+			LOG(PIL_CRIT, "Unable to get RDR entry in %s (%d)"
+			,	__FUNCTION__, ohrc);
+		} else if (ohRDR.RdrType == SAHPI_SENSOR_RDR) {
+			return ohRDR.RdrTypeUnion.SensorRec.Num;
 		}
-	}
+	} while (ohrc == SA_OK && ohnextid != SAHPI_LAST_ENTRY);
 
-	/* 
-	 * We are only interested in blades on the specific device that are
-	 * not expansion boards
-	 */
-	return foundBlade && foundRoot && !foundExp;
+	return 0;
 }
 
+
+/*
+ *	Get RPT update count
+ *	Loop through all RPT entries
+ *	  If entry is BladeCenter, save resource ID in dev->ohdevid
+ *	  If entry is MgmtMod and has sensor, save resource ID in dev->ohsensid
+ *	    and sensor number in dev->ohsensnum
+ *	  If entry is blade, save blade_info and add to dev->hostlist
+ *	Get RPT update count
+ *	If RPT update count changed since start of loop, repeat loop
+ *	Save RPT update count in dev->ohrptcnt
+ *
+ *	Note that not only does this function update hostlist, it also
+ *	updates ohrptcnt, ohdevid, ohsensid and ohsensnum.  However, with
+ *	this logic it does not need to be called again until the RPT update
+ *	count changes.
+ */
 
 static int
 get_bladehpi_hostlist(struct pluginDevice *dev)
 {
+	struct blade_info *	bi;
 	SaErrorT		ohrc;
 	SaHpiEntryIdT		ohnextid;
 	SaHpiRptEntryT		ohRPT;
@@ -873,9 +896,10 @@ get_bladehpi_hostlist(struct pluginDevice *dev)
 		,	__FUNCTION__, ohrc);
 		return S_BADCONFIG;
 	}
-	ohupdate = ohdi.RptUpdateCount;
 	
 try_again:
+	ohupdate = ohdi.RptUpdateCount;
+	dev->ohdevid = dev->ohsensid = dev->ohsensnum = 0;
 	ohnextid = SAHPI_FIRST_ENTRY;
 	do {
 		char blname[SAHPI_MAX_TEXT_BUFFER_LENGTH];
@@ -886,12 +910,41 @@ try_again:
 		if (ohrc != SA_OK) {
 			LOG(PIL_CRIT, "Unable to get RPT entry in %s (%d)"
 			,	__FUNCTION__, ohrc);
+			free_bladehpi_hostlist(dev);
 			return S_BADCONFIG;
 		}
 
-		if (is_resource_blade(dev->device, &ohRPT)) {
-			struct blade_info *bi;
+		switch (get_resource_type(dev->device, &ohRPT)) {
+		case OHRES_BLADECENT:
+			dev->ohdevid = ohRPT.ResourceId;
 
+			if (Debug) {
+				LOG(PIL_DEBUG, "BladeCenter '%s' has id %d"
+				,	ohRPT.ResourceTag.Data, dev->ohdevid);
+			}
+			break;
+
+		case OHRES_MGMTMOD:
+			if (ohRPT.ResourceCapabilities&SAHPI_CAPABILITY_SENSOR){
+ 				dev->ohsensnum = get_sensor_num(dev->ohsession
+							, ohRPT.ResourceId);
+
+				if (dev->ohsensnum) {
+					dev->ohsensid = ohRPT.ResourceId;
+
+					if (Debug) {
+						LOG(PIL_DEBUG
+						, "MgmtModule '%s' has id %d "
+						"with sensor #%d"
+						, ohRPT.ResourceTag.Data
+						, dev->ohsensid
+						, dev->ohsensnum);
+					}
+				}
+			} 
+			break;
+
+		case OHRES_BLADE:
 			if ((bi = (struct blade_info *)
 				MALLOC(sizeof(struct blade_info))) == NULL) {
 			        LOG(PIL_CRIT, "Out of memory in %s"
@@ -911,14 +964,22 @@ try_again:
 			} else {
 				bi->name = STRDUP(ohRPT.ResourceTag.Data);
 			}
+			if (bi->name == NULL) {
+				LOG(PIL_CRIT, "Out of memory for strdup in %s"
+				,	__FUNCTION__);
+				free_bladehpi_hostlist(dev);
+			        return S_OOPS;
+			}
+
 			bi->resourceId = ohRPT.ResourceId;
 			bi->resourceCaps = ohRPT.ResourceCapabilities;
 			dev->hostlist = g_list_append(dev->hostlist, bi);
 
-			if(Debug){
-				LOG(PIL_DEBUG, "Blade %s has id %d, caps %x"
+			if (Debug) {
+				LOG(PIL_DEBUG, "Blade '%s' has id %d, caps %x"
 				, bi->name, bi->resourceId, bi->resourceCaps);
 			}
+			break;
 		}
 	} while (ohrc == SA_OK && ohnextid != SAHPI_LAST_ENTRY);
 
@@ -926,6 +987,7 @@ try_again:
 	if (ohrc != SA_OK) {
 		LOG(PIL_CRIT, "Unable to get domain info in %s (%d)"
 		,	__FUNCTION__, ohrc);
+		free_bladehpi_hostlist(dev);
 		return S_BADCONFIG;
 	}
 
@@ -939,8 +1001,11 @@ try_again:
 		goto try_again;
 	}
 
+	dev->ohrptcnt = ohupdate;
+
 	return S_OK;
 }
+
 
 static void
 free_bladehpi_hostlist(struct pluginDevice *dev)
@@ -956,12 +1021,14 @@ free_bladehpi_hostlist(struct pluginDevice *dev)
 		}
 		dev->hostlist = NULL;
 	}
+	dev->ohdevid = dev->ohsensid = dev->ohsensnum = 0;
 }
+
 
 static int
 get_num_tokens(char *str)
 {
-	int namecount = 0;
+	int 	namecount = 0;
 
 	while (*str != EOS) {
 		str += strspn(str, WHITESPACE);
