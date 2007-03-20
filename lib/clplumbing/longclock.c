@@ -153,8 +153,11 @@ time_longclock(void)
 			cl_log(LOG_CRIT
 			,	"%s: old value was %lu"
 			", new value is %lu, diff is %lu, callcount %lu"
-			,	__FUNCTION__, lasttimes, timesval
-			,	jumpbackby, callcount);
+			,	__FUNCTION__
+			,	(unsigned long)lasttimes
+			,	(unsigned long)timesval
+			,	(unsigned long)jumpbackby
+			,	callcount);
 			/* Assume jump back was the error and ignore it */
 			/* (i.e., hope it goes away) */
 			timesval = lasttimes;

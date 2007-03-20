@@ -234,7 +234,7 @@ static int CYCNametoOutlet(struct pluginDevice *sd, const char *host, int *outle
 	char    savebuf[MAXSAVE];
 	int err;
 	int outlet, numoutlet = 0;
-	char name[17], locked[10], on[4];
+	char name[17], locked[11], on[4];
 
 	if (CYC_robust_cmd(sd, cmd) != S_OK) {
 		LOG(PIL_CRIT, "can't run status all command");
@@ -286,7 +286,7 @@ cyclades_hostlist(StonithPlugin  *s)
 	int err, i;
 	int outlet;
 	int numnames = 0;
-	char name[17], locked[10], on[4];
+	char name[17], locked[11], on[4];
 	char *NameList[MAX_OUTLETS];
 	char **ret = NULL;
 
