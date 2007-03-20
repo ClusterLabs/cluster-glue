@@ -111,21 +111,20 @@
 #ifndef UNIX_PATH_MAX
 #	define UNIX_PATH_MAX 108
 #endif
-#define MAX_LISTEN_NUM 10
 
-#ifdef USE_BINDSTAT_CREDS
-#ifndef SUN_LEN
-#    define SUN_LEN(ptr) ((size_t) (offsetof (sockaddr_un, sun_path) + strlen ((ptr)->sun_path))
-#endif
-#endif
+#if HB_IPC_METHOD == HB_IPC_SOCKET
 
-#ifndef MSG_NOSIGNAL
-#define		MSG_NOSIGNAL	0
-#endif
+# define MAX_LISTEN_NUM 10
 
-#ifndef AF_LOCAL
-#define         AF_LOCAL AF_UNIX
-#endif
+# ifndef MSG_NOSIGNAL
+#  define		MSG_NOSIGNAL	0
+# endif
+
+# ifndef AF_LOCAL
+#  define         AF_LOCAL AF_UNIX
+# endif
+
+#endif /* HB_IPC_METHOD */
 
 /***********************************************************************
  *
@@ -149,6 +148,16 @@
  * will fail.  This is a stopgap measure ;-)
  */
 #endif
+
+#if HB_IPC_METHOD == HB_IPC_SOCKET
+
+# ifdef USE_BINDSTAT_CREDS
+# ifndef SUN_LEN
+#    define SUN_LEN(ptr) ((size_t) (offsetof (sockaddr_un, sun_path) + strlen ((ptr)->sun_path))
+# endif
+# endif
+
+#endif /* HB_IPC_METHOD */
 
 /* wait connection private data. */
 struct SOCKET_WAIT_CONN_PRIVATE{
@@ -214,15 +223,25 @@ static struct IPC_MESSAGE* socket_message_new(struct IPC_CHANNEL*ch
 
 struct IPC_WAIT_CONNECTION *socket_wait_conn_new(GHashTable* ch_attrs);
 
+/* *** FIXME: This is also declared in 'ocf_ipc.c'. */
 struct IPC_CHANNEL* socket_client_channel_new(GHashTable *attrs);
 
-struct IPC_CHANNEL* socket_server_channel_new(int sockfd);
+static struct IPC_CHANNEL* socket_server_channel_new(int sockfd);
+
+static struct IPC_CHANNEL * channel_new(int sockfd, int conntype, const char *pathname);
+static int client_channel_new_auth(int sockfd);
+
+typedef void (*DelProc)(IPC_Message*);
+
+static struct IPC_MESSAGE * ipcmsg_new(struct IPC_CHANNEL* ch,
+  const void* data, int len, void* private, DelProc d);
 
 static pid_t socket_get_farside_pid(int sockfd);
 
 extern int (*ipc_pollfunc_ptr)(struct pollfd *, nfds_t, int);
 
 static int socket_resume_io_read(struct IPC_CHANNEL *ch, int*, gboolean read1anyway);
+
 static struct IPC_OPS socket_ops;
 static gboolean ipc_time_debug_flag = TRUE;
 
@@ -635,9 +654,6 @@ static struct IPC_CHANNEL*
 socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 ,	struct IPC_AUTH *auth_info)
 {
-	/* make peer_addr a pointer so it can be used by the
-	 *   USE_BINDSTAT_CREDS implementation of socket_verify_auth()
-	 */
 	struct IPC_CHANNEL *			ch = NULL;
 	int					s;
 	int					new_sock;
@@ -646,30 +662,26 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 	int auth_result = IPC_FAIL;
 	gboolean was_error = FALSE;
 #if HB_IPC_METHOD == HB_IPC_SOCKET
-	struct sockaddr_un *			peer_addr;
+	/* make peer_addr a pointer so it can be used by the
+	 *   USE_BINDSTAT_CREDS implementation of socket_verify_auth()
+	 */
+	struct sockaddr_un *			peer_addr = NULL;
 	socklen_t				sin_size;
 #elif HB_IPC_METHOD == HB_IPC_STREAM
 	struct strrecvfd strrecvfd;
 #endif
 	
-#if HB_IPC_METHOD == HB_IPC_SOCKET
-	peer_addr = g_new(struct sockaddr_un, 1);
-#endif
-
 	/* get select fd */
 
 	s = wait_conn->ops->get_select_fd(wait_conn); 
 	if (s < 0) {
 		cl_log(LOG_ERR, "get_select_fd: invalid fd");
-#if HB_IPC_METHOD == HB_IPC_SOCKET
-		g_free(peer_addr);
-		peer_addr = NULL;
-#endif
 		return NULL;
 	}
 
 	/* Get client connection. */
 #if HB_IPC_METHOD == HB_IPC_SOCKET
+	peer_addr = g_new(struct sockaddr_un, 1);
 	sin_size = sizeof(struct sockaddr_un);
 	new_sock = accept(s, (struct sockaddr *)peer_addr, &sin_size);
 #elif HB_IPC_METHOD == HB_IPC_STREAM
@@ -1699,9 +1711,6 @@ static IPC_Message*
 socket_new_ipcmsg(IPC_Channel* ch, const void* data, int len, void* private)
 {
 	IPC_Message*	hdr;
-	char*	copy = NULL;
-	char*	buf;
-	char*	body;
 	
 	if (ch == NULL || len < 0){
 		cl_log(LOG_ERR, "socket_new_ipcmsg:"
@@ -1715,8 +1724,24 @@ socket_new_ipcmsg(IPC_Channel* ch, const void* data, int len, void* private)
 		return NULL;
 	}
 
+	hdr = ipcmsg_new(ch, data, len, private, socket_del_ipcmsg);
 	
-	if ((hdr = (IPC_Message*)g_malloc(sizeof(*hdr)))  == NULL) {
+	if (hdr) ipcmsg_count_allocated ++;
+
+	return hdr;
+}
+
+static
+struct IPC_MESSAGE *
+ipcmsg_new(struct IPC_CHANNEL * ch, const void* data, int len, void* private,
+	DelProc delproc)
+{
+	struct IPC_MESSAGE * hdr;
+	char*	copy = NULL;
+	char*	buf;
+	char*	body;
+	
+	if ((hdr = g_new(struct IPC_MESSAGE, 1))  == NULL) {
 		return NULL;
 	}
 	
@@ -1742,10 +1767,8 @@ socket_new_ipcmsg(IPC_Channel* ch, const void* data, int len, void* private)
 	hdr->msg_buf = buf;
 	hdr->msg_body = body;
 	hdr->msg_ch = ch;
-	hdr->msg_done = socket_del_ipcmsg;
+	hdr->msg_done = delproc;
 	hdr->msg_private = private;
-	
-	ipcmsg_count_allocated ++;
 	
 	return hdr;
 }
@@ -1960,15 +1983,8 @@ socket_wait_conn_new(GHashTable *ch_attrs)
 
 struct IPC_CHANNEL * 
 socket_client_channel_new(GHashTable *ch_attrs) {
-  struct IPC_CHANNEL * temp_ch;
-  struct SOCKET_CH_PRIVATE* conn_info;
   char *path_name;
-  int sockfd, flags;
-#ifdef USE_BINDSTAT_CREDS
-  char rand_id[16];
-  char uuid_str_tmp[40];
-  struct sockaddr_un sock_addr;
-#endif
+  int sockfd;
 
   /*
    * I don't really understand why the client and the server use different
@@ -1993,10 +2009,10 @@ socket_client_channel_new(GHashTable *ch_attrs) {
    */
 
   path_name = (char *) g_hash_table_lookup(ch_attrs, IPC_PATH_ATTR);
-  if (path_name != NULL) { 
-	  if (strlen(path_name) >= sizeof(conn_info->path_name)) {
-	    return NULL;
-    }
+  if (path_name == NULL) {
+	return NULL;
+  }
+
 #if HB_IPC_METHOD == HB_IPC_SOCKET
     /* prepare the socket */
     if ((sockfd = socket(AF_LOCAL, SOCK_STREAM, 0)) == -1) {
@@ -2010,26 +2026,23 @@ socket_client_channel_new(GHashTable *ch_attrs) {
       return NULL;
     }
 #endif
-  }else{
-    return NULL;
-  }
   
-  temp_ch = g_new(struct IPC_CHANNEL, 1);
-  if (temp_ch == NULL){
-	  cl_log(LOG_ERR, "socket_client_channel_new:"
-		 " allocating memory for channel failed");
-	  return NULL;	  
-  }
-  memset(temp_ch, 0, sizeof(struct IPC_CHANNEL));
+	if (client_channel_new_auth(sockfd) < 0) {
+		close(sockfd);
+		return NULL;
+	}
+
   
-  
-  
-  conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
-#if HB_IPC_METHOD == HB_IPC_SOCKET
-  conn_info->peer_addr = NULL;
-#endif
-  
+  return channel_new(sockfd, IPC_CLIENT, path_name);
+}
+
+static
+int client_channel_new_auth(int sockfd) {
 #ifdef USE_BINDSTAT_CREDS
+  char rand_id[16];
+  char uuid_str_tmp[40];
+  struct sockaddr_un sock_addr;
+
   /* Prepare the socket */
   memset(&sock_addr, 0, sizeof(sock_addr));
   sock_addr.sun_family = AF_UNIX;
@@ -2039,70 +2052,38 @@ socket_client_channel_new(GHashTable *ch_attrs) {
   uuid_unparse(rand_id, uuid_str_tmp);
   
   snprintf(sock_addr.sun_path, sizeof(sock_addr.sun_path),
-	   "%s/%s/%s", HA_VARLIBDIR, PACKAGE, uuid_str_tmp);
+	   "%s/%s", HA_VARLIBHBDIR, uuid_str_tmp);
   
   unlink(sock_addr.sun_path);
   if(bind(sockfd, (struct sockaddr*)&sock_addr, SUN_LEN(&sock_addr)) < 0) {
 	  perror("Client bind() failure");
-	  close(sockfd);
-	  g_free(conn_info); conn_info = NULL;
-	  g_free(temp_ch);
-	  return NULL;
+	  return 0;
   }
 #endif
-  
-  flags = fcntl(sockfd, F_GETFL);
-  if (flags == -1) {
-	  cl_perror("socket_client_channel_new: cannot read file descriptor flags");
-	  g_free(conn_info); conn_info = NULL;
-	  g_free(temp_ch);
-	  close(sockfd);
-    return NULL;
-  }
-  flags |= O_NONBLOCK;
-  if (fcntl(sockfd, F_SETFL, flags) < 0) {
-    cl_perror("socket_client_channel_new: cannot set O_NONBLOCK");
-    close(sockfd);
-    g_free(conn_info);
-    g_free(temp_ch);
-    return NULL;
-  }
 
-  conn_info->s = sockfd;
-  conn_info->remaining_data = 0;
-  conn_info->buf_msg = NULL;
-  
-  strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
-  temp_ch->ch_status = IPC_DISCONNECT;
-#ifdef DEBUG
-  cl_log(LOG_INFO, "Initializing client socket %d to DISCONNECT", sockfd);
-#endif
-  temp_ch->ch_private = (void*) conn_info;
-  temp_ch->ops = (struct IPC_OPS *)&socket_ops;
-  temp_ch->msgpad = sizeof(struct SOCKET_MSG_HEAD);
-  temp_ch->bytes_remaining = 0;
-  temp_ch->should_send_block = FALSE;
-  temp_ch->send_queue = socket_queue_new();
-  temp_ch->recv_queue = socket_queue_new();
-  temp_ch->pool = NULL;
-  temp_ch->high_flow_mark = temp_ch->send_queue->max_qlen;
-  temp_ch->low_flow_mark = -1;
-  temp_ch->conntype = IPC_CLIENT;
-  return temp_ch;
-  
+  return 0;
 }
 
+static
 struct IPC_CHANNEL * 
-socket_server_channel_new(int sockfd){
+socket_server_channel_new(int sockfd) {
+	return channel_new(sockfd, IPC_SERVER, "?");
+}
+
+static
+struct IPC_CHANNEL * 
+channel_new(int sockfd, int conntype, const char *path_name) {
   struct IPC_CHANNEL * temp_ch;
   struct SOCKET_CH_PRIVATE* conn_info;
   int flags;
   
+  if (path_name == NULL || strlen(path_name) >= sizeof(conn_info->path_name)) {
+	return NULL;
+  }
   
   temp_ch = g_new(struct IPC_CHANNEL, 1); 
   if (temp_ch == NULL){
-	  cl_log(LOG_ERR, "socket_server_channel_new:"
-		 " allocating memory for channel failed");
+	  cl_log(LOG_ERR, "channel_new: allocating memory for channel failed");
 	  return NULL;	  
   }
   memset(temp_ch, 0, sizeof(struct IPC_CHANNEL));
@@ -2111,17 +2092,19 @@ socket_server_channel_new(int sockfd){
   
   flags = fcntl(sockfd, F_GETFL);
   if (flags == -1) {
-	  cl_perror("socket_server_channel_new: cannot read file descriptor flags");
+	  cl_perror("channel_new: cannot read file descriptor flags");
 	  g_free(conn_info); conn_info = NULL;
 	  g_free(temp_ch);
+	  if (conntype == IPC_CLIENT) close(sockfd);
 	  return NULL;
   }
   flags |= O_NONBLOCK;
   if (fcntl(sockfd, F_SETFL, flags) < 0) {
-	  cl_perror("socket_server_channel_new: cannot set O_NONBLOCK");
+	  cl_perror("channel_new: cannot set O_NONBLOCK");
 	  g_free(conn_info); conn_info = NULL;
 	  g_free(temp_ch);
-    return NULL;
+	  if (conntype == IPC_CLIENT) close(sockfd);
+	  return NULL;
   }
 
   conn_info->s = sockfd;
@@ -2130,10 +2113,10 @@ socket_server_channel_new(int sockfd){
 #if HB_IPC_METHOD == HB_IPC_SOCKET
   conn_info->peer_addr = NULL;
 #endif
-  strcpy(conn_info->path_name, "?");
+  strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
 
 #ifdef DEBUG
-  cl_log(LOG_INFO, "Initializing server socket %d to DISCONNECT", sockfd);
+  cl_log(LOG_INFO, "Initializing socket %d to DISCONNECT", sockfd);
 #endif
   temp_ch->ch_status = IPC_DISCONNECT;
   temp_ch->ch_private = (void*) conn_info;
@@ -2146,7 +2129,8 @@ socket_server_channel_new(int sockfd){
   temp_ch->pool = NULL;
   temp_ch->high_flow_mark = temp_ch->send_queue->max_qlen;
   temp_ch->low_flow_mark = -1;
-  temp_ch->conntype = IPC_SERVER;
+  temp_ch->conntype = conntype;
+
   return temp_ch;
   
 }
@@ -2249,30 +2233,11 @@ socket_free_message(struct IPC_MESSAGE * msg) {
  *       the pointer to the new message or NULL if the message can't be created.
  */
 
-
 static struct IPC_MESSAGE*
 socket_message_new(struct IPC_CHANNEL *ch, int msg_len)
 {
-  struct IPC_MESSAGE * temp_msg;
-
-  temp_msg = g_new(struct IPC_MESSAGE, 1);
-  memset(temp_msg, 0, sizeof(struct IPC_MESSAGE));
-  if (msg_len != 0){
-	  temp_msg->msg_buf = g_malloc(msg_len + ch->msgpad);
-	  temp_msg->msg_body = (char*)temp_msg->msg_buf + ch->msgpad;
-  }else{
-	  temp_msg->msg_buf = temp_msg->msg_body = NULL;
-  }
-  
-  temp_msg->msg_len = msg_len;
-  temp_msg->msg_private = NULL;
-  temp_msg->msg_ch = ch;
-  temp_msg->msg_done = socket_free_message;
-
-  return temp_msg;
+	return ipcmsg_new(ch, NULL, msg_len, NULL, socket_free_message);
 }
-
-
 
 
 /***********************************************************************

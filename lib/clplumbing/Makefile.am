@@ -76,20 +76,22 @@ libplumbgpl_la_LDFLAGS	= -version-info 1:0:0
 
 testdir = $(libdir)/@HB_PKG@
 test_PROGRAMS = ipctest ipctransientclient ipctransientserver base64_md5_test
+test_SCRIPTS  = transient-test.sh
 
 ipctest_SOURCES = ipctest.c
 ipctest_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB) \
 		$(top_builddir)/lib/pils/libpils.la
 
+noinst_HEADERS = ipctransient.h
 
 #ipctransient_SOURCES = ipctransient.c
 #ipctransient_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(top_builddir)/heartbeat/libhbclient.la $(GLIBLIB)
 
-ipctransientclient_SOURCES = ipctransientclient.c
+ipctransientclient_SOURCES = ipctransientclient.c ipctransientlib.c
 ipctransientclient_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB) \
 			$(top_builddir)/lib/pils/libpils.la
 
-ipctransientserver_SOURCES = ipctransientserver.c
+ipctransientserver_SOURCES = ipctransientserver.c ipctransientlib.c
 ipctransientserver_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB) \
 			$(top_builddir)/lib/pils/libpils.la
 
