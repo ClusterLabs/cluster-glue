@@ -101,3 +101,4 @@ ipctransientserver_LDADD = libplumb.la $(top_builddir)/replace/libreplace.la $(G
 base64_md5_test_SOURCES	= base64_md5_test.c
 base64_md5_test_LDADD	= libplumb.la $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
+EXTRA_DIST = $(test_SCRIPTS)
