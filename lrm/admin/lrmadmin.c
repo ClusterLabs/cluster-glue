@@ -337,7 +337,7 @@ int main(int argc, char **argv)
         lrmd = ll_lrm_new("lrm");
 
         if (NULL == lrmd) {
-               	cl_log(LOG_ERR,"ll_lrn_new return null.");
+               	cl_log(LOG_ERR,"ll_lrm_new return null.");
                	return -2;
         }
 
@@ -373,7 +373,7 @@ int main(int argc, char **argv)
 					ret_value = -3;
 				}
 				if ( call_id == -1 ) {
-					cl_log(LOG_WARNING, "Failed! no this "
+					cl_log(LOG_WARNING, "Failed! No such "
 					   "resource %s.", argv[optind]);
 					ret_value = -2;
 				}
@@ -388,7 +388,7 @@ int main(int argc, char **argv)
 				/* Return value: HA_OK = 1 Or  HA_FAIL = 0 */
 				if ( call_id == 0 ) {
 					cl_log(LOG_ERR, "Resource operation "
-					"Failed." );
+					"failed." );
 					ret_value = -3;
 					ASYN_OPS = FALSE;
 				} else { 
@@ -631,7 +631,7 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	op.op_type = argv[optind+1];
 	op.timeout = atoi(argv[optind+2]);
 
- 	/* When op.timeout!=0, plus addtional 1s. Or lrmadmin may time out before
+ 	/* When op.timeout!=0, plus additional 1s. Or lrmadmin may time out before
 	   the normal operation result returned from lrmd. This may be redudant, 
 	   but harmless. */
 	if (0 < op.timeout ) {
@@ -701,7 +701,7 @@ ra_provider(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	GList* provider = NULL;
 	
 	if(argc < 4) {
-		cl_log(LOG_ERR,"No enough parameters.");
+		cl_log(LOG_ERR,"Not enough parameters.");
 		return -2;
 	}
 
@@ -709,8 +709,8 @@ ra_provider(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	
 	while (NULL != (provider = g_list_first(providers))) {
 		printf("%s\n",(char*)provider->data);
-		providers = g_list_remove(providers, provider->data);
 		g_free(provider->data);
+		providers = g_list_remove(providers, provider->data);
 	}
 	g_list_free(providers);
 	return 0;
