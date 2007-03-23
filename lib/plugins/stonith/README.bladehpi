@@ -48,7 +48,9 @@ Information to match "uname -n" for each blade in the cluster.  For
 example, with the BladeCeter configured above use a brower to access 
 http://9.254.253.252, login with userid/userpass, and then go to
 Blade Tasks -> Configuration -> Blade Information, enter the proper
-names, and select Save.
+names, and select Save.  Be aware that heartbeat must be restarted
+before these changes take effect or, if using the OpenHPI daemon,
+the daemon must be restarted.
 
 More than one BladeCenter can be placed in the OpenHPI configuration
 file by using different numbers with the entity_root.  For example,
