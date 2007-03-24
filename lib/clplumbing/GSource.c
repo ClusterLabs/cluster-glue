@@ -1184,7 +1184,7 @@ set_sigchld_proctrack(int priority)
 	,	child_death_dispatch, NULL, NULL);
 
 	G_main_setmaxdispatchdelay((GSource*) src, 100);
-	G_main_setmaxdispatchtime((GSource*) src, 10);
+	G_main_setmaxdispatchtime((GSource*) src, 30);
 	G_main_setdescription((GSource*)src, "SIGCHLD");
 	return;
 }
