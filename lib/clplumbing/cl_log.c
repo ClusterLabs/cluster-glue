@@ -59,7 +59,6 @@
 #define NULLTIME 	0
 #define QUEUE_SATURATION_FUZZ 10
 
-static char	log_entity[MAXENTITY];
 static IPC_Channel*	logging_daemon_chan = NULL;
 
 int LogToDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
@@ -70,10 +69,11 @@ IPC_Message* ChildLogIPCMessage(int priority, const char *buf, int bstrlen,
 void	FreeChildLogIPCMessage(IPC_Message* msg);
 gboolean send_dropped_message(gboolean use_pri_str, IPC_Channel *chan);
 
+const char * prio2str(int priority);
 static int		use_logging_daemon =  FALSE;
 static int		conn_logd_time = 0;
+static char		cl_log_entity[MAXENTITY]= DFLT_ENTITY;
 static int		cl_log_facility = LOG_USER;
-static const char *	cl_log_entity = DFLT_ENTITY;
 
 static void		cl_opensyslog(void);
 static int		syslog_enabled = 0;
@@ -349,7 +349,7 @@ cl_log_set_entity(const char *	entity)
 	if (entity == NULL) {
 		entity = DFLT_ENTITY;
 	}
-	cl_log_entity = cl_strdup(entity);
+	strncpy(cl_log_entity, entity, MAXENTITY);
 	if (syslog_enabled) {
 		syslog_enabled = 0;
 		cl_opensyslog();
@@ -399,6 +399,46 @@ cl_log_set_logd_channel_source( void (*create_callback)(IPC_Channel* chan),
 	return 0;
 }
 
+const char *
+prio2str(int priority)
+{
+	static const char *log_prio[8] = {
+		"EMERG",
+		"ALERT",
+		"CRIT",
+		"ERROR",
+		"WARN",
+		"notice",
+		"info",
+		"debug"
+	};
+	int		logpri;
+
+	logpri =  LOG_PRI(priority);
+
+	return (logpri < 0 || logpri >= DIMOF(log_prio)) ?
+		"(undef)" : log_prio[logpri];
+}
+
+/* print log line to a FILE *f */
+#define print_logline(fp,entity,entity_pid,ts,pristr,buf) { \
+			fprintf(fp, "%s[%d]: %s ",entity,entity_pid,ha_timestamp(ts)); \
+			if (pristr) \
+				fprintf(fp,"%s: %s\n",pristr,buf); \
+			else \
+				fprintf(fp,"%s\n",buf); \
+		}
+/* append log line to a file */
+#define append_log(fname,entity,entity_pid,ts,pristr,buf) { \
+			fp = fopen(fname, "a"); \
+			if (fp != NULL) { \
+				print_logline(fp,entity,entity_pid,ts,pristr,buf); \
+				fclose(fp); \
+			} \
+			else \
+				syslog(LOG_ERR,"Cannot open %s: %m",fname); \
+		}
+
 /*
  * This function can cost us realtime unless use_logging_daemon
  * is enabled.  Then we log everything through a child process using
@@ -411,47 +451,20 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 	      const char* entity, int entity_pid, TIME_T ts)
 {
 	FILE *		fp = NULL;
-	int		logpri;
 	const char *	pristr;
 	int	needprivs = !cl_have_full_privs();
 
-	static const char *log_prio[8] = {
-		"EMERG",
-		"ALERT",
-		"CRIT",
-		"ERROR",
-		"WARN",
-		"notice",
-		"info",
-		"debug"
-	};
-	
 	if (entity == NULL){
 		entity =cl_log_entity;
 	}
 	
-	if (use_priority_str){
-		logpri =  LOG_PRI(priority);
-		
-		if (logpri < 0 || logpri >= DIMOF(log_prio)) {
-			pristr = "(undef)";
-		}else{
-			pristr = log_prio[logpri];
-		}
-	}else{
-		pristr = NULL;
-	}
-	
+	pristr = use_priority_str ? prio2str(priority) : NULL;
+
 	if (needprivs) {
 		return_to_orig_privs();
 	}
 	
 	if (syslog_enabled) {
-		if(entity){
-			strncpy(log_entity, entity, MAXENTITY);
-		}else{
-			strncpy(log_entity, DFLT_ENTITY,MAXENTITY);
-		}
 		if (pristr){
 			syslog(priority, "[%d]: %s: %s%c",
 			       entity_pid, pristr,  buf, 0);
@@ -460,80 +473,12 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 		}
 	}
 
-	if (stderr_enabled) {
-		if (pristr){
-			fprintf(stderr, "%s[%d]: %s %s: %s\n"
-				,	(entity ? entity : DFLT_ENTITY)
-				,       entity_pid
-				,	ha_timestamp(ts)
-				,	pristr,  buf);
-		}else {
-			fprintf(stderr, "%s[%d]: %s %s\n"
-				,	(entity ? entity : DFLT_ENTITY)
-				,       entity_pid
-				,	ha_timestamp(ts)
-				,	buf);
-			
-		}
-		
-	}
-	
-	if (debugfile_name != NULL) {
+	if (debugfile_name != NULL)
+		append_log(debugfile_name,entity,entity_pid,ts,pristr,buf);
 
-		fp = fopen(debugfile_name, "a");
-		if (fp != NULL) {
-			if (pristr){
-				fprintf(fp, "%s[%d]: %s %s: %s\n"
-					,	(entity ? entity : DFLT_ENTITY)
-					,       entity_pid
-					,	ha_timestamp(ts)
-					,	pristr,  buf);
-			}else{
-				fprintf(fp, "%s[%d]: %s %s\n"
-					,	(entity ? entity : DFLT_ENTITY)
-					,       entity_pid
-					,	ha_timestamp(ts)
-					,	buf);
-				
-			}
-			
-			fclose(fp);
-		} else {
-			fprintf(stderr, "Cannot open %s: %s\n",
-				debugfile_name, strerror(errno));
-			syslog(LOG_ERR, "Cannot open %s: %s\n",
-				debugfile_name, strerror(errno));
-		}
+	if (priority != LOG_DEBUG && logfile_name != NULL)
+		append_log(logfile_name,entity,entity_pid,ts,pristr,buf);
 
-	}
-	
-	if (priority != LOG_DEBUG && logfile_name != NULL) { 
-		
-		fp = fopen(logfile_name, "a");
-		if (fp != NULL) {
-			if (pristr){
-				fprintf(fp, "%s[%d]: %s %s: %s\n"
-				,	(entity ? entity : DFLT_ENTITY)
-				,       entity_pid
-				,	ha_timestamp(ts)
-				,	pristr,  buf);
-			}else {
-				fprintf(fp, "%s[%d]: %s %s\n"
-					,	(entity ? entity : DFLT_ENTITY)
-					,       entity_pid
-					,	ha_timestamp(ts)
-					,	buf);	
-			}
-			
-				fclose(fp);
-		} else {
-			fprintf(stderr, "Cannot open %s: %s\n",
-				logfile_name, strerror(errno));
-			syslog(LOG_ERR, "Cannot open %s: %s\n",
-				logfile_name, strerror(errno));
-		}
-	}
-	
 	if (needprivs) {
 		return_to_dropped_privs();
 	}
@@ -558,21 +503,8 @@ cl_log(int priority, const char * fmt, ...)
 {
 	va_list		ap;
 	char		buf[MAXLINE];
-	int		logpri = LOG_PRI(priority);
 	ssize_t		nbytes;
-	const char *	pristr;
 	int	needprivs = !cl_have_full_privs();
-
-	static const char *log_prio[8] = {
-		"EMERG",
-		"ALERT",
-		"CRIT",
-		"ERROR",
-		"WARN",
-		"notice",
-		"info",
-		"debug"
-	};
 
 	cl_process_pid = (int)getpid();
 
@@ -586,17 +518,15 @@ cl_log(int priority, const char * fmt, ...)
 	if (nbytes >= (ssize_t)sizeof(buf)){
 		nbytes =  sizeof(buf) -1 ;
 	}
-	
-	if (logpri < 0 || logpri >= DIMOF(log_prio)) {
-		pristr = "(undef)";
-	}else{
-		pristr = log_prio[logpri];
-	}
 
 	if (needprivs) {
 		return_to_orig_privs();
 	}
-	
+
+	if (stderr_enabled)
+		print_logline(stderr,cl_log_entity,cl_process_pid,
+			NULLTIME,prio2str(priority),buf);
+
 	if ( use_logging_daemon && cl_log_depth <= 1) {
 		LogToLoggingDaemon(priority, buf, nbytes, TRUE);
 	}else {
@@ -707,8 +637,8 @@ cl_set_logging_wqueue_maxlen(int qlen)
 
 int
 LogToDaemon(int priority, const char * buf, 
-	    int bufstrlen, gboolean use_pri_str){
-
+	    int bufstrlen, gboolean use_pri_str)
+{
 	int rc;
 	
 	cl_log_depth++;
@@ -757,7 +687,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 			priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);
 		return HA_FAIL;
 	}
-	
+
 	msg = ChildLogIPCMessage(priority, buf, bufstrlen, use_pri_str, chan);	
 	if (msg == NULL) {
 		drop_msg_num++;
@@ -796,8 +726,8 @@ LogToLoggingDaemon(int priority, const char * buf,
 				chan->ops->destroy(chan);
 			}
 			logging_daemon_chan = NULL;
-			cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);			
-			
+			cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);
+
 			if (drop_msg_num > 0){
 				/* Direct logging here is ok since we're
 				 *    switching to that for everything
@@ -910,7 +840,7 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	logbuf.use_pri_str = use_prio_str;
 	logbuf.entity_pid = getpid();
 	logbuf.timestamp = time(NULL);
-	if (cl_log_entity){
+	if (*cl_log_entity){
 		strncpy(logbuf.entity,cl_log_entity,MAXENTITY);
 	}else {
 		strncpy(logbuf.entity,DFLT_ENTITY,MAXENTITY);
@@ -957,12 +887,11 @@ FreeChildLogIPCMessage(IPC_Message* msg)
 static void
 cl_opensyslog(void)
 {
-	if (cl_log_entity == NULL || cl_log_facility < 0) {
+	if (*cl_log_entity == '\0' || cl_log_facility < 0) {
 		return;
 	}
 	syslog_enabled = 1;
-	openlog(log_entity, LOG_CONS, cl_log_facility);
-
+	openlog(cl_log_entity, LOG_CONS, cl_log_facility);
 }
 
 /* What a horrible substitute for a low-overhead event log!! - FIXME!! */
