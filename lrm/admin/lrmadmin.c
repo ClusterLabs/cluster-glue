@@ -207,7 +207,7 @@ int main(int argc, char **argv)
 	}
 	
         cl_log_set_entity(lrmadmin_name);
-	cl_log_enable_stderr(FALSE);
+	cl_log_enable_stderr(TRUE);
 	cl_log_set_facility(LOG_USER);
 
 	memset(rscid_arg_tmp, '\0', RID_LEN);
@@ -328,7 +328,7 @@ int main(int argc, char **argv)
 				return -1;
 
 			default:
-				cl_log(LOG_ERR,"Error:getopt returned character"
+				cl_log(LOG_ERR,"getopt returned character"
 					 " code %c.", option_char);
 				return -1;
                }
@@ -337,7 +337,7 @@ int main(int argc, char **argv)
         lrmd = ll_lrm_new("lrm");
 
         if (NULL == lrmd) {
-               	cl_log(LOG_ERR,"ll_lrm_new return null.");
+               	cl_log(LOG_ERR,"ll_lrm_new returned NULL.");
                	return -2;
         }
 
@@ -347,17 +347,17 @@ int main(int argc, char **argv)
 		login_name = fake_name;
 	}
         if (lrmd->lrm_ops->signon(lrmd, login_name) != 1) { /* != HA_OK */
-		printf("lrmd daemon is not running.\n");
+		printf("lrmd is not running.\n");
 		if (lrmadmin_cmd == DAEMON_OP) { 
 			return LSB_STATUS_STOPPED;
 		} else {
-			cl_log(LOG_WARNING,"Can't connect to lrmd, quit!");
+			cl_log(LOG_WARNING,"Can't connect to lrmd!");
 			return -2;
 		}
 	}
 	
 	if (lrmadmin_cmd == DAEMON_OP) { 
-		printf("lrmd daemon is running.\n");
+		printf("lrmd is stopped.\n");
 		lrmd->lrm_ops->signoff(lrmd);
 		return 0;
 	}
@@ -419,7 +419,7 @@ int main(int argc, char **argv)
 		case DEL_RSC:
 			/* Return value: HA_OK = 1 Or  HA_FAIL = 0 */
 			if (lrmd->lrm_ops->delete_rsc(lrmd, rscid_arg_tmp)==1) {
-				printf("Succeeded in delete this resource.\n");
+				printf("Succeeded in deleting this resource.\n");
 			} else {
 				printf("Failed to delete this resource.\n");
 				ret_value = -3;
@@ -448,7 +448,7 @@ int main(int argc, char **argv)
 		case RACLASS_SUPPORTED:
 			raclass_list = lrmd->lrm_ops->
 					get_rsc_class_supported(lrmd);
-			printf("Support %d RA classes\n", 
+			printf("There are %d RA classes supported:\n", 
 					g_list_length(raclass_list));
 			if (raclass_list) {
 				g_list_foreach(raclass_list, g_print_stringitem_and_free,
@@ -456,7 +456,7 @@ int main(int argc, char **argv)
 				g_list_free(raclass_list);
 				ret_value = LSB_EXIT_OK;
 			} else {
-				printf("No any RA class is supported\n");
+				printf("No RA classes found!\n");
 				ret_value = -3;
 			}
 
@@ -466,7 +466,7 @@ int main(int argc, char **argv)
 		case RATYPE_SUPPORTED:
 		     	ratype_list = lrmd->lrm_ops->
 				get_rsc_type_supported(lrmd, raclass);
-			printf("The are %d RAs:\n", g_list_length(ratype_list));
+			printf("There are %d RAs:\n", g_list_length(ratype_list));
 			if (ratype_list) {
 				g_list_foreach(ratype_list, g_print_rainfo_item_and_free,
 						NULL);
@@ -490,7 +490,7 @@ int main(int argc, char **argv)
 						, lrmd);
 				g_list_free(rscid_list);
 			} else
-				printf("Currently no resource is managed by "
+				printf("Currently no resources are managed by "
 					 "LRM.\n");
 
 			ASYN_OPS = FALSE;
@@ -538,7 +538,8 @@ int main(int argc, char **argv)
 
 
 		default:
-			fprintf(stderr, "This option is not supported yet.\n");
+			fprintf(stderr, "Option %c is not supported yet.\n",
+				option_char);
 			ret_value = -1;
 			ASYN_OPS = FALSE;
 			break;	
@@ -552,7 +553,7 @@ int main(int argc, char **argv)
 		}
 
 		mainloop = g_main_new(FALSE);
-		printf( "waiting for calling result from the lrmd.\n");
+		printf( "Waiting for lrmd to callback...\n");
         	g_main_run(mainloop);
 	}
 
@@ -617,7 +618,7 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	int call_id;
 	
 	if ((argc - optind) < 3) {
-		cl_log(LOG_ERR,"No enough parameters.");
+		cl_log(LOG_ERR,"Not enough parameters.");
 		return -2;
 	}
 
@@ -676,7 +677,7 @@ ra_metadata(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	char* metadata;
 
 	if(argc < 5) {
-		cl_log(LOG_ERR,"No enough parameters.");
+		cl_log(LOG_ERR,"Not enough parameters.");
 		return -2;
 	}
 
@@ -727,7 +728,7 @@ add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	int tmp_ret;
 
 	if ((argc - optind) < 4) {
-		cl_log(LOG_ERR,"No enough parameters.");
+		cl_log(LOG_ERR,"Not enough parameters.");
 		return -2;
 	}
 	
@@ -777,8 +778,8 @@ GHashTable ** params_ht)
 		for (i=start; i<amount; i++) {
 			delimit = strchr(argv[i], '=');
 			if (!delimit) {
-				cl_log(LOG_ERR, "parameter %s is invalid for "
-					"OCF standard.", argv[i]);
+				cl_log(LOG_ERR, "Parameter %s is invalid for "
+					"the OCF standard.", argv[i]);
 				goto error_return; /* Have to */
 			}
 
@@ -930,7 +931,7 @@ g_get_rsc_description(gpointer data, gpointer user_data)
 		print_rsc_inf(lrm_rsc);
 		lrm_free_rsc(lrm_rsc); 
 	} else
-		cl_log(LOG_ERR, "There is a invalid resource id %s.", 
+		cl_log(LOG_ERR, "Invalid resource id: %s.", 
 			rsc_id_tmp);
 	
 	g_free(data);
@@ -1012,7 +1013,7 @@ get_lrm_rsc(ll_lrm_t * lrmd, char * rscid)
 	if (!(lrm_rsc)) {
 		uuid_str_tmp[RID_LEN-1] = '\0';
 		strncpy(uuid_str_tmp, rscid, RID_LEN-1);
-		cl_log(LOG_ERR,"No this resource %s.", uuid_str_tmp);
+		cl_log(LOG_ERR,"Resource %s does not exist.", uuid_str_tmp);
 	}
 	return lrm_rsc;
 }
