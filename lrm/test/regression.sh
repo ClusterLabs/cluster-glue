@@ -1,6 +1,6 @@
 #!/bin/bash
 
- # Copyright (C) 2004 Andrew Beekhof <andrew@beekhof.net>
+ # Copyright (C) 2007 Dejan Muhamedagic <dmuhamedagic@suse.de>
  # 
  # This program is free software; you can redistribute it and/or
  # modify it under the terms of the GNU General Public
@@ -17,73 +17,66 @@
  # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  #
 
- 
+if [ `id -u` != 0 ]; then
+	echo "sorry, but i talk to root only"
+	exit 2
+fi
+if [ "`dirname $0`" != . ]; then
+	echo "you have to run me from the directory where i live"
+	exit 2
+fi
 
-verbose=$1
-io_dir=.
-diff_opts="--ignore-all-space -U -1 -u"
-failed=.regression.failed
-# zero out the error log
-> $failed
+TESTDIR=${TESTDIR:-testcases}
+TESTSET=$TESTDIR/basicset
+OUTDIR=${OUTDIR:-output}
+LRMD_OUTF="$OUTDIR/lrmd.out"
+OUTF="$OUTDIR/regression.out"
+LRMADMIN="../admin/lrmadmin"
+LRMD_OPTS="-r -vvv"
+DIFF_OPTS="--ignore-all-space -U -1 -u"
+export OUTDIR TESTDIR LRMADMIN DIFF_OPTS
 
-function do_test {
+exec >$OUTF 2>&1
+. /etc/ha.d/shellfuncs
+mkdir -p $OUTDIR
 
-    base=$1;
-    name=$2;
-    output=$io_dir/${base}.out
-    expected=$io_dir/${base}.exp
-
-
-    if [ "$create_mode" != "true" -a ! -f $expected ]; then
-	echo "Test $name	($base)...	Error ($expected)";
-#	return;
-    fi
-
-    ./$base > $output
-
-    if [ ! -s $output ]; then
-	echo "Test $name	($base)...	Error ($output)";
-	rm $output
-	return;
-    fi
-
-    if [ "$create_mode" = "true" ]; then
-	cp "$output" "$expected"
-    fi
-
-    diff $diff_opts -q $expected $output >/dev/null
-    rc=$?
-
-    if [ "$rc" = 0 ]; then
-	echo "Test $name	($base)...	Passed";
-    elif [ "$rc" = 1 ]; then
-	echo "Test $name	($base)...	* Failed";
-	diff $diff_opts $expected $output 2>/dev/null >> $failed
-    else
-	echo "Test $name	($base)...	Error (diff: $rc)";
-	echo "==== Raw results for test ($base) ====" >> $failed
-	cat $output 2>/dev/null >> $failed
-    fi
-    
-    rm $output
+start_lrmd() {
+	echo "starting lrmd" >/dev/tty
+	$HA_BIN/lrmd -s 2>/dev/null
+	if [ $? -eq 3 ]; then
+		$HA_BIN/lrmd $LRMD_OPTS >$LRMD_OUTF 2>&1 &
+		sleep 1
+		$HA_BIN/lrmd -s 2>/dev/null
+	else
+		echo "lrmd already running; can't proceed" >/dev/tty
+		return 2
+	fi
+}
+stop_lrmd() {
+	echo "stopping lrmd" >/dev/tty
+	$HA_BIN/lrmd -k
 }
 
-create_mode="true"
+start_lrmd || exit $?
+trap "stop_lrmd" EXIT
 
-#the returns of ra_info will be different based on your computer.
-#so if you want to run it, you need run in create_mode="true" first
-do_test ra_info 			"get ra info"
+[ "$1" = prepare ] && { export prepare=1; shift 1;}
 
-#following tests need the IP 192.168.58.4 can be added
-#e.g. run "ifconfig eth0 add 192.168.58.3" first
-do_test add_del_rsc 			"add/del resource"
-do_test simple_ops			"test simple ops"
-do_test test_target_rc			"test normal target rc"
-do_test test_target_rc_everytime	"test target_rc==EVERYTIME"
-do_test test_target_rc_changed		"test target_rc==CHANGED and interval>0"
+if [ "$1" -a -f "$TESTDIR/$1" ]; then
+	./evaltest.sh $1
+else
+	echo "$1" | grep -q "^set:" &&
+		TESTSET=$TESTDIR/`echo $1 | sed 's/set://'`
+	while read testcase; do
+		./evaltest.sh $testcase
+	done < $TESTSET
+fi
 
-#following test needs the IP 3ffe:ffff:0:f101::3 can be added
-#e.g. run "/sbin/ip -6 addr add 3ffe:ffff:0:f101::2/64 dev eth0" first
-#because IPaddr executes too fast so it is hard to test get_cur_state()
-#so I used IPv6addr to test it
-do_test	apitest			        "test get_cur_state() and stop_op()"
+if test -s $OUTF; then
+	echo "seems like some tests failed or else something not expected"
+	echo "check $OUTF:"
+	cat $OUTF
+	exit 1
+else
+	rm -f $OUTF $LRMD_OUTF
+fi >/dev/tty

@@ -1,0 +1,34 @@
+# add/remove resources
+#
+list
+add rsc=r1
+info rsc=r1
+list
+del rsc=r1
+%setenv dflt_class=lsb
+list
+add rsc=r1
+list
+del rsc=r1
+%setenv dflt_class=heartbeat
+list
+add rsc=r1
+list
+del rsc=r1
+list
+#
+# a bit of mix
+#
+%setenv dflt_class=ocf
+add rsc=r1
+add rsc=r1 class=heartbeat
+add rsc=r1
+del rsc=r1
+add rsc=r1 class=lsb
+list
+add rsc=r2
+list
+del rsc=r1
+del rsc=r2
+list
+del rsc=r1
