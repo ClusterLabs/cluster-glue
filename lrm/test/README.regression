@@ -1,0 +1,73 @@
+LRM regression tests
+
+Manifest
+
+	regression.sh: the top level program
+	evaltest.sh: the engine test engine
+
+	lrmadmin-interface: interface to lrmd (lrmadmin)
+	descriptions: describe what we are about to do
+	defaults: the default settings for test commands
+
+	testcases/: here are the testcases and filters
+	output/: here goes the output
+
+NB: You should never ever need to edit regression.sh and
+evaltest.sh. If you really have to, please talk to me and I will
+try to fix it so that you do not have to.
+
+Please write new test cases. The more the merrier :)
+
+Usage
+
+Test cases are collected in test sets. The default test set is
+basicset. The usage is:
+
+	./regression.sh ["prepare"] ["set:"<setname>|<testcase>]
+
+Specifying "prepare" will make regression.sh create expect
+output files for the given set of tests or testcase.
+
+The following files may be generated:
+
+	output/<testcase>.out: the output of the testcase
+	output/regression.out: the output of regression.sh
+	output/lrmd.out: the output of lrmd
+
+On success output from testcases is removed and regression.out is
+empty.
+
+Test cases
+
+Tests are written in a simple metalanguage. The best description
+of the language is in the lrmadmin-interface and descriptions
+scripts:
+
+$ egrep '^lrm|echo' lrmadmin-interface descriptions
+
+A test case is a list of tests, one per line. A few examples:
+
+	add  # add a resource with default name
+	list # list all resources
+	del rsc=wiwi # remove a wiwi resource
+
+A set of defaults is in the defaults file. That's why we can
+write short forms instead of
+
+	add rsc=r1 class=ocf type=Dummy provider=heartbeat ...
+
+There are special operations with which it is possible to change
+environment and do other potentially useful stuff.
+
+Filters and except files
+
+Some output is necessarily very volatile, such as time stamps.
+It is possible to specify a filter for each testcase to get rid
+of superfluous information. A filter is a filter in UNIX
+sense, it takes input from stdin and prints results to stdout.
+
+Except files are a list of extended regular expressions fed to
+egrep(1). That way one can filter out lines which are not
+interesting.
+
+
