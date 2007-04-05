@@ -1,5 +1,15 @@
 LRM regression tests
 
+* WARNING * WARNING * WARNING * WARNING * WARNING * WARNING *
+* 
+* evaltest.sh uses eval to an extent you don't really want to
+* know about. Beware. Beware twice. Any input from the testcases
+* directory is considered to be trusted. So, think twice before
+* devising your tests lest you kill your precious data. Got it?
+* Good.
+* 
+* end of WARNING * WARNING * WARNING * WARNING * WARNING * WARNING *
+
 Manifest
 
 	regression.sh: the top level program
