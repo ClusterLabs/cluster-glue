@@ -56,8 +56,29 @@ write short forms instead of
 
 	add rsc=r1 class=ocf type=Dummy provider=heartbeat ...
 
+Special operations
+
 There are special operations with which it is possible to change
-environment and do other potentially useful stuff.
+environment and do other useful things. All special ops start
+with the '%' sign and may be followed by additional parameters.
+
+%setenv
+	change the environment variable; see defaults for the
+	set of global variables and resetvars() in evaltest.sh
+
+%stop
+	skip the rest of the tests
+
+%extcheck
+	feed the output of the next test case to the specified
+	external program/filter; the program should either reside in
+	testcases/ or be in the PATH, i.e.
+	
+	%extcheck cat
+	
+	simulates a null op :)
+
+	see testcases/metadata for some examples
 
 Filters and except files
 
@@ -66,8 +87,12 @@ It is possible to specify a filter for each testcase to get rid
 of superfluous information. A filter is a filter in UNIX
 sense, it takes input from stdin and prints results to stdout.
 
+There is a common filter called very inventively
+testcases/common.filter which is applied to all test cases.
+
 Except files are a list of extended regular expressions fed to
 egrep(1). That way one can filter out lines which are not
-interesting.
+interesting. Again, the one applied to all is
+testcases/common.excl.
 
 

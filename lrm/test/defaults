@@ -5,4 +5,4 @@
 : ${dflt_provider:=heartbeat}
 : ${dflt_timeout:=1000}
 : ${dflt_interval:=0}
-: ${dflt_targetrc:=0}
+: ${dflt_targetrc:=EVERYTIME}
