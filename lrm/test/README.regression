@@ -28,6 +28,8 @@ basicset. The usage is:
 Specifying "prepare" will make regression.sh create expect
 output files for the given set of tests or testcase.
 
+The script will start and stop lrmd itself.
+
 The following files may be generated:
 
 	output/<testcase>.out: the output of the testcase
@@ -39,9 +41,9 @@ empty.
 
 Test cases
 
-Tests are written in a simple metalanguage. The best description
-of the language is in the lrmadmin-interface and descriptions
-scripts:
+Tests are written in a simple metalanguage. The list of commands
+is in the language file. The best description of the language is
+in the lrmadmin-interface and descriptions scripts:
 
 $ egrep '^lrm|echo' lrmadmin-interface descriptions
 
