@@ -41,7 +41,7 @@ setenvironment
 echo -n "$testcase" >/dev/tty
 
 resetvars() {
-	unset rsc type class provider timeout interval targetrc
+	unset rsc type class provider timeout interval targetrc args
 	unset extcheck
 }
 specopt() {
@@ -72,6 +72,7 @@ dotest() {
 while read cmd rest; do
 	case "$cmd" in
 		"#"*) : a comment ;;
+		"%stop") break ;;
 		"%"*) specopt ;;
 		*) dotest; resetvars ;;
 	esac

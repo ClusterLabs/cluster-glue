@@ -56,9 +56,21 @@ stop_lrmd() {
 	echo "stopping lrmd" >/dev/tty
 	$HA_BIN/lrmd -k
 }
+cp_Dummylsb() {
+	if [ ! -e /etc/init.d/Dummy-lsb ]; then
+		cp -p Dummy-lsb /etc/init.d
+		Dummylsb=1
+	fi
+}
+rm_Dummylsb() {
+	if [ "$Dummylsb" ]; then
+		rm -f /etc/init.d/Dummy-lsb
+	fi
+}
 
+cp_Dummylsb
 start_lrmd || exit $?
-trap "stop_lrmd" EXIT
+trap "stop_lrmd; rm_Dummylsb" EXIT
 
 [ "$1" = prepare ] && { export prepare=1; shift 1;}
 
