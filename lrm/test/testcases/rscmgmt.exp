@@ -1,5 +1,5 @@
 .TRY List resources
-Currently no resource is managed by LRM.
+Currently no resources are managed by LRM.
 .TRY Add resource rsc=r1 class=ocf type=Dummy provider=heartbeat args=
 Succeeded in adding this resource.
 .TRY Show info rsc=r1
@@ -15,10 +15,10 @@ Resource agency class:ocf
 Resource agency type:Dummy
 Resource agency provider:heartbeat
 .TRY Delete resource rsc=r1
-Succeeded in delete this resource.
+Succeeded in deleting this resource.
 .SETENV dflt_class=lsb
 .TRY List resources
-Currently no resource is managed by LRM.
+Currently no resources are managed by LRM.
 .TRY Add resource rsc=r1 class=lsb type=Dummy provider=heartbeat args=
 Succeeded in adding this resource.
 .TRY List resources
@@ -28,10 +28,10 @@ Resource agency class:lsb
 Resource agency type:Dummy
 Resource agency provider:heartbeat
 .TRY Delete resource rsc=r1
-Succeeded in delete this resource.
+Succeeded in deleting this resource.
 .SETENV dflt_class=heartbeat
 .TRY List resources
-Currently no resource is managed by LRM.
+Currently no resources are managed by LRM.
 .TRY Add resource rsc=r1 class=heartbeat type=Dummy provider=heartbeat args=
 Succeeded in adding this resource.
 .TRY List resources
@@ -41,9 +41,9 @@ Resource agency class:heartbeat
 Resource agency type:Dummy
 Resource agency provider:heartbeat
 .TRY Delete resource rsc=r1
-Succeeded in delete this resource.
+Succeeded in deleting this resource.
 .TRY List resources
-Currently no resource is managed by LRM.
+Currently no resources are managed by LRM.
 .SETENV dflt_class=ocf
 .TRY Add resource rsc=r1 class=ocf type=Dummy provider=heartbeat args=
 Succeeded in adding this resource.
@@ -54,7 +54,7 @@ Failed to add this resource.
 ERROR: lrm_add_rsc(): got a return code HA_FAIL from a reply message of addrsc with function get_ret_from_msg.
 Failed to add this resource.
 .TRY Delete resource rsc=r1
-Succeeded in delete this resource.
+Succeeded in deleting this resource.
 .TRY Add resource rsc=r1 class=lsb type=Dummy provider=heartbeat args=
 Succeeded in adding this resource.
 .TRY List resources
@@ -77,11 +77,11 @@ Resource agency class:ocf
 Resource agency type:Dummy
 Resource agency provider:heartbeat
 .TRY Delete resource rsc=r1
-Succeeded in delete this resource.
+Succeeded in deleting this resource.
 .TRY Delete resource rsc=r2
-Succeeded in delete this resource.
+Succeeded in deleting this resource.
 .TRY List resources
-Currently no resource is managed by LRM.
+Currently no resources are managed by LRM.
 .TRY Delete resource rsc=r1
 ERROR: lrm_delete_rsc(): got a return code HA_FAIL from a reply message of delrsc with function get_ret_from_msg.
 Failed to delete this resource.

@@ -32,11 +32,11 @@ output data:
 .TRY Show state rsc=r1
 resource state:LRM_RSC_IDLE
 The resource 2 operations' information:
-   operation 'monitor' [call_id=2]:
+   operation 'monitor' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=7 (not running), op_status=4 (failed due to an error)
       parameters: delay=0  
-   operation 'start' [call_id=3]:
+   operation 'start' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=0 (ok), op_status=0 (succeed)
       parameters: delay=0  
@@ -87,15 +87,15 @@ output data:
 .TRY Show state rsc=r1
 resource state:LRM_RSC_IDLE
 The resource 3 operations' information:
-   operation 'start' [call_id=5]:
+   operation 'start' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=0 (ok), op_status=0 (succeed)
       parameters: delay=0  
-   operation 'monitor' [call_id=6]:
+   operation 'monitor' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=0 (ok), op_status=0 (succeed)
       parameters: delay=0  
-   operation 'stop' [call_id=7]:
+   operation 'stop' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=0 (ok), op_status=0 (succeed)
       parameters: delay=0  
@@ -145,7 +145,7 @@ output data:
 
 .TRY Delete resource rsc=r1
 Succeeded in deleting this resource.
-.SETENV dflt_class=heartbeat
+.SETENV dflt_class=heartbeat dftl_rsc=r1-lsb
 .TRY Add resource rsc=r1 class=heartbeat type=Dummy provider=heartbeat args=0
 Succeeded in adding this resource.
 .TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
@@ -174,11 +174,11 @@ output data:
 .TRY Show state rsc=r1
 resource state:LRM_RSC_IDLE
 The resource 2 operations' information:
-   operation 'monitor' [call_id=12]:
+   operation 'monitor' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=7 (not running), op_status=4 (failed due to an error)
       parameters: 1=0  
-   operation 'start' [call_id=13]:
+   operation 'start' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=0 (ok), op_status=0 (succeed)
       parameters: 1=0  
@@ -231,15 +231,15 @@ output data:
 .TRY Show state rsc=r1
 resource state:LRM_RSC_IDLE
 The resource 3 operations' information:
-   operation 'start' [call_id=15]:
+   operation 'start' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=0 (ok), op_status=0 (succeed)
       parameters: 1=0  
-   operation 'monitor' [call_id=16]:
+   operation 'monitor' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=0 (ok), op_status=0 (succeed)
       parameters: 1=0  
-   operation 'stop' [call_id=17]:
+   operation 'stop' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=0 (ok), op_status=0 (succeed)
       parameters: 1=0  
@@ -291,7 +291,7 @@ output data:
 
 .TRY Delete resource rsc=r1
 Succeeded in deleting this resource.
-.SETENV dflt_class=lsb dflt_type=Dummy-lsb
+.SETENV dflt_class=lsb dflt_type=Dummy-lsb dftl_rsc=r1-lsb
 .TRY Add resource rsc=r1 class=lsb type=Dummy-lsb provider=heartbeat args=
 Succeeded in adding this resource.
 .TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
@@ -319,11 +319,11 @@ output data:
 .TRY Show state rsc=r1
 resource state:LRM_RSC_IDLE
 The resource 2 operations' information:
-   operation 'monitor' [call_id=22]:
+   operation 'monitor' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=7 (not running), op_status=4 (failed due to an error)
       parameters: 
-   operation 'start' [call_id=23]:
+   operation 'start' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=0 (ok), op_status=0 (succeed)
       parameters: 
@@ -374,15 +374,15 @@ output data:
 .TRY Show state rsc=r1
 resource state:LRM_RSC_IDLE
 The resource 3 operations' information:
-   operation 'start' [call_id=25]:
+   operation 'start' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=0 (ok), op_status=0 (succeed)
       parameters: 
-   operation 'monitor' [call_id=26]:
+   operation 'monitor' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=0 (ok), op_status=0 (succeed)
       parameters: 
-   operation 'stop' [call_id=27]:
+   operation 'stop' [call_id=(removed)]:
       start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
       rc=0 (ok), op_status=0 (succeed)
       parameters: 

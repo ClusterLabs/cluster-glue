@@ -6,3 +6,4 @@
 : ${dflt_timeout:=1000}
 : ${dflt_interval:=0}
 : ${dflt_targetrc:=EVERYTIME}
+dflt_args=""
