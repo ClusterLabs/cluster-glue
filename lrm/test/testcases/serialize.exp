@@ -1,0 +1,88 @@
+.SETENV dflt_timeout=2500
+.TRY Add resource rsc=r1 class=ocf type=Dummy provider=heartbeat args=delay=2
+Succeeded in adding this resource.
+.BG 3
+.BG test line 9 runs in background
+.SLEEP 1
+.BG test line 14 runs in background
+.BG test line 15 runs in background
+.SLEEP 7
+.TRY Show state rsc=r1
+resource state:LRM_RSC_IDLE
+The resource 2 operations' information:
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=7000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=2  
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=7000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=2  
+.TRY Execute rsc=r1 operation=stop timeout=2500 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:stop
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Show state rsc=r1
+resource state:LRM_RSC_IDLE
+The resource 3 operations' information:
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=7000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=2  
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=7000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=2  
+   operation 'stop' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=2500, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=2  
+.BG test line 9 finished (exit code: 0):
+==========test:9 start output==========
+.TRY Execute rsc=r1 operation=start timeout=2500 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:start
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+==========test:9   end output==========
+.BG test line 14 finished (exit code: 0):
+==========test:14 start output==========
+.TRY Execute rsc=r1 operation=start timeout=7000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:start
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+==========test:14   end output==========
+.BG test line 15 finished (exit code: 0):
+==========test:15 start output==========
+.TRY Execute rsc=r1 operation=monitor timeout=7000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+==========test:15   end output==========

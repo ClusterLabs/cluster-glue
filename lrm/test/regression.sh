@@ -33,7 +33,7 @@ LRMD_OUTF="$OUTDIR/lrmd.out"
 OUTF="$OUTDIR/regression.out"
 LRMADMIN="../admin/lrmadmin"
 LRMD_OPTS="-r -vvv"
-DIFF_OPTS="--ignore-all-space -U -1 -u"
+DIFF_OPTS="--ignore-all-space -U 1"
 export OUTDIR TESTDIR LRMADMIN DIFF_OPTS
 
 exec >$OUTF 2>&1
@@ -86,8 +86,7 @@ fi
 
 if test -s $OUTF; then
 	echo "seems like some tests failed or else something not expected"
-	echo "check $OUTF:"
-	cat $OUTF
+	echo "check $OUTF and diff files in $OUTDIR"
 	exit 1
 else
 	rm -f $OUTF $LRMD_OUTF

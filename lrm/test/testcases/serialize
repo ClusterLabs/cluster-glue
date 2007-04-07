@@ -1,0 +1,19 @@
+# allow for a delay of 1 sec
+%setenv dflt_timeout=2500
+add rsc=r1 args="delay=2"
+#
+# we run the next three ops in the background
+# in case ops are not serialized, the Dummy RA should complain
+#
+%bg 3
+exec operation=start
+# make sure that the first op really starts first
+# but it should be still running after the sleep
+%sleep 1
+# set timeouts high enough so that no op fails
+exec operation=start timeout=7000
+exec operation=monitor timeout=7000
+%sleep 7
+state
+exec operation=stop
+state
