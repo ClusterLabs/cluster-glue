@@ -52,7 +52,14 @@ specopt_setenv() {
 	eval $rest
 }
 specopt_sleep() {
-	sleep $rest
+	#sleep $rest
+	# the while loop below is the same
+	# but we give user some feedback on what's happening
+	while [ "$rest" -gt 0 ]; do
+		sleep 1
+		echo -n "+" >/dev/tty
+		rest=$((rest-1))
+	done
 }
 specopt_extcheck() {
 	extcheck="$rest"
@@ -76,18 +83,16 @@ specopt() {
 #
 # wait for background processes to finish
 # and print their output
-# NB: We wait for processes in FIFO order
+# NB: We wait for processes in a FIFO order
 #     The order in which they finish does not matter
 #
 waitforbgprocs() {
 	while [ "$bgprocs" ]; do
 		set $bgprocs
 		proc=$1  # get the first one
-		shift 1  # and remove it from the list
-		bgprocs="$@"
-
 		pid=`echo $proc | sed 's/.*://'`
 		testline=`echo $proc | sed 's/:.*//'`
+
 		while kill -0 $pid 2>/dev/null; do
 			sleep 1
 		done
@@ -98,6 +103,9 @@ waitforbgprocs() {
 		cat $outf-$testline
 		echo "==========test:$testline   end output=========="
 		rm -f $outf-$testline
+
+		shift 1  # remove the first one from the list
+		bgprocs="$@"
 	done
 }
 
@@ -181,5 +189,5 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
-echo " done" >/dev/tty
+echo " PASS" >/dev/tty
 rm -f $outf $difff
