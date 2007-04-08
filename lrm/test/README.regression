@@ -44,6 +44,11 @@ Test cases are collected in test sets. The default test set is
 basicset and running regression.sh without arguments will do all
 tests from that set.
 
+To show progress, for each test a '.' is printed. For sleeps,
+a '+' for each second. Once all tests have been evaluated, the
+output is checked against the expect file. If successful, "PASS"
+is printed, otherwise "FAIL".
+
 Specifying "prepare" will make regression.sh create expect
 output files for the given set of tests or testcase.
 

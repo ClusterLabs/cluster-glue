@@ -12,8 +12,9 @@ exec operation=start
 %sleep 1
 # set timeouts high enough so that no op fails
 exec operation=start timeout=7000
+%sleep 1
 exec operation=monitor timeout=7000
-%sleep 7
+%sleep 6
 state
 exec operation=stop
 state
