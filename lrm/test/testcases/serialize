@@ -1,4 +1,4 @@
-# allow for a delay of 1 sec
+# allow for a delay of 2 seconds
 %setenv dflt_timeout=2500
 add rsc=r1 args="delay=2"
 #
@@ -7,8 +7,8 @@ add rsc=r1 args="delay=2"
 #
 %bg 3
 exec operation=start
-# make sure that the first op really starts first
-# but it should be still running after the sleep
+# insert sleeps to make sure that the operations are started in
+# the order given here
 %sleep 1
 # set timeouts high enough so that no op fails
 exec operation=start timeout=7000
