@@ -1,0 +1,13 @@
+meatclient
+README
+stonith
+Makefile.in
+Makefile
+.*.swp
+.deps
+.libs
+*.lo
+*.la
+*.beam
+parser-messages
+MISC_ERRORS
