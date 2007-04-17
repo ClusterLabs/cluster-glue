@@ -1,6 +1,6 @@
+list
 # add/remove resources
 #
-list
 add rsc=r1
 info rsc=r1
 list

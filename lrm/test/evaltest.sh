@@ -1,6 +1,6 @@
 #!/bin/bash
 
- # Copyright (C) 2007 Dejan Muhamedagic <dmuhamedagic@suse.de>
+ # Copyright (C) 2007 Dejan Muhamedagic <dejan@suse.de>
  # 
  # This program is free software; you can redistribute it and/or
  # modify it under the terms of the GNU General Public
@@ -64,15 +64,23 @@ specopt_sleep() {
 specopt_extcheck() {
 	extcheck="$rest"
 	set $extcheck
-	[ -x "$1" ] ||  # a program in the PATH
+	which "$1" >/dev/null 2>&1 ||  # a program in the PATH
 		extcheck="$TESTDIR/$extcheck"  # or our script
 }
+specopt_repeat() {
+	repeat_limit=$rest
+}
 specopt_bg() {
-	if [ "$bgprocs_num" -eq 0 ]; then
+	if [ "$job_cnt" -gt "$bgprocs_num" ]; then
 		bgprocs_num=${rest:-1}
+		job_cnt=1
 	else
 		echo ".BG bad usage: more tests yet to be backgrounded"
 	fi
+}
+specopt_bgrepeat() { # common
+	specopt_bg
+	specopt_repeat
 }
 specopt() {
 	cmd=`echo $cmd | sed 's/%//'`  # strip leading '%'
@@ -90,38 +98,72 @@ waitforbgprocs() {
 	while [ "$bgprocs" ]; do
 		set $bgprocs
 		proc=$1  # get the first one
-		pid=`echo $proc | sed 's/.*://'`
-		testline=`echo $proc | sed 's/:.*//'`
+		shift 1  # remove it from the list
+		bgprocs="$@"
+		IFS=":"
+		set $proc  # split into lineno,pid
+		testline=$1 jobnum=$2 pid=$3
+		unset IFS
 
 		while kill -0 $pid 2>/dev/null; do
 			sleep 1
 		done
 		wait $pid # capture the exit code
 
-		echo ".BG test line $testline finished (exit code: $?):"
-		echo "==========test:$testline start output=========="
-		cat $outf-$testline
-		echo "==========test:$testline   end output=========="
-		rm -f $outf-$testline
-
-		shift 1  # remove the first one from the list
-		bgprocs="$@"
+		echo ".BG test line $testline/job $jobnum finished (exit code: $?):"
+		echo "==========test:$testline:$jobnum start output=========="
+		cat $outf-$testline-$jobnum
+		echo "==========test:$testline:$jobnum   end output=========="
+		rm -f $outf-$testline-$jobnum
 	done
+}
+
+#
+# substitute variables in the test line
+#
+substvars() {
+	sed "
+	s/%t/$test_cnt/g
+	s/%l/$line/g
+	s/%j/$job_cnt/g
+	s/%i/$repeat_cnt/g
+	"
 }
 
 dotest() {
 	echo -n "." >/dev/tty
-	eval $rest  # set parameters
+	test_cnt=$((test_cnt+1))
 	describe_$cmd  # show what we are about to do
 	lrm_$cmd |  # and execute the command
 		{ [ "$extcheck" ] && $extcheck || cat;}
+}
+runonetest() {
+	eval `echo $rest | substvars`  # set parameters
+	if [ "$job_cnt" -le "$bgprocs_num" ]; then
+		echo .BG test line $line/job $job_cnt runs in background
+		dotest > $outf-$line-$job_cnt 2>&1 &
+		bgprocs="$bgprocs $line:$job_cnt:$!"
+		job_cnt=$((job_cnt+1))
+	else
+		dotest
+	fi
+}
+runtest() {
+	while [ $repeat_cnt -le $repeat_limit ]; do
+		runonetest
+		resetvars  # unset all variables
+		repeat_cnt=$((repeat_cnt+1))
+	done
+	repeat_limit=1 repeat_cnt=1
 }
 
 #
 # run the tests
 #
-bgprocs_num=0
+bgprocs_num=0 job_cnt=1
+repeat_limit=1 repeat_cnt=1
 line=1
+test_cnt=1
 {
 while read cmd rest; do
 	case "$cmd" in
@@ -129,17 +171,7 @@ while read cmd rest; do
 		"#"*) : a comment ;;
 		"%stop") break ;;
 		"%"*) specopt ;;
-		*)
-			if [ "$bgprocs_num" -gt 0 ]; then
-				echo .BG test line $line runs in background
-				dotest $line > $outf-$line 2>&1 &
-				bgprocs="$bgprocs $line:$!"
-				bgprocs_num=$((bgprocs_num-1))
-			else
-				dotest $line
-			fi
-			resetvars  # unset all variables
-		;;
+		*) runtest ;;
 	esac
 	line=$((line+1))
 done < $TESTDIR/$testcase
@@ -178,7 +210,7 @@ EOF
 #
 echo -n " checking..." >/dev/tty
 filter_output < $outf |
-	diff $DIFF_OPTS - $expf > $difff
+	diff $DIFF_OPTS $expf - > $difff
 
 #
 # report if necessary
