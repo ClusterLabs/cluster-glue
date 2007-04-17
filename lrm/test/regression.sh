@@ -36,7 +36,9 @@ OUTF="$OUTDIR/regression.out"
 LRMADMIN="../admin/lrmadmin"
 LRMD_OPTS="-r -vvv"
 DIFF_OPTS="--ignore-all-space -U 1"
-export OUTDIR TESTDIR LRMADMIN DIFF_OPTS
+common_filter=$TESTDIR/common.filter
+common_exclf=$TESTDIR/common.excl
+export OUTDIR TESTDIR LRMADMIN
 rm -f $LRMD_LOGF $LRMD_DEBUGF
 
 abspath() {
@@ -45,8 +47,11 @@ abspath() {
 		echo `pwd`/$1
 }
 
+# make lrmd log to our files only
 export HA_logfile=`abspath $LRMD_LOGF`
 export HA_debugfile=`abspath $LRMD_DEBUGF`
+export HA_use_logd=no
+unset HA_logfacility
 
 exec >$OUTF 2>&1
 . /etc/ha.d/shellfuncs
@@ -86,13 +91,63 @@ trap "stop_lrmd; rm_Dummylsb" EXIT
 
 [ "$1" = prepare ] && { export prepare=1; shift 1;}
 
+setenvironment() {
+	filterf=$TESTDIR/$testcase.filter
+	exclf=$TESTDIR/$testcase.excl
+	expf=$TESTDIR/$testcase.exp
+	outf=$OUTDIR/$testcase.out
+	difff=$OUTDIR/$testcase.diff
+}
+
+filter_output() {
+	{ [ -x $common_filter ] && $common_filter || cat;} |
+	{ [ -f $common_exclf ] && egrep -vf $common_exclf || cat;} |
+	{ [ -x $filterf ] && $filterf || cat;} |
+	{ [ -f $exclf ] && egrep -vf $exclf || cat;}
+}
+
+dumpcase() {
+	cat<<EOF
+----------
+testcase $testcase failed
+output is in $outf
+diff (from $difff):
+`cat $difff`
+----------
+EOF
+}
+
+runtestcase() {
+	setenvironment
+	echo -n "$testcase" >/dev/tty
+	./evaltest.sh < $TESTDIR/$testcase > $outf 2>&1
+
+	filter_output < $outf |
+	if [ "$prepare" ]; then
+		echo " saving to expect file" >/dev/tty
+		cat > $expf
+	else
+		echo -n " checking..." >/dev/tty
+		diff $DIFF_OPTS $expf - > $difff
+		if [ $? -ne 0 ]; then
+			echo " FAIL" >/dev/tty
+			dumpcase
+			return 1
+		else
+			echo " PASS" >/dev/tty
+			rm -f $outf $difff
+		fi
+	fi
+}
+
 if [ "$1" -a -f "$TESTDIR/$1" ]; then
-	./evaltest.sh $1
+	testcase=$1
+	runtestcase
 else
 	echo "$1" | grep -q "^set:" &&
 		TESTSET=$TESTDIR/`echo $1 | sed 's/set://'`
 	while read testcase; do
-		./evaltest.sh $testcase
+		runtestcase
 	done < $TESTSET
 fi
 
