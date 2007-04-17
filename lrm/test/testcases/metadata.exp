@@ -1,3 +1,5 @@
+.SETENV LANG=POSIX
+.EXTCHECK sort
 .TRY List classes
 There are 4 RA classes supported:
 heartbeat

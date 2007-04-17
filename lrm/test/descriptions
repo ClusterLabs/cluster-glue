@@ -4,33 +4,33 @@ describe_list() {
 }
 describe_add() {
 	echo $lead Add resource \
-		rsc=${rsc:-$dflt_rsc} \
+		${rsc:-$dflt_rsc} \
 		class=${class:-$dflt_class} type=${type:-$dflt_type} \
 		provider=${provider:-$dflt_provider} \
 		args=$args
 }
 describe_del() {
 	echo $lead Delete resource \
-		rsc=${rsc:-$dflt_rsc}
+		${rsc:-$dflt_rsc}
 }
 describe_flush() {
 	echo $lead Flush resource \
-		rsc=${rsc:-$dflt_rsc}
+		${rsc:-$dflt_rsc}
 }
 describe_state() {
 	echo $lead Show state \
-		rsc=${rsc:-$dflt_rsc}
+		${rsc:-$dflt_rsc}
 }
 describe_info() {
 	echo $lead Show info \
-		rsc=${rsc:-$dflt_rsc}
+		${rsc:-$dflt_rsc}
 }
 describe_exec() {
-	echo $lead Execute \
-		rsc=${rsc:-$dflt_rsc} \
-		operation=${operation:-$dflt_operation} \
+	echo $lead Exec \
+		${rsc:-$dflt_rsc} \
+		op=${operation:-$dflt_operation} \
 		timeout=${timeout:-$dflt_timeout} interval=${interval:-$dflt_interval} \
-		targetrc=${targetrc:-$dflt_targetrc} args=$args
+		target=${targetrc:-$dflt_targetrc} args=$args
 }
 
 describe_classes() {

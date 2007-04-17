@@ -110,8 +110,26 @@ with the '%' sign and may be followed by additional parameters.
 
 	see testcases/metadata for some examples
 
+%repeat num
+	repeat the next test num times
+	there are several variables which are substituted in the test
+	lines, so that we can simulate a for loop:
+
+	s/%t/$test_cnt/g
+	s/%l/$line/g
+	s/%j/$job_cnt/g
+	s/%i/$repeat_cnt/g
+
+	for example, to add 10 resources:
+
+	%repeat 10
+	add rsc=r-%i
+
 %bg [num]
 	run next num (or just the next one) tests in background
+
+%bgrepeat [num]
+	a combination of the previous two (used often)
 
 Filters and except files
 

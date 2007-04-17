@@ -30,11 +30,23 @@ TESTDIR=${TESTDIR:-testcases}
 TESTSET=$TESTDIR/basicset
 OUTDIR=${OUTDIR:-output}
 LRMD_OUTF="$OUTDIR/lrmd.out"
+LRMD_LOGF="$OUTDIR/lrmd.log"
+LRMD_DEBUGF="$OUTDIR/lrmd.debug"
 OUTF="$OUTDIR/regression.out"
 LRMADMIN="../admin/lrmadmin"
 LRMD_OPTS="-r -vvv"
 DIFF_OPTS="--ignore-all-space -U 1"
 export OUTDIR TESTDIR LRMADMIN DIFF_OPTS
+rm -f $LRMD_LOGF $LRMD_DEBUGF
+
+abspath() {
+	echo $1 | grep -qs "^/" &&
+		echo $1 ||
+		echo `pwd`/$1
+}
+
+export HA_logfile=`abspath $LRMD_LOGF`
+export HA_debugfile=`abspath $LRMD_DEBUGF`
 
 exec >$OUTF 2>&1
 . /etc/ha.d/shellfuncs
@@ -87,6 +99,7 @@ fi
 if test -s $OUTF; then
 	echo "seems like some tests failed or else something not expected"
 	echo "check $OUTF and diff files in $OUTDIR"
+	echo "in case you wonder what lrmd was doing, read $LRMD_LOGF and $LRMD_DEBUGF"
 	exit 1
 else
 	rm -f $OUTF $LRMD_OUTF
