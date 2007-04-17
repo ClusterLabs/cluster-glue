@@ -1621,50 +1621,77 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 static int
 uncompress2compress(struct ha_msg* msg, int index)
 {
-	char	buf[MAXMSG];
+	char*	buf;
 	size_t	buflen = MAXMSG;
-	
+	int	rc = HA_FAIL;
+
+	buf = cl_malloc(buflen);
+	if (!buf) {
+		cl_log(LOG_ERR, "%s: failed to allocate buffer",
+		       __FUNCTION__);
+		goto err;
+	}
+
 	if (msg->types[index] != FT_UNCOMPRESS){
 		cl_log(LOG_ERR, "%s: the %dth field is not FT_UNCOMPRESS type",
 		       __FUNCTION__, index);
-		return HA_FAIL;
+		goto err;
 	}
 	
 
 	if (cl_compress_field(msg, index, buf, &buflen) != HA_OK){
 		cl_log(LOG_ERR, "%s: compressing %dth field failed", __FUNCTION__, index);
-		return HA_FAIL;
+		goto err;
 	}
 	
-	return cl_msg_replace(msg, index, buf, buflen, FT_COMPRESS);
+	rc = cl_msg_replace(msg, index, buf, buflen, FT_COMPRESS);
 
+err:
+	if (buf) {
+		cl_free(buf);
+	}
+
+	return rc;
 }
 
 static int
 compress2uncompress(struct ha_msg* msg, int index)
 {
-	char		buf[MAXMSG];
-	size_t		buflen = MAXMSG;	
+	char		*buf = NULL;
+	size_t		buflen = MAXUNCOMPRESSED;	
 	struct ha_msg*  msgfield;
-	int err;
+	int 		err = HA_FAIL;
+
+	buf = cl_malloc(buflen);
 	
+	if (!buf) {
+		cl_log(LOG_ERR, "%s: allocating buffer for uncompression failed",
+		       __FUNCTION__);
+		goto out;
+	}
+
 	if (cl_decompress_field(msg, index, buf, &buflen) != HA_OK){
 		cl_log(LOG_ERR, "%s: compress field failed",
 		       __FUNCTION__);
-		return HA_FAIL;
+		goto out;
 	}
 	
 	msgfield = wirefmt2msg(buf, buflen, 0);
 	if (msgfield == NULL){
 		cl_log(LOG_ERR, "%s: wirefmt to msg failed",
 		       __FUNCTION__);
-		return HA_FAIL;
+		goto out;
 	}
 	
 	err = cl_msg_replace(msg, index, (char*)msgfield, 0, FT_UNCOMPRESS);
 
 	ha_msg_del(msgfield);
-	
+
+out:
+	if (buf) {
+		cl_free(buf);
+	}
+
 	return err;
 }
 
