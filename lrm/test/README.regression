@@ -63,6 +63,13 @@ The following files may be generated:
 On success output from testcases is removed and regression.out is
 empty.
 
+Driving the test cases yourself
+
+evaltest.sh accepts input from stdin, evaluates it immediately,
+and prints results to stdout/stderr. One can perhaps get a better
+feeling of what's actually going on by running it interactively.
+Please note that you have to start the lrmd yourself beforehand.
+
 Test cases
 
 Tests are written in a simple metalanguage. The list of commands
