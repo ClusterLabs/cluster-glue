@@ -217,6 +217,10 @@ external_hostlist(StonithPlugin  *s)
 	i = 0;
 	tmp = strtok(output, WHITESPACE);
 	while (tmp != NULL) {
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: %s host %s",
+				__FUNCTION__, sd->subplugin, tmp);
+		}
 		ret[i] = STRDUP(tmp);
 		if (!ret[i]) {
 			LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
@@ -488,6 +492,10 @@ external_get_confignames(StonithPlugin* p)
 		/* now copy over confignames */
 		pch = strtok(output, WHITESPACE);		
 		for (i = 0; i < namecount; i++) {
+			if (Debug) {
+				LOG(PIL_DEBUG, "%s: %s configname %s",
+					__FUNCTION__, sd->subplugin, pch);
+			}
 			sd->confignames[i] = STRDUP(pch);
 			pch = strtok(NULL, WHITESPACE);
 		}
