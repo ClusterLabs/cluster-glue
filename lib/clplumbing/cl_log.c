@@ -73,6 +73,7 @@ const char * prio2str(int priority);
 static int		use_logging_daemon =  FALSE;
 static int		conn_logd_time = 0;
 static char		cl_log_entity[MAXENTITY]= DFLT_ENTITY;
+static char		common_log_entity[MAXENTITY]= DFLT_ENTITY;
 static int		cl_log_facility = LOG_USER;
 
 static void		cl_opensyslog(void);
@@ -329,6 +330,8 @@ cl_log_test_logd(void)
 	
 }
 
+/* FIXME: This is way too ugly to bear */
+
 void
 cl_log_set_facility(int facility)
 {
@@ -465,6 +468,11 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 	}
 	
 	if (syslog_enabled) {
+		if( entity ) {
+			strncpy(common_log_entity, entity, MAXENTITY);
+		} else {
+			strncpy(common_log_entity, DFLT_ENTITY,MAXENTITY);
+		}
 		if (pristr){
 			syslog(priority, "[%d]: %s: %s%c",
 			       entity_pid, pristr,  buf, 0);
@@ -891,7 +899,8 @@ cl_opensyslog(void)
 		return;
 	}
 	syslog_enabled = 1;
-	openlog(cl_log_entity, LOG_CONS, cl_log_facility);
+	strncpy(common_log_entity, cl_log_entity, MAXENTITY);
+	openlog(common_log_entity, LOG_CONS, cl_log_facility);
 }
 
 /* What a horrible substitute for a low-overhead event log!! - FIXME!! */
