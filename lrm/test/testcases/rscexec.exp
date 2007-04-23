@@ -1,12 +1,12 @@
 .TRY List resources
 Currently no resources are managed by LRM.
-.TRY Add resource r1 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r1 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
 .TRY List resources
 
 Resource ID:r1
 Resource agency class:ocf
-Resource agency type:Dummy
+Resource agency type:lrmregtest
 Resource agency provider:heartbeat
 Resource agency parameters:delay=0  
 .TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
@@ -67,7 +67,7 @@ The resource 3 operations' information:
 
 .TRY Delete resource r1
 Succeeded in deleting this resource.
-.SETENV dflt_class=heartbeat dftl_rsc=r1-lsb
+.SETENV dflt_class=heartbeat dflt_type=Dummy dftl_rsc=r1-heartbeat
 .TRY Add resource r1 class=heartbeat type=Dummy provider=heartbeat args=0
 Succeeded in adding this resource.
 .TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=

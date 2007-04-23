@@ -1,6 +1,6 @@
 # defaults
 : ${dflt_rsc:=r1}
-: ${dflt_type:=Dummy}
+: ${dflt_type:=lrmregtest}
 : ${dflt_class:=ocf}
 : ${dflt_provider:=heartbeat}
 : ${dflt_timeout:=1000}

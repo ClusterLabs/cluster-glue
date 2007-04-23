@@ -1,35 +1,35 @@
 .TRY List resources
 Currently no resources are managed by LRM.
-.TRY Add resource r1 class=ocf type=Dummy provider=heartbeat args=
+.TRY Add resource r1 class=ocf type=lrmregtest provider=heartbeat args=
 Succeeded in adding this resource.
 .TRY Show info r1
 
 Resource ID:r1
 Resource agency class:ocf
-Resource agency type:Dummy
+Resource agency type:lrmregtest
 Resource agency provider:heartbeat
 .TRY List resources
 
 Resource ID:r1
 Resource agency class:ocf
-Resource agency type:Dummy
+Resource agency type:lrmregtest
 Resource agency provider:heartbeat
 .TRY Delete resource r1
 Succeeded in deleting this resource.
-.SETENV dflt_class=lsb
+.SETENV dflt_class=lsb dflt_type=Dummy-lsb
 .TRY List resources
 Currently no resources are managed by LRM.
-.TRY Add resource r1 class=lsb type=Dummy provider=heartbeat args=
+.TRY Add resource r1 class=lsb type=Dummy-lsb provider=heartbeat args=
 Succeeded in adding this resource.
 .TRY List resources
 
 Resource ID:r1
 Resource agency class:lsb
-Resource agency type:Dummy
+Resource agency type:Dummy-lsb
 Resource agency provider:heartbeat
 .TRY Delete resource r1
 Succeeded in deleting this resource.
-.SETENV dflt_class=heartbeat
+.SETENV dflt_class=heartbeat dflt_type=Dummy
 .TRY List resources
 Currently no resources are managed by LRM.
 .TRY Add resource r1 class=heartbeat type=Dummy provider=heartbeat args=
@@ -55,13 +55,13 @@ ERROR: lrm_add_rsc(): got a return code HA_FAIL from a reply message of addrsc w
 Failed to add this resource.
 .TRY Delete resource r1
 Succeeded in deleting this resource.
-.TRY Add resource r1 class=lsb type=Dummy provider=heartbeat args=
+.TRY Add resource r1 class=lsb type=Dummy-lsb provider=heartbeat args=
 Succeeded in adding this resource.
 .TRY List resources
 
 Resource ID:r1
 Resource agency class:lsb
-Resource agency type:Dummy
+Resource agency type:Dummy-lsb
 Resource agency provider:heartbeat
 .TRY Add resource r2 class=ocf type=Dummy provider=heartbeat args=
 Succeeded in adding this resource.
@@ -69,7 +69,7 @@ Succeeded in adding this resource.
 
 Resource ID:r1
 Resource agency class:lsb
-Resource agency type:Dummy
+Resource agency type:Dummy-lsb
 Resource agency provider:heartbeat
 
 Resource ID:r2

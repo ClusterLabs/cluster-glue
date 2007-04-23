@@ -88,7 +88,7 @@ A test case is a list of tests, one per line. A few examples:
 A set of defaults for LRM options is in the defaults file. That's
 why we can write short forms instead of
 
-	add rsc=r1 class=ocf type=Dummy provider=heartbeat ...
+	add rsc=r1 class=ocf type=lrmregtest provider=heartbeat ...
 
 Special operations
 

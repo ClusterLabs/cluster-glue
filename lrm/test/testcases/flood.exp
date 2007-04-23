@@ -2,133 +2,133 @@
 Currently no resources are managed by LRM.
 .SETENV dflt_timeout=30000
 .REPEAT 64
-.TRY Add resource r1 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r1 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r2 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r2 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r3 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r3 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r4 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r4 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r5 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r5 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r6 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r6 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r7 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r7 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r8 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r8 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r9 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r9 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r10 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r10 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r11 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r11 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r12 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r12 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r13 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r13 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r14 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r14 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r15 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r15 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r16 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r16 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r17 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r17 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r18 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r18 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r19 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r19 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r20 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r20 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r21 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r21 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r22 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r22 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r23 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r23 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r24 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r24 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r25 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r25 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r26 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r26 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r27 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r27 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r28 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r28 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r29 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r29 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r30 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r30 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r31 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r31 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r32 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r32 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r33 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r33 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r34 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r34 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r35 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r35 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r36 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r36 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r37 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r37 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r38 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r38 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r39 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r39 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r40 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r40 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r41 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r41 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r42 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r42 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r43 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r43 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r44 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r44 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r45 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r45 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r46 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r46 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r47 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r47 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r48 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r48 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r49 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r49 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r50 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r50 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r51 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r51 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r52 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r52 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r53 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r53 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r54 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r54 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r55 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r55 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r56 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r56 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r57 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r57 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r58 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r58 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r59 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r59 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r60 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r60 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r61 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r61 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r62 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r62 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r63 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r63 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
-.TRY Add resource r64 class=ocf type=Dummy provider=heartbeat args=delay=0
+.TRY Add resource r64 class=ocf type=lrmregtest provider=heartbeat args=delay=0
 Succeeded in adding this resource.
 .BGREPEAT 64
 .BG test line 9/job 1 runs in background
