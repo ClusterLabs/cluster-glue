@@ -3,13 +3,16 @@
 stonith \- extensible interface for remotely powering down a node in the cluster
 .SH SYNOPSIS
 .br
-\fBstonith\fP [ -sv ] [ -t type ] [ -p param ] [ -F file ] -S nodename
-.br
-\fBstonith\fP [ -sv ] [ -t type ] [ -p param ] [ -F file ] -l
-.br
-\fBstonith\fP [ -sv ] -L
-.br
+
 \fBstonith\fP -h
+.br
+\fBstonith\fP [-svh] -L
+.br
+\fBstonith\fP [-svh] -t stonith-device-type -n
+.br
+\fBstonith\fP [-svh] -t stonith-device-type {-p stonith-device-parameters | -F stonith-device-parameters-file | name=value...} [-c count] -lS
+.br
+\fBstonith\fP [-svh] -t stonith-device-type {-p stonith-device-parameters | -F stonith-device-parameters-file | name=value...} [-c count] -T {reset|on|off} nodename
 .SH DESCRIPTION
 The STONITH module (a.k.a. STOMITH) provides an extensible interface for
 remotely powering down a node in the cluster.
@@ -60,6 +63,15 @@ Show the status of the STONITH device.
 .TP
 .B \-s:
 Silent operation. Suppress logging of error messages to standard error.
+.TP
+.B \-n:
+Output the config names of stonith-device-parameters
+.TP
+.B \-c count:
+Query the status of the STONITH device \fBcount\fP times.
+.TP
+.B \-T action:
+The action to perform on the node.  Chosen from \fBreset\fP, \fBon\fP, and \fBoff\fP.
 .TP
 .B \-v:
 Ignored.
