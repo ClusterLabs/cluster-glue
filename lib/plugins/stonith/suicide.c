@@ -18,6 +18,7 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#include <sys/utsname.h>
 
 #define	DEVICE	"Suicide STONITH device"
 #include "stonith_plugin_common.h"
@@ -116,8 +117,24 @@ suicide_status(StonithPlugin  *s)
 static char **
 suicide_hostlist(StonithPlugin  *s)
 {
+	char** 		ret = NULL;
+	struct utsname	name;
+
 	ERRIFWRONGDEV(s, NULL);
-	return NULL;
+
+	if (uname(&name) == -1) {
+		LOG(PIL_CRIT, "uname error %d", errno);
+		return ret;
+	}
+
+	ret = OurImports->StringToHostList(name.nodename);
+	if (ret == NULL) {
+		LOG(PIL_CRIT, "out of memory");
+		return ret;
+	}
+	g_strdown(ret[0]);
+
+	return ret;
 }
 
 /*

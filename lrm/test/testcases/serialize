@@ -4,7 +4,7 @@ list
 add rsc=r1 args="delay=2"
 #
 # we run the next three ops in the background
-# in case ops are not serialized, the Dummy RA should complain
+# in case ops are not serialized, the lrmregtest RA should complain
 #
 %bg 2
 exec operation=start
@@ -24,10 +24,10 @@ del rsc=r1
 #
 #
 #
-%setenv dflt_rsc=r2 dflt_timeout=1500
-add rsc=r2 args="ignore_TERM=1"
+%setenv dflt_rsc=r2 dflt_timeout=10500
+add rsc=r2 args="ignore_TERM=1 delay=9"
 exec operation=start
 %bg
-exec operation=monitor timeout=900
+exec operation=monitor timeout=500
 exec operation=monitor
 del rsc=r2

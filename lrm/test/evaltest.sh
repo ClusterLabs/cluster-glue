@@ -68,7 +68,7 @@ specopt_bgrepeat() { # common
 }
 specopt() {
 	cmd=`echo $cmd | sed 's/%//'`  # strip leading '%'
-	echo ".`echo $cmd | tr [a-z] [A-Z]` $rest"  # show what we got
+	echo ".`echo $cmd | tr '[a-z]' '[A-Z]'` $rest"  # show what we got
 	specopt_$cmd  # do what they asked for
 }
 

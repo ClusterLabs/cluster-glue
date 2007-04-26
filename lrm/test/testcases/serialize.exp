@@ -1,7 +1,7 @@
 .TRY List resources
 Currently no resources are managed by LRM.
 .SETENV dflt_timeout=2500
-.TRY Add resource r1 class=ocf type=Dummy provider=heartbeat args=delay=2
+.TRY Add resource r1 class=ocf type=lrmregtest provider=heartbeat args=delay=2
 Succeeded in adding this resource.
 .BG 2
 .BG test line 10/job 1 runs in background
@@ -45,17 +45,16 @@ The resource 3 operations' information:
       parameters: delay=2  
 .TRY Delete resource r1
 Succeeded in deleting this resource.
-.SETENV dflt_rsc=r2 dflt_timeout=1500
-.TRY Add resource r2 class=ocf type=Dummy provider=heartbeat args=ignore_TERM=1
+.SETENV dflt_rsc=r2 dflt_timeout=10500
+.TRY Add resource r2 class=ocf type=lrmregtest provider=heartbeat args=ignore_TERM=1 delay=9
 Succeeded in adding this resource.
-.TRY Exec r2 op=start timeout=1500 interval=0 target=EVERYTIME args=
+.TRY Exec r2 op=start timeout=10500 interval=0 target=EVERYTIME args=
 > start succeed (status=0,rc=0): [null]
 
 .BG 
 .BG test line 31/job 1 runs in background
-.TRY Exec r2 op=monitor timeout=1500 interval=0 target=EVERYTIME args=
-> monitor succeed (status=0,rc=0): [null]
-
+.TRY Exec r2 op=monitor timeout=10500 interval=0 target=EVERYTIME args=
+ERROR: This operation has timed out - no result from lrmd.
 .TRY Delete resource r2
 Succeeded in deleting this resource.
 .BG test line 10/job 1 finished (exit code: 0):
@@ -96,7 +95,6 @@ Succeeded in deleting this resource.
 ==========test:18:4   end output==========
 .BG test line 31/job 1 finished (exit code: 0):
 ==========test:31:1 start output==========
-.TRY Exec r2 op=monitor timeout=900 interval=0 target=EVERYTIME args=
-> monitor succeed (status=0,rc=0): [null]
-
+.TRY Exec r2 op=monitor timeout=500 interval=0 target=EVERYTIME args=
+ERROR: This operation has timed out - no result from lrmd.
 ==========test:31:1   end output==========

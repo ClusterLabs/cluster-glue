@@ -51,7 +51,7 @@ abspath() {
 export HA_logfile=`abspath $LRMD_LOGF`
 export HA_debugfile=`abspath $LRMD_DEBUGF`
 export HA_use_logd=no
-unset HA_logfacility
+export HA_logfacility=""
 
 exec >$OUTF 2>&1
 . /etc/ha.d/shellfuncs
@@ -73,21 +73,25 @@ stop_lrmd() {
 	echo "stopping lrmd" >/dev/tty
 	$HA_BIN/lrmd -k
 }
-cp_Dummylsb() {
+cp_ra() {
+	if [ ! -e /usr/lib/ocf/resource.d/heartbeat/lrmregtest ]; then
+		cp -p lrmregtest /usr/lib/ocf/resource.d/heartbeat
+		lrmregtest_ocf=1
+	fi
 	if [ ! -e /etc/init.d/Dummy-lsb ]; then
 		cp -p Dummy-lsb /etc/init.d
-		Dummylsb=1
+		Dummy_lsb=1
 	fi
 }
-rm_Dummylsb() {
-	if [ "$Dummylsb" ]; then
-		rm -f /etc/init.d/Dummy-lsb
-	fi
+rm_ra() {
+	[ "$lrmregtest_ocf" ] &&
+		rm -f /usr/lib/ocf/resource.d/heartbeat/lrmregtest
+	[ "$Dummy_lsb" ] && rm -f /etc/init.d/Dummy-lsb
 }
 
-cp_Dummylsb
+cp_ra
 start_lrmd || exit $?
-trap "stop_lrmd; rm_Dummylsb" EXIT
+trap "stop_lrmd; rm_ra" EXIT
 
 [ "$1" = prepare ] && { export prepare=1; shift 1;}
 
