@@ -3228,7 +3228,9 @@ perform_ra_op(lrmd_op_t* op)
 
 		default:	/* Parent */
 			child_count++;
-			NewTrackedProc(pid, 1, PT_LOGNONE, op, &ManagedChildTrackOps);
+			NewTrackedProc(pid, 1
+			,	debug ? PT_LOGVERBOSE : PT_LOGNONE
+			,	op, &ManagedChildTrackOps);
 
 			close(stdout_fd[1]);
 			close(stderr_fd[1]);
