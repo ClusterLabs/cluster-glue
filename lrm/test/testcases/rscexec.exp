@@ -1,0 +1,434 @@
+.TRY Add resource rsc=r1 class=ocf type=Dummy provider=heartbeat args=delay=0
+Succeeded in adding this resource.
+.TRY List resources
+
+Resource ID:r1
+Resource agency class:ocf
+Resource agency type:Dummy
+Resource agency provider:heartbeat
+Resource agency parameters:delay=0  
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:pending
+op_status: 4
+return code: 7
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=start timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:start
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Show state rsc=r1
+resource state:LRM_RSC_IDLE
+The resource 2 operations' information:
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=7 (not running), op_status=4 (failed due to an error)
+      parameters: delay=0  
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=0  
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=start timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:start
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=stop timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:stop
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Show state rsc=r1
+resource state:LRM_RSC_IDLE
+The resource 3 operations' information:
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=0  
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=0  
+   operation 'stop' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=0  
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:pending
+op_status: 4
+return code: 7
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=stop timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:stop
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:pending
+op_status: 4
+return code: 7
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=meta-data timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:meta-data
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Delete resource rsc=r1
+Succeeded in deleting this resource.
+.SETENV dflt_class=heartbeat dftl_rsc=r1-lsb
+.TRY Add resource rsc=r1 class=heartbeat type=Dummy provider=heartbeat args=0
+Succeeded in adding this resource.
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:pending
+op_status: 4
+return code: 7
+output data: 
+INFO:  Resource is stopped
+
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=start timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:start
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Show state rsc=r1
+resource state:LRM_RSC_IDLE
+The resource 2 operations' information:
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=7 (not running), op_status=4 (failed due to an error)
+      parameters: 1=0  
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 1=0  
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+INFO:  Running OK
+
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=start timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:start
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+INFO:  Running OK
+
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=stop timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:stop
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Show state rsc=r1
+resource state:LRM_RSC_IDLE
+The resource 3 operations' information:
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 1=0  
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 1=0  
+   operation 'stop' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 1=0  
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:pending
+op_status: 4
+return code: 7
+output data: 
+INFO:  Resource is stopped
+
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=stop timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:stop
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:pending
+op_status: 4
+return code: 7
+output data: 
+INFO:  Resource is stopped
+
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=meta-data timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:meta-data
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Delete resource rsc=r1
+Succeeded in deleting this resource.
+.SETENV dflt_class=lsb dflt_type=Dummy-lsb dftl_rsc=r1-lsb
+.TRY Add resource rsc=r1 class=lsb type=Dummy-lsb provider=heartbeat args=
+Succeeded in adding this resource.
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:pending
+op_status: 4
+return code: 7
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=start timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:start
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Show state rsc=r1
+resource state:LRM_RSC_IDLE
+The resource 2 operations' information:
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=7 (not running), op_status=4 (failed due to an error)
+      parameters: 
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=start timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:start
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=stop timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:stop
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Show state rsc=r1
+resource state:LRM_RSC_IDLE
+The resource 3 operations' information:
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 
+   operation 'stop' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:pending
+op_status: 4
+return code: 7
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=stop timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:stop
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=monitor timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:monitor
+operation status:pending
+op_status: 4
+return code: 7
+output data: 
+[null]
+---------------------------------------
+
+.TRY Execute rsc=r1 operation=meta-data timeout=1000 interval=0 targetrc=EVERYTIME args=
+Waiting for lrmd to callback...
+----------------operation--------------
+type:meta-data
+operation status:succeed
+op_status: 0
+return code: 0
+output data: 
+[null]
+---------------------------------------
+
+.TRY Delete resource rsc=r1
+Succeeded in deleting this resource.
