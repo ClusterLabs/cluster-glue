@@ -150,7 +150,7 @@ except KeyError:
         None
 
 if cmd == 'getconfignames':
-	for arg in [ "hostname", "ilo_hostname", "ilo_user", "ilo_password", "ilo_can_reset", "ilo_protocol", "ilo_powerdown_method"]:
+	for arg in [ "hostlist", "ilo_hostname", "ilo_user", "ilo_password", "ilo_can_reset", "ilo_protocol", "ilo_powerdown_method"]:
             print arg
         sys.exit(0)
 

@@ -1,4 +1,6 @@
 # list various meta-data
+%setenv LANG=POSIX
+%extcheck sort
 classes
 %extcheck ra-list.sh
 types class=ocf

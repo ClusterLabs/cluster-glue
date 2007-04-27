@@ -63,6 +63,13 @@ The following files may be generated:
 On success output from testcases is removed and regression.out is
 empty.
 
+Driving the test cases yourself
+
+evaltest.sh accepts input from stdin, evaluates it immediately,
+and prints results to stdout/stderr. One can perhaps get a better
+feeling of what's actually going on by running it interactively.
+Please note that you have to start the lrmd yourself beforehand.
+
 Test cases
 
 Tests are written in a simple metalanguage. The list of commands
@@ -81,7 +88,7 @@ A test case is a list of tests, one per line. A few examples:
 A set of defaults for LRM options is in the defaults file. That's
 why we can write short forms instead of
 
-	add rsc=r1 class=ocf type=Dummy provider=heartbeat ...
+	add rsc=r1 class=ocf type=lrmregtest provider=heartbeat ...
 
 Special operations
 
@@ -110,8 +117,26 @@ with the '%' sign and may be followed by additional parameters.
 
 	see testcases/metadata for some examples
 
+%repeat num
+	repeat the next test num times
+	there are several variables which are substituted in the test
+	lines, so that we can simulate a for loop:
+
+	s/%t/$test_cnt/g
+	s/%l/$line/g
+	s/%j/$job_cnt/g
+	s/%i/$repeat_cnt/g
+
+	for example, to add 10 resources:
+
+	%repeat 10
+	add rsc=r-%i
+
 %bg [num]
 	run next num (or just the next one) tests in background
+
+%bgrepeat [num]
+	a combination of the previous two (used often)
 
 Filters and except files
 
