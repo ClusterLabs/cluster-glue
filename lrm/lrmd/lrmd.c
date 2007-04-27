@@ -211,23 +211,23 @@ struct lrmd_rsc
 
 struct lrmd_op
 {
-	char*		rsc_id;
-	gboolean	is_copy;
-	pid_t		client_id;
-	int		call_id;
-	int		exec_pid;
-	guint		timeout_tag;
-	guint		repeat_timeout_tag;
-	int		interval;
-	int		delay;
-	struct ha_msg*	msg;
-	ra_pipe_op_t *	rapop;
-	char		first_line_ra_stdout[80]; /* only for heartbeat RAs */
+	char*			rsc_id;
+	gboolean		is_copy;
+	pid_t			client_id;
+	int			call_id;
+	int			exec_pid;
+	guint			repeat_timeout_tag;
+	int			interval;
+	int			delay;
+	struct ha_msg*		msg;
+	ra_pipe_op_t *		rapop;
+	char			first_line_ra_stdout[80]; /* only for heartbeat RAs*/
 	/*time stamp*/
-	longclock_t	t_recv;
-	longclock_t	t_addtolist;
-	longclock_t	t_perform;
-	longclock_t	t_done;
+	longclock_t		t_recv;
+	longclock_t		t_addtolist;
+	longclock_t		t_perform;
+	longclock_t		t_done;
+	ProcTrackKillInfo	killseq[3];
 };
 
 
@@ -259,7 +259,6 @@ static void dump_data_for_debug(void);
 static gboolean on_connect_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_connect_cbk(IPC_Channel* ch_cbk, gpointer user_data);
 static gboolean on_receive_cmd(IPC_Channel* ch_cmd, gpointer user_data);
-static gboolean on_op_timeout_expired(gpointer data);
 static gboolean on_repeat_op_readytorun(gpointer data);
 static void on_remove_client(gpointer user_data);
 static void destroy_pipe_ra_stderr(gpointer user_data);
@@ -540,21 +539,17 @@ lrmd_op_destroy(lrmd_op_t* op)
 
 	if (op->exec_pid > 1) {
 		return_to_orig_privs();
+		lrmd_log(LOG_ERR
+		,	"%s: killing lingering operation process %d"
+		,	__FUNCTION__, op->exec_pid);	
 		if (kill(-op->exec_pid, SIGKILL) < 0 && errno != ESRCH) {
 			cl_perror("Cannot kill pid %d", op->exec_pid);
 		}
+		if (!op->is_copy) {
+			RemoveTrackedProcTimeouts(op->exec_pid);
+		}
 		return_to_dropped_privs();
 		return;
-	}
-
-	if (op->repeat_timeout_tag > 0) {
-		Gmain_timeout_remove(op->repeat_timeout_tag);
-		op->repeat_timeout_tag =(guint)0;
-	}
-
-	if (op->timeout_tag > 0) {
-		Gmain_timeout_remove(op->timeout_tag);
-		op->timeout_tag = (guint)0;
 	}
 
 	ha_msg_del(op->msg);
@@ -587,11 +582,11 @@ lrmd_op_new(void)
 	op->rsc_id = NULL;
 	op->msg = NULL;
 	op->exec_pid = -1;
-	op->timeout_tag = 0;
 	op->repeat_timeout_tag = 0;
 	op->rapop = NULL;
 	op->first_line_ra_stdout[0] = EOS;
 	op->t_recv = time_longclock();
+	memset(op->killseq, 0, sizeof(op->killseq));
 	++lrm_objectstats.opcount;
 	return op;
 }
@@ -618,7 +613,6 @@ lrmd_op_copy(const lrmd_op_t* op)
 	ret->rapop = NULL;
 	ret->msg = ha_msg_copy(op->msg);
 	ret->rsc_id = cl_strdup(op->rsc_id);
-	ret->timeout_tag = 0;
 	ret->rapop = NULL;
 	ret->first_line_ra_stdout[0] = EOS;
 	ret->repeat_timeout_tag = 0;
@@ -707,8 +701,8 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	,	op->client_id, op->call_id, op->exec_pid, pidstat
 	,	(op->is_copy ? "copy" : "original"));
 	lrmd_debug(LOG_DEBUG
-	,	"%s: lrmd_op2: to_tag: %u rt_tag: %d, interval: %d, delay: %d"
-	,	text, op->timeout_tag, op->repeat_timeout_tag
+	,	"%s: lrmd_op2: rt_tag: %d, interval: %d, delay: %d"
+	,	text,  op->repeat_timeout_tag
 	,	op->interval, op->delay);
 	if (cmp_longclock(op->t_recv, zero_longclock) <= 0) {
 		t_recv = -1;
@@ -989,6 +983,7 @@ lrmd_dump_all_resources(void)
 }
 
 
+#if 0
 static void
 lrm_debug_running_op(lrmd_op_t* op, const char * text)
 {
@@ -1015,6 +1010,7 @@ lrm_debug_running_op(lrmd_op_t* op, const char * text)
 		}
 	}
 }
+#endif
 int
 main(int argc, char ** argv)
 {
@@ -1773,44 +1769,6 @@ on_remove_client (gpointer user_data)
 
 }
 
-/*
- * This function is called when the operation timeout expired without
- * the operation completing normally.
- */
-gboolean
-on_op_timeout_expired(gpointer data)
-{
-	lrmd_op_t* op = NULL;
-	lrmd_rsc_t* rsc = NULL;
-
-	op = (lrmd_op_t*)data;
-	CHECK_ALLOCATED(op, "op", FALSE);
-
-	if (op->exec_pid == 0) {
-		lrmd_log(LOG_ERR, "on_op_timeout_expired: op->exec_pid is an "
-			"invalid value. An internal error!");
-		return FALSE;
-	}
-
-	if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_TIMEOUT)) {
-		LOG_FAILED_TO_ADD_FIELD("opstatus")
-	}
-
-	lrmd_log(LOG_WARNING, "%s: TIMEOUT: %s."
-	,	__FUNCTION__,  op_info(op));
-	if (debug_level) {
-		lrm_debug_running_op(op, __FUNCTION__);
-	}
-
-	rsc = lookup_rsc(op->rsc_id);
-	on_op_done(op);
-	/* TODO: This seems to always execute the next operation queued
-	 * for the resource when the previous one expired - why? */
-	if (rsc != NULL) {
-		perform_op(rsc);
-	}
-	return FALSE;
-}
 
 /* This function called when its time to run a repeating operation now */
 /* Move op from repeat queue to running queue */
@@ -1839,18 +1797,12 @@ on_repeat_op_readytorun(gpointer data)
 		return FALSE;
 	}
 	rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
-	if (op->repeat_timeout_tag > 0) {
+	if (op->repeat_timeout_tag != 0) {
 		Gmain_timeout_remove(op->repeat_timeout_tag);
 		op->repeat_timeout_tag = (guint)0;
 	}
 
-	/* FIXME: Is there a special reason for setting
-	 * op->repeat_timeout_tag twice, and if so, why does the cast to
-	 * (guint) matter once but not twice? */
-
-	op->repeat_timeout_tag = 0;
 	op->exec_pid = -1;
-	op->timeout_tag = 0;
 
 	if (!shutdown_in_progress) {
 		op->t_addtolist = time_longclock();
@@ -2507,7 +2459,6 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		op->call_id = call_id;
 		op->exec_pid = -1;
 		op->client_id = client->pid;
-		op->timeout_tag = 0;
 		op->rsc_id = cl_strdup(rsc->id);
 		op->msg = ha_msg_copy(msg);
 		op->t_recv = time_longclock();
@@ -2796,7 +2747,7 @@ record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
 		/* Don't let the timers go away */
 		lrmd_op_destroy(old_op);
 	}else{
-		new_op->timeout_tag = (guint)0;
+		RemoveTrackedProcTimeouts(new_op->exec_pid);
 		new_op->repeat_timeout_tag = (guint)0;
 		new_op->exec_pid = -1;
 		g_hash_table_insert(client_last_op
@@ -2840,10 +2791,7 @@ on_op_done(lrmd_op_t* op)
 	/*  we should check if the resource exists. */
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
-		if(op->timeout_tag > 0 ) {
-			Gmain_timeout_remove(op->timeout_tag);
-			op->timeout_tag = (guint)0;
-		}
+		RemoveTrackedProcTimeouts(op->exec_pid);
 		lrmd_log(LOG_ERR
 		,	"%s: the resource for the operation %s does not exist."
 		,	__FUNCTION__, op_info(op));
@@ -2989,11 +2937,7 @@ on_op_done(lrmd_op_t* op)
 	, 	"on_op_done:%s is removed from op list" 
 	,	op_info(op));
 
-	if( op->timeout_tag > 0 ) {
-		Gmain_timeout_remove(op->timeout_tag);
-		op->timeout_tag = (guint)0;
-	}
-	
+	RemoveTrackedProcTimeouts(op->exec_pid);
 	
 	/*save the op in the last op hash table*/
 	client = lookup_client(op->client_id);
@@ -3006,7 +2950,6 @@ on_op_done(lrmd_op_t* op)
 		lrmd_op_destroy(rsc->last_op_done);
 	}
 	rsc->last_op_done = lrmd_op_copy(op);
-	rsc->last_op_done->timeout_tag = (guint)0;
 	rsc->last_op_done->repeat_timeout_tag = (guint)0;
 	
 	/*copy the repeat op to repeat list to wait next perform */
@@ -3014,7 +2957,6 @@ on_op_done(lrmd_op_t* op)
 	&&   LRM_OP_CANCELLED != op_status) {
 		lrmd_op_t* repeat_op = lrmd_op_copy(op);
 		repeat_op->exec_pid = -1;
-		repeat_op->timeout_tag = 0;
 		repeat_op->is_copy = FALSE;
 		repeat_op->repeat_timeout_tag = 
 			Gmain_timeout_add(op->interval,	
@@ -3210,10 +3152,6 @@ perform_ra_op(lrmd_op_t* op)
 		lrmd_log(LOG_ERR,"perform_ra_op: failed to get timeout from "
 			"the message op->msg.");
 	}
-	if (0 < timeout ) {
-		op->timeout_tag = Gmain_timeout_add(timeout
-				, on_op_timeout_expired, op);
-	}
 	
 	return_to_orig_privs();
 	switch(pid=fork()) {
@@ -3228,14 +3166,29 @@ perform_ra_op(lrmd_op_t* op)
 
 		default:	/* Parent */
 			child_count++;
-			NewTrackedProc(pid, 1, PT_LOGNONE, op, &ManagedChildTrackOps);
+			NewTrackedProc(pid, 1, PT_LOGVERBOSE, op, &ManagedChildTrackOps);
 
 			close(stdout_fd[1]);
 			close(stderr_fd[1]);
 			rapop = ra_pipe_op_new(stdout_fd[0], stderr_fd[0], op);
 			op->rapop = rapop;
 			op->exec_pid = pid;
+			if (0 < timeout ) {
 
+				/* Wait 'timeout' ms then send SIGTERM */
+				op->killseq[0].mstimeout = timeout;
+				op->killseq[0].signalno  = SIGTERM;
+
+				/* Wait 5 seconds then send SIGKILL */
+				op->killseq[1].mstimeout = 5000;
+				op->killseq[1].signalno  = SIGKILL;
+
+				/* Wait 5 more seconds then moan and complain */
+				op->killseq[2].mstimeout = 5000;
+				op->killseq[2].signalno  = 0;
+
+				SetTrackedProcTimeouts(pid, op->killseq);
+			}
 			return_to_dropped_privs();
 
 			if ( rapop == NULL) {
@@ -3333,15 +3286,10 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	}
 
 	op->exec_pid = -1;
-	if (SIGKILL == signo) {
-		lrmd_debug(LOG_DEBUG, "on_ra_proc_finished: this op %s is killed."
-			, op_info(op));
-		lrmd_op_destroy(op);
-		p->privatedata = NULL;
-		if (debug_level >= 2) {	
-			dump_data_for_debug();
-		}
-		return;
+	if (signo != 0) {
+		lrmd_debug(LOG_ERR
+		,	"%s: Operation %s was killed by signal %d."
+		,	__FUNCTION__, op_info(op), signo);
 	}
 
 	if (HA_OK == ha_msg_value_int(op->msg, F_LRM_OPSTATUS, &op_status)) {
@@ -3353,7 +3301,6 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 			if (debug_level >= 2) {	
 				dump_data_for_debug();
 			}
-	
 			return;
 		}
 	}

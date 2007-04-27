@@ -28,6 +28,8 @@
 #include <signal.h>
 #include <clplumbing/proctrack.h>
 #include <clplumbing/cl_log.h>
+#include <clplumbing/uids.h>
+#include <clplumbing/cl_signal.h>
 #include <clplumbing/Gmain_timeout.h>
 
 #define	DEBUGPROCTRACK	debugproctrack
@@ -76,6 +78,133 @@ NewTrackedProc(pid_t pid, int isapgrp, ProcTrackLogType loglevel
 	if (p->ops->procregistered) {
 		p->ops->procregistered(p);
 	}
+}
+
+static struct signal_info_s {
+	int		signo;
+	const char *	sigdefine;
+	const char*	sigwords;
+} signal_info [] = {
+
+#ifdef SIGHUP
+	{SIGHUP,	"SIGHUP",		"Hangup"},
+#endif
+#ifdef SIGINT
+	{SIGINT,	"SIGINT",		"Interrupt"},
+#endif
+#ifdef SIGQUIT
+	{SIGQUIT,	"SIGQUIT",		"Quit"},
+#endif
+#ifdef SIGILL
+	{SIGILL,	"SIGILL",		"Illegal instruction"},
+#endif
+#ifdef SIGTRAP
+	{SIGTRAP,	"SIGTRAP",		"Trace"},
+#endif
+#ifdef SIGABRT
+	{SIGABRT,	"SIGABRT",		"Abort"},
+#endif
+#ifdef SIGIOT
+	{SIGIOT,	"SIGIOT",		"IOT trap"},
+#endif
+#ifdef SIGBUS
+	{SIGBUS,	"SIGBUS",		"BUS error"},
+#endif
+#ifdef SIGFPE
+	{SIGFPE,	"SIGFPE",		"Floating-point exception"},
+#endif
+#ifdef SIGKILL
+	{SIGKILL,	"SIGKILL",		"Kill, unblockable"},
+#endif
+#ifdef SIGUSR1
+	{SIGUSR1,	"SIGUSR1",		"User-defined signal 1"},
+#endif
+#ifdef SIGSEGV
+	{SIGSEGV,	"SIGSEGV",		"Segmentation violation"},
+#endif
+#ifdef SIGUSR2
+	{SIGUSR2,	"SIGUSR2",		"User-defined signal 2"},
+#endif
+#ifdef SIGPIPE
+	{SIGPIPE,	"SIGPIPE",		"Broken pipe (POSIX)"},
+#endif
+#ifdef SIGALRM
+	{SIGALRM,	"SIGALRM",		"Alarm clock (POSIX)"},
+#endif
+#ifdef SIGTERM
+	{SIGTERM,	"SIGTERM",		"Termination (ANSI)"},
+#endif
+#ifdef SIGSTKFLT
+	{SIGSTKFLT,	"SIGSTKFLT",		"Stack fault"},
+#endif
+#ifdef SIGCHLD
+	{SIGCHLD,	"SIGCHLD",		"Child status has changed"},
+#endif
+#ifdef SIGCLD
+	{SIGCLD,	"SIGCLD	",		"Child status has changed"},
+#endif
+#ifdef SIGCONT
+	{SIGCONT,	"SIGCONT",		"Continue"},
+#endif
+#ifdef SIGSTOP
+	{SIGSTOP,	"SIGSTOP",		"Stop, unblockable"},
+#endif
+#ifdef SIGTSTP
+	{SIGTSTP,	"SIGTSTP",		"Keyboard stop"},
+#endif
+#ifdef SIGTTIN
+	{SIGTTIN,	"SIGTTIN",		"Background read from tty"},
+#endif
+#ifdef SIGTTOU
+	{SIGTTOU,	"SIGTTOU",		"Background write to tty"},
+#endif
+#ifdef SIGURG
+	{SIGURG,	"SIGURG	",		"Urgent condition on socket"},
+#endif
+#ifdef SIGXCPU
+	{SIGXCPU,	"SIGXCPU",		"CPU limit exceeded"},
+#endif
+#ifdef SIGXFSZ
+	{SIGXFSZ,	"SIGXFSZ",		"File size limit exceeded"},
+#endif
+#ifdef SIGVTALRM
+	{SIGVTALRM,	"SIGVTALRM",		"Virtual alarm clock"},
+#endif
+#ifdef SIGPROF
+	{SIGPROF,	"SIGPROF",		"Profiling alarm clock"},
+#endif
+#ifdef SIGWINCH
+	{SIGWINCH,	"SIGWINCH",		"Window size change"},
+#endif
+#ifdef SIGPOLL
+	{SIGPOLL,	"SIGPOLL",		"Pollable event occurred"},
+#endif
+#ifdef SIGIO
+	{SIGIO,		"SIGIO",		"I/O now possible"},
+#endif
+#ifdef SIGPWR
+	{SIGPWR,	"SIGPWR",		"Power failure restart"},
+#endif
+#ifdef SIGSYS
+	{SIGSYS,	"SIGSYS",		"Bad system call"},
+#endif
+};
+static const char *
+signal_name(int signo, const char ** sigdescription)
+{
+	int	j;
+	for (j=0; j < DIMOF(signal_info); ++j) {
+		if (signal_info[j].signo == signo) {
+			if (sigdescription) {
+				*sigdescription = signal_info[j].sigwords;
+			}
+			return signal_info[j].sigdefine;
+		}
+	}
+	if (sigdescription) {
+		*sigdescription = NULL;
+	}
+	return NULL;
 }
 
 /* returns TRUE if 'pid' was registered */
@@ -146,13 +275,26 @@ ReportProcHasDied(int pid, int status)
 			,	"Exiting %s process %d returned rc %d."
 			,	type, pid, exitcode);
 		}else if (deathbysig) {
+			const char *	signame = NULL;
+			const char *	sigwords = NULL;
+			int		logtype;
+			signame = signal_name(signo, &sigwords);
+			logtype = (debugreporting ? LOG_DEBUG : LOG_WARNING);
 			/*
 			 * Processes being killed isn't an error if
 			 * we're only logging because of debugging.
 			 */
-			cl_log((debugreporting ? LOG_DEBUG : LOG_WARNING)
-			,	"Exiting %s process %d killed by signal %d."
-			,	type, pid, signo);
+			if (signame && sigwords) {
+				cl_log(logtype
+				,	"Exiting %s process %d killed by"
+				" signal %d [%s - %s]."
+				,	type, pid, signo
+				,	signame, sigwords);
+			}else{
+				cl_log(logtype
+				,	"Exiting %s process %d killed by signal %d."
+				,	type, pid, signo);
+			}
 		}else{
 			cl_log(LOG_ERR, "Exiting %s process %d went away"
 			" strangely (!)"
@@ -168,10 +310,7 @@ ReportProcHasDied(int pid, int status)
 #endif
 
 	if (p) {
-		if (p->timerid > 0) {
-			g_source_remove(p->timerid);
-			p->timerid = 0;
-		}
+		RemoveTrackedProcTimeouts(pid);
 		/*
 		 * From clplumbing/proctrack.h:
 		 * (ProcTrack* p, int status, int signo, int exitcode
@@ -221,45 +360,109 @@ SetTrackedProcTimeouts(pid_t pid, ProcTrackKillInfo* info)
 	return pinfo->timerid;
 }
 
+void
+RemoveTrackedProcTimeouts(pid_t pid)
+{
+	ProcTrack*	pinfo;
+	pinfo = GetProcInfo(pid);
+	
+	if (pinfo == NULL) {
+		return;
+	}
+
+	if (pinfo->killinfo && pinfo->timerid) {
+		g_source_remove(pinfo->timerid);
+	}
+	pinfo->timeoutseq = 0;
+	pinfo->killinfo = NULL;
+	pinfo->timerid = 0;
+}
+
 static gboolean
 TrackedProcTimeoutFunction(gpointer p)
 {
-	/* This is safe - Pids are relative small ints */
+	/* This is safe - Pids are relatively small ints */
 	pid_t		pid = POINTER_TO_SIZE_T(p); /*pointer cast as int*/
 	ProcTrack*	pinfo;
 	int		nsig;
 	long		mstimeout;
+	int		hadprivs;
 
 	pinfo = GetProcInfo(pid);
 	
-	if (pinfo == NULL || pinfo->timeoutseq < 0
-	||	pinfo->killinfo == NULL) {
+	if (pinfo == NULL) {
+		cl_log(LOG_ERR, "%s: bad pinfo in call (pid %d)", __FUNCTION__, pid);
+		return FALSE;
+	}
+	if (pinfo->timeoutseq < 0 || pinfo->killinfo == NULL) {
+		cl_log(LOG_ERR
+		,	 "%s: bad call (pid %d): killinfo (%d, 0x%lx)"
+		,	__FUNCTION__, pid
+		,	pinfo->timeoutseq
+		,	POINTER_TO_SIZE_T(pinfo->killinfo));
 		return FALSE;
 	}
 
 	pinfo->timerid = 0;
 	nsig = pinfo->killinfo[pinfo->timeoutseq].signalno;
-	mstimeout = pinfo->killinfo[pinfo->timeoutseq].mstimeout;
 
 	if (nsig == 0) {
+		if (CL_PID_EXISTS(pid)) {
+			cl_log(LOG_ERR
+			,	"%s: %s process (PID %d) will not die!"
+			,	__FUNCTION__
+			,	pinfo->ops->proctype(pinfo)
+			,	(int)pid);
+		}
 		return FALSE;
 	}
-	cl_log(LOG_WARNING, "%s process (PID %d) timed out"
-	".  Killing with signal %d."
-	,	pinfo->ops->proctype(pinfo), (int)pid, nsig);
+	cl_log(LOG_WARNING, "%s process (PID %d) timed out (try %d)"
+	".  Killing with signal %s (%d)."
+	,	pinfo->ops->proctype(pinfo), (int)pid
+	,	pinfo->timeoutseq
+	,	signal_name(nsig, NULL)
+	,	nsig);
 
+	if (pinfo->isapgrp && nsig > 0) {
+		pid = -pid;
+	}
+
+	if (!(hadprivs = cl_have_full_privs())) {
+		return_to_orig_privs();
+	}
 	if (kill(pid, nsig) < 0) {
-		if (errno == EEXIST) {
-			/* No point in trying this again ;-) */
+		if (errno == ESRCH) {
+			/* Mission accomplished! */
+		cl_log(LOG_INFO, "%s process (PID %d) died before killing (try %d)"
+		,	pinfo->ops->proctype(pinfo), (int)pid
+		,	pinfo->timeoutseq);
 			return FALSE;
 		}else{
-			cl_perror("kill(%d,%d) failed"
-			,	pid, nsig);
+			cl_perror("%s: kill(%d,%d) failed"
+			,	__FUNCTION__, pid, nsig);
 		}
 	}
+	if (!hadprivs) {
+		return_to_dropped_privs();
+	}
+	pinfo->timeoutseq++;
+	mstimeout = pinfo->killinfo[pinfo->timeoutseq].mstimeout;
 	pinfo->timerid = Gmain_timeout_add(mstimeout
 	,	TrackedProcTimeoutFunction
-	,	GINT_TO_POINTER(pid));
+	,	p);
+	if (pinfo->timerid <= 0) {
+		cl_log(LOG_ERR, "%s: Could not add new kill timer [%u]"
+		,	__FUNCTION__, pinfo->timerid);
+		kill(pid, SIGKILL);
+	}
+	if (debugproctrack) {
+		cl_log(LOG_DEBUG, "%s process (PID %d) scheduled to be killed again"
+		" (try %d) in %ld ms [timerid %u]"
+		,	pinfo->ops->proctype(pinfo), (int)pid
+		,	pinfo->timeoutseq
+		,	mstimeout
+		,	pinfo->timerid);
+	}
 	return FALSE;
 }
 
