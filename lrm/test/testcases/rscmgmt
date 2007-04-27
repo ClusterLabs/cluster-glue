@@ -1,16 +1,16 @@
+list
 # add/remove resources
 #
-list
 add rsc=r1
 info rsc=r1
 list
 del rsc=r1
-%setenv dflt_class=lsb
+%setenv dflt_class=lsb dflt_type=Dummy-lsb
 list
 add rsc=r1
 list
 del rsc=r1
-%setenv dflt_class=heartbeat
+%setenv dflt_class=heartbeat dflt_type=Dummy
 list
 add rsc=r1
 list
@@ -21,10 +21,10 @@ list
 #
 %setenv dflt_class=ocf
 add rsc=r1
-add rsc=r1 class=heartbeat
+add rsc=r1 class=heartbeat type=Dummy
 add rsc=r1
 del rsc=r1
-add rsc=r1 class=lsb
+add rsc=r1 class=lsb type=Dummy-lsb
 list
 add rsc=r2
 list

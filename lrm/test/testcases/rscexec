@@ -1,3 +1,4 @@
+list
 # ocf
 add rsc=r1 args="delay=0"
 list
@@ -15,7 +16,7 @@ exec operation=monitor
 exec operation=meta-data
 del
 # heartbeat
-%setenv dflt_class=heartbeat dftl_rsc=r1-lsb
+%setenv dflt_class=heartbeat dflt_type=Dummy dftl_rsc=r1-heartbeat
 add args=0
 exec operation=monitor
 exec operation=start
