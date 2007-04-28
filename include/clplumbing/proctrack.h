@@ -98,6 +98,7 @@ void NewTrackedProc(pid_t pid, int isapgrp, ProcTrackLogType loglevel
 
 /* "info" is 0-terminated (terminated by a 0 signal) */
 int SetTrackedProcTimeouts(pid_t pid, ProcTrackKillInfo* info);
+void RemoveTrackedProcTimeouts(pid_t pid);
 
 /* Return information associated with the given PID (or NULL) */
 ProcTrack* GetProcInfo(pid_t pid);
