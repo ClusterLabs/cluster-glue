@@ -399,7 +399,7 @@ TrackedProcTimeoutFunction(gpointer p)
 		,	 "%s: bad call (pid %d): killinfo (%d, 0x%lx)"
 		,	__FUNCTION__, pid
 		,	pinfo->timeoutseq
-		,	POINTER_TO_SIZE_T(pinfo->killinfo));
+		,	(unsigned long)POINTER_TO_SIZE_T(pinfo->killinfo));
 		return FALSE;
 	}
 
