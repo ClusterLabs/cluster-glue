@@ -202,6 +202,10 @@ suicide_get_info(StonithPlugin * s, int reqtype)
 		ret = sd->idinfo;
 		break;
 
+	case ST_DEVICENAME:
+		ret = "suicide STONITH device";
+		break;
+
 	case ST_DEVICEDESCR:	/* Description of device type */
 		ret = "Virtual device to reboot/powerdown itself.\n";
 		break;
