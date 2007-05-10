@@ -48,10 +48,11 @@ abspath() {
 }
 
 # make lrmd log to our files only
-export HA_logfile=`abspath $LRMD_LOGF`
-export HA_debugfile=`abspath $LRMD_DEBUGF`
-export HA_use_logd=no
-export HA_logfacility=""
+HA_logfile=`abspath $LRMD_LOGF`
+HA_debugfile=`abspath $LRMD_DEBUGF`
+HA_use_logd=no
+HA_logfacility=""
+export HA_logfile HA_debugfile HA_use_logd HA_logfacility
 
 exec >$OUTF 2>&1
 . /etc/ha.d/shellfuncs
@@ -93,7 +94,7 @@ cp_ra
 start_lrmd || exit $?
 trap "stop_lrmd; rm_ra" EXIT
 
-[ "$1" = prepare ] && { export prepare=1; shift 1;}
+[ "$1" = prepare ] && { prepare=1; shift 1;}
 
 setenvironment() {
 	filterf=$TESTDIR/$testcase.filter
