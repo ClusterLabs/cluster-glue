@@ -21,6 +21,8 @@
  *
  */
 
+#include <config.h>
+
 #define	DEVICE	"SSH STONITH device"
 #include "stonith_plugin_common.h"
 
@@ -98,9 +100,9 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
  * We have to do it in the background, otherwise this command will not
  * return.
  */
-#define REBOOT_COMMAND "nohup sh -c '(sleep 2; nohup /sbin/reboot -nf) </dev/null >/dev/null 2>&1' &"
+#define REBOOT_COMMAND "nohup sh -c '(sleep 2; nohup " REBOOT " " REBOOT_OPTIONS ") </dev/null >/dev/null 2>&1' &"
 #undef REBOOT_COMMAND
-#define REBOOT_COMMAND "echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
+#define REBOOT_COMMAND "echo 'sleep 2; " REBOOT " " REBOOT_OPTIONS "' | SHELL=/bin/sh at now >/dev/null 2>&1"
 
 /*
  *    SSH STONITH device
