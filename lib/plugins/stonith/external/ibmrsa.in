@@ -21,7 +21,7 @@
 
 #exec 2>>$DEBUGF
 
-#function debug() {
+#debug() {
 #	cat >&2
 #}
 
@@ -36,10 +36,10 @@ then
 fi
 trap "cat $outf >&2; rm -f $outf" EXIT
 
-function chkmpcli() {
+chkmpcli() {
 	test -x /opt/IBMmpcli/bin/MPCLI.sh
 }
-function mpcli() {
+mpcli() {
 	chkmpcli || {
 		echo "IBM mpcli not installed"
 		return 1
@@ -63,16 +63,16 @@ function mpcli() {
 	grep -w $failstg $outf
 	test $rc -eq 0 -a $? -eq 1
 }
-function ibmrsa_reboot() {
+ibmrsa_reboot() {
 	echo restart -now | mpcli
 }
-function ibmrsa_poweron() {
+ibmrsa_poweron() {
 	echo poweron | mpcli
 }
-function ibmrsa_poweroff() {
+ibmrsa_poweroff() {
 	echo poweroff | mpcli
 }
-function ibmrsa_status() {
+ibmrsa_status() {
 	echo | mpcli
 }
 
