@@ -3229,7 +3229,7 @@ perform_ra_op(lrmd_op_t* op)
 		default:	/* Parent */
 			child_count++;
 			NewTrackedProc(pid, 1
-			,	debug ? PT_LOGVERBOSE : PT_LOGNONE
+			,	debug_level ? PT_LOGVERBOSE : PT_LOGNONE
 			,	op, &ManagedChildTrackOps);
 
 			close(stdout_fd[1]);
