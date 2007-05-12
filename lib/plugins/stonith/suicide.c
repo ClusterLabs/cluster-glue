@@ -18,6 +18,7 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#include <config.h>
 #include <sys/utsname.h>
 
 #define	DEVICE	"Suicide STONITH device"
@@ -82,8 +83,8 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 	,	&interfprivate); 
 }
 
-#define REBOOT_COMMAND "echo 'sleep 2; /sbin/reboot -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
-#define POWEROFF_COMMAND "echo 'sleep 2; /sbin/poweroff -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
+#define REBOOT_COMMAND "echo 'sleep 2; "  REBOOT " " REBOOT_OPTIONS "' | SHELL=/bin/sh at now >/dev/null 2>&1"
+#define POWEROFF_COMMAND "echo 'sleep 2; "  POWEROFF_CMD " " POWEROFF_OPTIONS "' | SHELL=/bin/sh at now >/dev/null 2>&1"
 
 /*
  *    Suicide STONITH device
