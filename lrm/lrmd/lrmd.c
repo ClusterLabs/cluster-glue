@@ -39,9 +39,6 @@
 #include <heartbeat.h>
 #include <pils/plugin.h>
 #include <pils/generic.h>
-#include <clplumbing/cl_log.h>
-#include <clplumbing/cl_syslog.h>
-#include <clplumbing/ipc.h>
 #include <clplumbing/GSource.h>
 #include <clplumbing/lsb_exitcodes.h>
 #include <clplumbing/cl_signal.h>
@@ -52,291 +49,21 @@
 #include <clplumbing/cl_pidfile.h>
 #include <ha_msg.h>
 #include <apphb.h>
+#include <hb_api.h>
+
 #include <lrm/lrm_api.h>
 #include <lrm/lrm_msg.h>
 #include <lrm/raexec.h>
 
-/* TODO: move to internal header */
-#define	MAX_PID_LEN 256
-#define	MAX_PROC_NAME 256
-#define	MAX_MSGTYPELEN 32
-#define	MAX_CLASSNAMELEN 32
-#define WARNINGTIME_IN_LIST 10000
-#define OPTARGS		"skrhvmi:"
-#define PID_FILE 	HA_VARRUNDIR"/lrmd.pid"
-#define LRMD_COREDUMP_ROOT_DIR HA_COREDIR
-#define APPHB_WARNTIME_FACTOR	3
-#define APPHB_INTVL_DETLA 	30  /* Millisecond */
-
-/* Donnot directly use the definition in heartbeat.h/hb_api.h for fewer
- * dependency, but need to keep identical with them.
- *
- * TODO: If it is common, it should come from a common header.
- */
-#define ENV_PREFIX "HA_"
-#define KEY_LOGDAEMON   "use_logd"
-#define HADEBUGVAL	"HA_DEBUG"
-#define lrmd_log(priority, fmt...); \
-		cl_log(priority, fmt); \
-
-#define lrmd_debug(priority, fmt...); \
-        if ( debug_level >= 1 ) { \
-                cl_log(priority, fmt); \
-        }
-
-#define lrmd_debug2(priority, fmt...); \
-        if ( debug_level >= 2 ) { \
-                cl_log(priority, fmt); \
-        }
-
-#define lrmd_debug3(priority, fmt...); \
-        if ( debug_level >= 3 ) { \
-                cl_log(priority, fmt); \
-        }
-
-#define	lrmd_nullcheck(p)	((p) ? (p) : "<null>")
-#define	lrm_str(p)	(lrmd_nullcheck(p))
+#include <lrmd.h>
+#include <lrmd_fdecl.h>
 
 static	gboolean	in_alloc_dump = FALSE;
-#define	CHECK_ALLOCATED(thing, name, result)				\
-	if (!cl_is_allocated(thing)) {					\
-		lrmd_log(LOG_ERR					\
-		,	"%s: %s pointer 0x%lx is not allocated."	\
-		,	__FUNCTION__, name, (unsigned long)thing);	\
-		if (!in_alloc_dump) {					\
-			in_alloc_dump = TRUE;				\
-			dump_mem_stats();				\
-			dump_data_for_debug();				\
-			in_alloc_dump = FALSE;				\
-			return result;					\
-		}							\
-	}
-
-#define CHECK_RETURN_OF_CREATE_LRM_RET					\
-	if (NULL == msg) {						\
-		lrmd_log(LOG_ERR					\
-		, 	"%s: cannot create a ret message with create_lrm_ret."	\
-		, 	__FUNCTION__);					\
-		return HA_FAIL;						\
-	}
-
-#define LOG_FAILED_TO_ADD_FIELD(field)					\
-			lrmd_log(LOG_ERR				\
-			,	"%s:%d: cannot add the field %s to a message." \
-			,	__FUNCTION__				\
-			,	__LINE__				\
-			,	field);
-
-#define LRMD_APPHB_HB				\
-        if (reg_to_apphb == TRUE) {		\
-                if (apphb_hb() != 0) {		\
-                        reg_to_apphb = FALSE;	\
-                }				\
-        }
-
-/*
- * The basic objects in our world:
- *
- *	lrmd_client_t:
- *	Client - a process which has connected to us for service.
- *
- *	lrmd_rsc_t:
- *	Resource - an abstract HA cluster resource implemented by a
- *		resource agent through our RA plugins
- *		It has two list of operations (lrmd_op_t) associated with it
- *			op_list - operations to be run as soon as they're ready
- *			repeat_op_list - operations to be run later
- *		It maintains the following tracking structures:
- *			last_op_done   Last operation performed on this resource
- *			last_op_table  Last operations of each type done per client
- *
- *	lrmd_op_t:
- *	Resource operation - an operation on a resource -- requested
- *	by a client.
- *
- *	ProcTrack - tracks a currently running resource operation.
- *		It points back to the lrmd_op_t that started it.
- *
- * Global structures containing these things:
- *
- *	clients - a hash table of all (currently connected) clients
- *
- *	resources - a hash table of all (currently configured) resources
- *
- *	Proctrack keeps its own private data structures to keep track of
- *	child processes that it created.  They in turn point to the
- *	lrmd_op_t objects that caused us to fork the child process.
- *
- *
- */
-
-typedef struct
-{
-	char*		app_name;
-	pid_t		pid;
-	gid_t		gid;
-	uid_t		uid;
-
-	IPC_Channel*	ch_cmd;
-	IPC_Channel*	ch_cbk;
-
-	GCHSource*	g_src;
-	GCHSource*	g_src_cbk;
-	char		lastrequest[MAX_MSGTYPELEN];
-	time_t		lastreqstart;
-	time_t		lastreqend;
-	time_t		lastrcsent;
-}lrmd_client_t;
-
-typedef struct lrmd_rsc lrmd_rsc_t;
-typedef struct lrmd_op	lrmd_op_t;
-typedef struct ra_pipe_op  ra_pipe_op_t;
-
-
-struct lrmd_rsc
-{
-	char*		id;		/* Unique resource identifier	*/
-	char*		type;		/* 				*/
-	char*		class;		/*				*/
-	char*		provider;	/* Resource provider (optional)	*/
-	GHashTable* 	params;		/* Parameters to this resource	*/
-					/* as name/value pairs		*/
-	GList*		op_list;	/* Queue of operations to run	*/
-	GList*		repeat_op_list;	/* Unordered list of repeating	*/
-					/* ops They will run later	*/
-	GHashTable*	last_op_table;	/* Last operation of each type	*/
-	lrmd_op_t*	last_op_done;	/* The last finished op of the resource */
-	guint		delay_timeout;  /* The delay value of op_list execution */
-};
-
-struct lrmd_op
-{
-	char*		rsc_id;
-	gboolean	is_copy;
-	pid_t		client_id;
-	int		call_id;
-	int		exec_pid;
-	guint		timeout_tag;
-	guint		repeat_timeout_tag;
-	int		interval;
-	int		delay;
-	struct ha_msg*	msg;
-	ra_pipe_op_t *	rapop;
-	char		first_line_ra_stdout[80]; /* only for heartbeat RAs */
-	/*time stamp*/
-	longclock_t	t_recv;
-	longclock_t	t_addtolist;
-	longclock_t	t_perform;
-	longclock_t	t_done;
-};
-
-
-/* For reading the output from executing the RA */
-struct ra_pipe_op
-{
-	/* The same value of the one in corresponding lrmd_op */
-	lrmd_op_t *	lrmd_op;
-	int		ra_stdout_fd;
-	int		ra_stderr_fd;
-	GFDSource *	ra_stdout_gsource;
-	GFDSource *	ra_stderr_gsource;
-	gboolean	first_line_read;
-
-	/* For providing more detailed information in log */
-	char *		rsc_id;
-	char *		op_type;
-	char *		rsc_class;
-};
-
-/* TODO: This ought to be broken up into several source files for easier
- * reading and debugging. */
-
-/* Debug oriented funtions */
-static gboolean debug_level_adjust(int nsig, gpointer user_data);
-static void dump_data_for_debug(void);
-
-/* glib loop call back functions */
-static gboolean on_connect_cmd(IPC_Channel* ch_cmd, gpointer user_data);
-static gboolean on_connect_cbk(IPC_Channel* ch_cbk, gpointer user_data);
-static gboolean on_receive_cmd(IPC_Channel* ch_cmd, gpointer user_data);
-static gboolean on_op_timeout_expired(gpointer data);
-static gboolean on_repeat_op_readytorun(gpointer data);
-static void on_remove_client(gpointer user_data);
-static void destroy_pipe_ra_stderr(gpointer user_data);
-static void destroy_pipe_ra_stdout(gpointer user_data);
-
-/* message handlers */
-static int on_msg_register(lrmd_client_t* client, struct ha_msg* msg);
-static int on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg);
-static int on_msg_get_rsc_types(lrmd_client_t* client, struct ha_msg* msg);
-static int on_msg_get_rsc_providers(lrmd_client_t* client, struct ha_msg* msg);
-static int on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg);
-static int on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg);
-static int on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg);
-static int on_msg_get_last_op(lrmd_client_t* client, struct ha_msg* msg);
-static int on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg);
-static int on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg);
-static int on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg);
-static int on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg);
-static gboolean sigterm_action(int nsig, gpointer unused);
-
-/* functions wrap the call to ra plugins */
-static int perform_ra_op(lrmd_op_t* op);
-
-/* Apphb related functions */
-static int init_using_apphb(void);
-static gboolean emit_apphb(gpointer data);
-
-/* Utility functions */
-static int flush_op(lrmd_op_t* op);
-static gboolean rsc_execution_freeze_timeout(gpointer data);
-static int perform_op(lrmd_rsc_t* rsc);
-static int unregister_client(lrmd_client_t* client);
-static int on_op_done(lrmd_op_t* op);
-static const char* op_info(const lrmd_op_t* op);
-static int send_ret_msg ( IPC_Channel* ch, int rc);
-static lrmd_client_t* lookup_client (pid_t pid);
-static lrmd_rsc_t* lookup_rsc (const char* rid);
-static lrmd_rsc_t* lookup_rsc_by_msg (struct ha_msg* msg);
-static int read_pipe(int fd, char ** data, gpointer user_data);
-static gboolean handle_pipe_ra_stdout(int fd, gpointer user_data);
-static gboolean handle_pipe_ra_stderr(int fd, gpointer user_data);
-static struct ha_msg* op_to_msg(lrmd_op_t* op);
-static gboolean lrm_shutdown(void);
-static gboolean can_shutdown(void);
-static gboolean free_str_hash_pair(gpointer key
-,	 gpointer value, gpointer user_data);
-static gboolean free_str_op_pair(gpointer key
-,	 gpointer value, gpointer user_data);
-static lrmd_op_t* lrmd_op_copy(const lrmd_op_t* op);
-static void send_last_op(gpointer key, gpointer value, gpointer user_data);
-static void record_op_completion(lrmd_client_t* client, lrmd_op_t* op);
-static void hash_to_str(GHashTable * , GString *);
-static void hash_to_str_foreach(gpointer key, gpointer value, gpointer userdata);
-static void warning_on_active_rsc(gpointer key, gpointer value, gpointer user_data);
-static void check_queue_duration(lrmd_op_t* op);
-
-/*
- * following functions are used to monitor the exit of ra proc
- */
-static void on_ra_proc_registered(ProcTrack* p);
-static void on_ra_proc_finished(ProcTrack* p, int status
-,			int signo, int exitcode, int waslogged);
-static const char* on_ra_proc_query_name(ProcTrack* p);
 
 ProcTrack_ops ManagedChildTrackOps = {
 	on_ra_proc_finished,
 	on_ra_proc_registered,
 	on_ra_proc_query_name
-};
-
-/* msg dispatch table */
-typedef int (*msg_handler)(lrmd_client_t* client, struct ha_msg* msg);
-struct msg_map
-{
-	const char* 	msg_type;
-	gboolean	need_return_ret;
-	msg_handler	handler;
 };
 
 struct msg_map msg_maps[] = {
@@ -356,9 +83,10 @@ struct msg_map msg_maps[] = {
 	{GETRSCMETA,	FALSE, 	on_msg_get_metadata},
 };
 
+GHashTable* clients		= NULL;	/* a GHashTable indexed by pid */
+GHashTable* resources 		= NULL;	/* a GHashTable indexed by rsc_id */
+
 static GMainLoop* mainloop 		= NULL;
-static GHashTable* clients		= NULL;	/* a GHashTable indexed by pid */
-static GHashTable* resources 		= NULL;	/* a GHashTable indexed by rsc_id */
 static int call_id 			= 1;
 static const char* lrm_system_name 	= "lrmd";
 static GHashTable * RAExecFuncs 	= NULL;
@@ -369,17 +97,6 @@ static gboolean reg_to_apphbd		= FALSE;
 static int max_child_count		= 4;
 static int retry_interval		= 1000; /* Millisecond */
 static int child_count			= 0;
-
-/*
- * Daemon functions
- *
- * copy from the code of Andrew Beekhof <andrew@beekhof.net>
- */
-static void usage(const char* cmd, int exit_status);
-static int init_start(void);
-static int init_stop(const char *pid_file);
-static int init_status(const char *pid_file, const char *client_name);
-static void lrmd_rsc_dump(char* rsc_id, const char * text);
 
 static struct {
 	int	opcount;
@@ -412,6 +129,7 @@ ra_pipe_op_new(int child_stdout, int child_stderr, lrmd_op_t * lrmd_op)
 	ra_pipe_op_t * rapop;
 	lrmd_rsc_t* rsc = NULL;
 
+	LRMAUDIT();
 	if ( NULL == lrmd_op ) {
 		lrmd_log(LOG_WARNING
 			, "%s:%d: lrmd_op==NULL, no need to malloc ra_pipe_op"
@@ -482,12 +200,14 @@ ra_pipe_op_new(int child_stdout, int child_stderr, lrmd_op_t * lrmd_op)
 		rapop->rsc_class = cl_strdup(rsc->class);
 	} 
 
+	LRMAUDIT();
 	return rapop;
 }
 
 static void
 ra_pipe_op_destroy(ra_pipe_op_t * op)
 {
+	LRMAUDIT();
 	CHECK_ALLOCATED(op, "ra_pipe_op", );
 
 	if ( NULL != op->ra_stdout_gsource) {
@@ -516,8 +236,10 @@ ra_pipe_op_destroy(ra_pipe_op_t * op)
 	}
 	op->first_line_read = FALSE;
 
-	cl_free(op->rsc_id);
-	op->rsc_id = NULL;
+	if( op->rsc_id ) {
+		cl_free(op->rsc_id);
+		op->rsc_id = NULL;
+	}
 	cl_free(op->op_type);
 	op->op_type = NULL;
 	cl_free(op->rsc_class);
@@ -529,38 +251,38 @@ ra_pipe_op_destroy(ra_pipe_op_t * op)
 	}
 
 	cl_free(op);
+	LRMAUDIT();
 }
 
 static void
 lrmd_op_destroy(lrmd_op_t* op)
 {
-
+	LRMAUDIT();
 	CHECK_ALLOCATED(op, "op", );
 	--lrm_objectstats.opcount;
 
 	if (op->exec_pid > 1) {
 		return_to_orig_privs();
+		lrmd_log(LOG_ERR
+		,	"%s: killing lingering operation process %d"
+		,	__FUNCTION__, op->exec_pid);	
 		if (kill(-op->exec_pid, SIGKILL) < 0 && errno != ESRCH) {
 			cl_perror("Cannot kill pid %d", op->exec_pid);
 		}
+		if (!op->is_copy) {
+			RemoveTrackedProcTimeouts(op->exec_pid);
+		}
 		return_to_dropped_privs();
+		LRMAUDIT();
 		return;
-	}
-
-	if (op->repeat_timeout_tag > 0) {
-		Gmain_timeout_remove(op->repeat_timeout_tag);
-		op->repeat_timeout_tag =(guint)0;
-	}
-
-	if (op->timeout_tag > 0) {
-		Gmain_timeout_remove(op->timeout_tag);
-		op->timeout_tag = (guint)0;
 	}
 
 	ha_msg_del(op->msg);
 	op->msg = NULL;
-	cl_free(op->rsc_id);
-	op->rsc_id = NULL;
+	if( op->rsc_id ) {
+		cl_free(op->rsc_id);
+		op->rsc_id = NULL;
+	}
 	op->exec_pid = 0;
 	if ( op->rapop != NULL ) {
 		op->rapop->lrmd_op = NULL;
@@ -568,9 +290,15 @@ lrmd_op_destroy(lrmd_op_t* op)
 	}
 	op->first_line_ra_stdout[0] = EOS;
 
+	/* we should remove it, right? */
+	if( op->repeat_timeout_tag ) {
+		Gmain_timeout_remove(op->repeat_timeout_tag);
+	}
+
 	lrmd_debug3(LOG_DEBUG, "lrmd_op_destroy: free the op whose address is %p"
 		  , op);
 	cl_free(op);
+	LRMAUDIT();
 }
 
 static lrmd_op_t*
@@ -587,11 +315,11 @@ lrmd_op_new(void)
 	op->rsc_id = NULL;
 	op->msg = NULL;
 	op->exec_pid = -1;
-	op->timeout_tag = 0;
 	op->repeat_timeout_tag = 0;
 	op->rapop = NULL;
 	op->first_line_ra_stdout[0] = EOS;
 	op->t_recv = time_longclock();
+	memset(op->killseq, 0, sizeof(op->killseq));
 	++lrm_objectstats.opcount;
 	return op;
 }
@@ -599,8 +327,10 @@ lrmd_op_new(void)
 static lrmd_op_t* 
 lrmd_op_copy(const lrmd_op_t* op)
 {
-	lrmd_op_t* ret = lrmd_op_new();
+	lrmd_op_t* ret;
 
+	LRMAUDIT();
+	ret = lrmd_op_new();
 	if (NULL == ret) {
 		return NULL;
 	}
@@ -618,12 +348,12 @@ lrmd_op_copy(const lrmd_op_t* op)
 	ret->rapop = NULL;
 	ret->msg = ha_msg_copy(op->msg);
 	ret->rsc_id = cl_strdup(op->rsc_id);
-	ret->timeout_tag = 0;
 	ret->rapop = NULL;
 	ret->first_line_ra_stdout[0] = EOS;
 	ret->repeat_timeout_tag = 0;
 	ret->exec_pid = -1;
 	ret->is_copy = TRUE;
+	LRMAUDIT();
 	return ret;
 }
 
@@ -691,6 +421,9 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	long		t_done;
 
 	CHECK_ALLOCATED(op, "op", );
+	if( !cl_is_allocated(op) ) {
+		return;
+	}
 	if (op->exec_pid < 1
 	||	((kill(op->exec_pid, 0) < 0) && ESRCH == errno)) {
 		pidstat = "not running";
@@ -707,8 +440,8 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	,	op->client_id, op->call_id, op->exec_pid, pidstat
 	,	(op->is_copy ? "copy" : "original"));
 	lrmd_debug(LOG_DEBUG
-	,	"%s: lrmd_op2: to_tag: %u rt_tag: %d, interval: %d, delay: %d"
-	,	text, op->timeout_tag, op->repeat_timeout_tag
+	,	"%s: lrmd_op2: rt_tag: %d, interval: %d, delay: %d"
+	,	text,  op->repeat_timeout_tag
 	,	op->interval, op->delay);
 	if (cmp_longclock(op->t_recv, zero_longclock) <= 0) {
 		t_recv = -1;
@@ -777,6 +510,9 @@ lrmd_client_dump(gpointer key, gpointer value, gpointer user_data)
 {
 	lrmd_client_t * client = (lrmd_client_t*)value;
 	CHECK_ALLOCATED(client, "client", );
+	if( !cl_is_allocated(client) ) {
+		return;
+	}
 
 	lrmd_debug(LOG_DEBUG, "client name: %s, client pid: %d"
 		", client uid: %d, gid: %d, last request: %s"
@@ -785,7 +521,7 @@ lrmd_client_dump(gpointer key, gpointer value, gpointer user_data)
 		,	lrm_str(client->app_name)
 		,	client->pid
 		,	client->uid, client->gid
-		,	lrm_str(client->lastrequest)
+		,	client->lastrequest
 		,	ctime(&client->lastreqstart)
 		,	ctime(&client->lastreqend)
 		,	ctime(&client->lastrcsent)
@@ -924,10 +660,20 @@ lrmd_rsc_dump(char* rsc_id, const char * text)
 {
 	static gboolean	incall = FALSE;
 	GList*		oplist;
-	lrmd_rsc_t*	rsc;
+	lrmd_rsc_t*	rsc=NULL;
 
-	rsc = (lrmd_rsc_t*) g_hash_table_lookup(resources, rsc_id);
+	if( rsc_id ) {
+		rsc = lookup_rsc(rsc_id);
+	} else {
+		lrmd_debug(LOG_INFO
+			, "%s:%d: the rsc_id is NULL"
+			, __FUNCTION__, __LINE__);
+		return;
+	}
 	CHECK_ALLOCATED(rsc, "rsc", );
+	if( !cl_is_allocated(rsc) ) {
+		return;
+	}
 	/* TODO: Dump params and last_op_table FIXME */
 
 	lrmd_debug(LOG_DEBUG, "%s: resource %s/%s/%s/%s"
@@ -944,14 +690,14 @@ lrmd_rsc_dump(char* rsc_id, const char * text)
 	incall = TRUE;
 
 	lrmd_debug(LOG_DEBUG, "%s: rsc->op_list...", text);
-	oplist = g_list_first(rsc->op_list);
-	for(;NULL!=oplist; oplist=g_list_next(oplist)) {
+	for(oplist = g_list_first(rsc->op_list); oplist;
+		oplist = g_list_next(oplist)) {
 		lrmd_op_dump(oplist->data, "rsc->op_list");
 	}
 
 	lrmd_debug(LOG_DEBUG, "%s: rsc->repeat_op_list...", text);
-	oplist = g_list_first(rsc->repeat_op_list);
-	for(; NULL!=oplist; oplist=g_list_next(oplist)) {
+	for(oplist = g_list_first(rsc->repeat_op_list); oplist;
+		oplist=g_list_next(oplist)) {
 		lrmd_op_dump(oplist->data, "rsc->repeat_op_list");
 	}
 	
@@ -989,6 +735,7 @@ lrmd_dump_all_resources(void)
 }
 
 
+#if 0
 static void
 lrm_debug_running_op(lrmd_op_t* op, const char * text)
 {
@@ -1015,6 +762,7 @@ lrm_debug_running_op(lrmd_op_t* op, const char * text)
 		}
 	}
 }
+#endif
 int
 main(int argc, char ** argv)
 {
@@ -1289,7 +1037,7 @@ init_using_apphb(void)
 	sprintf(lrmd_instance, "%s_%ld", lrm_system_name, (long)getpid());
 	if (apphb_register(lrm_system_name, lrmd_instance) != 0) {
 		lrmd_log(LOG_ERR, "Failed when trying to register to apphbd.");
-		lrmd_log(LOG_ERR, "Maybe apphd isnot running. Quit.");
+		lrmd_log(LOG_ERR, "Maybe apphbd is not running. Quit.");
 		return -1;
 	}
 	lrmd_log(LOG_INFO, "Registered to apphbd.");
@@ -1719,8 +1467,7 @@ remove_repeat_op_from_client(gpointer key, gpointer value, gpointer user_data)
 		}
 		else if (op->client_id == pid) {
 			op_node = g_list_next(op_node);
-			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list
-			,	op);
+			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list,op);
 			lrmd_op_destroy(op);
 		}
 		else {
@@ -1773,44 +1520,6 @@ on_remove_client (gpointer user_data)
 
 }
 
-/*
- * This function is called when the operation timeout expired without
- * the operation completing normally.
- */
-gboolean
-on_op_timeout_expired(gpointer data)
-{
-	lrmd_op_t* op = NULL;
-	lrmd_rsc_t* rsc = NULL;
-
-	op = (lrmd_op_t*)data;
-	CHECK_ALLOCATED(op, "op", FALSE);
-
-	if (op->exec_pid == 0) {
-		lrmd_log(LOG_ERR, "on_op_timeout_expired: op->exec_pid is an "
-			"invalid value. An internal error!");
-		return FALSE;
-	}
-
-	if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, LRM_OP_TIMEOUT)) {
-		LOG_FAILED_TO_ADD_FIELD("opstatus")
-	}
-
-	lrmd_log(LOG_WARNING, "%s: TIMEOUT: %s."
-	,	__FUNCTION__,  op_info(op));
-	if (debug_level) {
-		lrm_debug_running_op(op, __FUNCTION__);
-	}
-
-	rsc = lookup_rsc(op->rsc_id);
-	on_op_done(op);
-	/* TODO: This seems to always execute the next operation queued
-	 * for the resource when the previous one expired - why? */
-	if (rsc != NULL) {
-		perform_op(rsc);
-	}
-	return FALSE;
-}
 
 /* This function called when its time to run a repeating operation now */
 /* Move op from repeat queue to running queue */
@@ -1820,6 +1529,7 @@ on_repeat_op_readytorun(gpointer data)
 	lrmd_op_t* op = NULL;
 	lrmd_rsc_t* rsc = NULL;
 
+	LRMAUDIT();
 	op = (lrmd_op_t*)data;
 	CHECK_ALLOCATED(op, "op", FALSE );
 
@@ -1834,23 +1544,22 @@ on_repeat_op_readytorun(gpointer data)
 		"add it to the operation list."
 	, 	__FUNCTION__, op_info(op));
 
-	rsc = lookup_rsc(op->rsc_id);
-	if (rsc == NULL) {
+	if( op->rsc_id ) {
+		rsc = lookup_rsc(op->rsc_id);
+	} else {
+		lrmd_debug(LOG_INFO
+			, "%s: the rsc_id in op %s is NULL"
+			, __FUNCTION__, op_info(op));
 		return FALSE;
 	}
+
 	rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
-	if (op->repeat_timeout_tag > 0) {
+	if (op->repeat_timeout_tag != 0) {
 		Gmain_timeout_remove(op->repeat_timeout_tag);
 		op->repeat_timeout_tag = (guint)0;
 	}
 
-	/* FIXME: Is there a special reason for setting
-	 * op->repeat_timeout_tag twice, and if so, why does the cast to
-	 * (guint) matter once but not twice? */
-
-	op->repeat_timeout_tag = 0;
 	op->exec_pid = -1;
-	op->timeout_tag = 0;
 
 	if (!shutdown_in_progress) {
 		op->t_addtolist = time_longclock();
@@ -1866,6 +1575,7 @@ on_repeat_op_readytorun(gpointer data)
 	}
 	perform_op(rsc);
 
+	LRMAUDIT();
 	return FALSE;
 }
 
@@ -2403,15 +2113,54 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	return HA_OK;
 }
 
+static void
+remove_op(GList** listp)
+{
+	GList* node = NULL;
+	lrmd_op_t* op = NULL;
+
+	node = g_list_first(*listp);
+	while( node ) {
+		op = (lrmd_op_t*)node->data;
+		node = g_list_next(node);
+		*listp = g_list_remove(*listp, op);
+		flush_op(op);
+	}
+}
+static gboolean
+cancel_op(GList** listp,int cancel_op_id)
+{
+	GList* node = NULL;
+	lrmd_op_t* op = NULL;
+
+	node = g_list_first(*listp);
+	while (NULL != node ) {
+		op = (lrmd_op_t*)node->data;
+		node = g_list_next(node);
+		if( op->call_id == cancel_op_id ) {
+			lrmd_debug(LOG_DEBUG
+			,"%s: operation %s canceled"
+			, __FUNCTION__, op_info(op));
+			*listp = g_list_remove(*listp, op);
+			flush_op(op);
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+#define is_cancelop(t) (STRNCMP_CONST(t, CANCELOP)==0)
+#define is_flushop(t) (STRNCMP_CONST(t, FLUSHOPS)==0)
+
 int
 on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 {
 	lrmd_rsc_t* rsc = NULL;
-	GList* node = NULL;
 	const char* type = NULL;
-	lrmd_op_t* op = NULL;
 	int timeout = 0;
+	lrmd_op_t* op;
 
+	LRMAUDIT();
 	CHECK_ALLOCATED(client, "client", HA_FAIL);
 	CHECK_ALLOCATED(msg, "message", HA_FAIL);
 
@@ -2425,30 +2174,16 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	call_id++;
 	type = ha_msg_value(msg, F_LRM_TYPE);
 	/* when a flush request arrived, flush all pending ops */
-	if (0 == STRNCMP_CONST(type, FLUSHOPS)) {
+	if (is_flushop(type)) {
 		lrmd_debug2(LOG_DEBUG
 			,	"on_msg_perform_op:client [%d] flush operations"
 			,	client->pid);
-		
-		node = g_list_first(rsc->op_list);
-		while (NULL != node ) {
-			op = (lrmd_op_t*)node->data;
-			node = g_list_next(node);
-			rsc->op_list = g_list_remove(rsc->op_list, op);
-			flush_op(op);
-		}
-		node = g_list_first(rsc->repeat_op_list);
-		while (NULL != node ) {
-			op = (lrmd_op_t*)node->data;
-			node = g_list_next(node);
-			rsc->repeat_op_list =
-					g_list_remove(rsc->repeat_op_list, op);
-			flush_op(op);
-		}
+		remove_op(&(rsc->op_list));
+		remove_op(&(rsc->repeat_op_list));
 	}
-	else
-	if (0 == STRNCMP_CONST(type, CANCELOP)) {
+	else if (is_cancelop(type)) {
 		int cancel_op_id;
+		gboolean op_cancelled;
 		ha_msg_value_int(msg, F_LRM_CALLID, &cancel_op_id);
 		
 		lrmd_debug2(LOG_DEBUG
@@ -2456,59 +2191,42 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		,	__FUNCTION__
 		,	client->pid
 		, 	cancel_op_id);
-		
-		node = g_list_first(rsc->op_list);
-		while (NULL != node ) {
-			op = (lrmd_op_t*)node->data;
-			node = g_list_next(node);
-			if ( op->call_id == cancel_op_id) {
-				lrmd_debug(LOG_DEBUG
-				,"%s: cancel the operation %s from the internal"
-					" operation list)"
-				, __FUNCTION__
-				,op_info(op));
-				rsc->op_list = g_list_remove(rsc->op_list, op);
-				flush_op(op);
-				return call_id;
-			}
-		}
-		node = g_list_first(rsc->repeat_op_list);
-		while (NULL != node ) {
-			op = (lrmd_op_t*)node->data;
-			node = g_list_next(node);
-			if ( op->call_id == cancel_op_id) {
-				lrmd_debug(LOG_DEBUG
-				, "%s: cancel the operation %s from the "
-					"internal repeat operation list)"
-				, __FUNCTION__
-				, op_info(op));
-				rsc->repeat_op_list =
-					g_list_remove(rsc->repeat_op_list, op);
-				flush_op(op);
-				return call_id;
-			}
-		}
-		return -1;		
+
+		op_cancelled=
+			cancel_op(&(rsc->op_list), cancel_op_id) ||
+			cancel_op(&(rsc->repeat_op_list), cancel_op_id) ;
+		LRMAUDIT();
+		return op_cancelled ? call_id : -1;
 	}
 	else {
+		if( !(rsc->id) ) {
+			lrmd_debug(LOG_WARNING
+				, "%s:%d: the resource id is NULL"
+				, __FUNCTION__, __LINE__);
+			LRMAUDIT();
+			return -1;
+		}
 		if (HA_OK != ha_msg_add_int(msg, F_LRM_CALLID, call_id)) {
 			LOG_FAILED_TO_ADD_FIELD("callid")
+			LRMAUDIT();
 			return -1;
 		}
 		if (HA_OK !=ha_msg_add(msg, F_LRM_APP, client->app_name)) {
 			LOG_FAILED_TO_ADD_FIELD("app_name");
+			LRMAUDIT();
 			return -1;
 		}
 
 		op = lrmd_op_new();
 		if (op == NULL) {
+			LRMAUDIT();
 			return -1;
 		}
 		op->call_id = call_id;
 		op->exec_pid = -1;
 		op->client_id = client->pid;
-		op->timeout_tag = 0;
 		op->rsc_id = cl_strdup(rsc->id);
+
 		op->msg = ha_msg_copy(msg);
 		op->t_recv = time_longclock();
 		
@@ -2564,6 +2282,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		perform_op(rsc);
 	}
 
+	LRMAUDIT();
 	return call_id;
 getout:
 	/* FIXME.
@@ -2578,6 +2297,7 @@ getout:
 	}
 
 	lrmd_op_destroy(op);
+	LRMAUDIT();
 	return -1;
 }
 
@@ -2726,18 +2446,15 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	return HA_OK;
 }
 
+#define safe_len(s) (s ? strlen(s) : 0)
+
 static char *
 lrm_concat(const char *prefix, const char *suffix, char join) 
 {
 	int len = 2;
 	char *new_str = NULL;
-	if(prefix != NULL) {
-		len += strlen(prefix);
-	}
-		
-	if(suffix != NULL) {
-		len += strlen(suffix);
-	}
+	len += safe_len(prefix);
+	len += safe_len(suffix);
 
 	new_str = cl_malloc(sizeof(char)*len);
 	if (NULL == new_str) {
@@ -2763,12 +2480,13 @@ record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
 	GHashTable* client_last_op = NULL;
 	const char* op_type = NULL;
 	const char* op_interval = NULL;
-	
+
+	LRMAUDIT();
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
 		lrmd_log(LOG_ERR, "record_op_completion: cannot find the "
 			"resource %s regarding the operation %s"
-		,	op->rsc_id, op_info(op));
+		, lrm_str(op->rsc_id), op_info(op));
 		return;
 	}
 	/*find the hash table for the client*/
@@ -2796,15 +2514,13 @@ record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
 		/* Don't let the timers go away */
 		lrmd_op_destroy(old_op);
 	}else{
-		new_op->timeout_tag = (guint)0;
-		new_op->repeat_timeout_tag = (guint)0;
-		new_op->exec_pid = -1;
 		g_hash_table_insert(client_last_op
 		, 	op_hash_key
 		,	(gpointer)new_op);
 	}
-
+	LRMAUDIT();
 }
+
 /* this function return the op result to client if it is generated by client.
  * or do some monitor check if it is generated by monitor.
  * then remove it from the op list and put it into the lastop field of rsc.
@@ -2821,7 +2537,7 @@ on_op_done(lrmd_op_t* op)
 	lrmd_client_t* client = NULL;
 	lrmd_rsc_t* rsc = NULL;
 
-	
+	LRMAUDIT();
 	CHECK_ALLOCATED(op, "op", HA_FAIL );
 	if (op->exec_pid == 0) {
 		lrmd_log(LOG_ERR, "on_op_done: op->exec_pid == 0.");
@@ -2840,10 +2556,7 @@ on_op_done(lrmd_op_t* op)
 	/*  we should check if the resource exists. */
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
-		if(op->timeout_tag > 0 ) {
-			Gmain_timeout_remove(op->timeout_tag);
-			op->timeout_tag = (guint)0;
-		}
+		RemoveTrackedProcTimeouts(op->exec_pid);
 		lrmd_log(LOG_ERR
 		,	"%s: the resource for the operation %s does not exist."
 		,	__FUNCTION__, op_info(op));
@@ -2852,8 +2565,8 @@ on_op_done(lrmd_op_t* op)
 		/* delete the op */
 		lrmd_op_destroy(op);
 
+		LRMAUDIT();
 		return HA_FAIL;
-
 	}
 
 	if (HA_OK != ha_msg_value_int(op->msg,F_LRM_TARGETRC,&target_rc)){
@@ -2870,7 +2583,7 @@ on_op_done(lrmd_op_t* op)
 		return HA_FAIL;
 	}
 	op_status = (op_status_t)op_status_int;
-	
+
 	if (debug_level >= 2) {
 		lrmd_op_dump(op, __FUNCTION__);
 	}
@@ -2956,9 +2669,7 @@ on_op_done(lrmd_op_t* op)
 	 *
 	 */
 
-
 	if ( need_notify ) {
-
 		/* send the result to client */
 		/* we have to check whether the client still exists */
 		/* for the client may signoff during the op running. */
@@ -2979,8 +2690,6 @@ on_op_done(lrmd_op_t* op)
 			,	__FUNCTION__,	op_info(op));
 			lrmd_op_dump(op, "lrmd_op_done: no client");
 		}
-			
-
 	}
 	
 	/* remove the op from op_list and copy to last_op */
@@ -2989,32 +2698,26 @@ on_op_done(lrmd_op_t* op)
 	, 	"on_op_done:%s is removed from op list" 
 	,	op_info(op));
 
-	if( op->timeout_tag > 0 ) {
-		Gmain_timeout_remove(op->timeout_tag);
-		op->timeout_tag = (guint)0;
-	}
-	
-	
+	RemoveTrackedProcTimeouts(op->exec_pid);
+
 	/*save the op in the last op hash table*/
 	client = lookup_client(op->client_id);
 	if (NULL != client) {
 		record_op_completion(client, op);
 	}
-	
+
 	/*save the op in the last op finished*/
 	if (rsc->last_op_done != NULL) {
 		lrmd_op_destroy(rsc->last_op_done);
 	}
 	rsc->last_op_done = lrmd_op_copy(op);
-	rsc->last_op_done->timeout_tag = (guint)0;
 	rsc->last_op_done->repeat_timeout_tag = (guint)0;
-	
+
 	/*copy the repeat op to repeat list to wait next perform */
 	if ( 0 != op->interval && NULL != lookup_client(op->client_id)
 	&&   LRM_OP_CANCELLED != op_status) {
 		lrmd_op_t* repeat_op = lrmd_op_copy(op);
 		repeat_op->exec_pid = -1;
-		repeat_op->timeout_tag = 0;
 		repeat_op->is_copy = FALSE;
 		repeat_op->repeat_timeout_tag = 
 			Gmain_timeout_add(op->interval,	
@@ -3028,6 +2731,7 @@ on_op_done(lrmd_op_t* op)
 	}
 	lrmd_op_destroy(op);
 
+	LRMAUDIT();
 	return HA_OK;
 }
 /* this function flush one op */
@@ -3083,11 +2787,12 @@ perform_op(lrmd_rsc_t* rsc)
 	GList* node = NULL;
 	lrmd_op_t* op = NULL;
 
+	LRMAUDIT();
 	CHECK_ALLOCATED(rsc, "resource", HA_FAIL);
 	if (TRUE == shutdown_in_progress && can_shutdown()) {
 		lrm_shutdown();
 	}
-	
+
 	if (NULL == rsc->op_list) {
 		lrmd_debug2(LOG_DEBUG,"perform_op: no op to perform?");
 		return HA_OK;
@@ -3136,10 +2841,9 @@ perform_op(lrmd_rsc_t* rsc)
 		}
 	}
 
+	LRMAUDIT();
 	return HA_OK;
 }
-
-		
 
 struct ha_msg*
 op_to_msg(lrmd_op_t* op)
@@ -3178,7 +2882,8 @@ perform_ra_op(lrmd_op_t* op)
         GHashTable* op_params = NULL;
 	lrmd_rsc_t* rsc = NULL;
 	ra_pipe_op_t * rapop;
-	
+
+	LRMAUDIT();
 	CHECK_ALLOCATED(op, "op", HA_FAIL);
 	rsc = (lrmd_rsc_t*)lookup_rsc(op->rsc_id);
 	CHECK_ALLOCATED(rsc, "rsc", HA_FAIL);
@@ -3210,10 +2915,6 @@ perform_ra_op(lrmd_op_t* op)
 		lrmd_log(LOG_ERR,"perform_ra_op: failed to get timeout from "
 			"the message op->msg.");
 	}
-	if (0 < timeout ) {
-		op->timeout_tag = Gmain_timeout_add(timeout
-				, on_op_timeout_expired, op);
-	}
 	
 	return_to_orig_privs();
 	switch(pid=fork()) {
@@ -3237,12 +2938,28 @@ perform_ra_op(lrmd_op_t* op)
 			rapop = ra_pipe_op_new(stdout_fd[0], stderr_fd[0], op);
 			op->rapop = rapop;
 			op->exec_pid = pid;
+			if (0 < timeout ) {
 
+				/* Wait 'timeout' ms then send SIGTERM */
+				op->killseq[0].mstimeout = timeout;
+				op->killseq[0].signalno  = SIGTERM;
+
+				/* Wait 5 seconds then send SIGKILL */
+				op->killseq[1].mstimeout = 5000;
+				op->killseq[1].signalno  = SIGKILL;
+
+				/* Wait 5 more seconds then moan and complain */
+				op->killseq[2].mstimeout = 5000;
+				op->killseq[2].signalno  = 0;
+
+				SetTrackedProcTimeouts(pid, op->killseq);
+			}
 			return_to_dropped_privs();
 
 			if ( rapop == NULL) {
 				return HA_FAIL;
 			}
+			LRMAUDIT();
 			return HA_OK;
 
 		case 0:		/* Child */
@@ -3305,19 +3022,20 @@ on_ra_proc_registered(ProcTrack* p)
 {
 }
 
-/* Handle the  one of our ra child processes finsihed*/
+/* Handle one of our ra child processes finished*/
 static void
 on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 ,	int waslogged)
 {
 	lrmd_op_t* op = NULL;
-        lrmd_rsc_t* rsc = NULL;
+	lrmd_rsc_t* rsc = NULL;
 	struct RAExecOps * RAExec = NULL;
 	const char* op_type;
         int rc;
         int ret;
 	int op_status;
 
+	LRMAUDIT();
 	if (--child_count < 0) {
 		lrmd_log(LOG_ERR, "%s:%d: child number is less than zero: %d"
 			, __FUNCTION__, __LINE__, child_count);
@@ -3335,43 +3053,41 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	}
 
 	op->exec_pid = -1;
-	if (SIGKILL == signo) {
-		lrmd_debug(LOG_DEBUG, "on_ra_proc_finished: this op %s is killed."
-			, op_info(op));
-		lrmd_op_destroy(op);
+	if (signo != 0) {
+		lrmd_debug(LOG_ERR
+		,	"%s: Operation %s was killed by signal %d."
+		,	__FUNCTION__, op_info(op), signo);
+	}
+
+	rsc = lookup_rsc(op->rsc_id);
+	if (rsc == NULL) {
+		lrmd_debug(LOG_DEBUG, "on_ra_proc_finished: the rsc (id=%s) does"
+		" not exist", lrm_str(op->rsc_id));
+		on_op_done(op);
 		p->privatedata = NULL;
-		if (debug_level >= 2) {	
-			dump_data_for_debug();
-		}
 		return;
 	}
 
 	if (HA_OK == ha_msg_value_int(op->msg, F_LRM_OPSTATUS, &op_status)) {
 		if ( LRM_OP_CANCELLED == (op_status_t)op_status ) {
 			lrmd_debug(LOG_DEBUG, "on_ra_proc_finished: "
-				"this op %s is cancelled.", op_info(op));
+				"op %s is cancelled.", op_info(op));
+			rsc->op_list = g_list_remove(rsc->op_list, op);
+			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
 			lrmd_op_destroy(op);
 			p->privatedata = NULL;
 			if (debug_level >= 2) {	
 				dump_data_for_debug();
 			}
-	
+			LRMAUDIT();
 			return;
 		}
 	}
 
-	rsc = lookup_rsc(op->rsc_id);
-	if (rsc == NULL) {
-		lrmd_debug(LOG_DEBUG, "on_ra_proc_finished: the rsc (id=%s) does"
-		" not exist", op->rsc_id);
-		on_op_done(op);
-		p->privatedata = NULL;
-		return;
-	}	
 	RAExec = g_hash_table_lookup(RAExecFuncs,rsc->class);
 	if (NULL == RAExec) {
 		lrmd_log(LOG_ERR,"on_ra_proc_finished: can not find RAExec for"
-			"resource class <%s>", rsc->class);
+			" resource class <%s>", rsc->class);
 		dump_data_for_debug();
 		return;
 	}
@@ -3449,6 +3165,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	on_op_done(op);
 	perform_op(rsc);
 	p->privatedata = NULL;
+	LRMAUDIT();
 }
 
 /* Handle the death of one of our managed child processes */
@@ -3460,6 +3177,7 @@ on_ra_proc_query_name(ProcTrack* p)
         lrmd_rsc_t* rsc = NULL;
 	const char* op_type = NULL;
 
+	LRMAUDIT();
 	op = (lrmd_op_t*)(p->privatedata);
 	if (NULL == op || op->exec_pid == 0) {
 		return "*unknown*";
@@ -3470,11 +3188,12 @@ on_ra_proc_query_name(ProcTrack* p)
 	if (rsc == NULL) {
 		snprintf(proc_name
 		, MAX_PROC_NAME
-		, "unknown rsc(may deleted):%s"
+		, "unknown rsc(maybe deleted):%s"
 		, op_type);
 	}else {
 		snprintf(proc_name, MAX_PROC_NAME, "%s:%s", rsc->id, op_type);
 	}
+	LRMAUDIT();
 	return proc_name;
 }
 
@@ -3504,7 +3223,9 @@ lookup_client (pid_t pid)
 lrmd_rsc_t*
 lookup_rsc (const char* rid)
 {
-	return (lrmd_rsc_t*)g_hash_table_lookup(resources, rid);
+	return rid ?
+		(lrmd_rsc_t*)g_hash_table_lookup(resources, rid) :
+		NULL;
 }
 
 lrmd_rsc_t*
@@ -3597,10 +3318,10 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 		    ||(0==STRNCMP_CONST(rapop->op_type, "monitor")) 
 		    ||(0==STRNCMP_CONST(rapop->op_type, "status")) ) {
 			lrmd_debug2(LOG_DEBUG, "RA output: (%s:%s:stdout) %s"
-				, rapop->rsc_id, rapop->op_type, data);
+				, lrm_str(rapop->rsc_id), rapop->op_type, data);
 		} else {
 			lrmd_log(LOG_INFO, "RA output: (%s:%s:stdout) %s"
-				, rapop->rsc_id, rapop->op_type, data);
+				, lrm_str(rapop->rsc_id), rapop->op_type, data);
 		}
 
 		/*
@@ -3677,7 +3398,7 @@ handle_pipe_ra_stderr(int fd, gpointer user_data)
 
 	if (data!=NULL) { 
 		lrmd_log(LOG_INFO, "RA output: (%s:%s:stderr) %s"
-			, rapop->rsc_id, rapop->op_type, data);
+			, lrm_str(rapop->rsc_id), rapop->op_type, data);
 		g_free(data);
 	}
 
@@ -3810,10 +3531,10 @@ dump_data_for_debug(void)
 	lrmd_debug(LOG_DEBUG, "end to dump internal data for debugging.");
 }
 
-static const char* 
-op_info(const lrmd_op_t* op)
+const char* 
+gen_op_info(const lrmd_op_t* op, gboolean add_params)
 {
-	static char info[255];
+	static char info[512];
 	lrmd_rsc_t* rsc = NULL;
 	const char * op_type;
 	GString * param_gstr;
@@ -3829,29 +3550,29 @@ op_info(const lrmd_op_t* op)
 
 	if (rsc == NULL) {
 		snprintf(info,sizeof(info)
-		,"operation %s[%d] on unknown rsc(may deleted) for client %d"
-		,lrmd_nullcheck(op_type)
-		,op->call_id
-		,op->client_id);
+		,"operation %s[%d] on unknown rsc(maybe deleted) for client %d"
+		,lrm_str(op_type)
+		,op->call_id ,op->client_id);
 
 	}else{
-		param_gstr = g_string_new("");
-		op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
-		hash_to_str(op_params, param_gstr);
-		free_str_table(op_params);
-		op_params = NULL;
-
 		snprintf(info, sizeof(info)
-		,"operation %s[%d] on %s::%s::%s for client %d, its parameters: %s"
-		,lrmd_nullcheck(op_type)
-		,op->call_id
-		,lrmd_nullcheck(rsc->class)
-		,lrmd_nullcheck(rsc->type)
-		,lrmd_nullcheck(rsc->id)
-		,op->client_id
-		,param_gstr->str);
+		,"operation %s[%d] on %s::%s::%s for client %d"
+		,lrm_str(op_type), op->call_id
+		,lrm_str(rsc->class), lrm_str(rsc->type), lrm_str(rsc->id)
+		,op->client_id);
 
-		g_string_free(param_gstr, TRUE);
+		if( add_params ) {
+			param_gstr = g_string_new("");
+			op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
+			hash_to_str(op_params, param_gstr);
+			free_str_table(op_params);
+			op_params = NULL;
+
+			snprintf(info+strlen(info), sizeof(info)-strlen(info)
+				,", its parameters: %s",param_gstr->str);
+
+			g_string_free(param_gstr, TRUE);
+		}
 	}
 	return info;
 }
