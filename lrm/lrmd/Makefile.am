@@ -31,10 +31,12 @@ COMMONLIBS	=  $(top_builddir)/lib/clplumbing/libplumb.la   \
 
 halib_PROGRAMS 	=  lrmd
 
-lrmd_SOURCES 	=  lrmd.c
+lrmd_SOURCES 	=  lrmd.c audit.c lrmd_fdecl.h lrmd.h
 
 lrmd_LDFLAGS 	=  $(top_builddir)/lib/lrm/liblrm.la 		\
 		   $(COMMONLIBS) @LIBLTDL@			\
 		   $(top_builddir)/lib/pils/libpils.la
+
+noinst_HEADERS  = lrmd_fdecl.h lrmd.h
 
 # make lrmd's owner as hacluster:haclient?
