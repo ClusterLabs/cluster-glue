@@ -58,6 +58,7 @@ static volatile cl_mem_stats_t *	memstats = &default_memstats;
 #define	USE_ASSERTS	1
 #define	DUMPONERR	1
 #define	RETURN_TO_MALLOC 1
+#undef	RETURN_TO_MALLOC
 
 #ifndef DUMPONERR
 #	define	DUMPIFASKED()	/* nothing */
