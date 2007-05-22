@@ -1000,6 +1000,9 @@ normal_params_hash_to_str(gpointer key, gpointer value, gpointer user_data)
 	}
 
 	key_int = atoi((char *)key) - 1;
+	if( key_int < 0 ) {
+		return;
+	}
 	strncpy(str_tmp + key_int * ARGVI_MAX_LEN, (char*)value,
 		ARGVI_MAX_LEN - 1);
 }
