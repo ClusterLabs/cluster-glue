@@ -1,0 +1,196 @@
+.TRY List resources
+Currently no resources are managed by LRM.
+.TRY Add resource r1 class=ocf type=lrmregtest provider=heartbeat args=delay=0
+Succeeded in adding this resource.
+.TRY List resources
+
+Resource ID:r1
+Resource agency class:ocf
+Resource agency type:lrmregtest
+Resource agency provider:heartbeat
+Resource agency parameters:delay=0  
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+> monitor pending (status=4,rc=7): [null]
+
+.TRY Exec r1 op=start timeout=1000 interval=0 target=EVERYTIME args=
+> start succeed (status=0,rc=0): [null]
+
+.TRY Show state r1
+resource state:LRM_RSC_IDLE
+The resource 2 operations' information:
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=7 (not running), op_status=4 (failed due to an error)
+      parameters: delay=0  
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=0  
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+> monitor succeed (status=0,rc=0): [null]
+
+.TRY Exec r1 op=start timeout=1000 interval=0 target=EVERYTIME args=
+> start succeed (status=0,rc=0): [null]
+
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+> monitor succeed (status=0,rc=0): [null]
+
+.TRY Exec r1 op=stop timeout=1000 interval=0 target=EVERYTIME args=
+> stop succeed (status=0,rc=0): [null]
+
+.TRY Show state r1
+resource state:LRM_RSC_IDLE
+The resource 3 operations' information:
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=0  
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=0  
+   operation 'stop' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=0  
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+> monitor pending (status=4,rc=7): [null]
+
+.TRY Exec r1 op=stop timeout=1000 interval=0 target=EVERYTIME args=
+> stop succeed (status=0,rc=0): [null]
+
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+> monitor pending (status=4,rc=7): [null]
+
+.TRY Exec r1 op=meta-data timeout=1000 interval=0 target=EVERYTIME args=
+> meta-data succeed (status=0,rc=0): [null]
+
+.TRY Delete resource r1
+Succeeded in deleting this resource.
+.SETENV dflt_class=heartbeat dflt_type=Dummy dftl_rsc=r1-heartbeat
+.TRY Add resource r1 class=heartbeat type=Dummy provider=heartbeat args=0
+Succeeded in adding this resource.
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+
+> monitor pending (status=4,rc=7): INFO:  Resource is stopped
+
+.TRY Exec r1 op=start timeout=1000 interval=0 target=EVERYTIME args=
+> start succeed (status=0,rc=0): [null]
+
+.TRY Show state r1
+resource state:LRM_RSC_IDLE
+The resource 2 operations' information:
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=7 (not running), op_status=4 (failed due to an error)
+      parameters: 1=0  
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 1=0  
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+
+> monitor succeed (status=0,rc=0): INFO:  Running OK
+
+.TRY Exec r1 op=start timeout=1000 interval=0 target=EVERYTIME args=
+> start succeed (status=0,rc=0): [null]
+
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+
+> monitor succeed (status=0,rc=0): INFO:  Running OK
+
+.TRY Exec r1 op=stop timeout=1000 interval=0 target=EVERYTIME args=
+> stop succeed (status=0,rc=0): [null]
+
+.TRY Show state r1
+resource state:LRM_RSC_IDLE
+The resource 3 operations' information:
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 1=0  
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 1=0  
+   operation 'stop' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 1=0  
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+
+> monitor pending (status=4,rc=7): INFO:  Resource is stopped
+
+.TRY Exec r1 op=stop timeout=1000 interval=0 target=EVERYTIME args=
+> stop succeed (status=0,rc=0): [null]
+
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+
+> monitor pending (status=4,rc=7): INFO:  Resource is stopped
+
+.TRY Exec r1 op=meta-data timeout=1000 interval=0 target=EVERYTIME args=
+> meta-data succeed (status=0,rc=0): [null]
+
+.TRY Delete resource r1
+Succeeded in deleting this resource.
+.SETENV dflt_class=lsb dflt_type=Dummy-lsb dftl_rsc=r1-lsb
+.TRY Add resource r1 class=lsb type=Dummy-lsb provider=heartbeat args=
+Succeeded in adding this resource.
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+> monitor pending (status=4,rc=7): [null]
+
+.TRY Exec r1 op=start timeout=1000 interval=0 target=EVERYTIME args=
+> start succeed (status=0,rc=0): [null]
+
+.TRY Show state r1
+resource state:LRM_RSC_IDLE
+The resource 2 operations' information:
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=7 (not running), op_status=4 (failed due to an error)
+      parameters: 
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+> monitor succeed (status=0,rc=0): [null]
+
+.TRY Exec r1 op=start timeout=1000 interval=0 target=EVERYTIME args=
+> start succeed (status=0,rc=0): [null]
+
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+> monitor succeed (status=0,rc=0): [null]
+
+.TRY Exec r1 op=stop timeout=1000 interval=0 target=EVERYTIME args=
+> stop succeed (status=0,rc=0): [null]
+
+.TRY Show state r1
+resource state:LRM_RSC_IDLE
+The resource 3 operations' information:
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 
+   operation 'stop' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=1000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: 
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+> monitor pending (status=4,rc=7): [null]
+
+.TRY Exec r1 op=stop timeout=1000 interval=0 target=EVERYTIME args=
+> stop succeed (status=0,rc=0): [null]
+
+.TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
+> monitor pending (status=4,rc=7): [null]
+
+.TRY Exec r1 op=meta-data timeout=1000 interval=0 target=EVERYTIME args=
+> meta-data succeed (status=0,rc=0): [null]
+
+.TRY Delete resource r1
+Succeeded in deleting this resource.
