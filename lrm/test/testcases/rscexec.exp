@@ -5,10 +5,10 @@ Succeeded in adding this resource.
 .TRY List resources
 
 Resource ID:r1
-Resource agency class:ocf
-Resource agency type:lrmregtest
-Resource agency provider:heartbeat
-Resource agency parameters:delay=0  
+Resource agent class:ocf
+Resource agent type:lrmregtest
+Resource agent provider:heartbeat
+Resource agent parameters:delay=0  
 .TRY Exec r1 op=monitor timeout=1000 interval=0 target=EVERYTIME args=
 > monitor pending (status=4,rc=7): [null]
 

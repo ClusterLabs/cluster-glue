@@ -808,7 +808,7 @@ GHashTable ** params_ht)
 			/* printf("index: %d  value: %s \n", i-start+1, argv[i]); */
 		}
 	} else {
-		fprintf(stderr, "Not supported resource agency class.\n");
+		fprintf(stderr, "Not supported resource agent class.\n");
 		return -1;
 	}
 
@@ -862,7 +862,7 @@ params_hashtable_to_str(const char * class, GHashTable * ht)
 		strncpy(params_str, gstr_tmp->str, gstr_tmp->len+1);
 		g_string_free(gstr_tmp, TRUE);
 	} else {
-		fprintf(stderr, "Not supported resource agency class.\n");
+		fprintf(stderr, "Not supported resource agent class.\n");
 	}
 
 	return params_str;
@@ -955,15 +955,15 @@ print_rsc_inf(lrm_rsc_t * lrm_rsc)
 	rscid_str_tmp[RID_LEN-1] = '\0';
 	strncpy(rscid_str_tmp, lrm_rsc->id, RID_LEN-1);
 	printf("\nResource ID:%s\n", rscid_str_tmp);
-	printf("Resource agency class:%s\n", lrm_rsc->class);
-	printf("Resource agency type:%s\n", lrm_rsc->type);
-	printf("Resource agency provider:%s\n"
+	printf("Resource agent class:%s\n", lrm_rsc->class);
+	printf("Resource agent type:%s\n", lrm_rsc->type);
+	printf("Resource agent provider:%s\n"
 		, lrm_rsc->provider?lrm_rsc->provider:"default");
 
 	if (lrm_rsc->params) {
 		tmp = params_hashtable_to_str(lrm_rsc->class, 
 				lrm_rsc->params);
-		printf("Resource agency parameters:%s\n"
+		printf("Resource agent parameters:%s\n"
 			, (tmp == NULL) ? "No parameter" : tmp);
 		if (tmp != NULL) {
 			 g_free(tmp);
