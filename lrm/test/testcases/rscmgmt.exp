@@ -5,15 +5,15 @@ Succeeded in adding this resource.
 .TRY Show info r1
 
 Resource ID:r1
-Resource agency class:ocf
-Resource agency type:lrmregtest
-Resource agency provider:heartbeat
+Resource agent class:ocf
+Resource agent type:lrmregtest
+Resource agent provider:heartbeat
 .TRY List resources
 
 Resource ID:r1
-Resource agency class:ocf
-Resource agency type:lrmregtest
-Resource agency provider:heartbeat
+Resource agent class:ocf
+Resource agent type:lrmregtest
+Resource agent provider:heartbeat
 .TRY Delete resource r1
 Succeeded in deleting this resource.
 .SETENV dflt_class=lsb dflt_type=Dummy-lsb
@@ -24,9 +24,9 @@ Succeeded in adding this resource.
 .TRY List resources
 
 Resource ID:r1
-Resource agency class:lsb
-Resource agency type:Dummy-lsb
-Resource agency provider:heartbeat
+Resource agent class:lsb
+Resource agent type:Dummy-lsb
+Resource agent provider:heartbeat
 .TRY Delete resource r1
 Succeeded in deleting this resource.
 .SETENV dflt_class=heartbeat dflt_type=Dummy
@@ -37,9 +37,9 @@ Succeeded in adding this resource.
 .TRY List resources
 
 Resource ID:r1
-Resource agency class:heartbeat
-Resource agency type:Dummy
-Resource agency provider:heartbeat
+Resource agent class:heartbeat
+Resource agent type:Dummy
+Resource agent provider:heartbeat
 .TRY Delete resource r1
 Succeeded in deleting this resource.
 .TRY List resources
@@ -60,22 +60,22 @@ Succeeded in adding this resource.
 .TRY List resources
 
 Resource ID:r1
-Resource agency class:lsb
-Resource agency type:Dummy-lsb
-Resource agency provider:heartbeat
+Resource agent class:lsb
+Resource agent type:Dummy-lsb
+Resource agent provider:heartbeat
 .TRY Add resource r2 class=ocf type=Dummy provider=heartbeat args=
 Succeeded in adding this resource.
 .TRY List resources
 
 Resource ID:r1
-Resource agency class:lsb
-Resource agency type:Dummy-lsb
-Resource agency provider:heartbeat
+Resource agent class:lsb
+Resource agent type:Dummy-lsb
+Resource agent provider:heartbeat
 
 Resource ID:r2
-Resource agency class:ocf
-Resource agency type:Dummy
-Resource agency provider:heartbeat
+Resource agent class:ocf
+Resource agent type:Dummy
+Resource agent provider:heartbeat
 .TRY Delete resource r1
 Succeeded in deleting this resource.
 .TRY Delete resource r2

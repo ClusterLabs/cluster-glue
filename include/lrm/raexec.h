@@ -54,14 +54,14 @@ typedef enum UNIFORM_RET_EXECRA uniform_ret_execra_t;
 /* 
  * RA Execution Interfaces 
  * The plugin usage is divided into two step. First to send out a command to
- * execute a resource agency via calling function execra. Execra is a unblock
+ * execute a resource agent via calling function execra. Execra is a unblock
  * function, always return at once. Then to call function post_query_result to
  * get the RA exection result.     
 */
 struct RAExecOps { 
         /* 
 	 * Description: 
-	 * 	Launch a exection of a resource agency -- normally is a script
+	 * 	Launch a exection of a resource agent -- normally is a script
 	 *
 	 * Parameters:
 	 *	rsc_id:    The resource instance id.

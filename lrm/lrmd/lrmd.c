@@ -122,10 +122,21 @@ dump_mem_stats(void)
 #endif
 }
 
+#define set_fd_opts(fd,opts) do { \
+	int flag;
+	if ((flag = fcntl(fd, F_GETFL)) >= 0) { \
+		if (fcntl(fd, F_SETFL, flag|opts) < 0) { \
+			cl_perror("%s::%d: fcntl", __FUNCTION__ \
+				, __LINE__); \
+		} \
+	} else { \
+		cl_perror("%s::%d: fcntl", __FUNCTION__, __LINE__); \
+	} \
+	} while(0)
+
 static ra_pipe_op_t *
 ra_pipe_op_new(int child_stdout, int child_stderr, lrmd_op_t * lrmd_op)
 {
-	int flag;
 	ra_pipe_op_t * rapop;
 	lrmd_rsc_t* rsc = NULL;
 
@@ -151,41 +162,28 @@ ra_pipe_op_new(int child_stdout, int child_stderr, lrmd_op_t * lrmd_op)
 	 * obviously reduce the RA execution time (bug 553).
 	 */
 	/* Let the read operation be NONBLOCK */ 
-	if ((flag = fcntl(child_stdout, F_GETFL)) >= 0) {
-		if (fcntl(child_stdout, F_SETFL, flag|O_NONBLOCK) < 0) {
-			cl_perror("%s::%d: fcntl", __FUNCTION__
-				, __LINE__);
-		}
-	} else {
-		cl_perror("%s::%d: fcntl", __FUNCTION__, __LINE__);
-	}
+	set_fd_opts(child_stdout,O_NONBLOCK);
+	set_fd_opts(child_stderr,O_NONBLOCK);
 
-	if ((flag = fcntl(child_stderr, F_GETFL)) >= 0) {
-		if (fcntl(child_stderr, F_SETFL, flag|O_NONBLOCK) < 0) {
-			cl_perror("%s::%d: fcntl", __FUNCTION__, __LINE__);
-		}
-	} else {
-		cl_perror("%s::%d: fcntl", __FUNCTION__, __LINE__);
-	}
-
+	/* there's so much code duplication here */
 	rapop->ra_stdout_fd = child_stdout;
-	rapop->ra_stderr_fd = child_stderr;
 	if (rapop->ra_stdout_fd <= STDERR_FILENO) {
 		lrmd_log(LOG_ERR, "%s: invalid stdout fd [%d]"
 			, __FUNCTION__, rapop->ra_stdout_fd);
 	}
+	rapop->ra_stdout_gsource = G_main_add_fd(G_PRIORITY_HIGH
+				, child_stdout, FALSE, handle_pipe_ra_stdout
+				, rapop, destroy_pipe_ra_stdout);
+
+	rapop->ra_stderr_fd = child_stderr;
 	if (rapop->ra_stderr_fd <= STDERR_FILENO) {
 		lrmd_log(LOG_ERR, "%s: invalid stderr fd [%d]"
 			, __FUNCTION__, rapop->ra_stderr_fd);
 	}
-				
-	rapop->ra_stdout_gsource = G_main_add_fd(G_PRIORITY_HIGH
-				, child_stdout, FALSE, handle_pipe_ra_stdout
-				, rapop, destroy_pipe_ra_stdout);
 	rapop->ra_stderr_gsource = G_main_add_fd(G_PRIORITY_HIGH
 				, child_stderr, FALSE, handle_pipe_ra_stderr
 				, rapop, destroy_pipe_ra_stderr);
-			
+
 	rapop->lrmd_op = lrmd_op;
 
 	rapop->op_type = cl_strdup(ha_msg_value(lrmd_op->msg, F_LRM_OP));
@@ -236,10 +234,7 @@ ra_pipe_op_destroy(ra_pipe_op_t * op)
 	}
 	op->first_line_read = FALSE;
 
-	if( op->rsc_id ) {
-		cl_free(op->rsc_id);
-		op->rsc_id = NULL;
-	}
+	cl_free(op->rsc_id);
 	cl_free(op->op_type);
 	op->op_type = NULL;
 	cl_free(op->rsc_class);
@@ -376,7 +371,7 @@ op_status_to_str(int op_status)
 		default:
 			break;
 	}
-	snprintf(whatwasthat, sizeof(whatwasthat), "?status=%d?", op_status);
+	snprintf(whatwasthat, sizeof(whatwasthat), "UNDEFINED STATUS: %d?", op_status);
 	return whatwasthat;
 }
 static
@@ -392,7 +387,8 @@ op_target_rc_to_str(int target)
 		default:
 			break;
 	}
-	snprintf(whatwasthat, sizeof(whatwasthat), "?target_rc=%d?", target);
+	snprintf(whatwasthat, sizeof(whatwasthat)
+	,"UNDEFINED TARGET_RC: %d", target);
 	return whatwasthat;
 }
 
@@ -421,9 +417,6 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	long		t_done;
 
 	CHECK_ALLOCATED(op, "op", );
-	if( !cl_is_allocated(op) ) {
-		return;
-	}
 	if (op->exec_pid < 1
 	||	((kill(op->exec_pid, 0) < 0) && ESRCH == errno)) {
 		pidstat = "not running";
@@ -2544,7 +2537,7 @@ on_op_done(lrmd_op_t* op)
 		return HA_FAIL;
 	}
 	op->t_done = time_longclock();
-	
+
 	lrmd_debug2(LOG_DEBUG, "on_op_done: %s", op_info(op));
 	lrmd_debug2(LOG_DEBUG
 		 ,"TimeStamp:  Recv:%ld,Add to List:%ld,Perform:%ld, Done %ld"
@@ -3054,7 +3047,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 
 	op->exec_pid = -1;
 	if (signo != 0) {
-		lrmd_debug(LOG_ERR
+		lrmd_debug(LOG_WARNING
 		,	"%s: Operation %s was killed by signal %d."
 		,	__FUNCTION__, op_info(op), signo);
 	}

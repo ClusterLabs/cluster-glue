@@ -33,27 +33,27 @@ Resource options
 	        Delete a resource
 
 	 {-E|--execute} <rscid> <operator> <timeout> [<operator_parameters_list>]
-		Let resource agency to performance the operation
+		Let resource agent to performance the operation
 
 	 {-F|--flush} <rscid>
 		Clear all pending operation on the resource agnency      
 
 	 {-M|--monitor} {-s|-g} <rscid> <interval>
-		-s rscname	Set a monitors on the resource agency
+		-s rscname	Set a monitors on the resource agent
 		-g		Get the information about the monitors on the 
-				resource agency
+				resource agent
 
 	 {-S|--status} <rscid>
-		Get the status of current resource agency
+		Get the status of current resource agent
 
 	 {-L|--listall}
-		List all available resource agency
+		List all available resource agent
 
 	 {-I|--information} <rsc_id>
 		List the information about a resource
 
 	 {-R|--rasupported}
-		List the support types of resource agency such as OCF and etc.
+		List the support types of resource agent such as OCF and etc.
 
 Other options
 	 {-h|--help}
