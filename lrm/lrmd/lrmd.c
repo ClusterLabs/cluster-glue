@@ -123,7 +123,7 @@ dump_mem_stats(void)
 }
 
 #define set_fd_opts(fd,opts) do { \
-	int flag;
+	int flag; \
 	if ((flag = fcntl(fd, F_GETFL)) >= 0) { \
 		if (fcntl(fd, F_SETFL, flag|opts) < 0) { \
 			cl_perror("%s::%d: fcntl", __FUNCTION__ \
@@ -2521,9 +2521,9 @@ record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
 int
 on_op_done(lrmd_op_t* op)
 {
-	int target_rc = 0;
-	int last_rc = 0;
-	int op_rc = 0;
+	int target_rc = -1;
+	int last_rc = -1;
+	int op_rc = -1;
 	op_status_t op_status;
 	int op_status_int;
 	int need_notify = 0;
@@ -2580,87 +2580,26 @@ on_op_done(lrmd_op_t* op)
 	if (debug_level >= 2) {
 		lrmd_op_dump(op, __FUNCTION__);
 	}
-	if (LRM_OP_DONE != op_status) {
-		need_notify = 1;
-	} else if (HA_OK != ha_msg_value_int(op->msg,F_LRM_RC,&op_rc)){
-		lrmd_debug2(LOG_DEBUG, "on_op_done: will callback due to not "
-			"finding F_LRM_RC field in the message op->msg.");
-		need_notify = 1;
-	} else if (EVERYTIME == target_rc) {
-		lrmd_debug2(LOG_DEBUG, "on_op_done: will callback for being "
-			"asked to callback everytime.");
-		need_notify = 1;
-	} else if (CHANGED == target_rc) {
-		if (HA_OK != ha_msg_value_int(op->msg,F_LRM_LASTRC,
-						&last_rc)){
-			lrmd_debug2(LOG_DEBUG ,"on_op_done: will callback because "
-				"this is first execution [rc: %d].", op_rc);
-			need_notify = 1;
-		} else {
-			if (last_rc != op_rc) {
-				lrmd_debug2(LOG_DEBUG, "on_op_done: will callback "
-					" for this rc %d != last rc %d"
-				, 	op_rc, last_rc);
-				need_notify = 1;
-			}
-		}
-		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_LASTRC,
-						op_rc)){
-			lrmd_log(LOG_ERR,"on_op_done: can not save status to "
-				"the message op->msg.");
-			return HA_FAIL;
-		}
-	}
-	else {
-		if ( op_rc==target_rc ) {
-			lrmd_debug(LOG_DEBUG
-			,"on_op_done: will callback for target rc %d reached"
-			,op_rc);
-			
-			need_notify = 1;
-		}
-	}
 
-	/*
-	 * The code above is way too complicated. It needs work to
-	 * simplify it correctly.  FIXME.
-	 * Suggest factoring out the debug/dump code among other things.
-	 * -- it should go in lrmd_op_dump()
-	 */
-
-	/*
-	 *	If I understand the code above correctly...
-	 *	need_notify is set to false in only one case:
-	 *
-	 *	op_status ==  LRM_DONE
-	 * and	target_rc == CHANGED
-	 * and 	F_LRM_RC field == F_LRM_LASTRC field
-	 *	(with both present)
-	 *
-	 * Side-effects:
-	 *	set F_LRM_LASTRC to the value from F_LRM_RC field
-	 *		when target_rc == CHANGED and F_LRM_RC present
-	 *
-	 *	I think this code does the same thing, but is easier
-	 *	to understand.
-	 *
-	 *	op_rc = -1;
-	 *	ha_msg_value_int(op->msg,F_LRM_LRM_RC, &op_rc);
-	 *	last_rc = -1;
-	 *	ha_msg_value_int(op->msg,F_LRM_LASTRC, &last_rc);
-	 *
-	 *	if (CHANGED == target_rc && op_rc != -1
-	 *	&&	HA_OK != ha_msg_mod_int(op->msg,F_LRM_LASTRC, op_rc)){
-	 *		lrmd_log(LOG_ERR, "on_op_done: can not save status ");
-	 *		return HA_FAIL;
-	 *	}
-	 *	need_notify = TRUE;
-	 *	if (LRM_DONE == op_status && CHANGED == target_rc
-	 *	&&	-1 != op_rc && op_rc == last_rc) {
-	 *		need_notify = FALSE;
-	 *	}
-	 *
-	 */
+	ha_msg_value_int(op->msg,F_LRM_RC,&op_rc);
+	ha_msg_value_int(op->msg,F_LRM_LASTRC, &last_rc);
+	if (op_status != LRM_OP_DONE
+		|| (op_rc == -1)
+		|| (op_rc == target_rc)
+		|| (target_rc == EVERYTIME)
+		|| ((target_rc == CHANGED)
+			&& ((last_rc == -1) || (last_rc != op_rc)))
+		) {
+		need_notify = 1;
+	}
+	if (op_status == LRM_OP_DONE
+		&& CHANGED == target_rc
+		&& op_rc != -1
+		&& HA_OK != ha_msg_mod_int(op->msg, F_LRM_LASTRC, op_rc)) {
+		lrmd_log(LOG_ERR,"on_op_done: can not save status to "
+			"the message op->msg.");
+		return HA_FAIL;
+	}
 
 	if ( need_notify ) {
 		/* send the result to client */
