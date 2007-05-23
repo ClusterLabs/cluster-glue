@@ -913,7 +913,7 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 		
 	}
 	if(needs_shutdown) {
-		cl_log(LOG_INFO, "ha_logd: Exiting write process");
+		cl_log(LOG_INFO, "Exiting write process");
 		g_main_quit(loop);
 		return FALSE;
 	}
