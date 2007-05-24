@@ -129,9 +129,9 @@ on_client(gpointer key, gpointer value, gpointer user_data)
 	ret_on_badptr(client,"","client");
 	log_on_badptr(client->app_name,"","app_name");
 	log_on_null(client->ch_cmd,client->app_name,"ch_cmd");
-	log_on_null(client->ch_cbk,client->app_name,"ch_cbk");
+	/*log_on_null(client->ch_cbk,client->app_name,"ch_cbk");*/
 	log_on_null(client->g_src,client->app_name,"g_src");
-	log_on_null(client->g_src_cbk,client->app_name,"g_src_cbk");
+	/*log_on_null(client->g_src_cbk,client->app_name,"g_src_cbk");*/
 }
 
 void
@@ -144,7 +144,7 @@ on_resource(gpointer key, gpointer value, gpointer user_data)
 	log_on_badptr(rsc->type,rsc->id,"type");
 	log_on_badptr(rsc->class,rsc->id,"class");
 	log_on_badptr(rsc->provider,rsc->id,"provider");
-	log_on_null(rsc->params,rsc->id,"params");
+	/*log_on_null(rsc->params,rsc->id,"params");*/
 	log_on_null(rsc->last_op_table,rsc->id,"last_op_table");
 	/*log_on_null(rsc->last_op_done,rsc->id,"last_op_done");*/
 	audit_ops(rsc->op_list,rsc,"op_list");
