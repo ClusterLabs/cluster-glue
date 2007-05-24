@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <ctype.h>
+#include <string.h>
 #include <clplumbing/cl_signal.h>
 #include <clplumbing/cl_pidfile.h>
 #include <clplumbing/lsb_exitcodes.h>
@@ -72,6 +73,48 @@
 
 /* This is what the FHS standard specifies for the size of our lock file */
 #define	LOCKSTRLEN	11
+#include <clplumbing/cl_log.h>
+static int IsRunning(long pid)
+{
+	int rc = 0;
+	long mypid;
+	int running = 0;
+	char proc_path[PATH_MAX], exe_path[PATH_MAX], myexe_path[PATH_MAX];
+	
+	/* check if pid is running */
+	if (CL_KILL(pid, 0) < 0 && errno == ESRCH) {
+		goto bail;
+	}
+
+#ifndef HAVE_PROC_PID
+	return 1;
+#endif
+	
+	/* check to make sure pid hasn't been reused by another process */
+	snprintf(proc_path, sizeof(proc_path), "/proc/%lu/exe", pid);
+	
+	rc = readlink(proc_path, exe_path, PATH_MAX-1);
+	if(rc < 0) {
+		cl_perror("Could not read from %s", proc_path);
+		goto bail;
+	}
+	
+	mypid = (unsigned long) getpid();
+	
+	snprintf(proc_path, sizeof(proc_path), "/proc/%lu/exe", mypid);
+	rc = readlink(proc_path, myexe_path, PATH_MAX-1);
+	if(rc < 0) {
+		cl_perror("Could not read from %s", proc_path);
+		goto bail;
+	}
+
+	if(strcmp(exe_path, myexe_path) == 0) {
+		running = 1;
+	}
+
+  bail:
+	return running;
+}
 
 static int
 DoLock(const char *filename)
@@ -106,10 +149,8 @@ DoLock(const char *filename)
 				/* lockfile screwed up -> rm it and go on */
 			} else {
 				if (pid > 1 && (getpid() != pid)
-				&&	((CL_KILL((pid_t)pid, 0) >= 0)
-				||	errno != ESRCH)) {
-					/* tty is locked by existing (not
-					 * necessarily running) process
+				&&	IsRunning(pid)) {
+					/* is locked by existing process
 					 * -> give up */
 					close(fd);
 					return -1;
@@ -184,7 +225,7 @@ cl_read_pidfile(const char*filename)
 		return - LSB_STATUS_STOPPED;
 	}
 	
-	if (CL_KILL(pid, 0) >= 0 || errno != ESRCH){
+	if (IsRunning(pid)){
 		return pid;
 	}else{
 		return -LSB_STATUS_VAR_PID;
