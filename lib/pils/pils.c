@@ -1869,7 +1869,7 @@ so_select (const struct dirent *dire)
 	if (DEBUGPLUGIN) {
 		PILLog(PIL_DEBUG, "In so_select: %s.", dire->d_name);
 	}
-	if (obj_end < dire->d_name) {
+	if (end < dire->d_name) {
 			return 0;
 	}
 	if (strcmp(end, obj_end) == 0) {
