@@ -144,23 +144,35 @@ suicide_hostlist(StonithPlugin  *s)
 static int
 suicide_reset_req(StonithPlugin * s, int request, const char * host)
 {
-	int rc = -1;
+	int		rc = -1;
+	struct utsname	name;
 
 	ERRIFWRONGDEV(s, S_OOPS);
-	LOG(PIL_INFO, "Initiating suicide on host %s", host);
 
-	
-	switch (request) {
-		case ST_GENERIC_RESET:
-			rc = system(REBOOT_COMMAND);
-			break;
-		case ST_POWEROFF:
-			rc = system(POWEROFF_COMMAND);
-			break;
-		default:
-			LOG(PIL_CRIT, "As for suicide virtual stonith device, "
-				"reset request=%d is not supported", request);
+	if (request == ST_POWERON) {
+		LOG(PIL_CRIT, "%s not capable of power-on operation", DEVICE);
+		return S_INVAL;
+	} else if (request != ST_POWEROFF && request != ST_GENERIC_RESET) {
+		LOG(PIL_CRIT, "As for suicide virtual stonith device, "
+			"reset request=%d is not supported", request);
+		return S_INVAL;
 	}
+
+	if (uname(&name) == -1) {
+		LOG(PIL_CRIT, "uname error %d", errno);
+		return S_RESETFAIL ;
+	}
+
+	if (strcmp(name.nodename, host)) {
+		LOG(PIL_CRIT, "%s doesn't control host [%s]"
+		,	name.nodename, host);
+		return S_RESETFAIL ;
+	}
+
+	LOG(PIL_INFO, "Initiating suicide on host %s", host);
+	
+	rc = system(
+	    request == ST_GENERIC_RESET ? REBOOT_COMMAND : POWEROFF_COMMAND);
 
 	if (rc == 0)  {
 		LOG(PIL_INFO, "Suicide stonith succeeded.");
