@@ -85,6 +85,7 @@ struct msg_map msg_maps[] = {
 
 GHashTable* clients		= NULL;	/* a GHashTable indexed by pid */
 GHashTable* resources 		= NULL;	/* a GHashTable indexed by rsc_id */
+static GList* ops_lingerproc= NULL; /* list of ops to waiting to be removed */
 
 static GMainLoop* mainloop 		= NULL;
 static int call_id 			= 1;
@@ -249,29 +250,50 @@ ra_pipe_op_destroy(ra_pipe_op_t * op)
 	LRMAUDIT();
 }
 
+/*
+ * linger_proc is a hint on what to do and how to report in case
+ * there's still a process running originating from the operation
+ * LINGER_NO_CARE: we are bailing out, just kill the proc if any
+ * LINGER_REPORT: there could be a process running
+ * LINGER_NO_PROC: there should be no process for this operation;
+ * complain loud if there is one
+ */
+
+#define LINGER_NO_CARE 0
+#define LINGER_REPORT 1
+#define LINGER_NO_PROC 2
+
 static void
-lrmd_op_destroy(lrmd_op_t* op)
+lrmd_op_destroy(lrmd_op_t* op, int linger_proc)
 {
 	LRMAUDIT();
 	CHECK_ALLOCATED(op, "op", );
 	--lrm_objectstats.opcount;
 
 	if (op->exec_pid > 1) {
-		return_to_orig_privs();
-		lrmd_log(LOG_ERR
-		,	"%s: killing lingering operation process %d"
-		,	__FUNCTION__, op->exec_pid);	
-		if (kill(-op->exec_pid, SIGKILL) < 0 && errno != ESRCH) {
-			cl_perror("Cannot kill pid %d", op->exec_pid);
+		switch (linger_proc) {
+			case LINGER_NO_CARE:
+			case LINGER_REPORT:
+				lrmd_log( linger_proc==LINGER_NO_CARE ? LOG_NOTICE : LOG_WARNING
+				,	"%s: lingering operation process %d (%s); delaying op removal"
+				,	__FUNCTION__, op->exec_pid, op_info(op));	
+				break;
+			case LINGER_NO_PROC:
+				lrmd_log(LOG_CRIT
+				,	"%s: lingering operation process %d, op %s,"
+				" shouldn't happen, please report!"
+				,	__FUNCTION__, op->exec_pid, small_op_info(op));	
+				break;
 		}
-		if (!op->is_copy) {
-			RemoveTrackedProcTimeouts(op->exec_pid);
-		}
-		return_to_dropped_privs();
+		op->to_be_removed = TRUE;
+		ops_lingerproc = g_list_append(ops_lingerproc,op);
 		LRMAUDIT();
 		return;
 	}
 
+	if( op->to_be_removed ) {
+		ops_lingerproc = g_list_remove(ops_lingerproc,op);
+	}
 	ha_msg_del(op->msg);
 	op->msg = NULL;
 	if( op->rsc_id ) {
@@ -285,13 +307,12 @@ lrmd_op_destroy(lrmd_op_t* op)
 	}
 	op->first_line_ra_stdout[0] = EOS;
 
-	/* we should remove it, right? */
 	if( op->repeat_timeout_tag ) {
 		Gmain_timeout_remove(op->repeat_timeout_tag);
 	}
 
-	lrmd_debug3(LOG_DEBUG, "lrmd_op_destroy: free the op whose address is %p"
-		  , op);
+	lrmd_debug3(LOG_DEBUG, "%s: free the op whose address is %p"
+		  ,__FUNCTION__, op);
 	cl_free(op);
 	LRMAUDIT();
 }
@@ -314,6 +335,7 @@ lrmd_op_new(void)
 	op->rapop = NULL;
 	op->first_line_ra_stdout[0] = EOS;
 	op->t_recv = time_longclock();
+	op->to_be_removed = FALSE;
 	memset(op->killseq, 0, sizeof(op->killseq));
 	++lrm_objectstats.opcount;
 	return op;
@@ -595,7 +617,7 @@ lrmd_rsc_destroy(lrmd_rsc_t* rsc)
 		rsc->last_op_table = NULL;
 	}
 	if (rsc->last_op_done) {
-		lrmd_op_destroy(rsc->last_op_done);
+		lrmd_op_destroy(rsc->last_op_done,LINGER_NO_PROC);
 		rsc->last_op_done = NULL;
 	}
 
@@ -669,6 +691,7 @@ lrmd_rsc_dump(char* rsc_id, const char * text)
 	}
 	/* TODO: Dump params and last_op_table FIXME */
 
+	lrmd_debug(LOG_DEBUG, "%s: BEGIN resource dump", text);
 	lrmd_debug(LOG_DEBUG, "%s: resource %s/%s/%s/%s"
 	,	text
 	,	lrm_str(rsc->id)
@@ -1461,15 +1484,14 @@ remove_repeat_op_from_client(gpointer key, gpointer value, gpointer user_data)
 		else if (op->client_id == pid) {
 			op_node = g_list_next(op_node);
 			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list,op);
-			lrmd_op_destroy(op);
+			lrmd_op_destroy(op,LINGER_NO_CARE);
 		}
 		else {
 			op_node = g_list_next(op_node);
 		}
 	}
-
-
 }
+
 /* Remove all direct pointer references to 'client' before destroying it */
 static int
 unregister_client(lrmd_client_t* client)
@@ -2005,7 +2027,7 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		op = (lrmd_op_t*)op_node->data;
 		op_node = g_list_next(op_node);
 		rsc->op_list = g_list_remove(rsc->op_list, op);
-		lrmd_op_destroy(op);
+		lrmd_op_destroy(op,LINGER_NO_CARE);
 	}
 	/* remove repeat ops */
 	op_node = g_list_first(rsc->repeat_op_list);
@@ -2044,7 +2066,7 @@ free_str_op_pair(gpointer key, gpointer value, gpointer user_data)
 		lrmd_log(LOG_ERR, "%s(): NULL op in op_pair(%s)" , __FUNCTION__
 		,	(const char *)key);
 	}else{
-		lrmd_op_destroy(op);
+		lrmd_op_destroy(op,LINGER_NO_CARE);
 	}
 	return TRUE;
 }
@@ -2216,7 +2238,6 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 			return -1;
 		}
 		op->call_id = call_id;
-		op->exec_pid = -1;
 		op->client_id = client->pid;
 		op->rsc_id = cl_strdup(rsc->id);
 
@@ -2289,7 +2310,7 @@ getout:
 		op->rsc_id = NULL;
 	}
 
-	lrmd_op_destroy(op);
+	lrmd_op_destroy(op,LINGER_NO_PROC);
 	LRMAUDIT();
 	return -1;
 }
@@ -2492,12 +2513,12 @@ record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
 		,	(gpointer)cl_strdup(client->app_name)
 		,	(gpointer)client_last_op);
 	}
-		
+
 	/* Insert the op into the hash table for the client*/
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
 	op_interval = ha_msg_value(op->msg, F_LRM_INTERVAL);
 	op_hash_key = lrm_concat(op_type, op_interval, '_');
-	
+
 	old_op = g_hash_table_lookup(client_last_op, op_hash_key);
 	new_op = lrmd_op_copy(op);
 	if (NULL != old_op) {
@@ -2505,7 +2526,7 @@ record_op_completion(lrmd_client_t* client, lrmd_op_t* op)
 		, 	op_hash_key
 		,	(gpointer)new_op);
 		/* Don't let the timers go away */
-		lrmd_op_destroy(old_op);
+		lrmd_op_destroy(old_op,LINGER_NO_PROC);
 	}else{
 		g_hash_table_insert(client_last_op
 		, 	op_hash_key
@@ -2546,6 +2567,11 @@ on_op_done(lrmd_op_t* op)
 		 ,longclockto_ms(op->t_perform)
 		 ,longclockto_ms(op->t_done));
 
+	if( op->to_be_removed ) {
+		lrmd_op_destroy(op,LINGER_REPORT);
+		LRMAUDIT();
+		return HA_FAIL;
+	}
 	/*  we should check if the resource exists. */
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
@@ -2556,7 +2582,7 @@ on_op_done(lrmd_op_t* op)
 		lrmd_op_dump(op, __FUNCTION__);
 		lrmd_dump_all_resources();
 		/* delete the op */
-		lrmd_op_destroy(op);
+		lrmd_op_destroy(op,LINGER_REPORT);
 
 		LRMAUDIT();
 		return HA_FAIL;
@@ -2615,7 +2641,7 @@ on_op_done(lrmd_op_t* op)
 				lrmd_log(LOG_ERR,
 					"on_op_done: can not send the ret msg");
 			}
-		} else {	
+		} else {
 			lrmd_log(LOG_ERR
 			,	"%s: client for the operation %s does not exist"
 				" and client requested notification."
@@ -2623,7 +2649,7 @@ on_op_done(lrmd_op_t* op)
 			lrmd_op_dump(op, "lrmd_op_done: no client");
 		}
 	}
-	
+
 	/* remove the op from op_list and copy to last_op */
 	rsc->op_list = g_list_remove(rsc->op_list,op);
 	lrmd_debug2(LOG_DEBUG
@@ -2640,16 +2666,15 @@ on_op_done(lrmd_op_t* op)
 
 	/*save the op in the last op finished*/
 	if (rsc->last_op_done != NULL) {
-		lrmd_op_destroy(rsc->last_op_done);
+		lrmd_op_destroy(rsc->last_op_done,LINGER_NO_PROC);
 	}
 	rsc->last_op_done = lrmd_op_copy(op);
 	rsc->last_op_done->repeat_timeout_tag = (guint)0;
 
 	/*copy the repeat op to repeat list to wait next perform */
-	if ( 0 != op->interval && NULL != lookup_client(op->client_id)
+	if ( op->interval && lookup_client(op->client_id)
 	&&   LRM_OP_CANCELLED != op_status) {
 		lrmd_op_t* repeat_op = lrmd_op_copy(op);
-		repeat_op->exec_pid = -1;
 		repeat_op->is_copy = FALSE;
 		repeat_op->repeat_timeout_tag = 
 			Gmain_timeout_add(op->interval,	
@@ -2661,7 +2686,7 @@ on_op_done(lrmd_op_t* op)
 		, op_info(op));
 		
 	}
-	lrmd_op_destroy(op);
+	lrmd_op_destroy(op,LINGER_REPORT);
 
 	LRMAUDIT();
 	return HA_OK;
@@ -2712,6 +2737,27 @@ rsc_execution_freeze_timeout(gpointer data)
 	return FALSE;
 }
 
+/*
+ * Check if the given resource is in the list of operations
+ * which are to be removed and whose processes did not exit yet
+ * (could happen probably only in case the op has been cancelled)
+ */
+static lrmd_op_t *
+exists_lingerproc(lrmd_rsc_t *rsc)
+{
+	GList *op_node;
+	lrmd_op_t *op;
+
+	for(op_node = g_list_first(ops_lingerproc); op_node;
+			op_node = g_list_next(ops_lingerproc)) {
+		op = (lrmd_op_t*)op_node->data;
+		if( op->rsc_id && rsc == lookup_rsc(op->rsc_id) ) {
+			return op;
+		}
+	}
+	return NULL;
+}
+
 /* this function gets the first op in the rsc op list and execute it*/
 int
 perform_op(lrmd_rsc_t* rsc)
@@ -2730,6 +2776,14 @@ perform_op(lrmd_rsc_t* rsc)
 		return HA_OK;
 	}
 
+	op = exists_lingerproc(rsc);
+	if( op ) {
+		lrmd_debug(LOG_DEBUG, "perform_op: current op "
+		"(removal pending) for rsc is already running.");
+		lrmd_debug(LOG_DEBUG, "perform_op: its information: %s"
+		,	  op_info(op));
+		return HA_OK;
+	}
 	node = g_list_first(rsc->op_list);
 	while (NULL != node) {
 		op = node->data;
@@ -2991,10 +3045,17 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		,	__FUNCTION__, op_info(op), signo);
 	}
 
-	rsc = lookup_rsc(op->rsc_id);
+	if( op->rsc_id ) {
+		rsc = lookup_rsc(op->rsc_id);
+	}
 	if (rsc == NULL) {
-		lrmd_debug(LOG_DEBUG, "on_ra_proc_finished: the rsc (id=%s) does"
-		" not exist", lrm_str(op->rsc_id));
+		if( op->to_be_removed ) {
+			lrmd_debug(LOG_DEBUG, "on_ra_proc_finished: the rsc (id=%s) does"
+			" not exist (op to be removed)", lrm_str(op->rsc_id));
+		} else {
+			lrmd_log(LOG_WARNING, "on_ra_proc_finished: the rsc (id=%s) does"
+			" not exist", lrm_str(op->rsc_id));
+		}
 		on_op_done(op);
 		p->privatedata = NULL;
 		return;
@@ -3006,7 +3067,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 				"op %s is cancelled.", op_info(op));
 			rsc->op_list = g_list_remove(rsc->op_list, op);
 			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
-			lrmd_op_destroy(op);
+			lrmd_op_destroy(op,LINGER_NO_PROC);
 			p->privatedata = NULL;
 			if (debug_level >= 2) {	
 				dump_data_for_debug();
@@ -3106,7 +3167,7 @@ on_ra_proc_query_name(ProcTrack* p)
 {
 	static char proc_name[MAX_PROC_NAME];
 	lrmd_op_t* op = NULL;
-        lrmd_rsc_t* rsc = NULL;
+	lrmd_rsc_t* rsc = NULL;
 	const char* op_type = NULL;
 
 	LRMAUDIT();
@@ -3118,9 +3179,11 @@ on_ra_proc_query_name(ProcTrack* p)
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
+		
 		snprintf(proc_name
 		, MAX_PROC_NAME
-		, "unknown rsc(maybe deleted):%s"
+		, "unknown rsc(%s):%s"
+		, op->to_be_removed ? "op to be removed" : "maybe deleted"
 		, op_type);
 	}else {
 		snprintf(proc_name, MAX_PROC_NAME, "%s:%s", rsc->id, op_type);

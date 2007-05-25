@@ -65,6 +65,7 @@ static void warning_on_active_rsc(gpointer key, gpointer value, gpointer user_da
 static void check_queue_duration(lrmd_op_t* op);
 static void remove_op(GList** listp);
 static gboolean cancel_op(GList** listp,int cancel_op_id);
+static lrmd_op_t *exists_lingerproc(lrmd_rsc_t *rsc);
 
 /*
  * following functions are used to monitor the exit of ra proc

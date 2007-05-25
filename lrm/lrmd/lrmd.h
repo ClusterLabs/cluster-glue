@@ -160,6 +160,7 @@ struct lrmd_op
 	longclock_t		t_perform;
 	longclock_t		t_done;
 	ProcTrackKillInfo	killseq[3];
+	gboolean			to_be_removed;
 };
 
 
