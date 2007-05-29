@@ -253,7 +253,7 @@ ra_pipe_op_destroy(ra_pipe_op_t * op)
 /*
  * linger_proc is a hint on what to do and how to report in case
  * there's still a process running originating from the operation
- * LINGER_NO_CARE: we are bailing out, just kill the proc if any
+ * LINGER_NO_CARE: we are bailing out and don't care about any processes
  * LINGER_REPORT: there could be a process running
  * LINGER_NO_PROC: there should be no process for this operation;
  * complain loud if there is one
@@ -2778,31 +2778,58 @@ perform_op(lrmd_rsc_t* rsc)
 
 	op = exists_lingerproc(rsc);
 	if( op ) {
-		lrmd_debug(LOG_DEBUG, "perform_op: current op "
-		"(removal pending) for rsc is already running.");
-		lrmd_debug(LOG_DEBUG, "perform_op: its information: %s"
-		,	  op_info(op));
+		lrmd_debug(LOG_DEBUG, "%s:%d: %s "
+		"(removal pending) for rsc is already running."
+		, __FUNCTION__, __LINE__, op_info(op));
+		if( rsc->delay_timeout > 0 ) {
+			lrmd_log(LOG_INFO
+			,	"%s:%d: Operation already delayed: %s"
+			, __FUNCTION__, __LINE__
+			,	small_op_info(op));
+		} else {
+			lrmd_debug(LOG_DEBUG
+			, 	"%s:%d: postponing "
+				"execution of %s by %d ms"
+			, __FUNCTION__, __LINE__
+			, 	small_op_info(op), retry_interval);
+			rsc->delay_timeout = Gmain_timeout_add(retry_interval
+				, rsc_execution_freeze_timeout, rsc);
+		}
 		return HA_OK;
 	}
 	node = g_list_first(rsc->op_list);
 	while (NULL != node) {
 		op = node->data;
 		if (-1 != op->exec_pid)	{
-			lrmd_debug(LOG_DEBUG, "perform_op: current op for rsc is already running.");
-			lrmd_debug(LOG_DEBUG, "perform_op: its information: %s"
-			,	  op_info(op));
+			lrmd_debug(LOG_DEBUG, "%s:%d: %s for rsc is already running."
+			, __FUNCTION__, __LINE__, op_info(op));
+			if( rsc->delay_timeout > 0 ) {
+				lrmd_log(LOG_INFO
+				,	"%s:%d: Operation already delayed: %s"
+				, __FUNCTION__, __LINE__
+				,	small_op_info(op));
+			} else {
+				lrmd_debug(LOG_DEBUG
+				, 	"%s:%d: postponing "
+					"execution of %s by %d ms"
+				, __FUNCTION__, __LINE__
+				, 	small_op_info(op), retry_interval);
+				rsc->delay_timeout = Gmain_timeout_add(retry_interval
+					, rsc_execution_freeze_timeout, rsc);
+			}
 			break;
 		}
 
 		if ((int)rsc->delay_timeout > 0) {
 			lrmd_log(LOG_INFO
-			,	"Operation is already delayed: %s"
+			,	"%s:%d: operation already delayed: %s"
+			, __FUNCTION__, __LINE__
 			,	op_info(op));
 			break;
 		}
 
 		if (child_count >= max_child_count) {
-			lrmd_debug2(LOG_NOTICE
+			lrmd_debug(LOG_NOTICE
 			, 	"max_child_count (%d) reached, postponing "
 				"execution of %s by %d ms"
 			, 	max_child_count, op_info(op), retry_interval);
