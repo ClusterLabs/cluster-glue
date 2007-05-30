@@ -98,6 +98,7 @@ static int IsRunning(long pid)
 		cl_perror("Could not read from %s", proc_path);
 		goto bail;
 	}
+	exe_path[rc] = 0;
 	
 	mypid = (unsigned long) getpid();
 	
@@ -107,6 +108,7 @@ static int IsRunning(long pid)
 		cl_perror("Could not read from %s", proc_path);
 		goto bail;
 	}
+	myexe_path[rc] = 0;
 
 	if(strcmp(exe_path, myexe_path) == 0) {
 		running = 1;
