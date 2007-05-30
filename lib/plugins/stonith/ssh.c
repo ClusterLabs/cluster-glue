@@ -103,6 +103,9 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 #define REBOOT_COMMAND "nohup sh -c '(sleep 2; nohup " REBOOT " " REBOOT_OPTIONS ") </dev/null >/dev/null 2>&1' &"
 #undef REBOOT_COMMAND
 #define REBOOT_COMMAND "echo 'sleep 2; " REBOOT " " REBOOT_OPTIONS "' | SHELL=/bin/sh at now >/dev/null 2>&1"
+#define POWEROFF_COMMAND "echo 'sleep 2; " POWEROFF_CMD " " POWEROFF_OPTIONS "' | SHELL=/bin/sh at now >/dev/null 2>&1"
+
+#define MAX_PING_ATTEMPTS	15
 
 /*
  *    SSH STONITH device
@@ -135,7 +138,7 @@ ssh_status(StonithPlugin  *s)
 {
 	ERRIFWRONGDEV(s, S_OOPS);
 
-	return S_OK;
+	return system(NULL) ? S_OK : S_OOPS;
 }
 
 
@@ -146,10 +149,10 @@ ssh_status(StonithPlugin  *s)
 static char **
 ssh_hostlist(StonithPlugin  *s)
 {
-	struct pluginDevice*	sd;
+	struct pluginDevice* sd = (struct pluginDevice*)s;
 
 	ERRIFWRONGDEV(s, NULL);
-	sd = (struct pluginDevice*) s;
+
 	if (sd->hostcount < 0) {
 		LOG(PIL_CRIT
 		,	"unconfigured stonith object in %s", __FUNCTION__);
@@ -166,11 +169,18 @@ ssh_hostlist(StonithPlugin  *s)
 static int
 ssh_reset_req(StonithPlugin * s, int request, const char * host)
 {
-	struct pluginDevice* sd = (struct pluginDevice *)s;
-	char cmd[4096];
-	int i;
+	struct pluginDevice*	sd = (struct pluginDevice *)s;
+	char			cmd[4096];
+	int			i, status = -1;
 
 	ERRIFWRONGDEV(s, S_OOPS);
+
+	if (request == ST_POWERON) {
+		LOG(PIL_CRIT, "%s not capable of power-on operation", DEVICE);
+		return S_INVAL;
+	} else if (request != ST_POWEROFF && request != ST_GENERIC_RESET) {
+		return S_INVAL;
+	}
 
 	for (i = 0; i < sd->hostcount; i++) {
 		if (strcasecmp(host, sd->hostlist[i]) == 0) {
@@ -184,16 +194,41 @@ ssh_reset_req(StonithPlugin * s, int request, const char * host)
 		return(S_BADHOST);
 	}
 
-	LOG(PIL_INFO, "Initiating ssh-reset on host: %s", host);
+	LOG(PIL_INFO, "Initiating ssh-%s on host: %s"
+	,	request == ST_POWEROFF ? "poweroff" : "reset", host);
 
 	snprintf(cmd, sizeof(cmd)-1, "%s \"%s\" \"%s\"", SSH_COMMAND
-	,	host, REBOOT_COMMAND);
+	,	host
+	, request == ST_POWEROFF ? POWEROFF_COMMAND : REBOOT_COMMAND);
   
-	if (system(cmd) == 0)  {
-    		return S_OK;
+	status = system(cmd);
+	if (WIFEXITED(status) && 0 == WEXITSTATUS(status)) {
+		if (Debug) {
+			LOG(PIL_DEBUG, "checking whether %s stonith'd", host);
+		}
+
+		snprintf(cmd, sizeof(cmd)-1
+		,	"ping -w1 -c1 %s >/dev/null 2>&1", host);
+
+		for (i = 0; i < MAX_PING_ATTEMPTS; i++) {
+			status = system(cmd);
+			if (WIFEXITED(status) && 1 == WEXITSTATUS(status)) {
+				if (Debug) {
+					LOG(PIL_DEBUG, "unable to ping %s"
+					" after %d tries, stonith did work"
+					, host, i);
+				}
+				return S_OK;
+			}
+			sleep(1);
+		}
+
+		LOG(PIL_CRIT, "still able to ping %s after %d tries, stonith"
+			" did not work", host, MAX_PING_ATTEMPTS);
+		return S_RESETFAIL;
 	}else{
 		LOG(PIL_CRIT, "command %s failed", cmd);
-		return S_RESETFAIL ;
+		return S_RESETFAIL;
 	}
 }
 
@@ -240,7 +275,6 @@ ssh_get_info(StonithPlugin * s, int reqtype)
 	const char *		ret;
 
 	ERRIFWRONGDEV(s, NULL);
-	sd = (struct pluginDevice *)s;
 
 	switch (reqtype) {
 	case ST_DEVICEID:
@@ -282,11 +316,9 @@ ssh_get_info(StonithPlugin * s, int reqtype)
 static void
 ssh_destroy(StonithPlugin *s)
 {
-	struct pluginDevice* sd;
+	struct pluginDevice* sd = (struct pluginDevice *)s;
 
 	VOIDERRIFWRONGDEV(s);
-
-	sd = (struct pluginDevice *)s;
 
 	sd->pluginid = NOTpluginid;
 	if (sd->hostlist) {
