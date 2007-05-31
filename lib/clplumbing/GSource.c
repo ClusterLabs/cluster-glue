@@ -1599,7 +1599,7 @@ G_main_setall_id(guint id, const char * description, unsigned long delay
 {
 	G_main_setdescription_id(id, description);
 	G_main_setmaxdispatchdelay_id(id, delay);
-	G_main_setmaxdispatchtime_id(id, delay);
+	G_main_setmaxdispatchtime_id(id, elapsed);
 }
 
 static void		TempProcessRegistered(ProcTrack* p);
