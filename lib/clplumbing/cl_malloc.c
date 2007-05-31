@@ -374,6 +374,9 @@ cl_malloc(size_t size)
 	struct cl_bucket*	buckptr = NULL;
 	void*			ret;
 
+	if( !size ) {
+		size=sizeof(int);
+	}
 	if (!cl_malloc_inityet) {
 		cl_malloc_init();
 	}
