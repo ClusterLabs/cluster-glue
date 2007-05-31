@@ -70,18 +70,23 @@ extern GHashTable* resources;
 /* NB: this macro contains return */
 #define ret_on_badptr(p,item,text) do { \
 	if( !cl_is_allocated(p) ) { \
-		ptr_bad(LOG_ERR,p,item,text); \
+		ptr_bad(LOG_INFO,p,item,text); \
 		return; \
 	} \
 } while(0)
 #define log_on_badptr(p,item,text) do { \
 	if( !cl_is_allocated(p) ) { \
-		ptr_bad(LOG_ERR,p,item,text); \
+		ptr_bad(LOG_INFO,p,item,text); \
+	} \
+} while(0)
+#define log_on_nonnull_badptr(p,item,text) do { \
+	if( p && !cl_is_allocated(p) ) { \
+		ptr_bad(LOG_INFO,p,item,text); \
 	} \
 } while(0)
 #define log_on_null(p,item,text) do { \
 	if( !p ) { \
-		ptr_null(LOG_ERR,item,text); \
+		ptr_null(LOG_INFO,item,text); \
 	} \
 } while(0)
 
@@ -129,9 +134,9 @@ on_client(gpointer key, gpointer value, gpointer user_data)
 	ret_on_badptr(client,"","client");
 	log_on_badptr(client->app_name,"","app_name");
 	log_on_null(client->ch_cmd,client->app_name,"ch_cmd");
-	/*log_on_null(client->ch_cbk,client->app_name,"ch_cbk");*/
+	log_on_nonnull_badptr(client->ch_cbk,client->app_name,"ch_cbk");
 	log_on_null(client->g_src,client->app_name,"g_src");
-	/*log_on_null(client->g_src_cbk,client->app_name,"g_src_cbk");*/
+	log_on_nonnull_badptr(client->g_src_cbk,client->app_name,"g_src_cbk");
 }
 
 void
@@ -143,10 +148,10 @@ on_resource(gpointer key, gpointer value, gpointer user_data)
 	ret_on_badptr(rsc->id,"","id");
 	log_on_badptr(rsc->type,rsc->id,"type");
 	log_on_badptr(rsc->class,rsc->id,"class");
-	log_on_badptr(rsc->provider,rsc->id,"provider");
-	/*log_on_null(rsc->params,rsc->id,"params");*/
+	log_on_nonnull_badptr(rsc->provider,rsc->id,"provider");
+	log_on_nonnull_badptr(rsc->params,rsc->id,"params");
 	log_on_null(rsc->last_op_table,rsc->id,"last_op_table");
-	/*log_on_null(rsc->last_op_done,rsc->id,"last_op_done");*/
+	log_on_nonnull_badptr(rsc->last_op_done,rsc->id,"last_op_done");
 	audit_ops(rsc->op_list,rsc,"op_list");
 	audit_ops(rsc->repeat_op_list,rsc,"repeat_op_list");
 }
@@ -181,10 +186,8 @@ void
 on_ra_pipe_op(ra_pipe_op_t *rapop, lrmd_op_t *op, const char *desc)
 {
 	ret_on_badptr(rapop,small_op_info(op),desc);
-	/*
-	log_on_badptr(rapop->ra_stdout_gsource,small_op_info(op),"ra_stdout_gsource");
-	log_on_badptr(rapop->ra_stderr_gsource,small_op_info(op),"ra_stderr_gsource");
-	*/
+	log_on_nonnull_badptr(rapop->ra_stdout_gsource,small_op_info(op),"ra_stdout_gsource");
+	log_on_nonnull_badptr(rapop->ra_stderr_gsource,small_op_info(op),"ra_stderr_gsource");
 	log_on_badptr(rapop->rsc_id,small_op_info(op),"rsc_id");
 	log_on_badptr(rapop->op_type,small_op_info(op),"op_type");
 	log_on_badptr(rapop->rsc_class,small_op_info(op),"rsc_class");
