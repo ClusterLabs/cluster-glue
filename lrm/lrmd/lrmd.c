@@ -2749,7 +2749,7 @@ exists_lingerproc(lrmd_rsc_t *rsc)
 	lrmd_op_t *op;
 
 	for(op_node = g_list_first(ops_lingerproc); op_node;
-			op_node = g_list_next(ops_lingerproc)) {
+			op_node = g_list_next(op_node)) {
 		op = (lrmd_op_t*)op_node->data;
 		if( op->rsc_id && rsc == lookup_rsc(op->rsc_id) ) {
 			return op;
