@@ -2567,20 +2567,17 @@ on_op_done(lrmd_op_t* op)
 		 ,longclockto_ms(op->t_perform)
 		 ,longclockto_ms(op->t_done));
 
-	if( op->to_be_removed ) {
-		lrmd_op_destroy(op,LINGER_REPORT);
-		LRMAUDIT();
-		return HA_FAIL;
-	}
 	/*  we should check if the resource exists. */
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
 		RemoveTrackedProcTimeouts(op->exec_pid);
-		lrmd_log(LOG_ERR
-		,	"%s: the resource for the operation %s does not exist."
-		,	__FUNCTION__, op_info(op));
-		lrmd_op_dump(op, __FUNCTION__);
-		lrmd_dump_all_resources();
+		if( !op->to_be_removed ) {
+			lrmd_log(LOG_ERR
+			,	"%s: the resource for the operation %s does not exist."
+			,	__FUNCTION__, op_info(op));
+			lrmd_op_dump(op, __FUNCTION__);
+			lrmd_dump_all_resources();
+		}
 		/* delete the op */
 		lrmd_op_destroy(op,LINGER_REPORT);
 
