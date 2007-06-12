@@ -149,7 +149,7 @@ on_resource(gpointer key, gpointer value, gpointer user_data)
 	log_on_badptr(rsc->type,rsc->id,"type");
 	log_on_badptr(rsc->class,rsc->id,"class");
 	log_on_nonnull_badptr(rsc->provider,rsc->id,"provider");
-	log_on_nonnull_badptr(rsc->params,rsc->id,"params");
+	/*log_on_nonnull_badptr(rsc->params,rsc->id,"params");*/
 	log_on_null(rsc->last_op_table,rsc->id,"last_op_table");
 	log_on_nonnull_badptr(rsc->last_op_done,rsc->id,"last_op_done");
 	audit_ops(rsc->op_list,rsc,"op_list");
