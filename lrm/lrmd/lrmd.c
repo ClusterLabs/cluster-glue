@@ -229,49 +229,49 @@ ra_pipe_op_new(int child_stdout, int child_stderr, lrmd_op_t * lrmd_op)
 }
 
 static void
-ra_pipe_op_destroy(ra_pipe_op_t * op)
+ra_pipe_op_destroy(ra_pipe_op_t * rapop)
 {
 	LRMAUDIT();
-	CHECK_ALLOCATED(op, "ra_pipe_op", );
+	CHECK_ALLOCATED(rapop, "ra_pipe_op", );
 
-	if ( NULL != op->ra_stdout_gsource) {
-		G_main_del_fd(op->ra_stdout_gsource);
-		op->ra_stdout_gsource = NULL;
+	if ( NULL != rapop->ra_stdout_gsource) {
+		G_main_del_fd(rapop->ra_stdout_gsource);
+		rapop->ra_stdout_gsource = NULL;
 	}
 
-	if ( NULL != op->ra_stderr_gsource) {
-		G_main_del_fd(op->ra_stderr_gsource);
-		op->ra_stderr_gsource = NULL;
+	if ( NULL != rapop->ra_stderr_gsource) {
+		G_main_del_fd(rapop->ra_stderr_gsource);
+		rapop->ra_stderr_gsource = NULL;
 	}
 
-	if (op->ra_stdout_fd >= STDERR_FILENO) {
-		close(op->ra_stdout_fd);
-		op->ra_stdout_fd = -1;
-	}else if (op->ra_stdout_fd >= 0) {
+	if (rapop->ra_stdout_fd >= STDERR_FILENO) {
+		close(rapop->ra_stdout_fd);
+		rapop->ra_stdout_fd = -1;
+	}else if (rapop->ra_stdout_fd >= 0) {
 		lrmd_log(LOG_ERR, "%s: invalid stdout fd %d"
-		,	__FUNCTION__, op->ra_stdout_fd);
+		,	__FUNCTION__, rapop->ra_stdout_fd);
 	}
-	if (op->ra_stderr_fd >= STDERR_FILENO) {
-		close(op->ra_stderr_fd);
-		op->ra_stderr_fd = -1;
-	}else if (op->ra_stderr_fd >= 0) {
+	if (rapop->ra_stderr_fd >= STDERR_FILENO) {
+		close(rapop->ra_stderr_fd);
+		rapop->ra_stderr_fd = -1;
+	}else if (rapop->ra_stderr_fd >= 0) {
 		lrmd_log(LOG_ERR, "%s: invalid stderr fd %d"
-		,	__FUNCTION__, op->ra_stderr_fd);
+		,	__FUNCTION__, rapop->ra_stderr_fd);
 	}
-	op->first_line_read = FALSE;
+	rapop->first_line_read = FALSE;
 
-	cl_free(op->rsc_id);
-	cl_free(op->op_type);
-	op->op_type = NULL;
-	cl_free(op->rsc_class);
-	op->rsc_class = NULL;
+	cl_free(rapop->rsc_id);
+	cl_free(rapop->op_type);
+	rapop->op_type = NULL;
+	cl_free(rapop->rsc_class);
+	rapop->rsc_class = NULL;
 
-	if (op->lrmd_op != NULL) {
-		op->lrmd_op->rapop = NULL;
-		op->lrmd_op = NULL;
+	if (rapop->lrmd_op != NULL) {
+		rapop->lrmd_op->rapop = NULL;
+		rapop->lrmd_op = NULL;
 	}
 
-	cl_free(op);
+	cl_free(rapop);
 	LRMAUDIT();
 }
 
