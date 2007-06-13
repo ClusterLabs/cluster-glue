@@ -25,6 +25,8 @@ static int on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_last_op(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg);
+static int on_msg_cancel_op(lrmd_client_t* client, struct ha_msg* msg);
+static int on_msg_flush_all(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg);
 static gboolean sigterm_action(int nsig, gpointer unused);
@@ -41,7 +43,7 @@ static int flush_op(lrmd_op_t* op);
 static gboolean rsc_execution_freeze_timeout(gpointer data);
 static int perform_op(lrmd_rsc_t* rsc);
 static int unregister_client(lrmd_client_t* client);
-static int on_op_done(lrmd_op_t* op);
+static int on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op);
 static int send_ret_msg ( IPC_Channel* ch, int rc);
 static lrmd_client_t* lookup_client (pid_t pid);
 static lrmd_rsc_t* lookup_rsc (const char* rid);
@@ -58,14 +60,14 @@ static gboolean free_str_op_pair(gpointer key
 ,	 gpointer value, gpointer user_data);
 static lrmd_op_t* lrmd_op_copy(const lrmd_op_t* op);
 static void send_last_op(gpointer key, gpointer value, gpointer user_data);
-static void record_op_completion(lrmd_client_t* client, lrmd_op_t* op);
+static void record_op_completion(lrmd_client_t* client, lrmd_rsc_t* rsc, lrmd_op_t* op);
 static void hash_to_str(GHashTable * , GString *);
 static void hash_to_str_foreach(gpointer key, gpointer value, gpointer userdata);
 static void warning_on_active_rsc(gpointer key, gpointer value, gpointer user_data);
 static void check_queue_duration(lrmd_op_t* op);
-static void remove_op(GList** listp);
+static gboolean flush_all(GList** listp);
 static gboolean cancel_op(GList** listp,int cancel_op_id);
-static lrmd_op_t *exists_lingerproc(lrmd_rsc_t *rsc);
+static void send_delayed_replies(lrmd_rsc_t* rsc, lrmd_op_t* op);
 
 /*
  * following functions are used to monitor the exit of ra proc

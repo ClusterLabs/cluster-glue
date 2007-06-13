@@ -124,6 +124,17 @@ typedef struct lrmd_rsc lrmd_rsc_t;
 typedef struct lrmd_op	lrmd_op_t;
 typedef struct ra_pipe_op  ra_pipe_op_t;
 
+#define RSC_REMOVAL_PENDING 1
+#define RSC_FLUSHING_OPS 2
+#define rsc_frozen(r) \
+	((r)->state==RSC_REMOVAL_PENDING || (r)->state==RSC_FLUSHING_OPS)
+#define rsc_removal_pending(r) \
+	((r)->state==RSC_REMOVAL_PENDING)
+#define set_rsc_removal_pending(r) \
+	(r)->state = RSC_REMOVAL_PENDING
+#define set_rsc_flushing_ops(r) \
+	(r)->state = RSC_FLUSHING_OPS
+#define rsc_reset_state(r) (r)->state = 0
 
 struct lrmd_rsc
 {
@@ -139,6 +150,8 @@ struct lrmd_rsc
 	GHashTable*	last_op_table;	/* Last operation of each type	*/
 	lrmd_op_t*	last_op_done;	/* The last finished op of the resource */
 	guint		delay_timeout;  /* The delay value of op_list execution */
+	GList*		requestors;	/* a list of client pids to send replies to */
+	int			state;  /* status of the resource */
 };
 
 struct lrmd_op
@@ -160,7 +173,6 @@ struct lrmd_op
 	longclock_t		t_perform;
 	longclock_t		t_done;
 	ProcTrackKillInfo	killseq[3];
-	gboolean			to_be_removed;
 };
 
 
@@ -181,15 +193,6 @@ struct ra_pipe_op
 	char *		rsc_class;
 };
 
-
-/* msg dispatch table */
-typedef int (*msg_handler)(lrmd_client_t* client, struct ha_msg* msg);
-struct msg_map
-{
-	const char* 	msg_type;
-	gboolean	need_return_ret;
-	msg_handler	handler;
-};
 
 const char *gen_op_info(const lrmd_op_t* op, gboolean add_params);
 #define op_info(op) gen_op_info(op,TRUE)
