@@ -160,18 +160,25 @@ time_longclock(void)
 			,	callcount);
 			/* Assume jump back was the error and ignore it */
 			/* (i.e., hope it goes away) */
-			timesval = lasttimes;
 		}else{
 			/* Normal looking wraparound */
+			/* update last time BEFORE loging as log call
+			   can call this routine recursively leading
+			   to double update of wrapcount! */
+
+			lasttimes = timesval;
+			++wrapcount;
+			lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
+
 			cl_log(LOG_INFO
 			,	"%s: clock_t wrapped around (uptime)."
 			,	__FUNCTION__);
-			++wrapcount;
-			lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
 		}
 	}
-	lasttimes = timesval;
-	calledbefore = TRUE;
+	else {
+		lasttimes = timesval;
+		calledbefore = TRUE;
+	}
 	return (lc_wrapcount | (longclock_t)timesval);
 }
 #endif	/* ! CLOCK_T_IS_LONG_ENOUGH */
