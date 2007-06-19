@@ -48,11 +48,23 @@ sub vmware_command
 	@lines = readpipe "vmware-cmd $config $action";
 
     } else {
-	@lines = readpipe "ssh $device \"vmware-cmd $config $action\"";
+	@lines = readpipe "ssh $device \"vmware-cmd \\\"$config\\\" $action\"";
     }
 
     #print @lines;
     return @lines;
+}
+
+sub is_host_active
+{
+    my $config = config_for_host($_[0]);
+    my @lines = vmware_command($config, "getstate");
+    foreach $line (@lines) {
+	if ( $line =~ /getstate.* = on/ ) {
+	    return 1;
+	}
+    }
+    return 0;
 }
 
 sub supported_hosts
@@ -64,7 +76,10 @@ sub supported_hosts
 	@lines = split(/;/, $ENV{'host_map'});
 	foreach $line (@lines){
 	    @config = split(/=/, $line);
-	    print "$config[0]\n";
+	    $host = $config[0];
+	    if ( is_host_active($host) == 1 ) {
+		print "$host\n";
+	    }
 	}
 	
     } else {
@@ -72,7 +87,9 @@ sub supported_hosts
 	foreach $line (@lines){
 	    my @elements = split(/\//, $line);
 	    $host = $elements[$#elements-1];
-	    print $host."\n";
+	    if ( is_host_active($host) == 1 ) {
+		print "$host\n";
+	    }
 	}
     }
 }
@@ -117,7 +134,7 @@ if ( $command =~ /^gethosts$/ ) {
     supported_hosts;
 
 } elsif ( $command =~ /^getconfignames$/ ) {
-    print "automatic_hostnames\n";
+    print "device_host\n";
 
 } elsif ( $command =~ /^getinfo-devid$/ ) {
     print "VMware Server STONITH device\n";
