@@ -130,6 +130,11 @@ time_longclock(void)
 longclock_t
 time_longclock(void)
 {
+	/* Internal note: This updates the static fields; care should be
+	 * taken to not call a function like cl_log (which internally
+	 * calls time_longclock() as well) just before this happens,
+	 * because then this can recurse infinitely; that is why the
+	 * cl_log call is where it is; found by Simon Graham. */
 	static	gboolean	calledbefore	= FALSE;
 	static	unsigned long	lasttimes	= 0L;
 	static	unsigned long	wrapcount	= 0L;
