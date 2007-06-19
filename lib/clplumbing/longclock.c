@@ -130,6 +130,11 @@ time_longclock(void)
 longclock_t
 time_longclock(void)
 {
+	/* Internal note: This updates the static fields; care should be
+	 * taken to not call a function like cl_log (which internally
+	 * calls time_longclock() as well) just before this happens,
+	 * because then this can recurse infinitely; that is why the
+	 * cl_log call is where it is; found by Simon Graham. */
 	static	gboolean	calledbefore	= FALSE;
 	static	unsigned long	lasttimes	= 0L;
 	static	unsigned long	wrapcount	= 0L;
@@ -160,18 +165,25 @@ time_longclock(void)
 			,	callcount);
 			/* Assume jump back was the error and ignore it */
 			/* (i.e., hope it goes away) */
-			timesval = lasttimes;
 		}else{
 			/* Normal looking wraparound */
+			/* update last time BEFORE loging as log call
+			   can call this routine recursively leading
+			   to double update of wrapcount! */
+
+			lasttimes = timesval;
+			++wrapcount;
+			lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
+
 			cl_log(LOG_INFO
 			,	"%s: clock_t wrapped around (uptime)."
 			,	__FUNCTION__);
-			++wrapcount;
-			lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
 		}
 	}
-	lasttimes = timesval;
-	calledbefore = TRUE;
+	else {
+		lasttimes = timesval;
+		calledbefore = TRUE;
+	}
 	return (lc_wrapcount | (longclock_t)timesval);
 }
 #endif	/* ! CLOCK_T_IS_LONG_ENOUGH */
