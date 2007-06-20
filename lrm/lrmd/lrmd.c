@@ -3072,7 +3072,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	lrmd_rsc_t* rsc = NULL;
 	struct RAExecOps * RAExec = NULL;
 	const char* op_type;
-        int rc;
+        int rc = EXECRA_UNKNOWN_ERROR;
         int ret;
 	int op_status;
 
@@ -3083,7 +3083,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	}
 
 	CHECK_ALLOCATED(p, "ProcTrack p", );
-	op = p->privatedata;
+	op = proctrack_data(p);
 	lrmd_debug2(LOG_DEBUG, "on_ra_proc_finished: accessing the op whose "
 		  "address is %p", op);
 	CHECK_ALLOCATED(op, "op", );
@@ -3092,15 +3092,8 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		dump_data_for_debug();
 		return;
 	}
-
 	RemoveTrackedProcTimeouts(op->exec_pid);
 	op->exec_pid = -1;
-
-	if (signo != 0) {
-		lrmd_debug(LOG_WARNING
-		,	"%s: %s was killed by signal %d."
-		,	__FUNCTION__, op_info(op), signo);
-	}
 
 	rsc = lookup_rsc(op->rsc_id);
 	if (rsc == NULL) {
@@ -3110,23 +3103,22 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		lrmd_dump_all_resources();
 		/* delete the op */
 		lrmd_op_destroy(op);
-		p->privatedata = NULL;
+		reset_proctrack_data(p);
 		LRMAUDIT();
 		return;
 	}
 
-	if (HA_OK == ha_msg_value_int(op->msg, F_LRM_OPSTATUS, &op_status)) {
-		if ( LRM_OP_CANCELLED == (op_status_t)op_status ) {
-			lrmd_debug(LOG_DEBUG, "on_ra_proc_finished: "
-				"%s cancelled.", op_info(op));
-			on_op_done(rsc,op);
-			p->privatedata = NULL;
-			if (debug_level >= 2) {	
-				dump_data_for_debug();
-			}
-			LRMAUDIT();
-			return;
+	if (HA_OK == ha_msg_value_int(op->msg, F_LRM_OPSTATUS, &op_status)
+	&& (op_status_t)op_status == LRM_OP_CANCELLED ) {
+		lrmd_debug(LOG_DEBUG, "on_ra_proc_finished: "
+			"%s cancelled.", op_info(op));
+		on_op_done(rsc,op);
+		reset_proctrack_data(p);
+		if (debug_level >= 2) {	
+			dump_data_for_debug();
 		}
+		LRMAUDIT();
+		return;
 	}
 
 	RAExec = g_hash_table_lookup(RAExecFuncs,rsc->class);
@@ -3155,46 +3147,49 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		}
 	}
 
-	rc = RAExec->map_ra_retvalue(exitcode, op_type
-				     , op->first_line_ra_stdout);
-	if (rc != EXECRA_OK || debug_level > 0) {
-		if (signo != 0) {
-			lrmd_debug(rc == EXECRA_OK ? LOG_DEBUG : LOG_WARNING
-			,	"Resource Agent (%s): pid [%d] killed by"
-			" signal %d",	op_info(op), p->pid, signo);
-		}else if (rc == exitcode) {
-			lrmd_debug2(rc == EXECRA_OK ? LOG_DEBUG : LOG_INFO
-			,	"Resource Agent (%s): pid [%d] exited with"
-			" return code %d", op_info(op), p->pid, rc);
-		}else{
-			lrmd_debug2(rc == EXECRA_OK ? LOG_DEBUG : LOG_INFO
-			,	"Resource Agent (%s): pid [%d] exited with"
-			" return code %d (mapped from %d)"
-			,	op_info(op), p->pid, rc, exitcode);
+	if( signo ) {
+		if( proctrack_timedout(p) ) {
+			lrmd_log(LOG_WARNING,	"%s: pid [%d] timed out"
+			, op_info(op), proctrack_pid(p));
+			op_status = LRM_OP_TIMEOUT;
+		} else {
+			op_status = LRM_OP_ERROR;
 		}
-		if (rc != EXECRA_OK || debug_level > 1) {
-			lrmd_debug2(LOG_INFO, "Resource Agent output: [%s]"
-			,	op->first_line_ra_stdout);
+	} else {
+		rc = RAExec->map_ra_retvalue(exitcode, op_type
+						 , op->first_line_ra_stdout);
+		if (rc != EXECRA_OK || debug_level > 0) {
+			if (rc == exitcode) {
+				lrmd_debug2(rc == EXECRA_OK ? LOG_DEBUG : LOG_INFO
+				,	"%s: pid [%d] exited with"
+				" return code %d", op_info(op), proctrack_pid(p), rc);
+			}else{
+				lrmd_debug2(rc == EXECRA_OK ? LOG_DEBUG : LOG_INFO
+				,	"%s: pid [%d] exited with"
+				" return code %d (mapped from %d)"
+				,	op_info(op), proctrack_pid(p), rc, exitcode);
+			}
+			if (rc != EXECRA_OK || debug_level > 1) {
+				lrmd_debug2(LOG_INFO, "Resource Agent output: [%s]"
+				,	op->first_line_ra_stdout);
+			}
+		}
+		if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
+			op_status = LRM_OP_ERROR;
+			lrmd_log(LOG_CRIT
+			,	"on_ra_proc_finished: the exit code indicates a problem.");
+		} else {
+			op_status = LRM_OP_DONE;
 		}
 	}
-	if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
-		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS,
-							LRM_OP_ERROR)) {
-			LOG_FAILED_TO_ADD_FIELD("opstatus")
-			return ;
-		}
-		lrmd_log(LOG_CRIT
-		,	"on_ra_proc_finished: the exit code indicates a problem.");
-	} else {
-		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_OPSTATUS,
-								LRM_OP_DONE)) {
-			LOG_FAILED_TO_ADD_FIELD("opstatus")
-			return ;
-		}
-		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_RC, rc)) {
-			LOG_FAILED_TO_ADD_FIELD("F_LRM_RC")
-			return ;
-		}
+	if (HA_OK !=
+			ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, op_status)) {
+		LOG_FAILED_TO_ADD_FIELD("opstatus")
+		return ;
+	}
+	if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_RC, rc)) {
+		LOG_FAILED_TO_ADD_FIELD("F_LRM_RC")
+		return ;
 	}
 
 	if ( 0 < strlen(op->first_line_ra_stdout) ) {
@@ -3209,7 +3204,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 
 	on_op_done(rsc,op);
 	perform_op(rsc);
-	p->privatedata = NULL;
+	reset_proctrack_data(p);
 	LRMAUDIT();
 }
 
@@ -3223,7 +3218,7 @@ on_ra_proc_query_name(ProcTrack* p)
 	const char* op_type = NULL;
 
 	LRMAUDIT();
-	op = (lrmd_op_t*)(p->privatedata);
+	op = (lrmd_op_t*)(proctrack_data(p));
 	if (NULL == op || op->exec_pid == 0) {
 		return "*unknown*";
 	}

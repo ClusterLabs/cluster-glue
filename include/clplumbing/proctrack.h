@@ -45,6 +45,11 @@ enum _ProcTrackLogType {
 };
 typedef enum _ProcTrackLogType	ProcTrackLogType;
 
+#define proctrack_pid(p) (p)->pid
+#define proctrack_data(p) (p)->privatedata
+#define reset_proctrack_data(p) (p)->privatedata = NULL
+#define proctrack_timedout(p) ((p)->timeoutseq > 0)
+
 struct _ProcTrack {
 	pid_t			pid;
 	int			isapgrp;
