@@ -373,7 +373,6 @@ RemoveTrackedProcTimeouts(pid_t pid)
 	if (pinfo->killinfo && pinfo->timerid) {
 		g_source_remove(pinfo->timerid);
 	}
-	pinfo->timeoutseq = 0;
 	pinfo->killinfo = NULL;
 	pinfo->timerid = 0;
 }
@@ -416,6 +415,7 @@ TrackedProcTimeoutFunction(gpointer p)
 		}
 		return FALSE;
 	}
+	pinfo->timeoutseq++;
 	cl_log(LOG_WARNING, "%s process (PID %d) timed out (try %d)"
 	".  Killing with signal %s (%d)."
 	,	pinfo->ops->proctype(pinfo), (int)pid
@@ -445,7 +445,6 @@ TrackedProcTimeoutFunction(gpointer p)
 	if (!hadprivs) {
 		return_to_dropped_privs();
 	}
-	pinfo->timeoutseq++;
 	mstimeout = pinfo->killinfo[pinfo->timeoutseq].mstimeout;
 	pinfo->timerid = Gmain_timeout_add(mstimeout
 	,	TrackedProcTimeoutFunction
