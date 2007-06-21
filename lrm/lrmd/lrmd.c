@@ -2149,7 +2149,7 @@ on_msg_cancel_op(lrmd_client_t* client, struct ha_msg* msg)
 {
 	lrmd_rsc_t* rsc = NULL;
 	int cancel_op_id = 0;
-	int op_cancelled;
+	int op_cancelled = HA_OK;
 
 	LRMAUDIT();
 	CHECK_ALLOCATED(client, "client", HA_FAIL);
@@ -2170,11 +2170,12 @@ on_msg_cancel_op(lrmd_client_t* client, struct ha_msg* msg)
 	,	client->pid
 	, 	cancel_op_id);
 
-	(void)cancel_op(&(rsc->repeat_op_list), cancel_op_id);
-	op_cancelled = cancel_op(&(rsc->op_list), cancel_op_id);
-	if( op_cancelled == POSTPONE_MSG ) {
-		rsc->requestors =
-			g_list_append(rsc->requestors,GUINT_TO_POINTER(client->pid));
+	if( cancel_op(&(rsc->repeat_op_list), cancel_op_id) != HA_OK) {
+		op_cancelled = cancel_op(&(rsc->op_list), cancel_op_id);
+		if( op_cancelled == POSTPONE_MSG ) {
+			rsc->requestors =
+				g_list_append(rsc->requestors,GUINT_TO_POINTER(client->pid));
+		}
 	}
 	LRMAUDIT();
 	return op_cancelled;
