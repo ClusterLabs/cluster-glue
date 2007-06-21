@@ -44,20 +44,41 @@
 		}							\
 	}
 
-#define CHECK_RETURN_OF_CREATE_LRM_RET					\
+#define CHECK_RETURN_OF_CREATE_LRM_RET	do {		\
 	if (NULL == msg) {						\
 		lrmd_log(LOG_ERR					\
 		, 	"%s: cannot create a ret message with create_lrm_ret."	\
 		, 	__FUNCTION__);					\
 		return HA_FAIL;						\
-	}
+	} \
+} while(0)
+
+#define LOG_FAILED_TO_GET_FIELD(field)					\
+			lrmd_log(LOG_ERR				\
+			,	"%s:%d: cannot get field %s from message." \
+			,__FUNCTION__,__LINE__,field)
 
 #define LOG_FAILED_TO_ADD_FIELD(field)					\
 			lrmd_log(LOG_ERR				\
 			,	"%s:%d: cannot add the field %s to a message." \
 			,	__FUNCTION__				\
 			,	__LINE__				\
-			,	field);
+			,	field)
+
+/* NB: There's a return in these macros, hence the names */
+#define return_on_no_int_value(msg,fld,i) do { \
+	if (HA_OK != ha_msg_value_int(msg,fld,i)) { \
+		LOG_FAILED_TO_GET_FIELD(fld); \
+		return HA_FAIL; \
+	} \
+} while(0)
+#define return_on_no_value(msg,fld,v) do { \
+	v = ha_msg_value(msg,fld); \
+	if (!v) { \
+		LOG_FAILED_TO_GET_FIELD(fld); \
+		return HA_FAIL; \
+	} \
+} while(0)
 
 #define LRMD_APPHB_HB				\
         if (reg_to_apphb == TRUE) {		\
