@@ -596,12 +596,13 @@ lrm_op_done_callback(lrm_op_t* op)
 	printf("type:%s\n", op->op_type);
 	if ( (0 == STRNCMP_CONST(op->op_type, "status") 
 		|| 0 == STRNCMP_CONST(op->op_type, "monitor")) && (op->rc == 7) ) {
-		printf("operation status:%s\n", status_msg[LRM_OP_DONE]);
+		printf("operation status:%s\n", status_msg[LRM_OP_DONE-LRM_OP_PENDING]);
+		printf("op_status: %d\n", LRM_OP_DONE);
 	} else {
 		printf("operation status:%s\n", status_msg[(op->op_status 
 			- LRM_OP_PENDING) % DIMOF(status_msg)]);
+		printf("op_status: %d\n", op->op_status);
 	}
-	printf("op_status: %d\n", op->op_status);
 	printf("return code: %d\n", op->rc);
 	printf("output data: \n%s\n", (op->output ? op->output : "[null]"));
 	printf("---------------------------------------\n\n");
