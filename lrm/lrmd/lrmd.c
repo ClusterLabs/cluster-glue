@@ -76,21 +76,16 @@ struct msg_map
 };
 
 /*
- * three ways to handle replies:
+ * two ways to handle replies:
  * REPLY_NOW: pack whatever the handler returned and send it
- * REPLY_ON_DONE: if the handler returned a definitive return code
- * (i.e. one different from POSTPONE_MSG) then send it back to
- * the client; otherwise, do nothing: the reply will be sent later
  * NO_MSG: the handler will send the reply itself
  */
 #define REPLY_NOW 0
-#define REPLY_ON_DONE 1
-#define NO_MSG 2
-#define send_msg_now(i,rc) \
-	(msg_maps[i].reply_time==REPLY_NOW || \
-		(msg_maps[i].reply_time==REPLY_ON_DONE && rc!=POSTPONE_MSG))
+#define NO_MSG 1
+#define send_msg_now(i) \
+	(msg_maps[i].reply_time==REPLY_NOW)
 /* magic number, must be different from other return codes! */
-#define POSTPONE_MSG 32
+#define POSTPONED 32
 
 struct msg_map msg_maps[] = {
 	{REGISTER,	REPLY_NOW,	on_msg_register},
@@ -101,10 +96,10 @@ struct msg_map msg_maps[] = {
 	{GETRSC,	NO_MSG,	on_msg_get_rsc},
 	{GETLASTOP,	NO_MSG,	on_msg_get_last_op},
 	{GETALLRCSES,	NO_MSG,	on_msg_get_all},
-	{DELRSC,	REPLY_ON_DONE,	on_msg_del_rsc},
+	{DELRSC,	REPLY_NOW,	on_msg_del_rsc},
 	{PERFORMOP,	REPLY_NOW,	on_msg_perform_op},
-	{FLUSHOPS,	REPLY_ON_DONE,	on_msg_flush_all},
-	{CANCELOP,	REPLY_ON_DONE,	on_msg_cancel_op},
+	{FLUSHOPS,	REPLY_NOW,	on_msg_flush_all},
+	{CANCELOP,	REPLY_NOW,	on_msg_cancel_op},
 	{GETRSCSTATE,	NO_MSG,	on_msg_get_state},
 	{GETRSCMETA,	NO_MSG, 	on_msg_get_metadata},
 };
@@ -1459,7 +1454,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 			client->lastreqend = time(NULL);
 
 			/*return rc to client if need*/
-			if (send_msg_now(i,ret)) {
+			if (send_msg_now(i)) {
 				send_ret_msg(ch, ret);
 				client->lastrcsent = time(NULL);
 			}
@@ -2022,13 +2017,11 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		return -1;
 	}
 	LRMAUDIT();
-	set_rsc_removal_pending(rsc);
 	(void)flush_all(&(rsc->repeat_op_list));
 	if( flush_all(&(rsc->op_list)) ) {
+		set_rsc_removal_pending(rsc);
 		LRMAUDIT();
-		rsc->requestors =
-			g_list_append(rsc->requestors,GUINT_TO_POINTER(client->pid));
-		return POSTPONE_MSG; /* resource is busy, delay removal and reply */
+		return HA_OK; /* resource is busy, delay removal */
 	}
 	lrmd_rsc_destroy(rsc);
 	LRMAUDIT();
@@ -2125,6 +2118,7 @@ cancel_op(GList** listp,int cancel_op_id)
 {
 	GList* node = NULL;
 	lrmd_op_t* op = NULL;
+	int rc = HA_FAIL;
 
 	for( node = g_list_first(*listp)
 	; node; node = g_list_next(node) ) {
@@ -2133,15 +2127,16 @@ cancel_op(GList** listp,int cancel_op_id)
 			lrmd_debug(LOG_DEBUG
 			,"%s: %s cancelled"
 			, __FUNCTION__, op_info(op));
-			if( flush_op(op) == POSTPONE_MSG ) {
-				return POSTPONE_MSG;
-			} else {
+			rc = flush_op(op);
+			if( rc != POSTPONED && rc != HA_FAIL ) {
+				notify_client(op); /* send notification now */
 				*listp = g_list_remove(*listp, op);
-				return HA_OK;
+				lrmd_op_destroy(op);
 			}
+			return rc;
 		}
 	}
-	return -1;
+	return rc;
 }
 
 int
@@ -2159,7 +2154,7 @@ on_msg_cancel_op(lrmd_client_t* client, struct ha_msg* msg)
 	if (NULL == rsc) {
 		lrmd_log(LOG_ERR,
 			"%s: no resource with such id.", __FUNCTION__);
-		return -1;
+		return HA_FAIL;
 	}
 
 	return_on_no_int_value(msg, F_LRM_CALLID, &cancel_op_id);
@@ -2170,12 +2165,15 @@ on_msg_cancel_op(lrmd_client_t* client, struct ha_msg* msg)
 	,	client->pid
 	, 	cancel_op_id);
 
-	if( cancel_op(&(rsc->repeat_op_list), cancel_op_id) != HA_OK) {
+	if( cancel_op(&(rsc->repeat_op_list), cancel_op_id) != HA_OK ) {
 		op_cancelled = cancel_op(&(rsc->op_list), cancel_op_id);
-		if( op_cancelled == POSTPONE_MSG ) {
-			rsc->requestors =
-				g_list_append(rsc->requestors,GUINT_TO_POINTER(client->pid));
+		if(op_cancelled == POSTPONED) {
+			op_cancelled = HA_OK;
 		}
+	}
+	if( op_cancelled == HA_FAIL ) {
+		lrmd_debug(LOG_DEBUG, "%s: no operation with id %d",
+			__FUNCTION__, cancel_op_id);
 	}
 	LRMAUDIT();
 	return op_cancelled;
@@ -2191,11 +2189,12 @@ flush_all(GList** listp)
 	node = g_list_first(*listp);
 	while( node ) {
 		op = (lrmd_op_t*)node->data;
-		if( flush_op(op) == POSTPONE_MSG ) {
+		if( flush_op(op) == POSTPONED ) {
 			rsc_busy = TRUE;
 			node = g_list_next(node);
 		} else {
 			node = *listp = g_list_remove(*listp, op);
+			lrmd_op_destroy(op);
 		}
 	}
 	return rsc_busy;
@@ -2224,12 +2223,9 @@ on_msg_flush_all(lrmd_client_t* client, struct ha_msg* msg)
 	lrmd_debug2(LOG_DEBUG
 		,	"%s:client [%d] flush operations"
 		,	__FUNCTION__, client->pid);
-	set_rsc_flushing_ops(rsc);
 	(void)flush_all(&(rsc->repeat_op_list));
 	if( flush_all(&(rsc->op_list)) ) {
-		rsc->requestors =
-			g_list_append(rsc->requestors,GUINT_TO_POINTER(client->pid));
-		return POSTPONE_MSG; /* resource is busy, send msg later */
+		set_rsc_flushing_ops(rsc); /* resource busy */
 	}
 	LRMAUDIT();
 	return HA_OK;
@@ -2549,34 +2545,6 @@ record_op_completion(lrmd_client_t* client, lrmd_rsc_t* rsc, lrmd_op_t* op)
 	LRMAUDIT();
 }
 
-static void
-send_delayed_replies(lrmd_rsc_t* rsc, lrmd_op_t* op)
-{
-	GList* node = NULL;
-	lrmd_client_t* client = NULL;
-	pid_t client_id;
-
-	node = g_list_first(rsc->requestors);
-	while( node ) {
-		client_id = GPOINTER_TO_UINT(node->data);
-		client = lookup_client(client_id);
-		if( client && client->ch_cmd ) {
-			send_ret_msg(client->ch_cmd,HA_OK);
-			client->lastrcsent = time(NULL);
-			lrmd_debug(LOG_DEBUG, "%s: %s:%s sent delayed "
-			"message to the client(%d)" 
-			, __FUNCTION__, lrm_str(rsc->id), op_info(op), client->pid);
-		} else {
-			lrmd_log(LOG_ERR
-			,	"%s: client for the operation %s did not wait"
-				" for the reply."
-			,	__FUNCTION__, op_info(op));
-		}
-		node = rsc->requestors =
-			g_list_remove(rsc->requestors,GUINT_TO_POINTER(client_id));
-	}
-}
-
 /* 1. this function sends a message to the client:
  *   a) on operation instance exit using the callback channel
  *   b) in case a client requested that operation to be cancelled,
@@ -2667,7 +2635,7 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 		/*record the outcome of the op */
 		record_op_completion(client, rsc, op);
 		/*copy the repeat op to repeat list to wait next perform */
-		if ( op->interval && client ) {
+		if ( client && op->interval ) {
 			lrmd_op_t* repeat_op = lrmd_op_copy(op);
 			repeat_op->is_copy = FALSE;
 			repeat_op->repeat_timeout_tag = 
@@ -2679,34 +2647,13 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 			, "on_op_done:repeat %s is added to repeat op list to wait" 
 			, op_info(op));
 		}
-		if ( need_notify ) {
-			if (client) {
-				/* send the result to client */
-				if (!client->ch_cbk) {
-					lrmd_log(LOG_ERR,
-						"on_op_done: callback channel is null");
-				} else if (HA_OK != msg2ipcchan(op->msg, client->ch_cbk)) {
-					lrmd_log(LOG_ERR,
-						"on_op_done: can not send the ret msg");
-				}
-			} else {
-				lrmd_log(LOG_ERR
-				,	"%s: client for the operation %s does not exist"
-					" and client requested notification."
-				,	__FUNCTION__,	op_info(op));
-				lrmd_op_dump(op, "lrmd_op_done: no client");
-			}
-		}
-	} else { /* operation cancelled */
-		/* there should be only one, so this should succeed */
-		if( !rsc_frozen(rsc) || !rsc->op_list ) {
-			send_delayed_replies(rsc,op);
-		}
+	}
+	if ( need_notify ) {
+		notify_client(op);
 	}
 	lrmd_op_destroy(op);
 	if( !rsc->op_list ) {
 		if( rsc_removal_pending(rsc) ) {
-			rsc_reset_state(rsc);
 			lrmd_rsc_destroy(rsc);
 		} else {
 			rsc_reset_state(rsc);
@@ -2717,8 +2664,9 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 }
 
 /*
- * an operation is flushed (i.e. destroyed) only in case there is
+ * an operation is flushed only in case there is
  * no process running initiated by this operation
+ * NB: the caller has to destroy the operation itself
  */
 int
 flush_op(lrmd_op_t* op)
@@ -2740,13 +2688,12 @@ flush_op(lrmd_op_t* op)
 	}
 
 	if( op->exec_pid == -1 ) {
-		lrmd_op_destroy(op);
 		return HA_OK;
 	} else {
 		lrmd_debug(LOG_DEBUG, "%s: process for %s still "
 			"running, flush delayed"
 			,__FUNCTION__,small_op_info(op));
-		return POSTPONE_MSG;
+		return POSTPONED;
 	}
 }
 
@@ -3218,6 +3165,28 @@ send_ret_msg (IPC_Channel* ch, int ret)
 	}
 	ha_msg_del(msg);
 	return HA_OK;
+}
+
+void
+notify_client(lrmd_op_t* op)
+{
+	lrmd_client_t* client = lookup_client(op->client_id);
+
+	if (client) {
+		/* send the result to client */
+		if (!client->ch_cbk) {
+			lrmd_log(LOG_ERR,
+				"%s: callback channel is null", __FUNCTION__);
+		} else if (HA_OK != msg2ipcchan(op->msg, client->ch_cbk)) {
+			lrmd_log(LOG_ERR,
+				"%s: can not send the ret msg", __FUNCTION__);
+		}
+	} else {
+		lrmd_log(LOG_ERR
+		,	"%s: client for the operation %s does not exist"
+			" and client requested notification."
+		,	__FUNCTION__,	op_info(op));
+	}
 }
 
 lrmd_client_t*

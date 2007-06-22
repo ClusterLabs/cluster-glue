@@ -45,6 +45,7 @@ static int perform_op(lrmd_rsc_t* rsc);
 static int unregister_client(lrmd_client_t* client);
 static int on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op);
 static int send_ret_msg ( IPC_Channel* ch, int rc);
+static void notify_client(lrmd_op_t* op);
 static lrmd_client_t* lookup_client (pid_t pid);
 static lrmd_rsc_t* lookup_rsc (const char* rid);
 static lrmd_rsc_t* lookup_rsc_by_msg (struct ha_msg* msg);
@@ -67,7 +68,6 @@ static void warning_on_active_rsc(gpointer key, gpointer value, gpointer user_da
 static void check_queue_duration(lrmd_op_t* op);
 static gboolean flush_all(GList** listp);
 static gboolean cancel_op(GList** listp,int cancel_op_id);
-static void send_delayed_replies(lrmd_rsc_t* rsc, lrmd_op_t* op);
 
 /*
  * following functions are used to monitor the exit of ra proc

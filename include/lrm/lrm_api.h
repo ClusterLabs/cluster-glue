@@ -183,9 +183,11 @@ struct rsc_ops
  *
  *callid:	the call id returned by perform_op()
  *
- *return:	op cancel is delayed in case there is process running
- *       	for the op until the process has exited;
- *       	in that case this call will block
+ *return:	HA_OK for success, HA_FAIL for failure op not found
+ *				or other failure
+ *			NB: the client always gets a notification over callback
+ *				even for operations which were idle (of course, if
+ *				the request has been accepted for processing)
  */
 	int (*cancel_op) (lrm_rsc_t*, int call_id);
 
@@ -365,8 +367,7 @@ struct lrm_ops
  *
  *return:	HA_OK for success, HA_FAIL for failure
  *		NB: resource removal is delayed until all operations are
- *		removed; if there is a process running for the resource,
- *		this call will block
+ *		removed; the client, however, gets the reply immediately
  */
 	int	(*delete_rsc)(ll_lrm_t*, const char* rsc_id);
 
