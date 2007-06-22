@@ -60,6 +60,7 @@ void		cl_glib_msg_handler(const gchar *log_domain
 ,		gpointer user_data);
 
 void		cl_flush_logs(void);
+void cl_log_args(int argc, char **argv);
 
 
 typedef struct CircularBuffer_s 

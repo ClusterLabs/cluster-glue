@@ -1016,3 +1016,29 @@ DumpCircularBuffer(int nsig, gpointer user_data)
 	cl_log(LOG_INFO, "Mark: End dump of buffer %s", buffer->name);
 	return TRUE;
 }
+
+
+void
+cl_log_args(int argc, char **argv)
+{
+	int lpc = 0;
+	int len = 0;
+	int existing_len = 0;
+	char *arg_string = NULL;
+	
+	for(;lpc < argc; lpc++) {
+		if(argv[lpc] == NULL) {
+			break;
+		}
+		
+		len = 2 + strlen(argv[lpc]); /* +1 space, +1 EOS */
+		if(arg_string) {
+			existing_len = strlen(arg_string);
+		}
+
+		arg_string = cl_realloc(arg_string, len + existing_len);
+		sprintf(arg_string + existing_len, "%s ", argv[lpc]);
+	}
+	cl_log(LOG_INFO, "Invoked: %s", arg_string);
+	cl_free(arg_string);
+}
