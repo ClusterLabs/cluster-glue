@@ -2131,6 +2131,7 @@ cancel_op(GList** listp,int cancel_op_id)
 			if( rc != POSTPONED && rc != HA_FAIL ) {
 				notify_client(op); /* send notification now */
 				*listp = g_list_remove(*listp, op);
+				remove_op_history(op);
 				lrmd_op_destroy(op);
 			}
 			return rc;
@@ -2465,6 +2466,11 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	return HA_OK;
 }
 
+#define mk_op_id(op,id) do { \
+	const char *op_type = ha_msg_value(op->msg, F_LRM_OP); \
+	const char *op_interval = ha_msg_value(op->msg, F_LRM_INTERVAL); \
+	id = lrm_concat(op_type, op_interval, '_'); \
+} while(0)
 #define safe_len(s) (s ? strlen(s) : 0)
 
 static char *
@@ -2496,8 +2502,6 @@ record_op_completion(lrmd_client_t* client, lrmd_rsc_t* rsc, lrmd_op_t* op)
 	lrmd_op_t* old_op = NULL;
 	lrmd_op_t* new_op = NULL;
 	GHashTable* client_last_op = NULL;
-	const char* op_type = NULL;
-	const char* op_interval = NULL;
 
 	LRMAUDIT();
 	/*save the op in the last op finished*/
@@ -2524,11 +2528,7 @@ record_op_completion(lrmd_client_t* client, lrmd_rsc_t* rsc, lrmd_op_t* op)
 		,	(gpointer)client_last_op);
 	}
 
-	/* Insert the op into the hash table for the client*/
-	op_type = ha_msg_value(op->msg, F_LRM_OP);
-	op_interval = ha_msg_value(op->msg, F_LRM_INTERVAL);
-	op_hash_key = lrm_concat(op_type, op_interval, '_');
-
+	mk_op_id(op,op_hash_key);
 	old_op = g_hash_table_lookup(client_last_op, op_hash_key);
 	new_op = lrmd_op_copy(op);
 	if (NULL != old_op) {
@@ -2542,6 +2542,41 @@ record_op_completion(lrmd_client_t* client, lrmd_rsc_t* rsc, lrmd_op_t* op)
 		, 	op_hash_key
 		,	(gpointer)new_op);
 	}
+	LRMAUDIT();
+}
+
+static void 
+remove_op_history(lrmd_op_t* op)
+{
+	lrmd_client_t* client = lookup_client(op->client_id);
+	lrmd_rsc_t* rsc = NULL;
+	char *op_id, *last_op_id;
+	lrmd_op_t* old_op = NULL;
+	GHashTable* client_last_op = NULL;
+
+	LRMAUDIT();
+	if( !(rsc = lookup_rsc(op->rsc_id)) ) {
+		return;
+	}
+	mk_op_id(op,op_id);
+	if (rsc->last_op_done != NULL ) {
+		mk_op_id(rsc->last_op_done,last_op_id);
+		if( !strcmp(op_id,last_op_id) ) {
+			lrmd_op_destroy(rsc->last_op_done);
+			rsc->last_op_done = NULL;
+		}
+		cl_free(last_op_id);
+	}
+	if( client &&
+		(client_last_op = g_hash_table_lookup(rsc->last_op_table
+			, 			client->app_name)) ) {
+		old_op = g_hash_table_lookup(client_last_op, op_id);
+		if (old_op) {
+			g_hash_table_remove(client_last_op,	op_id);
+			lrmd_op_destroy(old_op);
+		}
+	}
+	cl_free(op_id);
 	LRMAUDIT();
 }
 
@@ -2647,6 +2682,8 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 			, "on_op_done:repeat %s is added to repeat op list to wait" 
 			, op_info(op));
 		}
+	} else {
+		remove_op_history(op);
 	}
 	if ( need_notify ) {
 		notify_client(op);
