@@ -410,7 +410,6 @@ external_set_config(StonithPlugin* s, StonithNVpair *list)
 			if (OurImports->GetValue(list, *p) == NULL) {
 				LOG(PIL_INFO, "Cannot get parameter %s from "
 					"StonithNVpair", *p);
-				return S_OOPS;
 			}
 		}
 	}
@@ -754,6 +753,11 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	g_string_free(g_str_tmp, TRUE);
 
 	rc = pclose(file);
+	if(rc != 0) {
+		LOG(PIL_DEBUG, "%s: Calling '%s' returned %d", __FUNCTION__, cmd, rc);
+		LOG(PIL_DEBUG, "%s: '%s' output: %s", __FUNCTION__, cmd, data?data:"-none-");
+	}
+
 	if (output) {
 		*output = data;
 	} else {
