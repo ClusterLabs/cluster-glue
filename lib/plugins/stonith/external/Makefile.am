@@ -21,4 +21,4 @@ MAINTAINERCLEANFILES = Makefile.in
 
 extdir		     = $(stonith_ext_plugindir)
 
-ext_SCRIPTS	     = ibmrsa riloe ssh 
+ext_SCRIPTS	     = ibmrsa riloe ssh vmware
