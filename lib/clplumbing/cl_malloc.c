@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <errno.h>
 #ifndef BSD
@@ -172,6 +173,7 @@ static void	cl_dump_item(const struct cl_bucket*b);
 #define	MEMORYSIZE(p)(CBHDR(p)->hdr.reqsize)
 
 #define MALLOCSIZE(allocsize) ((allocsize) + cl_malloc_hdr_offset + GUARDSIZE)
+#define MAXMALLOC	(SIZE_MAX-(MALLOCSIZE(0)+1))
 
 #ifdef MAKE_GUARD
 #	define GUARDLEN 4
@@ -374,8 +376,11 @@ cl_malloc(size_t size)
 	struct cl_bucket*	buckptr = NULL;
 	void*			ret;
 
-	if( !size ) {
+	if(size) {
 		size=sizeof(int);
+	}
+	if (size > MAXMALLOC) {
+		return NULL;
 	}
 	if (!cl_malloc_inityet) {
 		cl_malloc_init();
