@@ -22,7 +22,9 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#ifdef HAVE_STDINT_H
 #include <stdint.h>
+#endif /* HAVE_STDINT_H */
 #include <string.h>
 #include <errno.h>
 #ifndef BSD
