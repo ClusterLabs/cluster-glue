@@ -376,7 +376,7 @@ cl_malloc(size_t size)
 	struct cl_bucket*	buckptr = NULL;
 	void*			ret;
 
-	if(size) {
+	if(!size) {
 		size=sizeof(int);
 	}
 	if (size > MAXMALLOC) {
