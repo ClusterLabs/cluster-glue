@@ -377,7 +377,11 @@ cl_malloc(size_t size)
 	void*			ret;
 
 	if(!size) {
-		size=sizeof(int);
+		cl_log(LOG_ERR
+		,	"%s: refusing to allocate zero sized block"
+		,	__FUNCTION__
+		);
+		return NULL;
 	}
 	if (size > MAXMALLOC) {
 		return NULL;
