@@ -161,7 +161,6 @@ ra_pipe_op_new(int child_stdout, int child_stderr, lrmd_op_t * lrmd_op)
 	ra_pipe_op_t * rapop;
 	lrmd_rsc_t* rsc = NULL;
 
-	LRMAUDIT();
 	if ( NULL == lrmd_op ) {
 		lrmd_log(LOG_WARNING
 			, "%s:%d: lrmd_op==NULL, no need to malloc ra_pipe_op"
@@ -219,14 +218,12 @@ ra_pipe_op_new(int child_stdout, int child_stderr, lrmd_op_t * lrmd_op)
 		rapop->rsc_class = cl_strdup(rsc->class);
 	} 
 
-	LRMAUDIT();
 	return rapop;
 }
 
 static void
 ra_pipe_op_destroy(ra_pipe_op_t * rapop)
 {
-	LRMAUDIT();
 	CHECK_ALLOCATED(rapop, "ra_pipe_op", );
 
 	if ( NULL != rapop->ra_stdout_gsource) {
@@ -267,13 +264,11 @@ ra_pipe_op_destroy(ra_pipe_op_t * rapop)
 	}
 
 	cl_free(rapop);
-	LRMAUDIT();
 }
 
 static void
 lrmd_op_destroy(lrmd_op_t* op)
 {
-	LRMAUDIT();
 	CHECK_ALLOCATED(op, "op", );
 	--lrm_objectstats.opcount;
 
@@ -281,7 +276,6 @@ lrmd_op_destroy(lrmd_op_t* op)
 		lrmd_log(LOG_CRIT
 		,	"%s: lingering operation process %d, op %s"
 		,	__FUNCTION__, op->exec_pid, small_op_info(op));	
-		LRMAUDIT();
 		return;
 	}
 	ha_msg_del(op->msg);
@@ -304,7 +298,6 @@ lrmd_op_destroy(lrmd_op_t* op)
 	lrmd_debug3(LOG_DEBUG, "%s: free the op whose address is %p"
 		  ,__FUNCTION__, op);
 	cl_free(op);
-	LRMAUDIT();
 }
 
 static lrmd_op_t*
@@ -335,7 +328,6 @@ lrmd_op_copy(const lrmd_op_t* op)
 {
 	lrmd_op_t* ret;
 
-	LRMAUDIT();
 	ret = lrmd_op_new();
 	if (NULL == ret) {
 		return NULL;
@@ -359,7 +351,6 @@ lrmd_op_copy(const lrmd_op_t* op)
 	ret->repeat_timeout_tag = 0;
 	ret->exec_pid = -1;
 	ret->is_copy = TRUE;
-	LRMAUDIT();
 	return ret;
 }
 
