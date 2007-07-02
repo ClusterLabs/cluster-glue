@@ -33,6 +33,8 @@
 #include <sys/time.h>
 #include <fcntl.h>
 #include <pwd.h>
+#include <string.h>
+#include <stdlib.h>
 #ifdef HAVE_SYS_PRCTL_H
 #	include <sys/prctl.h>
 #endif
@@ -100,7 +102,9 @@ cl_cdtocoredir(void)
 	return rc;
 }
 
-#define	PROC_SYS_KERNEL	"/proc/sys/kernel/core_uses_pid"
+#define	CHECKED_KERNEL_CORE_ENV		"_PROC_SYS_CORE_CHECKED_"
+#define	PROC_SYS_KERNEL_CORE_PID	"/proc/sys/kernel/core_uses_pid"
+#define	PROC_SYS_KERNEL_CORE_PAT	"/proc/sys/kernel/core_pattern"
 
 static void cl_coredump_signal_handler(int nsig);
 
@@ -115,15 +119,38 @@ static void cl_coredump_signal_handler(int nsig);
 static int
 core_uses_pid(void)
 {
-	const char *	pathnames[] = {PROC_SYS_KERNEL};
+	const char *	uses_pid_pathnames[] = {PROC_SYS_KERNEL_CORE_PID};
+	const char *	corepats_pathnames[] = {PROC_SYS_KERNEL_CORE_PAT};
+	const char *	goodpats [] = {"%t", "%p"};
 	int		j;
 
 
-	for (j=0; j < DIMOF(pathnames); ++j) {
+	for (j=0; j < DIMOF(corepats_pathnames); ++j) {
+		int	fd;
+		char	buf[256];
+		int	rc;
+		int	k;
+
+		if ((fd = open(corepats_pathnames[j], O_RDONLY)) < 0) {
+			continue;
+		}
+		rc = read(fd, buf, sizeof(buf));
+		close(fd);
+		if (rc < 1) {
+			continue;
+		}
+		for (k=0; k < DIMOF(goodpats); ++k) {
+			if (strstr(buf, goodpats[k]) != NULL) {
+				return 1;
+			}
+		}
+		break;
+	}
+	for (j=0; j < DIMOF(uses_pid_pathnames); ++j) {
 		int	fd;
 		char	buf[2];
 		int	rc;
-		if ((fd = open(pathnames[j], O_RDONLY)) < 0) {
+		if ((fd = open(uses_pid_pathnames[j], O_RDONLY)) < 0) {
 			continue;
 		}
 		rc = read(fd, buf, sizeof(buf));
@@ -133,6 +160,7 @@ core_uses_pid(void)
 		}
 		return (buf[0] == '1');
 	}
+	setenv(CHECKED_KERNEL_CORE_ENV, "1", TRUE);
 	return -1;
 }
 
@@ -167,14 +195,17 @@ cl_enable_coredumps(int doenable)
 		errno = errsave;
 		return rc;
 	}
-	if (core_uses_pid() == 0) {
+	if (getenv(CHECKED_KERNEL_CORE_ENV) == NULL
+	&&	core_uses_pid() == 0) {
 		cl_log(LOG_WARNING
-		,	"Core dumps could be lost if multiple dumps occur");
+		,	"Core dumps could be lost if multiple dumps occur.");
+		cl_log(LOG_WARNING
+		,	"Consider setting non-default value in %s"
+		" (or equivalent) for maximum supportability", PROC_SYS_KERNEL_CORE_PAT);
 		cl_log(LOG_WARNING
 		,	"Consider setting %s (or equivalent) to"
-		" 1 for maximum supportability", PROC_SYS_KERNEL);
+		" 1 for maximum supportability", PROC_SYS_KERNEL_CORE_PID);
 	}
-		
 	return 0;
 }
 
