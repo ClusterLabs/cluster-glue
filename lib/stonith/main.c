@@ -369,21 +369,35 @@ main(int argc, char** argv)
 		exit(0);
 	}
 
-	if (!listparanames && optfile == NULL && parameters == NULL && nvcount == 0) {
-		fprintf(stderr
-		,	"Must specify either -p option, -F option or "
-		"name=value style arguments\n");
-		usage(cmdname, 1, NULL);
-	}
 	if (SwitchType == NULL) {
 		fprintf(stderr,	"Must specify device type (-t option)\n");
 		usage(cmdname, 1, NULL);
 	}
+
+	s = stonith_new(SwitchType);
+	if (!listparanames && optfile == NULL && parameters == NULL && nvcount == 0) {
+		const char**	names;
+		int		needs_parms = 1;
+
+		if (s != NULL && (names = stonith_get_confignames(s)) != NULL && names[0] == NULL) {
+			needs_parms = 0;
+		}
+
+		if (needs_parms) {
+			fprintf(stderr
+			,	"Must specify either -p option, -F option or "
+			"name=value style arguments\n");
+			if (s != NULL) {
+				stonith_delete(s); 
+			}
+			usage(cmdname, 1, NULL);
+		}
+	}
+
 #ifndef LOG_PERROR
 #	define LOG_PERROR	0
 #endif
 	openlog(cmdname, (LOG_CONS|(silent ? 0 : LOG_PERROR)), LOG_USER);
-	s = stonith_new(SwitchType);
 	if (s == NULL) {
 		syslog(LOG_ERR, "Invalid device type: '%s'", SwitchType);
 		exit(S_OOPS);
