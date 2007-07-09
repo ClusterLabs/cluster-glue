@@ -138,8 +138,8 @@ time_longclock(void)
 	static	gboolean	calledbefore	= FALSE;
 	static	unsigned long	lasttimes	= 0L;
 	static	unsigned long	wrapcount	= 0L;
-	static	longclock_t	lc_wrapcount	= 0L;
 	static	unsigned long	callcount	= 0L;
+	static	longclock_t	lc_wrapcount	= 0L;
 	unsigned long		timesval;
 
 	++callcount;
@@ -149,7 +149,7 @@ time_longclock(void)
 	if (calledbefore && timesval < lasttimes)  {
 		clock_t		jumpbackby = lasttimes - timesval;
 
-		if (jumpbackby < MINJUMP) {
+		if (jumpbackby < (clock_t)MINJUMP) {
 			/* Kernel weirdness */
 			cl_log(LOG_CRIT
 			,	"%s: clock_t from times(2) appears to"
