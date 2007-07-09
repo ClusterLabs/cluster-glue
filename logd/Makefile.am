@@ -25,13 +25,15 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 
 halibdir		= $(libdir)/@HB_PKG@
+ha_sbindir		= $(sbindir)
 gliblib			= @GLIBLIB@
 
 LIBRT 			= @LIBRT@
 AM_CFLAGS		= @CFLAGS@
 
 ## binary progs
-halib_PROGRAMS	  = ha_logd ha_logger logtest
+ha_sbin_PROGRAMS  = ha_logger
+halib_PROGRAMS	  = ha_logd logtest
 
 ha_logd_SOURCES	  = ha_logd.c
 ha_logd_LDADD	  = $(top_builddir)/lib/clplumbing/libplumb.la		\
@@ -46,4 +48,7 @@ logtest_SOURCES   = logtest.c
 logtest_LDADD     = $(top_builddir)/lib/clplumbing/libplumb.la    	\
                     $(gliblib)
 
-
+install-exec-hook:
+	cd $(DESTDIR)$(halibdir) && \
+	$(RM) $(DESTDIR)$(sbindir)/ha_logger && \
+	$(LN_S) $(sbindir)/ha_logger .
