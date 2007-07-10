@@ -105,7 +105,6 @@ xmlinfo = '''<parameters>
    The password for the ilo device user
   </longdesc>
  </parameter>
-</parameters>
 <parameter name="ilo_can_reset" unique="0">
   <content type="string" default="0"/>
   <shortdesc lang="en">Device can reset</shortdesc>
@@ -113,7 +112,6 @@ xmlinfo = '''<parameters>
    Does the ILO device support RESET commands (hint: older ones cannot)
   </longdesc>
  </parameter>
-</parameters>
 <parameter name="ilo_protocol" unique="0">
   <content type="string" default="1.2"/>
   <shortdesc lang="en">ILO Protocol</shortdesc>
@@ -122,7 +120,6 @@ xmlinfo = '''<parameters>
    Known supported versions: 1.2, 2.0
   </longdesc>
  </parameter>
-</parameters>
 <parameter name="ilo_powerdown_method" unique="0">
   <content type="string" default="power"/>
   <shortdesc lang="en">Power down method</shortdesc>
