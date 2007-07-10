@@ -80,28 +80,28 @@ xmlinfo = '''<parameters>
  <parameter name="hostlist" unique="1">
   <content type="string"/>
   <shortdesc lang="en">ilo target hostname</shortdesc>
-  <longdesc lang=en>
-   Continas the hostname that the ilo controls
+  <longdesc lang="en">
+   Contains the hostname that the ilo controls
   </longdesc>
  </parameter>
 <parameter name="ilo_hostname" unique="1">
   <content type="string"/>
   <shortdesc lang="en">ilo device hostname</shortdesc>
-  <longdesc lang=en>
+  <longdesc lang="en">
    The hostname of the ilo device
   </longdesc>
  </parameter>
 <parameter name="ilo_user" unique="0">
   <content type="string" default="Administrator"/>
   <shortdesc lang="en">ilo user</shortdesc>
-  <longdesc lang=en>
+  <longdesc lang="en">
    The user for connecting to the ilo device
   </longdesc>
  </parameter>
 <parameter name="ilo_password" unique="0">
   <content type="string" default=""/>
   <shortdesc lang="en">password</shortdesc>
-  <longdesc lang=en>
+  <longdesc lang="en">
    The password for the ilo device user
   </longdesc>
  </parameter>
@@ -109,7 +109,7 @@ xmlinfo = '''<parameters>
 <parameter name="ilo_can_reset" unique="0">
   <content type="string" default="0"/>
   <shortdesc lang="en">Device can reset</shortdesc>
-  <longdesc lang=en>
+  <longdesc lang="en">
    Does the ILO device support RESET commands (hint: older ones cannot)
   </longdesc>
  </parameter>
@@ -117,7 +117,7 @@ xmlinfo = '''<parameters>
 <parameter name="ilo_protocol" unique="0">
   <content type="string" default="1.2"/>
   <shortdesc lang="en">ILO Protocol</shortdesc>
-  <longdesc lang=en>
+  <longdesc lang="en">
    Protocol version supported by the ILO device.
    Known supported versions: 1.2, 2.0
   </longdesc>
@@ -126,7 +126,7 @@ xmlinfo = '''<parameters>
 <parameter name="ilo_powerdown_method" unique="0">
   <content type="string" default="power"/>
   <shortdesc lang="en">Power down method</shortdesc>
-  <longdesc lang=en>
+  <longdesc lang="en">
    The method to powerdown the host in question.
    * button - Emulate holding down the power button
    * power  - Emulate turning off the machines power 
