@@ -49,6 +49,4 @@ logtest_LDADD     = $(top_builddir)/lib/clplumbing/libplumb.la    	\
                     $(gliblib)
 
 install-exec-hook:
-	cd $(DESTDIR)$(halibdir) && \
-	$(RM) $(DESTDIR)$(sbindir)/ha_logger && \
-	$(LN_S) $(sbindir)/ha_logger .
+	$(LN_S) -f $(sbindir)/ha_logger $(DESTDIR)$(halibdir)
