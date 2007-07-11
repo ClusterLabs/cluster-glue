@@ -113,7 +113,7 @@ getinfo-xml)
 	cat <<EOF
 <parameters>
 
-<parameter name="hostname" unique="1">
+<parameter name="hostname" unique="1" required="1">
 <content type="string" />
 <shortdesc lang="en">
 Hostname
@@ -123,7 +123,7 @@ The hostname of the host to be managed by this STONITH device
 </longdesc>
 </parameter>
 
-<parameter name="ipaddr" unique="1">
+<parameter name="ipaddr" unique="1" required="1">
 <content type="string" />
 <shortdesc lang="en">
 IP Address
@@ -133,27 +133,27 @@ The IP address of the STONITH device
 </longdesc>
 </parameter>
 
-<parameter name="userid" unique="1">
+<parameter name="userid" unique="0" required="1">
 <content type="string" />
 <shortdesc lang="en">
 Login
 </shortdesc>
 <longdesc lang="en">
-The username used for logging in to the STONITH device
+The username used to login into the STONITH device
 </longdesc>
 </parameter>
 
-<parameter name="passwd" unique="1">
+<parameter name="passwd" unique="0" required="1">
 <content type="string" />
 <shortdesc lang="en">
 Password
 </shortdesc>
 <longdesc lang="en">
-The password used for logging in to the STONITH device
+The password used to login into the STONITH device
 </longdesc>
 </parameter>
 
-<parameter name="type">
+<parameter name="type" unique="0" required="1">
 <content type="string" />
 <shortdesc lang="en">
 Management processor type
