@@ -102,7 +102,8 @@ main(int argc, char** argv)
 		fd = open(meatpipe, O_WRONLY | O_NONBLOCK);
 
 		if (fd < 0) {
-			sprintf(line, "Meatware_IPC failed: %s", meatpipe);
+			snprintf(line, sizeof(line)
+			,	"Meatware_IPC failed: %s", meatpipe);
 			perror(line);
 			exit(S_BADHOST);
 		}

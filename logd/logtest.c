@@ -73,7 +73,7 @@ send_log_msg(gpointer data)
 	priority = LOG_INFO;
 	msgstring[0]=0;
 	
-	sprintf(msgstring, "Message %d", count++);
+	snprintf(msgstring,  sizeof(msgstring),"Message %d", count++);
 	fprintf(stderr, "sending %s\n", msgstring);
 	if (LogToDaemon(priority, msgstring,MAXMSGSIZE, FALSE) != HA_OK){			
 		printf("sending out messge %d failed\n", count);

@@ -82,7 +82,7 @@ int main(void)
 
 	md_tmp = md;
         for (i = 0; i < MD5LEN; i++) {
-                sprintf(md_tmp,"%02x", digest[i]);
+                snprintf(md_tmp, sizeof(md), "%02x", digest[i]);
                 md_tmp += 2;
         }
         *md_tmp = '\0';
