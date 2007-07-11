@@ -1041,7 +1041,8 @@ init_using_apphb(void)
 		return -1;
 	}
 
-	sprintf(lrmd_instance, "%s_%ld", lrm_system_name, (long)getpid());
+	snprintf(lrmd_instance, sizeof(lrmd_instance), "%s_%ld"
+	,	lrm_system_name, (long)getpid());
 	if (apphb_register(lrm_system_name, lrmd_instance) != 0) {
 		lrmd_log(LOG_ERR, "Failed when trying to register to apphbd.");
 		lrmd_log(LOG_ERR, "Maybe apphbd is not running. Quit.");

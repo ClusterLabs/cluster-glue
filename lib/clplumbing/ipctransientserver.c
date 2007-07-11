@@ -76,7 +76,7 @@ init_server_ipc_comms(const char *child,
 		cl_log(LOG_ERR, "%s: allocating memory failed", __FUNCTION__);
 		exit(1);
 	}
-	sprintf(commpath, "%s/%s", commdir, child);
+	snprintf(commpath, local_sock_len, "%s/%s", commdir, child);
 	commpath[local_sock_len - 1] = '\0';
 
 	attrs = g_hash_table_new(g_str_hash,g_str_equal);

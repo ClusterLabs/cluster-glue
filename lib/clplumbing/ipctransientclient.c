@@ -30,6 +30,8 @@ gboolean transient_client_callback(IPC_Channel* server, void* private_data);
 void client_send_message(
 	const char *message_text, IPC_Channel *server_channel, int iteration);
 
+#define	MAXTSTMSG	1000
+
 int
 main(int argc, char ** argv)
 {
@@ -55,11 +57,14 @@ main(int argc, char ** argv)
 	}
 
 	for(lpc = 0; lpc < MAX_MESSAGES; lpc++) {
-		messages[lpc] = (char *)malloc(sizeof(char)*1000);
+		messages[lpc] = (char *)malloc(sizeof(char)*MAXTSTMSG);
 	}
-	sprintf(messages[0], "%s_%ld%c", "hello", (long)getpid(), '\0');
-	sprintf(messages[1], "%s_%ld%c", "hello_world", (long)getpid(), '\0');
-	sprintf(messages[2], "%s_%ld%c", "hello_world_again", (long)getpid(), '\0');
+	snprintf(messages[0], MAXTSTMSG
+	,	"%s_%ld%c", "hello", (long)getpid(), '\0');
+	snprintf(messages[1], MAXTSTMSG
+	,	"%s_%ld%c", "hello_world", (long)getpid(), '\0');
+	snprintf(messages[2], MAXTSTMSG
+	,	"%s_%ld%c", "hello_world_again", (long)getpid(), '\0');
 
 	for(lpc = 0; lpc < MAX_MESSAGES; lpc++) {
 		client_send_message(messages[lpc], server_channel, lpc);
