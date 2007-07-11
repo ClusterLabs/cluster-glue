@@ -27,13 +27,8 @@
 
 #echo "started with: $@" | debug
 
-outf=@HA_VARRUNHBDIR@/ibmrsa-$$
-touch $outf
-if [ ! -f $outf ]
-then
-	echo "cannot create temporary file $outf"
-	exit 1
-fi
+. @HA_HBCONF_DIR@/shellfuncs
+outf=`maketempfile`
 trap "cat $outf >&2; rm -f $outf" EXIT
 
 chkmpcli() {
