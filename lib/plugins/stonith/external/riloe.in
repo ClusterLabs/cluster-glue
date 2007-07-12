@@ -127,6 +127,11 @@ xmlinfo = '''<parameters>
    The method to powerdown the host in question.
    * button - Emulate holding down the power button
    * power  - Emulate turning off the machines power 
+
+   NB: In case acpid is not running on the node to be fenced and
+   the method is set to power (which is the default) "on" and
+   "off" requests are not going to work. "reset" should work in
+   any case.
   </longdesc>
  </parameter>
 </parameters>'''
