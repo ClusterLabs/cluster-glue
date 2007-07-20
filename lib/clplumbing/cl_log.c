@@ -1025,6 +1025,10 @@ cl_log_args(int argc, char **argv)
 	int len = 0;
 	int existing_len = 0;
 	char *arg_string = NULL;
+
+	if(argc == 0 || argv == NULL) {
+	    return;
+	}
 	
 	for(;lpc < argc; lpc++) {
 		if(argv[lpc] == NULL) {
