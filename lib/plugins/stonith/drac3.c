@@ -136,7 +136,7 @@ static const char *drac3XML =
 static StonithPlugin *
 drac3_new(const char *subplugin)
 {
-	struct pluginDevice *drac3d = MALLOCT(struct pluginDevice);
+	struct pluginDevice *drac3d = ST_MALLOCT(struct pluginDevice);
 
 	if (drac3d == NULL) {
 			LOG(PIL_CRIT, "out of memory");

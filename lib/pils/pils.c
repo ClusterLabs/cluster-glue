@@ -584,7 +584,7 @@ RemoveAPILPluginType(PILPluginType*Plugintype)
  *	InterfaceManager_plugin_init: Initialize the handling of
  *	"Interface Manager" interfaces.
  *
- *	There are a few potential bootstraiffng problems here ;-)
+ *	There are a few potential bootstrapping problems here ;-)
  *
  */
 static PIL_rc

@@ -333,7 +333,7 @@ ssh_destroy(StonithPlugin *s)
 static StonithPlugin*
 ssh_new(const char *subplugin)
 {
-	struct pluginDevice*	sd = MALLOCT(struct pluginDevice);
+	struct pluginDevice*	sd = ST_MALLOCT(struct pluginDevice);
 
 	if (sd == NULL) {
 		LOG(PIL_CRIT, "out of memory");

@@ -317,7 +317,7 @@ riloe_destroy(StonithPlugin *s)
 static StonithPlugin *
 riloe_new(const char *subplugin)
 {
-	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
+	struct pluginDevice*	nd = ST_MALLOCT(struct pluginDevice);
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
