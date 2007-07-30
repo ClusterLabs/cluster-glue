@@ -920,7 +920,8 @@ try_again:
 
 			if (Debug) {
 				LOG(PIL_DEBUG, "BladeCenter '%s' has id %d"
-				,	ohRPT.ResourceTag.Data, dev->ohdevid);
+				,	(char*)ohRPT.ResourceTag.Data
+				,	dev->ohdevid);
 			}
 			break;
 
@@ -936,7 +937,7 @@ try_again:
 						LOG(PIL_DEBUG
 						, "MgmtModule '%s' has id %d "
 						"with sensor #%d"
-						, ohRPT.ResourceTag.Data
+						, (char*)ohRPT.ResourceTag.Data
 						, dev->ohsensid
 						, dev->ohsensnum);
 					}
@@ -958,11 +959,11 @@ try_again:
 			 * format consists only of "name"; we only need to
 			 * stash name because ResourceID is the important info
 			 */
-			if (sscanf(ohRPT.ResourceTag.Data, "Blade %d - %s"
+			if (sscanf((char*)ohRPT.ResourceTag.Data, "Blade %d - %s"
 					, &blnum, blname) == 2) {
 				bi->name = STRDUP(blname);
 			} else {
-				bi->name = STRDUP(ohRPT.ResourceTag.Data);
+				bi->name = STRDUP((char*)ohRPT.ResourceTag.Data);
 			}
 			if (bi->name == NULL) {
 				LOG(PIL_CRIT, "Out of memory for strdup in %s"
