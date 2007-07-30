@@ -40,7 +40,7 @@ callbacktest_LDFLAGS 	= 	$(COMMONLIBS)
 callbacktest_LDADD 	= 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 callbacktest_DEPENDENCIES    = 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 
-testdir			= 	$(libdir)/heartbeat/lrmtest
+testdir			= 	$(HA_NOARCHDATAHBDIR)/lrmtest
 test_SCRIPTS		=	LRMBasicSanityCheck
 EXTRA_DIST		=	LRMBasicSanityCheck
 
