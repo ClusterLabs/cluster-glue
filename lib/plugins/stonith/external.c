@@ -739,21 +739,12 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		data[slen]=EOS;
 		read_len = fread(buff, 1, BUFF_LEN, file);
 		if (read_len > 0) {
+			data=REALLOC(data, slen+read_len+1);
 			if (data == NULL) {
-				data = (char*)MALLOC(read_len+1);
-				if (data == NULL) {
-					break;
-				}
-				memcpy(data, buff, read_len);
-				slen = read_len;
-			}else{
-				data=REALLOC(data, slen+read_len+1);
-				if (data == NULL) {
-					break;
-				}
-				memcpy(data+slen, buff, read_len);
-				slen += read_len;
+				break;
 			}
+			memcpy(data+slen, buff, read_len);
+			slen += read_len;
 			data[slen] = EOS;
 		}else{
 			sleep(1);
