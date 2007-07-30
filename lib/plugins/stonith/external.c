@@ -734,7 +734,9 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 
 	data = NULL;
 	slen=0;
-	while(!feof(file)) {
+	data = MALLOC(1);
+	while(data && !feof(file)) {
+		data[slen]=EOS;
 		read_len = fread(buff, 1, BUFF_LEN, file);
 		if (read_len > 0) {
 			if (data == NULL) {
