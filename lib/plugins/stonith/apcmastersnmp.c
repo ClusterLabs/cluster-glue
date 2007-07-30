@@ -840,7 +840,7 @@ apcmastersnmp_destroy(StonithPlugin * s)
 static StonithPlugin *
 apcmastersnmp_new(const char *subplugin)
 {
-	struct pluginDevice *ad = MALLOCT(struct pluginDevice);
+	struct pluginDevice *ad = ST_MALLOCT(struct pluginDevice);
 
 	DEBUGCALL;
 

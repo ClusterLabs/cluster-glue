@@ -581,7 +581,7 @@ rcd_serial_destroy(StonithPlugin *s)
 static StonithPlugin *
 rcd_serial_new(const char *subplugin)
 {
-	struct pluginDevice*	rcd = MALLOCT(struct pluginDevice);
+	struct pluginDevice*	rcd = ST_MALLOCT(struct pluginDevice);
 
 	if (rcd == NULL) {
 		LOG(PIL_CRIT, "out of memory");

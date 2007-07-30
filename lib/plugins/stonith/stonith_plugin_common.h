@@ -62,9 +62,10 @@
 #define EXPECT_TOK	OurImports->ExpectToken
 #define STARTPROC	OurImports->StartProcess
 
-#ifndef MALLOCT
-#	define     MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
+#ifdef MALLOCT
+#	undef	MALLOCT
 #endif
+#define	ST_MALLOCT(t)      ((t *)(MALLOC(sizeof(t)))) 
 
 #define N_(text)	(text)
 #define _(text)		dgettext(ST_TEXTDOMAIN, text)

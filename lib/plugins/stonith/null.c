@@ -244,7 +244,7 @@ null_destroy(StonithPlugin *s)
 static StonithPlugin *
 null_new(const char *subplugin)
 {
-	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
+	struct pluginDevice*	nd = ST_MALLOCT(struct pluginDevice);
 
 	if (nd == NULL) {
 		LOG(PIL_CRIT, "out of memory");
