@@ -753,7 +753,6 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 				slen += read_len;
 			}
 			data[slen] = EOS;
-			fprintf(stderr, "Buf[%d chars] is [%s]\n", slen, data);
 		}else{
 			sleep(1);
 		}
