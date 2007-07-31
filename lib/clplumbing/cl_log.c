@@ -201,7 +201,7 @@ cl_inherit_logging_environment(int logqueuemax)
 	if (inherit_env != NULL && *inherit_env != EOS) {
 		int facility = -1;
 		facility = cl_syslogfac_str2int(inherit_env);
-		if ( facility != -1 ) {
+		if ( facility >= 0 ) {
 			cl_log_set_facility(facility);
 		}
 		inherit_env = NULL;
@@ -380,12 +380,18 @@ cl_log_set_entity(const char *	entity)
 void
 cl_log_set_logfile(const char *	path)
 {
+    if(path != NULL && strcasecmp("/dev/null", path) == 0) {
+	path = NULL;
+    }
 	logfile_name = path;
 }
 void
 cl_log_set_debugfile(const char * path)
 {
-	debugfile_name = path;
+    if(path != NULL && strcasecmp("/dev/null", path) == 0) {
+	path = NULL;
+    }
+    debugfile_name = path;
 }
 
 
