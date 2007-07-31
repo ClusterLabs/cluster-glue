@@ -26,4 +26,6 @@ char*	cl_get_env(const char* env_name);
 
 int	cl_binary_to_int(const char* data, int len);
 
+long	cl_get_msec(const char * input);	/* string to msec */
+
 #endif
