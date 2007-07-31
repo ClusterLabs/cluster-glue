@@ -140,6 +140,8 @@ if ( $command =~ /^gethosts$/ ) {
     print "VMware Server STONITH device\n";
 } elsif ( $command =~ /^getinfo-devdescr$/ ) {
     print "VMware Server STONITH device\n";
+} elsif ( $command =~ /^getinfo-devurl$/ ) {
+    print "http://www.vmware.com/";
 
 } elsif ( $command =~ /^on$/ ) {
     $config = config_for_host($targetHost);

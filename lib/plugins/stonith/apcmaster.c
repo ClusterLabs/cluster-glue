@@ -805,7 +805,7 @@ apcmaster_destroy(StonithPlugin *s)
 static StonithPlugin *
 apcmaster_new(const char *subplugin)
 {
-	struct pluginDevice*	ms = MALLOCT(struct pluginDevice);
+	struct pluginDevice*	ms = ST_MALLOCT(struct pluginDevice);
 
 	if (ms == NULL) {
 		LOG(PIL_CRIT, "out of memory");
