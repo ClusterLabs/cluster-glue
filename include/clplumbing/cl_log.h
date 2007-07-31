@@ -41,14 +41,14 @@ void		cl_log_enable_stderr(int truefalse);
 int		cl_set_logging_wqueue_maxlen(int);
 gboolean	cl_log_test_logd(void);
 void		cl_log_set_uselogd(int truefalse);
+void		cl_log_enable_syslog_filefmt(int truefalse);
 gboolean	cl_log_get_uselogd(void);
 void		cl_log_set_facility(int facility);
 void		cl_log_set_entity(const char *	entity);
 void		cl_log_set_logfile(const char *	path);
 void		cl_log_set_debugfile(const char * path);
-gboolean	cl_inherit_use_logd(const char*, int);
 void		inherit_compress(void);
-void		inherit_logconfig_from_environment(void);
+void		cl_inherit_logging_environment(int maxqlen);
 int		cl_log_set_logd_channel_source( void (*create_callback)(struct IPC_CHANNEL* chan),
 						GDestroyNotify destroy_callback);
 int		cl_log_get_logdtime(void);

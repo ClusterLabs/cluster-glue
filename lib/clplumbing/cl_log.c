@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <syslog.h>
 #include <time.h>
+#include <sys/utsname.h>
 #include <clplumbing/ipc.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/loggingdaemon.h>
@@ -60,6 +61,11 @@
 #define QUEUE_SATURATION_FUZZ 10
 
 static IPC_Channel*	logging_daemon_chan = NULL;
+static gboolean		syslogformatfile = FALSE;
+/*
+ * If true, then output messages more or less like this...
+ * Jul 14 21:45:18 beam logd: [1056]: info: setting log file to /dev/null
+ */
 
 int LogToDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 
@@ -81,11 +87,11 @@ static int		syslog_enabled = 0;
 static int		stderr_enabled = 0;
 static const char*	logfile_name = NULL;
 static const char*	debugfile_name = NULL;
-static int cl_process_pid = -1;
-static GDestroyNotify destroy_logging_channel_callback;
-static void (*create_logging_channel_callback)(IPC_Channel* chan);
-static gboolean		logging_chan_in_main_loop = FALSE;
+static int		cl_process_pid = -1;
 int			debug_level = 0;
+static GDestroyNotify	destroy_logging_channel_callback;
+static void		(*create_logging_channel_callback)(IPC_Channel* chan);
+static gboolean		logging_chan_in_main_loop = FALSE;
 
 /***********************
  *debug use only, do not use this function in your program
@@ -108,6 +114,11 @@ void
 cl_log_set_uselogd(int truefalse)
 {
 	use_logging_daemon = truefalse;
+}
+void
+cl_log_enable_syslog_filefmt(int truefalse)
+{
+	syslogformatfile = (gboolean)truefalse;
 }
 
 gboolean
@@ -132,35 +143,17 @@ cl_log_set_logdtime(int logdtime)
 }
 
 
-gboolean
-cl_inherit_use_logd(const char* param_name, int sendq_length) 
-{
-	char*		param_val;
-	gboolean	truefalse = FALSE;
-	
-	param_val = getenv(param_name);
-	
-	if(param_val != NULL) {
-		cl_str_to_boolean(param_val, &truefalse);
-		cl_log_set_uselogd(truefalse) ;
-	}
-	
-	if (truefalse){
-		if (sendq_length > 0){
-			cl_set_logging_wqueue_maxlen(sendq_length);
-		}
-	}
-	
-	return truefalse;
-	
-}     
+#define ENVPRE		"HA_"
 
-#define HADEBUGVAL	"HA_debug"
-#define LOGFENV		"HA_logfile"	/* well-formed log file :-) */
-#define DEBUGFENV	"HA_debugfile"	/* Debug log file */
-#define LOGFACILITY	"HA_logfacility"/* Facility to use for logger */
+#define ENV_HADEBUGVAL	"HA_debug"
+#define ENV_LOGFENV	"HA_logfile"	/* well-formed log file :-) */
+#define ENV_DEBUGFENV	"HA_debugfile"	/* Debug log file */
+#define ENV_LOGFACILITY	"HA_logfacility"/* Facility to use for logger */
+#define ENV_SYSLOGFMT	"HA_syslogmsgfmt"/* TRUE if we should use syslog message formatting */
+#define ENV_LOGDAEMON	"HA_logdaemon"
+#define	ENV_CONNINTVAL	"HA_conn_logd_time"
 #define TRADITIONAL_COMPRESSION "HA_traditional_compression"
-#define COMPRESSION "HA_compression"
+#define COMPRESSION	 "HA_compression"
 
 void
 inherit_compress(void)
@@ -168,7 +161,7 @@ inherit_compress(void)
 	char* inherit_env = NULL;
 	
 	inherit_env = getenv(TRADITIONAL_COMPRESSION);
-	if (inherit_env != NULL) {
+	if (inherit_env != NULL && *inherit_env != EOS) {
 		gboolean value;
 		
 		if (cl_str_to_boolean(inherit_env, &value)!= HA_OK){
@@ -181,31 +174,31 @@ inherit_compress(void)
 }
 
 void
-inherit_logconfig_from_environment(void)
+cl_inherit_logging_environment(int logqueuemax)
 {
 	char * inherit_env = NULL;
 
 	/* Donnot need to free the return pointer from getenv */
-	inherit_env = getenv(HADEBUGVAL);
+	inherit_env = getenv(ENV_HADEBUGVAL);
 	if (inherit_env != NULL && atoi(inherit_env) != 0 ) {
 		debug_level = atoi(inherit_env);
 		inherit_env = NULL;
 	}
 
-	inherit_env = getenv(LOGFENV);
-	if (inherit_env != NULL) {
+	inherit_env = getenv(ENV_LOGFENV);
+	if (inherit_env != NULL && *inherit_env != EOS) {
 		cl_log_set_logfile(inherit_env);
 		inherit_env = NULL;
 	}
 
-	inherit_env = getenv(DEBUGFENV);
-	if (inherit_env != NULL) {
+	inherit_env = getenv(ENV_DEBUGFENV);
+	if (inherit_env != NULL && *inherit_env != EOS) {
 		cl_log_set_debugfile(inherit_env);
 		inherit_env = NULL;
 	}
 
-	inherit_env = getenv(LOGFACILITY);
-	if (inherit_env != NULL) {
+	inherit_env = getenv(ENV_LOGFACILITY);
+	if (inherit_env != NULL && *inherit_env != EOS) {
 		int facility = -1;
 		facility = cl_syslogfac_str2int(inherit_env);
 		if ( facility != -1 ) {
@@ -214,9 +207,34 @@ inherit_logconfig_from_environment(void)
 		inherit_env = NULL;
 	}
 
+	inherit_env = getenv(ENV_SYSLOGFMT);
+	if (inherit_env != NULL && *inherit_env != EOS) {
+		gboolean truefalse;
+		if (cl_str_to_boolean(inherit_env, &truefalse) == HA_OK) {
+			cl_log_enable_syslog_filefmt(truefalse);
+		}
+	}
+
+	inherit_env = getenv(ENV_LOGDAEMON);
+	if (inherit_env != NULL && *inherit_env != EOS) {
+		gboolean	uselogd;
+		cl_str_to_boolean(inherit_env, &uselogd);
+		cl_log_set_uselogd(uselogd);
+		if (uselogd) {
+			if (logqueuemax > 0) {
+				cl_set_logging_wqueue_maxlen(logqueuemax);
+			}
+		}
+	}
+
+	inherit_env = getenv(ENV_CONNINTVAL);
+	if (inherit_env != NULL && *inherit_env != EOS) {
+		int logdtime;
+		logdtime = cl_get_msec(inherit_env);
+		cl_log_set_logdtime(logdtime);
+	}
 
 	inherit_compress();
-	
 	return;
 }
 
@@ -371,11 +389,11 @@ cl_log_set_debugfile(const char * path)
 }
 
 
-/* This function set two callback functions.
+/* 
+ * This function sets two callback functions.
  * One for creating a channel and 
  * the other for destroying a channel*
  */
-
 int
 cl_log_set_logd_channel_source( void (*create_callback)(IPC_Channel* chan),
 				GDestroyNotify destroy_callback)
@@ -384,13 +402,13 @@ cl_log_set_logd_channel_source( void (*create_callback)(IPC_Channel* chan),
 	
 	if (destroy_callback == NULL){
 		destroy_logging_channel_callback = remove_logging_channel_mainloop;
-	}else {		
+	}else{		
 		destroy_logging_channel_callback = destroy_callback;
 	}
 	
 	if (create_callback == NULL){
 		create_logging_channel_callback = add_logging_channel_mainloop;	
-	}else {
+	}else{
 		create_logging_channel_callback = create_callback;	
 	}
 	
@@ -431,16 +449,41 @@ prio2str(int priority)
 			else \
 				fprintf(fp,"%s\n",buf); \
 		}
-/* append log line to a file */
-#define append_log(fname,entity,entity_pid,ts,pristr,buf) { \
-			fp = fopen(fname, "a"); \
-			if (fp != NULL) { \
-				print_logline(fp,entity,entity_pid,ts,pristr,buf); \
-				fclose(fp); \
-			} \
-			else \
-				syslog(LOG_ERR,"Cannot open %s: %m",fname); \
-		}
+
+static char * syslog_timestamp(TIME_T t);
+
+static void
+append_log( const char * fname, const char * entity, int entity_pid
+,	TIME_T timestamp, const char * pristr, const char * msg)
+{
+	FILE *			fp = fopen(fname,"a");
+	static int		got_uname = FALSE;
+	static struct utsname	un;
+
+	if (!fp) {
+		syslog(LOG_ERR, "Cannot append to %s: %s", fname
+		,	strerror(errno)); 
+		return;
+	}
+	if (!syslogformatfile) {
+		print_logline(fp, entity, entity_pid, timestamp, pristr, msg);
+		fclose(fp);
+		return;
+	}
+	if (!got_uname) {
+		uname(&un);
+	}
+	/*
+	 * Jul 14 21:45:18 beam logd: [1056]: info: setting log file to /dev/null
+	 */
+	fprintf(fp, "%s %s %s: [%d]: %s %s %s\n"
+	,	syslog_timestamp(timestamp)
+	,	un.nodename, entity, entity_pid
+	,	(pristr ? pristr : "")
+	,	(pristr ? ": " : "")
+	,	msg);
+	fclose(fp);
+}
 
 /*
  * This function can cost us realtime unless use_logging_daemon
@@ -453,7 +496,6 @@ void
 cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 	      const char* entity, int entity_pid, TIME_T ts)
 {
-	FILE *		fp = NULL;
 	const char *	pristr;
 	int	needprivs = !cl_have_full_privs();
 
@@ -468,12 +510,12 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 	}
 	
 	if (syslog_enabled) {
-		if( entity ) {
+		if (entity) {
 			strncpy(common_log_entity, entity, MAXENTITY);
-		} else {
+		}else{
 			strncpy(common_log_entity, DFLT_ENTITY,MAXENTITY);
 		}
-		if (pristr){
+		if (pristr) {
 			syslog(priority, "[%d]: %s: %s%c",
 			       entity_pid, pristr,  buf, 0);
 		}else {
@@ -481,11 +523,13 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 		}
 	}
 
-	if (debugfile_name != NULL)
+	if (debugfile_name != NULL) {
 		append_log(debugfile_name,entity,entity_pid,ts,pristr,buf);
+	}
 
-	if (priority != LOG_DEBUG && logfile_name != NULL)
+	if (priority != LOG_DEBUG && logfile_name != NULL) {
 		append_log(logfile_name,entity,entity_pid,ts,pristr,buf);
+	}
 
 	if (needprivs) {
 		return_to_dropped_privs();
@@ -531,13 +575,14 @@ cl_log(int priority, const char * fmt, ...)
 		return_to_orig_privs();
 	}
 
-	if (stderr_enabled)
-		print_logline(stderr,cl_log_entity,cl_process_pid,
-			NULLTIME,prio2str(priority),buf);
+	if (stderr_enabled) {
+		print_logline(stderr, cl_log_entity,cl_process_pid,
+			NULLTIME, prio2str(priority), buf);
+	}
 
-	if ( use_logging_daemon && cl_log_depth <= 1) {
+	if (use_logging_daemon && cl_log_depth <= 1) {
 		LogToLoggingDaemon(priority, buf, nbytes, TRUE);
-	}else {
+	}else{
 		/* this may cause blocking... maybe should make it optional? */ 
 		cl_direct_log(priority, buf, TRUE, NULL, cl_process_pid, NULLTIME);
 	}
@@ -583,6 +628,38 @@ cl_glib_msg_handler(const gchar *log_domain,	GLogLevelFlags log_level
 
 	cl_log(ha_level, "glib: %s", message);
 }
+static char *
+syslog_timestamp(TIME_T t)
+{
+	static char		ts[64];
+	struct tm*		ttm;
+	TIME_T			now;
+	time_t			nowtt;
+	static const char*	monthstr [12] = {
+		"Jan", "Feb", "Mar",
+		"Apr", "May", "Jun",
+		"Jul", "Aug", "Sep",
+		"Oct", "Nov", "Dec"
+	};
+	
+	/* Work around various weridnesses in different OSes and time_t definitions */
+	if (t == 0){
+		now = time(NULL);
+	}else{
+		now = t;
+	}
+
+	nowtt = (time_t)now;
+	ttm = localtime(&nowtt);
+
+	snprintf(ts, sizeof(ts), "%3s %02d %02d:%02d:%02d"
+	,	monthstr[ttm->tm_mon], ttm->tm_mday
+	,	ttm->tm_hour, ttm->tm_min, ttm->tm_sec);
+	return(ts);
+}
+
+
+
 char *
 ha_timestamp(TIME_T t)
 {
@@ -592,7 +669,7 @@ ha_timestamp(TIME_T t)
 	time_t		nowtt;
 	
 	/* Work around various weridnesses in different OSes and time_t definitions */
-	if(t == 0){
+	if (t == 0){
 		now = time(NULL);
 	}else{
 		now = t;

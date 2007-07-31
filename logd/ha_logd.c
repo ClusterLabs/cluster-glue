@@ -42,6 +42,7 @@
 #include <clplumbing/coredumps.h>
 #include <clplumbing/setproctitle.h>
 #include <clplumbing/cl_signal.h>
+#include <clplumbing/cl_misc.h>
 #include <sys/wait.h>
 #include <clplumbing/cl_pidfile.h>
 #include <clplumbing/cl_syslog.h>
@@ -93,6 +94,7 @@ struct {
 	int		log_facility;
 	gboolean	useapphbd;
 	mode_t		logmode;
+	gboolean	syslogfmtmsgs;
 } logd_config =
 	{
 		"",
@@ -100,7 +102,8 @@ struct {
 		"logd",
 		LOG_LOCAL7,
 		FALSE,
-		0644
+		0644,
+		FALSE
 	};
 
 static void	logd_log(const char * fmt, ...) G_GNUC_PRINTF(1,2);
@@ -112,6 +115,7 @@ static int	set_useapphbd(const char* option);
 static int	set_sendqlen(const char * option);
 static int	set_recvqlen(const char * option);
 static int	set_logmode(const char * option);
+static int	set_syslogfmtmsgs(const char * option);
 
 
 static char*			cmdname = NULL;
@@ -128,7 +132,8 @@ struct directive{
 	{"useapphbd",	set_useapphbd},
 	{"sendqlen",	set_sendqlen},
 	{"recvqlen",	set_recvqlen},
-	{"logmode",	set_logmode}
+	{"logmode",	set_logmode},
+	{"syslogmsgfmt",set_syslogfmtmsgs}
 };
 
 struct _syslog_code {
@@ -297,6 +302,18 @@ set_logmode(const char * option)
 		,	option);
 	}
 	logd_config.logmode = (mode_t)mode;
+	return TRUE;
+}
+static int
+set_syslogfmtmsgs(const char * option)
+{
+	gboolean	dosyslogfmt;
+
+	if (cl_str_to_boolean(option, &dosyslogfmt) == HA_OK) {
+		cl_log_enable_syslog_filefmt(dosyslogfmt);
+	}else{
+		return FALSE;
+	}
 	return TRUE;
 }
 
