@@ -1,0 +1,186 @@
+rcd_serial - RC Delayed Serial
+------------------------------
+
+This stonith plugin uses one (or both) of the control lines of a serial
+device (on the stonith host) to reboot another host (the stonith'ed host)
+by closing its reset switch.  A simple idea with one major problem - any
+glitch which occurs on the serial line of the stonith host can potentially
+cause a reset of the stonith'ed host.  Such "glitches" can occur when the
+stonith host is powered up or reset, during BIOS detection of the serial
+ports, when the kernel loads up the serial port driver, etc.
+
+To fix this, you need to introduce a delay between the assertion of the
+control signal on the serial port and the closing of the reset switch.
+Then any glitches will be dissipated.  When you really want to do the
+business, you hold the control signal high for a "long time" rather than
+just tickling it "glitch-fashion" by, e.g., using the rcd_serial plugin.
+
+As the name of the plugin suggests, one way to achieve the required delay is
+to use a simple RC circuit and an npn transistor:
+
+
+                  .                        .
+            RTS   .                        .   ----------- +5V
+            or ----------                  .     |
+            DTR   .     |                  .     Rl    reset
+                  .     |        T1        .     |   |\logic
+                  .     Rt       |  ------RWL--------| -------> 
+                  .     |       b| /c      .         |/
+                  .     |---Rb---|/        .
+                  .     |        |\        .     (m/b wiring typical
+                  .     C        | \e      .      only - YMMV!)
+                  .     |          |       .
+                  .     |          |       .
+            SG ---------------------------RWG----------- 0V
+                  .                        .
+                  .                        .      stonith'ed host
+ stonith host --->.<----- RC circuit ----->.<---- RWL = reset wire live
+ (serial port)    .                        .      RWG = reset wire ground
+
+
+The characteristic delay (in seconds) is given by the product of Rt (in ohms)
+and C (in Farads).  Suitable values for the 4 components of the RC circuit
+above are:
+
+Rt = 20k
+C  = 47uF
+Rb = 360k
+T1 = BC108
+
+which gives a delay of 20 x 10e3 x 47 x 10e-6 = 0.94s.  In practice the
+actual delay achieved will depend on the pull-up load resistor Rl if Rl is
+small: for Rl greater than 3k there is no significant dependence but lower
+than this and the delay will increase - to about 1.4s at 1k and 1.9s at 0.5k.
+
+This circuit will work but it is a bit dangerous for the following reasons:
+
+1) If by mistake you open the serial port with minicom (or virtually any
+other piece of software) you will cause a stonith reset ;-(.  This is
+because opening the port will by default cause the assertion of both DTR
+and RTS, and a program like minicom will hold them high thenceforth (unless
+and until a receive buffer overflow pulls RTS down).
+
+2) Some motherboards have the property that when held in the reset state,
+all serial outputs are driven high.  Thus, if you have the circuit above
+attached to a serial port on such a motherboard, if you were to press the
+(manual) reset switch and hold it in for more than a second or so, you will
+cause a stonith reset of the attached system ;-(.
+
+This problem can be solved by adding a second npn transistor to act as a
+shorting switch across the capacitor, driven by the other serial output:
+
+
+         .                              .
+         .                              .   ----------- +5V
+ RTS -----------------                  .     |
+         .           |                  .     Rl    reset
+         .           |        T1        .     |   |\logic
+         .           Rt       |  ------RWL--------| -------> 
+         .           |       b| /c      .         |/
+         .     T2  --|---Rb---|/        .
+         .     |  /  |        |\        .     (m/b wiring typical
+         .    b| /c  |        | \e      .      only - YMMV!)
+ DTR ------Rb--|/    C          |       .
+         .     |\    |          |       .
+         .     | \e  |          |       .
+         .        |  |          |       .
+  SG ----------------------------------RWG------------- 0V
+         .                              .
+         .                              .      stonith'ed host
+stonith->.<--------- RC circuit ------->.<---- RWL = reset wire live
+ host    .                              .      RWG = reset wire ground
+
+
+Now when RTS goes high it can only charge up C and cause a reset if DTR is
+simultaneously kept low - if DTR goes high, T2 will switch on and discharge
+the capacitor.  Only a very unusual piece of software e.g. the rcd_serial
+plugin, is going to achieve this (rather bizarre) combination of signals
+(the "meaning" of which is something along the lines of "you are clear to
+send but I'm not ready"!).  T2 can be another BC108 and with Rb the same.
+
+RS232 signal levels are typically +-8V to +-12V so a 16V rating or greater
+for the capacitor is sufficient BUT NOTE that a _polarised_ electrolytic should
+not be used because the voltage switches around as the capacitor charges.
+Nitai make a range of non-polar aluminium electrolytic capacitors.  A 16V 47uF
+radial capacitor measures 6mm diameter by 11mm long and along with the 3
+resistors (1/8W are fine) and the transistors, the whole circuit can be built
+in the back of a DB9 serial "plug" so that all that emerges from the plug are
+the 2 reset wires to go to the stonith'ed host's m/b reset pins.
+
+NOTE that with these circuits the reset wires are now POLARISED and hence
+they are labelled RWG and RWL above.  You cannot connect to the reset pins
+either way round as you can when connecting a manual reset switch!  You'll
+soon enough know if you've got it the wrong way round because your machine
+will be in permanent reset state ;-(
+
+
+How to find out if your motherboard can be reset by these circuits
+------------------------------------------------------------------
+
+You can either build it first and then suck it and see, or, you need a
+multimeter.  The 0V rail of your system is available in either
+of the 2 black wires in the middle of a spare power connector (one of
+those horrible 4-way plugs which you push with difficulty into the back
+of hard disks, etc.  Curse IBM for ever specifying such a monstrosity!).
+Likewise, the +5V rail is the red wire. (The yellow one is +12V, ignore
+this.)
+
+First, with the system powered down and the meter set to read ohms:
+
+	check that one of the reset pins is connected to 0V - this then
+	is the RWG pin;
+
+	check that the other pin (RWL) has a high resistance wrt 0V
+	(probably > 2M) and has a small resistance wrt to +5V - between
+	0.5k and 10k (or higher, doesn't really matter) will be fine.
+
+Second, with the system powered up and the meter set to read Volts:
+
+	check that RWG is indeed that i.e. there should be 0V between it
+	and the 0V rail;
+
+	check that RWL is around +5V wrt the 0V rail.
+
+If all this checks out, you are _probably_ OK.  However, I've got one
+system which checks out fine but actually won't work.  The reason is that
+when you short the reset pins, the actual current drain is much higher than
+one would expect.  Why, I don't know, but there is a final test you can do
+to detect this kind of system.
+
+With the system powered up and the meter set to read milliamps:
+
+	short the reset pins with the meter i.e. reset the system, and
+	note how much current is actually drained when the system is in
+	the reset state.
+
+Mostly you will find that the reset current is 1mA or less and this is
+fine.  On the system I mention above, it is 80mA!  If the current is
+greater than 20mA or so, you have probably had it with the simple circuits
+above, although reducing the base bias resistor will get you a bit further.
+Otherwise, you have to use an analog switch (like the 4066 - I had to use 4
+of these in parallel to reset my 80mA system) which is tedious because then
+you need a +5V supply rail to the circuit so you can no longer just build it
+in the back of a serial plug.  Mail me if you want the details.
+
+With the circuit built and the rcd_serial plugin compiled, you can use:
+
+stonith -t rcd_serial -p "testhost /dev/ttyS0 rts XXX" testhost
+
+to test it.  XXX is the duration in millisecs so just keep increasing this
+until you get a reset - but wait a few secs between each attempt because
+the capacitor takes time to discharge.  Once you've found the minimum value
+required to cause a reset, add say 200ms for safety and use this value
+henceforth.
+
+Finally, of course, all the usual disclaimers apply.  If you follow my
+advice and destroy your system, sorry.  But it's highly unlikely: serial
+port outputs are internally protected against short circuits, and reset pins
+are designed to be short circuited!  The only circumstance in which I can
+see a possibility of damaging something by incorrect wiring would be if the
+2 systems concerned were not at the same earth potential.  Provided both
+systems are plugged into the same mains system (i.e. are not miles apart
+and connected only by a very long reset wire ;-) this shouldn't arise.
+
+John Sutton
+john@scl.co.uk
+October 2002
