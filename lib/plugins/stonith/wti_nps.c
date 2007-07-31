@@ -787,7 +787,7 @@ wti_nps_destroy(StonithPlugin *s)
 static StonithPlugin *
 wti_nps_new(const char *subplugin)
 {
-	struct pluginDevice*	nps = MALLOCT(struct pluginDevice);
+	struct pluginDevice*	nps = ST_MALLOCT(struct pluginDevice);
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);

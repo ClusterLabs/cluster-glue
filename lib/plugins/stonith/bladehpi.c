@@ -731,7 +731,7 @@ bladehpi_destroy(StonithPlugin *s)
 static StonithPlugin *
 bladehpi_new(const char *subplugin)
 {
-	struct pluginDevice *	dev = MALLOCT(struct pluginDevice);
+	struct pluginDevice *	dev = ST_MALLOCT(struct pluginDevice);
 	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);

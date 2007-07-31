@@ -521,6 +521,7 @@ external_get_confignames(StonithPlugin* p)
 		for (i = 0; i < dircount; i++) {
 			sd->confignames[i] = STRDUP(files[i]->d_name);
 			free(files[i]);
+			files[i] = NULL;
 		}
 		free(files);
 		sd->confignames[dircount] = NULL;
@@ -634,7 +635,7 @@ external_destroy(StonithPlugin *s)
 static StonithPlugin *
 external_new(const char *subplugin)
 {
-	struct pluginDevice*	sd = MALLOCT(struct pluginDevice);
+	struct pluginDevice*	sd = ST_MALLOCT(struct pluginDevice);
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
@@ -683,8 +684,8 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	char * 			data = NULL;
 	FILE *			file;
 	char			cmd[FILENAME_MAX+64];
-	GString *		g_str_tmp = NULL;
 	struct stat		buf;
+	int			slen;
 
 	rc = snprintf(cmd, FILENAME_MAX, "%s/%s", 
 		STONITH_EXT_PLUGINDIR, sd->subplugin);
@@ -731,26 +732,29 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		goto err;
 	}
 
-	g_str_tmp = g_string_new("");
-	while(!feof(file)) {
-		memset(buff, 0, BUFF_LEN);
+	data = NULL;
+	slen=0;
+	data = MALLOC(1);
+	while(data && !feof(file)) {
+		data[slen]=EOS;
 		read_len = fread(buff, 1, BUFF_LEN, file);
-		if (0<read_len) {
-			g_string_append(g_str_tmp, buff);
-		}
-		else {
+		if (read_len > 0) {
+			data=REALLOC(data, slen+read_len+1);
+			if (data == NULL) {
+				break;
+			}
+			memcpy(data+slen, buff, read_len);
+			slen += read_len;
+			data[slen] = EOS;
+		}else{
 			sleep(1);
 		}
 	}
-	data = (char*)MALLOC(g_str_tmp->len+1);
 	if (!data) {
 		LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
 		goto err;
 	}
 	
-	data[0] = data[g_str_tmp->len] = 0;
-	strncpy(data, g_str_tmp->str, g_str_tmp->len);
-	g_string_free(g_str_tmp, TRUE);
 
 	rc = pclose(file);
 	if(rc != 0) {

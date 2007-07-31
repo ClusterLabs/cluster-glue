@@ -970,7 +970,9 @@ apcsmart_destroy(StonithPlugin * s)
     	}
 	VOIDERRIFWRONGDEV(s);
 
-	APC_deinit( ad );
+	if (ad->upsfd >= 0 && ad->upsdev) {
+		APC_deinit( ad );
+	}
 
 	ad->pluginid = NOTpluginID;
 
@@ -998,7 +1000,7 @@ apcsmart_destroy(StonithPlugin * s)
 static StonithPlugin *
 apcsmart_new(const char *subplugin)
 {
-    struct pluginDevice *ad = MALLOCT(struct pluginDevice);
+    struct pluginDevice *ad = ST_MALLOCT(struct pluginDevice);
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);

@@ -1046,7 +1046,7 @@ rps10_destroy(StonithPlugin *s)
 static StonithPlugin * 
 rps10_new(const char *subplugin)
 {
-	struct pluginDevice*	ctx = MALLOCT(struct pluginDevice);
+	struct pluginDevice*	ctx = ST_MALLOCT(struct pluginDevice);
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);

@@ -406,7 +406,7 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 		return rc;
 	}
 
-	tmp = MALLOCT(struct ipmilanHostInfo);
+	tmp = ST_MALLOCT(struct ipmilanHostInfo);
 	tmp->hostname = namestocopy[0].s_value;
 	tmp->ipaddr   = namestocopy[1].s_value;
 	tmp->portnumber = atoi(namestocopy[2].s_value);
@@ -514,7 +514,7 @@ ipmilan_destroy(StonithPlugin *s)
 static StonithPlugin *
 ipmilan_new(const char *subplugin)
 {
-	struct pluginDevice*	nd = MALLOCT(struct pluginDevice);
+	struct pluginDevice*	nd = ST_MALLOCT(struct pluginDevice);
 
 	if (nd == NULL) {
 		LOG(PIL_CRIT, "out of memory");

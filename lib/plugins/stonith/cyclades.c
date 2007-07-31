@@ -614,7 +614,7 @@ cyclades_destroy(StonithPlugin *s)
 static StonithPlugin *
 cyclades_new(const char *plugin)
 {
-	struct pluginDevice*	sd = MALLOCT(struct pluginDevice);
+	struct pluginDevice*	sd = ST_MALLOCT(struct pluginDevice);
 
 	if (sd == NULL) {
 		LOG(PIL_CRIT, "out of memory");

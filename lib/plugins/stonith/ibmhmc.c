@@ -826,7 +826,7 @@ ibmhmc_destroy(StonithPlugin *s)
 static StonithPlugin *
 ibmhmc_new(const char *subplugin)
 {
-	struct pluginDevice* dev = MALLOCT(struct pluginDevice);
+	struct pluginDevice* dev = ST_MALLOCT(struct pluginDevice);
 	
 	if(Debug){
 		LOG(PIL_DEBUG, "%s: called\n", __FUNCTION__);

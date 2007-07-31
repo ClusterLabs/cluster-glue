@@ -873,7 +873,7 @@ baytech_destroy(StonithPlugin *s)
 static StonithPlugin *
 baytech_new(const char *subplugin)
 {
-	struct pluginDevice*	bt = MALLOCT(struct pluginDevice);
+	struct pluginDevice*	bt = ST_MALLOCT(struct pluginDevice);
 
 	if (bt == NULL) {
 		LOG(PIL_CRIT, "out of memory");

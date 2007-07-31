@@ -761,7 +761,7 @@ nw_rpc100s_destroy(StonithPlugin *s)
 static StonithPlugin *
 nw_rpc100s_new(const char *subplugin)
 {
-	struct pluginDevice*	ctx = MALLOCT(struct pluginDevice);
+	struct pluginDevice*	ctx = ST_MALLOCT(struct pluginDevice);
 
 	if (ctx == NULL) {
 		LOG(PIL_CRIT, "out of memory");
