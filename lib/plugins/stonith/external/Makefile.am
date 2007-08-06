@@ -19,8 +19,8 @@
 #
 MAINTAINERCLEANFILES = Makefile.in
 
-EXTRA_DIST           = vmware
+EXTRA_DIST           = vmware rackpdu
 
 extdir		     = $(stonith_ext_plugindir)
 
-ext_SCRIPTS	     = ibmrsa riloe ssh vmware
+ext_SCRIPTS	     = ibmrsa riloe ssh vmware rackpdu
