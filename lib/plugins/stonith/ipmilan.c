@@ -411,9 +411,32 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 	tmp->ipaddr   = namestocopy[1].s_value;
 	tmp->portnumber = atoi(namestocopy[2].s_value);
 	FREE(namestocopy[2].s_value);
-	tmp->authtype = atoi(namestocopy[3].s_value);
+	if (strcmp(namestocopy[3].s_value, "none") == 0) {
+		tmp->authtype = 0;
+	} else if (strcmp(namestocopy[3].s_value, "md2") == 0) {
+		tmp->authtype = 1;
+	} else if (strcmp(namestocopy[3].s_value, "md5") == 0) {
+		tmp->authtype = 2;
+	} else if (strcmp(namestocopy[3].s_value, "key") == 0) {
+		tmp->authtype = 4;
+	} else if (strcmp(namestocopy[3].s_value, "password") == 0) {
+		tmp->authtype = 4;
+	} else {
+		LOG(PIL_CRIT, "ipmilan auth type '%s' invalid.  See "
+		"README.ipmilan for allowed values", namestocopy[3].s_value);
+		return S_OOPS;
+	}
 	FREE(namestocopy[3].s_value);
-	tmp->privilege = atoi(namestocopy[4].s_value);
+	if (strcmp(namestocopy[4].s_value, "operator") == 0) {
+		tmp->privilege = 3;
+		}
+	if (strcmp(namestocopy[4].s_value, "admin") == 0) {
+		tmp->privilege = 4;
+	} else {
+		LOG(PIL_CRIT, "ipmilan priv value '%s' invalid.  See "
+		"README.ipmilan for allowed values", namestocopy[4].s_value);
+		return(S_OOPS);
+	}
 	FREE(namestocopy[4].s_value);
 	tmp->username = namestocopy[5].s_value;
 	tmp->password = namestocopy[6].s_value;
