@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 echo "../admin/lrmadmin -A ip-hb heartbeat IPaddr NULL 192.168.58.4"
 ../admin/lrmadmin -A ip-hb heartbeat IPaddr NULL 192.168.58.4
 echo "../admin/lrmadmin -E ip-hb status 0 0 EVERYTIME"
