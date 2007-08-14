@@ -41,6 +41,7 @@ static gboolean emit_apphb(gpointer data);
 /* Utility functions */
 static int flush_op(lrmd_op_t* op);
 static gboolean rsc_execution_freeze_timeout(gpointer data);
+static void add_op_to_runlist(lrmd_rsc_t* rsc, lrmd_op_t* op);
 static int perform_op(lrmd_rsc_t* rsc);
 static int unregister_client(lrmd_client_t* client);
 static int on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op);

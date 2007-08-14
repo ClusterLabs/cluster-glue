@@ -69,6 +69,11 @@
 #define F_LRM_METADATA		"lrm_metadata"
 #define F_LRM_USERDATA		"lrm_userdata"
 #define F_LRM_DELAY		"lrm_delay"
+#define F_LRM_T_RUN		"lrm_t_run"
+#define F_LRM_T_RCCHANGE	"lrm_t_rcchange"
+#define F_LRM_EXEC_TIME		"lrm_exec_time"
+#define F_LRM_QUEUE_TIME	"lrm_queue_time"
+
 #define	PRINT 	printf("file:%s,line:%d\n",__FILE__,__LINE__);
 
 

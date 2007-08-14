@@ -87,6 +87,10 @@
                 }				\
         }
 
+#define tm2age(tm) \
+	(cmp_longclock(tm, zero_longclock) <= 0) ? \
+		0 : longclockto_ms(sub_longclock(now, tm))
+
 /*
  * The basic objects in our world:
  *
@@ -193,6 +197,7 @@ struct lrmd_op
 	longclock_t		t_addtolist;
 	longclock_t		t_perform;
 	longclock_t		t_done;
+	longclock_t		t_rcchange; /* when rc changed */
 	ProcTrackKillInfo	killseq[3];
 };
 
