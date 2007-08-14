@@ -775,6 +775,33 @@ ha_msg_value_int(const struct ha_msg * msg, const char * name, int* value)
 	return HA_OK;
 }
 
+int
+ha_msg_add_ul(struct ha_msg * msg, const char * name, unsigned long value)
+{
+	char buf[MAX_INT_LEN];
+	snprintf(buf, MAX_INT_LEN, "%lu", value);
+	return (ha_msg_add(msg, name, buf));	
+}
+
+int
+ha_msg_mod_ul(struct ha_msg * msg, const char * name, unsigned long value)
+{
+	char buf[MAX_INT_LEN];
+	snprintf(buf, MAX_INT_LEN, "%lu", value);
+	return (cl_msg_modstring(msg, name, buf));	
+}
+
+int
+ha_msg_value_ul(const struct ha_msg * msg, const char * name, unsigned long* value)
+{
+	const char* svalue = ha_msg_value(msg, name);
+	if(NULL == svalue) {
+		return HA_FAIL;
+	}
+	*value = strtoul(svalue, NULL, 10);
+	return HA_OK;
+}
+
 /*
  * ha_msg_value_str_list()/ha_msg_add_str_list():
  * transform a string list suitable for putting into an ha_msg is by a convention

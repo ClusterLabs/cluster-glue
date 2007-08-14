@@ -318,6 +318,10 @@ lrmd_op_new(void)
 	op->rapop = NULL;
 	op->first_line_ra_stdout[0] = EOS;
 	op->t_recv = time_longclock();
+ 	op->t_perform = zero_longclock;
+ 	op->t_done = zero_longclock;
+ 	op->t_rcchange = zero_longclock;
+ 
 	memset(op->killseq, 0, sizeof(op->killseq));
 	++lrm_objectstats.opcount;
 	return op;
@@ -350,6 +354,10 @@ lrmd_op_copy(const lrmd_op_t* op)
 	ret->first_line_ra_stdout[0] = EOS;
 	ret->repeat_timeout_tag = 0;
 	ret->exec_pid = -1;
+	ret->t_recv = op->t_recv;
+ 	ret->t_perform = op->t_perform;
+ 	ret->t_done = op->t_done;
+ 	ret->t_rcchange = op->t_rcchange;
 	ret->is_copy = TRUE;
 	return ret;
 }
@@ -413,10 +421,6 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	int		target_rc = -1;
 	const char *	pidstat;
 	longclock_t	now = time_longclock();
-	long		t_recv;
-	long		t_addtolist;
-	long		t_perform;
-	long		t_done;
 
 	CHECK_ALLOCATED(op, "op", );
 	if (op->exec_pid < 1
@@ -438,30 +442,11 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	,	"%s: lrmd_op2: rt_tag: %d, interval: %d, delay: %d"
 	,	text,  op->repeat_timeout_tag
 	,	op->interval, op->delay);
-	if (cmp_longclock(op->t_recv, zero_longclock) <= 0) {
-		t_recv = -1;
-	}else{
-		t_recv = longclockto_ms(sub_longclock(now, op->t_recv));
-	}
-	if (cmp_longclock(op->t_addtolist, zero_longclock) <= 0) {
-		t_addtolist = -1;
-	}else{
-		t_addtolist = longclockto_ms(sub_longclock(now, op->t_addtolist));
-	}
-	if (cmp_longclock(op->t_perform, zero_longclock) <= 0) {
-		t_perform = -1;
-	}else{
-		t_perform = longclockto_ms(sub_longclock(now, op->t_perform));
-	}
-	if (cmp_longclock(op->t_done, zero_longclock) <= 0) {
-		t_done = -1;
-	}else{
-		t_done = longclockto_ms(sub_longclock(now, op->t_recv));
-	}
 	lrmd_debug(LOG_DEBUG
 	,	"%s: lrmd_op3: t_recv: %ldms, t_add: %ldms"
-	", t_perform: %ldms, t_done: %ldms"
-	,	text, t_recv, t_addtolist, t_perform, t_done);
+	", t_perform: %ldms, t_done: %ldms, t_rcchange: %ldms"
+	,	text, tm2age(op->t_recv), tm2age(op->t_addtolist)
+	,	tm2age(op->t_perform), tm2age(op->t_done), tm2age(op->t_rcchange));
 	lrmd_rsc_dump(op->rsc_id, text);
 }
 
@@ -1572,16 +1557,7 @@ on_repeat_op_readytorun(gpointer data)
 	op->exec_pid = -1;
 
 	if (!shutdown_in_progress) {
-		op->t_addtolist = time_longclock();
-		rsc->op_list = g_list_append(rsc->op_list, op);
-		if (g_list_length(rsc->op_list) >= 4) {
-			lrmd_log(LOG_WARNING
-			,	"%s: Operations list for %s is suspicously"
-			" long [%d]"
-			,	__FUNCTION__, rsc->id
-			,	g_list_length(rsc->op_list));
-			lrmd_rsc_dump(rsc->id, "rsc->op_list: too many ops");
-		}
+		add_op_to_runlist(rsc,op);
 	}
 	perform_op(rsc);
 
@@ -2280,7 +2256,6 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	op->delay = delay;
 
 	op->msg = ha_msg_copy(msg);
-	op->t_recv = time_longclock();
 	
 	lrmd_debug2(LOG_DEBUG
 	, "%s: client [%d] want to add an operation %s on resource %s."
@@ -2304,17 +2279,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		, "%s: add an operation %s to the operation list."
 		, __FUNCTION__
 		, op_info(op));
-		op->t_addtolist = time_longclock();
-		rsc->op_list = g_list_append(rsc->op_list, op);
-
-		if (g_list_length(rsc->op_list) >= 4) {
-			lrmd_log(LOG_WARNING
-			,	"%s: Operations list for %s is suspicously"
-			" long [%d]"
-			,	__FUNCTION__, rsc->id
-			,	g_list_length(rsc->op_list));
-			lrmd_rsc_dump(rsc->id, "rsc->op_list: too many ops");
-		}
+		add_op_to_runlist(rsc,op);
 	}
 
 	perform_op(rsc);
@@ -2570,6 +2535,21 @@ remove_op_history(lrmd_op_t* op)
 	LRMAUDIT();
 }
 
+static void
+add_op_to_runlist(lrmd_rsc_t* rsc, lrmd_op_t* op)
+{
+	op->t_addtolist = time_longclock();
+	rsc->op_list = g_list_append(rsc->op_list, op);
+	if (g_list_length(rsc->op_list) >= 4) {
+		lrmd_log(LOG_WARNING
+		,	"operations list for %s is suspicously"
+		" long [%d]"
+		,	rsc->id
+		,	g_list_length(rsc->op_list));
+		lrmd_rsc_dump(rsc->id, "rsc->op_list: too many ops");
+	}
+}
+
 /* 1. this function sends a message to the client:
  *   a) on operation instance exit using the callback channel
  *   b) in case a client requested that operation to be cancelled,
@@ -2604,11 +2584,13 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 
 	lrmd_debug2(LOG_DEBUG, "on_op_done: %s", op_info(op));
 	lrmd_debug2(LOG_DEBUG
-		 ,"TimeStamp:  Recv:%ld,Add to List:%ld,Perform:%ld, Done %ld"
+		 ,"Timestamps: Recv:%ld, Add to List:%ld, Perform:%ld"
+		 ", Done: %ld, Rc change: %ld"
 		 ,longclockto_ms(op->t_recv)
 		 ,longclockto_ms(op->t_addtolist)
 		 ,longclockto_ms(op->t_perform)
-		 ,longclockto_ms(op->t_done));
+		 ,longclockto_ms(op->t_done)
+		 ,longclockto_ms(op->t_rcchange));
 
 	if (HA_OK != ha_msg_value_int(op->msg,F_LRM_TARGETRC,&target_rc)){
 		lrmd_log(LOG_ERR
@@ -2648,6 +2630,9 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 			"the message op->msg.");
 		return HA_FAIL;
 	}
+	if ((last_rc == -1) || (last_rc != op_rc)) {
+		op->t_rcchange = op->t_perform;
+	}
 
 	/* remove the op from op_list and copy to last_op */
 	rsc->op_list = g_list_remove(rsc->op_list,op);
@@ -2675,6 +2660,7 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	} else {
 		remove_op_history(op);
 	}
+
 	if ( need_notify ) {
 		notify_client(op);
 	}
@@ -2830,6 +2816,9 @@ struct ha_msg*
 op_to_msg(lrmd_op_t* op)
 {
 	struct ha_msg* msg = NULL;
+	longclock_t	now = time_longclock(),
+		exec_time = zero_longclock,
+		queue_time = zero_longclock;
 
 	CHECK_ALLOCATED(op, "op", NULL);
 	if (op->exec_pid == 0) {
@@ -2842,11 +2831,37 @@ op_to_msg(lrmd_op_t* op)
 		return NULL;
 	}
 	if (HA_OK != ha_msg_add_int(msg, F_LRM_CALLID, op->call_id)) {
-		ha_msg_del(msg);
 		LOG_FAILED_TO_ADD_FIELD("call_id");
-		return NULL;
+		goto error;
+	}
+	if (HA_OK != ha_msg_add_ul(msg, F_LRM_T_RUN, tm2age(op->t_perform))) {
+		LOG_FAILED_TO_ADD_FIELD("t_run")
+		goto error;
+	}
+	if (HA_OK != ha_msg_add_ul(msg, F_LRM_T_RCCHANGE, tm2age(op->t_rcchange))) {
+		LOG_FAILED_TO_ADD_FIELD("t_rcchange")
+		goto error;
+	}
+	if (op->t_perform) {
+		queue_time =
+			longclockto_ms(sub_longclock(op->t_perform,op->t_addtolist));
+		if (op->t_done) {
+			exec_time =
+				longclockto_ms(sub_longclock(op->t_done,op->t_perform));
+		}
+	}
+	if (HA_OK != ha_msg_add_ul(msg, F_LRM_EXEC_TIME, exec_time)) {
+		LOG_FAILED_TO_ADD_FIELD("exec_time")
+		goto error;
+	}
+	if (HA_OK != ha_msg_add_ul(msg, F_LRM_QUEUE_TIME, queue_time)) {
+		LOG_FAILED_TO_ADD_FIELD("queue_time")
+		goto error;
 	}
 	return msg;
+
+error:	ha_msg_del(msg);
+	return NULL;
 }
 
 /* //////////////////////////////RA wrap funcs/////////////////////////////////// */
@@ -2889,6 +2904,7 @@ perform_ra_op(lrmd_op_t* op)
 	op_params = NULL;
 	free_str_table(params);
 	params = NULL;
+	op->t_perform = time_longclock();
 	check_queue_duration(op);
 
 	if(HA_OK != ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)){
@@ -3603,7 +3619,6 @@ check_queue_duration(lrmd_op_t* op)
 {
 	unsigned long t_stay_in_list = 0;
 	CHECK_ALLOCATED(op, "op", );
-	op->t_perform = time_longclock();
 	t_stay_in_list = longclockto_ms(op->t_perform - op->t_addtolist);
 	if ( t_stay_in_list > WARNINGTIME_IN_LIST) 
 	{
