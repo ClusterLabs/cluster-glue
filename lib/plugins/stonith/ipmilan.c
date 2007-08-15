@@ -411,7 +411,11 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 	tmp->ipaddr   = namestocopy[1].s_value;
 	tmp->portnumber = atoi(namestocopy[2].s_value);
 	FREE(namestocopy[2].s_value);
-	if (strcmp(namestocopy[3].s_value, "none") == 0) {
+	if (namestocopy[3].s_value == NULL) {
+		LOG(PIL_CRIT, "ipmilan auth type is NULL.  See "
+		"README.ipmilan for allowed values");
+		return S_OOPS;
+	} else if (strcmp(namestocopy[3].s_value, "none") == 0) {
 		tmp->authtype = 0;
 	} else if (strcmp(namestocopy[3].s_value, "md2") == 0) {
 		tmp->authtype = 1;
@@ -427,6 +431,10 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 		return S_OOPS;
 	}
 	FREE(namestocopy[3].s_value);
+	if (namestocopy[4].s_value == NULL) {
+		LOG(PIL_CRIT, "ipmilan priv value is NULL.  See "
+		"README.ipmilan for allowed values");
+		return S_OOPS;
 	if (strcmp(namestocopy[4].s_value, "operator") == 0) {
 		tmp->privilege = 3;
 		}
