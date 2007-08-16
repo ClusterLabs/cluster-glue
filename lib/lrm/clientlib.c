@@ -1229,6 +1229,8 @@ msg_to_op(struct ha_msg* msg)
 		return NULL;
 	}
 
+	op->rsc_id = g_strdup(rsc_id);
+
 	/* op->user_data */
 	user_data = cl_get_string(msg, F_LRM_USERDATA);
 	
@@ -1236,8 +1238,16 @@ msg_to_op(struct ha_msg* msg)
 		op->user_data = g_strdup(user_data);
 	}
 	
-	op->rsc_id = g_strdup(rsc_id);
-
+	/* time_stamps */
+	if (ha_msg_value_ul(msg, F_LRM_T_RUN, &op->t_run) != HA_OK
+	   || ha_msg_value_ul(msg, F_LRM_T_RCCHANGE, &op->t_rcchange) != HA_OK
+	   || ha_msg_value_ul(msg, F_LRM_EXEC_TIME, &op->exec_time) != HA_OK
+	   || ha_msg_value_ul(msg, F_LRM_QUEUE_TIME, &op->queue_time) != HA_OK) {
+		cl_log(LOG_WARNING
+		, "%s(%d): failed to get the timing information"
+		, __FUNCTION__, __LINE__);
+	}
+	
 	/* op->params */
 	op->params = ha_msg_value_str_table(msg, F_LRM_PARAM);
 
@@ -1247,8 +1257,8 @@ msg_to_op(struct ha_msg* msg)
 static struct ha_msg*
 op_to_msg (lrm_op_t* op)
 {
-	struct ha_msg* msg = ha_msg_new(5);
-	if (NULL == msg) {
+	struct ha_msg* msg = ha_msg_new(14);
+	if (!msg) {
 		LOG_BASIC_ERROR("ha_msg_new");
 		return NULL;
 	}
@@ -1259,34 +1269,17 @@ op_to_msg (lrm_op_t* op)
 	||  HA_OK != ha_msg_add_int(msg, F_LRM_TIMEOUT, op->timeout)
 	||  HA_OK != ha_msg_add_int(msg, F_LRM_INTERVAL, op->interval)
 	||  HA_OK != ha_msg_add_int(msg, F_LRM_DELAY, op->start_delay)
-	||  HA_OK != ha_msg_add_int(msg, F_LRM_TARGETRC, op->target_rc)) {
+	||  HA_OK != ha_msg_add_ul(msg, F_LRM_T_RUN,op->t_run)
+	||  HA_OK != ha_msg_add_ul(msg, F_LRM_T_RCCHANGE, op->t_rcchange)
+	||  HA_OK != ha_msg_add_ul(msg, F_LRM_EXEC_TIME, op->exec_time)
+	||  HA_OK != ha_msg_add_ul(msg, F_LRM_QUEUE_TIME, op->queue_time)
+	||  HA_OK != ha_msg_add_int(msg, F_LRM_TARGETRC, op->target_rc)
+	||  ( op->app_name && (HA_OK != ha_msg_add(msg, F_LRM_APP, op->app_name)))
+	||  ( op->user_data && (HA_OK != ha_msg_add(msg,F_LRM_USERDATA,op->user_data)))
+	||  ( op->params && (HA_OK != ha_msg_add_str_table(msg,F_LRM_PARAM,op->params)))) {
+		LOG_BASIC_ERROR("op_to_msg conversion failed");
 		ha_msg_del(msg);
-		LOG_BASIC_ERROR("ha_msg_add*");
 		return NULL;
-	}
-
-	if (NULL != op->app_name) {
-		if (HA_OK != ha_msg_add(msg, F_LRM_APP, op->app_name)){
-			ha_msg_del(msg);
-			LOG_BASIC_ERROR("ha_mag_add");
-			return NULL;
-		}
-	}
-
-	if (NULL != op->user_data) {
-		if (HA_OK != ha_msg_add(msg,F_LRM_USERDATA,op->user_data)){
-			ha_msg_del(msg);
-			LOG_BASIC_ERROR("ha_msg_add");
-			return NULL;
-		}
-	}
-
-	if (NULL != op->params) {
-		if (HA_OK != ha_msg_add_str_table(msg,F_LRM_PARAM,op->params)){
-			ha_msg_del(msg);
-			LOG_BASIC_ERROR("ha_msg_add_str_table");
-			return NULL;
-		}	
 	}
 
 	return msg;
