@@ -150,7 +150,7 @@ cl_log_set_logdtime(int logdtime)
 #define ENV_DEBUGFENV	"HA_debugfile"	/* Debug log file */
 #define ENV_LOGFACILITY	"HA_logfacility"/* Facility to use for logger */
 #define ENV_SYSLOGFMT	"HA_syslogmsgfmt"/* TRUE if we should use syslog message formatting */
-#define ENV_LOGDAEMON	"HA_logdaemon"
+#define ENV_LOGDAEMON	"HA_use_logd"
 #define	ENV_CONNINTVAL	"HA_conn_logd_time"
 #define TRADITIONAL_COMPRESSION "HA_traditional_compression"
 #define COMPRESSION	 "HA_compression"
