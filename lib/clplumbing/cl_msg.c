@@ -145,7 +145,7 @@ cl_msg_stats_open(const char* filename)
 		return -1;
 	}
 	
-	return open(filename, O_WRONLY|O_CREAT|O_APPEND);
+	return open(filename, O_WRONLY|O_CREAT|O_APPEND, 0755);
 
 }
 
@@ -772,6 +772,33 @@ ha_msg_value_int(const struct ha_msg * msg, const char * name, int* value)
 		return HA_FAIL;
 	}
 	*value = atoi(svalue);
+	return HA_OK;
+}
+
+int
+ha_msg_add_ul(struct ha_msg * msg, const char * name, unsigned long value)
+{
+	char buf[MAX_INT_LEN];
+	snprintf(buf, MAX_INT_LEN, "%lu", value);
+	return (ha_msg_add(msg, name, buf));	
+}
+
+int
+ha_msg_mod_ul(struct ha_msg * msg, const char * name, unsigned long value)
+{
+	char buf[MAX_INT_LEN];
+	snprintf(buf, MAX_INT_LEN, "%lu", value);
+	return (cl_msg_modstring(msg, name, buf));	
+}
+
+int
+ha_msg_value_ul(const struct ha_msg * msg, const char * name, unsigned long* value)
+{
+	const char* svalue = ha_msg_value(msg, name);
+	if(NULL == svalue) {
+		return HA_FAIL;
+	}
+	*value = strtoul(svalue, NULL, 10);
 	return HA_OK;
 }
 
