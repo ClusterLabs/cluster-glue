@@ -137,12 +137,12 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 #define OUTLET_NO_CMD_PEND		2
 
 /* oids */
-#define OID_IDENT			".1.3.6.1.4.1.318.1.1.4.1.4.0"
-#define OID_NUM_OUTLETS			".1.3.6.1.4.1.318.1.1.4.4.1.0"
-#define OID_OUTLET_NAMES		".1.3.6.1.4.1.318.1.1.4.5.2.1.3.%i"
-#define OID_OUTLET_STATE		".1.3.6.1.4.1.318.1.1.4.4.2.1.3.%i"
-#define OID_OUTLET_COMMAND_PENDING	".1.3.6.1.4.1.318.1.1.4.4.2.1.2.%i"
-#define OID_OUTLET_REBOOT_DURATION	".1.3.6.1.4.1.318.1.1.4.5.2.1.5.%i"
+#define OID_IDENT			".1.3.6.1.4.1.318.1.1.12.1.5.0"
+#define OID_NUM_OUTLETS			".1.3.6.1.4.1.318.1.1.12.1.8.0"
+#define OID_OUTLET_NAMES		".1.3.6.1.4.1.318.1.1.12.3.4.1.1.2.%i"
+#define OID_OUTLET_STATE		".1.3.6.1.4.1.318.1.1.12.3.3.1.1.4.%i"
+#define OID_OUTLET_COMMAND_PENDING	".1.3.6.1.4.1.318.1.1.12.3.5.1.1.5.%i"
+#define OID_OUTLET_REBOOT_DURATION	".1.3.6.1.4.1.318.1.1.12.3.4.1.1.6.%i"
 
 /* own defines */
 #define MAX_STRING		128
