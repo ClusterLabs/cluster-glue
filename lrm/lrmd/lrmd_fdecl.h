@@ -8,6 +8,7 @@ static void dump_data_for_debug(void);
 /* glib loop call back functions */
 static gboolean on_connect_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_connect_cbk(IPC_Channel* ch_cbk, gpointer user_data);
+static int msg_type_cmp(const void *p1, const void *p2);
 static gboolean on_receive_cmd(IPC_Channel* ch_cmd, gpointer user_data);
 static gboolean on_repeat_op_readytorun(gpointer data);
 static void on_remove_client(gpointer user_data);
