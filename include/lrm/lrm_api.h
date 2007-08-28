@@ -134,6 +134,7 @@ typedef struct{
 	int			user_data_len;
 	int			interval;
 	int			start_delay;
+	int			copyparams; /* copy parameters to the rsc */
 	int			target_rc;
 
 	/*output fields*/
