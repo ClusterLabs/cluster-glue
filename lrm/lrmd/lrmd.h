@@ -189,6 +189,7 @@ struct lrmd_op
 	guint			repeat_timeout_tag;
 	int			interval;
 	int			delay;
+	int			copyparams;
 	struct ha_msg*		msg;
 	ra_pipe_op_t *		rapop;
 	char			first_line_ra_stdout[80]; /* only for heartbeat RAs*/

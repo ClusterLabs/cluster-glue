@@ -50,6 +50,7 @@
 #define F_LRM_RPROVIDER		"lrm_rprovider"
 #define F_LRM_RPROVIDERS	"lrm_rproviders"
 #define F_LRM_PARAM		"lrm_param"
+#define F_LRM_COPYPARAMS	"lrm_copyparams"
 #define F_LRM_TIMEOUT		"lrm_timeout"
 #define F_LRM_OP		"lrm_op"
 #define F_LRM_OPCNT		"lrm_opcount"

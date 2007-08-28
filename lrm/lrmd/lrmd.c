@@ -2266,6 +2266,17 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	op->delay = delay;
 
 	op->msg = ha_msg_copy(msg);
+
+	if( ha_msg_value_int(msg,F_LRM_COPYPARAMS,&op->copyparams) == HA_OK
+			&& op->copyparams ) {
+		lrmd_debug(LOG_DEBUG
+			, "%s:%d: copying parameters for rsc %s"
+			, __FUNCTION__, __LINE__,rsc->id);
+		if (rsc->params) {
+			free_str_table(rsc->params);
+		}
+		rsc->params = ha_msg_value_str_table(msg, F_LRM_PARAM);
+	}
 	
 	lrmd_debug2(LOG_DEBUG
 	, "%s: client [%d] want to add an operation %s on resource %s."

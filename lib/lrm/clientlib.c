@@ -1257,7 +1257,7 @@ msg_to_op(struct ha_msg* msg)
 static struct ha_msg*
 op_to_msg (lrm_op_t* op)
 {
-	struct ha_msg* msg = ha_msg_new(14);
+	struct ha_msg* msg = ha_msg_new(15);
 	if (!msg) {
 		LOG_BASIC_ERROR("ha_msg_new");
 		return NULL;
@@ -1269,6 +1269,7 @@ op_to_msg (lrm_op_t* op)
 	||  HA_OK != ha_msg_add_int(msg, F_LRM_TIMEOUT, op->timeout)
 	||  HA_OK != ha_msg_add_int(msg, F_LRM_INTERVAL, op->interval)
 	||  HA_OK != ha_msg_add_int(msg, F_LRM_DELAY, op->start_delay)
+	||  HA_OK != ha_msg_add_int(msg, F_LRM_COPYPARAMS, op->copyparams)
 	||  HA_OK != ha_msg_add_ul(msg, F_LRM_T_RUN,op->t_run)
 	||  HA_OK != ha_msg_add_ul(msg, F_LRM_T_RCCHANGE, op->t_rcchange)
 	||  HA_OK != ha_msg_add_ul(msg, F_LRM_EXEC_TIME, op->exec_time)
