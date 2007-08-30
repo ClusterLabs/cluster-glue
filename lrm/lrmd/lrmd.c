@@ -2767,7 +2767,7 @@ perform_op(lrmd_rsc_t* rsc)
 	if (rsc_frozen(rsc)) {
 		lrmd_log(LOG_DEBUG,"%s: resource %s is frozen, "
 		"no ops allowed to run"
-		, __FUNCTION__, lrm_str(op->rsc_id));
+		, __FUNCTION__, rsc->id);
 		return HA_OK;
 	}
 
