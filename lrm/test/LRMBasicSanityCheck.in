@@ -20,6 +20,7 @@
 HBLIB=@libdir@/heartbeat
 LRMD=$HBLIB/lrmd
 LRMADMIN=$HBLIB/lrmadmin
+export LRMD LRMADMIN
 
 if [ $# -gt 0 ]; then
 	LRMD=$1/lrmd
@@ -35,57 +36,8 @@ if [ ! -f $LRMADMIN ]; then
 	echo $LRMADMIN does not exist
 	exit 1
 fi
-	
-#kill the previous instance lrm
-$LRMD -k
 
-#start the new instance of lrm
-$LRMD -r &
-sleep 1
+OUTDIR=/tmp/lrmtestoutput
+export OUTDIR
 
-#check is the new instance running
-$LRMD -s
-if [ $? != 0 ]; then
-	echo Can not start lrmd
-	exit 1
-fi
-
-#check can we login
-$LRMADMIN -d
-if [ $? != 0 ]; then
-	echo Can not logon to lrmd
-	exit 1
-fi
-
-#list the classes support
-$LRMADMIN -C
-if [ $? != 0 ]; then
-	echo Can not get ra classes supported
-	exit 1
-fi
-
-#add a resource
-$LRMADMIN -A ip heartbeat IPaddr NULL 192.168.58.4
-if [ $? != 0 ]; then
-	echo Can not add new resource
-	exit 1
-fi
-
-#get the resource added
-$LRMADMIN -I ip
-if [ $? != 0 ]; then
-	echo Can not get the resource added
-	exit 1
-fi
-
-#delete the resource
-$LRMADMIN -D ip
-if [ $? != 0 ]; then
-	echo Can not delete the resource
-	exit 1
-fi
-
-#kill the instance
-$LRMD -k
-
-exit 0
+`dirname $0`/regression.sh -q set:BSC

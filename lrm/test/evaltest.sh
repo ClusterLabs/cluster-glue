@@ -41,7 +41,7 @@ specopt_sleep() {
 	# but we give user some feedback on what's happening
 	while [ "$rest" -gt 0 ]; do
 		sleep 1
-		echo -n "+" >/dev/tty
+		echo -n "+" >&3
 		rest=$((rest-1))
 	done
 }
@@ -65,6 +65,9 @@ specopt_bg() {
 specopt_bgrepeat() { # common
 	specopt_bg
 	specopt_repeat
+}
+specopt_wait() { # common
+	waitforbgprocs
 }
 specopt() {
 	cmd=`echo $cmd | sed 's/%//'`  # strip leading '%'
@@ -115,7 +118,7 @@ substvars() {
 }
 
 dotest() {
-	echo -n "." >/dev/tty
+	echo -n "." >&3
 	test_cnt=$((test_cnt+1))
 	describe_$cmd  # show what we are about to do
 	lrm_$cmd |  # and execute the command

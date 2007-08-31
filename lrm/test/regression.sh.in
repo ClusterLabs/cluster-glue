@@ -17,35 +17,58 @@
  # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  #
 
-if [ `id -u` != 0 ]; then
-	echo "sorry, but i talk to root only"
-	exit 2
-fi
-if [ "`dirname $0`" != . ]; then
-	echo "you have to run me from the directory where i live"
-	exit 2
-fi
-
 TESTDIR=${TESTDIR:-testcases}
-TESTSET=$TESTDIR/basicset
+DFLT_TESTSET=basicset
 OUTDIR=${OUTDIR:-output}
 LRMD_OUTF="$OUTDIR/lrmd.out"
 LRMD_LOGF="$OUTDIR/lrmd.log"
 LRMD_DEBUGF="$OUTDIR/lrmd.debug"
 OUTF="$OUTDIR/regression.out"
-LRMADMIN="../admin/lrmadmin"
-LRMD_OPTS="-r -vvv"
+LRMADMIN="@libdir@/heartbeat/lrmadmin"
+LRMD_OPTS="-vvv"
 DIFF_OPTS="--ignore-all-space -U 1"
 common_filter=$TESTDIR/common.filter
 common_exclf=$TESTDIR/common.excl
+OCF_RA=$OCF_ROOT/resource.d/heartbeat/lrmregtest
+HB_RA=@HB_RA_DIR@/lrmregtest
+LSB_RA=/etc/init.d/lrmregtest
 export OUTDIR TESTDIR LRMADMIN
-rm -f $LRMD_LOGF $LRMD_DEBUGF
 
+logmsg() {
+	echo "`date`: $*" | tee -a $LRMD_DEBUGF | tee -a $LRMD_LOGF
+}
 abspath() {
 	echo $1 | grep -qs "^/" &&
 		echo $1 ||
 		echo `pwd`/$1
 }
+
+usage() {
+	cat<<EOF
+
+usage: $0 [-q] [testcase...|set:testset]
+
+Test lrmd using supplied testcases. If none are given,
+set:basicset is used. All testcases and sets are in testcases/.
+See also README.regression for description.
+
+-q: quiet operation (no progress shown)
+
+EOF
+exit 2
+}
+
+if [ `id -u` != 0 ]; then
+	echo "sorry, but i talk to root only"
+	exit 2
+fi
+cd `dirname $0`
+if [ ! -d "$TESTDIR" ]; then
+	echo "$0: $TESTDIR does not exit"
+	usage
+fi
+
+rm -f $LRMD_LOGF $LRMD_DEBUGF
 
 # make lrmd log to our files only
 HA_logfile=`abspath $LRMD_LOGF`
@@ -54,51 +77,79 @@ HA_use_logd=no
 HA_logfacility=""
 export HA_logfile HA_debugfile HA_use_logd HA_logfacility
 
-exec >$OUTF 2>&1
-. /etc/ha.d/shellfuncs
 mkdir -p $OUTDIR
+. /etc/ha.d/shellfuncs
+
+args=`getopt hq $*`
+[ $? -ne 0 ] && usage
+eval set -- "$args"
+
+SILENT=""
+while [ x"$1" != x ]; do
+	case "$1" in
+		-h) usage;;
+		-q) SILENT=1;;
+		--) shift 1; break;;
+		*) usage;;
+	esac
+	shift 1
+done
+
+exec >$OUTF 2>&1
+if [ "$SILENT" = 1 ]; then
+	exec 3>/dev/null
+else
+	exec 3>/dev/tty
+fi
 
 start_lrmd() {
-	echo "starting lrmd" >/dev/tty
+	echo "starting lrmd" >&3
 	$HA_BIN/lrmd -s 2>/dev/null
 	if [ $? -eq 3 ]; then
+		#strace -o /tmp/lrmd.trc $HA_BIN/lrmd $LRMD_OPTS >$LRMD_OUTF 2>&1 &
 		$HA_BIN/lrmd $LRMD_OPTS >$LRMD_OUTF 2>&1 &
 		sleep 1
 		$HA_BIN/lrmd -s 2>/dev/null
 	else
-		echo "lrmd already running; can't proceed" >/dev/tty
+		echo "lrmd already running; can't proceed" >&3
 		return 2
 	fi
 }
 stop_lrmd() {
-	echo "stopping lrmd" >/dev/tty
+	echo "stopping lrmd" >&3
 	$HA_BIN/lrmd -k
 }
 cp_ra() {
-	if [ ! -e /usr/lib/ocf/resource.d/heartbeat/lrmregtest ]; then
-		cp -p lrmregtest /usr/lib/ocf/resource.d/heartbeat
+	if [ ! -e $OCF_RA ]; then
+		cp -p lrmregtest $OCF_RA
+		chmod +x $OCF_RA
 		lrmregtest_ocf=1
 	fi
-	if [ ! -e /etc/init.d/Dummy-lsb ]; then
-		cp -p Dummy-lsb /etc/init.d
-		Dummy_lsb=1
+	if [ ! -e $LSB_RA ]; then
+		cp -p lrmregtest-lsb $LSB_RA
+		chmod +x $LSB_RA
+		lrmregtest_lsb=1
+	fi
+	if [ ! -e $HB_RA ]; then
+		cp -p lrmregtest-heartbeat $HB_RA
+		chmod +x $HB_RA
+		lrmregtest_heartbeat=1
 	fi
 }
 rm_ra() {
-	[ "$lrmregtest_ocf" ] &&
-		rm -f /usr/lib/ocf/resource.d/heartbeat/lrmregtest
-	[ "$Dummy_lsb" ] && rm -f /etc/init.d/Dummy-lsb
+	[ "$lrmregtest_ocf" ] && rm -f $OCF_RA
+	[ "$lrmregtest_lsb" ] && rm -f $LSB_RA
+	[ "$lrmregtest_heartbeat" ] && rm -f $HB_RA
 }
 
 cp_ra
 start_lrmd || exit $?
 trap "stop_lrmd; rm_ra" EXIT
 
-[ "$1" = prepare ] && { prepare=1; shift 1;}
-
 setenvironment() {
 	filterf=$TESTDIR/$testcase.filter
 	exclf=$TESTDIR/$testcase.excl
+	log_filter=$TESTDIR/$testcase.log_filter
 	expf=$TESTDIR/$testcase.exp
 	outf=$OUTDIR/$testcase.out
 	difff=$OUTDIR/$testcase.diff
@@ -124,43 +175,54 @@ EOF
 
 runtestcase() {
 	setenvironment
-	echo -n "$testcase" >/dev/tty
+	echo -n "$testcase" >&3
+	logmsg "BEGIN testcase $testcase"
 	./evaltest.sh < $TESTDIR/$testcase > $outf 2>&1
 
 	filter_output < $outf |
 	if [ "$prepare" ]; then
-		echo " saving to expect file" >/dev/tty
+		echo " saving to expect file" >&3
 		cat > $expf
 	else
-		echo -n " checking..." >/dev/tty
+		echo -n " checking..." >&3
 		diff $DIFF_OPTS $expf - > $difff
 		if [ $? -ne 0 ]; then
-			echo " FAIL" >/dev/tty
+			echo " FAIL" >&3
 			dumpcase
 			return 1
 		else
-			echo " PASS" >/dev/tty
+			echo " PASS" >&3
 			rm -f $outf $difff
 		fi
 	fi
+	sed -n "/BEGIN testcase $testcase/,\$p" $LRMD_LOGF |
+		{ [ -x $log_filter ] && $log_filter || cat;} |
+		egrep '(CRIT|ERROR):'
+	logmsg "END testcase $testcase"
 }
 
-if [ "$1" -a -f "$TESTDIR/$1" ]; then
-	testcase=$1
-	runtestcase
-else
-	echo "$1" | grep -q "^set:" &&
-		TESTSET=$TESTDIR/`echo $1 | sed 's/set://'`
-	while read testcase; do
-		runtestcase
-	done < $TESTSET
-fi
+[ "$1" = prepare ] && { prepare=1; shift 1;}
+[ $# -eq 0 ] && set "set:$DFLT_TESTSET"
 
-if test -s $OUTF; then
+for a; do
+	if [ "$a" -a -f "$TESTDIR/$a" ]; then
+		testcase=$a
+		runtestcase
+	else
+		echo "$a" | grep -q "^set:" &&
+			TESTSET=$TESTDIR/`echo $a | sed 's/set://'`
+		while read testcase; do
+			runtestcase
+		done < $TESTSET
+	fi
+done
+
+if egrep -wv '(BEGIN|END) testcase' $OUTF >/dev/null
+then
 	echo "seems like some tests failed or else something not expected"
 	echo "check $OUTF and diff files in $OUTDIR"
 	echo "in case you wonder what lrmd was doing, read $LRMD_LOGF and $LRMD_DEBUGF"
 	exit 1
 else
 	rm -f $OUTF $LRMD_OUTF
-fi >/dev/tty
+fi >&3
