@@ -13,7 +13,7 @@ classmeta class=ocf
 %extcheck xmllint.sh many
 classmeta class=lsb
 %extcheck xmllint.sh many
-classmeta class=heartbat
+classmeta class=heartbeat
 %extcheck xmllint.sh
 meta class=ocf type=Dummy
 %extcheck xmllint.sh

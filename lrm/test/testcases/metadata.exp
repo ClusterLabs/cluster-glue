@@ -20,7 +20,7 @@ Cool. RA list passed.
 .EXTCHECK xmllint.sh many
 .TRY Meta-data class=lsb
 .EXTCHECK xmllint.sh many
-.TRY Meta-data class=heartbat
+.TRY Meta-data class=heartbeat
 .EXTCHECK xmllint.sh
 .TRY Show meta-data class=ocf type=Dummy provider=heartbeat
 .EXTCHECK xmllint.sh

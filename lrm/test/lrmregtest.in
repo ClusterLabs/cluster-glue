@@ -35,7 +35,7 @@
 #######################################################################
 # Initialization:
 
-. @hb_libdir@/ocf-shellfuncs
+. ${OCF_ROOT}/resource.d/heartbeat/.ocf-shellfuncs
 
 #######################################################################
 
@@ -58,7 +58,7 @@ testing.
 How long to delay before each action.
 </longdesc>
 <shortdesc lang="en">Action delay</shortdesc>
-<content type="integer" default="5" />
+<content type="integer" default="0" />
 </parameter>
 
 <parameter name="check_parallel" unique="0">
@@ -159,7 +159,7 @@ invocation() {
 	echo "invoked with args: $@"
 }
 
-: ${OCF_RESKEY_delay=1}
+: ${OCF_RESKEY_delay=0}
 : ${OCF_RESKEY_check_parallel=1}
 : ${OCF_RESKEY_verbose=0}
 : ${OCF_RESKEY_ignore_TERM=0}

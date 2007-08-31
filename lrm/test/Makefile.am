@@ -18,6 +18,8 @@
 #
 MAINTAINERCLEANFILES = Makefile.in
 
+SUBDIRS = testcases
+
 INCLUDES 	      =	-I$(top_builddir)/include  -I$(top_srcdir)/include \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 
@@ -41,8 +43,9 @@ callbacktest_LDADD 	= 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 callbacktest_DEPENDENCIES    = 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 
 testdir			= 	$(HA_NOARCHDATAHBDIR)/lrmtest
-test_SCRIPTS		=	LRMBasicSanityCheck
-EXTRA_DIST		=	LRMBasicSanityCheck
+test_SCRIPTS	=	LRMBasicSanityCheck regression.sh evaltest.sh lrmregtest lrmregtest-heartbeat lrmregtest-lsb
+test_DATA	=	README.regression defaults descriptions lrmadmin-interface language
+#EXTRA_DIST		=	LRMBasicSanityCheck regression.sh evaltest.sh lrmregtest
 
 #install-exec-local:
 #	$(mkinstalldirs) $(DESTDIR)/$(testdir)
