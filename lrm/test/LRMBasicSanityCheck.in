@@ -41,3 +41,12 @@ OUTDIR=/tmp/lrmtestoutput
 export OUTDIR
 
 `dirname $0`/regression.sh -q set:BSC
+rc=$?
+if [ $rc -eq 0 ]; then
+	echo "LRM tests PASSED"
+	rm -rf $OUTDIR
+else
+	echo "LRM tests FAILED"
+	echo "Please check $OUTDIR for results"
+fi
+exit $rc
