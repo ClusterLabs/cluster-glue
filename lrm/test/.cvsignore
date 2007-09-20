@@ -13,3 +13,7 @@ parser-messages
 MISC_ERRORS
 callbacktest
 simple_ops
+lrmregtest
+lrmregtest-heartbeat
+lrmregtest-lsb
+regression.sh
