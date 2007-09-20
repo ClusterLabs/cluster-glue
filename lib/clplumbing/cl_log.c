@@ -371,6 +371,7 @@ cl_log_set_entity(const char *	entity)
 		entity = DFLT_ENTITY;
 	}
 	strncpy(cl_log_entity, entity, MAXENTITY);
+	cl_log_entity[MAXENTITY-1] = '\0';
 	if (syslog_enabled) {
 		syslog_enabled = 0;
 		cl_opensyslog();
@@ -518,9 +519,12 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 	if (syslog_enabled) {
 		if (entity) {
 			strncpy(common_log_entity, entity, MAXENTITY);
-		}else{
+		} else {
 			strncpy(common_log_entity, DFLT_ENTITY,MAXENTITY);
 		}
+
+		common_log_entity[MAXENTITY-1] = '\0';
+
 		if (pristr) {
 			syslog(priority, "[%d]: %s: %s%c",
 			       entity_pid, pristr,  buf, 0);
