@@ -371,7 +371,7 @@ RemoveTrackedProcTimeouts(pid_t pid)
 	}
 
 	if (pinfo->killinfo && pinfo->timerid) {
-		g_source_remove(pinfo->timerid);
+		Gmain_timeout_remove(pinfo->timerid);
 	}
 	pinfo->killinfo = NULL;
 	pinfo->timerid = 0;
