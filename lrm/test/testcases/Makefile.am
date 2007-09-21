@@ -22,7 +22,8 @@ testcasesdir		= 	$(HA_NOARCHDATAHBDIR)/lrmtest/testcases
 testcases_SCRIPTS	=	common.filter ra-list.sh rscmgmt.log_filter xmllint.sh
 testcases_DATA	=	BSC metadata metadata.exp rscexec \
 			rscexec.exp rscmgmt rscmgmt.exp
-EXTRA_DIST =		$(testcases_SCRIPTS)
+#			shouldn't need this next line...
+EXTRA_DIST =		$(testcases_SCRIPTS) $(testcases_DATA)
 
 #install-exec-local:
 #	$(mkinstalldirs) $(DESTDIR)/$(testdir)
