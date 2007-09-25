@@ -100,7 +100,7 @@ struct {
 		"",
 		"",
 		"logd",
-		LOG_LOCAL7,
+		HA_LOG_FACILITY,
 		FALSE,
 		0644,
 		FALSE

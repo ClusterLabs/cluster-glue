@@ -107,7 +107,7 @@ main(int argc, char** argv)
 	
 	maxcount = atoi(argv[1]);
 	
-	cl_log_set_facility(LOG_LOCAL7);
+	cl_log_set_facility(HA_LOG_FACILITY);
 	cl_log_set_uselogd(TRUE);
 	
 	if(!cl_log_test_logd()){
