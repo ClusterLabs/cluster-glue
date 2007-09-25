@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
  # Copyright (C) 2007 Dejan Muhamedagic <dmuhamedagic@suse.de>
  # 
@@ -78,7 +78,7 @@ HA_logfacility=""
 export HA_logfile HA_debugfile HA_use_logd HA_logfacility
 
 mkdir -p $OUTDIR
-. /etc/ha.d/shellfuncs
+. @HA_DIR@/shellfuncs
 
 args=`getopt hq $*`
 [ $? -ne 0 ] && usage
