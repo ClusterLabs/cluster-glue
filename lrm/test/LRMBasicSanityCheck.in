@@ -37,8 +37,12 @@ if [ ! -f $LRMADMIN ]; then
 	exit 1
 fi
 
-OUTDIR=/tmp/lrmtestoutput
+OUTDIR=/tmp/LRM_BSC_$$
 export OUTDIR
+[ -d $OUTDIR ] && {
+	echo $OUTDIR exists, please cleanup
+	exit 1
+}
 
 `dirname $0`/regression.sh -q set:BSC
 rc=$?
