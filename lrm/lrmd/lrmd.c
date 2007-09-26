@@ -809,7 +809,7 @@ main(int argc, char ** argv)
 
 	cl_log_set_entity(lrm_system_name);
 	cl_log_enable_stderr(debug_level?TRUE:FALSE);
-	cl_log_set_facility(LOG_DAEMON);
+	cl_log_set_facility(HA_LOG_FACILITY);
 
 	/* Use logd if it's enabled by heartbeat */
 	cl_inherit_logging_environment(0);
