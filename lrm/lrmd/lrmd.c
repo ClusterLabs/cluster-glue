@@ -1199,7 +1199,11 @@ init_start ()
 	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cbk, auth, FALSE,
 	                               on_connect_cbk, conn_cbk, NULL);
 
-	set_sigchld_proctrack(G_PRIORITY_HIGH);
+	/* our child signal handling involves calls with
+	 * unpredictable timing; so we raise the limit to
+	 * reduce the number of warnings
+	 */
+	set_sigchld_proctrack(G_PRIORITY_HIGH,10*DEFAULT_MAXDISPATCHTIME);
 
 	lrmd_debug(LOG_DEBUG, "Enabling coredumps");
 	/* Although lrmd can count on the parent to enable coredump, still
