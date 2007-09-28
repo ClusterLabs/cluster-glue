@@ -78,7 +78,7 @@ HA_logfacility=""
 export HA_logfile HA_debugfile HA_use_logd HA_logfacility
 
 mkdir -p $OUTDIR
-. @HA_DIR@/shellfuncs
+. @sysconfdir@/ha.d/shellfuncs
 
 args=`getopt hq $*`
 [ $? -ne 0 ] && usage
