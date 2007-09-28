@@ -1178,13 +1178,13 @@ child_death_dispatch(int sig, gpointer notused)
 }
 
 void
-set_sigchld_proctrack(int priority)
+set_sigchld_proctrack(int priority, unsigned long maxdisptime)
 {
 	GSIGSource* src = G_main_add_SignalHandler(priority, SIGCHLD
 	,	child_death_dispatch, NULL, NULL);
 
 	G_main_setmaxdispatchdelay((GSource*) src, 100);
-	G_main_setmaxdispatchtime((GSource*) src, 30);
+	G_main_setmaxdispatchtime((GSource*) src, maxdisptime);
 	G_main_setdescription((GSource*)src, "SIGCHLD");
 	return;
 }
