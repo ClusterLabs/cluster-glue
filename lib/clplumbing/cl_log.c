@@ -483,7 +483,7 @@ append_log( const char * fname, const char * entity, int entity_pid
 	/*
 	 * Jul 14 21:45:18 beam logd: [1056]: info: setting log file to /dev/null
 	 */
-	fprintf(fp, "%s %s %s: [%d]: %s %s %s\n"
+	fprintf(fp, "%s %s %s: [%d]: %s%s%s\n"
 	,	syslog_timestamp(timestamp)
 	,	un.nodename, entity, entity_pid
 	,	(pristr ? pristr : "")
