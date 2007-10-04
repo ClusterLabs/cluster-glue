@@ -122,19 +122,19 @@ stop_lrmd() {
 cp_ra() {
 	if [ ! -e $OCF_RA ]; then
 		cp -p lrmregtest $OCF_RA
-		chmod +x $OCF_RA
 		lrmregtest_ocf=1
 	fi
+	chmod +x $OCF_RA
 	if [ ! -e $LSB_RA ]; then
 		cp -p lrmregtest-lsb $LSB_RA
-		chmod +x $LSB_RA
 		lrmregtest_lsb=1
 	fi
+	chmod +x $LSB_RA
 	if [ ! -e $HB_RA ]; then
 		cp -p lrmregtest-heartbeat $HB_RA
-		chmod +x $HB_RA
 		lrmregtest_heartbeat=1
 	fi
+	chmod +x $HB_RA
 }
 rm_ra() {
 	[ "$lrmregtest_ocf" ] && rm -f $OCF_RA
