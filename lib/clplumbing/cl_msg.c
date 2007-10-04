@@ -1065,7 +1065,7 @@ cl_get_value(const struct ha_msg * msg, const char * name,
 	
 	int	j;
 	if (!msg || !msg->names || !msg->values) {
-		cl_log(LOG_ERR, "%s: wrong arugment (%s)",
+		cl_log(LOG_ERR, "%s: wrong argument (%s)",
 		       __FUNCTION__, name);
 		return(NULL);
 	}
@@ -1094,7 +1094,7 @@ cl_get_value_mutate(struct ha_msg * msg, const char * name,
 	
 	int	j;
 	if (!msg || !msg->names || !msg->values) {
-		cl_log(LOG_ERR, "%s: wrong arugment",
+		cl_log(LOG_ERR, "%s: wrong argument",
 		       __FUNCTION__);
 		return(NULL);
 	}
