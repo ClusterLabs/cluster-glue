@@ -82,12 +82,12 @@ getinfo-devurl)
 	exit 0
 	;;
 getinfo-xml)
-	cat << SSHXML
+	cat << PDUXML
 <parameters>
 <parameter name="host" unique="1" required="1">
 <content type="string" />
 <shortdesc lang="en">
-ESX server address.
+Name or IP address of Rack PDU host.
 </shortdesc>
 <longdesc lang="en">
 Name or IP address of Rack PDU host.
@@ -96,7 +96,7 @@ Name or IP address of Rack PDU host.
 <parameter name="community" unique="1" required="1">
 <content type="string" />
 <shortdesc lang="en">
-Name of user.
+Name of write community.
 </shortdesc>
 <longdesc lang="en">
 Name of write community.
@@ -112,7 +112,7 @@ Number of outlet.
 </longdesc>
 </parameter>
 </parameters>
-SSHXML
+PDUXML
 	exit 0
 	;;
 *)
