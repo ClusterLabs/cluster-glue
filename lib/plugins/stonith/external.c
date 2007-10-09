@@ -694,8 +694,9 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		return -1;
 	}
 	
-        if (stat(cmd, &buf) != 0) {
-		LOG(PIL_CRIT, "%s: stating %s failed.", __FUNCTION__, cmd);
+	if (stat(cmd, &buf) != 0) {
+		LOG(PIL_CRIT, "%s: stat(2) of %s failed: %s",
+			__FUNCTION__, cmd, strerror(errno));
                 return -1;
         }
 
@@ -758,8 +759,10 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 
 	rc = pclose(file);
 	if(rc != 0) {
-		LOG(PIL_DEBUG, "%s: Calling '%s' returned %d", __FUNCTION__, cmd, rc);
-		LOG(PIL_DEBUG, "%s: '%s' output: %s", __FUNCTION__, cmd, data?data:"-none-");
+		LOG(PIL_INFO, "%s: Calling '%s' returned %d", __FUNCTION__, cmd, rc);
+	}
+	if( data ) {
+		LOG(PIL_INFO, "%s: '%s' output: %s", __FUNCTION__, cmd, data);
 	}
 
 	if (output) {
