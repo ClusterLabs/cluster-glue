@@ -71,6 +71,8 @@ ibmrsa_status() {
 	echo | mpcli
 }
 
+hostname=`echo ${hostname} | tr ',' ' '`
+
 case $1 in
 gethosts)
 	echo $hostname
