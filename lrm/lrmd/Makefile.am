@@ -26,7 +26,7 @@ INCLUDES        = -I$(top_builddir)/include  -I$(top_srcdir)/include     \
 halibdir	=  $(libdir)/@HB_PKG@
 
 COMMONLIBS	=  $(top_builddir)/lib/clplumbing/libplumb.la   \
-		   $(top_builddir)/lib/hbclient/libhbclient.la  \
+		   $(top_builddir)/lib/apphb/libapphb.la 	\
 		   $(GLIBLIB)
 
 halib_PROGRAMS 	=  lrmd
