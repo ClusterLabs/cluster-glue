@@ -26,6 +26,7 @@ LRMD_DEBUGF="$OUTDIR/lrmd.debug"
 OUTF="$OUTDIR/regression.out"
 LRMADMIN="@libdir@/heartbeat/lrmadmin"
 LRMD_OPTS="-vvv"
+STONITHD_OPTS="-at"
 DIFF_OPTS="--ignore-all-space -U 1"
 common_filter=$TESTDIR/common.filter
 common_exclf=$TESTDIR/common.excl
@@ -78,7 +79,7 @@ HA_logfacility=""
 export HA_logfile HA_debugfile HA_use_logd HA_logfacility
 
 mkdir -p $OUTDIR
-. @HA_DIR@/shellfuncs
+. @sysconfdir@/ha.d/shellfuncs
 
 args=`getopt hq $*`
 [ $? -ne 0 ] && usage
@@ -102,6 +103,24 @@ else
 	exec 3>/dev/tty
 fi
 
+start_stonithd() {
+	echo "starting stonithd" >&3
+	$HA_BIN/stonithd -s 2>/dev/null
+	if [ $? -ne 0 ]; then
+		STOP_STONITHD=1
+		$HA_BIN/stonithd $STONITHD_OPTS
+		sleep 1
+		$HA_BIN/stonithd -s 2>/dev/null
+	else
+		STOP_STONITHD=
+	fi
+}
+stop_stonithd() {
+	if [ "$STOP_STONITHD" ]; then
+		echo "stopping stonithd" >&3
+		$HA_BIN/stonithd -k >/dev/null 2>&1
+	fi
+}
 start_lrmd() {
 	echo "starting lrmd" >&3
 	$HA_BIN/lrmd -s 2>/dev/null
@@ -122,19 +141,19 @@ stop_lrmd() {
 cp_ra() {
 	if [ ! -e $OCF_RA ]; then
 		cp -p lrmregtest $OCF_RA
-		chmod +x $OCF_RA
 		lrmregtest_ocf=1
 	fi
+	chmod +x $OCF_RA
 	if [ ! -e $LSB_RA ]; then
 		cp -p lrmregtest-lsb $LSB_RA
-		chmod +x $LSB_RA
 		lrmregtest_lsb=1
 	fi
+	chmod +x $LSB_RA
 	if [ ! -e $HB_RA ]; then
 		cp -p lrmregtest-heartbeat $HB_RA
-		chmod +x $HB_RA
 		lrmregtest_heartbeat=1
 	fi
+	chmod +x $HB_RA
 }
 rm_ra() {
 	[ "$lrmregtest_ocf" ] && rm -f $OCF_RA
@@ -144,7 +163,8 @@ rm_ra() {
 
 cp_ra
 start_lrmd || exit $?
-trap "stop_lrmd; rm_ra" EXIT
+start_stonithd || exit $?
+trap "stop_lrmd; stop_stonithd; rm_ra" EXIT
 
 setenvironment() {
 	filterf=$TESTDIR/$testcase.filter

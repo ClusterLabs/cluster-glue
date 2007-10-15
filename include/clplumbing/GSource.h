@@ -156,7 +156,8 @@ void	set_SignalHandler_dnotify(GSIGSource* chp, GDestroyNotify notify);
 
 
 /*	manage child process death using sig source*/
-void	set_sigchld_proctrack(int priority);
+#define DEFAULT_MAXDISPATCHTIME 30 /* in ms */
+void	set_sigchld_proctrack(int priority, unsigned long maxdisptime);
      
 
 
