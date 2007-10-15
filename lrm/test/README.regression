@@ -52,7 +52,9 @@ is printed, otherwise "FAIL".
 Specifying "prepare" will make regression.sh create expect
 output files for the given set of tests or testcase.
 
-The script will start and stop lrmd itself.
+The script will start and stop lrmd itself. stonithd is also
+started to test the XML descriptions printed by stonith agents.
+No other parts of stonithd functionality is tested.
 
 The following files may be generated:
 
@@ -137,6 +139,9 @@ with the '%' sign and may be followed by additional parameters.
 
 %bgrepeat [num]
 	a combination of the previous two (used often)
+
+%wait
+	wait for the last background test to finish
 
 Filters and except files
 
