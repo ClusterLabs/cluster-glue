@@ -24,8 +24,8 @@
 # Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
 #
 
-#SSH_COMMAND "@SSH@ -q -x -o PasswordAuthentication=no StrictHostKeyChecking=no" 
-SSH_COMMAND="@SSH@ -q -x -n -l root"
+SSH_COMMAND="@SSH@ -q -x -o PasswordAuthentication=no -o StrictHostKeyChecking=no -n -l root" 
+#SSH_COMMAND="@SSH@ -q -x -n -l root"
 
 REBOOT_COMMAND="echo 'sleep 2; @REBOOT@ @REBOOT_OPTIONS@' | SHELL=/bin/sh at now >/dev/null 2>&1"
 
