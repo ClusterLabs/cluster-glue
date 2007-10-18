@@ -879,8 +879,6 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 {
 	
 	IPC_Message*		ipcmsg;
-	LogDaemonMsg*		logmsg;
-	int			priority;
 	GMainLoop*		loop;
 	
 
@@ -902,14 +900,22 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 		
 		if( ipcmsg->msg_body 
 		    && ipcmsg->msg_len > 0 ){
+			LogDaemonMsg*	logmsg;
+			LogDaemonMsg	copy;
 			
 			logmsg = (LogDaemonMsg*) ipcmsg->msg_body;
-			priority = logmsg->priority;
+#define	COPYFIELD(copy, msg, field) memcpy(((u_char*)&copy.field), ((u_char*)&msg->field), sizeof(copy.field))
+			COPYFIELD(copy, logmsg, use_pri_str);
+			COPYFIELD(copy, logmsg, entity);
+			COPYFIELD(copy, logmsg, entity_pid);
+			COPYFIELD(copy, logmsg, timestamp);
+			COPYFIELD(copy, logmsg, priority);
+			/* Don't want to copy logmsg->message */
 		
-			cl_direct_log(priority, logmsg->message
-			,	logmsg->use_pri_str
-			,	logmsg->entity, logmsg->entity_pid
-			,	logmsg->timestamp);
+			cl_direct_log(copy.priority, logmsg->message
+			,	copy.use_pri_str
+			,	copy.entity, copy.entity_pid
+			,	copy.timestamp);
 		
 
 			(void)logd_log;
@@ -917,9 +923,9 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 			if (verbose){
 				logd_log("%s[%d]: %s %s\n", 
 					 logmsg->entity[0]=='\0'?
-					 "unknown": logmsg->entity,
-					 logmsg->entity_pid, 
-					 ha_timestamp(logmsg->timestamp),
+					 "unknown": copy.entity,
+					 copy.entity_pid, 
+					 ha_timestamp(copy.timestamp),
 					 logmsg->message);
 				 }
  */
