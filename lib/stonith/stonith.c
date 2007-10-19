@@ -429,9 +429,6 @@ stonith_free_hostlist(char** hostlist)
 {
 	char ** here;
 
-	if( !hostlist ) {
-		return;
-	}
 	for (here=hostlist; *here; ++here) {
 		FREE(*here);
 	}
