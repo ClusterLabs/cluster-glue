@@ -790,17 +790,13 @@ logd_term_action(int sig, gpointer userdata)
 		       (int)client->logchan->send_queue->current_qlen,
 		       client->app_name);
 		
-		while(client->logchan->send_queue->current_qlen > 0) {
-			sleep(1);
-		}
+		client->logchan->ops->waitout(client->logchan);
 	}
 
-	cl_log(LOG_DEBUG, "logd_term_action:"
-	       " waiting for %d messages to be read by write process",
-	       (int)chanspair[WRITE_PROC_CHAN]->send_queue->current_qlen);
-	while(chanspair[WRITE_PROC_CHAN]->send_queue->current_qlen > 0) {
-		sleep(1);
-	}
+	cl_log(LOG_DEBUG, "logd_term_action"
+	": waiting for %d messages to be read by write process"
+	,	(int)chanspair[WRITE_PROC_CHAN]->send_queue->current_qlen);
+	chanspair[WRITE_PROC_CHAN]->ops->waitout(chanspair[WRITE_PROC_CHAN]);
 	
         cl_log(LOG_DEBUG, "logd_term_action: sending SIGTERM to write process");
 	if (CL_KILL(write_process_pid, SIGTERM) >= 0){
