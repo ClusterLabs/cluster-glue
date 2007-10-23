@@ -3056,7 +3056,7 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	lrmd_rsc_t* rsc = NULL;
 	struct RAExecOps * RAExec = NULL;
 	const char* op_type;
-        int rc = EXECRA_UNKNOWN_ERROR;
+        int rc = EXECRA_EXEC_UNKNOWN_ERROR;
         int ret;
 	int op_status;
 
