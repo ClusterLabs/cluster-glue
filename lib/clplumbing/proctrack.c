@@ -272,31 +272,31 @@ ReportProcHasDied(int pid, int status)
 	if (doreport) {
 		if (deathbyexit) {
 			cl_log((exitcode == 0 ? LOG_INFO : LOG_WARNING)
-			,	"Exiting %s process %d returned rc %d."
+			,	"Managed %s process %d exited with return code %d."
 			,	type, pid, exitcode);
 		}else if (deathbysig) {
 			const char *	signame = NULL;
 			const char *	sigwords = NULL;
 			int		logtype;
 			signame = signal_name(signo, &sigwords);
-			logtype = (debugreporting ? LOG_DEBUG : LOG_WARNING);
+			logtype = (debugreporting ? LOG_INFO : LOG_WARNING);
 			/*
 			 * Processes being killed isn't an error if
 			 * we're only logging because of debugging.
 			 */
 			if (signame && sigwords) {
 				cl_log(logtype
-				,	"Exiting %s process %d killed by"
+				,	"Managed %s process %d killed by"
 				" signal %d [%s - %s]."
 				,	type, pid, signo
 				,	signame, sigwords);
 			}else{
 				cl_log(logtype
-				,	"Exiting %s process %d killed by signal %d."
+				,	"Managed %s process %d killed by signal %d."
 				,	type, pid, signo);
 			}
 		}else{
-			cl_log(LOG_ERR, "Exiting %s process %d went away"
+			cl_log(LOG_ERR, "Managed %s process %d went away"
 			" strangely (!)"
 			,	type, pid);
 		}
@@ -304,7 +304,7 @@ ReportProcHasDied(int pid, int status)
 #ifdef WCOREDUMP
 	if (didcoredump) {
 		/* We report ALL core dumps without exception */
-		cl_log(LOG_ERR, "Exiting %s process %d dumped core"
+		cl_log(LOG_ERR, "Managed %s process %d dumped core"
 		,	type, pid);
 	}
 #endif
@@ -319,7 +319,7 @@ ReportProcHasDied(int pid, int status)
 		p->ops->procdied(p, status, signo, exitcode,  doreport);
 		if (p->privatedata) {
 			/* They may have forgotten to free something... */
-			cl_log(LOG_ERR, "Exiting %s process %d did not"
+			cl_log(LOG_ERR, "Managed %s process %d did not"
 			" clean up private data!"
 			,	type, pid);
 		}
