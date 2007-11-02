@@ -21,7 +21,7 @@ classmeta class=stonith
 %extcheck xmllint.sh
 meta class=ocf type=Dummy
 %extcheck xmllint.sh
-meta class=lsb type=cron
+meta class=lsb type=heartbeat
 %extcheck xmllint.sh
 meta class=heartbeat type=Dummy
 %extcheck xmllint.sh
