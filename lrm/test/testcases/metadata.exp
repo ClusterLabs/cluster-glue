@@ -29,7 +29,7 @@ Cool. RA list passed.
 .EXTCHECK xmllint.sh
 .TRY Show meta-data class=ocf type=Dummy provider=heartbeat
 .EXTCHECK xmllint.sh
-.TRY Show meta-data class=lsb type=cron provider=heartbeat
+.TRY Show meta-data class=lsb type=heartbeat provider=heartbeat
 .EXTCHECK xmllint.sh
 .TRY Show meta-data class=heartbeat type=Dummy provider=heartbeat
 .EXTCHECK xmllint.sh
