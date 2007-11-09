@@ -1665,6 +1665,11 @@ TempProcessDied(ProcTrack* p, int status, int signo, int exitcode
 	struct tempproc_track *	pt = p->privatedata;
  
 	if (pt->complete) {
+		if (debug_level > 1) {
+			cl_log(LOG_DEBUG
+			,	"%s: Calling 'complete' for temp process %s"
+			,	__FUNCTION__, pt->procname);
+		}
 		pt->complete(pt->userdata, status, signo, exitcode);
 	}
 
@@ -1712,7 +1717,15 @@ TempProcessTrigger(gpointer ginfo)
 	info->isrunning = TRUE;
 
 	if (info->prefork) {
+		if (debug_level > 1) {
+			cl_log(LOG_DEBUG
+			,	"%s: Calling prefork for temp process %s"
+			,	__FUNCTION__, info->procname);
+		}
 		info->prefork(info->userdata);
+	}
+	if (ANYDEBUG) {
+		cl_log(LOG_DEBUG, "Forking temp process %s", info->procname);
 	}
 	switch ((pid=fork())) {
 		int		rc;
@@ -1736,10 +1749,16 @@ TempProcessTrigger(gpointer ginfo)
 
 	}
 	if (pid > 0) {
-		NewTrackedProc(pid,0,PT_LOGNORMAL,ginfo,&TempProcessTrackOps);
-	}
-	if (info->postfork) {
-		info->postfork(info->userdata);
+		NewTrackedProc(pid, 0, (ANYDEBUG? PT_LOGVERBOSE : PT_LOGNORMAL)
+		,	ginfo, &TempProcessTrackOps);
+		if (info->postfork) {
+			if (debug_level > 1) {
+				cl_log(LOG_DEBUG
+				,	"%s: Calling postfork for temp process %s"
+				,	__FUNCTION__, info->procname);
+			}
+			info->postfork(info->userdata);
+		}
 	}
 	return TRUE;
 }
