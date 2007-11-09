@@ -50,6 +50,7 @@ libplumb_la_SOURCES	= 		\
 			cl_syslog.c	\
 			cl_uuid.c	\
 			cl_plugin.c	\
+			cl_reboot.c	\
 			coredumps.c	\
 			cpulimits.c	\
 			Gmain_timeout.c	\

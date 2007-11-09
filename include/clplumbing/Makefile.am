@@ -35,6 +35,7 @@ include_HEADERS	=	\
 	cl_signal.h	\
 	cl_pidfile.h	\
 	cl_random.h	\
+	cl_reboot.h	\
 	cl_syslog.h	\
 	cl_uuid.h	\
 	coredumps.h	\
