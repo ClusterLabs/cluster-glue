@@ -36,6 +36,7 @@
 #define	HEARTBEAT	"hb"
 #define	SETINTERVAL	"setint"
 #define	SETWARNTIME	"setwarn"
+#define	SETREBOOT	"setboot"
 
 /*
  * These messages are really primitive.
