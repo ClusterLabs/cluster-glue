@@ -1,7 +1,7 @@
 sed '
 /^lrmadmin/s/([0-9][0-9]*)/()/
 /^lrmadmin/s/^lrmadmin[^:]*: [^ ]* //
-s/call_id=[0-9]\+/call_id=(removed)/
+s/call_id=[0-9][0-9]*/call_id=(removed)/
 ' |
 awk '
 /Waiting for lrmd to callback.../ { n=1; next; }
