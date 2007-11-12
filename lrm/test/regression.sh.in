@@ -32,7 +32,7 @@ common_filter=$TESTDIR/common.filter
 common_exclf=$TESTDIR/common.excl
 OCF_RA=$OCF_ROOT/resource.d/heartbeat/lrmregtest
 HB_RA=@HB_RA_DIR@/lrmregtest
-LSB_RA=/etc/init.d/lrmregtest
+LSB_RA=@LSB_RA_DIR@/lrmregtest
 export OUTDIR TESTDIR LRMADMIN
 
 logmsg() {
