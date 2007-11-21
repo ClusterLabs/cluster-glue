@@ -149,6 +149,9 @@ struct IPC_CHANNEL{
 	/* is the send blocking or nonblocking*/
 	gboolean	should_send_block;
 	
+	/* if send would block, should an error be returned or not */
+	gboolean	should_block_fail;
+	
 /*  There are two queues in channel. One is for sending and the other
  *  is for receiving. 
  *  Those two queues are channel's internal queues. They should not be 
