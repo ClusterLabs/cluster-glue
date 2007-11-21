@@ -974,7 +974,7 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 	if ( !ch->should_send_block &&
 	    ch->send_queue->current_qlen >= ch->send_queue->max_qlen) {
 		cl_log(LOG_WARNING, "send queue maximum length(%d) exceeded",
-			ch->send_queue->max_qlen);
+		       (int)ch->send_queue->max_qlen);
 
 		if (ch->should_block_fail) {
 			return IPC_FAIL;
