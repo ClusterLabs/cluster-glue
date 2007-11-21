@@ -973,10 +973,14 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 
 	if ( !ch->should_send_block &&
 	    ch->send_queue->current_qlen >= ch->send_queue->max_qlen) {
-		/*cl_log(LOG_WARNING, "send queue maximum length(%d) exceeded",
-		  ch->send_queue->max_qlen );*/
+		cl_log(LOG_WARNING, "send queue maximum length(%d) exceeded",
+			ch->send_queue->max_qlen);
 
-		return IPC_FAIL;
+		if (ch->should_block_fail) {
+			return IPC_FAIL;
+		} else {
+			return IPC_OK;
+		}
 	}
 	
 	while (ch->send_queue->current_qlen >= ch->send_queue->max_qlen){
@@ -2124,6 +2128,7 @@ channel_new(int sockfd, int conntype, const char *path_name) {
   temp_ch->msgpad = sizeof(struct SOCKET_MSG_HEAD);
   temp_ch->bytes_remaining = 0;
   temp_ch->should_send_block = FALSE;
+  temp_ch->should_block_fail = TRUE;
   temp_ch->send_queue = socket_queue_new();
   temp_ch->recv_queue = socket_queue_new();
   temp_ch->pool = NULL;
