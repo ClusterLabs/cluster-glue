@@ -149,33 +149,22 @@ cl_compress_load_plugin(const char* pluginname)
 		return HA_FAIL;
 	}
 
+	/* set the environment variable so that later programs can
+	 * load the appropriate plugin
+	 */
+	setenv(HACOMPRESSNAME,pluginname,1);
 	msg_compress_fns = funcs;
 	
 	return HA_OK;
-	
 }
-
-
 
 int
 cl_set_compress_fns(const char* pluginname)
 {
-	struct hb_compress_fns*	funcs = NULL;
-	
-	if (cl_compress_load_plugin(pluginname) != HA_OK){
-		cl_log(LOG_ERR, "%s: loading compression module"
-		       "(%s) failed",
-		       __FUNCTION__, pluginname);
-		return HA_FAIL;
-	}
-
-	funcs = g_hash_table_lookup(CompressFuncs, pluginname);
-	
-	assert(funcs != NULL);
-	
-	msg_compress_fns = funcs;
-
-	return HA_OK;
+	/* this function was unnecessary duplication of the
+	 * code in cl_compress_load_plugin
+	 */
+	return cl_compress_load_plugin(pluginname);
 }
 
 struct hb_compress_fns*

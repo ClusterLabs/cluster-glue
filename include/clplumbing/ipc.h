@@ -703,10 +703,9 @@ struct SOCKET_MSG_HEAD{
 
 
 /* MAXMSG is the maximum final message size on the wire. */
-/* TODO: This ought to be smaller than MAXUNCOMPRESSED, but I don't
- * understand the code well enough to make that actually work -- lmb */
-#define	MAXMSG		(2048*1024)
+#define	MAXMSG		(256*1024)
 /* MAXUNCOMPRESSED is the maximum, raw data size prior to compression. */
+/* 1:8 compression ratio is to be expected on data such as xml */
 #define	MAXUNCOMPRESSED	(2048*1024)
 #define HEADMAGIC	0xabcd
 #define POOL_SIZE (4*1024)

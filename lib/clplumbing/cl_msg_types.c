@@ -1351,10 +1351,12 @@ fields2netstring(char* sp, char* smax, char* name, size_t nlen,
 	char* tmpsp;
 
 	fieldlen = fieldtypefuncs[type].netstringlen(nlen, vallen, value);
+	/* this check seems to be superfluous because of the next one
 	if (fieldlen > MAXMSG){
-		cl_log(LOG_INFO, "field too big(%d)", (int)fieldlen);
+		cl_log(LOG_INFO, "%s: field too big(%d)", __FUNCTION__, (int)fieldlen);
 		return HA_FAIL;
 	}
+	*/
 	tmpsp = sp + netstring_extra(fieldlen);
 	if (tmpsp > smax){
 		cl_log(LOG_ERR, "%s: memory out of boundary, tmpsp=%p, smax=%p", 
@@ -1375,6 +1377,9 @@ fields2netstring(char* sp, char* smax, char* name, size_t nlen,
 	case FT_STRUCT:
 		{
 			struct ha_msg* msg = (struct ha_msg*) value;
+			/* infinite recursion? Must say that I got lost at
+			 * this point
+			 */
 			ret = msg2netstring_buf(msg, sp,get_netstringlen(msg),
 						&slen);
 			break;

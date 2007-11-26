@@ -145,6 +145,7 @@ msg2netstring_buf(const struct ha_msg *m, char *s,
 		size_t flen;
 		int	tmplen;
 		
+		/* some of these functions in its turn invoke us again */
 		ret = fieldtypefuncs[m->types[i]].tonetstring(sp, 
 							      smax,
 							      m->names[i],
@@ -216,9 +217,10 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 
 	len= get_netstringlen_auth(m) + 1;
 	
-	if (len >= MAXMSG){
-		cl_log(LOG_ERR, "%s: msg is too large"
-		       "len =%d,MAX msg allowed=%d", __FUNCTION__, len, MAXMSG);
+	/* use MAXUNCOMPRESSED for the in memory size check */
+	if (len >= MAXUNCOMPRESSED){
+		cl_log(LOG_ERR, "%s: msg is too large; len=%d,"
+		       " MAX msg allowed=%d", __FUNCTION__, len, MAXUNCOMPRESSED);
 		return NULL;
 	}
 

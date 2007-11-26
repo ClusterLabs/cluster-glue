@@ -1993,7 +1993,7 @@ IPC_Message*
 hamsg2ipcmsg(struct ha_msg* m, IPC_Channel* ch)
 {
 	size_t		len;
-	char *		s  = msg2wirefmt_ll(m, &len, FALSE);
+	char *		s  = msg2wirefmt_ll(m, &len, MSG_NEEDCOMPRESS);
 	IPC_Message*	ret = NULL;
 
 	if (s == NULL) {
@@ -2374,7 +2374,7 @@ msg2wirefmt_ll(struct ha_msg*m, size_t* len, int flag)
 	
 	if (msgfmt == MSGFMT_NETSTRING || must_use_netstring(m)){
 		wirefmtlen = get_netstringlen(m);		
-		if (wirefmtlen >= MAXMSG){
+		if (!(flag&MSG_NOSIZECHECK) && wirefmtlen >= MAXMSG){
 			cl_log(LOG_ERR, "%s: msg too big(%d)"
 			       "for netstring fmt",
 			       __FUNCTION__, wirefmtlen);
@@ -2424,7 +2424,13 @@ msg2wirefmt(struct ha_msg*m, size_t* len){
 char*
 msg2wirefmt_noac(struct ha_msg*m, size_t* len){
 	
-	return msg2wirefmt_ll(m, len, 0);
+	/* in this execution path the size check is not necessary;
+	 * still, the msg2wirefmt_ll is invoked more than once for
+	 * the same message (or parts of it) which is somewhat
+	 * strange, though perhaps it helps reduce the code
+	 * complexity
+	 */
+	return msg2wirefmt_ll(m, len, MSG_NOSIZECHECK);
 }
 
 
