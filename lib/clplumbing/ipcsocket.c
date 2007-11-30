@@ -210,6 +210,7 @@ struct IPC_Stats {
 };
 
 struct IPC_Stats	SocketIPCStats = {0,0,0,0};
+extern int	debug_level;
 
 /* unix domain socket implementations of IPC functions. */
 
@@ -621,13 +622,35 @@ socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn)
 
 	if (wc != NULL) {
 #if HB_IPC_METHOD == HB_IPC_SOCKET
-		close(wc->s);
-		cl_poll_ignore(wc->s);
-		unlink(wc->path_name);
+		if (wc->s >= 0) {
+			if (debug_level > 0) {
+				cl_log(LOG_DEBUG
+				,	"%s: closing socket %d"
+				,	__FUNCTION__, wc->s);
+			}
+			close(wc->s);
+			cl_poll_ignore(wc->s);
+			unlink(wc->path_name);
+			wc->s = -1;
+		}
 #elif HB_IPC_METHOD == HB_IPC_STREAM
-		close(wc->pipefds[0]);
-		close(wc->pipefds[1]);
 		cl_poll_ignore(wc->pipefds[0]);
+		if (wc->pipefds[0] >= 0) {
+			if (debug_level > 0) {
+				cl_log(LOG_DEBUG
+				,	"%s: closing pipe[0] %d"
+				,	__FUNCTION__, wc->pipefds[0]);
+			}
+			wc->pipefds[0] = -1;
+		}
+		if (wc->pipefds[1] >= 0) {
+			if (debug_level > 0) {
+				cl_log(LOG_DEBUG
+				,	"%s: closing pipe[1] %d"
+				,	__FUNCTION__, wc->pipefds[1]);
+			}
+			wc->pipefds[0] = -1;
+		}
 		unlink(wc->path_name);
 #endif
 		g_free(wc);
@@ -660,6 +683,7 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 	struct SOCKET_WAIT_CONN_PRIVATE*	conn_private;
 	struct SOCKET_CH_PRIVATE *		ch_private ;
 	int auth_result = IPC_FAIL;
+	int					saveerrno=errno;
 	gboolean was_error = FALSE;
 #if HB_IPC_METHOD == HB_IPC_SOCKET
 	/* make peer_addr a pointer so it can be used by the
@@ -692,9 +716,11 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 		new_sock = strrecvfd.fd;
 	}
 #endif
+	saveerrno=errno;
 	if (new_sock == -1){
 		if (errno != EAGAIN && errno != EWOULDBLOCK) {
-			cl_perror("socket_accept_connection: accept");
+			cl_perror("socket_accept_connection: accept(sock=%d)"
+			,	s);
 		}
 		was_error = TRUE;
 		
@@ -727,14 +753,15 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 			ch->ch_status = IPC_CONNECT;
 			ch->farside_pid = socket_get_farside_pid(new_sock);
 			return ch;
-
 		}
+		saveerrno=errno;
 	}
   
 #if HB_IPC_METHOD == HB_IPC_SOCKET
 	g_free(peer_addr);
 	peer_addr = NULL;
 #endif
+	errno=saveerrno;
 	return NULL;
 
 }
@@ -767,9 +794,17 @@ socket_disconnect(struct IPC_CHANNEL* ch)
 	if (ch->ch_status == IPC_CONNECT) {
 		socket_resume_io(ch);		
 	}
-	close(conn_info->s);
-	cl_poll_ignore(conn_info->s);
-	conn_info->s = -1;
+	
+	if (conn_info->s >= 0) {
+		if (debug_level > 0) {
+			cl_log(LOG_DEBUG
+			,	"%s: closing socket %d"
+			,	__FUNCTION__, conn_info->s);
+		}
+		close(conn_info->s);
+		cl_poll_ignore(conn_info->s);
+		conn_info->s = -1;
+	}
 	ch->ch_status = IPC_DISCONNECT;
 	return IPC_OK;
 }

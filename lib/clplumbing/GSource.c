@@ -469,10 +469,14 @@ G_main_del_IPC_Channel(GCHSource* chp)
 {
 	GSource* source = (GSource*) chp;
 
-	if (chp->gsourceid <= 0) {
+	if (chp == NULL || chp->gsourceid <= 0) {
 		return FALSE;
 	}
 
+	g_source_remove_poll(source, &chp->infd);
+	if (!chp->fd_fdx) {
+		g_source_remove_poll(source, &chp->outfd);
+	}
 	g_source_remove(chp->gsourceid);
 	chp->gsourceid = 0;
 	g_source_unref(source);
@@ -796,6 +800,11 @@ G_WC_dispatch(GSource* source,
         while(1) {
 		ch = wcp->wch->ops->accept_connection(wcp->wch, wcp->auth_info);
 		if (ch == NULL) {
+			if (errno == EBADF) {
+				cl_perror("%s: Stopping accepting connections(socket=%d)!!"
+				,	__FUNCTION__, wcp->gpfd.fd);
+				rc = FALSE;
+			}
 			break;
 	  	}
 		++count;
