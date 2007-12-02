@@ -374,6 +374,7 @@ G_main_IPC_Channel_constructor(GSource* source, IPC_Channel* ch
 	chp->maxdispatchdelayms = DEFAULT_MAXDELAY;
 	chp->maxdispatchms = DEFAULT_MAXDISPATCH;
 	lc_store((chp->detecttime), zero_longclock);
+	ch->refcount++;
 	chp->ch = ch;
 	chp->udata=userdata;
 	chp->dnotify = notify;
@@ -384,6 +385,9 @@ G_main_IPC_Channel_constructor(GSource* source, IPC_Channel* ch
 	
 	chp->fd_fdx = (rfd == wfd);
 	
+	if (debug_level > 1) {
+		cl_log(LOG_DEBUG, "%s(sock=%d,%d)",__FUNCTION__, rfd,wfd);
+	}
 	chp->infd.fd      = rfd;
 	chp->infd.events  = DEF_EVENTS;
 	g_source_add_poll(source, &chp->infd);
@@ -473,12 +477,12 @@ G_main_del_IPC_Channel(GCHSource* chp)
 		return FALSE;
 	}
 
-	g_source_remove_poll(source, &chp->infd);
-	if (!chp->fd_fdx) {
-		g_source_remove_poll(source, &chp->outfd);
+	if (debug_level > 1) {
+		cl_log(LOG_DEBUG, "%s(sock=%d)",__FUNCTION__, chp->infd.fd);
 	}
 	g_source_remove(chp->gsourceid);
 	chp->gsourceid = 0;
+	/* chp should (may) now be undefined */
 	g_source_unref(source);
 	
 	return TRUE;
@@ -639,19 +643,45 @@ G_CH_dispatch_int(GSource * source,
 /*
  *	Free up our data, and notify the user process...
  */
+int	ch_destroy_debug_me = 0;
 void
 G_CH_destroy_int(GSource* source)
 {
 	GCHSource* chp = (GCHSource*)source;
 	
-	chp->gsourceid = 0;
 	g_assert(IS_CHSOURCE(chp));
+	if (debug_level > 1) {
+		cl_log(LOG_DEBUG, "%s(chp=0x%lx, sock=%d) {", __FUNCTION__
+		,	(unsigned long)chp, chp->infd.fd);
+	}
 	
 	if (chp->dnotify) {
+		if (debug_level > 1) {
+			cl_log(LOG_DEBUG
+			,	"%s: Calling dnotify(sock=%d, arg=0x%lx) function"
+			,	__FUNCTION__, chp->infd.fd, (unsigned long)chp->udata);
+		}
 		chp->dnotify(chp->udata);
-	}	
-	chp->ch->ops->destroy(chp->ch);
-	
+	}else{
+		if (debug_level > 1) {
+			cl_log(LOG_DEBUG
+			,	"%s: NOT calling dnotify(sock=%d) function"
+			,	__FUNCTION__, chp->infd.fd);
+		}
+	}
+	if (chp->ch) {
+		if (debug_level > 1) {
+			cl_log(LOG_DEBUG
+			,	"%s: calling IPC destroy (chp->ch=0x%lx, sock=%d)"
+			,	__FUNCTION__ ,	(unsigned long)chp->ch, chp->infd.fd);
+		}
+		chp->ch->ops->destroy(chp->ch);
+		chp->ch = NULL;
+	}
+	/*chp->gsourceid = 0; ?*/
+	if (debug_level > 1) {
+		cl_log(LOG_DEBUG, "}/*%s(sock=%d)*/", __FUNCTION__, chp->infd.fd);
+	}
 }
 
 

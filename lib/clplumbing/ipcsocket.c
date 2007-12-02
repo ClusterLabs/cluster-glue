@@ -623,7 +623,7 @@ socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn)
 	if (wc != NULL) {
 #if HB_IPC_METHOD == HB_IPC_SOCKET
 		if (wc->s >= 0) {
-			if (debug_level > 0) {
+			if (debug_level > 1) {
 				cl_log(LOG_DEBUG
 				,	"%s: closing socket %d"
 				,	__FUNCTION__, wc->s);
@@ -636,7 +636,7 @@ socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn)
 #elif HB_IPC_METHOD == HB_IPC_STREAM
 		cl_poll_ignore(wc->pipefds[0]);
 		if (wc->pipefds[0] >= 0) {
-			if (debug_level > 0) {
+			if (debug_level > 1) {
 				cl_log(LOG_DEBUG
 				,	"%s: closing pipe[0] %d"
 				,	__FUNCTION__, wc->pipefds[0]);
@@ -644,7 +644,7 @@ socket_destroy_wait_conn(struct IPC_WAIT_CONNECTION * wait_conn)
 			wc->pipefds[0] = -1;
 		}
 		if (wc->pipefds[1] >= 0) {
-			if (debug_level > 0) {
+			if (debug_level > 1) {
 				cl_log(LOG_DEBUG
 				,	"%s: closing pipe[1] %d"
 				,	__FUNCTION__, wc->pipefds[1]);
@@ -786,6 +786,12 @@ socket_disconnect(struct IPC_CHANNEL* ch)
 	struct SOCKET_CH_PRIVATE* conn_info;
 
 	conn_info = (struct SOCKET_CH_PRIVATE*) ch->ch_private;
+	if (debug_level > 1) {
+		cl_log(LOG_DEBUG
+		,	"%s(sock=%d, ch=0x%lx){"
+		,	__FUNCTION__
+		,	conn_info->s, (unsigned long)ch);
+	}
 #if 0
 	if (ch->ch_status != IPC_DISCONNECT) {
   		cl_log(LOG_INFO, "forced disconnect for fd %d", conn_info->s);
@@ -796,7 +802,7 @@ socket_disconnect(struct IPC_CHANNEL* ch)
 	}
 	
 	if (conn_info->s >= 0) {
-		if (debug_level > 0) {
+		if (debug_level > 1) {
 			cl_log(LOG_DEBUG
 			,	"%s: closing socket %d"
 			,	__FUNCTION__, conn_info->s);
@@ -806,6 +812,10 @@ socket_disconnect(struct IPC_CHANNEL* ch)
 		conn_info->s = -1;
 	}
 	ch->ch_status = IPC_DISCONNECT;
+	if (debug_level > 1) {
+		cl_log(LOG_DEBUG, "}/*%s(sock=%d, ch=0x%lx)*/"
+		,	__FUNCTION__, conn_info->s, (unsigned long)ch);
+	}
 	return IPC_OK;
 }
 
@@ -833,8 +843,16 @@ socket_destroy_queue(struct IPC_QUEUE * q)
 static void
 socket_destroy_channel(struct IPC_CHANNEL * ch)
 {
+	--ch->refcount;
+	if (ch->refcount > 0) {
+		return;
+	}
 	if (ch->ch_status == IPC_CONNECT){
 		socket_resume_io(ch);		
+	}
+	if (debug_level > 1) {
+		cl_log(LOG_DEBUG, "socket_destroy(ch=0x%lx){"
+		,	(unsigned long)ch);
 	}
 	socket_disconnect(ch);
 	socket_destroy_queue(ch->send_queue);
@@ -857,6 +875,10 @@ socket_destroy_channel(struct IPC_CHANNEL * ch)
 	}
 	memset(ch, 0xff, sizeof(*ch));
 	g_free((void*)ch);
+	if (debug_level > 1) {
+		cl_log(LOG_DEBUG, "}/*socket_destroy(ch=0x%lx)*/"
+		,	(unsigned long)ch);
+	}
 }
 
 static int
@@ -2170,6 +2192,7 @@ channel_new(int sockfd, int conntype, const char *path_name) {
   temp_ch->high_flow_mark = temp_ch->send_queue->max_qlen;
   temp_ch->low_flow_mark = -1;
   temp_ch->conntype = conntype;
+  temp_ch->refcount = 0;
 
   return temp_ch;
   
