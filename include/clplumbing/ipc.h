@@ -128,6 +128,7 @@ typedef void(*flow_callback_t)(IPC_Channel*, void*);
 /* channel structure.*/
 struct IPC_CHANNEL{
 	int		ch_status;	/* identify the status of channel.*/
+	int		refcount;	/* reference count */
 	pid_t		farside_pid;	/* far side pid */
 	void*		ch_private;	/* channel private data. */
 					/* (may contain conn. info.) */
