@@ -382,7 +382,9 @@ APC_recv_rsp(int upsfd, char *rsp)
 	    		alarm(0);
 			STONITH_IGNORE_SIG(SIGALRM);
 			*p = '\0';
-			LOG(PIL_DEBUG, "%s: returning on error.", __FUNCTION__);
+			LOG(PIL_DEBUG, "%s: %s.", __FUNCTION__,
+				f_serialtimeout ? "timeout" :
+				"can't access device" );
 			return (f_serialtimeout ? S_TIMEOUT : S_ACCESS);
 		}
 	}
