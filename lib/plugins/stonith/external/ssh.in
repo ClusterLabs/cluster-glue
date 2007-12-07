@@ -81,7 +81,10 @@ reset)
             continue
           fi
           if
-            is_host_up $h
+            case ${livedangerously} in
+              [Yy]*)	is_host_up $h;;
+	      *)	true;;
+             esac
           then
 	    $SSH_COMMAND "$2" "$REBOOT_COMMAND"
 	    # Good thing this is only for testing...
@@ -148,6 +151,21 @@ Hostlist
 The list of hosts that the STONITH device controls
 </longdesc>
 </parameter>
+
+<parameter name="livedangerously" unique="0" required="0">
+<content type="enum" />
+<shortdesc lang="en">
+Live Dangerously!!
+</shortdesc>
+<longdesc lang="en">
+Set to "yes" if you want to risk your system's integrity.
+Of course, since this plugin isn't for production, using it
+in production at all is a bad idea.  On the other hand,
+setting this parameter to yes makes it an even worse idea.
+Viva la Vida Loca!
+</longdesc>
+</parameter>
+
 </parameters>
 SSHXML
 	exit 0
