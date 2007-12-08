@@ -1,0 +1,220 @@
+#!/bin/sh
+#
+#
+#	lrmregtest OCF RA. Does nothing but wait a few seconds, can be
+#	configured to fail occassionally.
+#
+#	updated to support the LRM regression testing.
+#
+# Copyright (c) 2007 SUSE LINUX AG, Dejan Muhamedagic
+#                    All Rights Reserved.
+#
+# Copyright (c) 2004 SUSE LINUX AG, Lars Marowsky-Brée
+#                    All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+
+#######################################################################
+# Initialization:
+
+. ${OCF_ROOT}/resource.d/heartbeat/.ocf-shellfuncs
+
+#######################################################################
+
+meta_data() {
+	cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="lrmregtest" version="0.9">
+<version>1.0</version>
+
+<longdesc lang="en">
+This is a lrmregtest Resource Agent. Use for LRM regression
+testing.
+</longdesc>
+<shortdesc lang="en">lrmregtest resource agent</shortdesc>
+
+<parameters>
+<parameter name="delay" unique="0">
+<longdesc lang="en">
+How long to delay before each action.
+</longdesc>
+<shortdesc lang="en">Action delay</shortdesc>
+<content type="integer" default="0" />
+</parameter>
+
+<parameter name="check_parallel" unique="0">
+<longdesc lang="en">
+Complain loudly if they try to run us in parallel on the same resource.
+</longdesc>
+<shortdesc lang="en">Report error if run twice at the same time</shortdesc>
+<content type="boolean" default="true" />
+</parameter>
+
+<parameter name="ignore_TERM" unique="0">
+<longdesc lang="en">
+Process the TERM signal and don't exit.
+</longdesc>
+<shortdesc lang="en">No TERM ain't gonna kill us.</shortdesc>
+<content type="boolean" default="false" />
+</parameter>
+
+<parameter name="verbose" unique="0">
+<longdesc lang="en">
+Print more information.
+</longdesc>
+<shortdesc lang="en">Be verbose.</shortdesc>
+<content type="boolean" default="false" />
+</parameter>
+
+</parameters>
+
+<actions>
+<action name="start"        timeout="90" />
+<action name="stop"         timeout="100" />
+<action name="monitor"      timeout="20" interval="10" depth="0" start-delay="0" />
+<action name="reload"       timeout="90" />
+<action name="migrate_to"   timeout="100" />
+<action name="migrate_from" timeout="90" />
+<action name="meta-data"    timeout="5" />
+<action name="verify-all"   timeout="30" />
+</actions>
+</resource-agent>
+END
+}
+
+#######################################################################
+
+# don't exit on TERM, to test that lrmd makes sure that we do exit
+sigterm_handler() {
+	ocf_log info "They use TERM to bring us down. No such luck."
+	return
+}
+
+dummy_usage() {
+	cat <<END
+usage: $0 {start|stop|monitor|migrate_to|migrate_from|validate-all|meta-data}
+
+Expects to have a fully populated OCF RA-compliant environment set.
+END
+}
+
+# signals interrupt slow calls (sleep)
+# this is an approximation (after all it's just a dummy)
+sleepsleep() {
+	delay=$1
+	now=`perl -e 'print time()'`
+	by=$((now+delay))
+	while [ $now -lt $by ]; do
+		ocf_log debug "Gonna sleep for $((by-now)) seconds..."
+		sleep $((by-now))
+		now=`perl -e 'print time()'`
+	done
+}
+dummy_start() {
+	sleepsleep $OCF_RESKEY_delay
+	ha_pseudo_resource lrmregtest_${OCF_RESOURCE_INSTANCE} start
+}
+
+dummy_stop() {
+	sleepsleep $OCF_RESKEY_delay
+	ha_pseudo_resource lrmregtest_${OCF_RESOURCE_INSTANCE} stop
+}
+
+dummy_monitor() {
+	sleepsleep $OCF_RESKEY_delay
+	ha_pseudo_resource lrmregtest_${OCF_RESOURCE_INSTANCE} monitor
+}
+
+dummy_validate() {
+	exit $OC_ERR_UNIMPLEMENTED
+}
+
+verbose() {
+	[ "$OCF_RESKEY_verbose" != 0 ]
+}
+environment() {
+	echo "OCF environment variables:"
+	set | egrep 'OCF_RESKEY|OCF_RESOURCE_INSTANCE'
+}
+invocation() {
+	echo "invoked with args: $@"
+}
+
+: ${OCF_RESKEY_delay=0}
+: ${OCF_RESKEY_check_parallel=1}
+: ${OCF_RESKEY_verbose=0}
+: ${OCF_RESKEY_ignore_TERM=0}
+
+verbose && environment
+
+lockf=`
+	ha_pseudo_resource lrmregtest_${OCF_RESOURCE_INSTANCE} print |
+		sed 's/$/.lock/'
+`
+
+check4parallel() {
+	if [ -f "$lockf" ] && kill -0 `cat $lockf` 2>/dev/null
+	then
+		ocf_log err "There is another instance of ${OCF_RESOURCE_INSTANCE} running: pid `cat $lockf`."
+		exit $OCF_ERR_GENERIC
+	fi
+}
+
+[ "$OCF_RESKEY_check_parallel" = 1 ] &&
+	check4parallel
+
+[ "$OCF_RESKEY_ignore_TERM" = 1 ] &&
+	trap sigterm_handler TERM
+
+echo $$ > $lockf
+trap "rm -f $lockf" EXIT
+
+verbose && invocation $@
+
+case $__OCF_ACTION in
+meta-data)	meta_data
+		exit $OCF_SUCCESS
+		;;
+start)		dummy_start;;
+stop)		dummy_stop;;
+monitor)	dummy_monitor;;
+migrate_to)	ocf_log info "Migrating ${OCF_RESOURCE_INSTANCE} to ${OCF_RESKEY_CRM_meta_migrate_to}."
+	        dummy_stop
+		;;
+migrate_from)	ocf_log info "Migrating ${OCF_RESOURCE_INSTANCE} to ${OCF_RESKEY_CRM_meta_migrated_from}."
+	        dummy_start
+		;;
+reload)		ocf_log err "Reloading..."
+	        dummy_start
+		;;
+validate-all)	dummy_validate;;
+usage|help)	dummy_usage
+		exit $OCF_SUCCESS
+		;;
+*)		dummy_usage
+		exit $OCF_ERR_UNIMPLEMENTED
+		;;
+esac
+rc=$?
+ocf_log debug "${OCF_RESOURCE_INSTANCE} $__OCF_ACTION : $rc"
+exit $rc
+

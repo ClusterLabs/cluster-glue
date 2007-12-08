@@ -1,0 +1,206 @@
+#!@PYTHON@
+#
+# Stonith module for RILOE Stonith device
+#
+# Copyright (c) 2004 Alain St-Denis <alain.st-denis@ec.gc.ca>
+#
+# Modified by Alan Robertson <alanr@unix.sh> for STONITH external compatibility.
+#
+# Extended and merged by Tijl Van den broeck <subspawn@gmail.com>
+#  with ilo-v2 script from Guy Coates
+#
+# Cleanup by Andrew Beekhof <abeekhof@suse.de>
+#
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+# 
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+# 
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+import sys
+import os
+import socket
+from httplib import *
+from time import sleep
+
+
+argv = sys.argv
+
+try:
+        cmd = argv[1]
+except IndexError:
+        print "Not enough arguments"
+        sys.exit(1)
+
+legacy_RI_HOST     = os.environ.get('RI_HOST',     '')
+legacy_RI_HOSTRI   = os.environ.get('RI_HOSTRI',   '')
+legacy_RI_LOGIN    = os.environ.get('RI_LOGIN',    'Administrator')
+legacy_RI_PASSWORD = os.environ.get('RI_PASSWORD', '')
+
+reset_ok     = os.environ.get('ilo_can_reset',        '0')
+ilo_protocol = os.environ.get('ilo_protocol',         '1.2')
+power_method = os.environ.get('ilo_powerdown_method', 'power')
+
+realhost = os.environ.get('hostlist',     legacy_RI_HOST)
+rihost   = os.environ.get('ilo_hostname', legacy_RI_HOSTRI)
+ilouser  = os.environ.get('ilo_user',     legacy_RI_LOGIN)
+ilopass  = os.environ.get('ilo_password', legacy_RI_PASSWORD)
+
+login = [ '<RIBCL VERSION="'+ilo_protocol+'">',
+          '<LOGIN USER_LOGIN="' + ilouser + '" PASSWORD="' + ilopass + '">' ]
+
+logout = [ '</LOGIN>', '</RIBCL>' ]
+
+
+status = [ '<SERVER_INFO MODE="read">', '<GET_HOST_POWER_STATUS/>', '</SERVER_INFO>' ]
+
+reset = [ '<SERVER_INFO MODE="write">', '<RESET_SERVER/>', '</SERVER_INFO>' ]
+
+if power_method == 'button':
+  off = [ '<SERVER_INFO MODE="write">', '<HOLD_PWR_BTN/>', '</SERVER_INFO>' ]
+else:
+  off = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "N"/>', '</SERVER_INFO>' ]
+
+on = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "Y"/>', '</SERVER_INFO>' ]
+
+
+todo = { 'reset':reset, 'on':on, 'off':off, 'status':status }
+
+
+xmlinfo = '''<parameters>
+ <parameter name="hostlist" unique="1" required="1">
+  <content type="string"/>
+  <shortdesc lang="en">ilo target hostname</shortdesc>
+  <longdesc lang="en">
+   Contains the hostname that the ilo controls
+  </longdesc>
+ </parameter>
+<parameter name="ilo_hostname" unique="1" required="1">
+  <content type="string"/>
+  <shortdesc lang="en">ilo device hostname</shortdesc>
+  <longdesc lang="en">
+   The hostname of the ilo device
+  </longdesc>
+ </parameter>
+<parameter name="ilo_user" unique="0" required="1">
+  <content type="string" default="Administrator"/>
+  <shortdesc lang="en">ilo user</shortdesc>
+  <longdesc lang="en">
+   The user for connecting to the ilo device
+  </longdesc>
+ </parameter>
+<parameter name="ilo_password" unique="0" required="1">
+  <content type="string" default=""/>
+  <shortdesc lang="en">password</shortdesc>
+  <longdesc lang="en">
+   The password for the ilo device user
+  </longdesc>
+ </parameter>
+<parameter name="ilo_can_reset" unique="0" required="0">
+  <content type="string" default="0"/>
+  <shortdesc lang="en">Device can reset</shortdesc>
+  <longdesc lang="en">
+   Does the ILO device support RESET commands (hint: older ones cannot)
+  </longdesc>
+ </parameter>
+<parameter name="ilo_protocol" unique="0" required="0">
+  <content type="string" default="1.2"/>
+  <shortdesc lang="en">ILO Protocol</shortdesc>
+  <longdesc lang="en">
+   Protocol version supported by the ILO device.
+   Known supported versions: 1.2, 2.0
+  </longdesc>
+ </parameter>
+<parameter name="ilo_powerdown_method" unique="0" required="0">
+  <content type="string" default="power"/>
+  <shortdesc lang="en">Power down method</shortdesc>
+  <longdesc lang="en">
+   The method to powerdown the host in question.
+   * button - Emulate holding down the power button
+   * power  - Emulate turning off the machines power 
+
+   NB: In case acpid is not running on the node to be fenced and
+   the method is set to power (which is the default) "on" and
+   "off" requests are not going to work. "reset" should work in
+   any case.
+  </longdesc>
+ </parameter>
+</parameters>'''
+
+info = {
+        'getinfo-devid':	'RILOE',
+        'getinfo-devname':	'riloe ' + rihost,
+        'getinfo-devdescr':	'COMPAQ RILOE STONITH device',
+        'getinfo-devurl':	'http://www.hp.com/',
+	      'gethosts':	 realhost,
+        'getinfo-xml':		xmlinfo
+}
+
+try:
+        print info[cmd]
+        sys.exit(0)
+except KeyError:
+        None
+
+if cmd == 'getconfignames':
+	for arg in [ "hostlist", "ilo_hostname", "ilo_user", "ilo_password", "ilo_can_reset", "ilo_protocol", "ilo_powerdown_method"]:
+            print arg
+        sys.exit(0)
+
+#
+#	All remaining commands need host and password to succeed...
+#
+
+if not rihost:
+        print "ILO device hostname not specified"
+        sys.exit(1)
+
+if not realhost:
+        print "Host controlled by this ILO device not specified"
+        sys.exit(1)
+
+
+acmds=[]
+try:
+        if cmd == 'reset' and not reset_ok:
+                acmds.append(login + todo['off'] + logout)
+                acmds.append(login + todo['on'] + logout)
+        else:   
+                acmds.append(login + todo[cmd] + logout)
+except KeyError:
+        print 'Invalid command: '+ cmd
+        sys.exit(1)
+
+
+try:
+        for cmds in acmds:
+
+                c=HTTPSConnection(rihost)
+                c.send('<?xml version="1.0"?>\r\n')
+                c.sock.recv(1024)
+
+                for line in cmds:
+                        c.send(line+'\r\n')
+                        c.sock.recv(1024)
+
+                c.close()
+                sleep(1)
+
+except socket.gaierror, msg:
+        print "ERROR: " + str(msg) + ": " + rihost
+        sys.exit(1)
+except socket.sslerror, msg:
+        print "ERROR: " + str(msg) + "for " + rihost
+        sys.exit(1)
+except socket.error, msg:
+        print "ERROR: " + str(msg) + "talking to " + rihost
+        sys.exit(1)
