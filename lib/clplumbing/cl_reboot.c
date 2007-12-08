@@ -31,6 +31,7 @@ cl_enable_coredump_before_reboot(gboolean yesno)
 void cl_reboot(int msdelaybeforereboot, const char * reason)
 {
 	int	rebootflag = 0;
+	int	systemrc = 0;
 #ifdef RB_AUTOBOOT
 	rebootflag = RB_AUTOBOOT;
 #endif
@@ -53,5 +54,8 @@ void cl_reboot(int msdelaybeforereboot, const char * reason)
 #error "reboot() call needs to take one or two args"
 #endif
 	/* Shouldn't ever get here, but just in case... */
-	system(REBOOT " " REBOOT_OPTIONS);
+	systemrc=system(REBOOT " " REBOOT_OPTIONS);
+	cl_log(LOG_EMERG, "ALL REBOOT OPTIONS FAILED: %s returned %d"
+	,	REBOOT " " REBOOT_OPTIONS, systemrc);
+	exit(1);
 }
