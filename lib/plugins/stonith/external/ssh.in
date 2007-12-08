@@ -40,6 +40,21 @@ POWEROFF_COMMAND="echo 'sleep 2; @REBOOT@ @REBOOT_OPTIONS@' | SHELL=/bin/sh at n
 # Rewrite the hostlist to accept "," as a delimeter for hostnames too.
 hostlist=`echo $hostlist | tr ',' ' '`
 
+is_host_up() {
+  for j in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+  do
+    if
+      ping -w1 -c1 "$1" >/dev/null 2>&1
+    then
+      sleep 1
+    else
+      return 1
+    fi
+  done
+  return 0
+}
+
+
 case $1 in
 gethosts)
 	for h in $hostlist ; do
@@ -65,18 +80,25 @@ reset)
           then
             continue
           fi
-	  $SSH_COMMAND "$2" "$REBOOT_COMMAND"
-	  # Good thing this is only for testing...
-          for j in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-          do
+          if
+            case ${livedangerously} in
+              [Yy]*)	is_host_up $h;;
+	      *)	true;;
+             esac
+          then
+	    $SSH_COMMAND "$2" "$REBOOT_COMMAND"
+	    # Good thing this is only for testing...
             if
-		ping -w1 -c1 "$2" >/dev/null 2>&1
+              is_host_up $h
             then
-		sleep 1
-	    else
-		exit 0
+              exit 1
+            else
+              exit 0
             fi
-          done
+          else
+            # well... Let's call it successful, after all this is only for testing...
+            exit 0
+          fi
 	done
 	exit 1
 	;;
@@ -129,6 +151,21 @@ Hostlist
 The list of hosts that the STONITH device controls
 </longdesc>
 </parameter>
+
+<parameter name="livedangerously" unique="0" required="0">
+<content type="enum" />
+<shortdesc lang="en">
+Live Dangerously!!
+</shortdesc>
+<longdesc lang="en">
+Set to "yes" if you want to risk your system's integrity.
+Of course, since this plugin isn't for production, using it
+in production at all is a bad idea.  On the other hand,
+setting this parameter to yes makes it an even worse idea.
+Viva la Vida Loca!
+</longdesc>
+</parameter>
+
 </parameters>
 SSHXML
 	exit 0
