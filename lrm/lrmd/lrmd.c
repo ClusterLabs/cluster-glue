@@ -759,7 +759,7 @@ lrm_debug_running_op(lrmd_op_t* op, const char * text)
 int
 main(int argc, char ** argv)
 {
-	int req_restart = FALSE;
+	int req_restart = TRUE;
 	int req_status  = FALSE;
 	int req_stop    = FALSE;
 
