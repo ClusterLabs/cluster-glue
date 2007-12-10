@@ -179,7 +179,7 @@ ExpectToken(int	fd, struct Etoken * toklist, int to_secs, char * savebuf
 			*buf = EOS;
 			++nchars;
 		}
-		if (Debug) {
+		if (Debug > 1) {
 			DEBUG("Got '%c'", ch);
 		}
 
