@@ -758,10 +758,10 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	
 
 	rc = pclose(file);
-	if(rc != 0) {
+	if (rc != 0) {
 		LOG(PIL_INFO, "%s: Calling '%s' returned %d", __FUNCTION__, cmd, rc);
 	}
-	if( data ) {
+	if (Debug && data) {
 		LOG(PIL_INFO, "%s: '%s' output: %s", __FUNCTION__, cmd, data);
 	}
 
