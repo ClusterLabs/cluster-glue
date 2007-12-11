@@ -195,9 +195,9 @@ riloe_reset_req(StonithPlugin * s, int request, const char * host)
 		LOG(PIL_DEBUG, "command %s will be executed", cmd);
 	}
 
-	if (system(cmd) == 0)
+	if (system(cmd) == 0) {
 		return S_OK;
-	else {
+	} else {
 		LOG(PIL_CRIT, "command %s failed", cmd);
 		return(S_RESETFAIL);
 	}
