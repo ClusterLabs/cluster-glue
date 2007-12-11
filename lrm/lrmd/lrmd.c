@@ -744,13 +744,13 @@ lrm_debug_running_op(lrmd_op_t* op, const char * text)
 		,	"ps -l -f -s %d | logger -p daemon.info -t 'T/O PS:'"
 		,	op->exec_pid);
 		lrmd_debug(LOG_DEBUG, "Running [%s]", cmd);
-		if (system(cmd) < 0) {
+		if (system(cmd) != 0) {
 			lrmd_log(LOG_ERR, "Running [%s] failed", cmd);
 		}
 		snprintf(cmd, sizeof(cmd)
 		,	"ps axww | logger -p daemon.info -t 't/o ps:'");
 		lrmd_debug(LOG_DEBUG, "Running [%s]", cmd);
-		if (system(cmd) < 0) {
+		if (system(cmd) != 0) {
 			lrmd_log(LOG_ERR, "Running [%s] failed", cmd);
 		}
 	}
