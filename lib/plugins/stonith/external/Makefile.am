@@ -19,8 +19,8 @@
 #
 MAINTAINERCLEANFILES = Makefile.in
 
-EXTRA_DIST           = vmware rackpdu ibmrsa-telnet
+EXTRA_DIST           = ibmrsa-telnet ipmi rackpdu vmware
 
 extdir		     = $(stonith_ext_plugindir)
 
-ext_SCRIPTS	     = ibmrsa ibmrsa-telnet riloe ssh vmware rackpdu
+ext_SCRIPTS	     = ibmrsa ibmrsa-telnet ipmi riloe ssh vmware rackpdu
