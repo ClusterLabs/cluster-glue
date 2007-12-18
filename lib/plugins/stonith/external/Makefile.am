@@ -23,4 +23,4 @@ EXTRA_DIST           = vmware rackpdu
 
 extdir		     = $(stonith_ext_plugindir)
 
-ext_SCRIPTS	     = ibmrsa riloe ssh vmware rackpdu
+ext_SCRIPTS	     = ibmrsa ibmrsa-telnet riloe ssh vmware rackpdu
