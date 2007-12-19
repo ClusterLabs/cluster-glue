@@ -69,6 +69,18 @@ if [ ! -d "$TESTDIR" ]; then
 	usage
 fi
 
+export OCF_ROOT
+if [ -z "$OCF_ROOT" ]; then
+	[ -d /usr/lib/ocf ] && OCF_ROOT=/usr/lib/ocf
+fi
+if [ ! -d "$OCF_ROOT" ]; then
+	echo "OCF_ROOT environment variable not set"
+	exit 2
+fi
+which xmllint >/dev/null 2>&1 || {
+	echo "WARNING: xmllint not available, some of the tests may fail"
+}
+
 rm -f $LRMD_LOGF $LRMD_DEBUGF
 
 # make lrmd log to our files only
