@@ -585,7 +585,7 @@ external_getinfo(StonithPlugin * s, int reqtype)
 	}
 
 	if (rc == 0) {
-		if (sd->outputbuf == NULL) {
+		if (sd->outputbuf != NULL) {
 			FREE(sd->outputbuf);
 		}
 		sd->outputbuf =  ret;
