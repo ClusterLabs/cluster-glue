@@ -2254,7 +2254,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 		LOG_FAILED_TO_ADD_FIELD("callid");
 		return -1;
 	}
-	if (HA_OK !=ha_msg_add(msg, F_LRM_APP, client->app_name)) {
+	if (HA_OK !=ha_msg_mod(msg, F_LRM_APP, client->app_name)) {
 		LOG_FAILED_TO_ADD_FIELD("app_name");
 		return -1;
 	}
@@ -2855,15 +2855,15 @@ op_to_msg(lrmd_op_t* op)
 		lrmd_log(LOG_ERR,"op_to_msg: can not copy the msg");
 		return NULL;
 	}
-	if (HA_OK != ha_msg_add_int(msg, F_LRM_CALLID, op->call_id)) {
+	if (HA_OK != ha_msg_mod_int(msg, F_LRM_CALLID, op->call_id)) {
 		LOG_FAILED_TO_ADD_FIELD("call_id");
 		goto error;
 	}
-	if (HA_OK != ha_msg_add_ul(msg, F_LRM_T_RUN, tm2age(op->t_perform))) {
+	if (HA_OK != ha_msg_mod_ul(msg, F_LRM_T_RUN, tm2age(op->t_perform))) {
 		LOG_FAILED_TO_ADD_FIELD("t_run")
 		goto error;
 	}
-	if (HA_OK != ha_msg_add_ul(msg, F_LRM_T_RCCHANGE, tm2age(op->t_rcchange))) {
+	if (HA_OK != ha_msg_mod_ul(msg, F_LRM_T_RCCHANGE, tm2age(op->t_rcchange))) {
 		LOG_FAILED_TO_ADD_FIELD("t_rcchange")
 		goto error;
 	}
@@ -2875,11 +2875,11 @@ op_to_msg(lrmd_op_t* op)
 				longclockto_ms(sub_longclock(op->t_done,op->t_perform));
 		}
 	}
-	if (HA_OK != ha_msg_add_ul(msg, F_LRM_EXEC_TIME, exec_time)) {
+	if (HA_OK != ha_msg_mod_ul(msg, F_LRM_EXEC_TIME, exec_time)) {
 		LOG_FAILED_TO_ADD_FIELD("exec_time")
 		goto error;
 	}
-	if (HA_OK != ha_msg_add_ul(msg, F_LRM_QUEUE_TIME, queue_time)) {
+	if (HA_OK != ha_msg_mod_ul(msg, F_LRM_QUEUE_TIME, queue_time)) {
 		LOG_FAILED_TO_ADD_FIELD("queue_time")
 		goto error;
 	}
