@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <time.h>
 #ifndef __USE_GNU
 #define __USE_GNU
 /* For strnlen protype */ 
