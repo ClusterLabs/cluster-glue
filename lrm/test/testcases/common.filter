@@ -2,6 +2,9 @@ sed '
 /^lrmadmin/s/([0-9][0-9]*)/()/
 /^lrmadmin/s/^lrmadmin[^:]*: [^ ]* //
 s/call_id=[0-9][0-9]*/call_id=(removed)/
+/run at:/d
+/last rc change at:/d
+/queue time:/d
 ' |
 awk '
 /Waiting for lrmd to callback.../ { n=1; next; }
