@@ -889,6 +889,7 @@ g_print_ops(gpointer data, gpointer user_data)
 {
 	lrm_op_t* op = (lrm_op_t*)data;
 	GString * param_gstr;
+	time_t run_at=0, rcchange_at=0;
 
 	if (NULL == op) {
 		cl_log(LOG_ERR, "%s:%d: op==NULL"
@@ -899,9 +900,16 @@ g_print_ops(gpointer data, gpointer user_data)
 	param_gstr = g_string_new("");
 	g_hash_table_foreach(op->params, ocf_params_hash_to_str, &param_gstr);
 
+	if( op->t_run )
+		run_at=time(NULL)-(op->t_run+999)/1000;
+	if( op->t_rcchange )
+		rcchange_at=time(NULL)-(op->t_rcchange+999)/1000;
 	printf("   operation '%s' [call_id=%d]:\n"
 	       "      start_delay=%d, interval=%d, timeout=%d, app_name=%s\n"
 	       "      rc=%d (%s), op_status=%d (%s)\n"
+	       "      run at: %s"
+	       "      last rc change at: %s"
+	       "      queue time: %lums, exec time: %lums\n"
 	       "      parameters: %s\n"
 		, nullcheck(op->op_type), op->call_id
 		, op->start_delay, op->interval, op->timeout
@@ -909,6 +917,9 @@ g_print_ops(gpointer data, gpointer user_data)
 		, rc_msg[(op->rc-EXECRA_EXEC_UNKNOWN_ERROR) % DIMOF(rc_msg)]
 		, op->op_status
 		, status_msg[(op->op_status-LRM_OP_PENDING) % DIMOF(status_msg)]
+		, op->t_run ? ctime(&run_at) : "N/A\n"
+		, op->t_rcchange ? ctime(&rcchange_at) : "N/A\n"
+		, op->queue_time, op->exec_time
 		, param_gstr->str);
 	g_string_free(param_gstr, TRUE);
 }
