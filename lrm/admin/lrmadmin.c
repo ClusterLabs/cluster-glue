@@ -902,9 +902,9 @@ g_print_ops(gpointer data, gpointer user_data)
 	g_hash_table_foreach(op->params, ocf_params_hash_to_str, &param_gstr);
 
 	if( op->t_run )
-		run_at=time(NULL)-(op->t_run+999)/1000;
+		run_at=(time_t)op->t_run;
 	if( op->t_rcchange )
-		rcchange_at=time(NULL)-(op->t_rcchange+999)/1000;
+		rcchange_at=(time_t)op->t_rcchange;
 	printf("   operation '%s' [call_id=%d]:\n"
 	       "      start_delay=%d, interval=%d, timeout=%d, app_name=%s\n"
 	       "      rc=%d (%s), op_status=%d (%s)\n"

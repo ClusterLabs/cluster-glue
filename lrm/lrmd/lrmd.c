@@ -2859,11 +2859,11 @@ op_to_msg(lrmd_op_t* op)
 		LOG_FAILED_TO_ADD_FIELD("call_id");
 		goto error;
 	}
-	if (HA_OK != ha_msg_mod_ul(msg, F_LRM_T_RUN, tm2age(op->t_perform))) {
+	if (HA_OK != ha_msg_mod_ul(msg, F_LRM_T_RUN, tm2unix(op->t_perform))) {
 		LOG_FAILED_TO_ADD_FIELD("t_run")
 		goto error;
 	}
-	if (HA_OK != ha_msg_mod_ul(msg, F_LRM_T_RCCHANGE, tm2age(op->t_rcchange))) {
+	if (HA_OK != ha_msg_mod_ul(msg, F_LRM_T_RCCHANGE, tm2unix(op->t_rcchange))) {
 		LOG_FAILED_TO_ADD_FIELD("t_rcchange")
 		goto error;
 	}
