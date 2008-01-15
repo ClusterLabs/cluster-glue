@@ -90,6 +90,8 @@
 #define tm2age(tm) \
 	(cmp_longclock(tm, zero_longclock) <= 0) ? \
 		0 : longclockto_ms(sub_longclock(now, tm))
+#define tm2unix(tm) \
+	(time(NULL)-(tm2age(tm)+999)/1000)
 
 /*
  * The basic objects in our world:
