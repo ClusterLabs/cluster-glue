@@ -217,18 +217,18 @@ ipmilan_status(StonithPlugin  *s)
 {
 	struct pluginDevice * nd;
 	struct ipmilanHostInfo * node;
-	int ret;
+	int ret, rv;
+	int i;
 
 	ERRIFWRONGDEV(s,S_OOPS);
 
 	ret = S_OK;
 
 	nd = (struct pluginDevice *)s;
-	node = nd->hostlist;
-#if 0
-	do {
-		ret = send_ipmi_msg(node, ST_IPMI_STATUS);
-		if (ret) {
+	for( i=0, node = nd->hostlist;
+			i < nd->hostcount; i++, node = node->next ) {
+		rv = do_ipmi_cmd(node, ST_IPMI_STATUS);
+		if (rv) {
 			LOG(PIL_INFO, "Host %s ipmilan status failure."
 			,	node->hostname);
 			ret = S_ACCESS;
@@ -236,10 +236,9 @@ ipmilan_status(StonithPlugin  *s)
 			LOG(PIL_INFO, "Host %s ipmilan status OK."
 			,	node->hostname);
 		}
-		node = node->next;
 
-	} while (node);
-#endif
+	}
+
 	return ret;
 }
 
@@ -332,20 +331,19 @@ ipmilan_reset_req(StonithPlugin * s, int request, const char * host)
 	int rc = 0;
 	struct pluginDevice * nd;
 	struct ipmilanHostInfo * node;
+	int i;
 
 	ERRIFWRONGDEV(s,S_OOPS);
 	
 	nd = (struct pluginDevice *)s;
-	node = nd->hostlist;
-	do {
+	for( i=0, node = nd->hostlist;
+			i < nd->hostcount; i++, node = node->next ) {
 		if (strcasecmp(node->hostname, host) == 0) {
 			break;
-		};
+		}
+	}
 
-		node = node->next;
-	} while (node);
-	
-	if (!node) {
+	if (i >= nd->hostcount) {
 		LOG(PIL_CRIT, "Host %s is not configured in this STONITH "
 		" module. Please check your configuration file.", host);
 		return (S_OOPS);
@@ -421,9 +419,9 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 		tmp->authtype = 1;
 	} else if (strcmp(namestocopy[3].s_value, "md5") == 0) {
 		tmp->authtype = 2;
-	} else if (strcmp(namestocopy[3].s_value, "key") == 0) {
-		tmp->authtype = 4;
-	} else if (strcmp(namestocopy[3].s_value, "password") == 0) {
+	} else if (strcmp(namestocopy[3].s_value, "key") == 0 ||
+			strcmp(namestocopy[3].s_value, "password") == 0 ||
+			strcmp(namestocopy[3].s_value, "straight") == 0) {
 		tmp->authtype = 4;
 	} else {
 		LOG(PIL_CRIT, "ipmilan auth type '%s' invalid.  See "
@@ -435,10 +433,9 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 		LOG(PIL_CRIT, "ipmilan priv value is NULL.  See "
 		"README.ipmilan for allowed values");
 		return S_OOPS;
-	if (strcmp(namestocopy[4].s_value, "operator") == 0) {
+	} else if (strcmp(namestocopy[4].s_value, "operator") == 0) {
 		tmp->privilege = 3;
-		}
-	if (strcmp(namestocopy[4].s_value, "admin") == 0) {
+	} else if (strcmp(namestocopy[4].s_value, "admin") == 0) {
 		tmp->privilege = 4;
 	} else {
 		LOG(PIL_CRIT, "ipmilan priv value '%s' invalid.  See "
@@ -448,7 +445,7 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 	FREE(namestocopy[4].s_value);
 	tmp->username = namestocopy[5].s_value;
 	tmp->password = namestocopy[6].s_value;
-	
+
 	if (nd->hostlist == NULL ) {
 		nd->hostlist = tmp;
 		nd->hostlist->prev = tmp;
@@ -539,6 +536,7 @@ ipmilan_destroy(StonithPlugin *s)
 
 	nd->hostcount = -1;
 	FREE(nd);
+	ipmi_leave();
 }
 
 /* Create a new ipmilan StonithPlugin device.  Too bad this function can't be static */

@@ -35,6 +35,7 @@
 #include <OpenIPMI/ipmi_auth.h>
 #include <OpenIPMI/ipmi_msgbits.h>
 #include <OpenIPMI/ipmi_posix.h>
+#include <OpenIPMI/ipmi_debug.h>
 
 #include "ipmilan.h"
 #include <stonith/stonith.h>
@@ -46,9 +47,13 @@ extern const PILPluginImports*  PluginImports;
 /* #define DUMP_MSG 0 */
 #define OPERATION_TIME_OUT 10
 
-os_handler_t *os_hnd;
+os_handler_t *os_hnd=NULL;
 selector_t *os_sel;
+static ipmi_con_t *con;
 extern os_handler_t ipmi_os_cb_handlers;
+
+static int request_done = 0;
+static int op_done = 0;
 
 typedef enum ipmi_status {
 	/*
@@ -72,8 +77,8 @@ typedef enum chassis_control_request {
 	SOFT_SHUTDOWN = 0X05
 } chassis_control_request_t;
 
-void dump_msg_data(ipmi_msg_t *msg, ipmi_addr_t *addr, char *type);
-int rsp_handler(ipmi_con_t *ipmi, ipmi_msg_t *rsp);
+void dump_msg_data(ipmi_msg_t *msg, ipmi_addr_t *addr, const char *type);
+int rsp_handler(ipmi_con_t *ipmi, ipmi_msgi_t *rspi);
 
 void send_ipmi_cmd(ipmi_con_t *con, int request);
 
@@ -87,7 +92,7 @@ timed_out(selector_t  *sel, sel_timer_t *timer, void *data)
 }
 
 void
-dump_msg_data(ipmi_msg_t *msg, ipmi_addr_t *addr, char *type)
+dump_msg_data(ipmi_msg_t *msg, ipmi_addr_t *addr, const char *type)
 {
 	ipmi_system_interface_addr_t *smi_addr = NULL;
 	int i;
@@ -139,34 +144,35 @@ dump_msg_data(ipmi_msg_t *msg, ipmi_addr_t *addr, char *type)
  */
 
 int
-rsp_handler(ipmi_con_t *ipmi, ipmi_msg_t *rsp)
+rsp_handler(ipmi_con_t *ipmi, ipmi_msgi_t *rspi)
 {
-
-/*  This code causes segmentation faults in the "rv = " line, and the
- *  "free(" line seems to be freeing invalid memory  */
-#if 0
 	int rv;
-	int * request;
+	long request;
 
-	request = (void *) rsp->data;
+	/*dump_msg_data(&rspi->msg, &rspi->addr, "response");*/
+	request = (long) rspi->data1;
 
-	rv = rsp->data[0];  
+	op_done = 1;
+	if( !rspi || !(rspi->msg.data) ) {
+		PILCallLog(PluginImports->log,PIL_CRIT, "No data received\n");
+		gstatus = S_RESETFAIL;
+		return IPMI_MSG_ITEM_NOT_USED;
+	}
+	rv = rspi->msg.data[0];
 	/* some IPMI device might not issue 0x00, success, for reset command.
 	   instead, a 0xc3, timeout, is returned. */
-	if (rv == 0x00 || 
-		(rv == 0xc3 && *request <= ST_POWEROFF && *request >= ST_GENERIC_RESET ) ) {
+	if (rv == 0x00) {
+		gstatus = S_OK;
+	} else if((rv == 0xc3 || rv == 0xff) && request == ST_GENERIC_RESET) {
+		PILCallLog(PluginImports->log,PIL_WARN ,
+		"IPMI reset request failed: %x, but we assume that it succeeded\n", rv);
 		gstatus = S_OK;
 	} else {
+		PILCallLog(PluginImports->log,PIL_INFO
+		, "IPMI request %ld failed: %x\n", request, rv);
 		gstatus = S_RESETFAIL;
 	}
-
-	free(request);
-#else
-	/*  so, until this code can be fixed, we'll just assume it's ok  */
-	gstatus = S_OK;
-#endif
-
-	return gstatus;
+	return IPMI_MSG_ITEM_NOT_USED;
 }
 
 void
@@ -177,7 +183,7 @@ send_ipmi_cmd(ipmi_con_t *con, int request)
 	ipmi_msg_t msg;
 	struct ipmi_system_interface_addr *si;
 	int rv;
-	ipmi_msg_t msgi;
+	ipmi_msgi_t *rspi;
 	/* chassis control command request is only 1 byte long */
 	unsigned char cc_data = POWER_CYCLE; 
 
@@ -194,11 +200,11 @@ send_ipmi_cmd(ipmi_con_t *con, int request)
 
 	switch (request) {
 		case ST_POWERON:
-			cc_data = POWER_DOWN;
+			cc_data = POWER_UP;
 			break;
 
 		case ST_POWEROFF:
-			cc_data = POWER_UP;
+			cc_data = POWER_DOWN;
 			break;
 
 		case ST_GENERIC_RESET:
@@ -208,7 +214,6 @@ send_ipmi_cmd(ipmi_con_t *con, int request)
 		case ST_IPMI_STATUS:
 			msg.netfn = IPMI_APP_NETFN;
 			msg.cmd = IPMI_GET_DEVICE_ID_CMD;
-			msg.data = NULL;
 			msg.data_len = 0;
 			break;
 
@@ -217,37 +222,42 @@ send_ipmi_cmd(ipmi_con_t *con, int request)
 			return;
 	}
 
-	msgi.data = (void *) malloc(sizeof(int));
-	*((unsigned char *)msgi.data) = request;
-	rv = con->send_command(con, &addr, addr_len, &msg, (ipmi_ll_rsp_handler_t) rsp_handler, (void *) &msgi);
-	if (rv == -1) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "Error sending IPMI command: %x\n", rv);
-		gstatus = S_ACCESS;
+ 	gstatus = S_ACCESS;
+	rspi = calloc(1, sizeof(ipmi_msgi_t));
+	if (NULL == rspi) {
+		PILCallLog(PluginImports->log,PIL_CRIT, "Error sending IPMI command: Out of memory\n");
+	} else {
+		rspi->data1 = (void *) (long) request;
+		rv = con->send_command(con, &addr, addr_len, &msg, rsp_handler, rspi);
+		if (rv == -1) {
+			PILCallLog(PluginImports->log,PIL_CRIT, "Error sending IPMI command: %x\n", rv);
+		} else {
+			request_done = 1;
+		}
 	}
 
 	return;
 }
 
 static void
-con_changed_handler(ipmi_con_t *ipmi,
-			int err,
-			unsigned int port_num,
-			int still_connected,
-			void *cb_data)
+con_changed_handler(ipmi_con_t *ipmi, int err, unsigned int port_num,
+			int still_connected, void *cb_data)
 {
 	int * request;
+
 	if (err) {
 		PILCallLog(PluginImports->log,PIL_CRIT, "Unable to setup connection: %x\n", err);
 		return;
 	}
 
-	request = (int *) cb_data;
-	send_ipmi_cmd(ipmi, *request);
+	if( !request_done ) {
+		request = (int *) cb_data;
+		send_ipmi_cmd(ipmi, *request);
+	}
 }
 
-
 static int
-setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
+setup_ipmi_conn(struct ipmilanHostInfo * host, int *request)
 {
 	int rv;
 
@@ -260,24 +270,21 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 	char username[17];
 	char password[17];
 
-	static ipmi_con_t *con;
-
-	sel_timer_t * timer;
-	struct timeval timeout;
+	/*DEBUG_MSG_ENABLE();*/
 
 	os_hnd = ipmi_posix_get_os_handler();
 	if (!os_hnd) {
-	    	PILCallLog(PluginImports->log,PIL_CRIT, "ipmi_smi_setup_con: Unable to allocate os handler");
+			PILCallLog(PluginImports->log,PIL_CRIT, "ipmi_smi_setup_con: Unable to allocate os handler");
 		return 1;
 	}
 
 	rv = sel_alloc_selector(os_hnd, &os_sel);
 	if (rv) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "Could not alloctate selector\n");
+		PILCallLog(PluginImports->log,PIL_CRIT, "Could not allocate selector\n");
 		return rv;
 	}
 
-    	ipmi_posix_os_handler_set_sel(os_hnd, os_sel);
+	ipmi_posix_os_handler_set_sel(os_hnd, os_sel);
 
 	rv = ipmi_init(os_hnd);
 	if (rv) {
@@ -313,13 +320,11 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 		return S_ACCESS;
 	}
 
-	/* in the OpenIPMI 1.3.x implementation the callback function was
-	 * called set_con_change_handler(), now with the OpenIPMI 2.0.x
-	 * implementation it has changed to add_con_change_handler(). Check out:
-	 *
-	 * http://cvs.sourceforge.net/viewcvs.py/openipmi/OpenIPMI/include/OpenIPMI/ipmi_conn.h?r1=1.27&r2=1.28
-	 */
-	con->add_con_change_handler(con, con_changed_handler, &request);
+#if OPENIPMI_VERSION_MAJOR < 2
+	con->set_con_change_handler(con, con_changed_handler, request);
+#else
+	con->add_con_change_handler(con, con_changed_handler, request);
+#endif
 
 	gstatus = IPMI_RUNNING;
 
@@ -329,6 +334,40 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 		gstatus = S_BADCONFIG;
 		return rv;
 	}
+	return S_OK;
+}
+
+void
+ipmi_leave()
+{
+	if( con && con->close_connection ) {
+		con->close_connection(con);
+		con = NULL;
+	}
+	if( os_sel ) {
+		sel_free_selector(os_sel);
+		os_sel = NULL;
+	}
+}
+
+int
+do_ipmi_cmd(struct ipmilanHostInfo * host, int request)
+{
+	int rv;
+	sel_timer_t * timer;
+	struct timeval timeout;
+
+	request_done = 0;
+	op_done = 0;
+
+	if( !os_hnd ) {
+		rv = setup_ipmi_conn(host, &request);
+		if( rv ) {
+			return rv;
+		}
+	} else {
+		send_ipmi_cmd(con, request);
+	}
 
 	gettimeofday(&timeout, NULL);
 	timeout.tv_sec += OPERATION_TIME_OUT;
@@ -337,23 +376,20 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int request)
 	sel_alloc_timer(os_sel, timed_out, NULL, &timer);
 	sel_start_timer(timer, &timeout);
 
-        while (1) {
-                rv = sel_select(os_sel, NULL, 0, NULL, NULL);
-		if (gstatus != IPMI_RUNNING) {
+	while (!op_done) {
+		rv = sel_select(os_sel, NULL, 0, NULL, NULL);
+		if (rv == -1) {
 			break;
 		}
-        }
+	}
 
 	sel_free_timer(timer);
-
-	con->close_connection(con);
-	ipmi_shutdown();
 	return gstatus;
 }
 
-int
-do_ipmi_cmd(struct ipmilanHostInfo * host, int request)
+#if OPENIPMI_VERSION_MAJOR < 2
+void
+posix_vlog(char *format, enum ipmi_log_type_e log_type, va_list ap)
 {
-	return setup_ipmi_conn(host, request);
 }
-
+#endif

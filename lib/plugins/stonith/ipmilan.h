@@ -36,6 +36,5 @@ struct ipmilanHostInfo {
 	struct ipmilanHostInfo *  next;
 };
 
-int
-do_ipmi_cmd(struct ipmilanHostInfo * host, int request);
-
+int do_ipmi_cmd(struct ipmilanHostInfo * host, int request);
+void ipmi_leave(void);
