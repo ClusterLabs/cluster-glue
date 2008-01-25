@@ -208,7 +208,7 @@ send_ipmi_cmd(ipmi_con_t *con, int request)
 			break;
 
 		case ST_GENERIC_RESET:
-			cc_data = POWER_CYCLE;
+			cc_data = HARD_RESET;
 			break;
 
 		case ST_IPMI_STATUS:
