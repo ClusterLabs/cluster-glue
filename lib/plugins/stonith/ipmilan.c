@@ -119,6 +119,7 @@ static const char * NOTpluginid = "IPMI-LAN device has been destroyed";
 #define ST_PORT		"port"
 #define ST_AUTH		"auth"
 #define ST_PRIV		"priv"
+#define ST_RESET_METHOD		"reset_method"
 
 #include "stonith_config_xml.h"
 
@@ -184,6 +185,22 @@ static const char * NOTpluginid = "IPMI-LAN device has been destroyed";
 	XML_PARAMETER_BEGIN(ST_PRIV, "string", "1") \
 	  XML_PRIV_SHORTDESC \
 	  XML_PRIV_LONGDESC \
+	XML_PARAMETER_END
+
+#define XML_RESET_METHOD_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_RESET_METHOD \
+	XML_PARM_SHORTDESC_END
+
+#define XML_RESET_METHOD_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	"How to reset the host (\"power_cycle\" or \"hard_reset\")" \
+	XML_PARM_LONGDESC_END
+
+#define XML_RESET_METHOD_PARM \
+	XML_PARAMETER_BEGIN(ST_RESET_METHOD, "string", "0") \
+	  XML_RESET_METHOD_SHORTDESC \
+	  XML_RESET_METHOD_LONGDESC \
 	XML_PARAMETER_END
 
 static const char *ipmilanXML = 
@@ -367,7 +384,7 @@ ipmilan_get_confignames(StonithPlugin * s)
 {
 	static const char * ret[] = 
 		{ ST_HOSTNAME, ST_IPADDR, ST_PORT, ST_AUTH,
-		  ST_PRIV, ST_LOGIN, ST_PASSWD, NULL};
+		  ST_PRIV, ST_LOGIN, ST_PASSWD, ST_RESET_METHOD, NULL};
 	return ret;
 }
 
@@ -380,6 +397,7 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 	struct pluginDevice* nd;
 	int		rc;
 	struct ipmilanHostInfo *  tmp;
+	const char *reset_opt;
 
 	StonithNamesToGet	namestocopy [] =
 	{	{ST_HOSTNAME,	NULL}
@@ -445,6 +463,15 @@ ipmilan_set_config(StonithPlugin* s, StonithNVpair * list)
 	FREE(namestocopy[4].s_value);
 	tmp->username = namestocopy[5].s_value;
 	tmp->password = namestocopy[6].s_value;
+	reset_opt = OurImports->GetValue(list, ST_RESET_METHOD);
+	if (!reset_opt || !strcmp(reset_opt, "power_cycle")) {
+		tmp->reset_method = 0;
+	} else if (!strcmp(reset_opt, "hard_reset")) {
+		tmp->reset_method = 1;
+	} else {
+		LOG(PIL_CRIT, "ipmilan reset_method '%s' invalid", reset_opt);
+		return S_OOPS;
+	}
 
 	if (nd->hostlist == NULL ) {
 		nd->hostlist = tmp;
