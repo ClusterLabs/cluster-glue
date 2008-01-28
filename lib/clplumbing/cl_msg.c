@@ -38,6 +38,8 @@
 #include <glib.h>
 #include <clplumbing/cl_uuid.h>
 #include <compress.h>
+#include <clplumbing/timers.h>
+#include <clplumbing/cl_signal.h>
 
 #define		MAXMSGLINE	512
 #define		MINFIELDS	30
@@ -1768,12 +1770,43 @@ msgfromstream_netstring(FILE * f)
 
 }
 
+static gboolean ipc_timer_expired = FALSE;
+
+static void cl_sigalarm_handler(int signum)
+{
+        if (signum == SIGALRM) {
+                ipc_timer_expired = TRUE;
+        }
+}
+
+int
+cl_ipc_wait_timeout(
+    IPC_Channel *chan, int (*waitfun)(IPC_Channel *chan), unsigned int timeout)
+{
+        int rc = IPC_FAIL;
+        struct sigaction old_action;
+
+	memset(&old_action, 0, sizeof(old_action));
+	cl_signal_set_simple_handler(SIGALRM, cl_sigalarm_handler, &old_action);
+
+	ipc_timer_expired = FALSE;
+
+	alarm(timeout);
+	rc = waitfun(chan);
+	if (rc == IPC_INTR && ipc_timer_expired) {
+	    rc = IPC_TIMEOUT;
+	}
+
+	alarm(0); /* ensure it expires */
+	cl_signal_set_simple_handler(SIGALRM, old_action.sa_handler, &old_action);
 
 
+        return rc;
+}
 
 /* Return the next message found in the IPC channel */
 static struct ha_msg*
-msgfromIPC_ll(IPC_Channel * ch, int flag)
+msgfromIPC_ll(IPC_Channel * ch, int flag, unsigned int timeout, int *rc_out)
 {
 	int		rc;
 	IPC_Message*	ipcmsg;
@@ -1782,12 +1815,23 @@ msgfromIPC_ll(IPC_Channel * ch, int flag)
 	int		allow_intr = flag & MSG_ALLOWINTR;
 	
  startwait:
-	rc = ch->ops->waitin(ch);
+	if(timeout > 0) {
+	    rc = cl_ipc_wait_timeout(ch, ch->ops->waitin, timeout);
+	} else {
+	    rc = ch->ops->waitin(ch);
+	}
+
+	if(rc_out) {
+	    *rc_out = rc;
+	}
 	
 	switch(rc) {
 	default:
 	case IPC_FAIL:
 		cl_perror("msgfromIPC: waitin failure");
+		return NULL;
+
+	case IPC_TIMEOUT:
 		return NULL;
 		
 	case IPC_BROKEN:
@@ -1814,10 +1858,13 @@ msgfromIPC_ll(IPC_Channel * ch, int flag)
 		,	rc, (unsigned long)ipcmsg);
 	}
 #endif
+	if(rc_out) {
+	    *rc_out = rc;
+	}
+
 	if (rc != IPC_OK) {
 		return NULL;
 	}
-
 
 	hmsg = wirefmt2msg_ll((char *)ipcmsg->msg_body, ipcmsg->msg_len, need_auth);
 	if (ipcmsg->msg_done) {
@@ -1828,13 +1875,17 @@ msgfromIPC_ll(IPC_Channel * ch, int flag)
 	return hmsg;
 }
 
-
-
 /* Return the next message found in the IPC channel */
+struct ha_msg*
+msgfromIPC_timeout(IPC_Channel *ch, int flag, unsigned int timeout, int *rc_out)
+{
+    return msgfromIPC_ll(ch, flag, timeout, rc_out);
+}
+
 struct ha_msg*
 msgfromIPC(IPC_Channel * ch, int flag)
 {
-	return msgfromIPC_ll(ch, flag);
+	return msgfromIPC_ll(ch, flag, 0, NULL);
 }
 
 
@@ -1844,12 +1895,8 @@ msgfromIPC_noauth(IPC_Channel * ch)
 	int flag = 0;
 	
 	flag |= MSG_ALLOWINTR;
-	return msgfromIPC_ll(ch, flag);
+	return msgfromIPC_ll(ch, flag, 0, NULL);
 }
-
-
-
-
 
 /* Return the next message found in the IPC channel */
 IPC_Message *
