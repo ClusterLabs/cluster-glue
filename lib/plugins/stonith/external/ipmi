@@ -1,0 +1,176 @@
+#!/bin/sh
+#
+# External STONITH module using IPMI.
+# This modules uses uses the ipmitool program available from 
+# http://ipmitool.sf.net/ for actual communication with the 
+# managed device. 
+#
+# Copyright (c) 2007 Martin Bene <martin.bene@icomedias.com>
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+
+
+
+RESET="power reset"
+POWEROFF="power off"
+POWERON="power on"
+STATUS="power status"
+IPMITOOL=`which ipmitool 2>/dev/null`
+
+function have_ipmi() {
+	test -x "${IPMITOOL}"
+}
+
+function do_ipmi() {
+	have_ipmi || {
+		echo "ipmitool not installed"
+		return 1
+	}
+	if [ -z "${ipaddr}" -o -z "${userid}" -o -z "${passwd}" ]; then
+		echo "ipaddr, userid or password missing; check configuration"
+		return 1
+	fi
+
+	${IPMITOOL} -I lan -H ${ipaddr} -U ${userid} -P ${passwd} ${1} || {
+		echo "error executing ipmi command"
+		return 1
+	}
+}
+
+# Rewrite the hostname to accept "," as a delimeter for hostnames too.
+hostname=`echo ${hostname} | tr ',' ' '`
+
+case ${1} in
+gethosts)
+	for h in ${hostname} ; do
+		echo ${h}
+	done
+	exit 0
+	;;
+on)
+	res=1
+	for h in ${hostname}; do
+		if [ "${h}" != "${2}" ]; then
+			continue
+		fi
+		do_ipmi "${POWERON}"
+		res=$?
+	done
+	exit ${res}
+	;;
+off)
+	res=1
+	for h in ${hostname}; do
+		if [ "${h}" != "${2}" ]; then
+			continue
+		fi
+		do_ipmi "${POWEROFF}"
+		res=$?
+	done
+	exit ${res}
+	;;
+reset)
+	res=1
+	for h in ${hostname}; do
+		if [ "${h}" != "${2}" ]; then
+			continue
+		fi
+		do_ipmi "${RESET}"
+		res=$?
+	done
+	exit $res
+	;;
+status)
+	do_ipmi "${STATUS}"
+	exit $?
+	;;
+getconfignames)
+	for i in hostname ipaddr userid passwd; do
+		echo $i
+	done
+	exit 0
+	;;
+getinfo-devid)
+	echo "IPMI STONITH device"
+	exit 0
+	;;
+getinfo-devname)
+	echo "IPMI STONITH external device"
+	exit 0
+	;;
+getinfo-devdescr)
+	echo "IPMI-based host reset"
+	exit 0
+	;;
+getinfo-devurl)
+	echo "http://ipmitool.sf.net/"
+	exit 0
+	;;
+getinfo-xml)
+	cat << IPMIXML
+<parameters>
+<parameter name="hostname" unique="1">
+<content type="string" />
+<shortdesc lang="en">
+Hostname
+</shortdesc>
+<longdesc lang="en">
+The name of the host to be managed by this STONITH device
+</longdesc>
+</parameter>
+
+<parameter name="ipaddr" unique="1">
+<content type="string" />
+<shortdesc lang="en">
+IP Address
+</shortdesc>
+<longdesc lang="en">
+The IP address of the STONITH device
+</longdesc>
+</parameter>
+
+<parameter name="userid" unique="1">
+<content type="string" />
+<shortdesc lang="en">
+Login
+</shortdesc>
+<longdesc lang="en">
+The username used for logging in to the STONITH device
+</longdesc>
+</parameter>
+
+<parameter name="passwd" unique="1">
+<content type="string" />
+<shortdesc lang="en">
+Password
+</shortdesc>
+<longdesc lang="en">
+The password used for logging in to the STONITH device
+</longdesc>
+</parameter>
+</parameters>
+IPMIXML
+	exit 0
+	;;
+*)
+	exit 1
+	;;
+esac

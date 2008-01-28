@@ -1,0 +1,11 @@
+Alain St-Denis wrote the riloe plugin. Here is his description on how to use it:
+"
+This is basically what I do: I based the riloe.c on null.c and I just call the ribcl.py script. If there was a more generic shell plugin, it would be great. To use it, add something like: 
+
+stonith_host host1 riloe "" 
+stonith_host host2 riloe "" 
+
+in ha.cf. Obviously, host[12] must be able to reach the riloe IP adress. All our riloe are named with a "-rm" appended to the host name. 
+"
+
+

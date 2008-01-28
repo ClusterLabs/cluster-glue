@@ -1,0 +1,40 @@
+20 December 2000
+
+I (rather poorly) integrated this contributed stonith driver into the
+linux-ha-stonith release.  There is a problem that needs to be
+resolved by autoconf in that the driver  will not compile unless
+libvacmclient is installed on the system.  
+
+For now, what I've done is included a line in stonith/Makefile that you can 
+uncomment if you want to compile the vacm stonith module.  Look in the
+Makefile in this directory for the following lines and do like it says
+
+
+# If you want the VA Linux Cluster stonith module installed, 
+# uncomment the following line.  You must have the vacmclient library 
+#VACM_STONITH = vacm_stonith.so 
+
+Please direct questions about the operation of the stonith module to
+Mike Tilstra (see the announcement to the linux-ha-dev mailing list
+attached below.)
+
+
+-Eric.
+eric.ayers@compgen.com
+
+------------------------------------------------------------------------------
+
+From: Mike Tilstra <conrad@sistina.com>
+Sender: linux-ha-dev-admin@lists.tummy.com
+To: linux-ha-dev@lists.tummy.com
+Subject: [Linux-ha-dev] stonith module for VACM
+Date: Tue, 19 Dec 2000 16:41:38 -0600
+
+This was in need for some testing I'm doing, so I hacked this up quick.  It
+works for me, but I'm willing to bet there's atleast one bug in it.
+
+Figured others might like it.
+
+...
+-- 
+Mike Tilstra                          conrad@sistina.com

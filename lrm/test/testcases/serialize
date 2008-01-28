@@ -1,0 +1,33 @@
+list
+# allow for a delay of 2 seconds
+%setenv dflt_timeout=2500
+add rsc=r1 args="delay=2"
+#
+# we run the next three ops in the background
+# in case ops are not serialized, the lrmregtest RA should complain
+#
+%bg 2
+exec operation=start
+# insert sleeps to make sure that the operations are started in
+# the order given here
+%sleep 1
+# set timeouts high enough so that no op fails
+exec operation=start timeout=3000
+%sleep 1
+%bgrepeat 4
+exec operation=monitor timeout=11000
+%sleep 11
+state
+exec operation=stop
+state
+del rsc=r1
+#
+#
+#
+%setenv dflt_rsc=r2 dflt_timeout=10500
+add rsc=r2 args="ignore_TERM=1 delay=9"
+exec operation=start
+%bg
+exec operation=monitor timeout=500
+exec operation=monitor
+del rsc=r2

@@ -1,0 +1,260 @@
+#!/bin/sh
+
+ # Copyright (C) 2007 Dejan Muhamedagic <dmuhamedagic@suse.de>
+ # 
+ # This program is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU General Public
+ # License as published by the Free Software Foundation; either
+ # version 2.1 of the License, or (at your option) any later version.
+ # 
+ # This software is distributed in the hope that it will be useful,
+ # but WITHOUT ANY WARRANTY; without even the implied warranty of
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ # General Public License for more details.
+ # 
+ # You should have received a copy of the GNU General Public
+ # License along with this library; if not, write to the Free Software
+ # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ #
+
+TESTDIR=${TESTDIR:-testcases}
+DFLT_TESTSET=basicset
+OUTDIR=${OUTDIR:-output}
+LRMD_OUTF="$OUTDIR/lrmd.out"
+LRMD_LOGF="$OUTDIR/lrmd.log"
+LRMD_DEBUGF="$OUTDIR/lrmd.debug"
+OUTF="$OUTDIR/regression.out"
+LRMADMIN="@libdir@/heartbeat/lrmadmin"
+LRMD_OPTS="-vvv"
+STONITHD_OPTS="-at"
+DIFF_OPTS="--ignore-all-space -U 1"
+common_filter=$TESTDIR/common.filter
+common_exclf=$TESTDIR/common.excl
+OCF_RA=$OCF_ROOT/resource.d/heartbeat/lrmregtest
+HB_RA=@HB_RA_DIR@/lrmregtest
+LSB_RA=@LSB_RA_DIR@/lrmregtest
+export OUTDIR TESTDIR LRMADMIN
+
+logmsg() {
+	echo "`date`: $*" | tee -a $LRMD_DEBUGF | tee -a $LRMD_LOGF
+}
+abspath() {
+	echo $1 | grep -qs "^/" &&
+		echo $1 ||
+		echo `pwd`/$1
+}
+
+usage() {
+	cat<<EOF
+
+usage: $0 [-q] [testcase...|set:testset]
+
+Test lrmd using supplied testcases. If none are given,
+set:basicset is used. All testcases and sets are in testcases/.
+See also README.regression for description.
+
+-q: quiet operation (no progress shown)
+
+EOF
+exit 2
+}
+
+if [ `id -u` != 0 ]; then
+	echo "sorry, but i talk to root only"
+	exit 2
+fi
+cd `dirname $0`
+if [ ! -d "$TESTDIR" ]; then
+	echo "$0: $TESTDIR does not exit"
+	usage
+fi
+
+export OCF_ROOT
+if [ -z "$OCF_ROOT" ]; then
+	[ -d /usr/lib/ocf ] && OCF_ROOT=/usr/lib/ocf
+fi
+if [ ! -d "$OCF_ROOT" ]; then
+	echo "OCF_ROOT environment variable not set"
+	exit 2
+fi
+which xmllint >/dev/null 2>&1 || {
+	echo "WARNING: xmllint not available, some of the tests may fail"
+}
+
+rm -f $LRMD_LOGF $LRMD_DEBUGF
+
+# make lrmd log to our files only
+HA_logfile=`abspath $LRMD_LOGF`
+HA_debugfile=`abspath $LRMD_DEBUGF`
+HA_use_logd=no
+HA_logfacility=""
+export HA_logfile HA_debugfile HA_use_logd HA_logfacility
+
+mkdir -p $OUTDIR
+. @sysconfdir@/ha.d/shellfuncs
+
+args=`getopt hq $*`
+[ $? -ne 0 ] && usage
+eval set -- "$args"
+
+SILENT=""
+while [ x"$1" != x ]; do
+	case "$1" in
+		-h) usage;;
+		-q) SILENT=1;;
+		--) shift 1; break;;
+		*) usage;;
+	esac
+	shift 1
+done
+
+exec >$OUTF 2>&1
+if [ "$SILENT" = 1 ]; then
+	exec 3>/dev/null
+else
+	exec 3>/dev/tty
+fi
+
+start_stonithd() {
+	echo "starting stonithd" >&3
+	$HA_BIN/stonithd -s 2>/dev/null
+	if [ $? -ne 0 ]; then
+		STOP_STONITHD=1
+		$HA_BIN/stonithd $STONITHD_OPTS
+		sleep 1
+		$HA_BIN/stonithd -s 2>/dev/null
+	else
+		STOP_STONITHD=
+	fi
+}
+stop_stonithd() {
+	if [ "$STOP_STONITHD" ]; then
+		echo "stopping stonithd" >&3
+		$HA_BIN/stonithd -k >/dev/null 2>&1
+	fi
+}
+start_lrmd() {
+	echo "starting lrmd" >&3
+	$HA_BIN/lrmd -s 2>/dev/null
+	if [ $? -eq 3 ]; then
+		#strace -o /tmp/lrmd.trc $HA_BIN/lrmd $LRMD_OPTS >$LRMD_OUTF 2>&1 &
+		$HA_BIN/lrmd $LRMD_OPTS >$LRMD_OUTF 2>&1 &
+		sleep 1
+		$HA_BIN/lrmd -s 2>/dev/null
+	else
+		echo "lrmd already running; can't proceed" >&3
+		return 2
+	fi
+}
+stop_lrmd() {
+	echo "stopping lrmd" >&3
+	$HA_BIN/lrmd -k
+}
+cp_ra() {
+	if [ ! -e $OCF_RA ]; then
+		cp -p lrmregtest $OCF_RA
+		lrmregtest_ocf=1
+	fi
+	chmod +x $OCF_RA
+	if [ ! -e $LSB_RA ]; then
+		cp -p lrmregtest-lsb $LSB_RA
+		lrmregtest_lsb=1
+	fi
+	chmod +x $LSB_RA
+	if [ ! -e $HB_RA ]; then
+		cp -p lrmregtest-heartbeat $HB_RA
+		lrmregtest_heartbeat=1
+	fi
+	chmod +x $HB_RA
+}
+rm_ra() {
+	[ "$lrmregtest_ocf" ] && rm -f $OCF_RA
+	[ "$lrmregtest_lsb" ] && rm -f $LSB_RA
+	[ "$lrmregtest_heartbeat" ] && rm -f $HB_RA
+}
+
+cp_ra
+start_lrmd || exit $?
+start_stonithd || exit $?
+trap "stop_lrmd; stop_stonithd; rm_ra" EXIT
+
+setenvironment() {
+	filterf=$TESTDIR/$testcase.filter
+	exclf=$TESTDIR/$testcase.excl
+	log_filter=$TESTDIR/$testcase.log_filter
+	expf=$TESTDIR/$testcase.exp
+	outf=$OUTDIR/$testcase.out
+	difff=$OUTDIR/$testcase.diff
+}
+
+filter_output() {
+	{ [ -x $common_filter ] && $common_filter || cat;} |
+	{ [ -f $common_exclf ] && egrep -vf $common_exclf || cat;} |
+	{ [ -x $filterf ] && $filterf || cat;} |
+	{ [ -f $exclf ] && egrep -vf $exclf || cat;}
+}
+
+dumpcase() {
+	cat<<EOF
+----------
+testcase $testcase failed
+output is in $outf
+diff (from $difff):
+`cat $difff`
+----------
+EOF
+}
+
+runtestcase() {
+	setenvironment
+	echo -n "$testcase" >&3
+	logmsg "BEGIN testcase $testcase"
+	./evaltest.sh < $TESTDIR/$testcase > $outf 2>&1
+
+	filter_output < $outf |
+	if [ "$prepare" ]; then
+		echo " saving to expect file" >&3
+		cat > $expf
+	else
+		echo -n " checking..." >&3
+		diff $DIFF_OPTS $expf - > $difff
+		if [ $? -ne 0 ]; then
+			echo " FAIL" >&3
+			dumpcase
+			return 1
+		else
+			echo " PASS" >&3
+			rm -f $outf $difff
+		fi
+	fi
+	sed -n "/BEGIN testcase $testcase/,\$p" $LRMD_LOGF |
+		{ [ -x $log_filter ] && $log_filter || cat;} |
+		egrep '(CRIT|ERROR):'
+	logmsg "END testcase $testcase"
+}
+
+[ "$1" = prepare ] && { prepare=1; shift 1;}
+[ $# -eq 0 ] && set "set:$DFLT_TESTSET"
+
+for a; do
+	if [ "$a" -a -f "$TESTDIR/$a" ]; then
+		testcase=$a
+		runtestcase
+	else
+		echo "$a" | grep -q "^set:" &&
+			TESTSET=$TESTDIR/`echo $a | sed 's/set://'`
+		while read testcase; do
+			runtestcase
+		done < $TESTSET
+	fi
+done
+
+if egrep -wv '(BEGIN|END) testcase' $OUTF >/dev/null
+then
+	echo "seems like some tests failed or else something not expected"
+	echo "check $OUTF and diff files in $OUTDIR"
+	echo "in case you wonder what lrmd was doing, read $LRMD_LOGF and $LRMD_DEBUGF"
+	exit 1
+else
+	rm -f $OUTF $LRMD_OUTF
+fi >&3
