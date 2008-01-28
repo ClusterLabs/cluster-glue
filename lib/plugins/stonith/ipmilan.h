@@ -31,6 +31,7 @@ struct ipmilanHostInfo {
 	int		privilege;
 	char * 		username;
 	char *		password;
+	int		reset_method;
 
 	struct ipmilanHostInfo *  prev;
 	struct ipmilanHostInfo *  next;
