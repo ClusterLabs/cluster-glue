@@ -20,8 +20,8 @@ LAN Support.
 
 3. Software Requirement
 
-This module needs OpenIPMI (http://openipmi.sf.net) to compile.  By the time
-of this writing, the version for OpenIPMI is 1.0.3.  
+This module needs OpenIPMI (http://openipmi.sf.net) to compile.
+Version 1.4.x or 2.0.x is supported.
 
 4. Hardware Configuration
 
@@ -36,8 +36,8 @@ device for the other nodes in the cluster. ;)
 
 The configuration file syntax looks like this:
 
-	<node1> <ip> <port> <auth> <priv> <user> <pass>
-	<node2> <ip> <port> <auth> <priv> <user> <pass>
+	<node1> <ip> <port> <auth> <priv> <user> <pass> <reset_method>
+	<node2> <ip> <port> <auth> <priv> <user> <pass> <reset_method>
 	...
 
 	node: the hostname.  
@@ -58,6 +58,10 @@ The configuration file syntax looks like this:
 	user: the username. use "" if it is empty.  Cannot exceed 16 characters.
 
 	pass: the password. use "" if it is empty.  Cannot exceed 16 characters.
+
+	reset_method: (optional) which IPMI chassis control to send
+	to reset the host. Possible values are power_cycle (default)
+	and hard_reset.
 
 Each line is white-space delimited and lines begins with '#' are ignored. 
 

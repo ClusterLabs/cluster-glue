@@ -51,6 +51,7 @@ os_handler_t *os_hnd=NULL;
 selector_t *os_sel;
 static ipmi_con_t *con;
 extern os_handler_t ipmi_os_cb_handlers;
+static int reset_method;
 
 static int request_done = 0;
 static int op_done = 0;
@@ -208,7 +209,7 @@ send_ipmi_cmd(ipmi_con_t *con, int request)
 			break;
 
 		case ST_GENERIC_RESET:
-			cc_data = HARD_RESET;
+			cc_data = (reset_method ? POWER_CYCLE : HARD_RESET);
 			break;
 
 		case ST_IPMI_STATUS:
@@ -307,6 +308,8 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int *request)
 
 	memcpy(username, host->username, sizeof(username));
 	memcpy(password, host->password, sizeof(password));
+
+	reset_method = host->reset_method;
 
 	rv = ipmi_lan_setup_con(lan_addr, lan_port, num_addr, 
 				authtype, privilege,
