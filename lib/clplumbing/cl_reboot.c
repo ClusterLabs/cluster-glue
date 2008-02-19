@@ -12,8 +12,6 @@
 #include <clplumbing/cl_log.h>
 #include <clplumbing/timers.h>
 
-#define	REBOOT1ARG	1
-
 enum rebootopt {
 	REBOOT_DEFAULT = 0,
 	REBOOT_NOCOREDUMP = 1,
@@ -46,9 +44,9 @@ void cl_reboot(int msdelaybeforereboot, const char * reason)
 	cl_log(LOG_EMERG, "Rebooting system.  Reason: %s", reason);
 	sync();
 	mssleep(msdelaybeforereboot);
-#ifdef REBOOT1ARG
+#if REBOOT_ARGS == 1
 	reboot(rebootflag);
-#elif REBOOT2ARG
+#elif REBOOT_ARGS == 2
 	reboot(rebootflag, NULL);
 #else
 #error "reboot() call needs to take one or two args"
