@@ -1436,9 +1436,9 @@ static gboolean
 Gmain_timeout_dispatch(GSource* src, GSourceFunc func, gpointer user_data);
 
 static GSourceFuncs Gmain_timeout_funcs = {
-	prepare: Gmain_timeout_prepare,
-	check: Gmain_timeout_check,
-	dispatch: Gmain_timeout_dispatch,
+	Gmain_timeout_prepare,
+	Gmain_timeout_check,
+	Gmain_timeout_dispatch,
 };
 
 
