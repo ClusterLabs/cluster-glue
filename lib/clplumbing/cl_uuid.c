@@ -150,7 +150,7 @@ cl_uuid_unparse(const cl_uuid_t* uu, char *out){
 		assert(0);
 	}
 	
-	return uuid_unparse(uu->uuid, out);
+	uuid_unparse(uu->uuid, out);
 }
 
 
