@@ -110,7 +110,8 @@ main(int argc, char** argv)
 				}else{
 					return EXIT_FAIL;
 				}
-				p = buf;
+				/* NOTREACHED */
+				/* p = buf; */
 			}
 			if (len > sizeof(buf) - 1) {
 				if (LogToDaemon(priority,*argv,
