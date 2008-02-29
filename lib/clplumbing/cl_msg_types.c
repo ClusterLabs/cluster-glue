@@ -520,12 +520,12 @@ string_display(int log_level, int seq, char* name, void* value, int vlen)
 static void
 binary_display(int log_level, int seq, char* name, void* value, int vlen)
 {
-	return general_display(log_level, seq, name, value, vlen, FT_BINARY);
+	general_display(log_level, seq, name, value, vlen, FT_BINARY);
 }
 
 static void
 compress_display(int log_level, int seq, char* name, void* value, int vlen){
-	return general_display(log_level, seq, name, value, vlen, FT_COMPRESS);
+	general_display(log_level, seq, name, value, vlen, FT_COMPRESS);
 }
 
 
@@ -554,13 +554,13 @@ general_struct_display(int log_level, int seq, char* name, void* value, int vlen
 static void
 struct_display(int log_level, int seq, char* name, void* value, int vlen)
 {
-	return general_struct_display(log_level, seq, name, value, vlen,  FT_STRUCT);
+	general_struct_display(log_level, seq, name, value, vlen,  FT_STRUCT);
 
 }
 static void
 uncompress_display(int log_level, int seq, char* name, void* value, int vlen)
 {
-	return general_struct_display(log_level, seq, name, value, vlen, FT_UNCOMPRESS);
+	general_struct_display(log_level, seq, name, value, vlen, FT_UNCOMPRESS);
 }
 
 #define update_buffer_head(buffer, len) if(len < 0) {	\
