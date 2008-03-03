@@ -17,7 +17,9 @@
 /* Messages sent to the logging daemon */
 #define	LD_LOGIT	2
 #define MAXENTITY	32
-struct LogDaemonMsg_s {
+
+/* Message contains following header, followed by the text (char[]) itself */
+struct LogDaemonMsgHdr_s {
 	int		msgtype;
 	int		facility;
 	int		priority;
@@ -26,6 +28,5 @@ struct LogDaemonMsg_s {
 	int		entity_pid;
 	char		entity[MAXENTITY];
 	TIME_T		timestamp;
-	char		message[0]; /* Actually much bigger ;-) */
 };
-typedef	struct LogDaemonMsg_s	LogDaemonMsg;
+typedef	struct LogDaemonMsgHdr_s	LogDaemonMsgHdr;
