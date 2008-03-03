@@ -21,6 +21,8 @@
  *
  */
 
+#include <lha_internal.h>
+
 #include <config.h>
 
 #define	DEVICE	"SSH STONITH device"
