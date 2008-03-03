@@ -26,6 +26,8 @@
  *
  */
 
+#include <lha_internal.h>
+
 #define	DEVICE	"WTI RPS10 Power Switch"
 #include "stonith_plugin_common.h"
 
