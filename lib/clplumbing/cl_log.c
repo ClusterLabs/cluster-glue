@@ -899,7 +899,7 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 		   gboolean use_prio_str, IPC_Channel* ch)
 {
 	IPC_Message*	ret;
-	LogDaemonMsg	logbuf;
+	LogDaemonMsgHdr	logbuf;
 	int		msglen;
 	char*		bodybuf;
 	
@@ -920,7 +920,7 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	memset(ret, 0, sizeof(IPC_Message));
 	
 	/* Compute msg len: including room for the EOS byte */
-	msglen = sizeof(LogDaemonMsg)+bufstrlen + 1;
+	msglen = sizeof(LogDaemonMsgHdr)+bufstrlen + 1;
 	bodybuf = cl_malloc(msglen + ch->msgpad);
 	if (bodybuf == NULL) {
 		cl_free(ret);

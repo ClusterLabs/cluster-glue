@@ -436,9 +436,9 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	if( ipcmsg->msg_body &&	ipcmsg->msg_len > 0 ){
 		
 		if (client->app_name[0] == '\0'){
-			LogDaemonMsg*	logmsg;
-			logmsg = (LogDaemonMsg*) ipcmsg->msg_body;
-			strncpy(client->app_name, logmsg->entity, MAXENTITY);
+			LogDaemonMsgHdr*	logmsghdr;
+			logmsghdr = (LogDaemonMsgHdr*) ipcmsg->msg_body;
+			strncpy(client->app_name, logmsghdr->entity, MAXENTITY);
 		}
 
 		if (!IPC_ISWCONN(logchan)){
@@ -896,19 +896,21 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 		
 		if( ipcmsg->msg_body 
 		    && ipcmsg->msg_len > 0 ){
-			LogDaemonMsg*	logmsg;
-			LogDaemonMsg	copy;
+			LogDaemonMsgHdr *logmsghdr;
+			LogDaemonMsgHdr	copy;
+			char *msgtext;
 			
-			logmsg = (LogDaemonMsg*) ipcmsg->msg_body;
+			logmsghdr = (LogDaemonMsgHdr*) ipcmsg->msg_body;
 #define	COPYFIELD(copy, msg, field) memcpy(((u_char*)&copy.field), ((u_char*)&msg->field), sizeof(copy.field))
-			COPYFIELD(copy, logmsg, use_pri_str);
-			COPYFIELD(copy, logmsg, entity);
-			COPYFIELD(copy, logmsg, entity_pid);
-			COPYFIELD(copy, logmsg, timestamp);
-			COPYFIELD(copy, logmsg, priority);
-			/* Don't want to copy logmsg->message */
+			COPYFIELD(copy, logmsghdr, use_pri_str);
+			COPYFIELD(copy, logmsghdr, entity);
+			COPYFIELD(copy, logmsghdr, entity_pid);
+			COPYFIELD(copy, logmsghdr, timestamp);
+			COPYFIELD(copy, logmsghdr, priority);
+			/* Don't want to copy the following message text */
 		
-			cl_direct_log(copy.priority, logmsg->message
+			msgtext = (char *)logmsghdr + sizeof(LogDaemonMsgHdr);
+			cl_direct_log(copy.priority, msgtext
 			,	copy.use_pri_str
 			,	copy.entity, copy.entity_pid
 			,	copy.timestamp);
@@ -922,7 +924,7 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 					 "unknown": copy.entity,
 					 copy.entity_pid, 
 					 ha_timestamp(copy.timestamp),
-					 logmsg->message);
+					 msgtext);
 				 }
  */
 			if (ipcmsg->msg_done){
