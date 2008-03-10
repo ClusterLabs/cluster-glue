@@ -81,7 +81,13 @@ $h
           
         case $2 in
             stop)
-                $SSH_COMMAND $dom0 "(sleep 2; $STOP_COMMAND $node) >/dev/null 2>&1 &"
+                 kill_node=`$SSH_COMMAND $dom0 "grep ^[[:space:]]*name $cfg" | cut -f 2 -d '=' |  sed -e 's,",,g'`
+                 if [ "x" = "x$kill_node" ]
+                 then
+                     echo "Couldn't find a node name to stop"
+                     exit 1
+                 fi
+                 $SSH_COMMAND $dom0 "(sleep 2; $STOP_COMMAND $kill_node) >/dev/null 2>&1 &"
                 break;;
             start)
                 $SSH_COMMAND $dom0 "(sleep 2; $START_COMMAND $cfg) >/dev/null 2>&1 &"
