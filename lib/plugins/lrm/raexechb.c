@@ -319,7 +319,7 @@ map_ra_retvalue(int ret_execra, const char * op_type, const char * std_output)
 		   * stop_pattern2 = "*not*running*",
 		   * running_pattern1 = "*running*",
 		   * running_pattern2 = "*OK*";
-	const char * lower_std_output = NULL;
+	char * lower_std_output = NULL;
 
 	if(ret_execra == EXECRA_NOT_INSTALLED) {
 		return ret_execra;
@@ -330,7 +330,9 @@ map_ra_retvalue(int ret_execra, const char * op_type, const char * std_output)
 		if (std_output == NULL ) {
 			cl_log(LOG_WARNING, "No status output from the (hb) resource agent.");
 			return EXECRA_NOT_RUNNING;
-		}else if (idebuglevel) {
+		}
+
+		if (idebuglevel) {
 			cl_log(LOG_DEBUG, "RA output was: [%s]", std_output);
 		}
 
@@ -348,9 +350,8 @@ map_ra_retvalue(int ret_execra, const char * op_type, const char * std_output)
 				,	stop_pattern1
 				,	stop_pattern2);
 			}
-			return EXECRA_NOT_RUNNING; /* stopped */
-		}
-		if ( TRUE == g_pattern_match_simple(running_pattern1
+			ret_execra = EXECRA_NOT_RUNNING; /* stopped */
+		} else if ( TRUE == g_pattern_match_simple(running_pattern1
 			, lower_std_output) || TRUE ==
 			g_pattern_match_simple(running_pattern2
 			, std_output) ) {
@@ -361,12 +362,14 @@ map_ra_retvalue(int ret_execra, const char * op_type, const char * std_output)
 				,	std_output, running_pattern1
 				,	running_pattern2);
 			}
-			return EXECRA_OK; /* running */
+			ret_execra = EXECRA_OK; /* running */
+		} else {
+			/* It didn't say it was running - must be stopped */
+			cl_log(LOG_DEBUG, "RA output [%s] didn't match any pattern"
+			,	std_output);
+			ret_execra = EXECRA_NOT_RUNNING; /* stopped */
 		}
-		/* It didn't say it was running - must be stopped */
-		cl_log(LOG_DEBUG, "RA output [%s] didn't match any pattern"
-		,	std_output);
-		return EXECRA_NOT_RUNNING; /* stopped */
+		g_free(lower_std_output);
 	}
 	/* For non-status operation return code */
 	if (ret_execra < 0) {
