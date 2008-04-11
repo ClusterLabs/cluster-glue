@@ -607,7 +607,7 @@ lrm_op_done_callback(lrm_op_t* op)
 	printf("return code: %d\n", op->rc);
 	printf("output data: \n%s\n", (op->output ? op->output : "[null]"));
 	printf("---------------------------------------\n\n");
-	ret_value = op->op_status;	
+	ret_value = op->rc;	
 }
 
 static int 
