@@ -147,7 +147,7 @@ cl_msg_stats_open(const char* filename)
 		return -1;
 	}
 	
-	return open(filename, O_WRONLY|O_CREAT|O_APPEND, 0755);
+	return open(filename, O_WRONLY|O_CREAT|O_APPEND, 0644);
 
 }
 
