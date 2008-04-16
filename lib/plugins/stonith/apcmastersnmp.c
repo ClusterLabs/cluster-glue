@@ -567,14 +567,6 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 			return (S_ACCESS);
 		}
 
-		if (*state == OUTLET_OFF) {
-			if (Debug) {
-				LOG(PIL_DEBUG, "%s: outlet %d is off."
-				,	__FUNCTION__, outlet);
-			}
-			continue;
-		}
-		
 	        /* prepare oid */
 	        snprintf(objname, MAX_STRING, OID_OUTLET_REBOOT_DURATION
 		,	outlet);
