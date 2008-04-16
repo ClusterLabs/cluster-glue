@@ -144,6 +144,15 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 #define OID_OUTLET_COMMAND_PENDING	".1.3.6.1.4.1.318.1.1.12.3.5.1.1.5.%i"
 #define OID_OUTLET_REBOOT_DURATION	".1.3.6.1.4.1.318.1.1.12.3.4.1.1.6.%i"
 
+/*
+	snmpset -c private -v1 172.16.0.32:161
+		".1.3.6.1.4.1.318.1.1.12.3.3.1.1.4.1" i 1
+	The last octet in the OID is the plug number. The value can
+	be 1 thru 8 because there are 8 power plugs on this device.
+	The integer that can be set is as follows: 1=on, 2=off, and
+	3=reset
+*/
+
 /* own defines */
 #define MAX_STRING		128
 #define ST_PORT			"port"
@@ -506,6 +515,8 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
     char objname[MAX_STRING];
     char value[MAX_STRING];
     char *outlet_name;
+    int req_oid = OUTLET_REBOOT;
+    int expect_state = OUTLET_ON;
     int i, h, num_outlets, outlet, reboot_duration, *state, bad_outlets;
     int outlets[8]; /* Assume that one node is connected to a 
 		       maximum of 8 outlets */
@@ -532,6 +543,9 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 	    LOG(PIL_CRIT, "%s: cannot read name for outlet %d."
             ,   __FUNCTION__, outlet);
 	    return (S_ACCESS);
+	}
+	if (Debug) {
+	    LOG(PIL_DEBUG, "%s: found outlet: %s.", __FUNCTION__, outlet_name);
 	}
 	
 	/* found one */
@@ -598,6 +612,24 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 	return (S_BADHOST);
     }
 
+
+	/* choose the OID for the stonith request */
+	switch (request) {
+		case ST_POWERON:
+			req_oid = OUTLET_ON;
+			expect_state = OUTLET_ON;
+			break;
+		case ST_POWEROFF:
+			req_oid = OUTLET_OFF;
+			expect_state = OUTLET_OFF;
+			break;
+		case ST_GENERIC_RESET:
+			req_oid = OUTLET_REBOOT;
+			expect_state = OUTLET_ON;
+			break;
+		default: break;
+	}
+
     /* Turn them all off */
 
     for (outlet=outlets[0], i=0 ; i < num_outlets; i++, outlet = outlets[i]) {
@@ -618,7 +650,7 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 	    
 	    /* prepare objnames */
 	    snprintf(objname, MAX_STRING, OID_OUTLET_STATE, outlet);
-	    snprintf(value, MAX_STRING, "%i", OUTLET_REBOOT);
+	    snprintf(value, MAX_STRING, "%i", req_oid);
 
 	    /* send reboot cmd */
 	    if (!APC_write(ad->sptr, objname, 'i', value)) {
@@ -650,7 +682,7 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
 			return (S_ACCESS);
 		}
 
-		if (*state != OUTLET_ON)
+		if (*state != expect_state)
 			bad_outlets++;
 	     }
 	     
@@ -660,13 +692,13 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
     
     if (bad_outlets == num_outlets) {
 	    /* reset failed */
-	    LOG(PIL_CRIT, "%s: resetting host '%s' failed."
+	    LOG(PIL_CRIT, "%s: stonith operation for '%s' failed."
 	    ,	__FUNCTION__, host);
 	    return (S_RESETFAIL);
     } else {
 	    /* Not all outlets back on, but at least one; implies node was */
 	    /* rebooted correctly */
-	    LOG(PIL_WARN,"%s: Not all outlets came back online!"
+	    LOG(PIL_WARN,"%s: Not all outlets in the expected state!"
 	    ,	__FUNCTION__);
 	    return (S_OK); 
     }
