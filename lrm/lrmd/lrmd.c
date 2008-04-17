@@ -1777,10 +1777,11 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 	provider = ha_msg_value(msg, F_LRM_RPROVIDER);
 
 	lrmd_debug2(LOG_DEBUG
-	,	"%s: the client [pid:%d] want to get rsc metadata of %s::%s."
+	,	"%s: the client [pid:%d] wants to get rsc metadata of %s::%s::%s."
 	,	__FUNCTION__
 	,	client->pid
 	,	lrm_str(rclass)
+	,	lrm_str(provider)
 	,	lrm_str(rtype));
 
 	ret = create_lrm_ret(HA_OK, 5);
@@ -1795,13 +1796,19 @@ on_msg_get_metadata(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	else {
 		char* meta = RAExec->get_resource_meta(rtype,provider);
-		if (NULL != meta) {
+		if (NULL != meta && strlen(meta) > 0) {
 			if (HA_OK != ha_msg_add(ret,F_LRM_METADATA, meta)) {
 				LOG_FAILED_TO_ADD_FIELD("metadata");
 			}
 			g_free(meta);
 		}
 		else {
+			lrmd_log(LOG_WARNING
+			, 	"%s: empty metadata for %s::%s::%s."
+			,	__FUNCTION__
+			,	lrm_str(rclass)
+			,	lrm_str(provider)
+			,	lrm_str(rtype));
 			ha_msg_mod_int(ret, F_LRM_RET, HA_FAIL);
 		}
 	}
