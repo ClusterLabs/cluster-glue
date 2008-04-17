@@ -65,6 +65,8 @@
 #define IPC_FAIL 1
 #define IPC_BROKEN 2
 #define IPC_INTR 3
+#define IPC_TIMEOUT 4
+
 /*
  *	IPC:  Sockets-like Interprocess Communication Abstraction
  *

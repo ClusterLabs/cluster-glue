@@ -9,6 +9,7 @@
 # Author: Andreas Mock (andreas.mock@web.de)
 #
 # History:
+#   2007-10-19  Fixed bad commandline handling in case of stonithing
 #   2007-10-11  First release.
 #
 # Comment: Please send bug fixes and enhancements.
@@ -31,8 +32,8 @@
 #                    All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify
-# it under the terms of version 2 of the GNU General Public License as
-# published by the Free Software Foundation.
+# it under the terms of version 2 or later of the GNU General Public
+# License as published by the Free Software Foundation.
 #
 # This program is distributed in the hope that it would be useful, but
 # WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -314,8 +315,8 @@ class RSAStonithPlugin:
 
     def process(self, argv):
         self._echo_debug("========== Start =============")
-        if len(argv) <> 1:
-            self.echo_log("ERROR", 'Exactly one commandline argument required.')
+        if len(argv) < 1:
+            self.echo_log("ERROR", 'At least one commandline argument required.')
             self.echo(self.usage())
             return(1)
         cmd = argv[0]

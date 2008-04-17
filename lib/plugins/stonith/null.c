@@ -19,6 +19,8 @@
  *
  */
 
+#include <lha_internal.h>
+
 #define	DEVICE	"NULL STONITH device"
 #include "stonith_plugin_common.h"
 

@@ -31,11 +31,11 @@ struct ipmilanHostInfo {
 	int		privilege;
 	char * 		username;
 	char *		password;
+	int		reset_method;
 
 	struct ipmilanHostInfo *  prev;
 	struct ipmilanHostInfo *  next;
 };
 
-int
-do_ipmi_cmd(struct ipmilanHostInfo * host, int request);
-
+int do_ipmi_cmd(struct ipmilanHostInfo * host, int request);
+void ipmi_leave(void);

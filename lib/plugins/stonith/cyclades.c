@@ -26,6 +26,8 @@
  *
  */
 
+#include <lha_internal.h>
+
 #define	DEVICE	"Cyclades AlterPath PM"
 
 #define DOESNT_USE_STONITHSCANLINE
