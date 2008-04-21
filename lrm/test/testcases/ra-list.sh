@@ -1,3 +1,5 @@
+#!/bin/sh
+
 awk '
 NR==1 {num=$3;next}
 {in_num++}
