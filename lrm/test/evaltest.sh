@@ -42,7 +42,7 @@ specopt_sleep() {
 	while [ "$rest" -gt 0 ]; do
 		sleep 1
 		echo -n "+" >&3
-		rest=$((rest-1))
+		rest=$(($rest-1))
 	done
 }
 specopt_extcheck() {
@@ -119,7 +119,7 @@ substvars() {
 
 dotest() {
 	echo -n "." >&3
-	test_cnt=$((test_cnt+1))
+	test_cnt=$(($test_cnt+1))
 	describe_$cmd  # show what we are about to do
 	lrm_$cmd |  # and execute the command
 		{ [ "$extcheck" ] && $extcheck || cat;}
@@ -130,7 +130,7 @@ runonetest() {
 		echo .BG test line $line/job $job_cnt runs in background
 		dotest > $OUTDIR/bg$$-$line-$job_cnt 2>&1 &
 		bgprocs="$bgprocs $line:$job_cnt:$!"
-		job_cnt=$((job_cnt+1))
+		job_cnt=$(($job_cnt+1))
 	else
 		dotest
 	fi
@@ -139,7 +139,7 @@ runtest() {
 	while [ $repeat_cnt -le $repeat_limit ]; do
 		runonetest
 		resetvars  # unset all variables
-		repeat_cnt=$((repeat_cnt+1))
+		repeat_cnt=$(($repeat_cnt+1))
 	done
 	repeat_limit=1 repeat_cnt=1
 }
@@ -160,6 +160,6 @@ while read cmd rest; do
 		"%"*) specopt ;;
 		*) runtest ;;
 	esac
-	line=$((line+1))
+	line=$(($line+1))
 done
 waitforbgprocs

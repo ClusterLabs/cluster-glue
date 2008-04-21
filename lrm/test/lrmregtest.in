@@ -122,10 +122,10 @@ END
 sleepsleep() {
 	delay=$1
 	now=`perl -e 'print time()'`
-	by=$((now+delay))
+	by=$(($now+$delay))
 	while [ $now -lt $by ]; do
-		ocf_log debug "Gonna sleep for $((by-now)) seconds..."
-		sleep $((by-now))
+		ocf_log debug "Gonna sleep for $(($by-$now)) seconds..."
+		sleep $(($by-$now))
 		now=`perl -e 'print time()'`
 	done
 }

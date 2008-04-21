@@ -1,3 +1,5 @@
+#!/bin/sh
+
 gawk -v many="$1" '
 BEGIN{XMLLINT="xmllint --noout -";}
 function chkoutput(ra) {
