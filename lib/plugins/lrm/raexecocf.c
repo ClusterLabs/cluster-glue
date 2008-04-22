@@ -321,12 +321,8 @@ get_resource_meta(const char* rsc_type, const char* provider)
 	g_str_tmp = g_string_new("");
 	while(!feof(file)) {
 		read_len = fread(buff, 1, BUFF_LEN - 1, file);
-		if (!read_len && ferror(file)) {
+		if (!read_len && ferror(file) && errno != EAGAIN) {
 			cl_log(LOG_WARNING, "%s: error on pipe: %s", __FUNCTION__, strerror(errno));
-			if (errno == EAGAIN) {
-				clearerr(file);
-				continue;
-			}
 		}
 		if (0<read_len) {
 			*(buff+read_len) = '\0';
@@ -334,6 +330,9 @@ get_resource_meta(const char* rsc_type, const char* provider)
 		}
 		else {
 			nanosleep(&short_sleep,NULL);
+		}
+		if (errno == EAGAIN) {
+			clearerr(file);
 		}
 	}
 	if( pclose(file) ) {
