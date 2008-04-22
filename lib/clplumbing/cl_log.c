@@ -566,7 +566,6 @@ cl_log(int priority, const char * fmt, ...)
 	va_list		ap;
 	char		buf[MAXLINE];
 	ssize_t		nbytes;
-	int	needprivs = !cl_have_full_privs();
 
 	cl_process_pid = (int)getpid();
 
@@ -579,10 +578,6 @@ cl_log(int priority, const char * fmt, ...)
 	
 	if (nbytes >= (ssize_t)sizeof(buf)){
 		nbytes =  sizeof(buf) -1 ;
-	}
-
-	if (needprivs) {
-		return_to_orig_privs();
 	}
 
 	if (stderr_enabled) {
