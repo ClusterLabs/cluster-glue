@@ -1218,7 +1218,10 @@ init_start ()
 	 * Calling this function accomplishes that.
 	 */
 	cl_set_all_coredump_signal_handlers();
-	drop_privs(0, 0); /* become "nobody" */
+	if( drop_privs(0, 0) ) { /* become "nobody" */
+		lrmd_log(LOG_WARNING,"%s: failed to drop privileges: %s"
+		, __FUNCTION__, strerror(errno));
+	}
 
 	/*
 	 * Add the signal handler for SIGUSR1, SIGUSR2. 
@@ -1261,7 +1264,10 @@ init_start ()
                 reg_to_apphbd = FALSE;
         }
 
-	return_to_orig_privs();
+	if( return_to_orig_privs() ) {
+		lrmd_log(LOG_ERROR,"%s: failed to raise privileges: %s"
+		, __FUNCTION__, strerror(errno));
+	}
 	conn_cmd->ops->destroy(conn_cmd);
 	conn_cmd = NULL;
 
@@ -2949,7 +2955,10 @@ perform_ra_op(lrmd_op_t* op)
 			"the message op->msg.");
 	}
 	
-	return_to_orig_privs();
+	if( return_to_orig_privs() ) {
+		lrmd_log(LOG_ERROR,"%s: failed to raise privileges: %s"
+		, __FUNCTION__, strerror(errno));
+	}
 	switch(pid=fork()) {
 		case -1:
 			cl_perror("perform_ra_op:fork failure");
@@ -2957,7 +2966,10 @@ perform_ra_op(lrmd_op_t* op)
 			close(stdout_fd[1]);
 			close(stderr_fd[0]);
 			close(stderr_fd[1]);
-			return_to_dropped_privs();
+			if( return_to_dropped_privs() ) {
+				lrmd_log(LOG_ERROR,"%s: failed to drop privileges: %s"
+				, __FUNCTION__, strerror(errno));
+			}
 			return HA_FAIL;
 
 		default:	/* Parent */
@@ -2987,7 +2999,10 @@ perform_ra_op(lrmd_op_t* op)
 
 				SetTrackedProcTimeouts(pid, op->killseq);
 			}
-			return_to_dropped_privs();
+			if( return_to_dropped_privs() ) {
+				lrmd_log(LOG_WARNING,"%s: failed to drop privileges: %s"
+				, __FUNCTION__, strerror(errno));
+			}
 
 			if ( rapop == NULL) {
 				return HA_FAIL;
