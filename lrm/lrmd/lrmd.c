@@ -1265,7 +1265,7 @@ init_start ()
         }
 
 	if( return_to_orig_privs() ) {
-		lrmd_log(LOG_ERROR,"%s: failed to raise privileges: %s"
+		lrmd_log(LOG_ERR,"%s: failed to raise privileges: %s"
 		, __FUNCTION__, strerror(errno));
 	}
 	conn_cmd->ops->destroy(conn_cmd);
@@ -2956,7 +2956,7 @@ perform_ra_op(lrmd_op_t* op)
 	}
 	
 	if( return_to_orig_privs() ) {
-		lrmd_log(LOG_ERROR,"%s: failed to raise privileges: %s"
+		lrmd_log(LOG_ERR,"%s: failed to raise privileges: %s"
 		, __FUNCTION__, strerror(errno));
 	}
 	switch(pid=fork()) {
@@ -2967,7 +2967,7 @@ perform_ra_op(lrmd_op_t* op)
 			close(stderr_fd[0]);
 			close(stderr_fd[1]);
 			if( return_to_dropped_privs() ) {
-				lrmd_log(LOG_ERROR,"%s: failed to drop privileges: %s"
+				lrmd_log(LOG_ERR,"%s: failed to drop privileges: %s"
 				, __FUNCTION__, strerror(errno));
 			}
 			return HA_FAIL;
