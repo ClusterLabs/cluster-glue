@@ -35,11 +35,11 @@ POWERON="power on"
 STATUS="power status"
 IPMITOOL=`which ipmitool 2>/dev/null`
 
-function have_ipmi() {
+have_ipmi() {
 	test -x "${IPMITOOL}"
 }
 
-function do_ipmi() {
+do_ipmi() {
 	have_ipmi || {
 		echo "ipmitool not installed"
 		return 1
