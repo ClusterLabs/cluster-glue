@@ -49,7 +49,7 @@ if [ -z "$outlet_config" ]; then
     outlet_config="none"
 fi
 
-function GetOutletNumber() {
+GetOutletNumber() {
     local nodename=$1
 
     if [ "$outlet_config" != "none" ]; then
@@ -88,7 +88,7 @@ function GetOutletNumber() {
     fi
 }
 
-function SendCommand() {
+SendCommand() {
 
     local host=$1
     local command=$2
