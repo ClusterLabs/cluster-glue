@@ -49,7 +49,12 @@ function do_ipmi() {
 		return 1
 	fi
 
-	${IPMITOOL} -I lan -H ${ipaddr} -U ${userid} -P ${passwd} ${1} || {
+	if [ -z "${interface}" ]; then
+		# default to "lan" interface
+		interface="lan"
+	fi
+
+	${IPMITOOL} -I ${interface} -H ${ipaddr} -U ${userid} -P ${passwd} ${1} || {
 		echo "error executing ipmi command"
 		return 1
 	}
@@ -103,7 +108,7 @@ status)
 	exit $?
 	;;
 getconfignames)
-	for i in hostname ipaddr userid passwd; do
+	for i in hostname ipaddr userid passwd interface; do
 		echo $i
 	done
 	exit 0
@@ -166,6 +171,17 @@ Password
 The password used for logging in to the STONITH device
 </longdesc>
 </parameter>
+
+<parameter name="interface" unique="1">
+<content type="string"/>
+<shortdesc lang="en">
+IPMI interface
+</shortdesc>
+<longdesc lang="en">
+IPMI interface to use, such as "lan" or "lanplus"
+</longdesc>
+</parameter>
+
 </parameters>
 IPMIXML
 	exit 0
