@@ -762,7 +762,7 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		LOG(PIL_INFO, "%s: Calling '%s' returned %d", __FUNCTION__, cmd, rc);
 	}
 	if (Debug && data) {
-		LOG(PIL_INFO, "%s: '%s' output: %s", __FUNCTION__, cmd, data);
+		LOG(PIL_DEBUG, "%s: '%s' output: %s", __FUNCTION__, cmd, data);
 	}
 
 	if (output) {
