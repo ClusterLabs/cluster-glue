@@ -32,7 +32,7 @@ apigid                          =       @HA_APIGID@
 
 
 lib_LTLIBRARIES = liblrm.la
-liblrm_la_SOURCES = lrm_msg.c clientlib.c
+liblrm_la_SOURCES = lrm_msg.c clientlib.c racommon.c
 liblrm_la_LDFLAGS = $(COMMONLIBS)
 liblrm_la_CFLAGS = $(INCLUDES)
 
