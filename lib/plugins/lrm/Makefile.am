@@ -25,25 +25,21 @@ INCLUDES 			=	-I$(top_builddir)/include -I$(top_srcdir)/include \
 halibdir			=	$(libdir)/@HB_PKG@
 havarlibdir			=	$(localstatedir)/lib/@HB_PKG@
 COMMONLIBS			=	$(top_builddir)/lib/clplumbing/libplumb.la   \
+                        		$(top_builddir)/lib/lrm/liblrm.la   \
                         		$(GLIBLIB)
 
 lrmdir				=	$(HA_VARLIBDIR)/$(HB_PKG)/$(LRM_DIR)
 plugindir               	= 	$(halibdir)/plugins/RAExec
 apigid                          =       @HA_APIGID@
 
-plugin_LTLIBRARIES = lsb.la ocf.la heartbeat.la stonith.la
-lsb_la_SOURCES = raexeclsb.c racommon.c
+plugin_LTLIBRARIES = lsb.la ocf.la heartbeat.la
+lsb_la_SOURCES = raexeclsb.c
 lsb_la_LDFLAGS = -L$(top_builddir)/lib/pils -lpils -export-dynamic -module -avoid-version
 
-ocf_la_SOURCES = raexecocf.c racommon.c
+ocf_la_SOURCES = raexecocf.c
 ocf_la_LDFLAGS = -L$(top_builddir)/lib/pils -lpils -export-dynamic -module -avoid-version
 
-stonith_la_SOURCES = raexecstonith.c racommon.c
-stonith_la_LDFLAGS = -L$(top_builddir)/lib/pils -lpils -export-dynamic -module -avoid-version \
-		     -L$(top_builddir)/lib/fencing -lstonithd \
-		     -L$(top_builddir)/lib/stonith -lstonith
-
-heartbeat_la_SOURCES = raexechb.c racommon.c
+heartbeat_la_SOURCES = raexechb.c
 heartbeat_la_LDFLAGS = -L$(top_builddir)/lib/pils -lpils -export-dynamic -module -avoid-version
 
 install-exec-local:
