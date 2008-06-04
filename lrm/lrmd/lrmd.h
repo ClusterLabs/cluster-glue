@@ -228,7 +228,8 @@ const char *gen_op_info(const lrmd_op_t* op, gboolean add_params);
 #define small_op_info(op) gen_op_info(op,FALSE)
 
 #define DOLRMAUDITS
-#undef DOLRMAUDITS
+/*#undef DOLRMAUDITS
+*/
 
 #define DOMEGALRMAUDITS
 #define LRMAUDIT_CLIENTS
