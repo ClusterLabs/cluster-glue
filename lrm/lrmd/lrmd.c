@@ -126,6 +126,8 @@ static struct {
 	int	rsccount;
 }lrm_objectstats;
 
+lrmd_op_t* current_op = NULL;
+
 static void
 dump_mem_stats(void)
 {
@@ -170,7 +172,7 @@ ra_pipe_op_new(int child_stdout, int child_stderr, lrmd_op_t * lrmd_op)
 	}
 	rapop = cl_calloc(sizeof(ra_pipe_op_t), 1);
 	if ( rapop == NULL) {
-		lrmd_log(LOG_ERR, "%s:%d out of memory." 
+		lrmd_log(LOG_ERR, "%s:%d out of memory" 
 			, __FUNCTION__, __LINE__);
 		return NULL;
 	}
@@ -2459,11 +2461,6 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	return HA_OK;
 }
 
-#define mk_op_id(op,id) do { \
-	const char *op_type = ha_msg_value(op->msg, F_LRM_OP); \
-	const char *op_interval = ha_msg_value(op->msg, F_LRM_INTERVAL); \
-	id = lrm_concat(op_type, op_interval, '_'); \
-} while(0)
 #define safe_len(s) (s ? strlen(s) : 0)
 
 static char *
@@ -2487,55 +2484,99 @@ lrm_concat(const char *prefix, const char *suffix, char join)
 	return new_str;
 }
 
-/* /////////////////////op functions//////////////////////////////////////////// */
-static void 
-record_op_completion(lrmd_client_t* client, lrmd_rsc_t* rsc, lrmd_op_t* op)
+/* /////////////////////op functions////////////////////// */
+
+#define mk_op_id(op,id) do { \
+	const char *op_type = ha_msg_value(op->msg, F_LRM_OP); \
+	const char *op_interval = ha_msg_value(op->msg, F_LRM_INTERVAL); \
+	id = lrm_concat(op_type, op_interval, '_'); \
+} while(0)
+
+/* find the last operation for the client
+ * replace it with the new one (if requested)
+ */
+static void
+replace_last_op(lrmd_client_t* client, lrmd_rsc_t* rsc, lrmd_op_t* op)
 {
-	char *op_hash_key = NULL;
-	lrmd_op_t* old_op = NULL;
-	lrmd_op_t* new_op = NULL;
-	GHashTable* client_last_op = NULL;
+	char *op_hash_key;
+	GHashTable *client_last_op;
+	lrmd_op_t *old_op, *new_op;
 
-	LRMAUDIT();
-	/*save the op in the last op finished*/
-	if (rsc->last_op_done != NULL) {
-		lrmd_op_destroy(rsc->last_op_done);
-	}
-	rsc->last_op_done = lrmd_op_copy(op);
-	rsc->last_op_done->repeat_timeout_tag = (guint)0;
-
-	if (!client) {
-		lrmd_debug(LOG_DEBUG, "%s: cannot record %s: client is gone."
-		,	__FUNCTION__, small_op_info(op)); 
-		LRMAUDIT();
+	if (!client || !rsc || !op)
 		return;
-	}
-	/*find the hash table for the client*/
-	client_last_op = g_hash_table_lookup(rsc->last_op_table
-	, 			client->app_name);
-	if (NULL == client_last_op) {
+	client_last_op = g_hash_table_lookup(rsc->last_op_table, client->app_name);
+	if (!client_last_op) {
 		client_last_op = g_hash_table_new_full(	g_str_hash
 		, 	g_str_equal, cl_free, NULL);
 		g_hash_table_insert(rsc->last_op_table
 		,	(gpointer)cl_strdup(client->app_name)
 		,	(gpointer)client_last_op);
 	}
-
 	mk_op_id(op,op_hash_key);
-	old_op = g_hash_table_lookup(client_last_op, op_hash_key);
-	new_op = lrmd_op_copy(op);
-	if (NULL != old_op) {
-		g_hash_table_replace(client_last_op
-		, 	op_hash_key
-		,	(gpointer)new_op);
-		/* Don't let the timers go away */
-		lrmd_op_destroy(old_op);
-	}else{
-		g_hash_table_insert(client_last_op
-		, 	op_hash_key
-		,	(gpointer)new_op);
+	old_op = (lrmd_op_t*)g_hash_table_lookup(client_last_op, op_hash_key);
+
+	/* make a copy of op and insert it into client_last_op */
+	if (!(new_op = lrmd_op_copy(op))) {
+		lrmd_log(LOG_ERR, "%s:%d out of memory" 
+			, __FUNCTION__, __LINE__);
 	}
+	if (old_op) {
+		g_hash_table_replace(client_last_op,op_hash_key,(gpointer)new_op);
+		lrmd_op_destroy(old_op);
+	} else {
+		g_hash_table_insert(client_last_op,op_hash_key,(gpointer)new_op);
+	}
+}
+
+static void
+record_op_completion(lrmd_rsc_t* rsc, lrmd_op_t* op)
+{
+	lrmd_client_t* client;
+
 	LRMAUDIT();
+	/*save the op in the last op finished*/
+	if (rsc->last_op_done != NULL) {
+		lrmd_op_destroy(rsc->last_op_done);
+	}
+	if (!(rsc->last_op_done = lrmd_op_copy(op))) {
+		lrmd_log(LOG_ERR, "%s:%d out of memory" 
+			, __FUNCTION__, __LINE__);
+	}
+	rsc->last_op_done->repeat_timeout_tag = (guint)0;
+
+	client = lookup_client(op->client_id);
+	if (!client) {
+		lrmd_debug(LOG_DEBUG, "%s: cannot record %s: client is gone."
+		,	__FUNCTION__, small_op_info(op)); 
+		LRMAUDIT();
+		return;
+	}
+	/* insert (or replace) the new op in last_op_table for the client */
+	replace_last_op(client,rsc,op);
+	LRMAUDIT();
+}
+
+static void
+to_repeatlist(lrmd_rsc_t* rsc, lrmd_op_t* op)
+{
+	lrmd_op_t *repeat_op;
+
+	if (!(repeat_op = lrmd_op_copy(op))) {
+		lrmd_log(LOG_ERR, "%s:%d out of memory" 
+			, __FUNCTION__, __LINE__);
+	}
+	repeat_op->t_perform = zero_longclock;
+	repeat_op->t_done = zero_longclock;
+	repeat_op->t_rcchange = zero_longclock;
+	repeat_op->is_copy = FALSE;
+	repeat_op->repeat_timeout_tag = 
+		Gmain_timeout_add(op->interval,	
+				on_repeat_op_readytorun, repeat_op);
+	rsc->repeat_op_list = 
+		g_list_append (rsc->repeat_op_list, repeat_op);
+	lrmd_debug2(LOG_DEBUG
+	, "on_op_done:repeat %s is added to repeat op list to wait" 
+	, op_info(op));
 }
 
 static void 
@@ -2604,14 +2645,11 @@ add_op_to_runlist(lrmd_rsc_t* rsc, lrmd_op_t* op)
 int
 on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 {
-	int target_rc = -1;
-	int last_rc = -1;
-	int op_rc = -1;
+	int target_rc, last_rc, op_rc;
+	int rc_changed;
 	op_status_t op_status;
-	int op_status_int;
-	int need_notify = 0;
-	lrmd_client_t* client = NULL;
 
+	current_op = op;
 	LRMAUDIT();
 	CHECK_ALLOCATED(op, "op", HA_FAIL );
 	if (op->exec_pid == 0) {
@@ -2620,86 +2658,52 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	}
 	op->t_done = time_longclock();
 
-	lrmd_debug2(LOG_DEBUG, "on_op_done: %s", op_info(op));
-	lrmd_debug2(LOG_DEBUG
-		 ,"Timestamps: Recv:%ld, Add to List:%ld, Perform:%ld"
-		 ", Done: %ld, Rc change: %ld"
-		 ,longclockto_ms(op->t_recv)
-		 ,longclockto_ms(op->t_addtolist)
-		 ,longclockto_ms(op->t_perform)
-		 ,longclockto_ms(op->t_done)
-		 ,longclockto_ms(op->t_rcchange));
-
-	if (HA_OK != ha_msg_value_int(op->msg,F_LRM_TARGETRC,&target_rc)){
-		lrmd_log(LOG_ERR
-		,	"%s: can not get target status field from a message"
-		,	__FUNCTION__);
-		return HA_FAIL;
-	}
-	if (HA_OK !=
-		ha_msg_value_int(op->msg, F_LRM_OPSTATUS, &op_status_int)) {
-		lrmd_log(LOG_ERR
-		,	"%s: can not get operation status field from a message"
-		,	__FUNCTION__);
-		return HA_FAIL;
-	}
-	op_status = (op_status_t)op_status_int;
-
 	if (debug_level >= 2) {
+		lrmd_debug(LOG_DEBUG, "on_op_done: %s", op_info(op));
 		lrmd_op_dump(op, __FUNCTION__);
 	}
 
+	return_on_no_int_value(op->msg,F_LRM_TARGETRC,&target_rc);
+	return_on_no_int_value(op->msg,F_LRM_OPSTATUS,(int *)&op_status);
+
+	last_rc = op_rc = -1; /* set all rc to -1 */
 	ha_msg_value_int(op->msg,F_LRM_RC,&op_rc);
-	ha_msg_value_int(op->msg,F_LRM_LASTRC, &last_rc);
-	if (op_status != LRM_OP_DONE
-		|| (op_rc == -1)
-		|| (op_rc == target_rc)
-		|| (target_rc == EVERYTIME)
-		|| ((target_rc == CHANGED)
-			&& ((last_rc == -1) || (last_rc != op_rc)))
-		) {
-		need_notify = 1;
-	}
-	if (op_status == LRM_OP_DONE
-		&& CHANGED == target_rc
-		&& op_rc != -1
-		&& HA_OK != ha_msg_mod_int(op->msg, F_LRM_LASTRC, op_rc)) {
-		lrmd_log(LOG_ERR,"on_op_done: can not save status to "
+	if (op_rc == -1 && HA_OK != ha_msg_mod_int(op->msg, F_LRM_LASTRC, op_rc)) {
+		lrmd_log(LOG_ERR,"on_op_done: cannot save status to "
 			"the message op->msg.");
 		return HA_FAIL;
 	}
-	if ((last_rc == -1) || (last_rc != op_rc)) {
+	ha_msg_value_int(op->msg,F_LRM_LASTRC,&last_rc);
+	rc_changed = (
+		op_status == LRM_OP_DONE
+		&& op_rc != -1
+		&& ((last_rc == -1) || (last_rc != op_rc))
+		);
+	lrmd_log(LOG_INFO,"on_op_done: rc_changed,last_rc,op_rc: %d,%d,%d",rc_changed,last_rc,op_rc);
+	if (rc_changed)
 		op->t_rcchange = op->t_perform;
-	}
 
-	/* remove the op from op_list and copy to last_op */
+	/* remove the op from op_list */
 	rsc->op_list = g_list_remove(rsc->op_list,op);
 	lrmd_debug2(LOG_DEBUG
 	, 	"on_op_done:%s is removed from op list" 
 	,	op_info(op));
 
-	client = lookup_client(op->client_id);
-	if ( LRM_OP_CANCELLED != op_status ) {
-		/*record the outcome of the op */
-		record_op_completion(client, rsc, op);
-		/*copy the repeat op to repeat list to wait next perform */
-		if ( client && op->interval ) {
-			lrmd_op_t* repeat_op = lrmd_op_copy(op);
-			repeat_op->is_copy = FALSE;
-			repeat_op->repeat_timeout_tag = 
-				Gmain_timeout_add(op->interval,	
-						on_repeat_op_readytorun, repeat_op);
-			rsc->repeat_op_list = 
-				g_list_append (rsc->repeat_op_list, repeat_op);
-			lrmd_debug2(LOG_DEBUG
-			, "on_op_done:repeat %s is added to repeat op list to wait" 
-			, op_info(op));
+	if (op_status != LRM_OP_CANCELLED) {
+		record_op_completion(rsc,op); /*record the outcome of the op */
+		if (op->interval) { /* copy op to the repeat list */
+			to_repeatlist(rsc,op);
 		}
 	} else {
 		remove_op_history(op);
 	}
 
-	if ( need_notify ) {
+	if (op_status != LRM_OP_DONE
+		|| (op_rc == -1)
+		|| (op_rc == target_rc)
+		|| (target_rc == EVERYTIME)
+		|| ((target_rc == CHANGED) && rc_changed)
+	) {
 		notify_client(op);
 	}
 	lrmd_op_destroy(op);
@@ -2923,15 +2927,15 @@ perform_ra_op(lrmd_op_t* op)
 	CHECK_ALLOCATED(rsc, "rsc", HA_FAIL);
 	
 	if ( pipe(stdout_fd) < 0 ) {
-		cl_perror("%s::%d: pipe", __FUNCTION__, __LINE__);
+		cl_perror("%s::%d: pipe error: %s", __FUNCTION__, __LINE__, strerror(errno));
 	}
 
 	if ( pipe(stderr_fd) < 0 ) {
-		cl_perror("%s::%d: pipe", __FUNCTION__, __LINE__);
+		cl_perror("%s::%d: pipe error: %s", __FUNCTION__, __LINE__, strerror(errno));
 	}
 
 	if (op->exec_pid == 0) {
-		lrmd_log(LOG_ERR, "perform_ra_op: op->exec_pid == 0.");
+		lrmd_log(LOG_ERR, "%s::%d: op->exec_pid == 0.", __FUNCTION__, __LINE__);
 		return HA_FAIL;
 	}
 
@@ -2951,24 +2955,25 @@ perform_ra_op(lrmd_op_t* op)
 
 	if(HA_OK != ha_msg_value_int(op->msg, F_LRM_TIMEOUT, &timeout)){
 		timeout = 0;
-		lrmd_log(LOG_ERR,"perform_ra_op: failed to get timeout from "
-			"the message op->msg.");
+		lrmd_log(LOG_ERR,"%s::%d: failed to get timeout for %s"
+		, __FUNCTION__, __LINE__, small_op_info(op));
 	}
 	
 	if( return_to_orig_privs() ) {
-		lrmd_log(LOG_ERR,"%s: failed to raise privileges: %s"
-		, __FUNCTION__, strerror(errno));
+		lrmd_log(LOG_ERR,"%s::%d: failed to raise privileges: %s"
+		, __FUNCTION__, __LINE__, strerror(errno));
 	}
 	switch(pid=fork()) {
 		case -1:
-			cl_perror("perform_ra_op:fork failure");
+			cl_perror("%s::%d: fork failed: %s"
+			, __FUNCTION__, __LINE__, strerror(errno));
 			close(stdout_fd[0]);
 			close(stdout_fd[1]);
 			close(stderr_fd[0]);
 			close(stderr_fd[1]);
 			if( return_to_dropped_privs() ) {
-				lrmd_log(LOG_ERR,"%s: failed to drop privileges: %s"
-				, __FUNCTION__, strerror(errno));
+				lrmd_log(LOG_ERR,"%s::%d: failed to drop privileges: %s"
+				, __FUNCTION__, __LINE__, strerror(errno));
 			}
 			return HA_FAIL;
 
@@ -3000,8 +3005,8 @@ perform_ra_op(lrmd_op_t* op)
 				SetTrackedProcTimeouts(pid, op->killseq);
 			}
 			if( return_to_dropped_privs() ) {
-				lrmd_log(LOG_WARNING,"%s: failed to drop privileges: %s"
-				, __FUNCTION__, strerror(errno));
+				lrmd_log(LOG_WARNING,"%s::%d: failed to drop privileges: %s"
+				, __FUNCTION__, __LINE__, strerror(errno));
 			}
 
 			if ( rapop == NULL) {
@@ -3027,8 +3032,8 @@ perform_ra_op(lrmd_op_t* op)
 			}
 			if (STDERR_FILENO != stderr_fd[1]) {
 				if (dup2(stderr_fd[1], STDERR_FILENO)!=STDERR_FILENO) {
-					cl_perror("%s::%d: dup2"
-						, __FUNCTION__, __LINE__);
+					cl_perror("%s::%d: dup2 failed: %s"
+						, __FUNCTION__, __LINE__, strerror(errno));
 				}
 				close(stderr_fd[1]);
 			}
@@ -3036,7 +3041,8 @@ perform_ra_op(lrmd_op_t* op)
 			if (NULL == RAExec) {
 				close(stdout_fd[1]);
 				close(stderr_fd[1]);
-				lrmd_log(LOG_ERR,"perform_ra_op: can not find RAExec");
+				lrmd_log(LOG_ERR,"%s::%d: can't find RAExec for class %s"
+				, __FUNCTION__, __LINE__, rsc->class);
 				exit(EXECRA_EXEC_UNKNOWN_ERROR);
 			}
 			/*should we use logging daemon or not in script*/
@@ -3084,8 +3090,9 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 
 	LRMAUDIT();
 	if (--child_count < 0) {
-		lrmd_log(LOG_ERR, "%s:%d: child number is less than zero: %d"
+		lrmd_log(LOG_ERR, "%s:%d: child count is less than zero: %d"
 			, __FUNCTION__, __LINE__, child_count);
+		child_count = 0;
 	}
 
 	CHECK_ALLOCATED(p, "ProcTrack p", );
