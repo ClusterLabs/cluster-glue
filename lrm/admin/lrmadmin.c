@@ -908,20 +908,22 @@ g_print_ops(gpointer data, gpointer user_data)
 	printf("   operation '%s' [call_id=%d]:\n"
 	       "      start_delay=%d, interval=%d, timeout=%d, app_name=%s\n"
 	       "      rc=%d (%s), op_status=%d (%s)\n"
-	       "      run at: %s"
-	       "      last rc change at: %s"
-	       "      queue time: %lums, exec time: %lums\n"
-	       "      parameters: %s\n"
 		, nullcheck(op->op_type), op->call_id
 		, op->start_delay, op->interval, op->timeout
 		, nullcheck(op->app_name), op->rc
 		, rc_msg[(op->rc-EXECRA_EXEC_UNKNOWN_ERROR) % DIMOF(rc_msg)]
 		, op->op_status
 		, status_msg[(op->op_status-LRM_OP_PENDING) % DIMOF(status_msg)]
-		, op->t_run ? ctime(&run_at) : "N/A\n"
-		, op->t_rcchange ? ctime(&rcchange_at) : "N/A\n"
-		, op->queue_time, op->exec_time
-		, param_gstr->str);
+	);
+	if( op->t_run || op->t_rcchange )
+		printf("      run at: %s"
+			   "      last rc change at: %s"
+			   "      queue time: %lums, exec time: %lums\n"
+			, op->t_run ? ctime(&run_at) : "N/A\n"
+			, op->t_rcchange ? ctime(&rcchange_at) : "N/A\n"
+			, op->queue_time, op->exec_time
+		);
+	printf("      parameters: %s\n", param_gstr->str);
 	g_string_free(param_gstr, TRUE);
 }
 
