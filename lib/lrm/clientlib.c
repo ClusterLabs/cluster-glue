@@ -1239,9 +1239,10 @@ msg_to_op(struct ha_msg* msg)
 	   || ha_msg_value_ul(msg, F_LRM_T_RCCHANGE, &op->t_rcchange) != HA_OK
 	   || ha_msg_value_ul(msg, F_LRM_EXEC_TIME, &op->exec_time) != HA_OK
 	   || ha_msg_value_ul(msg, F_LRM_QUEUE_TIME, &op->queue_time) != HA_OK) {
-		cl_log(LOG_WARNING
+		/* cl_log(LOG_WARNING
 		, "%s:%d: failed to get the timing information"
 		, __FUNCTION__, __LINE__);
+		*/
 	}
 	
 	/* op->params */
