@@ -126,8 +126,6 @@ static struct {
 	int	rsccount;
 }lrm_objectstats;
 
-lrmd_op_t* current_op = NULL;
-
 static void
 dump_mem_stats(void)
 {
@@ -2646,7 +2644,6 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	int rc_changed;
 	op_status_t op_status;
 
-	current_op = op;
 	LRMAUDIT();
 	CHECK_ALLOCATED(op, "op", HA_FAIL );
 	if (op->exec_pid == 0) {
@@ -2665,18 +2662,19 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 
 	last_rc = op_rc = -1; /* set all rc to -1 */
 	ha_msg_value_int(op->msg,F_LRM_RC,&op_rc);
-	if (op_rc == -1 && HA_OK != ha_msg_mod_int(op->msg, F_LRM_LASTRC, op_rc)) {
-		lrmd_log(LOG_ERR,"%s: cannot save status to msg",__FUNCTION__);
-		return HA_FAIL;
-	}
 	ha_msg_value_int(op->msg,F_LRM_LASTRC,&last_rc);
 	rc_changed = (
 		op_status == LRM_OP_DONE
 		&& op_rc != -1
 		&& ((last_rc == -1) || (last_rc != op_rc))
 	);
-	if (rc_changed)
+	if (rc_changed) {
+		if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_LASTRC, op_rc)) {
+			lrmd_log(LOG_ERR,"%s: cannot save status to msg",__FUNCTION__);
+			return HA_FAIL;
+		}
 		op->t_rcchange = op->t_perform;
+	}
 	if (store_timestamps(op))
 		return HA_FAIL;
 
@@ -2729,7 +2727,7 @@ flush_op(lrmd_op_t* op)
 		return HA_FAIL;
 	}
 
-	if (HA_OK != ha_msg_add_int(op->msg, F_LRM_RC, HA_FAIL)) {
+	if (HA_OK != ha_msg_mod_int(op->msg, F_LRM_RC, HA_FAIL)) {
 		LOG_FAILED_TO_ADD_FIELD("F_LRM_RC");
 		return HA_FAIL;
 	}
@@ -2883,7 +2881,6 @@ reset_timestamps(lrmd_op_t* op)
 {
 	op->t_perform = zero_longclock;
 	op->t_done = zero_longclock;
-	op->t_rcchange = zero_longclock;
 	cl_msg_remove(op->msg, F_LRM_T_RUN);
 	cl_msg_remove(op->msg, F_LRM_T_RCCHANGE);
 	cl_msg_remove(op->msg, F_LRM_EXEC_TIME);
