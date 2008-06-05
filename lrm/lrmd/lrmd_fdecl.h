@@ -56,6 +56,7 @@ static gboolean handle_pipe_ra_stdout(int fd, gpointer user_data);
 static gboolean handle_pipe_ra_stderr(int fd, gpointer user_data);
 static struct ha_msg* op_to_msg(lrmd_op_t* op);
 static int store_timestamps(lrmd_op_t* op);
+static void reset_timestamps(lrmd_op_t* op);
 static gboolean lrm_shutdown(void);
 static gboolean can_shutdown(void);
 static gboolean free_str_hash_pair(gpointer key

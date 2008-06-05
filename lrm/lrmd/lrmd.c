@@ -2564,9 +2564,7 @@ to_repeatlist(lrmd_rsc_t* rsc, lrmd_op_t* op)
 		lrmd_log(LOG_ERR, "%s:%d out of memory" 
 			, __FUNCTION__, __LINE__);
 	}
-	repeat_op->t_perform = zero_longclock;
-	repeat_op->t_done = zero_longclock;
-	repeat_op->t_rcchange = zero_longclock;
+	reset_timestamps(repeat_op);
 	repeat_op->is_copy = FALSE;
 	repeat_op->repeat_timeout_tag = 
 		Gmain_timeout_add(op->interval,	
@@ -2878,6 +2876,18 @@ store_timestamps(lrmd_op_t* op)
 		return 1;
 	}
 	return 0;
+}
+
+static void
+reset_timestamps(lrmd_op_t* op)
+{
+	op->t_perform = zero_longclock;
+	op->t_done = zero_longclock;
+	op->t_rcchange = zero_longclock;
+	cl_msg_remove(op->msg, F_LRM_T_RUN);
+	cl_msg_remove(op->msg, F_LRM_T_RCCHANGE);
+	cl_msg_remove(op->msg, F_LRM_EXEC_TIME);
+	cl_msg_remove(op->msg, F_LRM_QUEUE_TIME);
 }
 
 struct ha_msg*
