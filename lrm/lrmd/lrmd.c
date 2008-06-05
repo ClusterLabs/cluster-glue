@@ -2653,13 +2653,13 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	LRMAUDIT();
 	CHECK_ALLOCATED(op, "op", HA_FAIL );
 	if (op->exec_pid == 0) {
-		lrmd_log(LOG_ERR, "on_op_done: op->exec_pid == 0.");
+		lrmd_log(LOG_ERR, "%s: op->exec_pid == 0",__FUNCTION__);
 		return HA_FAIL;
 	}
 	op->t_done = time_longclock();
 
 	if (debug_level >= 2) {
-		lrmd_debug(LOG_DEBUG, "on_op_done: %s", op_info(op));
+		lrmd_debug(LOG_DEBUG, "%s: %s",__FUNCTION__, op_info(op));
 		lrmd_op_dump(op, __FUNCTION__);
 	}
 
@@ -2669,8 +2669,7 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	last_rc = op_rc = -1; /* set all rc to -1 */
 	ha_msg_value_int(op->msg,F_LRM_RC,&op_rc);
 	if (op_rc == -1 && HA_OK != ha_msg_mod_int(op->msg, F_LRM_LASTRC, op_rc)) {
-		lrmd_log(LOG_ERR,"on_op_done: cannot save status to "
-			"the message op->msg.");
+		lrmd_log(LOG_ERR,"%s: cannot save status to msg",__FUNCTION__);
 		return HA_FAIL;
 	}
 	ha_msg_value_int(op->msg,F_LRM_LASTRC,&last_rc);
@@ -2678,16 +2677,17 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 		op_status == LRM_OP_DONE
 		&& op_rc != -1
 		&& ((last_rc == -1) || (last_rc != op_rc))
-		);
-	lrmd_log(LOG_INFO,"on_op_done: rc_changed,last_rc,op_rc: %d,%d,%d",rc_changed,last_rc,op_rc);
+	);
 	if (rc_changed)
 		op->t_rcchange = op->t_perform;
+	if (store_timestamps(op))
+		return HA_FAIL;
 
 	/* remove the op from op_list */
 	rsc->op_list = g_list_remove(rsc->op_list,op);
 	lrmd_debug2(LOG_DEBUG
-	, 	"on_op_done:%s is removed from op list" 
-	,	op_info(op));
+	, 	"%s:%s is removed from op list"
+	,	__FUNCTION__, op_info(op));
 
 	if (op_status != LRM_OP_CANCELLED) {
 		record_op_completion(rsc,op); /*record the outcome of the op */
@@ -2728,7 +2728,7 @@ flush_op(lrmd_op_t* op)
 {
 	CHECK_ALLOCATED(op, "op", HA_FAIL );
 	if (op->exec_pid == 0) {
-		lrmd_debug(LOG_ERR, "%s: op->exec_pid == 0.",__FUNCTION__);
+		lrmd_debug(LOG_ERR, "%s: op->exec_pid == 0",__FUNCTION__);
 		return HA_FAIL;
 	}
 
@@ -2854,36 +2854,14 @@ perform_op(lrmd_rsc_t* rsc)
 	return HA_OK;
 }
 
-struct ha_msg*
-op_to_msg(lrmd_op_t* op)
+static int
+store_timestamps(lrmd_op_t* op)
 {
-	struct ha_msg* msg = NULL;
-	longclock_t	now = time_longclock(),
+	struct ha_msg* msg = op->msg;
+	longclock_t	now = time_longclock(), /* tm2unix() needs this */
 		exec_time = zero_longclock,
 		queue_time = zero_longclock;
 
-	CHECK_ALLOCATED(op, "op", NULL);
-	if (op->exec_pid == 0) {
-		lrmd_log(LOG_ERR, "op_to_msg: op->exec_pid is 0.");
-		return NULL;
-	}
-	msg = ha_msg_copy(op->msg);
-	if (NULL == msg) {
-		lrmd_log(LOG_ERR,"op_to_msg: can not copy the msg");
-		return NULL;
-	}
-	if (HA_OK != ha_msg_mod_int(msg, F_LRM_CALLID, op->call_id)) {
-		LOG_FAILED_TO_ADD_FIELD("call_id");
-		goto error;
-	}
-	if (HA_OK != ha_msg_mod_ul(msg, F_LRM_T_RUN, tm2unix(op->t_perform))) {
-		LOG_FAILED_TO_ADD_FIELD("t_run")
-		goto error;
-	}
-	if (HA_OK != ha_msg_mod_ul(msg, F_LRM_T_RCCHANGE, tm2unix(op->t_rcchange))) {
-		LOG_FAILED_TO_ADD_FIELD("t_rcchange")
-		goto error;
-	}
 	if (op->t_perform) {
 		queue_time =
 			longclockto_ms(sub_longclock(op->t_perform,op->t_addtolist));
@@ -2892,18 +2870,38 @@ op_to_msg(lrmd_op_t* op)
 				longclockto_ms(sub_longclock(op->t_done,op->t_perform));
 		}
 	}
-	if (HA_OK != ha_msg_mod_ul(msg, F_LRM_EXEC_TIME, exec_time)) {
-		LOG_FAILED_TO_ADD_FIELD("exec_time")
-		goto error;
+	if ((HA_OK!=ha_msg_mod_ul(msg,F_LRM_T_RUN,tm2unix(op->t_perform)))
+		|| (HA_OK!=ha_msg_mod_ul(msg,F_LRM_T_RCCHANGE,tm2unix(op->t_rcchange)))
+		|| (HA_OK!=ha_msg_mod_ul(msg,F_LRM_EXEC_TIME,exec_time))
+		|| (HA_OK!=ha_msg_mod_ul(msg,F_LRM_QUEUE_TIME,queue_time))
+	) {
+		lrmd_log(LOG_ERR,"%s: can not save timestamps to msg",__FUNCTION__);
+		return 1;
 	}
-	if (HA_OK != ha_msg_mod_ul(msg, F_LRM_QUEUE_TIME, queue_time)) {
-		LOG_FAILED_TO_ADD_FIELD("queue_time")
-		goto error;
+	return 0;
+}
+
+struct ha_msg*
+op_to_msg(lrmd_op_t* op)
+{
+	struct ha_msg* msg = NULL;
+
+	CHECK_ALLOCATED(op, "op", NULL);
+	if (op->exec_pid == 0) {
+		lrmd_log(LOG_ERR, "%s: op->exec_pid is 0",__FUNCTION__);
+		return NULL;
+	}
+	msg = ha_msg_copy(op->msg);
+	if (NULL == msg) {
+		lrmd_log(LOG_ERR,"%s: can not copy the msg",__FUNCTION__);
+		return NULL;
+	}
+	if ((HA_OK!=ha_msg_mod_int(msg,F_LRM_CALLID,op->call_id))) {
+		lrmd_log(LOG_ERR,"%s: can not save F_LRM_CALLID to msg",__FUNCTION__);
+		ha_msg_del(msg);
+		msg = NULL;
 	}
 	return msg;
-
-error:	ha_msg_del(msg);
-	return NULL;
 }
 
 /* //////////////////////////////RA wrap funcs/////////////////////////////////// */
