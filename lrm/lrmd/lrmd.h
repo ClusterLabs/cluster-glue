@@ -195,12 +195,12 @@ struct lrmd_op
 	struct ha_msg*		msg;
 	ra_pipe_op_t *		rapop;
 	char			first_line_ra_stdout[80]; /* only for heartbeat RAs*/
-	/*time stamp*/
-	longclock_t		t_recv;
-	longclock_t		t_addtolist;
-	longclock_t		t_perform;
-	longclock_t		t_done;
-	longclock_t		t_rcchange; /* when rc changed */
+	/*time stamps*/
+	longclock_t		t_recv; /* set in lrmd_op_new(), i.e. on op create */
+	longclock_t		t_addtolist; /* set in add_op_to_runlist() */
+	longclock_t		t_perform; /* set in perform_ra_op() */
+	longclock_t		t_done; /* set in on_op_done() */
+	longclock_t		t_rcchange; /* set in on_op_done(), could equal t_perform */
 	ProcTrackKillInfo	killseq[3];
 };
 
@@ -228,8 +228,7 @@ const char *gen_op_info(const lrmd_op_t* op, gboolean add_params);
 #define small_op_info(op) gen_op_info(op,FALSE)
 
 #define DOLRMAUDITS
-/*#undef DOLRMAUDITS
-*/
+#undef DOLRMAUDITS
 
 #define DOMEGALRMAUDITS
 #define LRMAUDIT_CLIENTS
