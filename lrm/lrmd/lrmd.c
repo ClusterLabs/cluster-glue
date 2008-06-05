@@ -2962,14 +2962,13 @@ perform_ra_op(lrmd_op_t* op)
 	}
 	switch(pid=fork()) {
 		case -1:
-			cl_perror("%s::%d: fork failed: %s"
-			, __FUNCTION__, __LINE__);
+			cl_perror("%s::%d: fork", __FUNCTION__, __LINE__);
 			close(stdout_fd[0]);
 			close(stdout_fd[1]);
 			close(stderr_fd[0]);
 			close(stderr_fd[1]);
 			if( return_to_dropped_privs() ) {
-				cl_perror("%s::%d: failed to drop privileges: %s"
+				cl_perror("%s::%d: failed to drop privileges"
 				, __FUNCTION__, __LINE__);
 			}
 			return HA_FAIL;
