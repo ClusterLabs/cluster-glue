@@ -1267,8 +1267,7 @@ init_start ()
         }
 
 	if( return_to_orig_privs() ) {
-		lrmd_log(LOG_ERR,"%s: failed to raise privileges: %s"
-		, __FUNCTION__, strerror(errno));
+		cl_perror("%s: failed to raise privileges", __FUNCTION__);
 	}
 	conn_cmd->ops->destroy(conn_cmd);
 	conn_cmd = NULL;
@@ -2925,11 +2924,11 @@ perform_ra_op(lrmd_op_t* op)
 	CHECK_ALLOCATED(rsc, "rsc", HA_FAIL);
 	
 	if ( pipe(stdout_fd) < 0 ) {
-		cl_perror("%s::%d: pipe error: %s", __FUNCTION__, __LINE__, strerror(errno));
+		cl_perror("%s::%d: pipe", __FUNCTION__, __LINE__);
 	}
 
 	if ( pipe(stderr_fd) < 0 ) {
-		cl_perror("%s::%d: pipe error: %s", __FUNCTION__, __LINE__, strerror(errno));
+		cl_perror("%s::%d: pipe", __FUNCTION__, __LINE__);
 	}
 
 	if (op->exec_pid == 0) {
@@ -2958,20 +2957,20 @@ perform_ra_op(lrmd_op_t* op)
 	}
 	
 	if( return_to_orig_privs() ) {
-		lrmd_log(LOG_ERR,"%s::%d: failed to raise privileges: %s"
-		, __FUNCTION__, __LINE__, strerror(errno));
+		cl_perror("%s::%d: failed to raise privileges"
+		, __FUNCTION__, __LINE__);
 	}
 	switch(pid=fork()) {
 		case -1:
 			cl_perror("%s::%d: fork failed: %s"
-			, __FUNCTION__, __LINE__, strerror(errno));
+			, __FUNCTION__, __LINE__);
 			close(stdout_fd[0]);
 			close(stdout_fd[1]);
 			close(stderr_fd[0]);
 			close(stderr_fd[1]);
 			if( return_to_dropped_privs() ) {
-				lrmd_log(LOG_ERR,"%s::%d: failed to drop privileges: %s"
-				, __FUNCTION__, __LINE__, strerror(errno));
+				cl_perror("%s::%d: failed to drop privileges: %s"
+				, __FUNCTION__, __LINE__);
 			}
 			return HA_FAIL;
 
@@ -3030,8 +3029,7 @@ perform_ra_op(lrmd_op_t* op)
 			}
 			if (STDERR_FILENO != stderr_fd[1]) {
 				if (dup2(stderr_fd[1], STDERR_FILENO)!=STDERR_FILENO) {
-					cl_perror("%s::%d: dup2 failed: %s"
-						, __FUNCTION__, __LINE__, strerror(errno));
+					cl_perror("%s::%d: dup2", __FUNCTION__, __LINE__);
 				}
 				close(stderr_fd[1]);
 			}
