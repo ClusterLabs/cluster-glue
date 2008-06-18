@@ -97,6 +97,7 @@ struct msg_map msg_maps[] = {
 	{GETLASTOP,	NO_MSG,	on_msg_get_last_op},
 	{GETALLRCSES,	NO_MSG,	on_msg_get_all},
 	{DELRSC,	REPLY_NOW,	on_msg_del_rsc},
+	{FAILRSC,	REPLY_NOW,	on_msg_fail_rsc},
 	{PERFORMOP,	REPLY_NOW,	on_msg_perform_op},
 	{FLUSHOPS,	REPLY_NOW,	on_msg_flush_all},
 	{CANCELOP,	REPLY_NOW,	on_msg_cancel_op},
@@ -2020,6 +2021,92 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	return HA_OK;
 }
 
+static int
+prepare_failmsg(struct ha_msg* msg, int fail_rc, const char *fail_reason)
+{
+	if (HA_OK != ha_msg_mod(msg,F_LRM_OP,ASYNC_OP_NAME)
+		|| HA_OK != ha_msg_add(msg,F_LRM_FAIL_REASON,fail_reason)
+		|| HA_OK != ha_msg_mod_int(msg,F_LRM_ASYNCMON_RC,fail_rc)
+		|| HA_OK != ha_msg_mod_int(msg,F_LRM_RC,fail_rc)
+		|| HA_OK != ha_msg_mod_int(msg,F_LRM_OPSTATUS,(int)LRM_OP_DONE)
+		|| HA_OK != ha_msg_mod_int(msg,F_LRM_CALLID,0)
+		|| HA_OK != ha_msg_mod_int(msg,F_LRM_TIMEOUT,0)
+		|| HA_OK != ha_msg_mod_int(msg,F_LRM_INTERVAL,0)
+		|| HA_OK != ha_msg_mod_int(msg,F_LRM_TARGETRC,EVERYTIME)
+		|| HA_OK != ha_msg_mod_int(msg,F_LRM_DELAY,0)
+	) {
+		lrmd_log(LOG_ERR,"%s:%d: cannot add field to a message"
+		,	__FUNCTION__, __LINE__);
+		return 1;
+	}
+	return 0;
+}
+
+static void
+async_notify(gpointer key, gpointer val, gpointer data)
+{
+	struct ha_msg* msg = (struct ha_msg*)data;
+	lrmd_client_t* client;
+
+	client = lookup_client_by_name((char *)key);
+	if (!client) {
+		lrmd_log(LOG_ERR,
+			"%s: strange, client not found", __FUNCTION__);
+		return;
+	}
+	if (HA_OK != ha_msg_mod(msg,F_LRM_APP,client->app_name)) {
+		lrmd_log(LOG_ERR,"%s:%d: cannot add field to a message"
+		,	__FUNCTION__, __LINE__);
+		return;
+	}
+	if (!client->ch_cbk) {
+		lrmd_log(LOG_WARNING,
+			"%s: callback channel is null", __FUNCTION__);
+	} else if (HA_OK != msg2ipcchan(msg, client->ch_cbk)) {
+		lrmd_log(LOG_WARNING,
+			"%s: can not send the ret msg", __FUNCTION__);
+	}
+}
+
+int
+on_msg_fail_rsc(lrmd_client_t* client, struct ha_msg* msg)
+{
+	lrmd_rsc_t* rsc;
+	const char* id;
+	int fail_rc = -1;
+	const char *fail_reason;
+
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
+
+	id = ha_msg_value(msg, F_LRM_RID);
+	lrmd_debug2(LOG_DEBUG
+	,	"%s: client [%d] wants to fail rsc %s"
+	,	__FUNCTION__, client->pid, lrmd_nullcheck(id));
+
+	rsc = lookup_rsc_by_msg(msg);
+	if (!rsc) {
+		lrmd_log(LOG_ERR, "%s: no resource with id %s."
+		,	__FUNCTION__, lrmd_nullcheck(id));
+		return HA_FAIL;
+	}
+	fail_reason = ha_msg_value(msg,F_LRM_FAIL_REASON);
+	if (!fail_reason || *fail_reason == '\0') {
+		fail_reason = DEFAULT_FAIL_REASON;
+	}
+	if (HA_OK != ha_msg_value_int(msg,F_LRM_ASYNCMON_RC,&fail_rc) || fail_rc <= 0) {
+		fail_rc = DEFAULT_FAIL_RC;
+	}
+	if (prepare_failmsg(msg,fail_rc,fail_reason))
+		return HA_FAIL;
+	lrmd_log(LOG_WARNING
+	,	"received asynchronous failure for rsc %s (rc: %d, reason: %s)"
+	,	lrmd_nullcheck(id), fail_rc, fail_reason);
+	/* notify all clients from last_op table about the failure */
+	g_hash_table_foreach(rsc->last_op_table,async_notify,msg);
+	return HA_OK;
+}
+
 static gboolean
 free_str_hash_pair(gpointer key, gpointer value, gpointer user_data)
 {
@@ -2420,6 +2507,7 @@ on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg)
 	if(last_ops != NULL) {
 		g_hash_table_foreach(last_ops, send_last_op, client->ch_cmd);
 	}
+
 	/* send the ops in op list */
 	for(node = g_list_first(rsc->op_list)
 	;	NULL != node; node = g_list_next(node)){
@@ -3295,6 +3383,19 @@ lrmd_client_t*
 lookup_client (pid_t pid)
 {
 	return (lrmd_client_t*) g_hash_table_lookup(clients, &pid);
+}
+
+static gboolean
+client_cmp_name(gpointer key, gpointer val, gpointer app_name)
+{
+	return strcmp(((lrmd_client_t*)val)->app_name,(char *)app_name) ?
+		FALSE : TRUE;
+}
+
+static lrmd_client_t*
+lookup_client_by_name(char *app_name)
+{
+	return (lrmd_client_t*)g_hash_table_find(clients,client_cmp_name,app_name);
 }
 
 lrmd_rsc_t*

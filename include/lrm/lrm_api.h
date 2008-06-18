@@ -166,6 +166,11 @@ typedef enum {
 	LRM_RSC_BUSY
 }state_flag_t;
 
+/* defaults for the asynchronous resource failures */
+enum { DEFAULT_FAIL_RC = EXECRA_UNKNOWN_ERROR };
+#define DEFAULT_FAIL_REASON "asynchronous monitor error"
+#define ASYNC_OP_NAME "monitor"
+
 struct rsc_ops
 {
 /*
@@ -376,6 +381,21 @@ struct lrm_ops
  */
 	int	(*delete_rsc)(ll_lrm_t*, const char* rsc_id);
 
+/*
+ *fail_rsc:	fail a resource
+ *		Allow asynchronous monitor failures. Notifies all clients
+ *		which have operations defined for the resource.
+ *		The fail_rc parameter should be set to one of the OCF
+ *		return codes (if non-positive it defaults to
+ *		OCF_ERR_GENERIC). The fail_reason parameter should
+ *		contain the description of the failure (i.e. "daemon
+ *		panicked" or similar). If NULL is passed or empty string,
+ *		it defaults to "asynchronous monitor failure".
+ *
+ *return:	HA_OK for success, HA_FAIL for failure
+ */
+	int (*fail_rsc)(ll_lrm_t* lrm, const char* rsc_id,
+		const int fail_rc, const char* fail_reason);
 /*
  *ipcchan:	Return the IPC channel which can be used for determining
  *		when messages are ready to be read.

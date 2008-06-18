@@ -93,6 +93,8 @@ static int lrm_add_rsc (ll_lrm_t*, const char* id, const char* class
 			,const char* type, const char* provider
 			,GHashTable* parameter);
 static int lrm_delete_rsc (ll_lrm_t*, const char* id);
+static int lrm_fail_rsc (ll_lrm_t* lrm, const char* rsc_id, const int fail_rc
+			,const char* fail_reason);
 static IPC_Channel* lrm_ipcchan (ll_lrm_t*);
 static int lrm_msgready (ll_lrm_t*);
 static int lrm_rcvmsg (ll_lrm_t*, int blocking);
@@ -111,6 +113,7 @@ static struct lrm_ops lrm_ops_instance =
 	lrm_get_rsc,
 	lrm_add_rsc,
 	lrm_delete_rsc,
+	lrm_fail_rsc,
 	lrm_ipcchan,
 	lrm_msgready,
 	lrm_rcvmsg
@@ -686,6 +689,53 @@ lrm_get_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	ha_msg_del(ret);
 	/* return the new resource */
 	return rsc;
+}
+
+static int
+lrm_fail_rsc (ll_lrm_t* lrm, const char* rsc_id, const int fail_rc
+,		 const char* fail_reason)
+{
+	struct ha_msg* msg;
+
+	/* check whether the rsc_id is available */
+	if (NULL == rsc_id || RID_LEN <= strlen(rsc_id))	{
+		cl_log(LOG_ERR, "%s: wrong parameter rsc_id.", __FUNCTION__);
+		return HA_FAIL;
+	}
+
+	/* check whether the channel to lrmd is available */
+	if (NULL == ch_cmd)	{
+		cl_log(LOG_ERR, "%s: ch_mod is null.", __FUNCTION__);
+		return HA_FAIL;
+	}
+
+	/* create the message */
+	msg = create_lrm_rsc_msg(rsc_id,FAILRSC);
+	if (NULL == msg) {
+		LOG_FAIL_create_lrm_rsc_msg(FAILRSC);
+		return HA_FAIL;
+	}
+	if ((fail_reason && HA_OK != ha_msg_add(msg,F_LRM_FAIL_REASON,fail_reason))
+		|| HA_OK != ha_msg_add_int(msg, F_LRM_ASYNCMON_RC, fail_rc)
+	) {
+		ha_msg_del(msg);
+		LOG_BASIC_ERROR("ha_msg_add");
+		return HA_FAIL;
+	}
+	/* send to lrmd */
+	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
+		ha_msg_del(msg);
+		LOG_FAIL_SEND_MSG(FAILRSC, "ch_cmd");
+		return HA_FAIL;
+	}
+	ha_msg_del(msg);
+	/* check the result */
+	if (HA_OK != get_ret_from_ch(ch_cmd)) {
+		LOG_GOT_FAIL_RET(LOG_ERR, FAILRSC);
+		return HA_FAIL;
+	}
+
+	return HA_OK;
 }
 
 static int

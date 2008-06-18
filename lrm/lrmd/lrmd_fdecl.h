@@ -26,6 +26,7 @@ static int on_msg_get_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_last_op(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_all(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg);
+static int on_msg_fail_rsc(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_cancel_op(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_flush_all(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg);
@@ -75,6 +76,11 @@ static void warning_on_active_rsc(gpointer key, gpointer value, gpointer user_da
 static void check_queue_duration(lrmd_op_t* op);
 static gboolean flush_all(GList** listp);
 static gboolean cancel_op(GList** listp,int cancel_op_id);
+static int prepare_failmsg(struct ha_msg* msg,
+			int fail_rc, const char *fail_reason);
+static void async_notify(gpointer key, gpointer val, gpointer data);
+static gboolean client_cmp_name(gpointer key, gpointer val, gpointer app_name);
+static lrmd_client_t* lookup_client_by_name(char *app_name);
 
 /*
  * following functions are used to monitor the exit of ra proc
