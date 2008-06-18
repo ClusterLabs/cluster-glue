@@ -1201,6 +1201,7 @@ msg_to_op(struct ha_msg* msg)
 	const char* op_type;
 	const char* app_name;
 	const char* rsc_id;
+	const char* fail_reason;
 	const char* output;
 	const void* user_data;
 
@@ -1274,8 +1275,13 @@ msg_to_op(struct ha_msg* msg)
 		free_op(op);
 		return NULL;
 	}
-
 	op->rsc_id = g_strdup(rsc_id);
+
+	/* op->fail_reason present only on async failures */
+	fail_reason = ha_msg_value(msg, F_LRM_FAIL_REASON);
+	if (fail_reason) {
+		op->fail_reason = g_strdup(fail_reason);
+	}
 
 	/* op->user_data */
 	user_data = cl_get_string(msg, F_LRM_USERDATA);

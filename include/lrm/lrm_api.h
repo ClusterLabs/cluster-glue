@@ -144,6 +144,7 @@ typedef struct{
 	char*			output;
 	char*			rsc_id;
 	char*			app_name;
+	char*			fail_reason;
 	unsigned long		t_run; /* when did the op run (as age) */
 	unsigned long		t_rcchange; /* last rc change (as age) */
 	unsigned long		exec_time; /* time it took the op to run */
