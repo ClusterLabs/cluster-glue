@@ -74,6 +74,8 @@
 #define F_LRM_T_RCCHANGE	"lrm_t_rcchange"
 #define F_LRM_EXEC_TIME		"lrm_exec_time"
 #define F_LRM_QUEUE_TIME	"lrm_queue_time"
+#define F_LRM_FAIL_REASON	"lrm_fail_reason"
+#define F_LRM_ASYNCMON_RC	"lrm_asyncmon_rc"
 
 #define	PRINT 	printf("file:%s,line:%d\n",__FILE__,__LINE__);
 
@@ -93,6 +95,7 @@
 #define FLUSHRSC		"flush"
 #define ADDRSC			"addrsc"
 #define DELRSC			"delrsc"
+#define FAILRSC			"failrsc"
 #define PERFORMOP		"op"
 #define ISOPSUPPORT		"opspt"
 #define OPDONE			"opdone"
