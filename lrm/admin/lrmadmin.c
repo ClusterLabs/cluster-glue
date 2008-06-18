@@ -46,7 +46,7 @@
 #include <clplumbing/GSource.h>
 #include <clplumbing/Gmain_timeout.h>
 
-const char * optstring = "AD:dEF:d:sg:M:O:P:c:S:LI:CT:n:h";
+const char * optstring = "AD:X:dEF:d:sg:M:O:P:c:S:LI:CT:n:h";
 
 #ifdef HAVE_GETOPT_H
 static struct option long_options[] = {
@@ -54,11 +54,12 @@ static struct option long_options[] = {
 	{"executera", 1, 0, 'E'},
 	{"flush",1,0,'F'},
 	{"monitor",0,0,'M'},
-	{"status",1,0,'S'},
+	{"state",1,0,'S'},
 	{"listall",0,0,'L'},
 	{"information",1,0,'I'},
 	{"add",1,0,'A'},
 	{"delete",1,0,'D'},
+	{"fail",1,0,'X'},
 	{"raclass_supported",1,0,'C'},
 	{"ratype_supported",1,0,'T'},
 	{"all_type_metadata",1,0,'O'},
@@ -86,6 +87,7 @@ typedef enum {
 	INF_RSC,
 	ADD_RSC,
 	DEL_RSC,
+	FAIL_RSC,
 	RACLASS_SUPPORTED,
 	RATYPE_SUPPORTED,
 	RA_METADATA,
@@ -137,6 +139,7 @@ const char * simple_help_screen =
 "         {-A|--add} <rscid> <raclass> <ratype> <provider|NULL> [<rsc_params_list>]\n"
 "         {-D|--delete} <rscid>\n"
 "         {-F|--flush} <rscid>\n"
+"         {-X|--fail} <rscid> [<fail_rc> [<fail_reason>]]\n"
 "         {-E|--execute} <rscid> <operator> <timeout> <interval> <target_rc|EVERYTIME|CHANGED> [<operator_parameters_list>]\n"
 "         {-S|--state} <rscid> [-n <fake_name>]\n"
 "         {-L|--listall}\n"
@@ -158,6 +161,7 @@ const char * simple_help_screen =
 static int resource_operation(ll_lrm_t * lrmd, int argc, int optind, 
 			      char * argv[]);
 static int add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
+static int fail_resource(ll_lrm_t * lrmd, char *rsc_id, int optc, char *opts[]);
 static int transfer_cmd_params(int amount, int start, char * argv[], 
 			   const char * class, GHashTable ** params_ht);
 static void g_print_stringitem_and_free(gpointer data, gpointer user_data);
@@ -243,6 +247,12 @@ int main(int argc, char **argv)
 				if (optarg) {
 					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				}
+				break;
+
+			case 'X':
+				OPTION_OBSCURE_CHECK 
+				lrmadmin_cmd = FAIL_RSC;
+				strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				break;
 
 			case 'C':
@@ -423,6 +433,19 @@ int main(int argc, char **argv)
 				printf("Succeeded in deleting this resource.\n");
 			} else {
 				printf("Failed to delete this resource.\n");
+				ret_value = -3;
+			}
+			ASYN_OPS = FALSE;
+			break;	
+
+		case FAIL_RSC:
+			/* Return value: HA_OK = 1 Or  HA_FAIL = 0 */
+			if (fail_resource(lrmd, rscid_arg_tmp,
+				argc-optind, argv+optind) == 1)
+			{
+				printf("Succeeded in failing the resource.\n");
+			} else {
+				printf("Failed to fail the resource.\n");
 				ret_value = -3;
 			}
 			ASYN_OPS = FALSE;
@@ -759,6 +782,25 @@ add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	}
 
 	return (tmp_ret ? 0 : -1); /* tmp_ret is HA_OK=1 or HA_FAIL=0 */
+}
+
+static int 
+fail_resource(ll_lrm_t * lrmd, char *rsc_id, int optc, char *opts[])
+{
+	int fail_rc = 0;
+	const char * reason = NULL;
+
+	if (optc > 2) {
+		cl_log(LOG_ERR,"Bad usage.");
+		return -2;
+	}
+
+	if (optc >= 1)
+		fail_rc = atoi(opts[0]);
+	if (optc == 2)
+		reason = opts[1];
+
+	return lrmd->lrm_ops->fail_rsc(lrmd, rsc_id, fail_rc, reason);
 }
 
 static int
