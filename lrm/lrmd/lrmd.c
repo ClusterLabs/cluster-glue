@@ -2024,12 +2024,13 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 static int
 prepare_failmsg(struct ha_msg* msg, int fail_rc, const char *fail_reason)
 {
+	call_id++; /* use the next id */
 	if (HA_OK != ha_msg_mod(msg,F_LRM_OP,ASYNC_OP_NAME)
 		|| HA_OK != ha_msg_add(msg,F_LRM_FAIL_REASON,fail_reason)
 		|| HA_OK != ha_msg_mod_int(msg,F_LRM_ASYNCMON_RC,fail_rc)
 		|| HA_OK != ha_msg_mod_int(msg,F_LRM_RC,fail_rc)
 		|| HA_OK != ha_msg_mod_int(msg,F_LRM_OPSTATUS,(int)LRM_OP_DONE)
-		|| HA_OK != ha_msg_mod_int(msg,F_LRM_CALLID,0)
+		|| HA_OK != ha_msg_mod_int(msg,F_LRM_CALLID,call_id)
 		|| HA_OK != ha_msg_mod_int(msg,F_LRM_TIMEOUT,0)
 		|| HA_OK != ha_msg_mod_int(msg,F_LRM_INTERVAL,0)
 		|| HA_OK != ha_msg_mod_int(msg,F_LRM_TARGETRC,EVERYTIME)
