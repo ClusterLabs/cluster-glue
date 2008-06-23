@@ -85,8 +85,12 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 	,	&interfprivate); 
 }
 
+#define REBOOT_COMMAND "nohup sh -c 'sleep 2; " REBOOT " " REBOOT_OPTIONS " </dev/null >/dev/null 2>&1' &"
+#define POWEROFF_COMMAND "nohup sh -c 'sleep 2; " POWEROFF_CMD " " POWEROFF_OPTIONS " </dev/null >/dev/null 2>&1' &"
+/*
 #define REBOOT_COMMAND "echo 'sleep 2; "  REBOOT " " REBOOT_OPTIONS "' | SHELL=/bin/sh at now >/dev/null 2>&1"
 #define POWEROFF_COMMAND "echo 'sleep 2; "  POWEROFF_CMD " " POWEROFF_OPTIONS "' | SHELL=/bin/sh at now >/dev/null 2>&1"
+*/
 
 /*
  *    Suicide STONITH device
