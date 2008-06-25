@@ -170,7 +170,7 @@ typedef enum {
 /* defaults for the asynchronous resource failures */
 enum { DEFAULT_FAIL_RC = EXECRA_UNKNOWN_ERROR };
 #define DEFAULT_FAIL_REASON "asynchronous monitor error"
-#define ASYNC_OP_NAME "monitor"
+#define ASYNC_OP_NAME "asyncmon"
 
 struct rsc_ops
 {
