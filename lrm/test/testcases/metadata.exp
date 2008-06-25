@@ -1,0 +1,38 @@
+.SETENV LANG=POSIX
+.EXTCHECK sort
+.TRY List classes
+There are 4 RA classes supported:
+heartbeat
+lsb
+ocf
+stonith
+.EXTCHECK ra-list.sh
+.TRY List types class=ocf
+Cool. RA list passed.
+.EXTCHECK ra-list.sh
+.TRY List types class=lsb
+Cool. RA list passed.
+.EXTCHECK ra-list.sh
+.TRY List types class=heartbeat
+Cool. RA list passed.
+.EXTCHECK ra-list.sh
+.TRY List types class=stonith
+Cool. RA list passed.
+.EXTCHECK xmllint.sh many
+.TRY Meta-data class=ocf
+.EXTCHECK xmllint.sh many
+.TRY Meta-data class=lsb
+.EXTCHECK xmllint.sh many
+.TRY Meta-data class=heartbeat
+.EXTCHECK xmllint.sh many
+.TRY Meta-data class=stonith
+.EXTCHECK xmllint.sh
+.TRY Show meta-data class=ocf type=Dummy provider=heartbeat
+.EXTCHECK xmllint.sh
+.TRY Show meta-data class=lsb type=heartbeat provider=heartbeat
+.EXTCHECK xmllint.sh
+.TRY Show meta-data class=heartbeat type=Dummy provider=heartbeat
+.EXTCHECK xmllint.sh
+.TRY Show meta-data class=stonith type=ssh provider=heartbeat
+.TRY Show provider class=ocf type=Dummy
+heartbeat
