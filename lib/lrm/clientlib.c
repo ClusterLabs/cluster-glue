@@ -1488,6 +1488,10 @@ execra_code2string(uniform_ret_execra_t code)
 		case EXECRA_NOT_RUNNING:
 			return "not running";
 		/* For status command only */
+		case EXECRA_RUNNING_MASTER:
+			return "master";
+		case EXECRA_FAILED_MASTER:
+			return "master (failed)";
 		case EXECRA_RA_DEAMON_DEAD1:
 			return "status: deamon dead";
 		case EXECRA_RA_DEAMON_DEAD2:
