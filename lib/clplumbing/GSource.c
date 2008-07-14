@@ -989,10 +989,10 @@ G_main_del_SignalHandler(GSIGSource* sig_src)
 	
 	CL_SIGNAL(sig_src->signal, NULL);
 
-	sig_src->gsourceid = 0;
 	sig_src->signal_triggered = FALSE;
 	g_source_remove(sig_src->gsourceid);
 	G_main_signal_list[sig_src->signal] = NULL;
+	sig_src->gsourceid = 0;
 	g_source_unref(source);
 	
 	return TRUE;
