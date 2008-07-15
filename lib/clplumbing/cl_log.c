@@ -103,6 +103,18 @@ IPC_Channel* get_log_chan(void){
 }
 /*************************/
 
+/**************************
+ * check if the fd is in use for logging
+ **************************/
+int
+cl_log_is_logd_fd(int fd)
+{
+	return logging_daemon_chan && (
+		fd == logging_daemon_chan->ops->get_send_select_fd(logging_daemon_chan)
+		||
+		fd == logging_daemon_chan->ops->get_recv_select_fd(logging_daemon_chan)
+		);
+}
 
 void
 cl_log_enable_stderr(int truefalse)
