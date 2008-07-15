@@ -3139,7 +3139,8 @@ perform_ra_op(lrmd_op_t* op)
 			}
 			/* close all descriptors except stdin/out/err */
 			for (fd = getdtablesize(); fd > STDERR_FILENO; fd--) {
-				close(fd);
+				if (!cl_log_is_logd_fd(fd))
+					close(fd);
 			}
 			
 			/*should we use logging daemon or not in script*/
