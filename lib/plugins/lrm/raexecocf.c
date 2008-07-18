@@ -171,6 +171,7 @@ execra(const char * rsc_id, const char * rsc_type, const char * provider,
 		g_string_free(params_gstring, TRUE);
 	}
 
+	closefiles(); /* don't leak open files */
 	/* execute the RA */
 	execl(ra_pathname, ra_pathname, op_type, (const char *)NULL);
 	cl_perror("(%s:%s:%d) execl failed for %s" 

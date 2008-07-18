@@ -137,3 +137,15 @@ get_runnable_list(const char* class_path, GList ** rsc_info)
 	}
 	return g_list_length(*rsc_info);
 }
+
+void
+closefiles(void)
+{
+	int fd;
+
+	/* close all descriptors except stdin/out/err and channels to logd */
+	for (fd = getdtablesize(); fd > STDERR_FILENO; fd--) {
+		if (!cl_log_is_logd_fd(fd))
+			close(fd);
+	}
+}

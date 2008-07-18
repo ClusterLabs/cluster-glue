@@ -242,6 +242,7 @@ execra( const char * rsc_id, const char * rsc_type, const char * provider,
 		g_string_free(debug_info, TRUE);
 	} 
 
+	closefiles(); /* don't leak open files */
 	execv(ra_pathname, params_argv);
 	cl_perror("(%s:%s:%d) execv failed for %s"
 		  , __FILE__, __FUNCTION__, __LINE__, ra_pathname);
