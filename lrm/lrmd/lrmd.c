@@ -3013,7 +3013,6 @@ perform_ra_op(lrmd_op_t* op)
         GHashTable* op_params = NULL;
 	lrmd_rsc_t* rsc = NULL;
 	ra_pipe_op_t * rapop;
-	int fd;
 
 	LRMAUDIT();
 	CHECK_ALLOCATED(op, "op", HA_FAIL);
@@ -3136,11 +3135,6 @@ perform_ra_op(lrmd_op_t* op)
 				lrmd_log(LOG_ERR,"%s::%d: can't find RAExec for class %s"
 				, __FUNCTION__, __LINE__, rsc->class);
 				exit(EXECRA_EXEC_UNKNOWN_ERROR);
-			}
-			/* close all descriptors except stdin/out/err */
-			for (fd = getdtablesize(); fd > STDERR_FILENO; fd--) {
-				if (!cl_log_is_logd_fd(fd))
-					close(fd);
 			}
 			
 			/*should we use logging daemon or not in script*/
