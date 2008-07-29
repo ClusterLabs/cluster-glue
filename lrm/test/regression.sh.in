@@ -17,6 +17,16 @@
  # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  #
 
+OCF_ROOT=@OCF_ROOT_DIR@
+export OCF_ROOT
+if [ -z "$OCF_ROOT" ]; then
+	[ -d /usr/lib/ocf ] && OCF_ROOT=/usr/lib/ocf
+fi
+if [ ! -d "$OCF_ROOT" ]; then
+	echo "OCF_ROOT environment variable not set"
+	exit 2
+fi
+
 TESTDIR=${TESTDIR:-testcases}
 DFLT_TESTSET=basicset
 OUTDIR=${OUTDIR:-output}
@@ -69,14 +79,6 @@ if [ ! -d "$TESTDIR" ]; then
 	usage
 fi
 
-export OCF_ROOT
-if [ -z "$OCF_ROOT" ]; then
-	[ -d /usr/lib/ocf ] && OCF_ROOT=/usr/lib/ocf
-fi
-if [ ! -d "$OCF_ROOT" ]; then
-	echo "OCF_ROOT environment variable not set"
-	exit 2
-fi
 which xmllint >/dev/null 2>&1 || {
 	echo "WARNING: xmllint not available, some of the tests may fail"
 }

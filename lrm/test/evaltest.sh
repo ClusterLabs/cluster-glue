@@ -19,6 +19,7 @@
 
 : ${TESTDIR:=testcases}
 : ${LRMADMIN:=../admin/lrmadmin}
+: ${OCF_ROOT:=/usr/lib/ocf}
 
 . ./defaults
 . ./lrmadmin-interface
