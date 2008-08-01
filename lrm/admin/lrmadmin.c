@@ -41,6 +41,7 @@
 #endif /* HAVE_GETOPT_H */
 #include <clplumbing/cl_log.h>
 #include <lrm/lrm_api.h>
+#include <lrm/lrm_msg.h>
 #include <lrm/raexec.h>
 #include <clplumbing/lsb_exitcodes.h>
 #include <clplumbing/GSource.h>
@@ -827,11 +828,11 @@ GHashTable ** params_ht)
 				goto error_return; /* Have to */
 			}
 
-			len_tmp = strnlen(delimit+1, 80) + 1;
+			len_tmp = strnlen(delimit+1, MAX_PARAM_LEN) + 1;
 			value = g_new(gchar, len_tmp);
 			strncpy(value, delimit+1, len_tmp);
 
-			len_tmp = strnlen(argv[i], 80) - strnlen(delimit, 80);
+			len_tmp = strnlen(argv[i], MAX_PARAM_LEN) - strnlen(delimit, MAX_PARAM_LEN);
 			key = g_new(gchar, len_tmp+1);
 			key[len_tmp] = '\0';
 			strncpy(key, argv[i], len_tmp);
