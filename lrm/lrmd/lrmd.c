@@ -2051,8 +2051,8 @@ async_notify(gpointer key, gpointer val, gpointer data)
 
 	client = lookup_client_by_name((char *)key);
 	if (!client) {
-		lrmd_log(LOG_ERR,
-			"%s: strange, client %s not found", __FUNCTION__, (char *)key);
+		lrmd_log(LOG_INFO,
+			"%s: client %s not found, probably signed out", __FUNCTION__, (char *)key);
 		return;
 	}
 	if (HA_OK != ha_msg_mod(msg,F_LRM_APP,client->app_name)) {
