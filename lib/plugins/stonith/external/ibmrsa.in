@@ -28,8 +28,8 @@
 #echo "started with: $@" | debug
 
 . @HA_HBCONF_DIR@/shellfuncs
-outf=`maketempfile`
-trap "cat $outf >&2; rm -f $outf" EXIT
+trap 'if [ -n "$outf" ]; then cat "$outf" >&2; rmtempfile "$outf"; fi' 0
+outf=`maketempfile` || exit 1
 
 chkmpcli() {
 	test -x /opt/IBMmpcli/bin/MPCLI.sh

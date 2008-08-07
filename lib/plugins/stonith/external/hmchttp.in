@@ -28,9 +28,8 @@
 #set -x
 hostlist=`echo $hostlist | tr ',' ' '`
 
-COOKIEFILE=`maketempfile`
-#trap "cat $COOKIEFILE >&2; rm -f $COOKIEFILE" EXIT
-trap "rm -f $COOKIEFILE" EXIT
+trap '[ ! -e "$COOKIEFILE" ] || rmtempfile "$COOKIEFILE"' 0
+COOKIEFILE=`maketempfile` || exit 1
 
 : ${CURLBIN="/usr/bin/curl"}
 : ${user=admin}
