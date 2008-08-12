@@ -136,6 +136,9 @@ struct pluginDevice {
 	SaHpiSensorNumT		ohsensnum;	/* sensor number */
 };
 
+static int open_hpi_session(struct pluginDevice *dev);
+static void close_hpi_session(struct pluginDevice *dev);
+
 static const char *pluginid = "BladeCenterDevice-Stonith";
 static const char *NOTpluginID = "IBM BladeCenter device has been destroyed";
 
@@ -198,6 +201,7 @@ bladehpi_status(StonithPlugin *s)
 	struct pluginDevice *	dev;
 	SaErrorT		ohrc;
 	SaHpiDomainInfoT 	ohdi;
+	int rc = S_OK;
 	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
@@ -206,20 +210,25 @@ bladehpi_status(StonithPlugin *s)
 	ERRIFWRONGDEV(s, S_OOPS);
 
 	dev = (struct pluginDevice *)s;
-	
+	rc = open_hpi_session(dev);
+	if( rc != S_OK )
+		return rc;
+
 	/* Refresh the hostlist only if RPTs updated */
 	ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi);
 	if (ohrc != SA_OK) {
 		LOG(PIL_CRIT, "Unable to get domain info in %s (%d)"
 		,	__FUNCTION__, ohrc);
-		return S_BADCONFIG;
+		rc = S_BADCONFIG;
+		goto done;
 	}
 	if (dev->ohrptcnt != ohdi.RptUpdateCount) {
 		free_bladehpi_hostlist(dev);
 		if (get_bladehpi_hostlist(dev) != S_OK) {
 			LOG(PIL_CRIT, "Unable to obtain list of hosts in %s"
 			,	__FUNCTION__);
-			return S_BADCONFIG;
+			rc = S_BADCONFIG;
+			goto done;
 		}
 	}
 
@@ -236,11 +245,14 @@ bladehpi_status(StonithPlugin *s)
 		if (ohrc == SA_ERR_HPI_BUSY || ohrc == SA_ERR_HPI_NO_RESPONSE) {
 			LOG(PIL_CRIT, "Unable to connect to BladeCenter in %s"
 			,	__FUNCTION__);
-			return S_OOPS;
+			rc = S_OOPS;
+			goto done;
 		}
 	}
 
-	return dev->ohdevid ? S_OK : S_OOPS;
+done:
+	close_hpi_session(dev);
+	return (rc == S_OK) ? (dev->ohdevid ? S_OK : S_OOPS) : rc;
 }
 
 
@@ -257,6 +269,7 @@ bladehpi_hostlist(StonithPlugin *s)
 	GList *			node = NULL;
 	SaErrorT		ohrc;
 	SaHpiDomainInfoT 	ohdi;
+	int rc = S_OK;
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
@@ -265,20 +278,23 @@ bladehpi_hostlist(StonithPlugin *s)
 	ERRIFWRONGDEV(s, NULL);
 
 	dev = (struct pluginDevice *)s;
+	rc = open_hpi_session(dev);
+	if( rc != S_OK )
+		return NULL;
 
 	/* Refresh the hostlist only if RPTs updated */
 	ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi);
 	if (ohrc != SA_OK) {
 		LOG(PIL_CRIT, "Unable to get domain info in %s (%d)"
 		,	__FUNCTION__, ohrc);
-		return NULL;
+		goto done;
 	}
 	if (dev->ohrptcnt != ohdi.RptUpdateCount) {
 		free_bladehpi_hostlist(dev);
 		if (get_bladehpi_hostlist(dev) != S_OK) {
 			LOG(PIL_CRIT, "Unable to obtain list of hosts in %s"
 			,	__FUNCTION__);
-			return NULL;
+			goto done;
 		}
 	}
 
@@ -287,13 +303,13 @@ bladehpi_hostlist(StonithPlugin *s)
 	if (numnames < 0) {
 		LOG(PIL_CRIT, "Unconfigured stonith object in %s"
 		,	__FUNCTION__);
-		return NULL;
+		goto done;
 	}
 
 	ret = (char **)MALLOC((numnames+1) * sizeof(char *));
 	if (ret == NULL) {
 		LOG(PIL_CRIT, "Out of memory for malloc in %s", __FUNCTION__);
-		return ret;
+		goto done;
 	}
 
 	memset(ret, 0, (numnames+1) * sizeof(char *));
@@ -305,11 +321,14 @@ bladehpi_hostlist(StonithPlugin *s)
 			LOG(PIL_CRIT, "Out of memory for strdup in %s"
 			,	__FUNCTION__);
 			stonith_free_hostlist(ret);
-			return NULL;
+			ret = NULL;
+			goto done;
 		}
 		g_strdown(ret[j]);
 	}
 
+done:
+	close_hpi_session(dev);
 	return ret;
 }
 
@@ -338,7 +357,9 @@ bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 	struct pluginDevice *	dev = NULL;
 	struct blade_info *	bi = NULL;
 	SaHpiPowerStateT	ohcurstate, ohnewstate;
+	SaHpiDomainInfoT 	ohdi;
 	SaErrorT		ohrc;
+	int rc = S_OK;
 	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called, request=%d, host=%s"
@@ -349,10 +370,31 @@ bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 	
 	if (host == NULL) {
 		LOG(PIL_CRIT, "Invalid host argument to %s", __FUNCTION__);
-		return S_OOPS;
+		rc = S_OOPS;
+		goto done;
 	}
 
 	dev = (struct pluginDevice *)s;
+	rc = open_hpi_session(dev);
+	if( rc != S_OK )
+		return rc;
+
+	ohrc = saHpiDomainInfoGet(dev->ohsession, &ohdi);
+	if (ohrc != SA_OK) {
+		LOG(PIL_CRIT, "Unable to get domain info in %s (%d)"
+		,	__FUNCTION__, ohrc);
+		rc = S_BADCONFIG;
+		goto done;
+	}
+	if (dev->ohrptcnt != ohdi.RptUpdateCount) {
+		free_bladehpi_hostlist(dev);
+		if (get_bladehpi_hostlist(dev) != S_OK) {
+			LOG(PIL_CRIT, "Unable to obtain list of hosts in %s"
+			,	__FUNCTION__);
+			rc = S_OOPS;
+			goto done;
+		}
+	}
 
 	for (node = g_list_first(dev->hostlist)
 	;	node != NULL
@@ -371,14 +413,16 @@ bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 		LOG(PIL_CRIT
 		,	"Host %s is not configured in this STONITH module, "
 			"please check your configuration information", host);
-		return S_OOPS;
+		rc = S_OOPS;
+		goto done;
 	}
 
 	/* Make sure host has proper capabilities for get */
 	if (!(bi->resourceCaps & SAHPI_CAPABILITY_POWER)) {
 		LOG(PIL_CRIT
 		,	"Host %s does not have power capability", host);
-		return S_OOPS;
+		rc = S_OOPS;
+		goto done;
 	}
 
 	ohrc = saHpiResourcePowerStateGet(dev->ohsession, bi->resourceId
@@ -386,14 +430,15 @@ bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 	if (ohrc != SA_OK) {
 		LOG(PIL_CRIT, "Unable to get host %s power state (%d)"
 		,	host, ohrc);
-		return S_OOPS;
+		rc = S_OOPS;
+		goto done;
 	}
 
 	switch (request) {
 		case ST_POWERON:
 			if (ohcurstate == SAHPI_POWER_ON) {
 				LOG(PIL_INFO, "Host %s already on", host);
-				return S_OK;
+				goto done;
 			}
 			ohnewstate = SAHPI_POWER_ON;
 
@@ -402,7 +447,7 @@ bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 		case ST_POWEROFF:
 			if (ohcurstate == SAHPI_POWER_OFF) {
 				LOG(PIL_INFO, "Host %s already off", host);
-				return S_OK;
+				goto done;
 			}
 			ohnewstate = SAHPI_POWER_OFF;
 	
@@ -420,7 +465,8 @@ bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 		default:
 			LOG(PIL_CRIT, "Invalid request argument to %s"
 			,	__FUNCTION__);
-			return S_INVAL;
+			rc = S_INVAL;
+			goto done;
 	}
 
 	if (!dev->softreset && (ohnewstate == SAHPI_POWER_CYCLE)) {
@@ -431,7 +477,8 @@ bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 		if (ohrc != SA_OK) {
 			LOG(PIL_CRIT, "Unable to set host %s power state to"
 				" OFF (%d)", host, ohrc);
-			return S_OOPS;
+			rc = S_OOPS;
+			goto done;
 		}
 
 		/* 
@@ -458,7 +505,8 @@ bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 		if (ohrc != SA_OK) {
 			LOG(PIL_CRIT, "Unable to set host %s power state to"
 			" ON (%d)", host, ohrc);
-			return S_OOPS;
+			rc = S_OOPS;
+			goto done;
 		}
 	} else {
 		/* Make sure host has proper capabilities to reset */
@@ -467,14 +515,16 @@ bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 			LOG(PIL_CRIT
 			,	"Host %s does not have reset capability"
 			,	host);
-			return S_OOPS;
+			rc = S_OOPS;
+			goto done;
 		}
 
 		if ((ohrc = saHpiResourcePowerStateSet(dev->ohsession
 				, bi->resourceId, ohnewstate)) != SA_OK) {
 			LOG(PIL_CRIT, "Unable to set host %s power state (%d)"
 			,	host, ohrc);
-			return S_OOPS;
+			rc = S_OOPS;
+			goto done;
 		}
 	}
 
@@ -500,7 +550,9 @@ bladehpi_reset_req(StonithPlugin *s, int request, const char *host)
 
 	LOG(PIL_INFO, "Host %s %s %d.", host, __FUNCTION__, request);
 
-	return S_OK;
+done:
+	close_hpi_session(dev);
+	return rc;
 }
 
 
@@ -518,7 +570,6 @@ bladehpi_set_config(StonithPlugin *s, StonithNVpair *list)
 	,	{NULL,		NULL}
 	};
 	int			rc, i;
-	SaErrorT		ohrc;
 	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called", __FUNCTION__);
@@ -609,6 +660,13 @@ bladehpi_set_config(StonithPlugin *s, StonithNVpair *list)
 		,	dev->ohver, SAHPI_INTERFACE_VERSION);
 		return S_BADCONFIG;
 	}
+	return S_OK;
+}
+
+static int
+open_hpi_session(struct pluginDevice *dev)
+{
+	SaErrorT		ohrc;
 
 	ohrc = saHpiSessionOpen(SAHPI_UNSPECIFIED_DOMAIN_ID
 				    , &dev->ohsession, NULL);
@@ -623,15 +681,16 @@ bladehpi_set_config(StonithPlugin *s, StonithNVpair *list)
 		return S_BADCONFIG;
 	}
 
-	if (get_bladehpi_hostlist(dev) != S_OK) {
-		LOG(PIL_CRIT, "Unable to obtain list of hosts in %s"
-		,	__FUNCTION__);
-		return S_BADCONFIG;
-	}
-
 	return S_OK;
 }
-
+static void
+close_hpi_session(struct pluginDevice *dev)
+{
+	if (dev && dev->ohsession) {
+		saHpiSessionClose(dev->ohsession);
+		dev->ohsession = 0;
+	}
+}
 
 static const char *
 bladehpi_getinfo(StonithPlugin *s, int reqtype)
