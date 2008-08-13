@@ -25,11 +25,11 @@
 #include <signal.h>
 #include <sys/signal.h>
 
-static int
+int
 stonith_signal_set_simple_handler(int sig, void (*handler)(int)
 ,		struct sigaction *oldact);
 
-static int
+int
 stonith_signal_set_simple_handler(int sig, void (*handler)(int)
 ,		struct sigaction *oldact)
 {
