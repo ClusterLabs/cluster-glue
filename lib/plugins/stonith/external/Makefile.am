@@ -20,7 +20,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
 EXTRA_DIST           = ibmrsa-telnet ipmi rackpdu vmware xen0 \
-			xen0-dom0-stonith-helper
+			xen0-ha-dom0-stonith-helper
 
 extdir		     = $(stonith_ext_plugindir)
 
