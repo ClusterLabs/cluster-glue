@@ -177,14 +177,23 @@ execra(const char * rsc_id, const char * rsc_type, const char * provider,
 	cl_perror("(%s:%s:%d) execl failed for %s" 
 		  , __FILE__, __FUNCTION__, __LINE__, ra_pathname);
 
-	switch (errno) {
-		case ENOENT:   /* No such file or directory */
-		case EISDIR:   /* Is a directory */
-			exit_value = EXECRA_NOT_INSTALLED;
+	switch (errno) { /* see execve(2) */
+		case E2BIG:   /* env to large */
+		case EACCES:   /* permission denied (various errors) */
+		case EFAULT:  /* address space issue */
+		case EINVAL:  /* bad format */
+		case EMFILE:  /* too many files open */
+		case EIO:  /* I/O error */
+		case ELOOP:  /* Too  many  symbolic links */
+		case ENAMETOOLONG:  /* */
+		case ENOMEM:  /* */
+		case EPERM:  /* */
+			exit_value = EXECRA_EXEC_UNKNOWN_ERROR;
 			break;
 
 		default:
-			exit_value = EXECRA_EXEC_UNKNOWN_ERROR;
+			exit_value = EXECRA_NOT_INSTALLED;
+			break;
 	}
 
 	exit(exit_value);
