@@ -1,0 +1,6 @@
+Makefile
+Makefile.in
+.*.swp
+*.beam
+parser-messages
+MISC_ERRORS

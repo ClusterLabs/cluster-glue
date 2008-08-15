@@ -1,0 +1,47 @@
+list
+# ocf
+%setenv dflt_rsc=rscexec_rsc_r1
+add rsc=rscexec_rsc_r1 args="delay=0"
+list
+exec operation=start
+state
+exec operation=monitor
+exec operation=start
+exec operation=monitor
+exec operation=stop
+state
+exec operation=monitor
+exec operation=stop
+exec operation=monitor
+exec operation=meta-data
+del
+# heartbeat
+%setenv dflt_class=heartbeat dftl_rsc=rscexec_rsc_r1-heartbeat
+add args=0
+exec operation=start
+state
+exec operation=monitor
+exec operation=start
+exec operation=monitor
+exec operation=stop
+state
+exec operation=monitor
+exec operation=stop
+exec operation=monitor
+exec operation=meta-data
+del
+# lsb
+%setenv dflt_class=lsb dftl_rsc=rscexec_rsc_r1-lsb
+add
+exec operation=start
+state
+exec operation=monitor
+exec operation=start
+exec operation=monitor
+exec operation=stop
+state
+exec operation=monitor
+exec operation=stop
+exec operation=monitor
+exec operation=meta-data
+del
