@@ -21,7 +21,7 @@ DOMU="$2"
 TIMEOUT="$3"
 
 # Make sure the timeout is an integer:
-if [ "$TIMEOUT" -eq 0 ]; then
+if [ "0$TIMEOUT" -eq 0 ]; then
 	TIMEOUT=300
 fi
 
