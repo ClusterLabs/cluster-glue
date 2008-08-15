@@ -61,8 +61,7 @@ reset)	SetTargetRole stopped || exit 1
 	SetTargetRole started
 	exit $?
 	;;
-status) crm_resource -r $DOMU -x >/dev/null 2>&1
-	exit $?
+status) exit 0
 	;;
 *)	logger "$0: Called with unknown command: $CMD"
    	exit 1
