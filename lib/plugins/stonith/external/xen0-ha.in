@@ -9,7 +9,7 @@
 #
 
 SSH_COMMAND="@SSH@ -q -x -n"
-HVM_HELPER="@stonith_plugindir@/xen-dom0-stonith-helper"
+HVM_HELPER="@stonith_plugindir@/xen0-ha-dom0-stonith-helper"
 
 # Rewrite the hostlist to accept "," as a delimeter for hostnames too.
 hostlist=`echo $hostlist | tr ',' ' '`
