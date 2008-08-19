@@ -50,7 +50,6 @@ include_HEADERS	=	\
 	realtime.h	\
 	replytrack.h	\
 	setproctitle.h	\
-	recoverymgr_cs.h\
 	timers.h	\
 	uids.h		\
 	cl_misc.h	\
