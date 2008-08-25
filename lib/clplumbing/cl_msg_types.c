@@ -31,7 +31,6 @@
 #include <sys/utsname.h>
 #include <ha_msg.h>
 #include <unistd.h>
-#include <clplumbing/cl_malloc.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/ipc.h>
 #include <clplumbing/base64.h>
@@ -293,7 +292,7 @@ string_list_unpack(const char* packed_str_list, size_t length)
 		
 		psl++;
 		
-		buf = cl_malloc(len + 1);
+		buf = malloc(len + 1);
 		if (buf == NULL){
 			cl_log(LOG_ERR, "unpack_string_list:"
 			       "unable to allocate buf");
@@ -324,7 +323,7 @@ static void
 string_memfree(void* value)
 {
 	if (value){
-		cl_free(value);
+		free(value);
 	}else {
 		cl_log(LOG_ERR, "string_memfree: "
 		       "value is NULL");
@@ -387,10 +386,10 @@ binary_dup(const void* value, size_t len)
 		return NULL;
 	}
 	
-	dupvalue = cl_malloc(len + 1);
+	dupvalue = malloc(len + 1);
 	if (dupvalue == NULL){
 		cl_log(LOG_ERR, "binary_dup:"
-		       "cl_malloc failed");
+		       "malloc failed");
 		return NULL;
 	}
 	
@@ -454,7 +453,7 @@ list_copy(const GList* _list)
 		}
 
 		len = strlen(element);
-		dup_element= cl_malloc(len + 1);
+		dup_element= malloc(len + 1);
 		if ( dup_element == NULL){
 			cl_log(LOG_ERR, "duplicate element failed");
 			continue;
@@ -1246,7 +1245,7 @@ string2binary(void* value, size_t len, int depth, void** nv, size_t* nlen)
 	int	buf_malloced = 0;
 	int	ret = HA_FAIL;
 	if (len > MAXLINE){
-		buf = cl_malloc(len);
+		buf = malloc(len);
 		if (buf == NULL){
 			cl_log(LOG_ERR, "%s: malloc failed",
 			       __FUNCTION__);
@@ -1277,7 +1276,7 @@ string2binary(void* value, size_t len, int depth, void** nv, size_t* nlen)
 	ret = HA_OK;
  out:
 	if (buf_malloced && buf){
-		cl_free(buf);
+		free(buf);
 	}
 	return ret;
 }
@@ -1307,7 +1306,7 @@ string2struct(void* value, size_t vallen, int depth, void** nv, size_t* nlen)
 		       ": string2msg_ll failed");
 		return(HA_FAIL);
 	}
-	cl_free(value);
+	free(value);
 	*nv = tmpmsg;
 	*nlen = 0;
 	
@@ -1331,7 +1330,7 @@ string2list(void* value, size_t vallen, int depth, void** nv, size_t* nlen)
 		       "unpack_string_list failed: %s", (char*)value);
 		return(HA_FAIL);
 	}
-	cl_free(value);
+	free(value);
 	
 	*nv = (void*)list;
 	*nlen = string_list_pack_length(list);
@@ -1630,7 +1629,7 @@ uncompress2compress(struct ha_msg* msg, int index)
 	size_t	buflen = MAXMSG;
 	int	rc = HA_FAIL;
 
-	buf = cl_malloc(buflen);
+	buf = malloc(buflen);
 	if (!buf) {
 		cl_log(LOG_ERR, "%s: failed to allocate buffer",
 		       __FUNCTION__);
@@ -1653,7 +1652,7 @@ uncompress2compress(struct ha_msg* msg, int index)
 
 err:
 	if (buf) {
-		cl_free(buf);
+		free(buf);
 	}
 
 	return rc;
@@ -1667,7 +1666,7 @@ compress2uncompress(struct ha_msg* msg, int index)
 	struct ha_msg*  msgfield;
 	int 		err = HA_FAIL;
 
-	buf = cl_malloc(buflen);
+	buf = malloc(buflen);
 	
 	if (!buf) {
 		cl_log(LOG_ERR, "%s: allocating buffer for uncompression failed",
@@ -1694,7 +1693,7 @@ compress2uncompress(struct ha_msg* msg, int index)
 
 out:
 	if (buf) {
-		cl_free(buf);
+		free(buf);
 	}
 
 	return err;

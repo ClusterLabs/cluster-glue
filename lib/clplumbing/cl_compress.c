@@ -65,7 +65,6 @@
 #include <compress.h>
 #include <ha_msg.h>
 #include <clplumbing/netstring.h>
-#include <clplumbing/cl_malloc.h>
 #include <pils/plugin.h>
 #include <pils/generic.h>
 #include <stonith/stonith.h>
@@ -206,7 +205,7 @@ cl_compressmsg(struct ha_msg* m, size_t* len)
 
 	destlen = MAXMSG;
 
-	dest = cl_malloc(destlen);
+	dest = malloc(destlen);
 	if (!dest) {
 		cl_log(LOG_ERR, "%s: failed to allocate destination buffer",
 		       __FUNCTION__);
@@ -243,7 +242,7 @@ cl_compressmsg(struct ha_msg* m, size_t* len)
 		goto out;
 	}
 	
-	cl_free(src);
+	free(src);
 
 	tmpmsg =ha_msg_new(0);
 	rc = ha_msg_addbin(tmpmsg, COMPRESSED_FIELD, dest, destlen)/*discouraged function*/;
@@ -276,7 +275,7 @@ cl_compressmsg(struct ha_msg* m, size_t* len)
 
 out:
 	if (dest) {
-		cl_free(dest);
+		free(dest);
 	}
 	
 	return ret;
@@ -312,7 +311,7 @@ cl_decompressmsg(struct ha_msg* m)
 	const char* decompress_name;
 	struct hb_compress_fns* funcs = NULL;
 
-	dest = cl_malloc(destlen);
+	dest = malloc(destlen);
 	
 	if (!dest) {
 		cl_log(LOG_ERR, "%s: Failed to allocate buffer.", __FUNCTION__);
@@ -370,7 +369,7 @@ cl_decompressmsg(struct ha_msg* m)
 
 out:
 	if (dest) {
-		cl_free(dest);
+		free(dest);
 	}
 	
 	return ret;
@@ -485,7 +484,7 @@ cl_compress_field(struct ha_msg* msg, int index, char* buf, size_t* buflen)
 		return HA_FAIL;;
 	}
 	
-	cl_free(src);
+	free(src);
 	src = NULL;
 	
 	return HA_OK;

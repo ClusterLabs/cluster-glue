@@ -38,7 +38,6 @@
 #ifdef HAVE_SYS_PRCTL_H
 #	include <sys/prctl.h>
 #endif
-#include <clplumbing/cl_malloc.h>
 #include <clplumbing/coredumps.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/uids.h>
@@ -57,10 +56,10 @@ cl_set_corerootdir(const char * dir)
 		return -1;
 	}
 	if (coreroot != NULL) {
-		cl_free(coreroot);
+		free(coreroot);
 		coreroot = NULL;
 	}
-	coreroot = cl_strdup(dir);
+	coreroot = strdup(dir);
 	if (coreroot == NULL) {
 		return -1;
 	}

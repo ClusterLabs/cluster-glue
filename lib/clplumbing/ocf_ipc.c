@@ -31,7 +31,6 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <pwd.h>
-#include <clplumbing/cl_malloc.h>
 #include <grp.h>
 
 static int num_pool_allocated = 0;
@@ -172,7 +171,7 @@ ipc_str_to_auth(const char* uidlist, int uidlen, const char* gidlist, int gidlen
 {
 	struct IPC_AUTH* auth;
 	
-	auth = cl_malloc(sizeof(struct IPC_AUTH));
+	auth = malloc(sizeof(struct IPC_AUTH));
 	if (auth == NULL) {
 		cl_log(LOG_ERR, "Out of memory for IPC_AUTH");
 		return NULL;
@@ -213,7 +212,7 @@ ipc_str_to_auth(const char* uidlist, int uidlen, const char* gidlist, int gidlen
 		auth->gid = NULL;		
 	}
 	
-	cl_free(auth);
+	free(auth);
 	auth = NULL;
 	return NULL;
 	
@@ -226,7 +225,7 @@ ipc_set_auth(uid_t * a_uid, gid_t * a_gid, int num_uid, int num_gid)
   int i;
   static int v = 1;
 
-  temp_auth = cl_malloc(sizeof(struct IPC_AUTH));
+  temp_auth = malloc(sizeof(struct IPC_AUTH));
   if (temp_auth == NULL){
 	  cl_log(LOG_ERR, "%s: memory allocation failed",__FUNCTION__);
 	  return NULL;
@@ -261,7 +260,7 @@ ipc_destroy_auth(struct IPC_AUTH *auth)
 		if (auth->gid) {
 			g_hash_table_destroy(auth->gid);
 		}
-		cl_free((void *)auth);
+		free((void *)auth);
 	}
 }
 
@@ -325,7 +324,7 @@ ipc_bufpool_new(int size)
 		return NULL;
 	}
 	
-	pool = (struct ipc_bufpool*)cl_malloc(totalsize+1);
+	pool = (struct ipc_bufpool*)malloc(totalsize+1);
 	if (pool == NULL){
 		cl_log(LOG_ERR, "%s: memory allocation failed", __FUNCTION__);
 		return NULL;
@@ -359,7 +358,7 @@ ipc_bufpool_del(struct ipc_bufpool* pool)
 	}
 	
 	memset(pool, 0, pool->size);
-	cl_free(pool);	
+	free(pool);	
 	num_pool_freed ++ ;
 	return;
 }
@@ -396,7 +395,7 @@ ipc_bufpool_msg_done(struct IPC_MESSAGE * msg) {
 	pool = (struct ipc_bufpool*)msg->msg_private;
 	
 	ipc_bufpool_unref(pool);
-	cl_free(msg);
+	free(msg);
 	
 }
 
@@ -405,7 +404,7 @@ ipc_bufpool_msg_new(void)
 {
 	struct IPC_MESSAGE * temp_msg;
 	
-	temp_msg = cl_malloc(sizeof(struct IPC_MESSAGE));
+	temp_msg = malloc(sizeof(struct IPC_MESSAGE));
 	if (temp_msg == NULL){
 		cl_log(LOG_ERR, "ipc_bufpool_msg_new:"
 		       "allocating new msg failed");

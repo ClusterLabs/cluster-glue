@@ -27,7 +27,6 @@
 #include <errno.h>
 
 #include <clplumbing/cl_log.h>
-#include <clplumbing/cl_malloc.h>
 #include <clplumbing/cl_signal.h>
 #include <clplumbing/GSource_internal.h>
 #include <clplumbing/proctrack.h>
@@ -1806,7 +1805,7 @@ static void
 tempproc_destroy_notify(gpointer userdata)
 {
 	if (userdata != NULL) {
-		cl_free(userdata);
+		free(userdata);
 		userdata = NULL;
 	}
 }
@@ -1824,7 +1823,7 @@ G_main_add_tempproc_trigger(int priority
 	struct tempproc_track* 	p;
 	GTRIGSource*		ret;
 
-	p = (struct tempproc_track *) cl_malloc(sizeof(struct tempproc_track));
+	p = (struct tempproc_track *) malloc(sizeof(struct tempproc_track));
 	if (p == NULL) {
 		return NULL;
 	}
@@ -1841,7 +1840,7 @@ G_main_add_tempproc_trigger(int priority
 	,	TempProcessTrigger, p,	tempproc_destroy_notify);
 
 	if (ret == NULL) {
-		cl_free(p);
+		free(p);
 		p = NULL;
 	}else{
 		p->trigger = ret;

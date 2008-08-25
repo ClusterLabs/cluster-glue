@@ -442,8 +442,8 @@ struct PILPluginImports_s {
 	,	void*	plugin_private);
 
 	void	(*log)	(PILLogLevel priority, const char * fmt, ...);
-	void*	(*alloc)(unsigned long size);
-	void*	(*mrealloc)(void * ptr, unsigned long size);
+	void*	(*alloc)(size_t size);
+	void*	(*mrealloc)(void * ptr, size_t size);
 	void	(*mfree)(void* space);
 	char*	(*mstrdup)(const char *s);
 };
@@ -465,8 +465,8 @@ PILPluginUniv*	NewPILPluginUniv(const char * baseplugindirectory);
 
 /* Change memory allocation functions right after creating universe */
 void PilPluginUnivSetMemalloc(PILPluginUniv*
-,	void*	(*alloc)(unsigned long size)
-,	void*	(*mrealloc)(void *, unsigned long size)
+,	void*	(*alloc)(size_t size)
+,	void*	(*mrealloc)(void *, size_t size)
 ,	void	(*mfree)(void* space)
 ,	char*	(*mstrdup)(const char *s));
 

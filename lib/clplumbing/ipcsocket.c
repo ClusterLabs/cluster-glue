@@ -359,13 +359,13 @@ ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos)
 					cl_log_message(LOG_DEBUG, hamsg);
 					ha_msg_del(hamsg);
 				} else {
-					if (!cl_is_allocated(ipcmsg)) {
+					if (!ipcmsg) {
 						cl_log(LOG_ERR,
 						"IPC msg 0x%lx is unallocated"
 						,	(gulong)ipcmsg);
 						return;
 					}
-					if (!cl_is_allocated(ipcmsg->msg_body)) {
+					if (!ipcmsg->msg_body) {
 						cl_log(LOG_ERR,
 						"IPC msg body 0x%lx is unallocated"
 						,	(gulong)ipcmsg->msg_body);

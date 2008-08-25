@@ -29,7 +29,6 @@
 #include <clplumbing/uids.h>
 #include <glib.h>
 #include <netinet/in.h>
-#include <clplumbing/cl_malloc.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -918,7 +917,7 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	}
 
 
-	ret = (IPC_Message*)cl_malloc(sizeof(IPC_Message));
+	ret = (IPC_Message*)malloc(sizeof(IPC_Message));
 
 	if (ret == NULL) {
 		return ret;
@@ -928,9 +927,9 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	
 	/* Compute msg len: including room for the EOS byte */
 	msglen = sizeof(LogDaemonMsgHdr)+bufstrlen + 1;
-	bodybuf = cl_malloc(msglen + ch->msgpad);
+	bodybuf = malloc(msglen + ch->msgpad);
 	if (bodybuf == NULL) {
-		cl_free(ret);
+		free(ret);
 		return NULL;
 	}
 	
@@ -973,10 +972,10 @@ FreeChildLogIPCMessage(IPC_Message* msg)
 		return;
 	}
 	memset(msg->msg_body, 0, msg->msg_len);
-	cl_free(msg->msg_buf);
+	free(msg->msg_buf);
 	
 	memset(msg, 0, sizeof (*msg));
-	cl_free(msg);
+	free(msg);
 	
 	childlog_ipcmsg_freed ++;
 	
@@ -1002,7 +1001,7 @@ cl_opensyslog(void)
 CircularBuffer_t *
 NewCircularBuffer(const char *name, uint size, gboolean empty_after_dump)
 {
-	CircularBuffer_t *buffer = cl_malloc(sizeof(CircularBuffer_t));
+	CircularBuffer_t *buffer = malloc(sizeof(CircularBuffer_t));
 	if (!buffer) {
 		return buffer;
 	}
@@ -1027,7 +1026,7 @@ LogToCircularBuffer(CircularBuffer_t *buffer, int level, const char *fmt, ...)
 	va_list ap;
 	char buf[MAXLINE];
 	int	nbytes;
-	CircularBufferEntry_t *entry = cl_malloc(sizeof(CircularBufferEntry_t));
+	CircularBufferEntry_t *entry = malloc(sizeof(CircularBufferEntry_t));
 	
 	if (!entry) {
 		return;
@@ -1044,8 +1043,8 @@ LogToCircularBuffer(CircularBuffer_t *buffer, int level, const char *fmt, ...)
 
 	while(buffer->queue->length > buffer->size) {
 		entry = g_queue_pop_head(buffer->queue);
-		cl_free(entry->buf);
-		cl_free(entry);
+		free(entry->buf);
+		free(entry);
 	}
 }
 
@@ -1055,8 +1054,8 @@ EmptyCircularBuffer(CircularBuffer_t *buffer)
 	CircularBufferEntry_t *entry = NULL;
 	while(buffer->queue->length > 0) {
 		entry = g_queue_pop_head(buffer->queue);
-		cl_free(entry->buf);
-		cl_free(entry);
+		free(entry->buf);
+		free(entry);
 	}
 }
 
@@ -1086,8 +1085,8 @@ DumpCircularBuffer(int nsig, gpointer user_data)
 		while(buffer->queue->length > 0) {
 			entry = g_queue_pop_head(buffer->queue);
 			cl_log(entry->level, "%s", entry->buf);
-			cl_free(entry->buf);
-			cl_free(entry);
+			free(entry->buf);
+			free(entry);
 		}
 
 	} else {
@@ -1134,9 +1133,9 @@ cl_log_args(int argc, char **argv)
 			existing_len = strlen(arg_string);
 		}
 
-		arg_string = cl_realloc(arg_string, len + existing_len);
+		arg_string = realloc(arg_string, len + existing_len);
 		sprintf(arg_string + existing_len, "%s ", argv[lpc]);
 	}
 	cl_log(LOG_INFO, "Invoked: %s", arg_string);
-	cl_free(arg_string);
+	free(arg_string);
 }

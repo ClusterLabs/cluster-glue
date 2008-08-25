@@ -68,20 +68,10 @@ extern GHashTable* resources;
 		item,text);
 
 /* NB: this macro contains return */
-#define ret_on_badptr(p,item,text) do { \
-	if( !cl_is_allocated(p) ) { \
+#define ret_on_null(p,item,text) do { \
+	if( !p ) { \
 		ptr_bad(LOG_INFO,p,item,text); \
 		return; \
-	} \
-} while(0)
-#define log_on_badptr(p,item,text) do { \
-	if( !cl_is_allocated(p) ) { \
-		ptr_bad(LOG_INFO,p,item,text); \
-	} \
-} while(0)
-#define log_on_nonnull_badptr(p,item,text) do { \
-	if( p && !cl_is_allocated(p) ) { \
-		ptr_bad(LOG_INFO,p,item,text); \
 	} \
 } while(0)
 #define log_on_null(p,item,text) do { \
@@ -131,12 +121,12 @@ on_client(gpointer key, gpointer value, gpointer user_data)
 {
 	lrmd_client_t * client = (lrmd_client_t*)value;
 
-	ret_on_badptr(client,"","client");
-	log_on_badptr(client->app_name,"","app_name");
+	ret_on_null(client,"","client");
+	log_on_null(client->app_name,"","app_name");
 	log_on_null(client->ch_cmd,client->app_name,"ch_cmd");
-	log_on_nonnull_badptr(client->ch_cbk,client->app_name,"ch_cbk");
+	log_on_null(client->ch_cbk,client->app_name,"ch_cbk");
 	log_on_null(client->g_src,client->app_name,"g_src");
-	log_on_nonnull_badptr(client->g_src_cbk,client->app_name,"g_src_cbk");
+	log_on_null(client->g_src_cbk,client->app_name,"g_src_cbk");
 }
 
 void
@@ -144,14 +134,14 @@ on_resource(gpointer key, gpointer value, gpointer user_data)
 {
 	lrmd_rsc_t* rsc = (lrmd_rsc_t*)value;
 
-	ret_on_badptr(rsc,"","rsc");
-	ret_on_badptr(rsc->id,"","id");
-	log_on_badptr(rsc->type,rsc->id,"type");
-	log_on_badptr(rsc->class,rsc->id,"class");
-	log_on_nonnull_badptr(rsc->provider,rsc->id,"provider");
-	/*log_on_nonnull_badptr(rsc->params,rsc->id,"params");*/
+	ret_on_null(rsc,"","rsc");
+	ret_on_null(rsc->id,"","id");
+	log_on_null(rsc->type,rsc->id,"type");
+	log_on_null(rsc->class,rsc->id,"class");
+	log_on_null(rsc->provider,rsc->id,"provider");
+	/*log_on_null(rsc->params,rsc->id,"params");*/
 	log_on_null(rsc->last_op_table,rsc->id,"last_op_table");
-	log_on_nonnull_badptr(rsc->last_op_done,rsc->id,"last_op_done");
+	log_on_null(rsc->last_op_done,rsc->id,"last_op_done");
 	audit_ops(rsc->op_list,rsc,"op_list");
 	audit_ops(rsc->repeat_op_list,rsc,"repeat_op_list");
 }
@@ -159,14 +149,14 @@ on_resource(gpointer key, gpointer value, gpointer user_data)
 void
 on_op(lrmd_op_t *op, lrmd_rsc_t* rsc, const char *desc)
 {
-	ret_on_badptr(op,rsc->id,desc);
-	log_on_badptr(op->rsc_id,rsc->id,"rsc_id");
+	ret_on_null(op,rsc->id,desc);
+	log_on_null(op->rsc_id,rsc->id,"rsc_id");
 	if( strcmp(op->rsc_id,rsc->id) ) {
 		lrmd_log(LOG_ERR,"LRMAUDIT: rsc %s, op %s "
 			"op->rsc_id does not match rsc->id",
 			rsc->id,small_op_info(op));
 	}
-	log_on_badptr(op->msg,small_op_info(op),"msg");
+	log_on_null(op->msg,small_op_info(op),"msg");
 	if( op->rapop ) {
 		if( op->rapop->lrmd_op != op ) {
 			lrmd_log(LOG_ERR,
@@ -185,12 +175,12 @@ on_op(lrmd_op_t *op, lrmd_rsc_t* rsc, const char *desc)
 void
 on_ra_pipe_op(ra_pipe_op_t *rapop, lrmd_op_t *op, const char *desc)
 {
-	ret_on_badptr(rapop,small_op_info(op),desc);
-	log_on_nonnull_badptr(rapop->ra_stdout_gsource,small_op_info(op),"ra_stdout_gsource");
-	log_on_nonnull_badptr(rapop->ra_stderr_gsource,small_op_info(op),"ra_stderr_gsource");
-	log_on_badptr(rapop->rsc_id,small_op_info(op),"rsc_id");
-	log_on_badptr(rapop->op_type,small_op_info(op),"op_type");
-	log_on_badptr(rapop->rsc_class,small_op_info(op),"rsc_class");
+	ret_on_null(rapop,small_op_info(op),desc);
+	log_on_null(rapop->ra_stdout_gsource,small_op_info(op),"ra_stdout_gsource");
+	log_on_null(rapop->ra_stderr_gsource,small_op_info(op),"ra_stderr_gsource");
+	log_on_null(rapop->rsc_id,small_op_info(op),"rsc_id");
+	log_on_null(rapop->op_type,small_op_info(op),"op_type");
+	log_on_null(rapop->rsc_class,small_op_info(op),"rsc_class");
 	if( strcmp(op->rsc_id,rapop->rsc_id) ) {
 		lrmd_log(LOG_ERR,"LRMAUDIT: %s: rapop->rsc_id "
 			"does not match op_rsc->id",

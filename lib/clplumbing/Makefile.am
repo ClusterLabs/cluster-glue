@@ -38,7 +38,6 @@ libplumb_la_SOURCES	= 		\
 			base64.c	\
 			cl_compress.c	\
 			cl_log.c	\
-			cl_malloc.c	\
 			cl_misc.c 	\
 			cl_msg.c	\
 			cl_msg_types.c  \

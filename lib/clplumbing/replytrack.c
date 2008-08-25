@@ -103,9 +103,9 @@ rt_node_info_new(const char * nodename, cl_uuid_t nodeid)
 	if (!ret) {
 		return ret;
 	}
-	ret->nodename = cl_strdup(nodename);
+	ret->nodename = strdup(nodename);
 	if (!ret->nodename) {
-		cl_free(ret);
+		free(ret);
 		ret = NULL;
 		return ret;
 	}
@@ -118,10 +118,10 @@ rt_node_info_del(struct rt_node_info * ni)
 {
 	if (ni != NULL) {
 		if (ni->nodename != NULL) {
-			cl_free(ni->nodename);
+			free(ni->nodename);
 		}
 		memset(ni, 0, sizeof(*ni));
-		cl_free(ni);
+		free(ni);
 	}
 }
 
@@ -330,7 +330,7 @@ replytrack_new(nodetrack_t *	membership
 		return ret;
 	}
 	if (!copy_hashtables(&membership->nt, &ret->tables)) {
-		cl_free(ret);
+		free(ret);
 		ret = NULL;
 		return ret;
 	}
@@ -369,7 +369,7 @@ replytrack_del(replytrack_t * rl)
 	destroy_map_hashtable(rl->tables.uuidmap);
 	rl->tables.uuidmap=NULL;
 	memset(&rl, 0, sizeof(rl));
-	cl_free(rl);
+	free(rl);
 	rl=NULL;
 }
 
@@ -458,7 +458,7 @@ nodetrack_new(nodetrack_callback_t callback, gpointer user_data)
 	nodetrack_t_count++;
 	ret->refcount = 0;
 	if (!create_new_hashtables(&ret->nt))  {
-		cl_free(ret);
+		free(ret);
 		ret = NULL;
 	}
 	ret->user_data = user_data;
@@ -481,7 +481,7 @@ nodetrack_del(nodetrack_t * np)
 	destroy_map_hashtable(np->nt.uuidmap);
 	np->nt.uuidmap=NULL;
 	memset(np, 0, sizeof(*np));
-	cl_free(np);
+	free(np);
 }
 
 gboolean
@@ -602,7 +602,7 @@ nodetrack_intersection_new(nodetrack_t** tables, int ntables
 	}
 	ret->intersection = nodetrack_new(callback, user_data);
 	if (!ret->intersection)  {
-		cl_free(ret);
+		free(ret);
 		ret = NULL;
 		return ret;
 	}
@@ -631,7 +631,7 @@ nodetrack_intersection_del(nodetrack_intersection_t* p)
 	nodetrack_del(p->intersection);
 	p->intersection = NULL;
 	memset(p, 0, sizeof(*p));
-	cl_free(p);
+	free(p);
 	p = NULL;
 	replytrack_intersection_t_count--;
 }

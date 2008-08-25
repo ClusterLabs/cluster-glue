@@ -23,7 +23,6 @@
 #include <clplumbing/cl_log.h>
 #include <clplumbing/ipc.h>
 #include <clplumbing/GSource.h>
-#include <clplumbing/cl_malloc.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -474,7 +473,7 @@ on_remove_client (gpointer user_data)
 	
 	logd_client_list = g_list_remove(logd_client_list, user_data);
 	if (user_data){
-		cl_free(user_data);
+		free(user_data);
 	}
 	return;
 }
@@ -495,7 +494,7 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 		return TRUE;
 	}
 	/* create new client */
-	if (NULL == (client = cl_malloc(sizeof(ha_logd_client_t)))) {
+	if (NULL == (client = malloc(sizeof(ha_logd_client_t)))) {
 		return FALSE;
 	}
 	memset(client, 0, sizeof(ha_logd_client_t));
@@ -508,7 +507,7 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 					       on_remove_client);
 	if (client->g_src <=0){
 		cl_log(LOG_ERR, "add the client to main loop failed");
-		cl_free(client);
+		free(client);
 		return TRUE;
 	}
 	if (stop_reading){

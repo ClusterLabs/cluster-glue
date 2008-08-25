@@ -31,7 +31,6 @@
 #include <glib.h>
 #include <ha_msg.h>
 #include <clplumbing/netstring.h>
-#include <clplumbing/cl_malloc.h>
 #include <pils/plugin.h>
 #include <pils/generic.h>
 #include <stonith/stonith.h>

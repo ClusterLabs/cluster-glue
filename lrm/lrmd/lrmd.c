@@ -127,24 +127,6 @@ static struct {
 	int	rsccount;
 }lrm_objectstats;
 
-static void
-dump_mem_stats(void)
-{
-#ifndef _CLPLUMBING_CLMALLOC_NATIVE_H
-	volatile cl_mem_stats_t * ms = cl_malloc_getstats();
-	lrmd_debug(LOG_DEBUG
-	,	"MEM STATS: pending alloc %ld, pending size %ld"
-	,	ms->numalloc - ms->numfree
-	,	ms->nbytes_alloc);
-
-	lrmd_debug(LOG_DEBUG
-	,	"STATS: OP Count: %d, Client Count: %d, Resource Count: %d"
-	,	lrm_objectstats.opcount
-	,	lrm_objectstats.clientcount
-	,	lrm_objectstats.rsccount);
-#endif
-}
-
 #define set_fd_opts(fd,opts) do { \
 	int flag; \
 	if ((flag = fcntl(fd, F_GETFL)) >= 0) { \
@@ -169,7 +151,7 @@ ra_pipe_op_new(int child_stdout, int child_stderr, lrmd_op_t * lrmd_op)
 			, __FUNCTION__, __LINE__);
 		return NULL;
 	}
-	rapop = cl_calloc(sizeof(ra_pipe_op_t), 1);
+	rapop = calloc(sizeof(ra_pipe_op_t), 1);
 	if ( rapop == NULL) {
 		lrmd_log(LOG_ERR, "%s:%d out of memory" 
 			, __FUNCTION__, __LINE__);
@@ -208,8 +190,8 @@ ra_pipe_op_new(int child_stdout, int child_stderr, lrmd_op_t * lrmd_op)
 
 	rapop->lrmd_op = lrmd_op;
 
-	rapop->op_type = cl_strdup(ha_msg_value(lrmd_op->msg, F_LRM_OP));
-	rapop->rsc_id = cl_strdup(lrmd_op->rsc_id);
+	rapop->op_type = strdup(ha_msg_value(lrmd_op->msg, F_LRM_OP));
+	rapop->rsc_id = strdup(lrmd_op->rsc_id);
 	rsc = lookup_rsc(lrmd_op->rsc_id);
 	if (rsc == NULL) {
 		lrmd_debug(LOG_WARNING
@@ -217,7 +199,7 @@ ra_pipe_op_new(int child_stdout, int child_stderr, lrmd_op_t * lrmd_op)
 			, __FUNCTION__, __LINE__, lrmd_op->rsc_id);
 		rapop->rsc_class = NULL;
 	} else {
-		rapop->rsc_class = cl_strdup(rsc->class);
+		rapop->rsc_class = strdup(rsc->class);
 	} 
 
 	return rapop;
@@ -254,10 +236,10 @@ ra_pipe_op_destroy(ra_pipe_op_t * rapop)
 	}
 	rapop->first_line_read = FALSE;
 
-	cl_free(rapop->rsc_id);
-	cl_free(rapop->op_type);
+	free(rapop->rsc_id);
+	free(rapop->op_type);
 	rapop->op_type = NULL;
-	cl_free(rapop->rsc_class);
+	free(rapop->rsc_class);
 	rapop->rsc_class = NULL;
 
 	if (rapop->lrmd_op != NULL) {
@@ -265,7 +247,7 @@ ra_pipe_op_destroy(ra_pipe_op_t * rapop)
 		rapop->lrmd_op = NULL;
 	}
 
-	cl_free(rapop);
+	free(rapop);
 }
 
 static void
@@ -283,7 +265,7 @@ lrmd_op_destroy(lrmd_op_t* op)
 	ha_msg_del(op->msg);
 	op->msg = NULL;
 	if( op->rsc_id ) {
-		cl_free(op->rsc_id);
+		free(op->rsc_id);
 		op->rsc_id = NULL;
 	}
 	op->exec_pid = 0;
@@ -299,18 +281,17 @@ lrmd_op_destroy(lrmd_op_t* op)
 
 	lrmd_debug3(LOG_DEBUG, "%s: free the op whose address is %p"
 		  ,__FUNCTION__, op);
-	cl_free(op);
+	free(op);
 }
 
 static lrmd_op_t*
 lrmd_op_new(void)
 {
-	lrmd_op_t* op = (lrmd_op_t*)cl_calloc(sizeof(lrmd_op_t),1);
+	lrmd_op_t* op = (lrmd_op_t*)calloc(sizeof(lrmd_op_t),1);
 
 	if (op == NULL) {
 		lrmd_log(LOG_ERR, "lrmd_op_new(): out of memory when "
-			 "cl_calloc a lrmd_op_t.");
-		dump_mem_stats();
+			 "calloc a lrmd_op_t.");
 		return NULL;
 	}
 	op->rsc_id = NULL;
@@ -351,7 +332,7 @@ lrmd_op_copy(const lrmd_op_t* op)
 	/* Do a "deep" copy of the message structure */
 	ret->rapop = NULL;
 	ret->msg = ha_msg_copy(op->msg);
-	ret->rsc_id = cl_strdup(op->rsc_id);
+	ret->rsc_id = strdup(op->rsc_id);
 	ret->rapop = NULL;
 	ret->first_line_ra_stdout[0] = EOS;
 	ret->repeat_timeout_tag = 0;
@@ -465,21 +446,20 @@ lrmd_client_destroy(lrmd_client_t* client)
 	 */
 	unregister_client(client);
 	if (client->app_name) {
-		cl_free(client->app_name);
+		free(client->app_name);
 		client->app_name = NULL;
 	}
-	cl_free(client);
+	free(client);
 }
 
 static lrmd_client_t*
 lrmd_client_new(void)
 {
 	lrmd_client_t*	client;
-	client = cl_calloc(sizeof(lrmd_client_t), 1);
+	client = calloc(sizeof(lrmd_client_t), 1);
 	if (client == NULL) {
 		lrmd_log(LOG_ERR, "lrmd_client_new(): out of memory when "
-			 "cl_calloc lrmd_client_t.");
-		dump_mem_stats();
+			 "calloc lrmd_client_t.");
 		return NULL;
 	}
 	client->g_src = NULL;
@@ -492,7 +472,7 @@ lrmd_client_dump(gpointer key, gpointer value, gpointer user_data)
 {
 	lrmd_client_t * client = (lrmd_client_t*)value;
 	CHECK_ALLOCATED(client, "client", );
-	if( !cl_is_allocated(client) ) {
+	if(!client) {
 		return;
 	}
 
@@ -568,19 +548,19 @@ lrmd_rsc_destroy(lrmd_rsc_t* rsc)
 	}
 	g_hash_table_remove(resources, rsc->id);
 	if (rsc->id) {
-		cl_free(rsc->id);
+		free(rsc->id);
 		rsc->id = NULL;
 	}
 	if (rsc->type) {
-		cl_free(rsc->type);
+		free(rsc->type);
 		rsc->type = NULL;
 	}
 	if (rsc->class) {
-		cl_free(rsc->class);
+		free(rsc->class);
 		rsc->class = NULL;
 	}
 	if (rsc->provider) {
-		cl_free(rsc->provider);
+		free(rsc->provider);
 		rsc->provider = NULL;
 	}
 	if (NULL != rsc->params) {
@@ -603,7 +583,7 @@ lrmd_rsc_destroy(lrmd_rsc_t* rsc)
 		rsc->delay_timeout = (guint)0;
 	}
 
-	cl_free(rsc);
+	free(rsc);
 	LRMAUDIT();
 }
 
@@ -611,25 +591,24 @@ static lrmd_rsc_t*
 lrmd_rsc_new(const char * id, struct ha_msg* msg)
 {
 	lrmd_rsc_t*	rsc;
-	rsc = (lrmd_rsc_t *)cl_calloc(sizeof(lrmd_rsc_t),1);
+	rsc = (lrmd_rsc_t *)calloc(sizeof(lrmd_rsc_t),1);
 	if (rsc == NULL) {
-		lrmd_log(LOG_ERR, "lrmd_rsc_new(): out of memory when cl_calloc "
+		lrmd_log(LOG_ERR, "lrmd_rsc_new(): out of memory when calloc "
 			 "a lrmd_rsc_t");
-		dump_mem_stats();
 		return NULL;
 	}
 	rsc->delay_timeout = (guint)0;
 	if (id) {
-		rsc->id = cl_strdup(id);
+		rsc->id = strdup(id);
 	}
 	if (msg) {
-		rsc->type = cl_strdup(ha_msg_value(msg, F_LRM_RTYPE));
-		rsc->class = cl_strdup(ha_msg_value(msg, F_LRM_RCLASS));
+		rsc->type = strdup(ha_msg_value(msg, F_LRM_RTYPE));
+		rsc->class = strdup(ha_msg_value(msg, F_LRM_RCLASS));
 		if (NULL == ha_msg_value(msg, F_LRM_RPROVIDER)) {
 			lrmd_log(LOG_NOTICE, "%s(): No %s field in message"
 			, __FUNCTION__, F_LRM_RPROVIDER);
 		}else{
-			rsc->provider = cl_strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
+			rsc->provider = strdup(ha_msg_value(msg, F_LRM_RPROVIDER));
 			if (rsc->provider == NULL) {
 				goto errout;
 			}
@@ -640,7 +619,7 @@ lrmd_rsc_new(const char * id, struct ha_msg* msg)
 			goto errout;
 		}
 	}
-	g_hash_table_insert(resources, cl_strdup(id), rsc);
+	g_hash_table_insert(resources, strdup(id), rsc);
 	++lrm_objectstats.rsccount;
 	return rsc;
 errout:
@@ -664,7 +643,7 @@ lrmd_rsc_dump(char* rsc_id, const char * text)
 		return;
 	}
 	CHECK_ALLOCATED(rsc, "rsc", );
-	if( !cl_is_allocated(rsc) ) {
+	if(!rsc) {
 		return;
 	}
 	/* TODO: Dump params and last_op_table FIXME */
@@ -767,7 +746,6 @@ main(int argc, char ** argv)
 	int argerr = 0;
 	int flag;
 
-	cl_malloc_forced_for_glib();
 	while ((flag = getopt(argc, argv, OPTARGS)) != EOF) {
 		switch(flag) {
 			case 'h':		/* Help message */
@@ -1242,7 +1220,7 @@ init_start ()
 		exit(100);
 	}
 	resources = g_hash_table_new_full(g_str_hash
-	,		g_str_equal, cl_free, NULL);
+	,		g_str_equal, free, NULL);
 	if (resources == NULL) {
 		cl_log(LOG_ERR, "can not new hash table resources");
 		exit(100);
@@ -1276,7 +1254,7 @@ init_start ()
 
 	g_hash_table_destroy(uidlist);
 	if ( NULL != auth ) {
-		cl_free(auth);
+		free(auth);
 	}
 	if (cl_unlock_pidfile(PID_FILE) == 0) {
 		lrmd_debug(LOG_DEBUG, "[%s] stopped", lrm_system_name);
@@ -1600,7 +1578,7 @@ on_msg_register(lrmd_client_t* client, struct ha_msg* msg)
 			"the ha message.");
 		return HA_FAIL;
 	}
-	client->app_name = cl_strdup(app_name);
+	client->app_name = strdup(app_name);
 
 	return_on_no_int_value(msg, F_LRM_PID, &client->pid);
 	return_on_no_int_value(msg, F_LRM_GID, (int *)&client->gid);
@@ -2112,7 +2090,7 @@ static gboolean
 free_str_hash_pair(gpointer key, gpointer value, gpointer user_data)
 {
 	GHashTable* table = (GHashTable*) value;
-	cl_free(key);
+	free(key);
 	g_hash_table_foreach_remove(table, free_str_op_pair, NULL);
 	g_hash_table_destroy(table);
 	return TRUE;
@@ -2187,7 +2165,7 @@ on_msg_add_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	rsc->last_op_done = NULL;
 	rsc->params = ha_msg_value_str_table(msg,F_LRM_PARAM);
 	rsc->last_op_table = g_hash_table_new(g_str_hash, g_str_equal);
-	g_hash_table_insert(resources, cl_strdup(rsc->id), rsc);
+	g_hash_table_insert(resources, strdup(rsc->id), rsc);
  
 	LRMAUDIT();
 	return HA_OK;
@@ -2365,7 +2343,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	op->call_id = call_id;
 	op->client_id = client->pid;
-	op->rsc_id = cl_strdup(rsc->id);
+	op->rsc_id = strdup(rsc->id);
 	op->interval = interval;
 	op->delay = delay;
 
@@ -2557,9 +2535,9 @@ lrm_concat(const char *prefix, const char *suffix, char join)
 	len += safe_len(prefix);
 	len += safe_len(suffix);
 
-	new_str = cl_malloc(sizeof(char)*len);
+	new_str = malloc(sizeof(char)*len);
 	if (NULL == new_str) {
-		lrmd_log(LOG_ERR,"%s:%d: cl_malloc failed"
+		lrmd_log(LOG_ERR,"%s:%d: malloc failed"
 			 , __FUNCTION__, __LINE__);
 		return NULL;
 	}
@@ -2593,9 +2571,9 @@ replace_last_op(lrmd_client_t* client, lrmd_rsc_t* rsc, lrmd_op_t* op)
 	client_last_op = g_hash_table_lookup(rsc->last_op_table, client->app_name);
 	if (!client_last_op) {
 		client_last_op = g_hash_table_new_full(	g_str_hash
-		, 	g_str_equal, cl_free, NULL);
+		, 	g_str_equal, free, NULL);
 		g_hash_table_insert(rsc->last_op_table
-		,	(gpointer)cl_strdup(client->app_name)
+		,	(gpointer)strdup(client->app_name)
 		,	(gpointer)client_last_op);
 	}
 	mk_op_id(op,op_hash_key);
@@ -2683,7 +2661,7 @@ remove_op_history(lrmd_op_t* op)
 			lrmd_op_destroy(rsc->last_op_done);
 			rsc->last_op_done = NULL;
 		}
-		cl_free(last_op_id);
+		free(last_op_id);
 	}
 	if( client &&
 		(client_last_op = g_hash_table_lookup(rsc->last_op_table
@@ -2694,7 +2672,7 @@ remove_op_history(lrmd_op_t* op)
 			lrmd_op_destroy(old_op);
 		}
 	}
-	cl_free(op_id);
+	free(op_id);
 	LRMAUDIT();
 }
 
