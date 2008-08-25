@@ -23,7 +23,6 @@
 #include <clplumbing/cl_log.h>
 #include <clplumbing/ipc.h>
 #include <clplumbing/GSource.h>
-#include <clplumbing/cl_malloc.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>

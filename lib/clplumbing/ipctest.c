@@ -32,7 +32,6 @@
 #include <clplumbing/cl_poll.h>
 #include <clplumbing/GSource.h>
 #include <clplumbing/ipc.h>
-#include <clplumbing/cl_malloc.h>
 
 #define	MAXERRORS	1000
 #define	MAXERRORS_RECV	10
@@ -455,8 +454,6 @@ main(int argc, char ** argv)
 		  procname, iter_def, clients_def);
 		exit(1);
 	}
-
-	cl_malloc_forced_for_glib();
 
 	cl_log_set_entity(procname);
 	cl_log_enable_stderr(TRUE);

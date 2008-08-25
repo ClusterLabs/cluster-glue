@@ -492,8 +492,8 @@ NewPILPluginUniv(const char * basepluginpath)
 /* Change memory allocation functions immediately  after creating universe */
 void
 PilPluginUnivSetMemalloc(PILPluginUniv* u
-,	void*	(*allocfun)(unsigned long size)
-,	void*	(*reallocfun)(void * ptr, unsigned long size)
+,	void*	(*allocfun)(size_t size)
+,	void*	(*reallocfun)(void * ptr, size_t size)
 ,	void	(*freefun)(void* space)
 ,	char*	(*strdupfun)(const char *s))
 {

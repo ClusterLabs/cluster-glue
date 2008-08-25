@@ -224,7 +224,7 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 		return NULL;
 	}
 
-	s = cl_calloc(1, len);
+	s = calloc(1, len);
 	if (!s){
 		cl_log(LOG_ERR, "%s: no memory for netstring", __FUNCTION__);
 		return(NULL);
@@ -234,7 +234,7 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 
 	if (msg2netstring_buf(m, s, len, &payload_len) != HA_OK){
 		cl_log(LOG_ERR, "%s:  msg2netstring_buf() failed", __FUNCTION__);
-		cl_free(s);
+		free(s);
 		return(NULL);
 	}
 	
@@ -247,7 +247,7 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 		if (authnum < 0){
 			cl_log(LOG_WARNING
 			       ,	"Cannot compute message authentication!");
-			cl_free(s);
+			free(s);
 			return(NULL);
 		}
 		
@@ -255,7 +255,7 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 		auth_strlen = strlen(authstring);
 		if (sp  + 2 + auth_strlen + bytes_for_int(auth_strlen)  >= smax){
 			cl_log(LOG_ERR, "%s: out of boundary for auth", __FUNCTION__);
-			cl_free(s);
+			free(s);
 			return NULL;
 		}
 		sp += sprintf(sp, "%ld:%s,", (long)strlen(authstring), authstring);	

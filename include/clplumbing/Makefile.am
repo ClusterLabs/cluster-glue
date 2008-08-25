@@ -30,7 +30,6 @@ include_HEADERS	=	\
 	apphb_cs.h	\
 	base64.h	\
 	cl_log.h	\
-	cl_malloc.h	\
 	cl_poll.h	\
 	cl_signal.h	\
 	cl_pidfile.h	\

@@ -31,13 +31,12 @@
 #define	lrm_str(p)	(lrmd_nullcheck(p))
 
 #define	CHECK_ALLOCATED(thing, name, result)				\
-	if (!cl_is_allocated(thing)) {					\
+	if (!thing) {					\
 		lrmd_log(LOG_ERR					\
 		,	"%s: %s pointer 0x%lx is not allocated."	\
 		,	__FUNCTION__, name, (unsigned long)thing);	\
 		if (!in_alloc_dump) {					\
 			in_alloc_dump = TRUE;				\
-			dump_mem_stats();				\
 			dump_data_for_debug();				\
 			in_alloc_dump = FALSE;				\
 			return result;					\
