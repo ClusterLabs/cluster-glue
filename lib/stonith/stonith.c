@@ -37,6 +37,9 @@
 
 
 #define MALLOC		StonithPIsys->imports->alloc
+#ifdef MALLOCT
+#	undef	MALLOCT
+#endif
 #define MALLOCT(t)	(t*)(MALLOC(sizeof(t)))
 #define REALLOC		StonithPIsys->imports->mrealloc
 #define STRDUP		StonithPIsys->imports->mstrdup
