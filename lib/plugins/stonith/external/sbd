@@ -19,12 +19,10 @@ off|reset)
     exit $?
     ;;
 status)
-    # As long as the daemon is running, all is well.
     if ! pidof sbd >/dev/null 2>&1 ; then
     	exit 7
-    else
-        exit 0
     fi
+    exit 0
     ;;
 on)
     exit 1

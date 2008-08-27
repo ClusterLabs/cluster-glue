@@ -34,37 +34,11 @@
 #include <linux/types.h>
 #include <linux/watchdog.h>
 #include <linux/fs.h>
-#include <arpa/inet.h>
-
-
-/* Sector data types */
-struct sector_header_s {
-	char	magic[8];
-	unsigned char	version;
-	unsigned char	slots;
-	uint32_t	sector_size;
-};
-
-struct sector_mbox_s {
-	signed char	cmd;
-	char		from[64];
-};
-
-struct sector_node_s {
-	/* slots will be created with in_use == 0 */
-	char	in_use;
-	char 	name[64];
-};
+#include "sbd.h"
 
 /* These have to match the values in the header of the partition */
 static char		sbd_magic[8] = "SBD_SBD_";
 static char		sbd_version  = 0x01;
-#define SBD_MSG_EMPTY 0x00
-#define SBD_MSG_TEST  0x01
-#define SBD_MSG_RESET 0x02
-#define SBD_MSG_OFF   0x03
-			
-
 
 /* TODO: These should be tunable. */
 static unsigned long	timeout_watchdog 	= 5;
@@ -74,10 +48,10 @@ static int		timeout_deadtime	= 10;
 
 static int	watchdog_use		= 1;
 static int	go_daemon		= 1;
-char *		watchdogdev 		= "/dev/watchdog";
+const char *	watchdogdev 		= "/dev/watchdog";
 
 /* */
-static unsigned long	sector_size = 0;
+static unsigned long	sector_size	= 0;
 static int	watchdogfd 		= -1;
 static int	devfd;
 static char	*devname;
@@ -112,7 +86,7 @@ watchdog_init_interval(void)
 		timeout_watchdog);
 }
 
-void
+static void
 watchdog_tickle(void)
 {
 	if (watchdogfd >= 0) {
@@ -125,7 +99,7 @@ watchdog_tickle(void)
 	}
 }
 
-void
+static void
 watchdog_init(void)
 {
 	if (watchdogfd < 0 && watchdogdev != NULL) {
@@ -146,7 +120,8 @@ watchdog_init(void)
 	}
 }
 
-void
+/*
+static void
 watchdog_close(void)
 {
 	if (watchdogfd >= 0) {
@@ -161,26 +136,31 @@ watchdog_close(void)
 		watchdogfd = -1;
 	}
 }
+*/
 
-void
+static int
 open_device(const char* devname)
 {
+	if (!devname)
+		return -1;
+
 	devfd = open(devname, O_SYNC|O_RDWR|O_DIRECT);
 
 	if (devfd == -1) {
 		cl_perror("Opening device %s failed.", devname);
-		exit(1);
+		return -1;
 	}
 
 	ioctl(devfd, BLKSSZGET, &sector_size);
 
 	if (sector_size == 0) {
 		cl_perror("Get sector size failed.\n");
-		exit(1);
+		return -1;
 	}
+	return 0;
 }
 
-signed char
+static signed char
 cmd2char(const char *cmd)
 {
 	if (strcmp("clear", cmd) == 0) {
@@ -209,7 +189,7 @@ sector_alloc(void)
 	return x;
 }
 
-const char*
+static const char*
 char2cmd(const char cmd)
 {
 	switch (cmd) {
@@ -231,7 +211,7 @@ char2cmd(const char cmd)
 	}
 }
 
-int
+static int
 sector_write(int sector, const void *data)
 {
 	if (lseek(devfd, sector_size*sector, 0) < 0) {
@@ -246,7 +226,7 @@ sector_write(int sector, const void *data)
 	return(0);
 }
 
-int
+static int
 sector_read(int sector, void *data)
 {
 	if (lseek(devfd, sector_size*sector, 0) < 0) {
@@ -261,34 +241,31 @@ sector_read(int sector, void *data)
 	return(0);
 }
 
-#define SLOT_TO_SECTOR(slot) (1+slot*2)
-#define MBOX_TO_SECTOR(mbox) (2+mbox*2)
-
-int
+static int
 slot_read(int slot, struct sector_node_s *s_node)
 {
 	return sector_read(SLOT_TO_SECTOR(slot), s_node);
 }
 
-int
+static int
 slot_write(int slot, const struct sector_node_s *s_node)
 {
 	return sector_write(SLOT_TO_SECTOR(slot), s_node);
 }
 
-int
+static int
 mbox_write(int mbox, const struct sector_mbox_s *s_mbox)
 {
 	return sector_write(MBOX_TO_SECTOR(mbox), s_mbox);
 }
 
-int
+static int
 mbox_read(int mbox, struct sector_mbox_s *s_mbox)
 {
 	return sector_read(MBOX_TO_SECTOR(mbox), s_mbox);
 }
 
-int
+static int
 mbox_write_verify(int mbox, const struct sector_mbox_s *s_mbox)
 {
 	void *data;
@@ -308,19 +285,19 @@ mbox_write_verify(int mbox, const struct sector_mbox_s *s_mbox)
 	return 0;
 }
 
-int
+static int
 header_write(const struct sector_header_s *s_header)
 {
 	return sector_write(0, s_header);
 }
 
-int
+static int
 header_read(struct sector_header_s *s_header)
 {
 	return sector_read(0, s_header);
 }
 
-int
+static int
 valid_header(const struct sector_header_s *s_header)
 {
 	if (memcmp(s_header->magic, sbd_magic, sizeof(s_header->magic)) != 0) {
@@ -338,7 +315,7 @@ valid_header(const struct sector_header_s *s_header)
 	return 0;
 }
 
-struct sector_header_s *
+static struct sector_header_s *
 header_get(void)
 {
 	struct sector_header_s *s_header;
@@ -360,7 +337,7 @@ header_get(void)
 	return s_header;
 }
 
-int
+static int
 init_device(int n_slots)
 {
 	struct sector_header_s	*s_header;
@@ -409,7 +386,7 @@ out:	free(s_node);
 /* Check if there already is a slot allocated to said name; returns the
  * slot number. If not found, returns -1.
  * This is necessary because slots might not be continuous. */
-int
+static int
 slot_lookup(const struct sector_header_s *s_header, const char *name)
 {
 	struct sector_node_s	*s_node = NULL;
@@ -439,7 +416,7 @@ out:	free(s_node);
 	return rc;
 }
 
-int
+static int
 slot_unused(const struct sector_header_s *s_header)
 {
 	struct sector_node_s	*s_node;
@@ -462,7 +439,7 @@ out:	free(s_node);
 }
 
 
-int
+static int
 slot_allocate(const char *name)
 {
 	struct sector_header_s	*s_header = NULL;
@@ -512,7 +489,7 @@ out:	free(s_node);
 	return(rc);
 }
 
-int
+static int
 slot_list(void)
 {
 	struct sector_header_s	*s_header = NULL;
@@ -549,7 +526,7 @@ out:	free(s_node);
 	return rc;
 }
 
-int
+static int
 slot_msg(const char *name, const char *cmd)
 {
 	struct sector_header_s	*s_header = NULL;
@@ -597,7 +574,7 @@ out:	free(s_mbox);
 	return rc;
 }
 
-void
+static void
 sysrq_trigger(char t)
 {
 	FILE *procf;
@@ -613,7 +590,7 @@ sysrq_trigger(char t)
 	return;
 }
 
-void
+static void
 do_reset(void)
 {
 	sysrq_trigger('b');
@@ -622,7 +599,7 @@ do_reset(void)
 	exit(1);
 }
 
-void
+static void
 do_off(void)
 {
 	sysrq_trigger('o');
@@ -667,7 +644,7 @@ make_daemon(void)
 }
 
 
-int
+static int
 daemonize(void)
 {
 	struct sector_mbox_s	*s_mbox = NULL;
@@ -750,12 +727,18 @@ main(int argc, char** argv)
 	cl_log_enable_stderr(1);
 	cl_log_set_facility(LOG_DAEMON);
 
-	devname = argv[1];
-	open_device(devname);
-	
 	if (argc < 3) {
-		exit_status = 1;
-	} else if (strcmp(argv[2],"create") == 0) {
+		exit_status = -1;
+		goto out;
+	}
+
+	devname = argv[1];
+	if (open_device(devname) < 0) {
+		exit_status = -1;
+		goto out;
+	}
+
+	if (strcmp(argv[2],"create") == 0) {
 		int n_slots = atoi(argv[3]);
 		exit_status = init_device(n_slots);
 	} else if (strcmp(argv[2],"allocate") == 0) {
@@ -770,7 +753,7 @@ main(int argc, char** argv)
 		exit_status = -1;
 	}
 
-
+out:
 	if (exit_status < 0) {
 		usage();
 		return(1);
