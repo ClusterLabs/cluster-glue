@@ -31,7 +31,7 @@ AM_CFLAGS			= @CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 ## include files
 
 ## binaries
-sbin_PROGRAMS		= stonith meatclient
+sbin_PROGRAMS		= stonith meatclient sbd
 
 
 stonith_SOURCES		= main.c
@@ -41,6 +41,11 @@ stonith_LDFLAGS		=  @LIBADD_DL@ @LIBLTDL@ -export-dynamic @DLOPEN_FORCE_FLAGS@ @
 
 meatclient_SOURCES	= meatclient.c 
 meatclient_LDADD	= $(GLIBLIB)
+
+sbd_SOURCES		= sbd.c 
+sbd_LDADD		= $(GLIBLIB)					\
+			$(top_builddir)/lib/clplumbing/libplumb.la	\
+			$(top_builddir)/lib/clplumbing/libplumbgpl.la
 
 ## libraries
 
