@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# This STONITH script drives the shared-storage stonith plugin.
+#
+# Author:	Lars Marowsky-Bree
+# Copyright:	2008 Lars Marowsky-Bree
+# License:      GNU General Public License (GPL)
+#
+
+# Main code
+
+case $1 in
+gethosts)
+    echo `sbd $sbd_device list | cut -f2`
+    exit 0
+    ;;
+off|reset)
+    sbd $sbd_device message $2 $1
+    exit $?
+    ;;
+status)
+    # As long as the daemon is running, all is well.
+    if ! pidof sbd >/dev/null 2>&1 ; then
+    	exit 7
+    else
+        exit 0
+    fi
+    ;;
+on)
+    exit 1
+    ;;
+getconfignames)
+    echo "sbd_device"
+    exit 0
+    ;;
+getinfo-devid)
+    echo "Shared storage STONITH"
+    exit 0
+    ;;
+getinfo-devname)
+    echo "Shared storage STONITH"
+    exit 0
+    ;;
+getinfo-devdescr)
+    echo "Proof-of-concept code!"
+    exit 0
+    ;;
+getinfo-devurl)
+    echo "http://www.linux-ha.org/SBD"
+    exit 0
+    ;;
+getinfo-xml)
+    cat << SSHXML
+<parameters>
+<parameter name="sbd_device" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+SBD device
+</shortdesc>
+<longdesc lang="en">
+The block device used for the SBD.
+</longdesc>
+</parameter>
+</parameters>
+SSHXML
+    exit 0
+    ;;
+*)
+    exit 1
+    ;;
+esac

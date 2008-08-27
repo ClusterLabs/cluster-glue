@@ -20,13 +20,13 @@
 MAINTAINERCLEANFILES = Makefile.in
 
 EXTRA_DIST           = ibmrsa-telnet ipmi rackpdu vmware xen0 \
-			xen0-ha-dom0-stonith-helper
+			xen0-ha-dom0-stonith-helper sbd
 
 extdir		     = $(stonith_ext_plugindir)
 
 helperdir	     = $(stonith_plugindir)
 
 ext_SCRIPTS	     = ibmrsa ibmrsa-telnet ipmi riloe ssh vmware rackpdu xen0 hmchttp \
-			xen0-ha
+			xen0-ha sbd
 
 helper_SCRIPTS	     = xen0-ha-dom0-stonith-helper
