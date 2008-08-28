@@ -25,6 +25,8 @@ struct sector_header_s {
 	unsigned char	slots;
 	/* Caveat: stored in network byte-order */
 	uint32_t	sector_size;
+	/* TODO: Move timeouts here and add to create + dump */
+	/* TODO: Add sbd to init script instead */
 };
 
 struct sector_mbox_s {
@@ -38,10 +40,11 @@ struct sector_node_s {
 	char 	name[64];
 };
 
-#define SBD_MSG_EMPTY 0x00
-#define SBD_MSG_TEST  0x01
-#define SBD_MSG_RESET 0x02
-#define SBD_MSG_OFF   0x03
+#define SBD_MSG_EMPTY	0x00
+#define SBD_MSG_TEST	0x01
+#define SBD_MSG_RESET	0x02
+#define SBD_MSG_OFF	0x03
+#define SBD_MSG_EXIT	0x04
 			
 #define SLOT_TO_SECTOR(slot) (1+slot*2)
 #define MBOX_TO_SECTOR(mbox) (2+mbox*2)
@@ -50,7 +53,7 @@ static void usage(void);
 static void watchdog_init_interval(void);
 static void watchdog_tickle(void);
 static void watchdog_init(void);
-/* static void watchdog_close(void); */
+static void watchdog_close(void);
 static int open_device(const char* devname);
 static signed char cmd2char(const char *cmd);
 static void * sector_alloc(void);
