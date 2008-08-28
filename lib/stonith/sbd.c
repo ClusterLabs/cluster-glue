@@ -82,7 +82,7 @@ usage()
 "watch		Loop forever, monitoring own slot\n"
 "allocate <node>\n"
 "		Allocate a slot for node (optional)\n"
-"message <node> (test|reset|off|clear)\n"
+"message <node> (test|reset|off|clear|exit)\n"
 "		Writes the specified message to node's slot.\n"
 , cmdname);
 }
@@ -137,7 +137,6 @@ watchdog_init(void)
 	}
 }
 
-/*
 static void
 watchdog_close(void)
 {
@@ -153,7 +152,6 @@ watchdog_close(void)
 		watchdogfd = -1;
 	}
 }
-*/
 
 static int
 open_device(const char* devname)
@@ -188,6 +186,8 @@ cmd2char(const char *cmd)
 		return SBD_MSG_RESET;
 	} else if (strcmp("off", cmd) == 0) {
 		return SBD_MSG_OFF;
+	} else if (strcmp("exit", cmd) == 0) {
+		return SBD_MSG_EXIT;
 	}
 	return -1;
 }
@@ -221,6 +221,9 @@ char2cmd(const char cmd)
 			break;
 		case SBD_MSG_OFF:
 			return "off";
+			break;
+		case SBD_MSG_EXIT:
+			return "exit";
 			break;
 		default:
 			return "undefined";
@@ -707,6 +710,10 @@ daemonize(void)
 			case SBD_MSG_OFF:
 				do_off();
 				break;
+			case SBD_MSG_EXIT:
+				watchdog_close();
+				goto out;
+				break;
 			default:
 				/* TODO: Should we do something on
 				 * unknown messages? */
@@ -720,7 +727,6 @@ daemonize(void)
 	}
 
 out:
-	/* This is ONLY reached for non-daemon code! */
 	free(s_mbox);
 	return rc;
 }
@@ -817,7 +823,7 @@ main(int argc, char** argv)
 	} else if (strcmp(argv[optind],"message") == 0) {
 		exit_status = slot_msg(argv[optind+1], argv[optind+2]);
 	} else if (strcmp(argv[optind],"watch") == 0) {
-		daemonize();
+		exit_status = daemonize();
 	} else {
 		exit_status = -1;
 	}
