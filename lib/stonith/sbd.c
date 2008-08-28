@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <string.h>
 #include <syslog.h>
 #include <sys/types.h>
@@ -40,17 +41,18 @@
 static char		sbd_magic[8] = "SBD_SBD_";
 static char		sbd_version  = 0x01;
 
-/* TODO: These should be tunable. */
+/* Tunable defaults: */
 static unsigned long	timeout_watchdog 	= 5;
 static int		timeout_allocate 	= 2;
 static int		timeout_loop	    	= 1;
-static int		timeout_deadtime	= 10;
+static int		timeout_msgwait		= 10;
 
-static int	watchdog_use		= 1;
-static int	go_daemon		= 1;
+static int	watchdog_use		= 0;
+static int	go_daemon		= 0;
 const char *	watchdogdev 		= "/dev/watchdog";
+static char *	local_uname;
 
-/* */
+/* Global, non-tunable variables: */
 static unsigned long	sector_size	= 0;
 static int	watchdogfd 		= -1;
 static int	devfd;
@@ -60,14 +62,29 @@ static char	*cmdname;
 void
 usage()
 {
-	fprintf(stderr, "Syntax:\n"
-"%s /dev/foo <command> <options>\n"
+	fprintf(stderr, 
+"Shared storage fencing tool.\n"
+"Syntax:\n"
+"	%s <options> <command> <cmdarguments>\n"
+"Options:\n"
+"-d <devname>	Block device to use (mandatory)\n"
+"-W		Use watchdog (recommended)\n"
+"-w <dev>	Specify watchdog device (optional)\n"
+"-D		Run as background daemon (optional)\n"
+"-n <node>	Set local node name; defaults to uname -n (optional)\n"
+"-1 <N>		Set watchdog timeout to N seconds (optional)\n"
+"-2 <N>		Set slot allocation timeout to N seconds (optional)\n"
+"-3 <N>		Set daemon loop timeout to N seconds (optional)\n"
+"-4 <N>		Set msgwait timeout to N seconds (optional)\n"
 "Commands:\n"
-"create <slots>	- initialize N slots. OVERWRITES DEVICE!\n"
-"list		- List all allocated slots on device, and messages.\n"
-"daemon		- Start as daemon, monitoring own slot\n"
-"allocate <name>	- Allocate a slot for <name>\n"
-"message <name> (test|reset|off|clear)\n", cmdname);
+"create		initialize N slots on <dev> - OVERWRITES DEVICE!\n"
+"list		List all allocated slots on device, and messages.\n"
+"watch		Loop forever, monitoring own slot\n"
+"allocate <node>\n"
+"		Allocate a slot for node (optional)\n"
+"message <node> (test|reset|off|clear)\n"
+"		Writes the specified message to node's slot.\n"
+, cmdname);
 }
 
 static void
@@ -338,7 +355,7 @@ header_get(void)
 }
 
 static int
-init_device(int n_slots)
+init_device(void)
 {
 	struct sector_header_s	*s_header;
 	struct sector_node_s	*s_node;
@@ -352,7 +369,7 @@ init_device(int n_slots)
 	s_mbox = sector_alloc();
 	memcpy(s_header->magic, sbd_magic, sizeof(s_header->magic));
 	s_header->version = sbd_version;
-	s_header->slots = n_slots;
+	s_header->slots = 255;
 	s_header->sector_size = htonl(sector_size);
 
 	fstat(devfd, &s);
@@ -366,9 +383,9 @@ init_device(int n_slots)
 		rc = -1; goto out;
 	}
 	cl_log(LOG_INFO, "Initializing %d slots on %s",
-			n_slots,
+			s_header->slots,
 			devname);
-	for (i=0;i < n_slots;i++) {
+	for (i=0;i < s_header->slots;i++) {
 		if (slot_write(i, s_node) < 0) {
 			rc = -1; goto out;
 		}
@@ -531,7 +548,6 @@ slot_msg(const char *name, const char *cmd)
 {
 	struct sector_header_s	*s_header = NULL;
 	struct sector_mbox_s	*s_mbox = NULL;
-	struct utsname		uname_buf;
 	int			mbox;
 	int			rc = 0;
 
@@ -559,13 +575,12 @@ slot_msg(const char *name, const char *cmd)
 		rc = -1; goto out;
 	}
 
-	uname(&uname_buf);
-	strncpy(s_mbox->from, uname_buf.nodename, sizeof(s_mbox->from)-1);
+	strncpy(s_mbox->from, local_uname, sizeof(s_mbox->from)-1);
 
 	if (mbox_write_verify(mbox, s_mbox) < -1) {
 		rc = -1; goto out;
 	}
-	sleep(timeout_deadtime);
+	sleep(timeout_msgwait);
 	cl_log(LOG_INFO, "%s successfully delivered to %s",
 			cmd, name);
 
@@ -648,12 +663,10 @@ static int
 daemonize(void)
 {
 	struct sector_mbox_s	*s_mbox = NULL;
-	struct utsname		uname_buf;
 	int			mbox;
 	int			rc = 0;
 
-	uname(&uname_buf);
-	mbox = slot_allocate(uname_buf.nodename);
+	mbox = slot_allocate(local_uname);
 	if (mbox < 0) {
 		cl_log(LOG_ERR, "No slot allocated, and automatic allocation failed.");
 		rc = -1; goto out;
@@ -712,10 +725,28 @@ out:
 	return rc;
 }
 
+static void
+get_uname(void)
+{
+	struct utsname		uname_buf;
+	int i;
+
+	if (uname(&uname_buf) < 0) {
+		cl_perror("uname() failed?");
+		exit(1);
+	}
+	
+	local_uname = strdup(uname_buf.nodename);
+
+	for (i = 0; i < strlen(local_uname); i++)
+		local_uname[i] = tolower(local_uname[i]);
+}
+
 int
 main(int argc, char** argv)
 {
 	int		exit_status = 0;
+	int		c;
 
 	if ((cmdname = strrchr(argv[0], '/')) == NULL) {
 		cmdname = argv[0];
@@ -726,28 +757,66 @@ main(int argc, char** argv)
 	cl_log_set_entity(cmdname);
 	cl_log_enable_stderr(1);
 	cl_log_set_facility(LOG_DAEMON);
+	
+	get_uname();
 
-	if (argc < 3) {
+	while ((c = getopt (argc, argv, "DWw:d:n:")) != -1) {
+		switch (c) {
+		case 'D':
+			go_daemon = 1;
+			break;
+		case 'W':
+			watchdog_use = 1;
+			break;
+		case 'w':
+			watchdogdev = optarg;
+			break;
+		case 'd':
+			devname = optarg;
+			break;
+		case 'n':
+			local_uname = optarg;
+			break;
+		case '1':
+			timeout_watchdog = atoi(optarg);
+			break;
+		case '2':
+			timeout_allocate = atoi(optarg);
+			break;
+		case '3':
+			timeout_loop = atoi(optarg);
+			break;
+		case '4':
+			timeout_msgwait = atoi(optarg);
+			break;
+		default:
+			exit_status = -1;
+			goto out;
+			break;
+		}
+	}
+	
+	/* There must at least be one command following the options: */
+	if ( (argc - optind) < 1) {
+		fprintf(stderr, "Not enough arguments.\n");
 		exit_status = -1;
 		goto out;
 	}
 
-	devname = argv[1];
 	if (open_device(devname) < 0) {
 		exit_status = -1;
 		goto out;
 	}
 
-	if (strcmp(argv[2],"create") == 0) {
-		int n_slots = atoi(argv[3]);
-		exit_status = init_device(n_slots);
-	} else if (strcmp(argv[2],"allocate") == 0) {
-		exit_status = slot_allocate(argv[3]);
-	} else if (strcmp(argv[2],"list") == 0) {
+	if (strcmp(argv[optind],"create") == 0) {
+		exit_status = init_device();
+	} else if (strcmp(argv[optind],"allocate") == 0) {
+		exit_status = slot_allocate(argv[optind+1]);
+	} else if (strcmp(argv[optind],"list") == 0) {
 		exit_status = slot_list();
-	} else if (strcmp(argv[2],"message") == 0) {
-		exit_status = slot_msg(argv[3], argv[4]);
-	} else if (strcmp(argv[2],"daemon") == 0) {
+	} else if (strcmp(argv[optind],"message") == 0) {
+		exit_status = slot_msg(argv[optind+1], argv[optind+2]);
+	} else if (strcmp(argv[optind],"watch") == 0) {
 		daemonize();
 	} else {
 		exit_status = -1;
