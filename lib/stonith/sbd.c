@@ -564,6 +564,9 @@ slot_msg(const char *name, const char *cmd)
 		rc = -1; goto out;
 	}
 
+	if (strcmp(name, "LOCAL") == 0)
+		name = local_uname;
+
 	mbox = slot_lookup(s_header, name);
 	if (mbox < 0) {
 		cl_log(LOG_ERR, "slot_msg(): No slot found for %s.", name);
