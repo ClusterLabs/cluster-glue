@@ -66,7 +66,7 @@ static int header_write(const struct sector_header_s *s_header);
 static int header_read(struct sector_header_s *s_header);
 static int valid_header(const struct sector_header_s *s_header);
 static struct sector_header_s * header_get(void);
-static int init_device(int n_slots);
+static int init_device(void);
 static int slot_lookup(const struct sector_header_s *s_header, const char *name);
 static int slot_unused(const struct sector_header_s *s_header);
 static int slot_allocate(const char *name);
@@ -77,4 +77,5 @@ static void do_reset(void);
 static void do_off(void);
 static void make_daemon(void);
 static int daemonize(void);
+static void get_uname(void);
 
