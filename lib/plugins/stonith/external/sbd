@@ -11,15 +11,15 @@
 
 case $1 in
 gethosts)
-    echo `sbd $sbd_device list | cut -f2`
+    echo `sbd -d $sbd_device list | cut -f2`
     exit 0
     ;;
 off|reset)
-    sbd $sbd_device message $2 $1
+    sbd -d $sbd_device message $2 $1
     exit $?
     ;;
 status)
-    if sbd $sbd_device list >/dev/null 2>&1 ; then
+    if sbd -d $sbd_device list >/dev/null 2>&1 ; then
     	exit 0
     else
     	exit 1
