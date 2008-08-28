@@ -19,10 +19,11 @@ off|reset)
     exit $?
     ;;
 status)
-    if ! pidof sbd >/dev/null 2>&1 ; then
-    	exit 7
+    if sbd $sbd_device list >/dev/null 2>&1 ; then
+    	exit 0
+    else
+    	exit 1
     fi
-    exit 0
     ;;
 on)
     exit 1
@@ -32,19 +33,28 @@ getconfignames)
     exit 0
     ;;
 getinfo-devid)
-    echo "Shared storage STONITH"
+    echo "Shared storage STONITH device"
     exit 0
     ;;
 getinfo-devname)
-    echo "Shared storage STONITH"
+    echo "Shared storage STONITH device"
     exit 0
     ;;
 getinfo-devdescr)
-    echo "Proof-of-concept code!"
+    cat << DESC
+sbd uses a shared storage device as a medium to communicate
+fencing requests. This allows clusters without network power
+switches; the downside is that access to the shared storage
+device becomes a Single Point of Failure. 
+
+It requires sbd to be configured.  Please read
+http://www.linux-ha.org/SBD_Fencing!
+
+DESC
     exit 0
     ;;
 getinfo-devurl)
-    echo "http://www.linux-ha.org/SBD"
+    echo "http://www.linux-ha.org/SBD_Fencing"
     exit 0
     ;;
 getinfo-xml)
@@ -56,7 +66,7 @@ getinfo-xml)
 SBD device
 </shortdesc>
 <longdesc lang="en">
-The block device used for the SBD.
+The block device used for the SBD partition.
 </longdesc>
 </parameter>
 </parameters>
