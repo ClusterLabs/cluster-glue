@@ -629,14 +629,16 @@ make_daemon(void)
 	long			pid;
 	const char *		devnull = "/dev/null";
 
-	pid = fork();
-	if (pid < 0) {
-		cl_log(LOG_ERR, "%s: could not start daemon\n",
-				cmdname);
-		cl_perror("fork");
-		exit(1);
-	}else if (pid > 0) {
-		exit(0);
+	if (go_daemon > 0) {
+		pid = fork();
+		if (pid < 0) {
+			cl_log(LOG_ERR, "%s: could not start daemon\n",
+					cmdname);
+			cl_perror("fork");
+			exit(1);
+		}else if (pid > 0) {
+			exit(0);
+		}
 	}
 
 	cl_log_enable_stderr(FALSE);
@@ -679,9 +681,7 @@ daemonize(void)
 		rc = -1; goto out;
 	}
 
-	if (go_daemon > 0) {
-		make_daemon();
-	}
+	make_daemon();
 
 	if (watchdog_use != 0)
 		watchdog_init();
