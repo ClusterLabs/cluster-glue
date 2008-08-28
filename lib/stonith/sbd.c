@@ -373,8 +373,8 @@ init_device(void)
 	s_header->sector_size = htonl(sector_size);
 
 	fstat(devfd, &s);
-	printf("st_size = %ld, st_blksize = %ld, st_blocks = %ld\n",
-			s.st_size, s.st_blksize, s.st_blocks);
+	/* printf("st_size = %ld, st_blksize = %ld, st_blocks = %ld\n",
+			s.st_size, s.st_blksize, s.st_blocks); */
 	
 	cl_log(LOG_INFO, "Creating version %d header on %s",
 			s_header->version,
