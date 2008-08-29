@@ -67,12 +67,12 @@ libplumb_la_SOURCES	= 		\
 
 libplumb_la_LIBADD      = $(top_builddir)/replace/libreplace.la \
 			$(top_builddir)/lib/pils/libpils.la
-libplumb_la_LDFLAGS	= -version-info 1:0:0
+libplumb_la_LDFLAGS	= -version-info 2:0:0
 
 libplumbgpl_la_SOURCES	= setproctitle.c
 libplumbgpl_la_LIBADD   = $(top_builddir)/replace/libreplace.la \
 			$(top_builddir)/lib/pils/libpils.la
-libplumbgpl_la_LDFLAGS	= -version-info 1:0:0
+libplumbgpl_la_LDFLAGS	= -version-info 2:0:0
 
 testdir = $(libdir)/@HB_PKG@
 test_PROGRAMS = ipctest ipctransientclient ipctransientserver base64_md5_test
