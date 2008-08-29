@@ -25,8 +25,10 @@ struct sector_header_s {
 	unsigned char	slots;
 	/* Caveat: stored in network byte-order */
 	uint32_t	sector_size;
-	/* TODO: Move timeouts here and add to create + dump */
-	/* TODO: Add sbd to init script instead */
+	uint32_t	timeout_watchdog;
+	uint32_t	timeout_allocate;
+	uint32_t	timeout_loop;
+	uint32_t	timeout_msgwait;
 };
 
 struct sector_mbox_s {
@@ -65,7 +67,10 @@ static int slot_write(int slot, const struct sector_node_s *s_node);
 static int mbox_write(int mbox, const struct sector_mbox_s *s_mbox);
 static int mbox_read(int mbox, struct sector_mbox_s *s_mbox);
 static int mbox_write_verify(int mbox, const struct sector_mbox_s *s_mbox);
-static int header_write(const struct sector_header_s *s_header);
+/* After a call to header_write(), certain data fields will have been
+ * converted to on-disk byte-order; the header should not be accessed
+ * afterwards anymore! */
+static int header_write(struct sector_header_s *s_header);
 static int header_read(struct sector_header_s *s_header);
 static int valid_header(const struct sector_header_s *s_header);
 static struct sector_header_s * header_get(void);
@@ -75,6 +80,7 @@ static int slot_unused(const struct sector_header_s *s_header);
 static int slot_allocate(const char *name);
 static int slot_list(void);
 static int slot_msg(const char *name, const char *cmd);
+static int header_dump(void);
 static void sysrq_trigger(char t);
 static void do_reset(void);
 static void do_off(void);
