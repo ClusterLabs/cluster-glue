@@ -171,7 +171,7 @@ if not realhost:
 
 acmds=[]
 try:
-        if cmd == 'reset' and not reset_ok:
+        if cmd == 'reset' and reset_ok == '0':
                 acmds.append(login + todo['off'] + logout)
                 acmds.append(login + todo['on'] + logout)
         else:   
