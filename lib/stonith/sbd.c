@@ -685,11 +685,6 @@ make_daemon(void)
 	close(2);
 	(void)open(devnull, O_WRONLY);
 	cl_cdtocoredir();
-	if (getsid(0) != pid) {
-		if (setsid() < 0) {
-			cl_perror("setsid() failure.");
-		}
-	}
 	cl_make_realtime(-1, -1, 128, 128);
 
 }
