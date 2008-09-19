@@ -11,6 +11,8 @@
 #
 # Cleanup by Andrew Beekhof <abeekhof@suse.de>
 #
+# Rewritten by Dejan Muhamedagic <dejan@suse.de>
+# Now, the plugin actually reads replies from iLO.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -29,17 +31,27 @@
 import sys
 import os
 import socket
-from httplib import *
-from time import sleep
+import xml.dom.minidom
+from httplib import HTTPSConnection
+import time
 
+def my_err(msg):
+    print "ERROR: %s" % msg
+def my_warn(msg):
+    print "WARNING: %s" % msg
+def my_debug(msg):
+    print "DEBUG: %s" % msg
+def fatal(msg):
+    my_err(msg)
+    sys.exit(1)
 
 argv = sys.argv
 
 try:
-        cmd = argv[1]
+    cmd = argv[1]
 except IndexError:
-        print "Not enough arguments"
-        sys.exit(1)
+    print "Not enough arguments"
+    sys.exit(1)
 
 legacy_RI_HOST     = os.environ.get('RI_HOST',     '')
 legacy_RI_HOSTRI   = os.environ.get('RI_HOSTRI',   '')
@@ -54,27 +66,6 @@ realhost = os.environ.get('hostlist',     legacy_RI_HOST)
 rihost   = os.environ.get('ilo_hostname', legacy_RI_HOSTRI)
 ilouser  = os.environ.get('ilo_user',     legacy_RI_LOGIN)
 ilopass  = os.environ.get('ilo_password', legacy_RI_PASSWORD)
-
-login = [ '<RIBCL VERSION="'+ilo_protocol+'">',
-          '<LOGIN USER_LOGIN="' + ilouser + '" PASSWORD="' + ilopass + '">' ]
-
-logout = [ '</LOGIN>', '</RIBCL>' ]
-
-
-status = [ '<SERVER_INFO MODE="read">', '<GET_HOST_POWER_STATUS/>', '</SERVER_INFO>' ]
-
-reset = [ '<SERVER_INFO MODE="write">', '<RESET_SERVER/>', '</SERVER_INFO>' ]
-
-if power_method == 'button':
-  off = [ '<SERVER_INFO MODE="write">', '<HOLD_PWR_BTN/>', '</SERVER_INFO>' ]
-else:
-  off = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "N"/>', '</SERVER_INFO>' ]
-
-on = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "Y"/>', '</SERVER_INFO>' ]
-
-
-todo = { 'reset':reset, 'on':on, 'off':off, 'status':status }
-
 
 xmlinfo = '''<parameters>
  <parameter name="hostlist" unique="1" required="1">
@@ -128,79 +119,345 @@ xmlinfo = '''<parameters>
    * button - Emulate holding down the power button
    * power  - Emulate turning off the machines power 
 
-   NB: In case acpid is not running on the node to be fenced and
-   the method is set to power (which is the default) "on" and
-   "off" requests are not going to work. "reset" should work in
-   any case.
+   NB: A button request takes around 20 seconds. The power method
+   about half a minute.
   </longdesc>
  </parameter>
 </parameters>'''
 
 info = {
-        'getinfo-devid':	'RILOE',
-        'getinfo-devname':	'riloe ' + rihost,
-        'getinfo-devdescr':	'COMPAQ RILOE STONITH device',
-        'getinfo-devurl':	'http://www.hp.com/',
-	      'gethosts':	 realhost,
-        'getinfo-xml':		xmlinfo
+        'getinfo-devid':    'iLO2',
+        'getinfo-devname':  'ilo2 ' + rihost,
+        'getinfo-devdescr': 'HP/COMPAQ iLO2 STONITH device',
+        'getinfo-devurl':   'http://www.hp.com/',
+        'gethosts':    realhost,
+        'getinfo-xml':      xmlinfo
 }
 
-try:
-        print info[cmd]
-        sys.exit(0)
-except KeyError:
-        None
+if cmd in info:
+    print info[cmd]
+    sys.exit(0)
 
 if cmd == 'getconfignames':
-	for arg in [ "hostlist", "ilo_hostname", "ilo_user", "ilo_password", "ilo_can_reset", "ilo_protocol", "ilo_powerdown_method"]:
-            print arg
-        sys.exit(0)
-
-#
-#	All remaining commands need host and password to succeed...
-#
+    for arg in [ "hostlist", "ilo_hostname", "ilo_user", "ilo_password", "ilo_can_reset", "ilo_protocol", "ilo_powerdown_method"]:
+        print arg
+    sys.exit(0)
 
 if not rihost:
-        print "ILO device hostname not specified"
-        sys.exit(1)
+    fatal("ILO device hostname not specified")
 
 if not realhost:
-        print "Host controlled by this ILO device not specified"
-        sys.exit(1)
+    fatal("Host controlled by this ILO device not specified")
 
+# XML elements
+E_RIBCL = "RIBCL"
+E_LOGIN = "LOGIN"
+E_SERVER_INFO = "SERVER_INFO"
 
-acmds=[]
-try:
-        if cmd == 'reset' and reset_ok == '0':
-                acmds.append(login + todo['off'] + logout)
-                acmds.append(login + todo['on'] + logout)
-        else:   
-                acmds.append(login + todo[cmd] + logout)
-except KeyError:
-        print 'Invalid command: '+ cmd
-        sys.exit(1)
+# power mgmt methods
+E_RESET = "RESET_SERVER" # error if powered off
+E_COLD_BOOT = "COLD_BOOT_SERVER" # error if powered off
+E_WARM_BOOT = "WARM_BOOT_SERVER" # error if powered off
+E_PRESS_BUTTON = "PRESS_PWR_BTN"
+E_HOLD_BUTTON = "HOLD_PWR_BTN"
 
+# get/set status elements
+E_SET_POWER = "SET_HOST_POWER"
+E_GET_PSTATUS = "GET_HOST_POWER_STATUS"
 
-try:
-        for cmds in acmds:
+# whatever this means, but we have to use it to get good XML
+E_LOCFG = "LOCFG"
+LOCFG_VER = '2.21'
 
-                c=HTTPSConnection(rihost)
-                c.send('<?xml version="1.0"?>\r\n')
-                c.sock.recv(1024)
+# attributes
+A_VERSION = "VERSION" # ilo_protocol
+A_USER = "USER_LOGIN"
+A_PWD = "PASSWORD"
+A_MODE = "MODE" # info mode (read or write)
+A_POWER_SW = "HOST_POWER"  # "Y" or "N"
+A_POWER_STATE = "HOST_POWER"  # "ON" or "OFF"
 
-                for line in cmds:
-                        c.send(line+'\r\n')
-                        c.sock.recv(1024)
+def new_power_req(tag, name = None, value = None):
+    '''
+    Create a new RIBCL request (as XML).
+    '''
+    my_debug("creating power request: %s,%s,%s"%(tag,name,value))
+    doc = xml.dom.minidom.Document()
+    locfg = doc.createElement(E_LOCFG)
+    locfg.setAttribute(A_VERSION,LOCFG_VER)
+    ribcl = doc.createElement(E_RIBCL)
+    ribcl.setAttribute(A_VERSION,ilo_protocol)
+    login = doc.createElement(E_LOGIN)
+    login.setAttribute(A_USER,ilouser)
+    login.setAttribute(A_PWD,ilopass)
+    serv_info = doc.createElement(E_SERVER_INFO)
+    # read or write, it doesn't really matter, i.e. even if we
+    # say "write" that doesn't mean we can't read
+    serv_info.setAttribute(A_MODE,"write")
+    doc.appendChild(locfg)
+    locfg.appendChild(ribcl)
+    ribcl.appendChild(login)
+    login.appendChild(serv_info)
+    el_node = doc.createElement(tag)
+    if name:
+        el_node.setAttribute(name,value)
+    serv_info.appendChild(el_node)
+    s = doc.toprettyxml()
+    doc.unlink()
+    # work around an iLO bug: last line containing "</LOCFG>"
+    # produces a syntax error
+    lines = s.split('\n')
+    return '\n'.join(lines[:-2])
 
-                c.close()
-                sleep(1)
+E_RESPONSE = "RESPONSE"
+E_HOST_POWER = "GET_HOST_POWER"
+A_STATUS = "STATUS"
+# documentation mentions both; better safe than sorry
+A_MSG = "MSG"
+A_MSG2 = "MESSAGE"
 
-except socket.gaierror, msg:
-        print "ERROR: " + str(msg) + ": " + rihost
-        sys.exit(1)
-except socket.sslerror, msg:
-        print "ERROR: " + str(msg) + "for " + rihost
-        sys.exit(1)
-except socket.error, msg:
-        print "ERROR: " + str(msg) + "talking to " + rihost
-        sys.exit(1)
+def is_element(xmlnode):
+    return xmlnode.nodeType == xmlnode.ELEMENT_NODE
+
+def read_resp(node):
+    '''
+    Check if the RESPONSE XML is OK.
+    '''
+    msg = ""
+    str_status = ""
+    for attr in node.attributes.keys():
+        if attr == A_STATUS:
+            str_status = node.getAttribute(attr)
+        elif attr == A_MSG:
+            msg = node.getAttribute(attr)
+        elif attr == A_MSG2:
+            msg = node.getAttribute(attr)
+        else:
+            my_warn("unexpected attribute %s in %s" % (attr,E_RESPONSE))
+    if not str_status:
+        my_err("no status in response")
+        return -1
+    try:
+        status = int(str_status,16)
+    except ValueError:
+        my_err("unexpected status %s in response" % str_status)
+        return -1
+    if status != 0:
+        my_err("%s (rc: %s)"%(msg,str_status))
+        return -1
+    return 0
+
+def read_power(node):
+    '''
+    Read the power from the XML node. Set the global power
+    variable correspondingly.
+    '''
+    global power
+    for attr in node.attributes.keys():
+        if attr == A_POWER_STATE:
+            power_state = node.getAttribute(attr).upper()
+        else:
+            my_warn("unexpected attribute %s in %s" % (attr,node.tagName))
+    if not power_state:
+        my_err("no %s attribute in %s" % (A_POWER_STATE,node.tagName))
+        return -1
+    if power_state not in ("ON","OFF"):
+        my_err("unexpected value for %s: %s" % (A_POWER_STATE,power_state))
+        return -1
+    power = (power_state == "ON")
+    my_debug("Host has power: %s"%power)
+    return 0
+
+el_parsers = {
+    E_RESPONSE:read_resp,
+    E_HOST_POWER:read_power
+}
+def proc_resp(doc):
+    '''
+    Process one iLO reply. Real work is done in el_parsers.
+    '''
+    ribcl = doc.childNodes[0]
+    if not is_element(ribcl) or ribcl.tagName != E_RIBCL:
+        my_err("unexpected top element in response")
+        return -1
+    for child in ribcl.childNodes:
+        if not is_element(child):
+            continue
+        if child.tagName in el_parsers:
+            rc = el_parsers[child.tagName](child)
+            if rc != 0:
+                return -1
+        else:
+            my_warn("unexpected element in response: %s" % child.toxml())
+    return 0
+
+def open_ilo(host):
+    # open https connection
+    try:
+        return HTTPSConnection(host)
+    except socket.gaierror, msg:
+        fatal("%s: %s" %(msg,host))
+    except socket.sslerror, msg:
+        fatal("%s for %s" %(msg,host))
+    except socket.error, msg:
+        fatal("%s while talking to %s" %(msg,host))
+
+def send_request(req,proc_f):
+    '''
+    1. After every request, the iLO closes the connection.
+    2. For every request, there are multiple replies. Each reply
+    is an XML document. Most of replies are just a kind of
+    (verbose) XML "OK".
+    '''
+    c = open_ilo(rihost)
+    try:
+        c.send(req+'\r\n')
+    except socket.error, msg:
+        fatal("%s, while talking to %s" %(msg,rihost))
+
+    result = []
+    while True:
+        try:
+            reply = c.sock.recv(1024)
+            #print "RECV:",reply
+            if not reply:
+                break
+            result.append(reply)
+        except socket.error, msg:
+            if msg[0] == 6: # connection closed
+                break
+            my_err("%s, while talking to %s" %(msg,rihost))
+            return -1
+    c.close()
+
+    if not result:
+        fatal("no response from %s"%rihost)
+    for reply in result:
+        try:
+            doc = xml.dom.minidom.parseString(reply)
+        except xml.parsers.expat.ExpatError,msg:
+            fatal("malformed response: %s\n%s"%(msg,reply))
+        rc = proc_f(doc)
+        doc.unlink()
+        if rc != 0:
+            break
+    return rc
+
+def manage_power(cmd):
+    '''
+    Before trying to send a request we have to check the power
+    state.
+    '''
+    rc = 0
+    req = ''
+    # it won't do to turn it on if it's already on!
+    if cmd == "on" and not power:
+        req = new_power_req(E_SET_POWER,A_POWER_SW,"Y")
+    # also to turn it off if it's already off
+    elif cmd == "off" and power:
+        req = new_power_req(E_SET_POWER,A_POWER_SW,"N")
+    elif cmd == "cold_boot" and power:
+        req = new_power_req(E_COLD_BOOT)
+    elif cmd == "warm_boot" and power:
+        req = new_power_req(E_WARM_BOOT)
+    elif cmd == "reset":
+        if power:
+            req = new_power_req(E_RESET)
+        # reset doesn't work if the host's off
+        else:
+            req = new_power_req(E_SET_POWER,A_POWER_SW,"Y")
+    if req:
+        rc = send_request(req,proc_resp)
+    return rc
+def power_on():
+    '''
+    Update the power variable without checking the power state.
+    The iLO is slow at times to report the actual power state, so
+    we assume that it changed if the request succeeded.
+    '''
+    rc = manage_power("on")
+    if rc == 0:
+        global power
+        power = True
+    return rc
+def power_off():
+    rc = manage_power("off")
+    if rc == 0:
+        global power
+        power = False
+    return rc
+def cold_boot():
+    rc = manage_power("cold_boot")
+    return rc
+def warm_boot():
+    rc = manage_power("warm_boot")
+    return rc
+def reset():
+    rc = manage_power("reset")
+    if rc == 0:
+        global power
+        power = True
+    return rc
+def hold_button():
+    '''
+    Hold the power button. Got this error message when tried
+    without the TOGGLE attribute:
+        Command without TOGGLE="Yes" attribute is ignored
+        when host power is off. (rc: 0x0054)
+    Didn't find any documentation about TOGGLE.
+    '''
+    if power:
+        req = new_power_req(E_HOLD_BUTTON)
+    else:
+        req = new_power_req(E_HOLD_BUTTON,"TOGGLE","Yes")
+    rc = send_request(req,proc_resp)
+    return rc
+def read_power_state():
+    req = new_power_req(E_GET_PSTATUS)
+    rc = send_request(req,proc_resp)
+    return rc
+
+def reset_power():
+    '''
+    Three methods to reset:
+    - hold power button
+    - reset (only if host has power and user said that reset is ok)
+    - power off/on
+    '''
+    if power_method == 'button':
+        return hold_button()
+    elif reset_ok != '0':
+        if power:
+            return reset()
+        else:
+            return power_on()
+    else:
+        rc = power_off()
+        if rc == 0:
+            time.sleep(2)
+            rc = power_on()
+        return rc
+
+# track state of host power
+power = -1
+
+todo = {
+'reset':reset_power,
+'on':power_on,
+'off':power_off,
+'cold':cold_boot,
+'warm':warm_boot,
+'status':lambda: 0  # just return 0, we already read the state
+}
+
+rc = read_power_state()
+if rc == 0:
+    if cmd in todo:
+        rc = todo[cmd]()
+    else:
+        fatal('Invalid command: %s' % cmd)
+if rc != 0:
+    fatal("request failed")
+sys.exit(rc)
+
+# vi:ts=4:sw=4:et:
