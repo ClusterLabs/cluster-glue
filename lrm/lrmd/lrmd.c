@@ -3061,7 +3061,14 @@ perform_ra_op(lrmd_op_t* op)
 			if (0 < timeout ) {
 
 				/* Wait 'timeout' ms then send SIGTERM */
-				op->killseq[0].mstimeout = timeout;
+				/* allow for extra 15 seconds for stonith,
+				 * because stonithd handles its children with the
+				 * same timeout; in this case the lrmd child
+				 * should never timeout, but return the timeout
+				 * reported by stonithd
+				 */
+				op->killseq[0].mstimeout = timeout
+					+ (!strcmp(rsc->class,"stonith") ? 15000 : 0);
 				op->killseq[0].signalno  = SIGTERM;
 
 				/* Wait 5 seconds then send SIGKILL */
