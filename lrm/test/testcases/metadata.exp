@@ -34,5 +34,5 @@ Cool. RA list passed.
 .TRY Show meta-data class=heartbeat type=Dummy provider=heartbeat
 .EXTCHECK xmllint.sh
 .TRY Show meta-data class=stonith type=ssh provider=heartbeat
-.TRY Show provider class=ocf type=Dummy
+.TRY Show provider class=ocf type=IPaddr
 heartbeat

@@ -26,4 +26,4 @@ meta class=lsb type=heartbeat
 meta class=heartbeat type=Dummy
 %extcheck xmllint.sh
 meta class=stonith type=ssh
-provider class=ocf type=Dummy
+provider class=ocf type=IPaddr
