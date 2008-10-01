@@ -71,6 +71,12 @@ xmlGetXPathString (const char *str,
     xmlXPathObjectPtr path; 
     xmlChar *xmlRC;    
     
+    if (!strchr(str,'<')) {
+        fprintf(stderr,"%s malformed\n", str);
+        rc[0] = 0x00;
+        return(1);
+    }
+
     doc = xmlParseMemory(str, strlen(str));
     xmlXPathInit();
     ctx = xmlXPathNewContext(doc);

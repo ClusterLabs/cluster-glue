@@ -144,7 +144,8 @@ drac3_new(const char *subplugin)
 	}
 	memset(drac3d, 0, sizeof(*drac3d));
 	drac3d->pluginid = pluginid;
-	drac3d->curl = NULL;
+	drac3d->curl = curl_easy_init();
+	drac3InitCurl(drac3d->curl);
 	drac3d->host = NULL;
 	drac3d->user = NULL;
 	drac3d->pass = NULL;
