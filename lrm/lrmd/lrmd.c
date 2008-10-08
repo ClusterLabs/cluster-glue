@@ -2617,6 +2617,8 @@ record_op_completion(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	}
 	/* insert (or replace) the new op in last_op_table for the client */
 	replace_last_op(client,rsc,op);
+	if (op->interval) /* copy op to the repeat list */
+		to_repeatlist(rsc,op);
 	LRMAUDIT();
 }
 
@@ -2753,9 +2755,6 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 
 	if (op_status != LRM_OP_CANCELLED) {
 		record_op_completion(rsc,op); /*record the outcome of the op */
-		if (op->interval) { /* copy op to the repeat list */
-			to_repeatlist(rsc,op);
-		}
 	} else {
 		remove_op_history(op);
 	}
