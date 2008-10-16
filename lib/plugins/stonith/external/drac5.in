@@ -18,6 +18,7 @@
 
 #echo "started with: $@" | debug
 
+. @HA_HBCONF_DIR@/shellfuncs
 trap 'if [ -n "$outf" ]; then cat "$outf" >&2; rmtempfile "$outf"; fi' 0
 outf=`maketempfile` || exit 1
 
