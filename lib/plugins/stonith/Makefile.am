@@ -145,7 +145,7 @@ cyclades_la_LDFLAGS	= -export-dynamic -module -avoid-version
 cyclades_la_LIBADD	= $(GLIBLIB)
 
 drac3_la_SOURCES	= drac3.c drac3_command.c drac3_command.h drac3_hash.c drac3_hash.h	$(INCFILES)
-drac3_la_LDFLAGS	= -export-dynamic -module -avoid-version -lplumb -lcurl -lxml2 $(GLIBLIB)
+drac3_la_LDFLAGS	= -export-dynamic -module -avoid-version -lcurl -lxml2 $(GLIBLIB)
 
 external_la_SOURCES	= external.c	$(INCFILES)
 external_la_LDFLAGS	= -export-dynamic -module -avoid-version
