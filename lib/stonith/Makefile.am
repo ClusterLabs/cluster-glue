@@ -62,4 +62,4 @@ libstonith_la_LIBADD	= $(top_builddir)/lib/pils/libpils.la	\
 
 man_MANS		= stonith.8 meatclient.8
 
-EXTRA_DIST              = $(man_MANS)
+EXTRA_DIST              = $(man_MANS) sbd.h
