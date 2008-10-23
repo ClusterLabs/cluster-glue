@@ -177,7 +177,7 @@ class RSAStonithPlugin:
         if f:
             f.write("%s: %s: %s\n" % (self._get_timestamp(), self._appl,
                     ' '.join(args)))
-            f.flush
+            f.flush()
 
     def echo(self, *args):
         what = ''.join([str(x) for x in args])
