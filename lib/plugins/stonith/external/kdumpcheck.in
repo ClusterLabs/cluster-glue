@@ -69,14 +69,18 @@ check_hostlist() {
 ##
 get_username() {
     kdump_conf="/etc/kdump.conf"
-    config_name="kdump_check_user"
 
     if [ ! -f "${kdump_conf}" ]; then
         echo "`date`::DEBUG: ${kdump_conf} doesn't exist." | print_debug
         return 0
     fi
 
-    tmp=`grep "^\s*${config_name}\>" ${kdump_conf} | awk '{print $2}'`
+    tmp=""
+    while read config_opt config_val; do
+        if [ "${config_opt}" = "kdump_check_user" ]; then
+                tmp="${config_val}"
+        fi
+    done < "${kdump_conf}"
     if [ -n "${tmp}" ]; then
         USERNAME="${tmp}"
     fi
@@ -123,7 +127,7 @@ check_identity_file() {
 check_user_existence() {
 
     # Get kdump check user name and check whether he exists or not.
-    grep -q "^${USERNAME}\>" /etc/passwd > /dev/null 2>&1
+    grep -q "^${USERNAME}:" /etc/passwd > /dev/null 2>&1
     ret=$?
     if [ ${ret} != 0 ]; then
         echo "`date`::ERROR: user ${USERNAME} doesn't exist." \
