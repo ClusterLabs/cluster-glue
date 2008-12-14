@@ -1,0 +1,236 @@
+#!/bin/sh
+#
+#
+# logd     	    Start logd (non-blocking log service)
+#
+# Author:       Dejan Muhamedagic <dmuhamedagic@suse.de>
+#               (After the heartbeat init script)
+# License:      GNU General Public License (GPL)
+#
+#		This script works correctly under SuSE, Debian,
+#		Conectiva, Red Hat and a few others.  Please let me know if it
+#		doesn't work under your distribution, and we'll fix it.
+#		We don't hate anyone, and like for everyone to use
+#		our software, no matter what OS or distribution you're using.
+#
+# chkconfig: 2345 @LOGD_INITSTARTPRI@ @LOGD_INITSTOPPRI@
+# description: Startup script logd service.
+# processname: ha_logd
+# pidfile: @localstatedir@/run/logd.pid
+# config: @sysconfdir@/logd.cf
+#
+### BEGIN INIT INFO
+# Description: ha_logd is a non-blocking logging daemon.
+#	It can log messages either to a file or through syslog
+#	daemon.
+#
+# Short-Description: ha_logd logging daemon
+# Provides: ha_logd
+# Required-Start: $remote_fs $network $time $syslog
+# Should-Start: openhpid
+# Required-Stop: $remote_fs $network $time $syslog
+# Should-stop: openhpid
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+### END INIT INFO
+
+[ -f @INITDEFDIR@/heartbeat ] && . @INITDEFDIR@/heartbeat
+
+: ${USE_LOGD=yes}
+LOGD_OPT=""
+[ -n "$LOGD_CFG" ] && LOGD_OPT="$LOGD_OPT -c $LOGD_CFG"
+
+HA_DIR=@sysconfdir@/ha.d; export HA_DIR
+. $HA_DIR/shellfuncs
+
+LOCKDIR=@localstatedir@/lock/subsys
+RUNDIR=@localstatedir@/run
+
+
+#	Echo without putting a newline on the end
+EchoNoNl() {
+    Echo @ECHO_N@ "$@@ECHO_C@"
+}
+
+#	Echo with escapes enabled...
+EchoEsc() {
+    Echo @ECHO_E@ "$@"
+}
+
+echo_failure() {
+    EchoEsc " ha_logd failure [rc=$1]. $rc_failed"
+    return $1
+}
+
+echo_success() {
+    : Cool!  It started!
+    EchoEsc "$rc_done"
+}
+
+if
+  [ -r /etc/SuSE-release ]
+then
+  # rc.status is new since SuSE 7.0
+  [ -r /etc/rc.status ] && . /etc/rc.status
+  [ -r /etc/rc.config ] && . /etc/rc.config
+
+  # Determine the base and follow a runlevel link name.
+  base=${0##*/}
+  link=${base#*[SK][0-9][0-9]}
+
+fi
+if
+  [ -z "$rc_done" ]
+then
+  rc_done="Done."
+  rc_failed="Failed."
+  rc_skipped="Skipped."
+fi
+
+
+# exec 2>>/var/log/ha-debug
+
+#	This should probably be it's own autoconf parameter
+#	because RH has moved it from time to time...
+#	and I suspect Conectiva and Mandrake also supply it.
+
+DISTFUNCS=/etc/rc.d/init.d/functions
+SUBSYS=ha_logd
+
+[ -x $HA_BIN/ha_logd ] || exit 0
+
+#
+#	Some environments like it if we use their functions...
+#
+if
+  [ ! -x $DISTFUNCS ]
+then
+  # Provide our own versions of these functions
+  status() {
+	$HA_BIN/ha_logd -s
+  }
+  echo_failure() {
+      EchoEsc " ha_logd failure [rc=$1]. $rc_failed"
+      return $1
+  }
+  echo_success() {
+	: Cool!  It started!
+      EchoEsc "$rc_done"
+  }
+else
+  . $DISTFUNCS
+fi
+
+#
+#	See if they've configured things yet...
+#
+if
+  [ ! -f $LOGD_CFG ]
+then
+  EchoNoNl "ha_logd not configured: $LOGD_CFG not found."
+  echo_failure 1
+  exit 0
+fi
+
+StartLogd() {
+    if [ "$USE_LOGD" != "yes" ]; then
+	return 0
+    fi
+
+  EchoNoNl "Starting ha_logd: "
+
+    $HA_BIN/ha_logd -s >/dev/null 2>&1
+
+    if 
+	[ $? -eq 0 ]
+    then
+	Echo "logd is already running" 
+	return 0
+    fi
+    
+
+    $HA_BIN/ha_logd -d $LOGD_OPT >/dev/null 2>&1
+    if 
+	[ $? -ne 0 ]
+    then
+	Echo "starting logd failed"
+    fi
+    
+}
+
+StopLogd() {
+    if [ "$USE_LOGD" != "yes" ]; then
+	return 0
+    fi
+
+  EchoNoNl "Stopping ha_logd: "
+
+    $HA_BIN/ha_logd -s >/dev/null 2>&1
+    
+    if 
+	[ $? -ne 0 ] 
+    then
+	   Echo "logd is already stopped" 
+	   return 0
+    fi
+
+    $HA_BIN/ha_logd -k >/dev/null 2>&1
+    if 
+	[ $? -ne 0 ]	
+    then
+	Echo "stopping logd failed"
+    fi    
+}
+
+StatusLogd() {
+  $HA_BIN/ha_logd -s
+}
+
+RC=0
+# See how we were called.
+
+case "$1" in
+  start)
+	StartLogd
+	RC=$?
+	Echo
+	if
+	  [ $RC -eq 0 ]
+	then
+	  [ ! -d $LOCKDIR ] && mkdir -p $LOCKDIR
+	  touch $LOCKDIR/$SUBSYS
+	fi
+	;;
+
+  status)
+	StatusLogd
+	RC=$?;;
+
+  stop)
+	StopLogd
+	RC=$?
+	Echo
+        if
+          [ $RC -eq 0 ]
+        then
+          rm -f $LOCKDIR/$SUBSYS
+        fi
+	;;
+
+  restart)
+        sleeptime=1
+	StopLogd
+	sleep $sleeptime
+	echo_success
+	Echo
+	StartLogd
+	Echo
+	;;
+
+  *)
+	Echo "Usage: $0 {start|stop|status|restart}"
+	exit 1
+esac
+
+exit $RC
+
