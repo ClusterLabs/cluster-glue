@@ -26,10 +26,8 @@
 #
 # Short-Description: ha_logd logging daemon
 # Provides: ha_logd
-# Required-Start: $remote_fs $network $time $syslog
-# Should-Start: openhpid
-# Required-Stop: $remote_fs $network $time $syslog
-# Should-stop: openhpid
+# Required-Start: $network $syslog
+# Required-Stop: $network $syslog
 # Default-Start: 2 3 4 5
 # Default-Stop: 0 1 6
 ### END INIT INFO
