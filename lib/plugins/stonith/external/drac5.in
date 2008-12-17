@@ -22,7 +22,7 @@
 trap 'if [ -n "$outf" ]; then cat "$outf" >&2; rmtempfile "$outf"; fi' 0
 outf=`maketempfile` || exit 1
 
-function sshlogin() {
+sshlogin() {
 	if [ x = "x$ipaddr" -o x = "x$userid" ]
 	then
 		echo "ipaddr or userid missing; check configuration"
@@ -33,19 +33,19 @@ function sshlogin() {
 	@SSH@ -q -x -n $userid@$ipaddr racadm serveraction "$1" >$outf 2>&1
 }
 
-function drac_reset() {
+drac_reset() {
 	sshlogin hardreset
 }
 
-function drac_on() {
+drac_on() {
 	sshlogin poweron
 }
 
-function drac_off() {
+drac_off() {
 	sshlogin poweroff
 }
 
-function drac_status() {
+drac_status() {
 	sshlogin powerstatus
 }
 
