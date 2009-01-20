@@ -60,7 +60,7 @@
 #define QUEUE_SATURATION_FUZZ 10
 
 static IPC_Channel*	logging_daemon_chan = NULL;
-static gboolean		syslogformatfile = FALSE;
+static gboolean		syslogformatfile = TRUE;
 /*
  * If true, then output messages more or less like this...
  * Jul 14 21:45:18 beam logd: [1056]: info: setting log file to /dev/null
