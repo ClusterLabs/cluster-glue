@@ -19,11 +19,20 @@ off|reset)
     exit $?
     ;;
 status)
-    if sbd -d $sbd_device list >/dev/null 2>&1 ; then
-    	exit 0
-    else
+    if ! sbd -d $sbd_device list >/dev/null 2>&1 ; then
     	exit 1
     fi
+    nodes="$(crm_node -l)"
+    if [ -z "$node" ]; then
+        # No active nodes; strange, but maybe not running pacemaker?
+    	exit 0
+    fi
+    for N in $nodes ; do
+    	if ! sbd -d $sbd_device ping $N >/dev/null 2>&1 ; then
+	    exit 1
+	fi
+    done
+    exit 0
     ;;
 on)
     exit 1
