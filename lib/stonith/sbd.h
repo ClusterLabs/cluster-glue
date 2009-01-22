@@ -79,6 +79,7 @@ static int slot_lookup(const struct sector_header_s *s_header, const char *name)
 static int slot_unused(const struct sector_header_s *s_header);
 static int slot_allocate(const char *name);
 static int slot_list(void);
+static int slot_ping(const char *name);
 static int slot_msg(const char *name, const char *cmd);
 static int header_dump(void);
 static void sysrq_trigger(char t);

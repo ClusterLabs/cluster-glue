@@ -623,6 +623,68 @@ out:	free(s_mbox);
 	return rc;
 }
 
+static int
+slot_ping(const char *name)
+{
+	struct sector_header_s	*s_header = NULL;
+	struct sector_mbox_s	*s_mbox = NULL;
+	int			mbox;
+	int			waited = 0;
+	int			rc = 0;
+
+	if (!name) {
+		cl_log(LOG_ERR, "slot_ping(): No recipient specified.\n");
+		rc = -1; goto out;
+	}
+
+	s_header = header_get();
+	if (!s_header) {
+		rc = -1; goto out;
+	}
+
+	if (strcmp(name, "LOCAL") == 0) {
+		name = local_uname;
+	}
+
+	mbox = slot_lookup(s_header, name);
+	if (mbox < 0) {
+		cl_log(LOG_ERR, "slot_msg(): No slot found for %s.", name);
+		rc = -1; goto out;
+	}
+
+	s_mbox = sector_alloc();
+	s_mbox->cmd = SBD_MSG_TEST;
+
+	strncpy(s_mbox->from, local_uname, sizeof(s_mbox->from)-1);
+
+	cl_log(LOG_DEBUG, "Pinging node %s", name);
+	if (mbox_write(mbox, s_mbox) < -1) {
+		rc = -1; goto out;
+	}
+
+	rc = -1;
+	while (waited <= timeout_msgwait) {
+		if (mbox_read(mbox, s_mbox) < 0)
+			break;
+		if (s_mbox->cmd != SBD_MSG_TEST) {
+			rc = 0;
+			break;
+		}
+		sleep(1);
+		waited++;
+	}
+
+	if (rc == 0) {
+		cl_log(LOG_DEBUG, "%s successfully pinged.", name);
+	} else {
+		cl_log(LOG_WARN, "%s failed to ping.", name);
+	}
+
+out:	free(s_mbox);
+	free(s_header);
+	return rc;
+}
+
 static void
 sysrq_trigger(char t)
 {
@@ -815,7 +877,7 @@ main(int argc, char** argv)
 	
 	get_uname();
 
-	while ((c = getopt (argc, argv, "DWw:d:n:")) != -1) {
+	while ((c = getopt (argc, argv, "DWw:d:n:1:2:3:4:")) != -1) {
 		switch (c) {
 		case 'D':
 			go_daemon = 1;
@@ -873,6 +935,8 @@ main(int argc, char** argv)
 		exit_status = slot_list();
 	} else if (strcmp(argv[optind],"message") == 0) {
 		exit_status = slot_msg(argv[optind+1], argv[optind+2]);
+	} else if (strcmp(argv[optind],"ping") == 0) {
+		exit_status = slot_ping(argv[optind+1]);
 	} else if (strcmp(argv[optind],"watch") == 0) {
 		exit_status = daemonize();
 	} else {
