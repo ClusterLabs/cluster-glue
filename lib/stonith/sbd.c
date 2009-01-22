@@ -649,7 +649,7 @@ slot_ping(const char *name)
 	mbox = slot_lookup(s_header, name);
 	if (mbox < 0) {
 		cl_log(LOG_ERR, "slot_msg(): No slot found for %s.", name);
-		rc = -1; goto out;
+		rc = 1; goto out;
 	}
 
 	s_mbox = sector_alloc();
@@ -659,10 +659,10 @@ slot_ping(const char *name)
 
 	cl_log(LOG_DEBUG, "Pinging node %s", name);
 	if (mbox_write(mbox, s_mbox) < -1) {
-		rc = -1; goto out;
+		rc = 1; goto out;
 	}
 
-	rc = -1;
+	rc = 1;
 	while (waited <= timeout_msgwait) {
 		if (mbox_read(mbox, s_mbox) < 0)
 			break;
