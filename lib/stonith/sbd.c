@@ -677,7 +677,7 @@ slot_ping(const char *name)
 	if (rc == 0) {
 		cl_log(LOG_DEBUG, "%s successfully pinged.", name);
 	} else {
-		cl_log(LOG_WARN, "%s failed to ping.", name);
+		cl_log(LOG_ERR, "%s failed to ping.", name);
 	}
 
 out:	free(s_mbox);
