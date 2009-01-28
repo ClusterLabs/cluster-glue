@@ -401,6 +401,18 @@ typedef enum {
 typedef void (*PILLogFun)(PILLogLevel priority, const char * fmt, ...);
 
 /*
+ * The size glib2 type du jour?
+ * (once, this used to be size_t, so this change could break
+ * distributions with older glib2 versions; if so, just add an
+ * #ifelse below)
+ */
+#if GLIB_MINOR_VERSION <= 14
+	typedef gulong glib_size_t;
+#else
+	typedef gsize glib_size_t;
+#endif
+
+/*
  * struct PILPluginImports_s (typedef PILPluginImports) defines
  * the functions and capabilities that every plugin imports when it is loaded.
  */
@@ -442,9 +454,9 @@ struct PILPluginImports_s {
 	,	void*	plugin_private);
 
 	void	(*log)	(PILLogLevel priority, const char * fmt, ...);
-	void*	(*alloc)(size_t size);
-	void*	(*mrealloc)(void * ptr, size_t size);
-	void	(*mfree)(void* space);
+        gpointer (*alloc)(glib_size_t size);
+        gpointer (*mrealloc)(gpointer space, glib_size_t size);
+	void	(*mfree)(gpointer space);
 	char*	(*mstrdup)(const char *s);
 };
 
@@ -465,8 +477,8 @@ PILPluginUniv*	NewPILPluginUniv(const char * baseplugindirectory);
 
 /* Change memory allocation functions right after creating universe */
 void PilPluginUnivSetMemalloc(PILPluginUniv*
-,	void*	(*alloc)(size_t size)
-,	void*	(*mrealloc)(void *, size_t size)
+,       gpointer (*alloc)(glib_size_t size)
+,       gpointer (*mrealloc)(gpointer, glib_size_t size)
 ,	void	(*mfree)(void* space)
 ,	char*	(*mstrdup)(const char *s));
 
