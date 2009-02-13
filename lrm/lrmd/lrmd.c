@@ -593,8 +593,8 @@ lrmd_rsc_new(const char * id, struct ha_msg* msg)
 	lrmd_rsc_t*	rsc;
 	rsc = (lrmd_rsc_t *)calloc(sizeof(lrmd_rsc_t),1);
 	if (rsc == NULL) {
-		lrmd_log(LOG_ERR, "lrmd_rsc_new(): out of memory when calloc "
-			 "a lrmd_rsc_t");
+		lrmd_log(LOG_ERR, "%s: out of memory when calloc "
+			 "a lrmd_rsc_t", __FUNCTION__);
 		return NULL;
 	}
 	rsc->delay_timeout = (guint)0;
@@ -2025,8 +2025,15 @@ static void
 async_notify(gpointer key, gpointer val, gpointer data)
 {
 	struct ha_msg* msg = (struct ha_msg*)data;
+	lrmd_client_t* client;
 
-	send_msg(msg, lookup_client_by_name((char *)key));
+	client = lookup_client_by_name((char *)key);
+	if (!client) {
+		lrmd_log(LOG_INFO,
+			"%s: client %s not found, probably signed out", __FUNCTION__, (char *)key);
+	} else {
+		send_msg(msg, client);
+	}
 }
 
 int
