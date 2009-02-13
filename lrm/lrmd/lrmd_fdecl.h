@@ -48,6 +48,8 @@ static int perform_op(lrmd_rsc_t* rsc);
 static int unregister_client(lrmd_client_t* client);
 static int on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op);
 static int send_ret_msg ( IPC_Channel* ch, int rc);
+static void send_cbk_msg(struct ha_msg* msg, lrmd_client_t* client);
+static void send_msg(struct ha_msg* msg, lrmd_client_t* client);
 static void notify_client(lrmd_op_t* op);
 static lrmd_client_t* lookup_client (pid_t pid);
 static lrmd_rsc_t* lookup_rsc (const char* rid);
