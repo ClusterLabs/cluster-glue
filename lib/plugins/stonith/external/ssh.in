@@ -1,0 +1,176 @@
+#!/bin/sh
+#
+# External STONITH module for ssh.
+#
+# Copyright (c) 2004 SUSE LINUX AG - Lars Marowsky-Bree <lmb@suse.de>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+
+SSH_COMMAND="@SSH@ -q -x -o PasswordAuthentication=no -o StrictHostKeyChecking=no -n -l root" 
+#SSH_COMMAND="@SSH@ -q -x -n -l root"
+
+REBOOT_COMMAND="echo 'sleep 2; @REBOOT@ @REBOOT_OPTIONS@' | SHELL=/bin/sh at now >/dev/null 2>&1"
+
+# Warning: If you select this poweroff command, it'll physically
+# power-off the machine, and quite a number of systems won't be remotely
+# revivable.
+# TODO: Probably should touch a file on the server instead to just
+# prevent heartbeat et al from being started after the reboot.
+# POWEROFF_COMMAND="echo 'sleep 2; /sbin/poweroff -nf' | SHELL=/bin/sh at now >/dev/null 2>&1"
+POWEROFF_COMMAND="echo 'sleep 2; @REBOOT@ @REBOOT_OPTIONS@' | SHELL=/bin/sh at now >/dev/null 2>&1"
+
+# Rewrite the hostlist to accept "," as a delimeter for hostnames too.
+hostlist=`echo $hostlist | tr ',' ' '`
+
+is_host_up() {
+  for j in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+  do
+    if
+      ping -w1 -c1 "$1" >/dev/null 2>&1
+    then
+      sleep 1
+    else
+      return 1
+    fi
+  done
+  return 0
+}
+
+
+case $1 in
+gethosts)
+	for h in $hostlist ; do
+		echo $h
+	done
+	exit 0
+	;;
+on)
+	# Can't really be implemented because ssh cannot power on a system
+	# when it is powered off.
+	exit 1
+	;;
+off)
+	# Shouldn't really be implemented because if ssh cannot power on a 
+	# system, it shouldn't be allowed to power it off.
+	exit 1
+	;;
+reset)
+	for h in $hostlist
+	do
+	  if
+            [ "$h" != "$2" ]
+          then
+            continue
+          fi
+          if
+            case ${livedangerously} in
+              [Yy]*)	is_host_up $h;;
+	      *)	true;;
+             esac
+          then
+	    $SSH_COMMAND "$2" "$REBOOT_COMMAND"
+	    # Good thing this is only for testing...
+            if
+              is_host_up $h
+            then
+              exit 1
+            else
+              exit 0
+            fi
+          else
+            # well... Let's call it successful, after all this is only for testing...
+            exit 0
+          fi
+	done
+	exit 1
+	;;
+status)
+	if
+	  [ -z "$hostlist" ]
+	then
+	  exit 1
+	fi
+	for h in $hostlist
+	do
+	  if
+            ping -w1 -c1 "$h" 2>&1 | grep "unknown host"
+          then
+	    exit 1
+	  fi
+	done
+	exit 0
+	;;
+getconfignames)
+	echo "hostlist"
+	exit 0
+	;;
+getinfo-devid)
+	echo "ssh STONITH device"
+	exit 0
+	;;
+getinfo-devname)
+	echo "ssh STONITH external device"
+	exit 0
+	;;
+getinfo-devdescr)
+	echo "ssh-based Linux host reset"
+	echo "Fine for testing, but not suitable for production!"
+	exit 0
+	;;
+getinfo-devurl)
+	echo "http://openssh.org"
+	exit 0
+	;;
+getinfo-xml)
+	cat << SSHXML
+<parameters>
+<parameter name="hostlist" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Hostlist
+</shortdesc>
+<longdesc lang="en">
+The list of hosts that the STONITH device controls
+</longdesc>
+</parameter>
+
+<parameter name="livedangerously" unique="0" required="0">
+<content type="enum" />
+<shortdesc lang="en">
+Live Dangerously!!
+</shortdesc>
+<longdesc lang="en">
+Set to "yes" if you want to risk your system's integrity.
+Of course, since this plugin isn't for production, using it
+in production at all is a bad idea.  On the other hand,
+setting this parameter to yes makes it an even worse idea.
+Viva la Vida Loca!
+</longdesc>
+</parameter>
+
+</parameters>
+SSHXML
+	exit 0
+	;;
+*)
+	exit 1
+	;;
+esac
