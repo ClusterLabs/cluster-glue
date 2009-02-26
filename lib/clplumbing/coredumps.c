@@ -115,6 +115,7 @@ static void cl_coredump_signal_handler(int nsig);
  *		 0:	supported and disabled
  *		 1:	supported and enabled
  */
+#define BUF_MAX 256
 static int
 core_uses_pid(void)
 {
@@ -126,23 +127,24 @@ core_uses_pid(void)
 
 	for (j=0; j < DIMOF(corepats_pathnames); ++j) {
 		int	fd;
-		char	buf[256];
+		char	buf[BUF_MAX];
 		int	rc;
 		int	k;
 
 		if ((fd = open(corepats_pathnames[j], O_RDONLY)) < 0) {
 			continue;
 		}
-		rc = read(fd, buf, sizeof(buf));
+		
+		memset(buf, 0, BUF_MAX);
+		rc = read(fd, buf, BUF_MAX - 1); /* Ensure it is always NULL terminated */
 		close(fd);
-		if (rc < 1) {
-			continue;
-		}
-		for (k=0; k < DIMOF(goodpats); ++k) {
+		
+		for (k=0; rc > 0 && k < DIMOF(goodpats); ++k) {
 			if (strstr(buf, goodpats[k]) != NULL) {
 				return 1;
 			}
 		}
+
 		break;
 	}
 	for (j=0; j < DIMOF(uses_pid_pathnames); ++j) {
