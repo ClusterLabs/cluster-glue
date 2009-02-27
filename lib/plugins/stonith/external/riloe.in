@@ -425,7 +425,7 @@ def reset_power():
     - power off/on
     '''
     if power_method == 'button':
-        return hold_button()
+        rc = hold_button()
     elif reset_ok != '0':
         if power:
             return reset()
@@ -433,10 +433,12 @@ def reset_power():
             return power_on()
     else:
         rc = power_off()
-        if rc == 0:
-            time.sleep(2)
-            rc = power_on()
-        return rc
+    if rc == 0:
+        rc = read_power_state()
+    if rc == 0 and not power:
+        time.sleep(2)
+        rc = power_on()
+    return rc
 
 # track state of host power
 power = -1
