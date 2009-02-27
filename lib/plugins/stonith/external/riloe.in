@@ -309,12 +309,16 @@ def send_request(req,proc_f):
     is an XML document. Most of replies are just a kind of
     (verbose) XML "OK".
     '''
+    t_begin = time.time()
     c = open_ilo(rihost)
     try:
         c.send(req+'\r\n')
     except socket.error, msg:
         fatal("%s, while talking to %s" %(msg,rihost))
+    t_end = time.time()
+    my_debug("request sent in %0.2f s" % ((t_end-t_begin)))
 
+    t_begin = time.time()
     result = []
     while True:
         try:
@@ -329,6 +333,7 @@ def send_request(req,proc_f):
             my_err("%s, while talking to %s" %(msg,rihost))
             return -1
     c.close()
+    t_end = time.time()
 
     if not result:
         fatal("no response from %s"%rihost)
@@ -341,6 +346,7 @@ def send_request(req,proc_f):
         doc.unlink()
         if rc != 0:
             break
+    my_debug("iLO processed request (rc=%d) in %0.2f s" % (rc,(t_end-t_begin)))
     return rc
 
 def manage_power(cmd):
