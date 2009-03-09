@@ -184,6 +184,8 @@ struct IPC_QUEUE{
 	size_t		current_qlen;	/* Current qlen */
 	size_t		max_qlen;	/* Max allowed qlen */
 	GList*		queue;		/* List of messages */
+	/* keep the time of the last max queue warning */
+	time_t		last_maxqlen_warn;
 };
 
 /* authentication information : set of gids and uids */
