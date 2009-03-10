@@ -186,6 +186,8 @@ struct IPC_QUEUE{
 	GList*		queue;		/* List of messages */
 	/* keep the time of the last max queue warning */
 	time_t		last_maxqlen_warn;
+	/* and the number of messages lost */
+	unsigned	maxqlen_cnt;
 };
 
 /* authentication information : set of gids and uids */
