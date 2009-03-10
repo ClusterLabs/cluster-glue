@@ -809,15 +809,26 @@ LogToLoggingDaemon(int priority, const char * buf,
 		 */
 		if (drop_msg_num > 0
 		    && chan->send_queue->current_qlen
-		    < (chan->send_queue->max_qlen -1 -QUEUE_SATURATION_FUZZ)) {
+		    < (chan->send_queue->max_qlen -1 -QUEUE_SATURATION_FUZZ))
+		{
 			/* have to send it this way so the order is correct */
 			send_dropped_message(use_pri_str, chan);
 		}
 	
-		sendrc =  chan->ops->send(chan, msg);
+		/* Don't log a debug message if we're
+		 * approaching the queue limit and already
+		 * dropped a message
+		 */
+		if (drop_msg_num == 0
+		    || chan->send_queue->current_qlen >=
+		      (chan->send_queue->max_qlen -1 -QUEUE_SATURATION_FUZZ)
+		    || priority != LOG_DEBUG )
+		{
+			sendrc =  chan->ops->send(chan, msg);
+		}
 	}
-	
-	if (sendrc == IPC_OK) {		
+
+	if (sendrc == IPC_OK) {
 		return HA_OK;
 		
 	} else {
