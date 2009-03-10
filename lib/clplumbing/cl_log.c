@@ -820,7 +820,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 		 * dropped a message
 		 */
 		if (drop_msg_num == 0
-		    || chan->send_queue->current_qlen >=
+		    || chan->send_queue->current_qlen <
 		      (chan->send_queue->max_qlen -1 -QUEUE_SATURATION_FUZZ)
 		    || priority != LOG_DEBUG )
 		{
