@@ -92,9 +92,17 @@ $h
                  if [ "x$run_dump" != "x" ]
                  then
                      #Need to run core dump
-                     $SSH_COMMAND $dom0 "$DUMP_COMMAND $kill_node >/dev/null 2>&1"
+                     if [ "x$dump_dir" != "x" ]
+                     then
+			 #Dump with the specified core file
+			 TIMESTAMP=`date +%Y-%m%d-%H%M.%S`
+			 DOMAINNAME=`printf "%s" $kill_node`
+                         COREFILE=$dump_dir/$TIMESTAMP-$DOMAINNAME.core
+                         $SSH_COMMAND $dom0 "(mkdir -p $dump_dir; $DUMP_COMMAND $kill_node $COREFILE) >/dev/null 2>&1"
+                     else 
+                         $SSH_COMMAND $dom0 "$DUMP_COMMAND $kill_node >/dev/null 2>&1"
+		     fi
                  fi
-
                  $SSH_COMMAND $dom0 "(sleep 2; $STOP_COMMAND $kill_node) >/dev/null 2>&1 &"
                 break;;
             start)
@@ -221,6 +229,18 @@ Run dump-core
 </shortdesc>
 <longdesc lang="en">
 If set plugin will call "xm dump-core" before killing DomU
+</longdesc>
+</parameter>
+<parameter name="dump_dir" unique="1" required="0">
+<content type="string" />
+<shortdesc lang="en">
+Run dump-core with the specified directory 
+</shortdesc>
+<longdesc lang="en">
+This parameter can indicate the dump destination.
+Should be set as a full path format, ex.) "/var/log/dump"
+The above example would dump the core, like;
+/var/log/dump/2009-0316-1403.37-domU.core
 </longdesc>
 </parameter>
 </parameters>
