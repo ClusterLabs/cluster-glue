@@ -19,7 +19,7 @@
  #
 HBLIB=@libdir@/heartbeat
 LRMD=$HBLIB/lrmd
-LRMADMIN=$HBLIB/lrmadmin
+LRMADMIN=@sbindir@/lrmadmin
 export LRMD LRMADMIN
 
 if [ $# -gt 0 ]; then
