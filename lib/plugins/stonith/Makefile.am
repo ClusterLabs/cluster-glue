@@ -37,7 +37,6 @@ AM_CFLAGS		= @NON_FATAL_CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
 			-DLOCALEDIR='"@LOCALE@"' 		
 
 
-EXTRA_DIST = README.meatware README.rcd_serial README.vacm README.drac3 README.ipmilan README.cyclades README.bladehpi
 
 #
 #       We need "vacmclient_api.h" and -lvacmclient to make the VACM
@@ -197,3 +196,15 @@ suicide_la_LDFLAGS	= -export-dynamic -module -avoid-version
 stonithscriptdir        =  $(stonith_plugindir)/stonith2
 
 stonithscript_SCRIPTS  	= ribcl.py 
+
+# readme files
+
+stdocdir 		= $(datadir)/doc/packages/@HB_PKG@/stonith
+
+README_FILES = README.bladehpi README.cyclades README.drac3 \
+				README.external README.ipmilan README.meatware \
+				README.rcd_serial README.riloe README.vacm
+
+EXTRA_DIST = $(README_FILES)
+
+stdoc_DATA		= $(README_FILES)
