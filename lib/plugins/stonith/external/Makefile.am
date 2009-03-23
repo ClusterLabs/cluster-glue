@@ -19,8 +19,10 @@
 #
 MAINTAINERCLEANFILES = Makefile.in
 
+README_FILES	= README_kdumpcheck.txt
+
 EXTRA_DIST           = drac5 ibmrsa-telnet ipmi rackpdu vmware xen0 \
-			xen0-ha-dom0-stonith-helper sbd kdumpcheck
+			xen0-ha-dom0-stonith-helper sbd kdumpcheck $(README_FILES)
 
 extdir		     = $(stonith_ext_plugindir)
 
@@ -30,3 +32,9 @@ ext_SCRIPTS	     = drac5 ibmrsa ibmrsa-telnet ipmi riloe ssh vmware rackpdu xen0
 			xen0-ha sbd kdumpcheck
 
 helper_SCRIPTS	     = xen0-ha-dom0-stonith-helper
+
+# readme files
+
+stdocdir 		= $(datadir)/doc/packages/@HB_PKG@/stonith
+
+stdoc_DATA		= $(README_FILES)
