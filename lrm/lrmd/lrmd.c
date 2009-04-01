@@ -3006,7 +3006,7 @@ perform_ra_op(lrmd_op_t* op)
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
 	if (!op->interval) { /* log non-repeating ops */
-		lrmd_log(LOG_INFO,"rsc:%s: %s",rsc->id,op_type);
+		lrmd_log(LOG_INFO,"rsc:%s:%d: %s",rsc->id,op->call_id,op_type);
 	}
 	op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
 	params = merge_str_tables(rsc->params,op_params);
