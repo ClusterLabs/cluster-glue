@@ -327,7 +327,8 @@ get_resource_list(GList ** rsc_info)
 		if ( (fp = fopen(ra_pathname, "r")) == NULL ) {
 			tmp = g_list_next(cur);
 			*rsc_info = g_list_remove(*rsc_info, cur->data);
-			g_free(cur->data);
+			if (cur->data)
+				g_free(cur->data);
 			cur = tmp;
 			continue;
 		}
