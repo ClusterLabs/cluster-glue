@@ -24,7 +24,6 @@ export LRMD LRMADMIN
 
 if [ $# -gt 0 ]; then
 	LRMD=$1/lrmd
-	LRMADMIN=$1/lrmadmin
 fi
 
 if [ ! -f $LRMD ]; then
