@@ -3087,6 +3087,15 @@ perform_ra_op(lrmd_op_t* op)
 			return HA_OK;
 
 		case 0:		/* Child */
+			if (sched_getscheduler(0) != SCHED_OTHER) {
+				lrmd_debug(LOG_DEBUG,
+					"perform_ra_op: resetting scheduler class to SCHED_OTHER");
+				struct sched_param sp;
+				sp.sched_priority = 0;
+				if (sched_setscheduler(0, SCHED_OTHER, &sp) == -1)
+					cl_perror("%s::%d: sched_setscheduler",
+						__FUNCTION__, __LINE__);
+			}
 			/* Man: The call setpgrp() is equivalent to setpgid(0,0)
 			 * _and_ compiles on BSD variants too
 			 * need to investigate if it works the same too.
