@@ -34,6 +34,7 @@
 #include <dirent.h>
 #include <pwd.h>
 #include <time.h>
+#include <sched.h>
 
 #include <glib.h>
 #include <heartbeat.h>
