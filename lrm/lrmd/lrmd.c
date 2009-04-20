@@ -2986,6 +2986,7 @@ perform_ra_op(lrmd_op_t* op)
         GHashTable* op_params = NULL;
 	lrmd_rsc_t* rsc = NULL;
 	ra_pipe_op_t * rapop;
+	struct sched_param sp;
 
 	LRMAUDIT();
 	CHECK_ALLOCATED(op, "op", HA_FAIL);
@@ -3091,7 +3092,6 @@ perform_ra_op(lrmd_op_t* op)
 			if (sched_getscheduler(0) != SCHED_OTHER) {
 				lrmd_debug(LOG_DEBUG,
 					"perform_ra_op: resetting scheduler class to SCHED_OTHER");
-				struct sched_param sp;
 				sp.sched_priority = 0;
 				if (sched_setscheduler(0, SCHED_OTHER, &sp) == -1)
 					cl_perror("%s::%d: sched_setscheduler",
