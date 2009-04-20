@@ -104,6 +104,8 @@ struct msg_map msg_maps[] = {
 	{CANCELOP,	REPLY_NOW,	on_msg_cancel_op},
 	{GETRSCSTATE,	NO_MSG,	on_msg_get_state},
 	{GETRSCMETA,	NO_MSG, 	on_msg_get_metadata},
+	{SETLRMDPARAM,	REPLY_NOW, 	on_msg_set_lrmd_param},
+	{GETLRMDPARAM,	NO_MSG, 	on_msg_get_lrmd_param},
 };
 #define MSG_NR sizeof(msg_maps)/sizeof(struct msg_map)
 
@@ -3329,6 +3331,99 @@ on_ra_proc_query_name(ProcTrack* p)
 	}
 	LRMAUDIT();
 	return proc_name;
+}
+
+static int
+get_lrmd_param(const char *name, char *value, int maxstring)
+{
+	if (!name) {
+		lrmd_log(LOG_ERR, "%s: empty name", __FUNCTION__);
+		return HA_FAIL;
+	}
+	if (!strcmp(name,"max-children")) {
+		snprintf(value, maxstring, "%d", max_child_count);
+		return HA_OK;
+	} else {
+		lrmd_log(LOG_ERR, "%s: unknown lrmd parameter %s", __FUNCTION__, name);
+		return HA_FAIL;
+	}
+}
+
+static int
+set_lrmd_param(const char *name, const char *value)
+{
+	int ival;
+
+	if (!name) {
+		lrmd_log(LOG_ERR, "%s: empty name", __FUNCTION__);
+		return HA_FAIL;
+	}
+	if (!value) {
+		lrmd_log(LOG_ERR, "%s: empty value", __FUNCTION__);
+		return HA_FAIL;
+	}
+	if (!strcmp(name,"max-children")) {
+		ival = atoi(value);
+		if (ival <= 0) {
+			lrmd_log(LOG_ERR, "%s: invalid value for lrmd parameter %s"
+				, __FUNCTION__, name);
+			return HA_FAIL;
+		}
+		lrmd_log(LOG_INFO, "setting max-children to %d", ival);
+		max_child_count = ival;
+		return HA_OK;
+	} else {
+		lrmd_log(LOG_ERR, "%s: unknown lrmd parameter %s"
+			, __FUNCTION__, name);
+		return HA_FAIL;
+	}
+}
+
+int
+on_msg_set_lrmd_param(lrmd_client_t* client, struct ha_msg* msg)
+{
+	const char *name, *value;
+
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
+
+	name = ha_msg_value(msg,F_LRM_LRMD_PARAM_NAME);
+	value = ha_msg_value(msg,F_LRM_LRMD_PARAM_VAL);
+	if (!name || !value) {
+		lrmd_log(LOG_ERR, "%s: no parameter defined"
+			, __FUNCTION__);
+		return HA_FAIL;
+	}
+	return set_lrmd_param(name,value);
+}
+
+int
+on_msg_get_lrmd_param(lrmd_client_t* client, struct ha_msg* msg)
+{
+	struct ha_msg* ret = NULL;
+	const char *name;
+	char value[MAX_NAME_LEN];
+
+	CHECK_ALLOCATED(client, "client", HA_FAIL);
+	CHECK_ALLOCATED(msg, "message", HA_FAIL);
+
+	ret = create_lrm_ret(HA_OK, 1);
+	CHECK_RETURN_OF_CREATE_LRM_RET;
+
+	name = ha_msg_value(msg,F_LRM_LRMD_PARAM_NAME);
+	if (get_lrmd_param(name, value, MAX_NAME_LEN) != HA_OK) {
+		return HA_FAIL;
+	}
+	if (HA_OK != ha_msg_add(ret, F_LRM_LRMD_PARAM_VAL, value)) {
+		ha_msg_del(ret);
+		LOG_FAILED_TO_ADD_FIELD(F_LRM_LRMD_PARAM_VAL);
+		return HA_FAIL;
+	}
+	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
+		lrmd_log(LOG_ERR, "%s: can not send the ret msg",__FUNCTION__);
+	}
+	ha_msg_del(ret);
+	return HA_OK;
 }
 
 

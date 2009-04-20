@@ -76,6 +76,8 @@
 #define F_LRM_QUEUE_TIME	"lrm_queue_time"
 #define F_LRM_FAIL_REASON	"lrm_fail_reason"
 #define F_LRM_ASYNCMON_RC	"lrm_asyncmon_rc"
+#define F_LRM_LRMD_PARAM_NAME	"lrm_lrmd_param_name"
+#define F_LRM_LRMD_PARAM_VAL	"lrm_lrmd_param_val"
 
 #define	PRINT 	printf("file:%s,line:%d\n",__FILE__,__LINE__);
 
@@ -103,6 +105,8 @@
 #define RETURN			"return"
 #define FLUSHOPS		"flushops"
 #define CANCELOP		"cancelop"
+#define	SETLRMDPARAM	"setparam"
+#define	GETLRMDPARAM	"getparam"
 
 #define MAX_INT_LEN 		64
 #define MAX_NAME_LEN 		255

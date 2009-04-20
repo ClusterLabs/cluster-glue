@@ -31,6 +31,10 @@ static int on_msg_cancel_op(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_flush_all(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg);
 static int on_msg_get_state(lrmd_client_t* client, struct ha_msg* msg);
+static int on_msg_set_lrmd_param(lrmd_client_t* client, struct ha_msg* msg);
+static int on_msg_get_lrmd_param(lrmd_client_t* client, struct ha_msg* msg);
+static int set_lrmd_param(const char *name, const char *value);
+static int get_lrmd_param(const char *name, char *value, int maxstring);
 static gboolean sigterm_action(int nsig, gpointer unused);
 
 /* functions wrap the call to ra plugins */

@@ -95,6 +95,8 @@ static int lrm_add_rsc (ll_lrm_t*, const char* id, const char* class
 static int lrm_delete_rsc (ll_lrm_t*, const char* id);
 static int lrm_fail_rsc (ll_lrm_t* lrm, const char* rsc_id, const int fail_rc
 			,const char* fail_reason);
+static int lrm_set_lrmd_param (ll_lrm_t* lrm, const char* name, const char *value);
+static char* lrm_get_lrmd_param (ll_lrm_t* lrm, const char* name);
 static IPC_Channel* lrm_ipcchan (ll_lrm_t*);
 static int lrm_msgready (ll_lrm_t*);
 static int lrm_rcvmsg (ll_lrm_t*, int blocking);
@@ -104,6 +106,8 @@ static struct lrm_ops lrm_ops_instance =
 	lrm_signoff,
 	lrm_delete,
 	lrm_set_lrm_callback,
+	lrm_set_lrmd_param,
+	lrm_get_lrmd_param,
 	lrm_get_rsc_class_supported,
 	lrm_get_rsc_type_supported,
 	lrm_get_rsc_provider_supported,
@@ -736,6 +740,103 @@ lrm_fail_rsc (ll_lrm_t* lrm, const char* rsc_id, const int fail_rc
 	}
 
 	return HA_OK;
+}
+
+static int
+lrm_set_lrmd_param(ll_lrm_t* lrm, const char* name, const char *value)
+{
+	struct ha_msg* msg;
+
+	if (!name || !value) {
+		cl_log(LOG_ERR, "%s: no parameter name or value", __FUNCTION__);
+		return HA_FAIL;
+	}
+
+	/* check whether the channel to lrmd is available */
+	if (NULL == ch_cmd)	{
+		cl_log(LOG_ERR, "%s: ch_mod is null.", __FUNCTION__);
+		return HA_FAIL;
+	}
+
+	/* create the message */
+	msg = create_lrm_msg(SETLRMDPARAM);
+	if (NULL == msg) {
+		LOG_FAIL_create_lrm_rsc_msg(SETLRMDPARAM);
+		return HA_FAIL;
+	}
+	if (HA_OK != ha_msg_add(msg,F_LRM_LRMD_PARAM_NAME,name)
+	|| HA_OK != ha_msg_add(msg,F_LRM_LRMD_PARAM_VAL,value)) {
+		ha_msg_del(msg);
+		LOG_BASIC_ERROR("ha_msg_add");
+		return HA_FAIL;
+	}
+	/* send to lrmd */
+	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
+		ha_msg_del(msg);
+		LOG_FAIL_SEND_MSG(FAILRSC, "ch_cmd");
+		return HA_FAIL;
+	}
+	ha_msg_del(msg);
+	/* check the result */
+	if (HA_OK != get_ret_from_ch(ch_cmd)) {
+		LOG_GOT_FAIL_RET(LOG_ERR, FAILRSC);
+		return HA_FAIL;
+	}
+
+	return HA_OK;
+}
+
+static char*
+lrm_get_lrmd_param (ll_lrm_t* lrm, const char *name)
+{
+	struct ha_msg* msg = NULL;
+	struct ha_msg* ret = NULL;
+	const char* value = NULL;
+	char* v2;
+
+	/* check whether the channel to lrmd is available */
+	if (NULL == ch_cmd)	{
+		cl_log(LOG_ERR, "lrm_get_rsc: ch_mod is null.");
+		return NULL;
+	}
+	/* create the msg of get resource */
+	msg = create_lrm_msg(GETLRMDPARAM);
+	if ( NULL == msg) {
+		LOG_FAIL_create_lrm_msg(GETLRMDPARAM);
+		return NULL;
+	}
+	if (HA_OK != ha_msg_add(msg,F_LRM_LRMD_PARAM_NAME,name)) {
+		ha_msg_del(msg);
+		LOG_BASIC_ERROR("ha_msg_add");
+		return NULL;
+	}
+	/* send the msg to lrmd */
+	if (HA_OK != msg2ipcchan(msg,ch_cmd)) {
+		ha_msg_del(msg);
+		LOG_FAIL_SEND_MSG(GETLRMDPARAM, "ch_cmd");
+		return NULL;
+	}
+	ha_msg_del(msg);
+	/* get the return msg from lrmd */
+	ret = msgfromIPC(ch_cmd, MSG_ALLOWINTR);
+	if (NULL == ret) {
+		LOG_FAIL_receive_reply(GETLRMDPARAM);
+		return NULL;
+	}
+	/* get the return code of return message */
+	if (HA_OK != get_ret_from_msg(ret)) {
+		ha_msg_del(ret);
+		return NULL;
+	}
+	value = ha_msg_value(ret,F_LRM_LRMD_PARAM_VAL);
+	if (!value) {
+		LOG_FAIL_GET_MSG_FIELD(LOG_ERR, F_LRM_LRMD_PARAM_VAL, ret);
+		ha_msg_del(ret);
+		return NULL;
+	}
+	v2 = g_strdup(value);
+	ha_msg_del(ret);
+	return v2;
 }
 
 static int

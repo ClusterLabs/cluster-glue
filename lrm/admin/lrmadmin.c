@@ -47,14 +47,13 @@
 #include <clplumbing/GSource.h>
 #include <clplumbing/Gmain_timeout.h>
 
-const char * optstring = "AD:X:dEF:d:sg:M:O:P:c:S:LI:CT:n:h";
+const char * optstring = "A:D:X:dE:F:dg:p:M:O:P:c:S:LI:CT:n:h";
 
 #ifdef HAVE_GETOPT_H
 static struct option long_options[] = {
 	{"daemon", 0, 0, 'd'},
 	{"executera", 1, 0, 'E'},
 	{"flush",1,0,'F'},
-	{"monitor",0,0,'M'},
 	{"state",1,0,'S'},
 	{"listall",0,0,'L'},
 	{"information",1,0,'I'},
@@ -66,6 +65,8 @@ static struct option long_options[] = {
 	{"all_type_metadata",1,0,'O'},
 	{"metadata",1,0,'M'},
 	{"provider",1,0,'P'},
+	{"set_lrmd_param", 1, 0, 'p'},
+	{"get_lrmd_param", 1, 0, 'g'},
 	{"help",0,0,'h'},
 	{0,0,0,0}
 };
@@ -86,6 +87,8 @@ typedef enum {
 	RSC_STATE,
 	LIST_ALLRSC,
 	INF_RSC,
+	SET_PARAM,
+	GET_PARAM,
 	ADD_RSC,
 	DEL_RSC,
 	FAIL_RSC,
@@ -150,6 +153,8 @@ const char * simple_help_screen =
 "         {-O|--all metadata of this class} <raclass>\n"
 "         {-M|--metadata} <raclass> <ratype> <provider|NULL>\n"
 "         {-P|--provider} <raclass> <ratype>\n"
+"         {-p|--set_lrmd_param} <name> <value>\n"
+"         {-g|--get_lrmd_param} <name>\n"
 "         {-h|--help}\n";
 
 #define OPTION_OBSCURE_CHECK \
@@ -163,6 +168,8 @@ static int resource_operation(ll_lrm_t * lrmd, int argc, int optind,
 			      char * argv[]);
 static int add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
 static int fail_resource(ll_lrm_t * lrmd, char *rsc_id, int optc, char *opts[]);
+static int get_param(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
+static int set_param(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
 static int transfer_cmd_params(int amount, int start, char * argv[], 
 			   const char * class, GHashTable ** params_ht);
 static void g_print_stringitem_and_free(gpointer data, gpointer user_data);
@@ -204,7 +211,7 @@ int main(int argc, char **argv)
 	char raclass[20];
 	const char * login_name = lrmadmin_name;
 
-	/* Prevent getopt_long to print error message on stderr isself */
+	/* Prevent getopt_long to print error message on stderr itself */
 	/*opterr = 0; */  
 	
 	if (argc == 1) {
@@ -321,6 +328,16 @@ int main(int argc, char **argv)
 				lrmadmin_cmd = INF_RSC;
 				break;
 
+			case 'p':
+				OPTION_OBSCURE_CHECK 
+				lrmadmin_cmd = SET_PARAM;
+				break;
+
+			case 'g':
+				OPTION_OBSCURE_CHECK 
+				lrmadmin_cmd = GET_PARAM;
+				break;
+
 			case 'n':
 				if (optarg) {
 					fake_name = optarg;
@@ -415,6 +432,16 @@ int main(int argc, char **argv)
 			break;
 		case RA_PROVIDER:
 			ra_provider(lrmd, argc, optind, argv);
+			ASYN_OPS = FALSE;
+			break;
+
+		case SET_PARAM:
+			set_param(lrmd, argc, optind, argv);
+			ASYN_OPS = FALSE;
+			break;
+
+		case GET_PARAM:
+			get_param(lrmd, argc, optind, argv);
 			ASYN_OPS = FALSE;
 			break;
 
@@ -802,6 +829,34 @@ fail_resource(ll_lrm_t * lrmd, char *rsc_id, int optc, char *opts[])
 		reason = opts[1];
 
 	return lrmd->lrm_ops->fail_rsc(lrmd, rsc_id, fail_rc, reason);
+}
+
+static int 
+get_param(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
+{
+	const char *name = argv[optind-1];
+	char *value;
+
+	if ((argc - optind) != 0) {
+		cl_log(LOG_ERR,"Bad usage.");
+		return -2;
+	}
+	value = lrmd->lrm_ops->get_lrmd_param(lrmd, name);
+	printf("%s: %s\n", name, value);
+	return 0;
+}
+
+static int 
+set_param(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
+{
+	const char *name = argv[optind-1];
+	const char *value = argv[optind];
+
+	if ((argc - optind) != 1) {
+		cl_log(LOG_ERR,"Bad usage.");
+		return -2;
+	}
+	return lrmd->lrm_ops->set_lrmd_param(lrmd, name, value);
 }
 
 static int
