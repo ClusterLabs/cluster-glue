@@ -268,6 +268,16 @@ struct lrm_ops
 			lrm_op_done_callback_t op_done_callback_func);
 
 /*
+ *set_lrmd_param:	set lrmd parameter
+ *get_lrmd_param:	get lrmd parameter
+ *
+ *return:	HA_OK for success, HA_FAIL for failure
+ *		NB: currently used only for max_child_count
+ */
+	int	(*set_lrmd_param)(ll_lrm_t*, const char *name, const char *value);
+	char* (*get_lrmd_param)(ll_lrm_t*, const char *name);
+
+/*
 	int		(*set_parameters)(ll_lrm_t*, const GHashTable* option);
 
 	GHashTable*     (*get_all_parameters)(ll_lrm_t*);
