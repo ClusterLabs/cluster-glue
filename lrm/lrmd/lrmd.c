@@ -3791,6 +3791,8 @@ read_pipe(int fd, char ** data, void * user_data)
 static gboolean 
 debug_level_adjust(int nsig, gpointer user_data)
 {
+	const char s[16];
+
 	switch (nsig) {
 		case SIGUSR1:
 			debug_level++;
@@ -3810,6 +3812,8 @@ debug_level_adjust(int nsig, gpointer user_data)
 				"unexpected signal(%d). Something wrong?.",nsig);
 	}
 
+	snprintf(s, sizeof(s), "%d", debug_level);
+	setenv(HADEBUGVAL, s, 1);
 	return TRUE;
 }
 
