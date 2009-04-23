@@ -147,7 +147,7 @@ static int get_provider_list(const char* ra_type, GList ** providers);
 /* The end of exported function list */
 
 /* The begin of internal used function & data list */
-#define HADEBUGVAL      "HA_DEBUG"
+#define HADEBUGVAL      "HA_debug"
 #define MAX_PARAMETER_NUM 40
 
 const int MAX_LENGTH_OF_RSCNAME = 40,
