@@ -3791,7 +3791,7 @@ read_pipe(int fd, char ** data, void * user_data)
 static gboolean 
 debug_level_adjust(int nsig, gpointer user_data)
 {
-	const char s[16];
+	char s[16];
 
 	switch (nsig) {
 		case SIGUSR1:
