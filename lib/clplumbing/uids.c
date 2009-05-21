@@ -92,7 +92,7 @@ drop_privs(uid_t uid, gid_t gid)
 }
 
 int	/* Return to our original privileges (if any) */
-return_to_orig_privs()
+return_to_orig_privs(void)
 {
 	int	rc;
 	if (!anysaveduid) {
