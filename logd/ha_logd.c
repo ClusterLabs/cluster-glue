@@ -505,7 +505,7 @@ on_connect_cmd (IPC_Channel* ch, gpointer user_data)
 					       ch, FALSE, on_receive_cmd,
 					       (gpointer)client,
 					       on_remove_client);
-	if (client->g_src <=0){
+	if (client->g_src == NULL){
 		cl_log(LOG_ERR, "add the client to main loop failed");
 		free(client);
 		return TRUE;
