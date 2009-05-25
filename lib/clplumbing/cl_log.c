@@ -762,7 +762,7 @@ cl_flush_logs(void)
 	logging_daemon_chan->ops->waitout(logging_daemon_chan);
 }
 
-int
+static int
 LogToLoggingDaemon(int priority, const char * buf, 
 		   int bufstrlen, gboolean use_pri_str)
 {

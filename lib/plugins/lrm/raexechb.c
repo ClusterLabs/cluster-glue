@@ -129,8 +129,8 @@ static int get_provider_list(const char* ra_type, GList ** providers);
 #define MAX_PARAMETER_NUM 40
 typedef char * RA_ARGV[MAX_PARAMETER_NUM];
 
-const int MAX_LENGTH_OF_RSCNAME = 40,
-	  MAX_LENGTH_OF_OPNAME = 40;
+static const int MAX_LENGTH_OF_RSCNAME = 40,
+		 MAX_LENGTH_OF_OPNAME = 40;
 
 static int prepare_cmd_parameters(const char * rsc_type, const char * op_type,
 		GHashTable * params, RA_ARGV params_argv);

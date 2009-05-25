@@ -47,36 +47,36 @@
 #include <clplumbing/GSource.h>
 #include <clplumbing/Gmain_timeout.h>
 
-const char * optstring = "A:D:X:dE:F:dg:p:M:O:P:c:S:LI:CT:n:h";
+static const char *optstring = "A:D:X:dE:F:dg:p:M:O:P:c:S:LI:CT:n:h";
 
 #ifdef HAVE_GETOPT_H
 static struct option long_options[] = {
-	{"daemon", 0, 0, 'd'},
-	{"executera", 1, 0, 'E'},
-	{"flush",1,0,'F'},
-	{"state",1,0,'S'},
-	{"listall",0,0,'L'},
-	{"information",1,0,'I'},
-	{"add",1,0,'A'},
-	{"delete",1,0,'D'},
-	{"fail",1,0,'X'},
-	{"raclass_supported",1,0,'C'},
-	{"ratype_supported",1,0,'T'},
-	{"all_type_metadata",1,0,'O'},
-	{"metadata",1,0,'M'},
-	{"provider",1,0,'P'},
-	{"set_lrmd_param", 1, 0, 'p'},
-	{"get_lrmd_param", 1, 0, 'g'},
-	{"help",0,0,'h'},
-	{0,0,0,0}
+	{"daemon",		0, NULL, 'd'},
+	{"executera",		1, NULL, 'E'},
+	{"flush",		1, NULL, 'F'},
+	{"state",		1, NULL, 'S'},
+	{"listall",		0, NULL, 'L'},
+	{"information",		1, NULL, 'I'},
+	{"add",			1, NULL, 'A'},
+	{"delete",		1, NULL, 'D'},
+	{"fail",		1, NULL, 'X'},
+	{"raclass_supported",	1, NULL, 'C'},
+	{"ratype_supported",	1, NULL, 'T'},
+	{"all_type_metadata",	1, NULL, 'O'},
+	{"metadata",		1, NULL, 'M'},
+	{"provider",		1, NULL, 'P'},
+	{"set_lrmd_param",	1, NULL, 'p'},
+	{"get_lrmd_param",	1, NULL, 'g'},
+	{"help",		0, NULL, 'h'},
+	{NULL,			0, NULL, 0}
 };
 #endif /* HAVE_GETOPT_H */
 
-GMainLoop *mainloop = NULL;
-const char * lrmadmin_name = "lrmadmin";
-const char * fake_name = NULL;
+static GMainLoop *mainloop;
+static const char *lrmadmin_name = "lrmadmin";
+static const char *fake_name;
 /* 20 is the length limit for a argv[x] */
-const int ARGVI_MAX_LEN = 48;
+static const int ARGVI_MAX_LEN = 48;
 
 typedef enum {
 	ERROR_OPTION = -1,
@@ -138,7 +138,7 @@ static gboolean ASYN_OPS = FALSE;
 static int call_id = 0;
 static int TIMEOUT = -1; /* the unit is ms */
 
-const char * simple_help_screen =
+static const char *simple_help_screen =
 "lrmadmin {-d|--deamon}\n"
 "         {-A|--add} <rscid> <raclass> <ratype> <provider|NULL> [<rsc_params_list>]\n"
 "         {-D|--delete} <rscid>\n"
@@ -197,15 +197,15 @@ static gboolean lrm_op_timeout(gpointer data);
 
 static void lrm_op_done_callback(lrm_op_t* op);
 
-int ret_value = 0; 
+static int ret_value;
 int main(int argc, char **argv)
 {
 	int option_char;
 	char rscid_arg_tmp[RID_LEN];
         ll_lrm_t* lrmd;
 	lrm_rsc_t * lrm_rsc;
-	GList 	*raclass_list = 0, 
-		*ratype_list = 0,
+	GList 	*raclass_list = NULL,
+		*ratype_list = NULL,
 		*rscid_list;
 	GHashTable *all_meta = NULL;
 	char raclass[20];

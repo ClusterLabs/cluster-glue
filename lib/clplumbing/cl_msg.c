@@ -55,7 +55,6 @@
 static int	compression_threshold = (2*1024);
 
 static enum cl_msgfmt msgfmt = MSGFMT_NVPAIR;
-int	cl_max_msg_size = (512*1024);
 static	gboolean use_traditional_compression = TRUE;
 
 const char*

@@ -236,7 +236,7 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 }
 
 void
-cl_make_normaltime()
+cl_make_normaltime(void)
 {
 #ifdef DEFAULT_REALTIME
 	struct sched_param	sp;

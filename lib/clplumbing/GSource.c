@@ -642,7 +642,6 @@ G_CH_dispatch_int(GSource * source,
 /*
  *	Free up our data, and notify the user process...
  */
-int	ch_destroy_debug_me = 0;
 void
 G_CH_destroy_int(GSource* source)
 {

@@ -115,7 +115,7 @@ get_runnable_list(const char* class_path, GList ** rsc_info)
 		*rsc_info = NULL;
 	}
 
-	file_num = scandir(class_path, &namelist, 0, alphasort);
+	file_num = scandir(class_path, &namelist, NULL, alphasort);
 	if (file_num < 0) {
 		cl_log(LOG_ERR, "scandir failed in RA plugin");
 		return -2;
@@ -125,7 +125,7 @@ get_runnable_list(const char* class_path, GList ** rsc_info)
 
 			tmp_buffer[0] = '\0';
 			tmp_buffer[FILENAME_MAX] = '\0';
-			snprintf(tmp_buffer, FILENAME_MAX, "%s/%s", 
+			snprintf(tmp_buffer, FILENAME_MAX, "%s/%s",
 				 class_path, namelist[file_num]->d_name );
 			if ( filtered(tmp_buffer) == TRUE ) {
 				*rsc_info = g_list_append(*rsc_info,

@@ -29,16 +29,15 @@
 #include <syslog.h>
 #include <clplumbing/GSource.h>
 
-void lrm_op_done_callback (lrm_op_t* op);
-void printf_rsc(lrm_rsc_t* rsc);
-void printf_op(lrm_op_t* op);
-void printf_hash_table(GHashTable* hash_table);
-void get_all_rsc(ll_lrm_t* lrm);
-void get_cur_state(lrm_rsc_t* rsc);
-gboolean lrm_dispatch(IPC_Channel* notused, gpointer user_data);
-GMainLoop* mainloop 		= NULL;
+static void lrm_op_done_callback(lrm_op_t *op);
+static void printf_rsc(lrm_rsc_t *rsc);
+static void printf_op(lrm_op_t *op);
+static void printf_hash_table(GHashTable *hash_table);
+static gboolean lrm_dispatch(IPC_Channel *notused, gpointer user_data);
+static GMainLoop *mainloop;
 
-int main (int argc, char* argv[])
+int
+main(int argc, char *argv[])
 {
 	ll_lrm_t* lrm;
 	lrm_rsc_t* rsc = NULL;
@@ -128,22 +127,27 @@ int main (int argc, char* argv[])
 
 	puts("signoff...");
 	lrm->lrm_ops->signoff(lrm);
-	
+
 	return 0;
 }
-void lrm_op_done_callback(lrm_op_t* op)
+
+static void
+lrm_op_done_callback(lrm_op_t *op)
 {
 	puts("lrm_op_done_callback...");
 	printf_op(op);
 }
-gboolean lrm_dispatch(IPC_Channel* notused, gpointer user_data)
+
+static gboolean
+lrm_dispatch(IPC_Channel *notused, gpointer user_data)
 {
 	ll_lrm_t *lrm = (ll_lrm_t*)user_data;
 	lrm->lrm_ops->rcvmsg(lrm, FALSE);
 	return TRUE;
 }
 
-void printf_rsc(lrm_rsc_t* rsc)
+static void
+printf_rsc(lrm_rsc_t *rsc)
 {
 	printf("print resource\n");
 	if (NULL == rsc) {
@@ -159,7 +163,8 @@ void printf_rsc(lrm_rsc_t* rsc)
 	printf("print end\n");
 }
 
-void printf_op(lrm_op_t* op)
+static void
+printf_op(lrm_op_t *op)
 {
 	printf("print op\n");
 
@@ -188,48 +193,13 @@ printf_pair(gpointer key, gpointer value, gpointer user_data)
 {
 	printf("\t\t%s=%s\n",(char*)key,(char*)value);
 }
-void
-printf_hash_table(GHashTable* hash_table)
+
+static void
+printf_hash_table(GHashTable *hash_table)
 {
 	if (NULL == hash_table) {
 		printf("\t\tnull\n");
 		return;
 	}
 	g_hash_table_foreach(hash_table, printf_pair, NULL);
-}
-void
-get_all_rsc(ll_lrm_t* lrm)
-{
-	GList* element = NULL, * rid_list = NULL;
-
-	puts("get_all_rscs...");
-	rid_list = lrm->lrm_ops->get_all_rscs(lrm);
-	if (NULL != rid_list) {
-		element = g_list_first(rid_list);
-		while (NULL != element) {
-			printf("\tid:%s\n",(char*)element->data);
-			element = g_list_next(element);
-		}
-	} else {
-		puts("\tnone.");
-	}
-}
-void
-get_cur_state(lrm_rsc_t* rsc)
-{
-	state_flag_t state;
-	GList* node = NULL, * op_list = NULL;
-	lrm_op_t* op = NULL;
-
-	op_list = rsc->ops->get_cur_state(rsc, &state);
-
-	printf("\tcurrent state:%s\n",state==LRM_RSC_IDLE?"Idel":"Busy");
-
-       
-	for(node = g_list_first(op_list); NULL != node;
-                node = g_list_next(node)) {
-		op = (lrm_op_t*)node->data;
-		printf_op(op);
-	}
-
 }

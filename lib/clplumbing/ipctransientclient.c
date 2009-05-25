@@ -19,7 +19,7 @@
 #include <ipctransient.h>
 
 #define MAX_MESSAGES 3
-char *messages[MAX_MESSAGES];
+static char *messages[MAX_MESSAGES];
 
 IPC_Message *create_simple_message(const char *text, IPC_Channel *ch);
 IPC_Channel *init_client_ipctest_comms(
