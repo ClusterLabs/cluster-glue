@@ -209,7 +209,7 @@ struct IPC_Stats {
 	int	last_send_rc;
 };
 
-struct IPC_Stats	SocketIPCStats = {0,0,0,0};
+static struct IPC_Stats SocketIPCStats = {0, 0, 0, 0};
 extern int	debug_level;
 
 /* unix domain socket implementations of IPC functions. */

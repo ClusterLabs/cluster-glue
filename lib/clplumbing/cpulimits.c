@@ -186,13 +186,13 @@ cl_cpu_limit_setpercent(int ipercent)
 }
 
 int
-cl_cpu_limit_ms_interval()
+cl_cpu_limit_ms_interval(void)
 {
 	return	cpuinterval_ms;
 }
 
 int
-cl_cpu_limit_update()
+cl_cpu_limit_update(void)
 {
 	longclock_t	now = time_longclock();
 	long		msleft;

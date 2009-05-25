@@ -57,10 +57,10 @@ static int (*PollFunc)(struct pollfd * fds, unsigned int, int)
 =	(int (*)(struct pollfd * fds, unsigned int, int))  poll;
 static gboolean checkmsg(IPC_Message* rmsg, const char * who, int rcount);
 
-const char *procname;
+static const char *procname;
 
-int iter_def = 10000;	/* number of iterations */
-int verbosity = 0;	/* verbosity level */
+static const int iter_def = 10000;	/* number of iterations */
+static int verbosity;			/* verbosity level */
 
 /*
  * The ipc interface can be invoked as either:
@@ -72,7 +72,7 @@ int verbosity = 0;	/* verbosity level */
  */
 /* *** CLIENTS_MAX currently 1 while coding *** */
 #define CLIENTS_MAX 1	/* max. number of independent clients */
-int clients_def = 0;	/* number of independent clients */
+static int clients_def;	/* number of independent clients */
 
 static int
 channelpair(TestFunc_t	clientfunc, TestFunc_t serverfunc, int count)
@@ -394,7 +394,7 @@ transport_tests(int iterations, int clients)
 	return rc;
 }
 
-int data_size = 10;
+static int data_size = 10;
 
 int
 main(int argc, char ** argv)

@@ -49,7 +49,7 @@ extern const char* FT_strings[];
 #define		NL_TO_SYM	0
 #define		SYM_TO_NL	1
 
-int		SPECIAL_SYMS[MAXDEPTH]={
+static const int SPECIAL_SYMS[MAXDEPTH] = {
 	20,
 	21,
 	22,

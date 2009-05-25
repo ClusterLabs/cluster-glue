@@ -249,7 +249,7 @@ cl_enable_coredumps(int doenable)
  * prctl(2).  This is an untested theory at this time...
  */
 void
-cl_set_all_coredump_signal_handlers()
+cl_set_all_coredump_signal_handlers(void)
 {
 	static const int coresigs [] = {SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGSEGV
 #ifdef SIGBUS

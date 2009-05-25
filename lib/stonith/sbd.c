@@ -49,7 +49,7 @@ static int		timeout_msgwait		= 10;
 
 static int	watchdog_use		= 0;
 static int	go_daemon		= 0;
-const char *	watchdogdev 		= "/dev/watchdog";
+static const char *watchdogdev		= "/dev/watchdog";
 static char *	local_uname;
 
 /* Global, non-tunable variables: */
@@ -59,10 +59,10 @@ static int	devfd;
 static char	*devname;
 static char	*cmdname;
 
-void
-usage()
+static void
+usage(void)
 {
-	fprintf(stderr, 
+	fprintf(stderr,
 "Shared storage fencing tool.\n"
 "Syntax:\n"
 "	%s <options> <command> <cmdarguments>\n"
@@ -194,7 +194,7 @@ cmd2char(const char *cmd)
 	return -1;
 }
 
-void *
+static void *
 sector_alloc(void)
 {
 	void *x;
@@ -204,7 +204,7 @@ sector_alloc(void)
 		exit(1);
 	}
 	memset(x, 0, sector_size);
-	
+
 	return x;
 }
 
