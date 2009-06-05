@@ -335,11 +335,6 @@ esac
 AC_MSG_RESULT($U64T)
 AC_DEFINE_UNQUOTED(U64T, "$U64T", Correct printf format for logging uint64_t)
 
-AC_CHECK_HEADERS(heartbeat/hb_config.h)
-if test "$ac_cv_header_heartbeat_hb_config_h" != "yes"; then
-   AC_MSG_FAILURE(The heartbeat-common development headers were not found)
-fi
-
 dnl Variables needed for substitution
 AC_DEFINE_UNQUOTED(GLUE_DAEMON_USER,"$GLUE_DAEMON_USER", User to run daemons as)
 AC_DEFINE_UNQUOTED(HA_CCMUSER,"$GLUE_DAEMON_USER", User to run daemons as)
