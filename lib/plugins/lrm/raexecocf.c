@@ -72,8 +72,6 @@ static int get_provider_list(const char* ra_type, GList ** providers);
 /* The end of exported function list */
 
 /* The begin of internal used function & data list */
-#define HADEBUGVAL      "HA_debug"
-
 static void add_OCF_prefix(GHashTable * params, GHashTable * new_params);
 static void add_OCF_env_vars(GHashTable * env, const char * rsc_id,
 			     const char * rsc_type, const char * provider);

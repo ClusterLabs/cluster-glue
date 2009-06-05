@@ -20,6 +20,6 @@
 #
 MAINTAINERCLEANFILES    = Makefile.in
 
-includedir=$(stonith_includedir)
+idir=$(includedir)/stonith
 
-include_HEADERS	        = expect.h stonith.h stonith_plugin.h st_ttylock.h
+i_HEADERS	        = expect.h stonith.h stonith_plugin.h st_ttylock.h

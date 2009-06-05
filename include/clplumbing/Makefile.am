@@ -21,9 +21,9 @@
 #
 MAINTAINERCLEANFILES    = Makefile.in
 
-includedir=$(base_includedir)/clplumbing
+idir=$(includedir)/clplumbing
 
-include_HEADERS	=	\
+i_HEADERS	=	\
 	Gmain_timeout.h	\
 	GSource.h	\
 	GSource_internal.h	\
@@ -57,4 +57,3 @@ include_HEADERS	=	\
 	cl_tiebreaker.h	\
 	cl_quorum.h	\
 	cl_quorumd.h
-	
