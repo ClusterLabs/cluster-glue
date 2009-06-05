@@ -759,6 +759,7 @@ dnl Structures
 dnl ========================================================================
 
 AC_CHECK_MEMBERS([struct tm.tm_gmtoff],,,[[#include <time.h>]])
+AC_CHECK_TYPES([nfds_t],,,[[#include <poll.h>]])
 
 dnl ========================================================================
 dnl Functions
