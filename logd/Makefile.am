@@ -26,7 +26,6 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 
 halibdir		= $(libdir)/@HB_PKG@
 ha_sbindir		= $(sbindir)
-gliblib			= @GLIBLIB@
 
 LIBRT 			= @LIBRT@
 AM_CFLAGS		= @CFLAGS@
@@ -37,16 +36,15 @@ halib_PROGRAMS	  = ha_logd logtest
 
 ha_logd_SOURCES	  = ha_logd.c
 ha_logd_LDADD	  = $(top_builddir)/lib/clplumbing/libplumb.la		\
-		    $(top_builddir)/lib/clplumbing/libplumbgpl.la	\
-		    $(gliblib) $(top_builddir)/lib/apphb/libapphb.la
+		    $(top_builddir)/lib/clplumbing/libplumbgpl.la
+
+#		    $(top_builddir)/lib/apphb/libapphb.la
 
 ha_logger_SOURCES = ha_logger.c
-ha_logger_LDADD   = $(top_builddir)/lib/clplumbing/libplumb.la  	\
-                    $(gliblib)
+ha_logger_LDADD   = $(top_builddir)/lib/clplumbing/libplumb.la
 
 logtest_SOURCES   = logtest.c
-logtest_LDADD     = $(top_builddir)/lib/clplumbing/libplumb.la    	\
-                    $(gliblib)
+logtest_LDADD     = $(top_builddir)/lib/clplumbing/libplumb.la
 
 install-exec-hook:
 	$(LN_S) -f $(sbindir)/ha_logger $(DESTDIR)$(halibdir)

@@ -35,7 +35,6 @@
 #include <time.h>
 
 #include <glib.h>
-#include <heartbeat.h>
 #include <pils/plugin.h>
 #include <pils/generic.h>
 #include <clplumbing/GSource.h>
@@ -47,8 +46,9 @@
 #include <clplumbing/Gmain_timeout.h>
 #include <clplumbing/cl_pidfile.h>
 #include <ha_msg.h>
-#include <apphb.h>
-#include <hb_api.h>
+#ifdef ENABLE_APPHB
+#  include <apphb.h>
+#endif
 
 #include <lrm/lrm_api.h>
 #include <lrm/lrm_msg.h>

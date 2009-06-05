@@ -19,17 +19,11 @@
 MAINTAINERCLEANFILES = Makefile.in
 
 INCLUDES                	=	-I$(top_builddir)/include -I$(top_srcdir)/include \
-                       			-I$(top_builddir)/linux-ha -I$(top_srcdir)/linux-ha \
 					-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 
-halibdir			=	$(libdir)/@HB_PKG@
-havarlibdir			=	$(localstatedir)/lib/@HB_PKG@
+lrmdir				=	$(localstatedir)/lib/heartbeat/lrm
 COMMONLIBS			=	$(top_builddir)/lib/clplumbing/libplumb.la   \
-                        		$(GLIBLIB)
-LRM_DIR 			=	lrm
-lrmdir				=	$(HA_VARLIBDIR)/$(HB_PKG)/$(LRM_DIR)
-apigid                          =       @HA_APIGID@
-
+					$(GLIBLIB)
 
 lib_LTLIBRARIES = liblrm.la
 liblrm_la_SOURCES = lrm_msg.c clientlib.c racommon.c
@@ -38,5 +32,5 @@ liblrm_la_CFLAGS = $(INCLUDES)
 
 install-exec-local:
 	$(mkinstalldirs) $(DESTDIR)$(lrmdir)
-	-chgrp $(apigid) $(DESTDIR)/$(lrmdir)
+	-chgrp $(GLUE_DAEMON_GROUP) $(DESTDIR)/$(lrmdir)
 	chmod 770 $(DESTDIR)/$(lrmdir)

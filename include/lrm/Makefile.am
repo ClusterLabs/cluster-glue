@@ -17,7 +17,6 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
 MAINTAINERCLEANFILES = Makefile.in
-                                                                                                                                                         
-includedir=$(base_includedir)/heartbeat/lrm
 
-include_HEADERS = lrm_api.h lrm_msg.h racommon.h raexec.h
+idir=$(includedir)/heartbeat/lrm
+i_HEADERS = lrm_api.h lrm_msg.h racommon.h raexec.h

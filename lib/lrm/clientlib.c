@@ -27,7 +27,6 @@
 #include <string.h>
 
 #include <glib.h>
-#include <heartbeat.h>
 #include <clplumbing/ipc.h>
 #include <ha_msg.h>
 #include <lrm/lrm_api.h>

@@ -19,7 +19,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include <lha_internal.h>
-#include <heartbeat.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -33,8 +32,8 @@
 #include <clplumbing/netstring.h>
 #include <pils/plugin.h>
 #include <pils/generic.h>
-#include <stonith/stonith.h>
-#include <stonith/stonith_plugin.h>
+/* #include <stonith/stonith.h> */
+/* #include <stonith/stonith_plugin.h> */
 #include <clplumbing/cl_plugin.h>
 
 #define MAXTYPES 16
@@ -63,7 +62,7 @@ init_pluginsys(void){
 		return TRUE;
 	}
 	
-	plugin_univ = NewPILPluginUniv(HA_PLUGIN_D);
+	plugin_univ = NewPILPluginUniv(HA_PLUGIN_DIR);
 	
 	if (plugin_univ) {
 		if (PILLoadPlugin(plugin_univ, PI_IFMANAGER, "generic", reqs)

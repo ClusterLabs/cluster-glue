@@ -25,12 +25,10 @@ INCLUDES 			=	-I$(top_builddir)/include -I$(top_srcdir)/include \
 halibdir			=	$(libdir)/@HB_PKG@
 havarlibdir			=	$(localstatedir)/lib/@HB_PKG@
 COMMONLIBS			=	$(top_builddir)/lib/clplumbing/libplumb.la   \
-                        		$(top_builddir)/lib/lrm/liblrm.la   \
-                        		$(GLIBLIB)
+					$(top_builddir)/lib/lrm/liblrm.la   \
+					$(GLIBLIB)
 
-lrmdir				=	$(HA_VARLIBDIR)/$(HB_PKG)/$(LRM_DIR)
 plugindir               	= 	$(halibdir)/plugins/RAExec
-apigid                          =       @HA_APIGID@
 
 plugin_LTLIBRARIES = lsb.la ocf.la heartbeat.la
 lsb_la_SOURCES = raexeclsb.c
@@ -41,8 +39,3 @@ ocf_la_LDFLAGS = -L$(top_builddir)/lib/pils -lpils -export-dynamic -module -avoi
 
 heartbeat_la_SOURCES = raexechb.c
 heartbeat_la_LDFLAGS = -L$(top_builddir)/lib/pils -lpils -export-dynamic -module -avoid-version
-
-install-exec-local:
-	$(mkinstalldirs) $(DESTDIR)$(lrmdir)
-	-chgrp $(apigid) $(DESTDIR)/$(lrmdir)
-	chmod 770 $(DESTDIR)/$(lrmdir)
