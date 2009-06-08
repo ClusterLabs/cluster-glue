@@ -26,6 +26,14 @@ tgz:
 	hg archive -t tgz $(TARFILE)
 	echo Rebuilt $(TARFILE) on `date`
 
+install-exec-local:
+	$(INSTALL) -d $(DESTDIR)/$(HA_COREDIR)
+	-$(INSTALL) -d -m 700 -o root $(DESTDIR)/$(HA_COREDIR)/root
+	-$(INSTALL) -d -m 700 -o nobody $(DESTDIR)/$(HA_COREDIR)/nobody
+	$(INSTALL) -d -m 700 $(DESTDIR)/$(HA_COREDIR)/$(GLUE_DAEMON_USER)
+	-chown $(GLUE_DAEMON_USER) $(DESTDIR)/$(HA_COREDIR)/$(GLUE_DAEMON_USER)
+# Use chown because $(GLUE_DAEMON_USER) may not exist yet
+
 dist-clean-local:
 	rm -f autoconf automake autoheader $(TARFILE)
 
