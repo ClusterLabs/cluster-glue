@@ -26,8 +26,7 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 
 ## libraries
 
-halibdir		= $(libdir)/@HB_PKG@
-plugindir               = $(halibdir)/plugins/InterfaceMgr
+plugindir               = $(libdir)/@HB_PKG@/plugins/InterfaceMgr
 plugin_LTLIBRARIES	= generic.la
 
 generic_la_SOURCES	= generic.c
