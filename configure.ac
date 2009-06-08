@@ -511,7 +511,6 @@ AC_CHECK_LIB(c, dlopen)				dnl if dlopen is in libc...
 AC_CHECK_LIB(dl, dlopen)			dnl for Linux
 AC_CHECK_LIB(rt, sched_getscheduler)            dnl for Tru64
 AC_CHECK_LIB(gnugetopt, getopt_long)		dnl if available
-AC_CHECK_LIB(pam, pam_start)			dnl if available
 AC_CHECK_LIB(uuid, uuid_parse)			dnl e2fsprogs
 AC_CHECK_LIB(uuid, uuid_create)			dnl ossp
 AC_CHECK_LIB(posix4, sched_getscheduler)
@@ -612,10 +611,8 @@ AC_CHECK_HEADERS(malloc.h)
 AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(netinet/in.h)
 AC_CHECK_HEADERS(netinet/ip.h)
-AC_CHECK_HEADERS(pam/pam_appl.h)
 AC_CHECK_HEADERS(pthread.h)
 AC_CHECK_HEADERS(pwd.h)
-AC_CHECK_HEADERS(security/pam_appl.h)
 AC_CHECK_HEADERS(sgtty.h)
 AC_CHECK_HEADERS(signal.h)
 AC_CHECK_HEADERS(stdarg.h)
@@ -659,18 +656,13 @@ else
    XML2HEAD="`$XML2CONFIG --cflags`"
    AC_MSG_RESULT($XML2HEAD)
    AC_CHECK_LIB(xml2, xmlReadMemory)
-   AC_CHECK_LIB(xslt, xsltApplyStylesheet)
 fi
 
 CPPFLAGS="$CPPFLAGS $XML2HEAD"
 
 AC_CHECK_HEADERS(libxml/xpath.h)
-AC_CHECK_HEADERS(libxslt/xslt.h)
 if test "$ac_cv_header_libxml_xpath_h" != "yes"; then
    AC_MSG_ERROR(The libxml developement headers were not found)
-fi
-if test "$ac_cv_header_libxslt_xslt_h" != "yes"; then
-   AC_MSG_ERROR(The libxslt developement headers were not found)
 fi
 
 dnl Check syslog.h for 'facilitynames' table
@@ -982,30 +974,6 @@ fi
 if test x$ac_cv_header_bzlib_h != xyes; then
    AC_MSG_ERROR(BZ2 Development headers not found)
 fi
-
-dnl ========================================================================
-dnl    GnuTLS
-dnl ========================================================================
-
-AC_CHECK_HEADERS(gnutls/gnutls.h)
-AC_CHECK_HEADERS(security/pam_appl.h pam/pam_appl.h)
-
-dnl GNUTLS library: Attempt to determine by 'libgnutls-config' program.
-dnl If no 'libgnutls-config', try traditional autoconf means.
-AC_PATH_PROGS(LIBGNUTLS_CONFIG, libgnutls-config)
-
-if test -n "$LIBGNUTLS_CONFIG"; then
-	AC_MSG_CHECKING(for gnutls header flags)
-	GNUTLSHEAD="`$LIBGNUTLS_CONFIG --cflags`";
-	AC_MSG_RESULT($GNUTLSHEAD)
-	AC_MSG_CHECKING(for gnutls library flags)
-	GNUTLSLIBS="`$LIBGNUTLS_CONFIG --libs`";
-	AC_MSG_RESULT($GNUTLSLIBS)
-else
-	AC_CHECK_LIB(gnutls, gnutls_init)
-fi
-AC_SUBST(GNUTLSHEAD)
-AC_SUBST(GNUTLSLIBS)
 
 dnl ========================================================================
 dnl checks for library functions to replace them
