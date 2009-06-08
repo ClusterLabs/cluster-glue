@@ -142,17 +142,17 @@ AC_ARG_WITH(ocf-root,
 	 OCF_ROOT_DIR="$withval"; fi ])
 
 AC_ARG_WITH(
-  group-name,
+  daemon-group,
     [  --with-daemon-group=GROUP_NAME
-                          GROUP_NAME to run our programs as. [default=haclient]  ],
+                          Group to run our programs as. [default=haclient]  ],
     [ GLUE_DAEMON_GROUP="$withval" ],
     [ GLUE_DAEMON_GROUP="haclient" ],
   )
 
 AC_ARG_WITH(
-  ccmuser-name,
-    [  --with-daemon-name=USER_NAME
-                          USER_NAME to run privileged non-root things as. [default=hacluster]  ],
+  daemon-user,
+    [  --with-daemon-user=USER_NAME
+                          User to run privileged non-root things as. [default=hacluster]  ],
     [ GLUE_DAEMON_USER="$withval" ],
     [ GLUE_DAEMON_USER="hacluster" ],
   )
