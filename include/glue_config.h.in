@@ -15,6 +15,12 @@
 /* User to run daemons as */
 #undef HA_CCMUSER
 
+/* Group to run daemons as */
+#undef HA_APIGROUP
+
+/* Location for daemons */
+#undef HA_LIBHBDIR
+
 /* top directory of area to drop core files in */
 #undef HA_COREDIR
 
