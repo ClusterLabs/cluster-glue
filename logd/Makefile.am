@@ -46,6 +46,3 @@ ha_logger_LDADD   = $(top_builddir)/lib/clplumbing/libplumb.la
 
 logtest_SOURCES   = logtest.c
 logtest_LDADD     = $(top_builddir)/lib/clplumbing/libplumb.la
-
-install-exec-hook:
-	$(LN_S) -f $(sbindir)/ha_logger $(DESTDIR)$(halibdir)
