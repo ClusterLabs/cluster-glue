@@ -17,7 +17,7 @@
 #
 
 MAINTAINERCLEANFILES    = Makefile.in
-SUBDIRS	= clplumbing stonith lrm
+SUBDIRS	= clplumbing pils stonith lrm
 
 idir=$(includedir)/heartbeat
 i_HEADERS = compress.h glue_config.h ha_msg.h 
