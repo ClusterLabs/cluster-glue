@@ -337,7 +337,6 @@ AC_DEFINE_UNQUOTED(U64T, "$U64T", Correct printf format for logging uint64_t)
 
 dnl Variables needed for substitution
 AC_DEFINE_UNQUOTED(GLUE_DAEMON_USER,"$GLUE_DAEMON_USER", User to run daemons as)
-AC_DEFINE_UNQUOTED(HA_CCMUSER,"$GLUE_DAEMON_USER", User to run daemons as)
 AC_SUBST(GLUE_DAEMON_USER)
 
 AC_DEFINE_UNQUOTED(GLUE_DAEMON_GROUP,"$GLUE_DAEMON_GROUP", Group to run daemons as)
@@ -396,6 +395,12 @@ AC_DEFINE_UNQUOTED(STONITH_MODULES, "$stonith_plugindir", Location of stonith pl
 AC_DEFINE_UNQUOTED(STONITH_EXT_PLUGINDIR, "$stonith_ext_plugindir", Location of non-pluing stonith scripts)
 AC_SUBST(stonith_plugindir)
 AC_SUBST(stonith_ext_plugindir)
+
+dnl Old names for new things
+AC_DEFINE_UNQUOTED(HA_CCMUSER,   "$GLUE_DAEMON_USER",  User to run daemons as) 
+AC_DEFINE_UNQUOTED(HA_APIGROUP,  "$GLUE_DAEMON_GROUP", Group to run daemons as)
+AC_DEFINE_UNQUOTED(HA_LIBHBDIR,  "$GLUE_DAEMON_DIR",   Location for daemons)
+
 
 LRM_DIR=lrm
 AC_SUBST(LRM_DIR)
