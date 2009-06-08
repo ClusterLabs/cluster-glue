@@ -1182,6 +1182,7 @@ lib/Makefile							\
    lib/stonith/Makefile						\
    lib/lrm/Makefile						\
    lib/plugins/Makefile						\
+      lib/plugins/InterfaceMgr/Makefile				\
       lib/plugins/lrm/Makefile					\
       lib/plugins/stonith/Makefile				\
          lib/plugins/stonith/ribcl.py				\
