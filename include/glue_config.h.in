@@ -30,6 +30,9 @@
 /* Default logging facility */
 #undef HA_LOG_FACILITY
 
+/* Default plugin search path */
+#undef PILS_BASE_PLUGINDIR
+
 /* Where to find plugins */
 #undef HA_PLUGIN_DIR
 

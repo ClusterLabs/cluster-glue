@@ -74,9 +74,9 @@ init_pluginsys(void) {
 	StonithPIsys = NewPILPluginUniv(STONITH_MODULES);
 	
 	if (StonithPIsys) {
-		if (PILLoadPlugin(StonithPIsys, PI_IFMANAGER, "generic", Reqs)
-		!=	PIL_OK){
-			fprintf(stderr, "generic plugin load failed\n");
+		int rc = PILLoadPlugin(StonithPIsys, PI_IFMANAGER, "generic", Reqs);
+		if (rc != PIL_OK) {
+			fprintf(stderr, "generic plugin load failed: %d\n", rc);
 			DelPILPluginUniv(StonithPIsys);
 			StonithPIsys = NULL;
 		}

@@ -377,6 +377,7 @@ HA_COREDIR="${localstatedir}/lib/heartbeat/cores"
 AC_DEFINE_UNQUOTED(HA_COREDIR,"$HA_COREDIR", top directory of area to drop core files in)
 AC_SUBST(HA_COREDIR)
 
+AC_DEFINE_UNQUOTED(PILS_BASE_PLUGINDIR,"$libdir/heartbeat/plugins", Default plugin search path)
 AC_DEFINE_UNQUOTED(HA_PLUGIN_DIR,"$libdir/heartbeat/plugins", Where to find plugins)
 AC_DEFINE_UNQUOTED(LRM_PLUGIN_DIR,"$libdir/heartbeat/plugins/RAExec", Where to find LRM plugins)
 
@@ -1229,7 +1230,6 @@ AC_MSG_RESULT([  Header files             = ${includedir}])
 AC_MSG_RESULT([  Arch-independent files   = ${datadir}])
 AC_MSG_RESULT([  State information        = ${localstatedir}])
 AC_MSG_RESULT([  System configuration     = ${sysconfdir}])
-AC_MSG_RESULT([  AIS Plugins              = ${LCRSODIR}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([  Use system LTDL          = ${ac_cv_lib_ltdl_lt_dlopen}])
 AC_MSG_RESULT([])
