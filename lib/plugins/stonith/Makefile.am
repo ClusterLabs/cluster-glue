@@ -195,7 +195,7 @@ stonithscript_SCRIPTS  	= ribcl.py
 
 # readme files
 
-stdocdir 		= $(docdir)/@HB_PKG@/stonith
+stdocdir 		= $(datadir)/doc/stonith
 
 README_FILES = README.bladehpi README.cyclades README.drac3 \
 				README.external README.ipmilan README.meatware \
