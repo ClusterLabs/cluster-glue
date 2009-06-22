@@ -88,6 +88,8 @@ typedef struct {
 #define ST_DEVICEDESCR	4	/* Device Description text */
 #define ST_DEVICEURL	5	/* Manufacturer/Device URL */
 
+extern PILPluginUniv *StonithPIsys;
+
 char **	stonith_types(void);	/* NULL-terminated list */
 				/* valid until next call of stonith_types() */
 Stonith*stonith_new(const char * type);
