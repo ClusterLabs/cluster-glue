@@ -567,7 +567,6 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
  * non-blocking IPC.
  */
 
-gboolean last_log_failed = FALSE;
 static int	cl_log_depth = 0;
 
 /* Cluster logging function */

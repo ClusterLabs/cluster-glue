@@ -238,7 +238,7 @@ get_resource_list(GList ** rsc_info)
 			"will cause memory leak.");
 		*rsc_info = NULL;
 	}
-	file_num = scandir(RA_PATH, &namelist, 0, alphasort);
+	file_num = scandir(RA_PATH, &namelist, NULL, alphasort);
 	if (file_num < 0) {
 		return -2;
 	}
