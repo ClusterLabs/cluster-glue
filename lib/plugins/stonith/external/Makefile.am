@@ -35,6 +35,6 @@ helper_SCRIPTS	     = xen0-ha-dom0-stonith-helper
 
 # readme files
 
-stdocdir		= $(docdir)/@HB_PKG@/stonith
+stdocdir		= $(docdir)/stonith
 
 stdoc_DATA		= $(README_FILES)
