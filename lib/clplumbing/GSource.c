@@ -365,8 +365,16 @@ G_main_IPC_Channel_constructor(GSource* source, IPC_Channel* ch
 	       ,	GDestroyNotify notify)
 {
 	int		rfd, wfd;
-	
 	GCHSource* chp;
+
+	if( !source ) {
+		cl_log(LOG_WARNING, "%s:%d: got null source", __FUNCTION__,__LINE__);
+		return NULL;
+	}
+	if( !ch ) {
+		cl_log(LOG_WARNING, "%s:%d: got null channel", __FUNCTION__,__LINE__);
+		return NULL;
+	}
 	chp = (GCHSource*)source;
 	
 	chp->magno = MAG_GCHSOURCE;
@@ -409,9 +417,14 @@ G_main_add_IPC_Channel(int priority, IPC_Channel* ch
 		       ,	gpointer userdata
 		       ,	GDestroyNotify notify)
 {
-	GCHSource* chp;
-	
-	GSource * source = g_source_new(&G_CH_SourceFuncs, 
+	GCHSource *chp;
+	GSource *source;
+
+	if( !ch ) {
+		cl_log(LOG_WARNING, "%s:%d: got null channel", __FUNCTION__,__LINE__);
+		return NULL;
+	}
+	source = g_source_new(&G_CH_SourceFuncs, 
 					sizeof(GCHSource));
 	G_main_IPC_Channel_constructor(source,ch,userdata,notify);
 	
