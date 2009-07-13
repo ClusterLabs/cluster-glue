@@ -16,10 +16,12 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
 
-MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure DRF/config-h.in \
-                        DRF/stamp-h.in libtool.m4 ltdl.m4 libltdl.tar
+MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure DRF/config-h.in \
+			  DRF/stamp-h.in libtool.m4 ltdl.m4 libltdl.tar
 
-SUBDIRS	= include $(LIBLTDL_DIR) replace lib lrm logd
+SUBDIRS			= include $(LIBLTDL_DIR) replace lib lrm logd
+
+ACLOCAL_AMFLAGS		= -I libltdl/m4
 
 tgz:
 	rm -f $(TARFILE)
