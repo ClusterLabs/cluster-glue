@@ -226,6 +226,16 @@ main(int argc, char** argv)
 	int		count = 1;
 	int		help = 0;
 
+	/* The bladehpi stonith plugin makes use of openhpi which is
+	 * threaded.  The mix of memory allocation without thread
+	 * initialization followed by g_thread_init followed by
+	 * deallocating that memory results in segfault.  Hence the
+	 * following G_SLICE setting; see
+	 * http://library.gnome.org/devel/glib/stable/glib-Memory-Slices.html#g-slice-alloc
+	 */
+
+	setenv("G_SLICE", "always-malloc", 1);
+
 	if ((cmdname = strrchr(argv[0], '/')) == NULL) {
 		cmdname = argv[0];
 	}else{
