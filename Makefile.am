@@ -23,10 +23,32 @@ SUBDIRS			= include $(LIBLTDL_DIR) replace lib lrm logd
 
 ACLOCAL_AMFLAGS		= -I libltdl/m4
 
+RPM_OPTS	= --define "_sourcedir $(RPM_ROOT)" \
+		  --define "_specdir $(RPM_ROOT)" \
+		  --define "_builddir $(RPM_ROOT)" \
+		  --define "_srcrpmdir $(RPM_ROOT)" \
+		  --define "_rpmdir $(RPM_ROOT)"
+
+#RPM_ROOT		= $(abs_builddir)
+TARFILE			= cluster-glue.tar.gz
+RPM_ROOT		= $(top_srcdir)
+SPEC			= $(top_srcdir)/cluster-glue.spec
+
 tgz:
 	rm -f $(TARFILE)
 	hg archive -t tgz $(TARFILE)
 	echo Rebuilt $(TARFILE) on `date`
+
+srpm:	tgz
+	-rm *.src.rpm
+	rpmbuild -bs $(RPM_OPTS) $(SPEC)
+
+rpm:	srpm
+	echo To create custom builds, edit the flags and options in pacemaker.spec first
+	rpmbuild -ba $(RPM_OPTS) $(SPEC)
+
+mock:	srpm
+	mock --root fedora-rawhide-x86_64 --rebuild $(top_builddir)/*.src.rpm
 
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)/$(HA_COREDIR)
