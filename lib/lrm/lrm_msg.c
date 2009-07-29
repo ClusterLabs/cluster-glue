@@ -27,7 +27,6 @@
 #include <unistd.h>
 #include <clplumbing/cl_log.h>
 #include <ha_msg.h>
-#include <heartbeat.h>
 #include <lrm/lrm_api.h>
 #include <lrm/lrm_msg.h>
 #define LOG_BASIC_ERROR(apiname)	\

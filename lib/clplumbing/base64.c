@@ -15,7 +15,6 @@
  */
 
 #include <lha_internal.h>
-#include <heartbeat.h>
 #include <syslog.h>
 #include <string.h>
 #include <stdlib.h>

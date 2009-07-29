@@ -52,7 +52,6 @@
  */
 
 #include <lha_internal.h>
-#include <heartbeat.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -92,7 +91,7 @@ init_pluginsys(void){
 		return TRUE;
 	}
 
-	CompressPIsys = NewPILPluginUniv(HA_PLUGIN_D);
+	CompressPIsys = NewPILPluginUniv(HA_PLUGIN_DIR);
 	
 	if (CompressPIsys) {
 		if (PILLoadPlugin(CompressPIsys, PI_IFMANAGER, "generic", Reqs)

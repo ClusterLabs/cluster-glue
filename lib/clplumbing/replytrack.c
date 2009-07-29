@@ -30,9 +30,9 @@
  */
 
 #include <lha_internal.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <sys/wait.h>
-#include <heartbeat.h>
 #include <sys/types.h>
 #include <signal.h>
 #include <memory.h>

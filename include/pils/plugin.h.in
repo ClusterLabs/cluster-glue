@@ -21,6 +21,7 @@
 #ifndef PILS_PLUGIN_H
 #  define PILS_PLUGIN_H
 #  include <ltdl.h>
+#  include <glue_config.h>
 
 /* Glib headers generate warnings - so we make them go away */
 
@@ -365,9 +366,6 @@ typedef PIL_rc(*PILInterfaceFun)(PILInterface*, void* ud_interface);
 #define IS_PILINTERFACE(s)	((s)->MagicNum == PIL_MAGIC_INTERFACE)
 #define IS_PILINTERFACETYPE(s)	((s)->MagicNum == PIL_MAGIC_INTERFACETYPE)
 #define IS_PILINTERFACEUNIV(s)	((s)->MagicNum == PIL_MAGIC_INTERFACEUNIV)
-
-/* This is the place where PILS installs its own plugins */
-#define	PILS_BASE_PLUGINDIR	"@pils_plugindir@"
 
 /* The type of a Plugin Initialization Function */
 typedef PIL_rc (*PILPluginInitFun) (PILPlugin*us
