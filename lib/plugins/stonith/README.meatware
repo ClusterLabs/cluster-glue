@@ -1,0 +1,26 @@
+
+MEATWARE Module for Linux-HA STONITH
+
+ABOUT:
+
+  This is a port of the "meatware" stomith method found in the GFS
+  distribution (see http://globalfilesystem.org/) to the Linux-HA
+  project. It notifies operators if a node needs to be reset and
+  waits for confirmation.
+
+USAGE:
+
+  The module can be used like any other stonith module. It will
+  syslog a message at CRIT level if it needs an operator to power-cycle
+  a node on its behalf.
+  To confirm that a manual reset has been done, execute
+
+    "meatclient -c <host>".
+
+  If you abort the confirmation, the module will report that the reset
+  has failed.
+
+AUTHOR:
+
+  Gregor Binder <gbinder@sysfive.com>
+

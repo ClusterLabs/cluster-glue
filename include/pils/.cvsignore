@@ -1,0 +1,6 @@
+Makefile
+Makefile.in
+plugin.h
+*.beam
+parser-messages
+MISC_ERRORS
