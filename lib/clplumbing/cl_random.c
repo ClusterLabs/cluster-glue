@@ -196,9 +196,11 @@ cl_randseed(void)
 			if (fread(buf, 1, sizeof(buf), fs)!= sizeof(buf)){
 				cl_log(LOG_INFO, "%s: reading file %s failed"
 		       	,	__FUNCTION__, randdevname[idev]);
+				fclose(fs);
 			}else{
+				fclose(fs);
 				return (unsigned int)cl_binary_to_int(buf, sizeof(buf));
-			}	
+			}
 		}
 	}
 
