@@ -25,7 +25,6 @@ INCLUDES 	      =	-I$(top_builddir)/include  -I$(top_srcdir)/include \
 
 COMMONLIBS	      =	$(top_builddir)/lib/clplumbing/libplumb.la $(GLIBLIB)
 
-LRM_DIR			=	lrm
 noinst_PROGRAMS 	= 	apitest plugintest callbacktest
 
 apitest_SOURCES  	= 	apitest.c
@@ -42,13 +41,8 @@ callbacktest_LDFLAGS 	= 	$(COMMONLIBS)
 callbacktest_LDADD 	= 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 callbacktest_DEPENDENCIES    = 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 
-testdir			= 	$(HA_NOARCHDATAHBDIR)/lrmtest
+testdir		= 	$(datadir)/$(PACKAGE)/lrmtest
 test_SCRIPTS	=	LRMBasicSanityCheck regression.sh evaltest.sh lrmregtest lrmregtest-heartbeat lrmregtest-lsb
 test_DATA	=	README.regression defaults descriptions lrmadmin-interface language
 #				shouldn't need this, but we do for some versions of autofoo tools
 EXTRA_DIST		=	$(test_SCRIPTS) $(test_DATA)
-
-#install-exec-local:
-#	$(mkinstalldirs) $(DESTDIR)/$(testdir)
-#	-chgrp $(HA_APIGROUP) $(DESTDIR)/$(testdir)
-#	-chmod g+w $(DESTDIR)/$(testdir)

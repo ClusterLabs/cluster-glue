@@ -30,13 +30,9 @@ INCFILES		= stonith_expect_helpers.h	\
 INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/linux-ha -I$(top_srcdir)/linux-ha  \
 			-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
-			
-
-AM_CFLAGS		= @NON_FATAL_CFLAGS@ -DST_TEXTDOMAIN='"@STONITHPKG@"' \
-			-DSTONITH_MODULES='"$(stonithlibdir)"' \
-			-DLOCALEDIR='"@LOCALE@"' 		
 
 
+AM_CFLAGS		= @NON_FATAL_CFLAGS@
 
 #
 #       We need "vacmclient_api.h" and -lvacmclient to make the VACM

@@ -20,6 +20,6 @@
 #
 MAINTAINERCLEANFILES    = Makefile.in
 
-includedir=$(pils_includedir)
+idir=$(includedir)/pils
 
-include_HEADERS	        = generic.h interface.h plugin.h
+i_HEADERS	        = generic.h interface.h plugin.h

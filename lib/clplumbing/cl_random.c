@@ -25,7 +25,7 @@
 #include  <clplumbing/cl_misc.h>
 #include  <clplumbing/Gmain_timeout.h>
 #include  <clplumbing/cl_random.h>
-#include  <hb_api_core.h>
+#include  <clplumbing/longclock.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -94,7 +94,7 @@ get_more_random(void)
 	}
 	if (g_main_loop_is_running(NULL)) {
 		randgen_scheduled = TRUE;
-		Gmain_timeout_add_full(PRI_RANDOM, 10, add_a_random, NULL, NULL);
+		Gmain_timeout_add_full(G_PRIORITY_LOW+1, 10, add_a_random, NULL, NULL);
 	}
 }
 

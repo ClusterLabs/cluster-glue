@@ -36,7 +36,10 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdarg.h>
-#include <apphb.h>
+#ifdef ENABLE_APPHB
+#  include <apphb.h>
+static gboolean RegisteredWithApphbd = FALSE;
+#endif
 #include <clplumbing/Gmain_timeout.h>
 #include <clplumbing/coredumps.h>
 #include <clplumbing/setproctitle.h>
@@ -79,7 +82,6 @@
 static const int logd_keepalive_ms = 1000;
 static const int logd_warntime_ms = 5000;
 static const int logd_deadtime_ms = 10000;
-static gboolean RegisteredWithApphbd = FALSE;
 static gboolean verbose = FALSE;
 static pid_t write_process_pid;
 static IPC_Channel *chanspair[2];
@@ -701,6 +703,7 @@ parse_config(const char* cfgfile)
 static void
 logd_init_register_with_apphbd(void)
 {
+#ifdef ENABLE_APPHB
 	static int	failcount = 0;
 	if (!logd_config.useapphbd || RegisteredWithApphbd) {
 		return;
@@ -729,6 +732,7 @@ logd_init_register_with_apphbd(void)
 	}else{
 		failcount = 0;
 	}
+#endif
 }
 
 
@@ -745,6 +749,7 @@ logd_reregister_with_apphbd(gpointer dummy)
 static gboolean
 logd_apphb_hb(gpointer dummy)
 {
+#ifdef ENABLE_APPHB
 	if (logd_config.useapphbd) {
 		if (RegisteredWithApphbd) {
 			if (apphb_hb() < 0) {
@@ -759,7 +764,7 @@ logd_apphb_hb(gpointer dummy)
 		 * reregister us if we become unregistered somehow...
 		 */
 	}
-	
+#endif	
 	return TRUE;
 
 }

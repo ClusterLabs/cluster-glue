@@ -37,7 +37,6 @@
 #include <sched.h>
 
 #include <glib.h>
-#include <heartbeat.h>
 #include <pils/plugin.h>
 #include <pils/generic.h>
 #include <clplumbing/GSource.h>
@@ -49,8 +48,10 @@
 #include <clplumbing/Gmain_timeout.h>
 #include <clplumbing/cl_pidfile.h>
 #include <ha_msg.h>
-#include <apphb.h>
-#include <hb_api.h>
+#ifdef ENABLE_APPHB
+#  include <apphb.h>
+#endif
+/* #include <hb_api.h> */
 
 #include <lrm/lrm_api.h>
 #include <lrm/lrm_msg.h>
@@ -1001,6 +1002,7 @@ register_pid(gboolean do_fork,
 static int
 init_using_apphb(void)
 {
+#ifdef ENABLE_APPHB
 	char lrmd_instance[40];
 
 	if (reg_to_apphbd == FALSE) {
@@ -1020,13 +1022,14 @@ init_using_apphb(void)
 	apphb_setwarn(apphb_interval*APPHB_WARNTIME_FACTOR);
 
 	Gmain_timeout_add(apphb_interval - APPHB_INTVL_DETLA, emit_apphb, NULL);
-
+#endif
 	return 0;
 }
 
 static gboolean
 emit_apphb(gpointer data)
 {
+#ifdef ENABLE_APPHB
 	if (reg_to_apphbd == FALSE) {
 		return FALSE;
 	}
@@ -1036,7 +1039,7 @@ emit_apphb(gpointer data)
 		reg_to_apphbd = FALSE;
 		return FALSE;
 	};
-
+#endif
 	return TRUE;
 }
 
@@ -1242,10 +1245,12 @@ init_start ()
 
 	emit_apphb(NULL);
         if (reg_to_apphbd == TRUE) {
+#ifdef ENABLE_APPHB
                 apphb_unregister();
+#endif
                 reg_to_apphbd = FALSE;
         }
-
+	
 	if( return_to_orig_privs() ) {
 		cl_perror("%s: failed to raise privileges", __FUNCTION__);
 	}
@@ -2988,7 +2993,6 @@ perform_ra_op(lrmd_op_t* op)
         GHashTable* op_params = NULL;
 	lrmd_rsc_t* rsc = NULL;
 	ra_pipe_op_t * rapop;
-	struct sched_param sp;
 
 	LRMAUDIT();
 	CHECK_ALLOCATED(op, "op", HA_FAIL);
@@ -3091,7 +3095,9 @@ perform_ra_op(lrmd_op_t* op)
 			return HA_OK;
 
 		case 0:		/* Child */
+#ifdef DEFAULT_REALTIME
 			if (sched_getscheduler(0) != SCHED_OTHER) {
+				struct sched_param sp;
 				lrmd_debug(LOG_DEBUG,
 					"perform_ra_op: resetting scheduler class to SCHED_OTHER");
 				sp.sched_priority = 0;
@@ -3099,6 +3105,7 @@ perform_ra_op(lrmd_op_t* op)
 					cl_perror("%s::%d: sched_setscheduler",
 						__FUNCTION__, __LINE__);
 			}
+#endif
 			/* Man: The call setpgrp() is equivalent to setpgid(0,0)
 			 * _and_ compiles on BSD variants too
 			 * need to investigate if it works the same too.

@@ -47,12 +47,12 @@
 #include <clplumbing/GSource.h>
 #include <clplumbing/Gmain_timeout.h>
 
-static const char *optstring = "A:D:X:dE:F:dg:p:M:O:P:c:S:LI:CT:n:h";
+static const char *optstring = "A:D:X:dEF:dg:p:M:O:P:c:S:LI:CT:n:h";
 
 #ifdef HAVE_GETOPT_H
 static struct option long_options[] = {
 	{"daemon",		0, NULL, 'd'},
-	{"executera",		1, NULL, 'E'},
+	{"executera",		0, NULL, 'E'},
 	{"flush",		1, NULL, 'F'},
 	{"state",		1, NULL, 'S'},
 	{"listall",		0, NULL, 'L'},
