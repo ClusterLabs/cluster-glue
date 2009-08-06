@@ -19,8 +19,7 @@ dnl     checks for compiler characteristics
 dnl     checks for library functions
 dnl     checks for system services
 
-AC_INIT(glue, 1.0.0, pacemaker@oss.clusterlabs.org)
-CRM_DTD_VERSION="1.0"
+AC_INIT(glue, 1.0.0, linux-ha-dev@lists.linux-ha.org)
 
 PKG_FEATURES=""
 HB_PKG=heartbeat
@@ -637,6 +636,7 @@ AC_CHECK_HEADERS(sys/dir.h)
 AC_CHECK_HEADERS(sys/ioctl.h)
 AC_CHECK_HEADERS(sys/param.h)
 AC_CHECK_HEADERS(sys/poll.h)
+AC_CHECK_HEADERS(sys/reboot.h)
 AC_CHECK_HEADERS(sys/resource.h)
 AC_CHECK_HEADERS(sys/select.h)
 AC_CHECK_HEADERS(sys/socket.h)
@@ -764,6 +764,14 @@ dnl ========================================================================
 
 AC_CHECK_MEMBERS([struct tm.tm_gmtoff],,,[[#include <time.h>]])
 AC_CHECK_TYPES([nfds_t],,,[[#include <poll.h>]])
+
+AC_MSG_CHECKING(if clock_t is long enough)
+if test $ac_cv_sizeof_long -ge 8; then
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(CLOCK_T_IS_LONG_ENOUGH, 1, [Set if CLOCK_T is adequate by itself for the "indefinite future" (>= 100 years)])
+else
+  AC_MSG_RESULT(no)
+fi
 
 dnl ========================================================================
 dnl Functions
