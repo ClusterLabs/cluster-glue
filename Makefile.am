@@ -19,9 +19,7 @@
 MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure DRF/config-h.in \
 			  DRF/stamp-h.in libtool.m4 ltdl.m4 libltdl.tar
 
-SUBDIRS			= include $(LIBLTDL_DIR) replace lib lrm logd
-
-ACLOCAL_AMFLAGS		= -I libltdl/m4
+SUBDIRS			= include $(LIBLTDL_DIR) replace lib lrm logd hb_report
 
 RPM_OPTS	= --define "_sourcedir $(RPM_ROOT)" \
 		  --define "_specdir $(RPM_ROOT)" \
