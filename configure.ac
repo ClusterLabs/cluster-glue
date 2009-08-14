@@ -1222,7 +1222,9 @@ lrm/Makefile					        	\
 logd/Makefile					        	\
 logd/logd					        	\
 replace/Makefile				        	\
-		)
+hb_report/Makefile				        	\
+   hb_report/hb_report				        	\
+)
 
 dnl Now process the entire list of files added by previous 
 dnl  calls to AC_CONFIG_FILES()
