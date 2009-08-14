@@ -33,15 +33,10 @@
 # Default-Stop: 0 1 6
 ### END INIT INFO
 
-LOGD_CFG=@HA_SYSCONFDIR@/logd.cf
+LOGD_CFG=@sysconfdir@/logd.cf
 LOGD_OPT=""
 [ -f "$LOGD_CFG" ] && LOGD_OPT="-c $LOGD_CFG"
 LOGD="@libdir@/@HB_PKG@/ha_logd"
-
-if [ ! -f $LOGD_CFG ]; then
-  echo -n "ha_logd not configured: $LOGD_CFG not found."
-  exit 6
-fi
 
 if [ ! -f $LOGD_BIN ]; then
   echo -n "ha_logd not installed."
