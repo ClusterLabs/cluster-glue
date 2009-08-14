@@ -36,10 +36,6 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdarg.h>
-#ifdef ENABLE_APPHB
-#  include <apphb.h>
-static gboolean RegisteredWithApphbd = FALSE;
-#endif
 #include <clplumbing/Gmain_timeout.h>
 #include <clplumbing/coredumps.h>
 #include <clplumbing/setproctitle.h>
@@ -93,7 +89,6 @@ static struct {
 	char		logfile[MAXLINE];
 	char		entity[MAXLINE];
 	int		log_facility;
-	gboolean	useapphbd;
 	mode_t		logmode;
 	gboolean	syslogfmtmsgs;
 } logd_config =
@@ -112,7 +107,6 @@ static int	set_debugfile(const char* option);
 static int	set_logfile(const char* option);
 static int	set_facility(const char * value);
 static int	set_entity(const char * option);
-static int	set_useapphbd(const char* option);
 static int	set_sendqlen(const char * option);
 static int	set_recvqlen(const char * option);
 static int	set_logmode(const char * option);
@@ -130,7 +124,6 @@ static struct directive {
 	{"logfile",	set_logfile},
 	{"logfacility",	set_facility},
 	{"entity",	set_entity},
-	{"useapphbd",	set_useapphbd},
 	{"sendqlen",	set_sendqlen},
 	{"recvqlen",	set_recvqlen},
 	{"logmode",	set_logmode},
@@ -212,28 +205,6 @@ set_entity(const char * option)
 	return TRUE;
 
 }
-
-static int
-set_useapphbd(const char* option)
-{
-	if (!option){
-		cl_log(LOG_ERR,"set_useapphbd: option is NULL");
-		return FALSE;
-	}
-	
-	cl_log(LOG_INFO, "setting useapphbd to %s", option);
-	if (0 == strcmp(option, "yes")){
-		logd_config.useapphbd = TRUE;
-		return TRUE;
-	} else if (0 == strcmp(option, "no")){
-		logd_config.useapphbd = FALSE;
-		return TRUE;
-	} else {
-		cl_log(LOG_INFO,"invalid useapphbd option");
-		return FALSE;
-	}
-}
-
 
 static int
 set_sendqlen(const char * option)
@@ -698,78 +669,6 @@ parse_config(const char* cfgfile)
 	return ret;
 }
 
-#define APPLOGDINSTANCE "logging daemon"
-
-static void
-logd_init_register_with_apphbd(void)
-{
-#ifdef ENABLE_APPHB
-	static int	failcount = 0;
-	if (!logd_config.useapphbd || RegisteredWithApphbd) {
-		return;
-	}
-		
-	if (apphb_register(cmdname, APPLOGDINSTANCE) != 0) {
-		/* Log attempts once an hour or so... */
-		if ((failcount % 60) ==  0) {
-			cl_log(LOG_INFO, "Unable to register with apphbd."
-			       "Continuing to try and register.\n");
-		}
-		++failcount;
-		return;
-	}
-
-	RegisteredWithApphbd = TRUE;
-	cl_log(LOG_INFO, "Registered with apphbd as %s/%s.\n",
-		 cmdname, APPLOGDINSTANCE); 
-	
-	if (apphb_setinterval(logd_deadtime_ms) < 0
-	    ||	apphb_setwarn(logd_warntime_ms) < 0) {
-		cl_log(LOG_ERR, "Unable to setup with apphbd.\n");
-		apphb_unregister();
-		RegisteredWithApphbd = FALSE;
-		++failcount;
-	}else{
-		failcount = 0;
-	}
-#endif
-}
-
-
-static gboolean
-logd_reregister_with_apphbd(gpointer dummy)
-{
-	if (logd_config.useapphbd) {
-		logd_init_register_with_apphbd();
-	}
-	return logd_config.useapphbd;
-}
-
-
-static gboolean
-logd_apphb_hb(gpointer dummy)
-{
-#ifdef ENABLE_APPHB
-	if (logd_config.useapphbd) {
-		if (RegisteredWithApphbd) {
-			if (apphb_hb() < 0) {
-				/* apphb_hb() will fail if apphbd exits */
-				cl_log(LOG_ERR, "apphb_hb() failed.\n");
-				apphb_unregister();
-				RegisteredWithApphbd = FALSE;
-			}
-		}	
-		/*
-		 * Our timeout job (hb_reregister_with_apphbd) will
-		 * reregister us if we become unregistered somehow...
-		 */
-	}
-#endif	
-	return TRUE;
-
-}
-
-
 static gboolean
 logd_term_action(int sig, gpointer userdata)
 {      
@@ -856,18 +755,6 @@ read_msg_process(IPC_Channel* chan)
 	chan->low_flow_mark = (chan->send_queue->max_qlen*3)/4;
 
 	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT, chan, FALSE,NULL,NULL,NULL);
-	
-	if (logd_config.useapphbd) {
-		logd_reregister_with_apphbd(NULL);
-		Gmain_timeout_add_full(G_PRIORITY_LOW,
-				       60* 1000, 
-				       logd_reregister_with_apphbd,
-				       NULL, NULL);
-		Gmain_timeout_add_full(G_PRIORITY_LOW,
-				       logd_keepalive_ms,
-				       logd_apphb_hb,
-				       NULL, NULL);
-	}
 	
 	g_main_run(mainloop);
 	
