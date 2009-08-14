@@ -27,8 +27,6 @@
 
 #echo "started with: $@" | debug
 
-. @HA_HBCONF_DIR@/shellfuncs
-trap 'if [ -n "$outf" ]; then cat "$outf" >&2; rmtempfile "$outf"; fi' 0
 outf=`maketempfile` || exit 1
 
 chkmpcli() {
@@ -57,6 +55,7 @@ mpcli() {
 	rc=$?
 	grep -w $failstg $outf
 	test $rc -eq 0 -a $? -eq 1
+	rm -f $outf
 }
 ibmrsa_reboot() {
 	echo restart -now | mpcli
