@@ -30,6 +30,8 @@ ha_sbindir		= $(sbindir)
 LIBRT 			= @LIBRT@
 AM_CFLAGS		= @CFLAGS@
 
+initddir               = @INITDIR@
+  
 ## binary progs
 ha_sbin_PROGRAMS  = ha_logger
 halib_PROGRAMS	  = ha_logd logtest
@@ -46,3 +48,6 @@ ha_logger_LDADD   = $(top_builddir)/lib/clplumbing/libplumb.la
 
 logtest_SOURCES   = logtest.c
 logtest_LDADD     = $(top_builddir)/lib/clplumbing/libplumb.la
+
+initd_SCRIPTS     = logd
+

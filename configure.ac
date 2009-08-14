@@ -1220,6 +1220,7 @@ lrm/Makefile					        	\
    lrm/test/LRMBasicSanityCheck			        	\
    lrm/test/testcases/Makefile			        	\
 logd/Makefile					        	\
+logd/logd					        	\
 replace/Makefile				        	\
 		)
 
