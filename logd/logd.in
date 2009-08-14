@@ -26,210 +26,77 @@
 #
 # Short-Description: ha_logd logging daemon
 # Provides: ha_logd
-# Required-Start: $network $syslog
-# Required-Stop: $network $syslog
+# Required-Start: $network $syslog $remote_fs
+# Required-Stop: $network $syslog $remote_fs
 # X-Start-Before: heartbeat openais
 # Default-Start: 2 3 4 5
 # Default-Stop: 0 1 6
 ### END INIT INFO
 
-[ -f @INITDEFDIR@/heartbeat ] && . @INITDEFDIR@/heartbeat
-
-: ${USE_LOGD=yes}
+LOGD_CFG=@HA_SYSCONFDIR@/logd.cf
 LOGD_OPT=""
-[ -n "$LOGD_CFG" ] && LOGD_OPT="$LOGD_OPT -c $LOGD_CFG"
+[ -f "$LOGD_CFG" ] && LOGD_OPT="-c $LOGD_CFG"
+LOGD="@libdir@/@HB_PKG@/ha_logd"
 
-HA_DIR=@sysconfdir@/ha.d; export HA_DIR
-. $HA_DIR/shellfuncs
-
-LOCKDIR=@localstatedir@/lock/subsys
-RUNDIR=@localstatedir@/run
-
-
-#	Echo without putting a newline on the end
-EchoNoNl() {
-    Echo @ECHO_N@ "$@@ECHO_C@"
-}
-
-#	Echo with escapes enabled...
-EchoEsc() {
-    Echo @ECHO_E@ "$@"
-}
-
-echo_failure() {
-    EchoEsc " ha_logd failure [rc=$1]. $rc_failed"
-    return $1
-}
-
-echo_success() {
-    : Cool!  It started!
-    EchoEsc "$rc_done"
-}
-
-if
-  [ -r /etc/SuSE-release ]
-then
-  # rc.status is new since SuSE 7.0
-  [ -r /etc/rc.status ] && . /etc/rc.status
-  [ -r /etc/rc.config ] && . /etc/rc.config
-
-  # Determine the base and follow a runlevel link name.
-  base=${0##*/}
-  link=${base#*[SK][0-9][0-9]}
-
-fi
-if
-  [ -z "$rc_done" ]
-then
-  rc_done="Done."
-  rc_failed="Failed."
-  rc_skipped="Skipped."
+if [ ! -f $LOGD_CFG ]; then
+  echo -n "ha_logd not configured: $LOGD_CFG not found."
+  exit 6
 fi
 
-
-# exec 2>>/var/log/ha-debug
-
-#	This should probably be it's own autoconf parameter
-#	because RH has moved it from time to time...
-#	and I suspect Conectiva and Mandrake also supply it.
-
-DISTFUNCS=/etc/rc.d/init.d/functions
-SUBSYS=ha_logd
-
-[ -x $HA_BIN/ha_logd ] || exit 0
-
-#
-#	Some environments like it if we use their functions...
-#
-if
-  [ ! -x $DISTFUNCS ]
-then
-  # Provide our own versions of these functions
-  status() {
-	$HA_BIN/ha_logd -s
-  }
-  echo_failure() {
-      EchoEsc " ha_logd failure [rc=$1]. $rc_failed"
-      return $1
-  }
-  echo_success() {
-	: Cool!  It started!
-      EchoEsc "$rc_done"
-  }
-else
-  . $DISTFUNCS
-fi
-
-#
-#	See if they've configured things yet...
-#
-if
-  [ ! -f $LOGD_CFG ]
-then
-  EchoNoNl "ha_logd not configured: $LOGD_CFG not found."
-  echo_failure 1
-  exit 0
+if [ ! -f $LOGD_BIN ]; then
+  echo -n "ha_logd not installed."
+  exit 5
 fi
 
 StartLogd() {
-    if [ "$USE_LOGD" != "yes" ]; then
-	return 0
-    fi
-
-  EchoNoNl "Starting ha_logd: "
-
-    $HA_BIN/ha_logd -s >/dev/null 2>&1
-
-    if 
-	[ $? -eq 0 ]
-    then
-	Echo "logd is already running" 
+    echo -n "Starting ha_logd: "
+    $LOGD_BIN -s >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+	echo "logd is already running" 
 	return 0
     fi
     
-
-    $HA_BIN/ha_logd -d $LOGD_OPT >/dev/null 2>&1
-    if 
-	[ $? -ne 0 ]
-    then
-	Echo "starting logd failed"
+    $LOGD_BIN -d $LOGD_OPT >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+	echo "starting logd failed"
+	exit 1
     fi
-    
+    exit 0
 }
 
 StopLogd() {
-    if [ "$USE_LOGD" != "yes" ]; then
-	return 0
-    fi
+    echo -n "Stopping ha_logd: "
 
-  EchoNoNl "Stopping ha_logd: "
-
-    $HA_BIN/ha_logd -s >/dev/null 2>&1
-    
-    if 
-	[ $? -ne 0 ] 
-    then
-	   Echo "logd is already stopped" 
+    $LOGD_BIN -s >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+	   echo "logd is already stopped" 
 	   return 0
     fi
 
-    $HA_BIN/ha_logd -k >/dev/null 2>&1
-    if 
-	[ $? -ne 0 ]	
-    then
-	Echo "stopping logd failed"
+    $LOGD_BIN -k >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+	echo "stopping logd failed"
+	exit 1
     fi    
 }
 
 StatusLogd() {
-  $HA_BIN/ha_logd -s
+  $LOGD_BIN -s
+  exit $?
 }
 
-RC=0
-# See how we were called.
-
 case "$1" in
-  start)
-	StartLogd
-	RC=$?
-	Echo
-	if
-	  [ $RC -eq 0 ]
-	then
-	  [ ! -d $LOCKDIR ] && mkdir -p $LOCKDIR
-	  touch $LOCKDIR/$SUBSYS
-	fi
-	;;
-
-  status)
-	StatusLogd
-	RC=$?;;
-
-  stop)
-	StopLogd
-	RC=$?
-	Echo
-        if
-          [ $RC -eq 0 ]
-        then
-          rm -f $LOCKDIR/$SUBSYS
-        fi
-	;;
-
+  start) StartLogd ;;
+  status) StatusLogd ;;
+  stop) StopLogd ;;
   restart)
         sleeptime=1
-	StopLogd
-	sleep $sleeptime
-	echo_success
-	Echo
-	StartLogd
-	Echo
+	$0 stop && sleep $sleeptime && $0 start
+	echo
 	;;
 
   *)
-	Echo "Usage: $0 {start|stop|status|restart}"
+	echo "Usage: $0 {start|stop|status|restart}"
 	exit 1
 esac
-
-exit $RC
 
