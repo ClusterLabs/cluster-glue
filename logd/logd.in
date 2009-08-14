@@ -36,7 +36,7 @@
 LOGD_CFG=@sysconfdir@/logd.cf
 LOGD_OPT=""
 [ -f "$LOGD_CFG" ] && LOGD_OPT="-c $LOGD_CFG"
-LOGD="@libdir@/@HB_PKG@/ha_logd"
+LOGD_BIN="@libdir@/@HB_PKG@/ha_logd"
 
 if [ ! -f $LOGD_BIN ]; then
   echo -n "ha_logd not installed."
@@ -56,6 +56,7 @@ StartLogd() {
 	echo "starting logd failed"
 	exit 1
     fi
+    echo "ok"
     exit 0
 }
 
@@ -72,7 +73,9 @@ StopLogd() {
     if [ $? -ne 0 ]; then
 	echo "stopping logd failed"
 	exit 1
-    fi    
+    fi
+    echo "stopped"
+    exit 0
 }
 
 StatusLogd() {
