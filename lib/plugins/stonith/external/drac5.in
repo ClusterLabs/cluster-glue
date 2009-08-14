@@ -18,8 +18,6 @@
 
 #echo "started with: $@" | debug
 
-. @HA_HBCONF_DIR@/shellfuncs
-trap 'if [ -n "$outf" ]; then cat "$outf" >&2; rmtempfile "$outf"; fi' 0
 outf=`maketempfile` || exit 1
 
 sshlogin() {
@@ -31,6 +29,7 @@ sshlogin() {
 
 	test -f /etc/ha.d/drac.debug && set -x
 	@SSH@ -q -x -n $userid@$ipaddr racadm serveraction "$1" >$outf 2>&1
+	rm -f $outf
 }
 
 drac_reset() {
