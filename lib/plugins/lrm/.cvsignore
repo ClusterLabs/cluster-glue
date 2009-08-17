@@ -1,0 +1,11 @@
+Makefile.in
+Makefile
+.*.swp
+.deps
+.libs
+*.lo
+*.la
+*.loT
+*.beam
+parser-messages
+MISC_ERRORS
