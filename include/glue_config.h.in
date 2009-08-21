@@ -21,6 +21,8 @@
 /* Location for daemons */
 #undef HA_LIBHBDIR
 
+#undef HA_LIBDIR
+
 /* top directory of area to drop core files in */
 #undef HA_COREDIR
 
@@ -44,6 +46,8 @@
 
 /* Whatever this used to mean */
 #undef HA_VARLIBHBDIR
+
+#undef HA_VARLIBDIR
 
 /* System lock directory */
 #undef HA_VARLOCKDIR
@@ -83,4 +87,6 @@
 
 /* Stonith plugin domain */
 #undef ST_TEXTDOMAIN
- 
+
+#undef HA_HBCONF_DIR
+
