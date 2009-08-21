@@ -82,6 +82,7 @@ usage(void)
 "Commands:\n"
 "create		initialize N slots on <dev> - OVERWRITES DEVICE!\n"
 "list		List all allocated slots on device, and messages.\n"
+"dump		Dump meta-data header from device.\n"
 "watch		Loop forever, monitoring own slot\n"
 "allocate <node>\n"
 "		Allocate a slot for node (optional)\n"
