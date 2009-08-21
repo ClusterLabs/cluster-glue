@@ -68,6 +68,7 @@ usage(void)
 "	%s <options> <command> <cmdarguments>\n"
 "Options:\n"
 "-d <devname>	Block device to use (mandatory)\n"
+"-h		Display this help.\n"
 "-n <node>	Set local node name; defaults to uname -n (optional)\n"
 "\n"
 "-W		Use watchdog (recommended) (watch only)\n"
@@ -877,7 +878,7 @@ main(int argc, char** argv)
 	
 	get_uname();
 
-	while ((c = getopt (argc, argv, "DWw:d:n:1:2:3:4:")) != -1) {
+	while ((c = getopt (argc, argv, "DWhw:d:n:1:2:3:4:")) != -1) {
 		switch (c) {
 		case 'D':
 			go_daemon = 1;
@@ -906,6 +907,9 @@ main(int argc, char** argv)
 		case '4':
 			timeout_msgwait = atoi(optarg);
 			break;
+		case 'h':
+			usage();
+			return(0);
 		default:
 			exit_status = -1;
 			goto out;
