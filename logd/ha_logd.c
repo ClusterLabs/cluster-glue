@@ -97,7 +97,6 @@ static struct {
 		"",
 		"logd",
 		HA_LOG_FACILITY,
-		FALSE,
 		0644,
 		FALSE
 	};
