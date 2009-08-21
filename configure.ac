@@ -362,6 +362,8 @@ AC_SUBST(HA_VARRUNDIR)
 HA_VARLIBHBDIR=${localstatedir}/lib/heartbeat
 AC_DEFINE_UNQUOTED(HA_VARLIBHBDIR,"$HA_VARLIBHBDIR", Whatever this used to mean)
 AC_SUBST(HA_VARLIBHBDIR)
+AC_DEFINE_UNQUOTED(HA_VARLIBHBDIR,"$HA_VARLIBDIR", Whatever this used to mean)
+AC_SUBST(HA_VARLIBDIR)
 
 AC_DEFINE_UNQUOTED(OCF_ROOT_DIR,"$OCF_ROOT_DIR", OCF root directory - specified by the OCF standard)
 AC_SUBST(OCF_ROOT_DIR)
@@ -388,11 +390,15 @@ AC_DEFINE_UNQUOTED(LRM_PLUGIN_DIR,"$libdir/heartbeat/plugins/RAExec", Where to f
 
 AC_DEFINE_UNQUOTED(LSB_RA_DIR,"$INITDIR", Location for LSB RAs)
 
+AC_DEFINE_UNQUOTED(HA_SYSCONFDIR, "$sysconfdir", Location of system configuration files)
+
+HA_HBCONF_DIR=${sysconfdir}/ha.d/
+AC_DEFINE_UNQUOTED(HA_HBCONF_DIR,"$HA_HBCONF_DIR", Location for v1 Heartbeat configuration)
+AC_SUBST(HA_HBCONF_DIR)
+
 HB_RA_DIR=${sysconfdir}/ha.d/resource.d/
 AC_DEFINE_UNQUOTED(HB_RA_DIR,"$HB_RA_DIR", Location for v1 Heartbeat RAs)
 AC_SUBST(HB_RA_DIR)
-
-AC_DEFINE_UNQUOTED(HA_SYSCONFDIR, "$sysconfdir", Location of system configuration files)
 
 stonith_plugindir="${libdir}/stonith/plugins"
 stonith_ext_plugindir="${stonith_plugindir}/external"
@@ -406,6 +412,7 @@ dnl Old names for new things
 AC_DEFINE_UNQUOTED(HA_CCMUSER,   "$GLUE_DAEMON_USER",  User to run daemons as) 
 AC_DEFINE_UNQUOTED(HA_APIGROUP,  "$GLUE_DAEMON_GROUP", Group to run daemons as)
 AC_DEFINE_UNQUOTED(HA_LIBHBDIR,  "$GLUE_DAEMON_DIR",   Location for daemons)
+AC_DEFINE_UNQUOTED(HA_LIBDIR,  "$GLUE_DAEMON_DIR",   Location for daemons)
 
 
 LRM_DIR=lrm
