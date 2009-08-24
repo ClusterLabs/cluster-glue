@@ -21,29 +21,33 @@ MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure DRF/config-h.in \
 
 SUBDIRS			= include $(LIBLTDL_DIR) replace lib lrm logd hb_report
 
+# Older versions of auto* don't support abs_builddir
+#RPM_ROOT		= $(abs_builddir)
+RPM_ROOT		= $(top_builddir)
 RPM_OPTS	= --define "_sourcedir $(RPM_ROOT)" \
 		  --define "_specdir $(RPM_ROOT)" \
 		  --define "_builddir $(RPM_ROOT)" \
 		  --define "_srcrpmdir $(RPM_ROOT)" \
 		  --define "_rpmdir $(RPM_ROOT)"
 
-#RPM_ROOT		= $(abs_builddir)
 TARFILE			= cluster-glue.tar.gz
-RPM_ROOT		= $(top_srcdir)
-SPEC			= $(top_srcdir)/cluster-glue.spec
+
+getdistro = $(shell test -e /etc/SuSE-release || echo fedora; test -e /etc/SuSE-release && echo suse)
 
 tgz:
 	rm -f $(TARFILE)
 	hg archive -t tgz $(TARFILE)
-	echo Rebuilt $(TARFILE) on `date`
+	echo `date`: Rebuilt $(TARFILE)
 
 srpm:	tgz
 	-rm *.src.rpm
-	rpmbuild -bs $(RPM_OPTS) $(SPEC)
+	-echo `date`: Building Source RPM for $(call getdistro) and derivatives
+	rpmbuild -bs $(RPM_OPTS) $(top_srcdir)/cluster-glue-$(call getdistro).spec
 
 rpm:	srpm
-	echo To create custom builds, edit the flags and options in pacemaker.spec first
-	rpmbuild -ba $(RPM_OPTS) $(SPEC)
+	echo To create custom builds, edit the flags and options in cluster-glue-$(call getdistro).spec first
+	-echo `date`: Building Binary RPM for $(call getdistro) and derivatives
+	rpmbuild $(RPM_OPTS) --rebuild $(top_builddir)/*.src.rpm
 
 mock:	srpm
 	mock --root fedora-rawhide-x86_64 --rebuild $(top_builddir)/*.src.rpm
