@@ -112,7 +112,8 @@ plugin_LTLIBRARIES =	apcmaster.la	\
 			ssh.la			\
 			suicide.la		\
 			$(vacm_LIB)		\
-			wti_nps.la
+			wti_nps.la		\
+			wti_mpc.la
 
 apcmaster_la_SOURCES	= apcmaster.c $(INCFILES)
 apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version
@@ -185,6 +186,11 @@ vacm_la_LIBADD		= $(top_builddir)/replace/libreplace.la
 wti_nps_la_SOURCES	= wti_nps.c $(INCFILES)
 wti_nps_la_LDFLAGS	= -export-dynamic -module -avoid-version
 wti_nps_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
+
+wti_mpc_la_SOURCES= wti_mpc.c $(INCFILES)
+wti_mpc_la_LDFLAGS= -export-dynamic -module -avoid-version @SNMPLIB@ \
+			  @CRYPTOLIB@
+wti_mpc_la_LIBADD	= $(GLIBLIB)
 
 suicide_la_SOURCES	= suicide.c $(INCFILES)
 suicide_la_LDFLAGS	= -export-dynamic -module -avoid-version
