@@ -1,5 +1,5 @@
 /*
- * Stonith module for APC Masterswitch (SNMP)
+ * Stonith module for WTI MPC (SNMP)
  * Copyright (c) 2001 Andreas Piesk <a.piesk@gmx.net>
  * Mangled by Sun Jiang Dong <sunjd@cn.ibm.com>, IBM, 2005
  * 
@@ -139,9 +139,12 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 
 /* oids */
 #define OID_IDENT			".1.3.6.1.2.1.1.5.0"
-#define OID_NUM_OUTLETS			".1.3.6.1.4.1.2634.3.1.3.1.2.%u"
-#define OID_OUTLET_NAMES		".1.3.6.1.4.1.2634.3.1.3.1.2.%u"
-#define OID_OUTLET_STATE		".1.3.6.1.4.1.2634.3.1.3.1.3.%i"
+
+#define OID_GROUP_NAMES_V1		".1.3.6.1.4.1.2634.3.1.3.1.2.%u"
+#define OID_GROUP_STATE_V1		".1.3.6.1.4.1.2634.3.1.3.1.3.%i"
+
+#define OID_GROUP_NAMES_V3		".1.3.6.1.4.1.2634.3.100.300.1.2.%u"
+#define OID_GROUP_STATE_V3		".1.3.6.1.4.1.2634.3.100.300.1.3.%i"
 
 #define MAX_OUTLETS 128
 
@@ -157,6 +160,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, const PILPluginImports* imports)
 /* own defines */
 #define MAX_STRING		128
 #define ST_PORT			"port"
+#define ST_MIBVERSION		"mib-version"
 
 /* structur of stonith object */
 struct pluginDevice {
@@ -167,6 +171,7 @@ struct pluginDevice {
 	char *			hostname;	/* masterswitch's hostname  */
 						/* or  ip addr		*/
 	int			port;		/* snmp port		*/
+	int			mib_version;	/* mib version to use   */
 	char *			community;	/* snmp community (r/w)	*/
 	int			num_outlets;	/* number of outlets	*/
 };
@@ -193,11 +198,28 @@ static const char *NOTpluginID = "WTI MPC device has been destroyed";
 	  XML_PORT_LONGDESC \
 	XML_PARAMETER_END
 
+#define XML_MIBVERSION_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_MIBVERSION \
+	XML_PARM_SHORTDESC_END
+
+#define XML_MIBVERSION_LONGDESC \
+	XML_MIBVERSION_LONGDESC_BEGIN("en") \
+	"Version number of MPC MIB that we should use. Valid values are 1 (for 1.44 firmware) and 3 (for 1.62 firmware and later)" \
+	XML_PARM_LONGDESC_END
+
+#define XML_MIBVERSION_PARM \
+	XML_PARAMETER_BEGIN(ST_MIBVERSION, "string", "1") \
+	  XML_PORT_SHORTDESC \
+	  XML_PORT_LONGDESC \
+	XML_PARAMETER_END
+
 static const char *apcmastersnmpXML = 
   XML_PARAMETERS_BEGIN
     XML_IPADDR_PARM
     XML_PORT_PARM
     XML_COMMUNITY_PARM
+    XML_MIBVERSION_PARM
   XML_PARAMETERS_END;
 
 /*
@@ -444,7 +466,18 @@ wti_mpc_hostlist(StonithPlugin * s)
     for (j = 0; j < ad->num_outlets; ++j) {
 
 	/* prepare objname */
-	snprintf(objname, MAX_STRING, OID_OUTLET_NAMES, j + 1);
+	switch (ad->mib_version) {
+	    case 3:
+                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V3,j+1);
+                break;
+            case 1:
+            default:
+                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V1,j+1);
+		break;
+	}
+	if (Debug) {
+	    LOG(PIL_DEBUG, "%s: using %s as group names oid", __FUNCTION__, objname);
+	}
 
 	/* read outlet name */
 	if ((outlet_name = MPC_read(ad->sptr, objname, ASN_OCTET_STR)) ==
@@ -514,7 +547,15 @@ wti_mpc_reset_req(StonithPlugin * s, int request, const char *host)
     for (outlet = 1; outlet <= ad->num_outlets; outlet++) {
 
 	/* prepare objname */
-	snprintf(objname, MAX_STRING, OID_OUTLET_NAMES, outlet);
+	switch (ad->mib_version) {
+	    case 3:
+                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V3,outlet);
+                break;
+            case 1:
+            default:
+                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V1,outlet);
+		break;
+	}
 
 	/* read outlet name */
 	if ((outlet_name = MPC_read(ad->sptr, objname, ASN_OCTET_STR))
@@ -567,7 +608,17 @@ wti_mpc_reset_req(StonithPlugin * s, int request, const char *host)
     /* Turn them all off */
    
 	    /* prepare objnames */
-	    snprintf(objname, MAX_STRING, OID_OUTLET_STATE, found_outlet);
+
+	switch (ad->mib_version) {
+	    case 3:
+                snprintf(objname,MAX_STRING,OID_GROUP_STATE_V3,found_outlet);
+                break;
+            case 1:
+            default:
+                snprintf(objname,MAX_STRING,OID_GROUP_STATE_V1,found_outlet);
+		break;
+	}
+
 	    snprintf(value, MAX_STRING, "%i", req_oid);
 
 	    /* send reboot cmd */
@@ -588,7 +639,7 @@ wti_mpc_reset_req(StonithPlugin * s, int request, const char *host)
 static const char **
 wti_mpc_get_confignames(StonithPlugin * s)
 {
-	static const char * ret[] = {ST_IPADDR, ST_PORT, ST_COMMUNITY, NULL};
+	static const char * ret[] = {ST_IPADDR, ST_PORT, ST_COMMUNITY, ST_MIBVERSION, NULL};
 	return ret;
 }
 
@@ -608,6 +659,7 @@ wti_mpc_set_config(StonithPlugin * s, StonithNVpair * list)
 	{	{ST_IPADDR,	NULL}
 	,	{ST_PORT,	NULL}
 	,	{ST_COMMUNITY,	NULL}
+	,	{ST_MIBVERSION,	NULL}
 	,	{NULL,		NULL}
 	};
 
@@ -624,6 +676,8 @@ wti_mpc_set_config(StonithPlugin * s, StonithNVpair * list)
 	sd->port = atoi(namestocopy[1].s_value);
 	PluginImports->mfree(namestocopy[1].s_value);
 	sd->community = namestocopy[2].s_value;
+	sd->mib_version = atoi(namestocopy[3].s_value);
+	PluginImports->mfree(namestocopy[3].s_value);
 
         /* try to resolve the hostname/ip-address */
 	if (gethostbyname(sd->hostname) != NULL) {
@@ -633,11 +687,27 @@ wti_mpc_set_config(StonithPlugin * s, StonithNVpair * list)
 		/* now try to get a snmp session */
 		if ((sd->sptr = MPC_open(sd->hostname, sd->port, sd->community)) != NULL) {
 
-			/* ok, get the number of outlets from the mpc */
+	    /* ok, get the number of groups from the mpc */
             sd->num_outlets=0;
-            /* We scan goup name from 1 to MAX_OUTLETS */
+            /* We scan goup names table starting from 1 to MAX_OUTLETS */
+            /* and increase num_outlet counter on every group entry with name */
+            /* first entry without name is the mark of the end of the group table */
             for (mo=1;mo<MAX_OUTLETS;mo++) {
-                snprintf(objname,MAX_STRING,OID_NUM_OUTLETS,mo);
+		switch (sd->mib_version) {
+		    case 3:
+	                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V3,mo);
+	                break;
+	            case 1:
+	            default:
+	                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V1,mo);
+			break;
+		}
+
+		if (Debug) {
+	            LOG(PIL_DEBUG, "%s: used for groupTable retrieval: %s."
+		    ,   __FUNCTION__, objname);
+		}
+
                 if ((i = MPC_read(sd->sptr, objname, ASN_OCTET_STR)) == NULL) {
                     LOG(PIL_CRIT
                     , "%s: cannot read number of outlets."
@@ -777,6 +847,7 @@ wti_mpc_new(const char *subplugin)
 	ad->sptr = NULL;
 	ad->hostname = NULL;
 	ad->community = NULL;
+	ad->mib_version=1;
 	ad->idinfo = DEVICE;
 	ad->sp.s_ops = &wti_mpcOps;
 
