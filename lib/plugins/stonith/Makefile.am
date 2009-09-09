@@ -205,7 +205,8 @@ stdocdir 		= $(docdir)/stonith
 
 README_FILES = README.bladehpi README.cyclades README.drac3 \
 				README.external README.ipmilan README.meatware \
-				README.rcd_serial README.riloe README.vacm
+				README.rcd_serial README.riloe README.vacm \
+				README.wti_mpc
 
 EXTRA_DIST = $(README_FILES)
 
