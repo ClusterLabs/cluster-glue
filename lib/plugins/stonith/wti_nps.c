@@ -168,6 +168,7 @@ static const char *wti_npsXML =
  
 static struct Etoken password[] =	{ {"Password:", 0, 0}, {NULL,0,0}};
 static struct Etoken Prompt[] =		{ {"PS>", 0, 0}
+					, {"IPS>", 0, 0}
 					, {"BB>", 0, 0}
 					, {NULL,0,0}};
 static struct Etoken LoginOK[] =	{ {WTINPSSTR, 0, 0}
