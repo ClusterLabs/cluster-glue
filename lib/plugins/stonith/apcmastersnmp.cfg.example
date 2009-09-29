@@ -1,0 +1,39 @@
+#
+# this is an example config for the stonith module apcmastersnmp
+#
+# 1. what does the fields on the line mean ?
+#
+#    all parameters must be given on a single line. blank lines and lines
+#    starting with '#' are ignored. only the first not ignored line will
+#    be processed. all subsequent lines will be ignored. the different
+#    fields must be seperated by white-spaces (blanks and/or tabs).
+#
+#    the first field is the either the hostname or the ip address. the
+#    hostname must be resolvable. the second fields specifies the snmp port
+#    the masterswitch is listening. for snmp the default is 161. the last
+#    field contains the so called 'community' string. this must be the same
+#    as the one in the masterswitch configuration.
+#
+#
+# 2. how must the masterswitch be configured ?
+#
+#    as said above, the community string must be set to the same value entered
+#    in this config. the different outlets must be named after the connected
+#    hosts. that means, the outlet names must be the same as the node names
+#    in /etc/ha.d/ha.cf. the reset values should be set to reasonable values.
+#
+#    the module DON'T configure the module in any way!
+#
+#
+# 3. how does the module work ?
+#
+#    in case of a stonith the module receives the nodename of the host, which
+#    should be reset. the module looks up this nodename in the list of outlet
+#    names. that's why the names must be identical (see 2.). if it finds the
+#    name, it'll reset the appropriate outlet using the configured values
+#    (eg. delay, duration). then the module waits for the outlet to coming
+#    up. if it comes up, a successful stonith will be reported back. otherwise
+#    the stonith failed and a failure code will be returned.
+#
+
+192.168.1.110	161	private
