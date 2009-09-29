@@ -67,7 +67,7 @@ class TimeoutException(Exception):
 class RSABoard(telnetlib.Telnet):
     def __init__(self, *args, **kwargs):
         telnetlib.Telnet.__init__(self, *args, **kwargs)
-        self._timeout = 3
+        self._timeout = 10
         self._loggedin = 0
         self._history = []
         self._appl = os.path.basename(sys.argv[0])
@@ -82,37 +82,37 @@ class RSABoard(telnetlib.Telnet):
         self._history.append(self._get_timestamp() + ': WRITE: ' + repr(buffer))
         telnetlib.Telnet.write(self, buffer)
 
-    def read_until(self, what, timeout=2):
-        line = telnetlib.Telnet.read_until(self, what, timeout)
+    def expect(self, what, timeout=20):
+        line = telnetlib.Telnet.expect(self, what, timeout)
         self._history.append(self._get_timestamp() + ': READ : ' + repr(line))
-        if not line.endswith(what):
+        if not line:
             raise TimeoutException("Timeout while waiting for '%s'." % (what, ))
         return line
 
     def login(self, user, passwd):
         self.write("\r")
-        line = self.read_until('username: ', self._timeout)
+        line = self.expect(['^login : ', '^username: '], self._timeout)
         self.write(user)
         self.write('\r')
-        line = self.read_until('password: ', self._timeout)
+        line = self.expect(['^Password: ', '^password: '], self._timeout)
         self.write(passwd)
         self.write('\r')
-        line = self.read_until('> ', self._timeout)
+        line = self.expect(['^system>', '^> '], self._timeout)
 
     def reset(self):
         self.write('power cycle\r')
-        line = self.read_until('ok', 10)
-        line = self.read_until('> ', self._timeout)
+        line = self.expect(['^ok'], self._timeout)
+        line = self.expect(['^system>', '^> '], self._timeout)
 
     def on(self):
         self.write('power on\r')
-        line = self.read_until('ok', 10)
-        line = self.read_until('> ', self._timeout)
+        line = self.expect(['^ok'], self._timeout)
+        line = self.expect(['^system>', '^> '], self._timeout)
 
     def off(self):
         self.write('power off\r')
-        line = self.read_until('ok', 10)
-        line = self.read_until('> ', self._timeout)
+        line = self.expect(['^ok'], self._timeout)
+        line = self.expect(['^system>', '^> '], self._timeout)
 
     def exit(self):
         self.write('exit\r')

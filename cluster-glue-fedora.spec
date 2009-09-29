@@ -95,6 +95,7 @@ standards, and an interface to common STONITH devices.
 %{_datadir}/heartbeat/ha_cf_support.sh
 %{_datadir}/heartbeat/openais_conf_support.sh
 %{_datadir}/heartbeat/utillib.sh
+%{_datadir}/heartbeat/combine-logs.pl
 
 %{_sbindir}/ha_logger
 %{_sbindir}/hb_report
