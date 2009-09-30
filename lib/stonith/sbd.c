@@ -53,7 +53,7 @@ static const char *watchdogdev		= "/dev/watchdog";
 static char *	local_uname;
 
 /* Global, non-tunable variables: */
-static size_t	sector_size		= 0;
+static int	sector_size		= 0;
 static int	watchdogfd 		= -1;
 static int	devfd;
 static char	*devname;
