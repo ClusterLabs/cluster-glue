@@ -26,7 +26,10 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 ## include files
 
 ## binaries
-sbin_PROGRAMS		= stonith meatclient sbd
+sbin_PROGRAMS		= stonith meatclient 
+if ON_LINUX
+sbin_PROGRAMS		+= sbd
+endif
 
 stonith_SOURCES		= main.c
 
