@@ -412,8 +412,6 @@ dnl Old names for new things
 AC_DEFINE_UNQUOTED(HA_CCMUSER,   "$GLUE_DAEMON_USER",  User to run daemons as) 
 AC_DEFINE_UNQUOTED(HA_APIGROUP,  "$GLUE_DAEMON_GROUP", Group to run daemons as)
 AC_DEFINE_UNQUOTED(HA_LIBHBDIR,  "$GLUE_DAEMON_DIR",   Location for daemons)
-AC_DEFINE_UNQUOTED(HA_LIBDIR,  "$GLUE_DAEMON_DIR",   Location for daemons)
-
 
 LRM_DIR=lrm
 AC_SUBST(LRM_DIR)
