@@ -311,7 +311,7 @@ darwin*)
 		;;
 esac
 
-AM_CONDITIONAL(ON_LINUX, $ON_LINUX)
+AM_CONDITIONAL(ON_LINUX, test $ON_LINUX = 1)
 
 dnl Eventually remove this 
 dnl CFLAGS="$CFLAGS -I${prefix}/include/heartbeat"
