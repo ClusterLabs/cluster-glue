@@ -11,6 +11,9 @@
 %global upstreamprefix Reusable-Cluster-Components-
 %global upstreamversion d97b9dea436e
 
+# Keep around for when/if required
+#global alphatag %{upstreamversion}.hg
+
 Name:		cluster-glue
 Summary:	Reusable cluster components
 Version:	1.0
