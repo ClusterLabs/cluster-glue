@@ -215,6 +215,7 @@ execra( const char * rsc_id, const char * rsc_type, const char * provider,
 	char * inherit_debuglevel = NULL;
 	char * optype_tmp = NULL;
 	int index_tmp = 0;
+	int save_errno;
 
 	/* Specially handle the operation "metameta-data". To build up its
 	 * output from templet, dummy data and its comment head.
@@ -261,21 +262,12 @@ execra( const char * rsc_id, const char * rsc_type, const char * provider,
 
 	closefiles(); /* don't leak open files */
 	execv(ra_pathname, params_argv);
+	/* oops, exec failed */
+	save_errno = errno; /* cl_perror may change errno */
 	cl_perror("(%s:%s:%d) execv failed for %s"
 		  , __FILE__, __FUNCTION__, __LINE__, ra_pathname);
-
-        switch (errno) {
-                case ENOENT:   /* No such file or directory */
-			/* Fall down */
-                case EISDIR:   /* Is a directory */
-			exit_value = EXECRA_NOT_INSTALLED;
-                        break;
-
-                default:
-                        exit_value = EXECRA_EXEC_UNKNOWN_ERROR;
-        }
-
-        exit(exit_value);
+	errno = save_errno;
+	exit(get_failed_exec_rc());
 }
 
 static uniform_ret_execra_t
