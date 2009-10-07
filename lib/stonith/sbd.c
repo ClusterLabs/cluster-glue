@@ -102,9 +102,10 @@ watchdog_init_interval(void)
 		cl_perror( "WDIOC_SETTIMEOUT"
 		": Failed to set watchdog timer to %lu seconds.",
 		timeout_watchdog);
+	} else {
+		cl_log(LOG_INFO, "Set watchdog timeout to %lu seconds.",
+			timeout_watchdog);
 	}
-	cl_log(LOG_INFO, "Set watchdog timeout to %lu seconds.",
-		timeout_watchdog);
 }
 
 static void
