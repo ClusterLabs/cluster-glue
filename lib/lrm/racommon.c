@@ -27,6 +27,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <dirent.h>
 #include <libgen.h>  /* Add it for compiling on OSX */
 #include <glib.h>
@@ -136,6 +137,26 @@ get_runnable_list(const char* class_path, GList ** rsc_info)
 		free(namelist);
 	}
 	return g_list_length(*rsc_info);
+}
+
+int
+get_failed_exec_rc(void)
+{
+	int rc;
+
+	switch (errno) { /* see execve(2) */
+		case ENOENT:  /* No such file or directory */
+		case EISDIR:   /* Is a directory */
+			rc = EXECRA_NOT_INSTALLED;
+			break;
+		case EACCES:   /* permission denied (various errors) */
+			rc = EXECRA_INSUFFICIENT_PRIV;
+			break;
+		default:
+			rc = EXECRA_EXEC_UNKNOWN_ERROR;
+			break;
+	}
+	return rc;
 }
 
 void

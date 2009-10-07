@@ -148,6 +148,7 @@ execra(const char * rsc_id, const char * rsc_type, const char * provider,
 	GHashTable * tmp_for_setenv;
 	GString * params_gstring;
 	char * inherit_debuglevel = NULL;
+	int save_errno;
 
 	get_ra_pathname(RA_PATH, rsc_type, provider, ra_pathname);
 
@@ -172,29 +173,12 @@ execra(const char * rsc_id, const char * rsc_type, const char * provider,
 	closefiles(); /* don't leak open files */
 	/* execute the RA */
 	execl(ra_pathname, ra_pathname, op_type, (const char *)NULL);
+	/* oops, exec failed */
+	save_errno = errno; /* cl_perror may change errno */
 	cl_perror("(%s:%s:%d) execl failed for %s" 
 		  , __FILE__, __FUNCTION__, __LINE__, ra_pathname);
-
-	switch (errno) { /* see execve(2) */
-		case E2BIG:   /* env to large */
-		case EACCES:   /* permission denied (various errors) */
-		case EFAULT:  /* address space issue */
-		case EINVAL:  /* bad format */
-		case EMFILE:  /* too many files open */
-		case EIO:  /* I/O error */
-		case ELOOP:  /* Too  many  symbolic links */
-		case ENAMETOOLONG:  /* */
-		case ENOMEM:  /* */
-		case EPERM:  /* */
-			exit_value = EXECRA_EXEC_UNKNOWN_ERROR;
-			break;
-
-		default:
-			exit_value = EXECRA_NOT_INSTALLED;
-			break;
-	}
-
-	exit(exit_value);
+	errno = save_errno;
+	exit(get_failed_exec_rc());
 }
 
 static uniform_ret_execra_t
