@@ -208,7 +208,6 @@ static int
 execra( const char * rsc_id, const char * rsc_type, const char * provider,
 	const char * op_type, const int timeout, GHashTable * params)
 {
-	uniform_ret_execra_t exit_value;
 	RA_ARGV params_argv;
 	char ra_pathname[RA_MAX_NAME_LENGTH];
 	GString * debug_info;
