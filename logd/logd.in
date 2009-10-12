@@ -13,7 +13,7 @@
 #		We don't hate anyone, and like for everyone to use
 #		our software, no matter what OS or distribution you're using.
 #
-# chkconfig: 2345 @LOGD_INITSTARTPRI@ @LOGD_INITSTOPPRI@
+# chkconfig: 2345 19 21
 # description: Startup script logd service.
 # processname: ha_logd
 # pidfile: @localstatedir@/run/logd.pid
