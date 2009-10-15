@@ -219,20 +219,6 @@ case $libdir in
     ;;
 esac
 
-AC_MSG_CHECKING(for the location of the lock directory)
-for HA_VARLOCKDIR in ${localstatedir}/lock ${localstatedir}/spool/lock ${localstatedir}/spool/locks ${localstatedir}/lock
-do
-  if
-    test -d "$HA_VARLOCKDIR"
-  then
-    AC_MSG_RESULT($HA_VARLOCKDIR)
-    break
-  fi
-done
-
-AC_SUBST(HA_VARLOCKDIR)
-AC_DEFINE_UNQUOTED(HA_VARLOCKDIR,"$HA_VARLOCKDIR", System lock directory)
-
 DLOPEN_FORCE_FLAGS=""
 AC_SUBST(DLOPEN_FORCE_FLAGS)
 
@@ -265,12 +251,26 @@ if test "x$docdir" = "x"; then
 fi
 AC_SUBST(docdir)
 
+AC_MSG_CHECKING(for the location of the lock directory)
+for HA_VARLOCKDIR in ${localstatedir}/lock ${localstatedir}/spool/lock ${localstatedir}/spool/locks ${localstatedir}/lock
+do
+  if
+    test -d "$HA_VARLOCKDIR"
+  then
+    AC_MSG_RESULT($HA_VARLOCKDIR)
+    break
+  fi
+done
+
+AC_SUBST(HA_VARLOCKDIR)
+AC_DEFINE_UNQUOTED(HA_VARLOCKDIR,"$HA_VARLOCKDIR", System lock directory)
+
 dnl Home-grown variables
 eval INITDIR="${INITDIR}"
 
 for j in prefix exec_prefix bindir sbindir libexecdir datadir sysconfdir \
     sharedstatedir localstatedir libdir includedir oldincludedir infodir \
-    mandir INITDIR docdir
+    mandir INITDIR docdir HA_VARLOCKDIR
 do 
   dirname=`eval echo '${'${j}'}'`
   if
