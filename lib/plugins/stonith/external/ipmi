@@ -54,7 +54,7 @@ do_ipmi() {
 		interface="lan"
 	fi
 
-	${IPMITOOL} -I ${interface} -H ${ipaddr} -U ${userid} -P ${passwd} ${1} || {
+	${IPMITOOL} -I ${interface} -H ${ipaddr} -U "${userid}" -P "${passwd}" ${1} || {
 		echo "error executing ipmi command"
 		return 1
 	}
