@@ -582,6 +582,7 @@ slot_msg(const char *name, const char *cmd)
 	struct sector_mbox_s	*s_mbox = NULL;
 	int			mbox;
 	int			rc = 0;
+	int			skip_wait = 0;
 
 	if (!name || !cmd) {
 		cl_log(LOG_ERR, "slot_msg(): No recipient / cmd specified.\n");
@@ -618,7 +619,9 @@ slot_msg(const char *name, const char *cmd)
 	if (mbox_write_verify(mbox, s_mbox) < -1) {
 		rc = -1; goto out;
 	}
-	sleep(timeout_msgwait);
+	if (strcasecmp(cmd, "exit") != 0) {
+		sleep(timeout_msgwait);
+	}
 	cl_log(LOG_INFO, "%s successfully delivered to %s",
 			cmd, name);
 
