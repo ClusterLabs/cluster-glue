@@ -1,0 +1,27 @@
+#!/bin/sh
+
+sed '
+/^lrmadmin/s/([0-9][0-9]*)/()/
+/^lrmadmin/s/^lrmadmin[^:]*: [^ ]* //
+s/call_id=[0-9][0-9]*/call_id=(removed)/
+/run at:/d
+/last rc change at:/d
+/queue time:/d
+' |
+awk '
+/Waiting for lrmd to callback.../ { n=1; next; }
+n==1 && /----------------operation--------------/ { n++; next; }
+n==2 && /type:/ { op=$0; sub("type:","",op); next }
+n==2 && /operation status:/ { desc=$0; sub("operation status:","",desc); next }
+n==2 && /op_status:/ { stat=$0; sub("op_status: *","",stat); next }
+n==2 && /return code:/ { rc=$0; sub("return code: *","",rc); next }
+n==2 && /output data:/ { n++; next; }
+n==3 && /---------------------------------------/ {
+	printf("> %s %s (status=%s,rc=%s): %s\n",op,desc,stat,rc,substr(output,2));
+	n=0;
+	output="";
+	next;
+}
+n==3 && $1!="" { output=output"/"$0; next; }
+{ print }
+'
