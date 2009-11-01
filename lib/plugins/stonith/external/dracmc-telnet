@@ -37,16 +37,16 @@
 # or when the plugin is started by multiple cluster nodes, there is a
 # built in retry mechanism for login.  On 10 retries, the code gives up
 # and throws.
-#     When cloning this resource, make sure to create a location
-# constraint that excludes the node that is to be fenced and also set
-# the clone ordered property to true.
+#     When running this resource, it is best to not run it as a clone,
+# rather as a normal, single-instance resource.  Make sure to create a
+# location constraint that excludes the node that is to be fenced.
 #
 #  For example:
 #
-#    primitive dracmc_node1 stonith:external/dracmc-telnet \
+#    primitive fence_node1 stonith:external/dracmc-telnet \
 #             nodename=node1 cyclades_ip=10.0.0.1 cyclades_port=7001 \
-#             servername=Server-1 username=admin password=letmein
-#    clone fence_node1 dracmc_node1 meta ordered=true
+#             servername=Server-1 username=USERID password=PASSWORD \
+#             op monitor interval="200m" timeout="60s"
 #    location loc-fence_node1 fence_node1 -inf: node1
 #    commit
 #
@@ -455,9 +455,9 @@ if __name__ == '__main__':
 #<cib>
 #    <configuration>
 #        <resources>
-#            <primitive id="r_stonith-node01" class="stonith" type="external/dracmc" provider="heartbeat" resource_stickiness="0">
+#            <primitive id="r_stonith-node01" class="stonith" type="external/dracmc-telnet" provider="heartbeat" resource_stickiness="0">
 #                <operations>
-#                    <op name="monitor" interval="60" timeout="300" prereq="nothing" id="r_stonith-node01-mon"/>
+#                    <op name="monitor" interval="200m" timeout="60s" prereq="nothing" id="r_stonith-node01-mon"/>
 #                    <op name="start" timeout="180" id="r_stonith-node01-start"/>
 #                    <op name="stop" timeout="180" id="r_stonith-node01-stop"/>
 #                </operations>
@@ -467,8 +467,8 @@ if __name__ == '__main__':
 #                        <nvpair id="r_stonith-node01-cyclades_ip" name="cyclades_ip" value="192.168.0.1"/>
 #                        <nvpair id="r_stonith-node01-cyclades_port" name="cyclades_port" value="7032"/>
 #                        <nvpair id="r_stonith-node01-servername" name="servername" value="Server-7"/>
-#                        <nvpair id="r_stonith-node01-username" name="username" value="userid"/>
-#                        <nvpair id="r_stonith-node01-password" name="password" value="password"/>
+#                        <nvpair id="r_stonith-node01-username" name="username" value="USERID"/>
+#                        <nvpair id="r_stonith-node01-password" name="password" value="PASSWORD"/>
 #                        <nvpair id="r_stonith-node01-type" name="type" value="dellblade"/>
 #                    </attributes>
 #                </instance_attributes>
