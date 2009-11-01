@@ -582,7 +582,6 @@ slot_msg(const char *name, const char *cmd)
 	struct sector_mbox_s	*s_mbox = NULL;
 	int			mbox;
 	int			rc = 0;
-	int			skip_wait = 0;
 
 	if (!name || !cmd) {
 		cl_log(LOG_ERR, "slot_msg(): No recipient / cmd specified.\n");
