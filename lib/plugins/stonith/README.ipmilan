@@ -1,0 +1,131 @@
+			IPMILAN STONITH Module
+		   Copyright (c) 2003 Intel Corp. 
+		      yixiong.zou@intel.com
+
+1. Intro
+
+IPMILAN STONITH module works by sending a node an IPMI message, in particular,
+a 'chassis control' command.  Currently the message is sent over the LAN.  
+
+2. Hardware Requirement
+
+In order to use this module, the node has to be IPMI v1.5 compliant and
+also supports IPMI over LAN.  For example, the Intel Langley platform. 
+
+Note: IPMI over LAN is an optional feature defined by IPMI v1.5 spec.  
+So even if a system is IPMI compliant/compatible, it might still not 
+support IPMI over LAN.  If you are sure this is your case and you still
+want to try this plugin, read section 6, IPMI v1.5 without IPMI over 
+LAN Support.
+
+3. Software Requirement
+
+This module needs OpenIPMI (http://openipmi.sf.net) to compile.
+Version 1.4.x or 2.0.x is supported.
+
+4. Hardware Configuration
+
+How to configure the node so it accepts IPMI lan packets is beyond the
+scope of this document.  Consult your product manual for this. 
+
+5. STONITH Configuration
+
+Each node in the cluster has to be configured individually.  So normally there
+would be at least two entries, unless you want to use a different STONITH
+device for the other nodes in the cluster. ;)  
+
+The configuration file syntax looks like this:
+
+	<node1> <ip> <port> <auth> <priv> <user> <pass> <reset_method>
+	<node2> <ip> <port> <auth> <priv> <user> <pass> <reset_method>
+	...
+
+	node: the hostname.  
+
+	ip: the IP address of the node.   If a node has more than one IP addresses,
+	    this is the IP address of the interface which accepts IPMI messages. :)
+
+	port: the port number to send the IPMI message to.  The default is 623.
+	      But it could be different or even configurable. 
+
+	auth: the authorization type of the IPMI session.  Valid choices are 
+	      "none", "straight", "md2", and "md5". 
+
+	priv: the privilege level of the user.  Valid choices are "operator"
+	      or "admin".  These are the privilege levels required to run the
+	      'chassis control' command.  
+
+	user: the username. use "" if it is empty.  Cannot exceed 16 characters.
+
+	pass: the password. use "" if it is empty.  Cannot exceed 16 characters.
+
+	reset_method: (optional) which IPMI chassis control to send
+	to reset the host. Possible values are power_cycle (default)
+	and hard_reset.
+
+Each line is white-space delimited and lines begins with '#' are ignored. 
+
+6. IPMI v1.5 without IPMI over LAN Support
+
+If somehow your computer have a BMC but without LAN support, you might
+still be able to use this module.  
+
+  0) Make sure OpenIPMI is installed.  OpenIPMI 1.0.3 should work.
+
+  1) Create a /etc/ipmi_lan.conf file. 
+
+     Here's a sample of how this file should look like
+
+     addr 172.16.1.249 999
+     PEF_alerting on
+     per_msg_auth off
+     priv_limit admin
+     allowed_auths_admin none md2 md5
+     user 20 on "" "" admin 5 md2 md5 none
+
+     If you do not understand what each line means, do a man on ipmilan.
+
+  2) run ipmilan as root. 
+
+  3) Try send youself an IPMI packet over the network using ipmicmd see
+     if it works. 
+
+     ipmicmd -k "0f 00 06 01" lan 172.16.1.249 999 none admin "" ""
+
+     The result should be something like:
+
+     Connection 0 to the BMC is up0f 07 00 01 00 01 80 01 19 01 8f 77 00 00 4b 02
+
+  4) Configure your system so everytime it boots up, the ipmi device
+     drivers are all loaded and ipmilan is run.  This is all OS dependent
+     so I can't tell you what to do.
+
+  The major draw back of this is that you will not be able to power it up
+  once it's power down, which for a real IPMI, you could.
+
+
+7. Bugs
+
+Some IPMI device does not return 0x0, success, to the host who issued the reset
+command.  A timeout, 0xc3, could be returned instead.  So I am counting that
+also as a "successful reset".  
+
+Note: This behavior is not fully IPMI v1.5 compliant.  Based on the IPMI v1.5
+spec, the IPMI device should return the appropriate return code.  And it is
+even allowed to return the appropriate return code before performing the
+action.  
+
+
+8. TODO
+
+1) Right now the timeout on each host is hard coded to be 10 seconds.  It will
+   be nice to be able to set this value for individual host.
+
+2) A better way of detecting the success of the reset operation will be good.  A
+   lot of times the host which carried out the reset does not return a success. 
+
+3) The os_handler should be contributed back to the OpenIPMI project so that 
+   we do not need to maintain it here.  It does not make sense for every little
+   app like this to write its own os_handler.  A generic one like in this
+   program should be sufficient. 
+
