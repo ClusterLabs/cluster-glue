@@ -47,6 +47,7 @@
 #include <clplumbing/uids.h>
 #include <clplumbing/Gmain_timeout.h>
 #include <clplumbing/cl_pidfile.h>
+#include <clplumbing/realtime.h>
 #include <ha_msg.h>
 #ifdef ENABLE_APPHB
 #  include <apphb.h>

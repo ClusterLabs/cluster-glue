@@ -44,10 +44,6 @@
 static gboolean	cl_realtimepermitted = TRUE;
 static void cl_rtmalloc_setup(void);
 
-#if defined(SCHED_RR) && defined(_POSIX_PRIORITY_SCHEDULING) && !defined(ON_DARWIN)
-#	define DEFAULT_REALTIME	SCHED_RR
-#endif
-
 #define HOGRET	0xff
 /*
  * Slightly wacko recursive function to touch requested amount
