@@ -26,16 +26,16 @@
 
 Name:           cluster-glue
 Summary:        Reusable cluster components
-Version:        1.0
-Release:        1
+Version:        1.0.1
+Release:	1%{?dist}
 License:        GPL v2 or later; LGPL v2.1 or later
 Url:            http://www.linux-ha.org
 Group:		Productivity/Clustering/HA
-Source:         cluster-glue.tar.gz
+Source:         cluster-glue.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 AutoReqProv:    on
 BuildRequires:  automake autoconf libtool e2fsprogs-devel glib2-devel pkgconfig python-devel libxml2-devel
-BuildRequires:  libnet net-snmp-devel OpenIPMI-devel openhpi-devel
+BuildRequires:  libnet net-snmp-devel OpenIPMI-devel openhpi-devel 
 
 Obsoletes:	heartbeat-common
 Requires(pre):    /usr/sbin/groupadd /usr/bin/getent /usr/sbin/useradd

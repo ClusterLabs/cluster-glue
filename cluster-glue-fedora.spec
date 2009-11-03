@@ -7,21 +7,18 @@
 
 # When downloading directly from Mercurial, it will automatically add this prefix
 # Invoking 'hg archive' wont but you can add one with: hg archive -t tgz -p "Reusable-Cluster-Components-" -r $upstreamversion $upstreamversion.tar.gz
-%global specversion 9
 %global upstreamprefix Reusable-Cluster-Components-
 %global upstreamversion d97b9dea436e
 
-# Keep around for when/if required
-#global alphatag %{upstreamversion}.hg
-
 Name:		cluster-glue
 Summary:	Reusable cluster components
-Version:	1.0
-Release:	%{?alphatag:0.}%{specversion}%{?alphatag:.%{alphatag}}%{?dist}
+Version:	1.0.1
+Release:	1%{?dist}
 License:	GPLv2+ and LGPLv2+
 Url:		http://www.clusterlabs.org
 Group:		System Environment/Base
-Source0:	cluster-glue.tar.gz
+Source0:	cluster-glue.tar.bz2
+Requires:	perl-TimeDate
 
 # Directives to allow upgrade from combined heartbeat packages in Fedora11
 Provides:       heartbeat-stonith = 3.0.0-1
