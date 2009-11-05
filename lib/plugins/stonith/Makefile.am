@@ -51,7 +51,7 @@ endif
 #
 
 if USE_APC_SNMP
-apcmastersnmp_LIB = apcmastersnmp.la
+apcmastersnmp_LIB = apcmastersnmp.la wti_mpc.la
 else
 apcmastersnmp_LIB =
 endif
@@ -112,8 +112,7 @@ plugin_LTLIBRARIES =	apcmaster.la	\
 			ssh.la			\
 			suicide.la		\
 			$(vacm_LIB)		\
-			wti_nps.la		\
-			wti_mpc.la
+			wti_nps.la
 
 apcmaster_la_SOURCES	= apcmaster.c $(INCFILES)
 apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version
