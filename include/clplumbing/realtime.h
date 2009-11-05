@@ -18,6 +18,10 @@
 #	define _CLPLUMBING_REALTIME_H
 #	include <sched.h>
 
+#if defined(SCHED_RR) && defined(_POSIX_PRIORITY_SCHEDULING) && !defined(ON_DARWIN)
+#       define DEFAULT_REALTIME SCHED_RR
+#endif
+
 /*
  *
  * make_realtime() will make the current process a soft realtime process
