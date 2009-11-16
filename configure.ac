@@ -786,6 +786,77 @@ AC_CHECK_FUNCS(g_log_set_default_handler)
 AC_CHECK_FUNCS(getopt, AC_DEFINE(HAVE_DECL_GETOPT,  1, [Have getopt function]))
 AC_CHECK_FUNCS(getpeereid)
 
+dnl **********************************************************************
+dnl Check for various argv[] replacing functions on various OSs
+dnl
+dnl Borrowed from Proftpd
+dnl Proftpd is Licenced under the terms of the GNU General Public Licence
+dnl and is available from http://www.proftpd.org/
+dnl
+
+AC_CHECK_FUNCS(setproctitle)
+AC_CHECK_HEADERS(libutil.h)
+AC_CHECK_LIB(util, setproctitle,
+        [AC_DEFINE(HAVE_SETPROCTITLE,1,[ ])
+                ac_cv_func_setproctitle="yes" ; LIBS="$LIBS -lutil"])
+
+if test "$ac_cv_func_setproctitle" = "yes"; then
+  pf_argv_set="PF_ARGV_NONE"
+fi
+
+if test "$pf_argv_set" = ""; then
+  AC_CHECK_HEADERS(sys/pstat.h)
+  if test "$ac_cv_header_pstat_h" = "yes"; then
+    AC_CHECK_FUNCS(pstat)
+
+    if test "$ac_cv_func_pstat" = "yes"; then
+        pf_argv_set="PF_ARGV_PSTAT"
+    else
+        pf_argv_set="PF_ARGV_WRITEABLE"
+    fi
+  fi
+
+  if test "$pf_argv_set" = ""; then
+    AC_EGREP_HEADER([#define.*PS_STRINGS.*],sys/exec.h,
+                        have_psstrings="yes",have_psstrings="no")
+    if test "$have_psstrings" = "yes"; then
+        pf_argv_set="PF_ARGV_PSSTRINGS"
+    fi
+  fi
+
+  if test "$pf_argv_set" = ""; then
+    AC_CACHE_CHECK(whether __progname and __progname_full are available,
+                    pf_cv_var_progname,
+                    AC_TRY_LINK([extern char *__progname, *__progname_full;],
+                        [__progname = "foo"; __progname_full = "foo bar";],
+                        pf_cv_var_progname="yes", pf_cv_var_progname="no"))
+
+    if test "$pf_cv_var_progname" = "yes"; then
+        AC_DEFINE(HAVE___PROGNAME,1,[ ])
+    fi
+
+    AC_CACHE_CHECK(which argv replacement method to use,
+                    pf_cv_argv_type,
+                    AC_EGREP_CPP(yes,[
+#if defined(__GNU_HURD__)
+  yes
+#endif
+  ],pf_cv_argv_type="new", pf_cv_argv_type="writeable"))
+
+    if test "$pf_cv_argv_type" = "new"; then
+        pf_argv_set="PF_ARGV_NEW"
+    fi
+
+    if test "$pf_argv_set" = ""; then
+        pf_argv_set="PF_ARGV_WRITEABLE"
+    fi
+  fi
+fi
+AC_DEFINE_UNQUOTED(PF_ARGV_TYPE, $pf_argv_set,
+        mechanism to pretty-print ps output: setproctitle-equivalent)
+
+dnl End of tests borrowed from Proftpd
+
 dnl ========================================================================
 dnl   ltdl
 dnl ========================================================================
