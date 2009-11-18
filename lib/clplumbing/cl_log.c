@@ -84,6 +84,7 @@ static int		cl_log_facility = LOG_USER;
 static void		cl_opensyslog(void);
 static int		syslog_enabled = 0;
 static int		stderr_enabled = 0;
+static int		stdout_enabled = 0;
 static const char*	logfile_name = NULL;
 static const char*	debugfile_name = NULL;
 static int		cl_process_pid = -1;
@@ -119,6 +120,12 @@ void
 cl_log_enable_stderr(int truefalse)
 {
 	stderr_enabled = truefalse;
+}
+
+void
+cl_log_enable_stdout(int truefalse)
+{
+	stdout_enabled = truefalse;
 }
 
 void
@@ -592,6 +599,11 @@ cl_log(int priority, const char * fmt, ...)
 
 	if (stderr_enabled) {
 		print_logline(stderr, cl_log_entity,cl_process_pid,
+			NULLTIME, prio2str(priority), buf);
+	}
+
+	if (stdout_enabled) {
+		print_logline(stdout, cl_log_entity,cl_process_pid,
 			NULLTIME, prio2str(priority), buf);
 	}
 
