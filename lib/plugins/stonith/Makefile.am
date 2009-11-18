@@ -102,6 +102,7 @@ plugin_LTLIBRARIES =	apcmaster.la	\
 			cyclades.la		\
 			$(drac3_LIB)		\
 			external.la		\
+			rhcs.la		\
 			ibmhmc.la		\
 			$(ipmilan_LIB)		\
 			meatware.la		\
@@ -146,6 +147,10 @@ drac3_la_LIBADD		= -lcurl -lxml2 $(GLIBLIB)
 external_la_SOURCES	= external.c	$(INCFILES)
 external_la_LDFLAGS	= -export-dynamic -module -avoid-version
 external_la_LIBADD	= $(top_builddir)/replace/libreplace.la
+
+rhcs_la_SOURCES	= rhcs.c	$(INCFILES)
+rhcs_la_LDFLAGS	= -export-dynamic -module -avoid-version
+rhcs_la_LIBADD	= $(top_builddir)/replace/libreplace.la
 
 ibmhmc_la_SOURCES	= ibmhmc.c	$(INCFILES)
 ibmhmc_la_LDFLAGS	= -export-dynamic -module -avoid-version

@@ -80,6 +80,9 @@
 /* Location of non-pluing stonith scripts */
 #undef STONITH_EXT_PLUGINDIR
 
+/* Location of RHCS stonith scripts */
+#undef STONITH_RHCS_PLUGINDIR
+
 /* Location of stonith plugins */
 #undef STONITH_MODULES
 
