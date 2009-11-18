@@ -402,11 +402,14 @@ AC_SUBST(HB_RA_DIR)
 
 stonith_plugindir="${libdir}/stonith/plugins"
 stonith_ext_plugindir="${stonith_plugindir}/external"
+stonith_rhcs_plugindir="${stonith_plugindir}/rhcs"
 AC_DEFINE_UNQUOTED(ST_TEXTDOMAIN, "stonith", Stonith plugin domain) 
 AC_DEFINE_UNQUOTED(STONITH_MODULES, "$stonith_plugindir", Location of stonith plugins)
-AC_DEFINE_UNQUOTED(STONITH_EXT_PLUGINDIR, "$stonith_ext_plugindir", Location of non-pluing stonith scripts)
+AC_DEFINE_UNQUOTED(STONITH_EXT_PLUGINDIR, "$stonith_ext_plugindir", Location of non-plugin stonith scripts)
+AC_DEFINE_UNQUOTED(STONITH_RHCS_PLUGINDIR, "$stonith_rhcs_plugindir", Location of RHCS fence scripts)
 AC_SUBST(stonith_plugindir)
 AC_SUBST(stonith_ext_plugindir)
+AC_SUBST(stonith_rhcs_plugindir)
 
 dnl Old names for new things
 AC_DEFINE_UNQUOTED(HA_CCMUSER,   "$GLUE_DAEMON_USER",  User to run daemons as) 
