@@ -7,13 +7,13 @@
  * Based on ssh.c, Authors: Joachim Gleissner <jg@suse.de>,
  *                          Lars Marowsky-Bree <lmb@suse.de>
  * Modified for external.c: Scott Kleihege <scott@tummy.com>
- * Modified for rhcs.c: Dejan Muhamedagic <dejan@suse.de>
  * Reviewed, tested, and config parsing: Sean Reifschneider <jafo@tummy.com>
  * And overhauled by Lars Marowsky-Bree <lmb@suse.de>, so the circle
  *   closes...
  * Mangled by Zhaokai <zhaokai@cn.ibm.com>, IBM, 2005
  * Changed to allow full-featured external plugins by Dave Blaschke 
  *   <debltc@us.ibm.com>
+ * Modified for rhcs.c: Dejan Muhamedagic <dejan@suse.de>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -34,6 +34,12 @@
 #include <lha_internal.h>
 
 #include <dirent.h>
+#include <libxml/xmlmemory.h>
+#include <libxml/xmlreader.h>
+#include <libxml/tree.h>
+#include <libxml/parser.h>
+#include <libxml/xpath.h>
+#include <libxml/xpathInternals.h>
 
 #include "stonith_plugin_common.h"
 
@@ -108,6 +114,7 @@ struct pluginDevice {
 	char **		confignames;
 	char *		hostlist;
 	char *		outputbuf;
+	xmlDoc *	metadata;
 };
 
 static const char * pluginid = "RHCSDevice-Stonith";
@@ -357,7 +364,7 @@ let_remove_eachitem(gpointer key, gpointer value, gpointer user_data)
 	if (value) {
 		FREE(value);
 	}
-        return TRUE;
+	return TRUE;
 }
 
 static void
@@ -371,6 +378,11 @@ rhcs_unconfig(struct pluginDevice *sd) {
 	if (sd->hostlist) {
 		FREE(sd->hostlist);
 		sd->hostlist = NULL;
+	}
+	if (sd->metadata) {
+		xmlFreeDoc(sd->metadata);
+		xmlCleanupParser();
+		sd->metadata = NULL;
 	}
 }
 
@@ -438,7 +450,7 @@ rhcs_exec_select(const struct dirent *dire)
 	
 	if ((stat(filename, &statf) == 0) &&
 	    (S_ISREG(statf.st_mode)) &&
-            (statf.st_mode & (S_IXUSR|S_IXGRP|S_IXOTH))) {
+			(statf.st_mode & (S_IXUSR|S_IXGRP|S_IXOTH))) {
 		if (statf.st_mode & (S_IWGRP|S_IWOTH)) {
 			LOG(PIL_WARN, "Executable file %s ignored "
 				"(writable by group/others)", filename);
@@ -451,6 +463,199 @@ rhcs_exec_select(const struct dirent *dire)
 	return 0;
 }
 
+static xmlDoc *
+load_metadata(struct pluginDevice *	sd)
+{
+	xmlDoc *doc = NULL;
+	const char *op = "metadata";
+	int rc;
+	char *ret = NULL;
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
+	}
+
+	rc = rhcs_run_cmd(sd, op, &ret);
+	if (rc != 0) {
+		LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
+			__FUNCTION__, sd->subplugin, op, rc);
+		if (ret) {
+			LOG(PIL_CRIT, "plugin output: %s", ret);
+			FREE(ret);
+		}
+		goto err;
+	}
+
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: '%s %s' returned %d",
+			__FUNCTION__, sd->subplugin, op, rc);
+	}
+
+	doc = xmlParseMemory(ret, strlen(ret));
+	if (!doc) {
+		LOG(PIL_CRIT, "%s: could not parse metadata",
+			__FUNCTION__);
+		goto err;
+	}
+	sd->metadata = doc;
+
+err:
+	if (ret) {
+		FREE(ret);
+	}
+	return doc;
+}
+
+static const char *skip_attrs[] = {
+	"action", "verbose", "debug", "version", "help", "separator",
+	NULL
+};
+/* XML stuff */
+typedef int (*node_proc)
+	(xmlNodeSet *nodes, struct pluginDevice *sd);
+
+static int
+proc_xpath(const char *xpathexp, struct pluginDevice *sd, node_proc fun)
+{
+	xmlXPathObject *xpathObj = NULL;
+	xmlXPathContext *xpathCtx = NULL; 
+	int rc = 1;
+
+	if (!sd->metadata && !load_metadata(sd)) {
+		LOG(PIL_INFO, "%s: no metadata", __FUNCTION__);
+		return 1;
+	}
+
+	/* Create xpath evaluation context */
+	xpathCtx = xmlXPathNewContext(sd->metadata);
+	if(xpathCtx == NULL) {
+		LOG(PIL_CRIT, "%s: unable to create new XPath context", __FUNCTION__);
+		return 1;
+	}
+	/* Evaluate xpath expression */
+	xpathObj = xmlXPathEvalExpression((const xmlChar*)xpathexp, xpathCtx);
+	if(xpathObj == NULL) {
+		LOG(PIL_CRIT, "%s: unable to evaluate expression %s",
+			__FUNCTION__, xpathexp);
+		goto err;
+	}
+
+	if (sd->outputbuf != NULL) {
+		FREE(sd->outputbuf);
+		sd->outputbuf = NULL;
+	}
+	rc = fun(xpathObj->nodesetval, sd);
+err:
+	if (xpathObj)
+		xmlXPathFreeObject(xpathObj);
+	if (xpathCtx)
+		xmlXPathFreeContext(xpathCtx); 
+	return rc;
+}
+
+static int
+load_confignames(xmlNodeSet *nodes, struct pluginDevice *sd)
+{
+	xmlChar *attr;
+	const char **skip;
+	xmlNode *cur;
+	int i, j, namecount;
+
+	namecount = nodes->nodeNr;
+	if (!namecount) {
+		LOG(PIL_INFO, "%s: no configuration parameters", __FUNCTION__);
+		return 1;
+	}
+	sd->confignames = (char **)MALLOC((namecount+1)*sizeof(char *));
+	if (sd->confignames == NULL) {
+		LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
+		return 1;
+	}
+
+	/* now copy over confignames */
+	j = 0;
+	for (i = 0; i < nodes->nodeNr; i++) {
+		cur = nodes->nodeTab[i];
+		attr = xmlGetProp(cur, (const xmlChar*)"name");
+		for (skip = skip_attrs; *skip; skip++) {
+			if (!strcmp(*skip,(char *)attr))
+				goto skip;
+		}
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: %s configname %s",
+				__FUNCTION__, sd->subplugin, (char *)attr);
+		}
+		sd->confignames[j++] = strdup((char *)attr);
+		xmlFree(attr);
+	skip:
+		continue;
+	}
+	sd->confignames[j] = NULL;
+
+	return 0;
+}
+
+static int
+dump_content(xmlNodeSet *nodes, struct pluginDevice *sd)
+{
+	xmlChar *content = NULL;
+	xmlNode *cur;
+	int rc = 1;
+
+	if (!nodes || !nodes->nodeTab || !nodes->nodeTab[0]) {
+		LOG(PIL_WARN, "%s: %s no nodes",
+			__FUNCTION__, sd->subplugin);
+		return 1;
+	}
+	cur = nodes->nodeTab[0];
+	content = xmlNodeGetContent(cur);
+	if (content && strlen((char *)content) > 0) {
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: %s found content for %s",
+				__FUNCTION__, sd->subplugin, cur->name);
+		}
+		sd->outputbuf = STRDUP((char *)content);
+		rc = !(*sd->outputbuf);
+	} else {
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: %s no content for %s",
+				__FUNCTION__, sd->subplugin, cur->name);
+		}
+		rc = 1;
+	}
+
+	if (content)
+		xmlFree(content);
+	return rc;
+}
+
+static int
+dump_params_xml(xmlNodeSet *nodes, struct pluginDevice *sd)
+{
+    int len = 0;
+	xmlNode *cur;
+    xmlBuffer *xml_buffer = NULL;
+	int rc = 0;
+
+    xml_buffer = xmlBufferCreate();
+	if (!xml_buffer) {
+		LOG(PIL_CRIT, "%s: failed to create xml buffer", __FUNCTION__);
+		return 1;
+	}
+	cur = nodes->nodeTab[0];
+	len = xmlNodeDump(xml_buffer, sd->metadata, cur, 0, TRUE);
+	if (len <= 0) {
+		LOG(PIL_CRIT, "%s: could not dump xml for %s", 
+			__FUNCTION__, (char *)xmlGetProp(cur, (const xmlChar*)"name"));
+		rc = 1;
+		goto err;
+	}
+	sd->outputbuf = STRDUP((char *)xml_buffer->content);
+err:
+    xmlBufferFree(xml_buffer);
+	return rc;
+}
+
 /*
  * Return STONITH config vars
  */
@@ -458,8 +663,7 @@ static const char**
 rhcs_get_confignames(StonithPlugin* p)
 {
   	struct pluginDevice *	sd;
-	const char *		op = "getconfignames";
-	int 			i, rc;
+	int i;
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
@@ -468,53 +672,11 @@ rhcs_get_confignames(StonithPlugin* p)
 	sd = (struct pluginDevice *)p;
 
 	if (sd->subplugin != NULL) {
-		/* return list of subplugin's required parameters */
-		/* (unused) */
-		char	*output = NULL, *pch;
-		int	namecount;
-
-		LOG(PIL_WARN, "%s not supported for rhcs", op);
-		return NULL;
-
-		rc = rhcs_run_cmd(sd, op, &output);
-		if (rc != 0) {
-			LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
-				__FUNCTION__, sd->subplugin, op, rc);
-			if (output) {
-				LOG(PIL_CRIT, "plugin output: %s", output);
-				FREE(output);
-			}
+		if (!sd->metadata && !load_metadata(sd)) {
 			return NULL;
 		}
-		if (Debug) {
-			LOG(PIL_DEBUG, "%s: '%s %s' returned %d",
-				__FUNCTION__, sd->subplugin, op, rc);
-			if (output) {
-				LOG(PIL_DEBUG, "plugin output: %s", output);
-			}
-		}
-		
-		namecount = get_num_tokens(output);
-		sd->confignames = (char **)MALLOC((namecount+1)*sizeof(char *));
-		if (sd->confignames == NULL) {
-			LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
-			if (output) { FREE(output); }
-			return NULL;
-		}
-
-		/* now copy over confignames */
-		pch = strtok(output, WHITESPACE);		
-		for (i = 0; i < namecount; i++) {
-			if (Debug) {
-				LOG(PIL_DEBUG, "%s: %s configname %s",
-					__FUNCTION__, sd->subplugin, pch);
-			}
-			sd->confignames[i] = STRDUP(pch);
-			pch = strtok(NULL, WHITESPACE);
-		}
-		FREE(output);
-		sd->confignames[namecount] = NULL;
-	}else{
+		proc_xpath("/resource-agent/parameters/parameter", sd, load_confignames);
+	} else {
 		/* return list of subplugins in rhcs directory */
 		struct dirent **	files = NULL;
 		int			dircount;
@@ -565,10 +727,8 @@ static const char *
 rhcs_getinfo(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* sd;
-	char *		ret = NULL;
 	const char *	op;
-	int rc;
-  
+
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 	}
@@ -581,6 +741,10 @@ rhcs_getinfo(StonithPlugin * s, int reqtype)
 		return(NULL);
 	}
 
+	if (!sd->metadata && !load_metadata(sd)) {
+		return NULL;
+	}
+
 	switch (reqtype) {
 		case ST_DEVICEID:
 			op = "getinfo-devid";
@@ -588,13 +752,21 @@ rhcs_getinfo(StonithPlugin * s, int reqtype)
 			break;
 
 		case ST_DEVICENAME:
-			op = "getinfo-devname";
-			return fake_op(sd, op);
+			if (!proc_xpath("/resource-agent/shortdesc", sd, dump_content)) {
+				return sd->outputbuf;
+			} else {
+				op = "getinfo-devname";
+				return fake_op(sd, op);
+			}
 			break;
 
 		case ST_DEVICEDESCR:
-			op = "getinfo-devdescr";
-			return fake_op(sd, op);
+			if (!proc_xpath("/resource-agent/longdesc", sd, dump_content)) {
+				return sd->outputbuf;
+			} else {
+				op = "getinfo-devdescr";
+				return fake_op(sd, op);
+			}
 			break;
 
 		case ST_DEVICEURL:
@@ -603,34 +775,15 @@ rhcs_getinfo(StonithPlugin * s, int reqtype)
 			break;
 
 		case ST_CONF_XML:
-			op = "metadata";
+			if (!proc_xpath("/resource-agent/parameters", sd, dump_params_xml)) {
+				return sd->outputbuf;
+			}
 			break;
 
 		default:
 			return NULL;
 	}
-
-	rc = rhcs_run_cmd(sd, op, &ret);
-	if (rc != 0) {
-		LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
-			__FUNCTION__, sd->subplugin, op, rc);
-		if (ret) {
-			LOG(PIL_CRIT, "plugin output: %s", ret);
-			FREE(ret);
-		}
-	}
-	else {
-		if (Debug) {
-			LOG(PIL_DEBUG, "%s: '%s %s' returned %d",
-				__FUNCTION__, sd->subplugin, op, rc);
-		}
-		if (sd->outputbuf != NULL) {
-			FREE(sd->outputbuf);
-		}
-		sd->outputbuf =  ret;
-		return(ret);
-	}
-	return(NULL);
+	return NULL;
 }
 
 /*
@@ -697,18 +850,26 @@ rhcs_new(const char *subplugin)
 	return &(sd->sp);
 }
 
+#define MAXLINE 512
+
 static void
 rhcs_print_var(gpointer key, gpointer value, gpointer user_data)
 {
 	int fd = GPOINTER_TO_UINT(user_data);
+	char arg[MAXLINE];
+	int cnt;
 
+	cnt = snprintf(arg, MAXLINE, "%s=%s\n", (char *)key, (char *)value);
+	if (cnt <= 0 || cnt >= MAXLINE) {
+		LOG(PIL_CRIT, "%s: param/value pair too large", __FUNCTION__);
+		return;
+	}
 	if (Debug) {
 		LOG(PIL_DEBUG, "set rhcs plugin param '%s=%s'", (char *)key, (char *)value);
 	}
-	write(fd, (char *)key, strlen((char *)key));
-	write(fd, "=", 1);
-	write(fd, (char *)value, strlen((char *)value));
-	write(fd, "\n", 1);
+	if (write(fd, arg, cnt) < 0) {
+		LOG(PIL_CRIT, "%s: write: %m", __FUNCTION__);
+	}
 }
 
 /* Run the command with op as command line argument(s) and return the exit
