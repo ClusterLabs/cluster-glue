@@ -389,6 +389,18 @@ main(int argc, char** argv)
 		exit(0);
 	}
 
+#ifndef LOG_PERROR
+#	define LOG_PERROR	0
+#endif
+	openlog(cmdname, (LOG_CONS|(silent ? 0 : LOG_PERROR)), LOG_USER);
+	if (s == NULL) {
+		syslog(LOG_ERR, "Invalid device type: '%s'", SwitchType);
+		exit(S_OOPS);
+	}
+	if (debug) {
+		stonith_set_debug(s, debug);
+	}
+
 	if (SwitchType == NULL) {
 		fprintf(stderr,	"Must specify device type (-t option)\n");
 		usage(cmdname, 1, NULL);
@@ -412,18 +424,6 @@ main(int argc, char** argv)
 			}
 			usage(cmdname, 1, NULL);
 		}
-	}
-
-#ifndef LOG_PERROR
-#	define LOG_PERROR	0
-#endif
-	openlog(cmdname, (LOG_CONS|(silent ? 0 : LOG_PERROR)), LOG_USER);
-	if (s == NULL) {
-		syslog(LOG_ERR, "Invalid device type: '%s'", SwitchType);
-		exit(S_OOPS);
-	}
-	if (debug) {
-		stonith_set_debug(s, debug);
 	}
 
 	if (listparanames) {
