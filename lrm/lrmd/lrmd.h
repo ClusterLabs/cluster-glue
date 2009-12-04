@@ -161,6 +161,12 @@ typedef struct ra_pipe_op  ra_pipe_op_t;
 #define set_rsc_flushing_ops(r) \
 	(r)->state = RSC_FLUSHING_OPS
 #define rsc_reset_state(r) (r)->state = 0
+/* log messages for repeating ops (monitor) once an hour */
+#define LOGMSG_INTERVAL (60*60)
+#define is_logmsg_due(op) \
+	(longclockto_ms(sub_longclock(time_longclock(), op->t_lastlogmsg))/1000 >= \
+		(unsigned long)LOGMSG_INTERVAL)
+
 
 struct lrmd_rsc
 {
@@ -200,6 +206,7 @@ struct lrmd_op
 	longclock_t		t_perform; /* set in perform_ra_op() */
 	longclock_t		t_done; /* set in on_op_done() */
 	longclock_t		t_rcchange; /* set in on_op_done(), could equal t_perform */
+	longclock_t		t_lastlogmsg; /* the last time the monitor op was logged */
 	ProcTrackKillInfo	killseq[3];
 };
 
