@@ -309,6 +309,7 @@ lrmd_op_new(void)
  	op->t_perform = zero_longclock;
  	op->t_done = zero_longclock;
  	op->t_rcchange = zero_longclock;
+ 	op->t_lastlogmsg = zero_longclock;
  
 	memset(op->killseq, 0, sizeof(op->killseq));
 	++lrm_objectstats.opcount;
@@ -3014,7 +3015,7 @@ perform_ra_op(lrmd_op_t* op)
 	}
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
-	if (!op->interval) { /* log non-repeating ops */
+	if (!op->interval || is_logmsg_due(op)) { /* log non-repeating ops */
 		lrmd_log(LOG_INFO,"rsc:%s:%d: %s",rsc->id,op->call_id,op_type);
 	}
 	op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
@@ -3053,9 +3054,13 @@ perform_ra_op(lrmd_op_t* op)
 		default:	/* Parent */
 			child_count++;
 			NewTrackedProc(pid, 1
-			,	debug_level ? (op->interval ? PT_LOGNORMAL : PT_LOGVERBOSE) : PT_LOGNONE
+			,	debug_level ?
+				((op->interval && !is_logmsg_due(op)) ? PT_LOGNORMAL : PT_LOGVERBOSE) : PT_LOGNONE
 			,	op, &ManagedChildTrackOps);
 
+			if (op->interval && is_logmsg_due(op)) {
+				op->t_lastlogmsg = time_longclock();
+			}
 			close(stdout_fd[1]);
 			close(stderr_fd[1]);
 			rapop = ra_pipe_op_new(stdout_fd[0], stderr_fd[0], op);
