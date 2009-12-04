@@ -17,7 +17,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-MAINTAINERCLEANFILES    = Makefile.in $(wildcard *.xml.in)
+MAINTAINERCLEANFILES    = Makefile.in hb_report.xml
+
+CLEANFILES		= $(man_MANS)
 
 hanoarchdir		= $(datadir)/heartbeat
 
