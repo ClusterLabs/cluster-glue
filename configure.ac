@@ -485,6 +485,7 @@ AC_PATH_PROGS(MAILCMD, mailx mail)
 AC_PATH_PROGS(EGREP, egrep)
 AC_PATH_PROGS(PKGCONFIG, pkg-config)
 AC_PATH_PROGS(XML2CONFIG, xml2-config)
+AC_PATH_PROGS(XSLTPROC, xsltproc)
 AC_PATH_PROGS(VALGRIND_BIN, valgrind, /usr/bin/valgrind)
 AC_DEFINE_UNQUOTED(VALGRIND_BIN, "$VALGRIND_BIN", Valgrind command)
 
@@ -494,6 +495,7 @@ AC_SUBST(SHELL)
 AC_SUBST(PING)
 AC_SUBST(TEST)
 AC_SUBST(RPM)
+AC_SUBST(XSLTPROC)
 
 AC_MSG_CHECKING(ifconfig option to list interfaces)
 for IFCONFIG_A_OPT in  "-A" "-a" ""
@@ -1303,6 +1305,7 @@ logd/logd					        	\
 replace/Makefile				        	\
 hb_report/Makefile				        	\
    hb_report/hb_report				        	\
+   hb_report/hb_report.xml			        	\
 )
 
 dnl Now process the entire list of files added by previous 
