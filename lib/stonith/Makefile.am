@@ -55,8 +55,4 @@ libstonith_la_LIBADD	= $(top_builddir)/lib/pils/libpils.la	\
 			$(top_builddir)/replace/libreplace.la	\
 			$(GLIBLIB)
 
-## Man pages
-
-man_MANS		= stonith.8 meatclient.8
-
-EXTRA_DIST              = $(man_MANS) sbd.h
+EXTRA_DIST              = sbd.h

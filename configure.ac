@@ -1306,7 +1306,9 @@ replace/Makefile				        	\
 hb_report/Makefile				        	\
    hb_report/hb_report				        	\
 doc/Makefile							\
-   doc/hb_report.xml
+   doc/hb_report.xml						\
+   doc/stonith.xml						\
+   doc/meatclient.xml
 )
 
 dnl Now process the entire list of files added by previous 
