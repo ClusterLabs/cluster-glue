@@ -38,6 +38,7 @@ void		cl_direct_log(int priority, const char* buf, gboolean, const char*, int, T
 void            cl_log(int priority, const char * fmt, ...) G_GNUC_PRINTF(2,3);
 void            cl_perror(const char * fmt, ...) G_GNUC_PRINTF(1,2);
 void		cl_log_enable_stderr(int truefalse);
+void		cl_log_enable_stdout(int truefalse);
 int		cl_set_logging_wqueue_maxlen(int);
 gboolean	cl_log_test_logd(void);
 void		cl_log_set_uselogd(int truefalse);
