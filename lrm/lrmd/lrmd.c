@@ -1458,25 +1458,10 @@ remove_repeat_op_from_client(gpointer key, gpointer value, gpointer user_data)
 {
 	lrmd_rsc_t* rsc = (lrmd_rsc_t*)value;
 	pid_t pid = GPOINTER_TO_UINT(user_data); /* pointer cast as int */
-	GList* op_node = NULL;
-	lrmd_op_t* op = NULL;
 
-	op_node = g_list_first(rsc->repeat_op_list);
-	while (NULL != op_node) {
-		op = (lrmd_op_t*)op_node->data;
-		if (NULL == op) {
-			lrmd_log(LOG_ERR
-			,	"%s (): repeat_op_list node has NULL data."
-			,	__FUNCTION__);
-		}
-		else if (op->client_id == pid) {
-			op_node = g_list_next(op_node);
-			rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list,op);
-			lrmd_op_destroy(op);
-		}
-		else {
-			op_node = g_list_next(op_node);
-		}
+	(void)flush_all(&(rsc->repeat_op_list),pid);
+	if( flush_all(&(rsc->op_list),pid) ) {
+		set_rsc_flushing_ops(rsc); /* resource busy */
 	}
 }
 
@@ -1998,8 +1983,8 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		return -1;
 	}
 	LRMAUDIT();
-	(void)flush_all(&(rsc->repeat_op_list));
-	if( flush_all(&(rsc->op_list)) ) {
+	(void)flush_all(&(rsc->repeat_op_list),0);
+	if( flush_all(&(rsc->op_list),0) ) {
 		set_rsc_removal_pending(rsc);
 		LRMAUDIT();
 		return HA_OK; /* resource is busy, delay removal */
@@ -2244,7 +2229,7 @@ on_msg_cancel_op(lrmd_client_t* client, struct ha_msg* msg)
 }
 
 static gboolean
-flush_all(GList** listp)
+flush_all(GList** listp, int client_pid)
 {
 	GList* node = NULL;
 	lrmd_op_t* op = NULL;
@@ -2256,9 +2241,12 @@ flush_all(GList** listp)
 		if( flush_op(op) == POSTPONED ) {
 			rsc_busy = TRUE;
 			node = g_list_next(node);
-		} else {
+		} else if (!client_pid || op->client_id == client_pid) {
 			node = *listp = g_list_remove(*listp, op);
+			remove_op_history(op);
 			lrmd_op_destroy(op);
+		} else {
+			node = g_list_next(node);
 		}
 	}
 	return rsc_busy;
@@ -2287,8 +2275,8 @@ on_msg_flush_all(lrmd_client_t* client, struct ha_msg* msg)
 	lrmd_debug2(LOG_DEBUG
 		,	"%s:client [%d] flush operations"
 		,	__FUNCTION__, client->pid);
-	(void)flush_all(&(rsc->repeat_op_list));
-	if( flush_all(&(rsc->op_list)) ) {
+	(void)flush_all(&(rsc->repeat_op_list),0);
+	if( flush_all(&(rsc->op_list),0) ) {
 		set_rsc_flushing_ops(rsc); /* resource busy */
 	}
 	LRMAUDIT();
