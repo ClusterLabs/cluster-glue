@@ -393,10 +393,6 @@ main(int argc, char** argv)
 #	define LOG_PERROR	0
 #endif
 	openlog(cmdname, (LOG_CONS|(silent ? 0 : LOG_PERROR)), LOG_USER);
-	if (s == NULL) {
-		syslog(LOG_ERR, "Invalid device type: '%s'", SwitchType);
-		exit(S_OOPS);
-	}
 	if (debug) {
 		stonith_set_debug(s, debug);
 	}
@@ -407,6 +403,10 @@ main(int argc, char** argv)
 	}
 
 	s = stonith_new(SwitchType);
+	if (s == NULL) {
+		syslog(LOG_ERR, "Invalid device type: '%s'", SwitchType);
+		exit(S_OOPS);
+	}
 	if (!listparanames && !metadata && optfile == NULL && parameters == NULL && nvcount == 0) {
 		const char**	names;
 		int		needs_parms = 1;
