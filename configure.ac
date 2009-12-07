@@ -485,7 +485,13 @@ AC_PATH_PROGS(MAILCMD, mailx mail)
 AC_PATH_PROGS(EGREP, egrep)
 AC_PATH_PROGS(PKGCONFIG, pkg-config)
 AC_PATH_PROGS(XML2CONFIG, xml2-config)
+
 AC_PATH_PROGS(XSLTPROC, xsltproc)
+AM_CONDITIONAL(BUILD_DOC, test "x$XSLTPROC" != "x" )
+if test "x$XSLTPROC" = "x"; then
+   AC_MSG_WARN([xsltproc not installed, unable to (re-)build manual pages])
+fi
+
 AC_PATH_PROGS(VALGRIND_BIN, valgrind, /usr/bin/valgrind)
 AC_DEFINE_UNQUOTED(VALGRIND_BIN, "$VALGRIND_BIN", Valgrind command)
 

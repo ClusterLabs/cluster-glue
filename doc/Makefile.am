@@ -23,7 +23,11 @@ CLEANFILES		= $(man_MANS)
 
 hanoarchdir		= $(datadir)/heartbeat
 
-man_MANS		= hb_report.8 stonith.8 meatclient.8
+man_MANS		=
+
+if BUILD_DOC
+man_MANS		+= hb_report.8 stonith.8 meatclient.8
+endif
 
 STYLESHEET_PREFIX 	?= http://docbook.sourceforge.net/release/xsl/current
 MANPAGES_STYLESHEET 	?= $(STYLESHEET_PREFIX)/manpages/docbook.xsl
