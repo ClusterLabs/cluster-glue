@@ -35,7 +35,6 @@ initddir               = @INITDIR@
 ## binary progs
 ha_sbin_PROGRAMS  = ha_logger
 halib_PROGRAMS	  = ha_logd logtest
-man_MANS	  = ha_logger.1 ha_logd.8
 
 ha_logd_SOURCES	  = ha_logd.c
 ha_logd_LDADD	  = $(top_builddir)/lib/clplumbing/libplumb.la		\

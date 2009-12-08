@@ -1311,6 +1311,8 @@ hb_report/Makefile				        	\
    hb_report/hb_report				        	\
 doc/Makefile							\
    doc/hb_report.xml						\
+   doc/ha_logd.xml						\
+   doc/ha_logger.xml						\
    doc/stonith.xml						\
    doc/meatclient.xml
 )

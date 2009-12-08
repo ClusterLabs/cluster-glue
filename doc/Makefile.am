@@ -17,7 +17,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-MAINTAINERCLEANFILES    = Makefile.in hb_report.xml meatclient.xml
+MAINTAINERCLEANFILES    = Makefile.in hb_report.xml ha_logd.xml ha_logger.xml stonith.xml meatclient.xml
 
 CLEANFILES		= $(man_MANS)
 
@@ -26,8 +26,10 @@ hanoarchdir		= $(datadir)/heartbeat
 man_MANS		=
 
 if BUILD_DOC
-man_MANS		+= hb_report.8 stonith.8 meatclient.8
+man_MANS		+= hb_report.8 ha_logd.8 ha_logger.1 stonith.8 meatclient.8
 endif
+
+EXTRA_DIST		= $(man_MANS)
 
 STYLESHEET_PREFIX 	?= http://docbook.sourceforge.net/release/xsl/current
 MANPAGES_STYLESHEET 	?= $(STYLESHEET_PREFIX)/manpages/docbook.xsl
