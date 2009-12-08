@@ -27,9 +27,8 @@
 
 #echo "started with: $@" | debug
 
-. /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs
-trap 'if [ -n "$outf" ]; then cat "$outf" >&2; rmtempfile "$outf"; fi' 0
-outf=`maketempfile` || exit 1
+trap 'if [ -n "$outf" ]; then cat "$outf" >&2; rm -f "$outf"; fi' 0
+outf=`mktemp` || exit 1
 
 chkmpcli() {
 	test -x /opt/IBMmpcli/bin/MPCLI.sh
