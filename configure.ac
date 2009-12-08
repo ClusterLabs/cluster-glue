@@ -1290,8 +1290,6 @@ lib/Makefile							\
          lib/plugins/stonith/ribcl.py				\
          lib/plugins/stonith/external/Makefile			\
             lib/plugins/stonith/external/drac5			\
-            lib/plugins/stonith/external/hmchttp		\
-            lib/plugins/stonith/external/ibmrsa			\
             lib/plugins/stonith/external/kdumpcheck		\
             lib/plugins/stonith/external/riloe			\
             lib/plugins/stonith/external/ssh			\
