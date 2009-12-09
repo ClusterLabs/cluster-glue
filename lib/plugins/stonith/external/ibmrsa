@@ -6,14 +6,6 @@
 # External STONITH module for IBM BMC.
 # This STONITH module depends on IBMmpcli.
 #
-# See
-# http://www-307.ibm.com/pc/support/site.wss/MIGR-54214.html
-# and
-# http://www.redbooks.ibm.com/abstracts/sg246495.html
-# for documentation about IBM management processors and the
-# IBMmpcli utility.
-# 
-#
 
 #DEBUGF=/var/log/ha-ibmrsa.log
 #touch $DEBUGF
