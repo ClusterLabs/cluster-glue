@@ -19,7 +19,8 @@
 #
 MAINTAINERCLEANFILES = Makefile.in
 
-README_FILES	= README_kdumpcheck.txt
+README_FILES	= README_kdumpcheck.txt README.dracmc \
+			README.ibmrsa README.ibmrsa-telnet
 
 EXTRA_DIST           = drac5 ibmrsa-telnet ipmi rackpdu vmware xen0 \
 			xen0-ha-dom0-stonith-helper sbd kdumpcheck $(README_FILES)
