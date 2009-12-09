@@ -46,7 +46,7 @@ AM_CFLAGS			= @CFLAGS@
 
 lib_LTLIBRARIES		= libpils.la
 
-plugindir		= $(pkglibdir)/plugins/test
+plugindir		= $(libdir)/@HB_PKG@/plugins/test
 plugin_LTLIBRARIES	= test.la 
 
 libpils_la_SOURCES	= pils.c
