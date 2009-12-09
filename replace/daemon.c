@@ -63,7 +63,7 @@ daemon(nochdir, noclose)
 	case 0:
 		break;
 	default:
-		_exit(0);
+		exit(0);
 	}
 
 	if (setsid() == -1)
@@ -72,12 +72,12 @@ daemon(nochdir, noclose)
 	if (!nochdir)
 		(void)chdir("/");
 
-	if (!noclose && (fd = _open("/dev/null", O_RDWR, 0)) != -1) {
+	if (!noclose && (fd = open("/dev/null", O_RDWR, 0)) != -1) {
 		(void)dup2(fd, STDIN_FILENO);
 		(void)dup2(fd, STDOUT_FILENO);
 		(void)dup2(fd, STDERR_FILENO);
 		if (fd > 2)
-			(void)_close(fd);
+			(void)close(fd);
 	}
 	return (0);
 }
