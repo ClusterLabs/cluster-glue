@@ -124,7 +124,7 @@ standards, and an interface to common STONITH devices.
 %dir %attr (0700, nobody, %{nogroup})	%{_var}/lib/heartbeat/cores/nobody
 %dir %attr (0700, %{uname}, %{gname})	%{_var}/lib/heartbeat/cores/%{uname}
 %if 0%{?fedora} 
-%doc %{_docdir}/glue/stonith
+%doc %{_docdir}/%{name}/stonith
 %else
 %doc %{_docdir}/stonith
 %endif
@@ -177,11 +177,10 @@ such as Pacemaker.
 
 %files -n cluster-glue-libs-devel
 %defattr(-,root,root)
-%dir %{_libdir}/glue
-%dir %{_libdir}/glue/plugins
-%dir %{_libdir}/glue/plugins/test
+%dir %{_libdir}/heartbeat/plugins
+%dir %{_libdir}/heartbeat/plugins/test
 %dir %{_libdir}/heartbeat
-%dir %{_datadir}/glue
+%dir %{_datadir}/heartbeat
 %{_libdir}/lib*.so
 %{_libdir}/heartbeat/ipctest
 %{_libdir}/heartbeat/ipctransientclient
@@ -193,8 +192,8 @@ such as Pacemaker.
 %{_includedir}/heartbeat
 %{_includedir}/stonith
 %{_includedir}/pils
-%{_datadir}/glue/lrmtest
-%{_libdir}/glue/plugins/test/test.so
+%{_datadir}/heartbeat/lrmtest
+%{_libdir}/heartbeat/plugins/test/test.so
 %doc AUTHORS
 %doc COPYING
 %doc COPYING.LIB
