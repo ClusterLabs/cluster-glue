@@ -21,6 +21,8 @@ MAINTAINERCLEANFILES    = Makefile.in hb_report.xml ha_logd.xml ha_logger.xml st
 
 CLEANFILES		= $(man_MANS)
 
+SUBDIRS			= stonith
+
 hanoarchdir		= $(datadir)/heartbeat
 
 man_MANS		=
