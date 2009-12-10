@@ -180,17 +180,12 @@ fi
 
 %{_sysconfdir}/init.d/logd
 
-%if 0%{?suse_version} < 1020
-%doc %{_datadir}/doc/%{name}/stonith
-%else
-%doc %{_docdir}/%{name}/stonith
-%endif
-
 %doc %{_mandir}/man8/*
 %doc %{_mandir}/man1/*
 %doc AUTHORS
 %doc COPYING
 %doc logd/logd.cf
+%doc doc/stonith
 
 /sbin/rclogd
 

@@ -202,16 +202,3 @@ suicide_la_LDFLAGS	= -export-dynamic -module -avoid-version
 stonithscriptdir        =  $(stonith_plugindir)/stonith2
 
 stonithscript_SCRIPTS  	= ribcl.py 
-
-# readme files
-
-stdocdir 		= $(docdir)/$(PACKAGE)/stonith
-
-README_FILES = README.bladehpi README.cyclades README.drac3 \
-				README.external README.ipmilan README.meatware \
-				README.rcd_serial README.riloe README.vacm \
-				README.wti_mpc
-
-EXTRA_DIST = $(README_FILES)
-
-stdoc_DATA		= $(README_FILES)
