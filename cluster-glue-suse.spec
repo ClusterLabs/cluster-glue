@@ -86,14 +86,11 @@ CFLAGS="${CFLAGS} ${RPM_OPT_FLAGS}"
 export CFLAGS
 
 ./autogen.sh
-%if 0%{?suse_version} < 1020
 %configure \
     --enable-fatal-warnings=yes \
     --with-daemon-group=%{gname} \
-    --with-daemon-user=%{uname}
-%else
-%configure --enable-fatal-warnings=yes --with-daemon-group=%{gname} --with-daemon-user=%{uname} --docdir=%{_docdir}
-%endif
+    --with-daemon-user=%{uname} \
+    --docdir=%{_docdir}/%{name}
 make %{?_smp_mflags}
 ###########################################################
 
