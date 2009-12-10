@@ -87,9 +87,9 @@ export CFLAGS
 
 ./autogen.sh
 %if 0%{?suse_version} < 1020
-%configure --enable-fatal-warnings=no --with-daemon-group=%{gname} --with-daemon-user=%{uname}
+%configure --enable-fatal-warnings=yes --with-daemon-group=%{gname} --with-daemon-user=%{uname}
 %else
-%configure --enable-fatal-warnings=no --with-daemon-group=%{gname} --with-daemon-user=%{uname} --docdir=%{_docdir}
+%configure --enable-fatal-warnings=yes --with-daemon-group=%{gname} --with-daemon-user=%{uname} --docdir=%{_docdir}
 %endif
 export MAKE="make %{?jobs:-j%jobs}"
 make %{?jobs:-j%jobs}

@@ -59,7 +59,7 @@ BuildRequires: libuuid-devel
 ./autogen.sh
 
 %{configure}	CFLAGS="${CFLAGS} $(echo '%{optflags}')" \
-		--enable-fatal-warnings=no \
+		--enable-fatal-warnings=yes \
 		--with-daemon-group=%{gname} \
 		--with-daemon-user=%{uname} \
 		--localstatedir=%{_var} \
