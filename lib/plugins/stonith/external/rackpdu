@@ -28,8 +28,6 @@
 # Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
 #
 
-. /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs
-
 SWITCH_ON="1"
 SWITCH_OFF="2"
 SWITCH_RESET="3"
@@ -58,12 +56,12 @@ GetOutletNumber() {
 	if [ -f "$outlet_config" ]; then
     	    local outlet_num=`grep $nodename $outlet_config | tr -d ' ' | cut -f2 -d'='`
 	    if [ -z "$outlet_num" ]; then
-		ha_log "ERROR: Outlet number not found for node $nodename. Check configuration file $outlet_config"
+		echo "ERROR: Outlet number not found for node $nodename. Check configuration file $outlet_config" >&2
 		return 0
 	    fi
 	    return $outlet_num
 	else
-	    ha_log "ERROR: File $outlet_config not found."
+	    echo "ERROR: File $outlet_config not found." >&2
 	    return 0
 	fi
     else
@@ -83,7 +81,7 @@ GetOutletNumber() {
 	    return $outlet_num
 	done
 	
-	ha_log "ERROR: Outlet number not found for node $nodename. Result: $snmp_result"
+	echo "ERROR: Outlet number not found for node $nodename. Result: $snmp_result" >&2
 	return 0
     fi
 }
@@ -101,7 +99,7 @@ SendCommand() {
         local check_result=`echo "$set_result" | grep "Timeout"`	    
 
         if [ ! -z "$check_result" ]; then
-    	    ha_log "ERROR: Write SNMP value $oid.$outlet=$command. Result: $set_result"
+    	    echo "ERROR: Write SNMP value $oid.$outlet=$command. Result: $set_result" >&2
 	fi
 	    
 	return 0
@@ -121,7 +119,7 @@ gethosts)
 	    snmp_check=`echo "$snmp_result" | grep "Timeout"`
 
 	    if [ ! -z "$snmp_check" ]; then
-		ha_log "ERROR: Cannot read list of nodes from device. Result: $snmp_result"
+		echo "ERROR: Cannot read list of nodes from device. Result: $snmp_result" >&2
 		exit 1
 	    else
 		hostlist=`echo "$snmp_result" | cut -f2 -d'"' | tr ' ' '_' | tr '\012' ' '`

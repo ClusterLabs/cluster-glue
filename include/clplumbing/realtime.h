@@ -19,7 +19,7 @@
 #	include <sched.h>
 
 #if defined(SCHED_RR) && defined(_POSIX_PRIORITY_SCHEDULING) && !defined(ON_DARWIN)
-#       define DEFAULT_REALTIME SCHED_RR
+#       define DEFAULT_REALTIME_POLICY SCHED_RR
 #endif
 
 /*

@@ -51,7 +51,7 @@ endif
 #
 
 if USE_APC_SNMP
-apcmastersnmp_LIB = apcmastersnmp.la
+apcmastersnmp_LIB = apcmastersnmp.la wti_mpc.la
 else
 apcmastersnmp_LIB =
 endif
@@ -102,6 +102,7 @@ plugin_LTLIBRARIES =	apcmaster.la	\
 			cyclades.la		\
 			$(drac3_LIB)		\
 			external.la		\
+			rhcs.la		\
 			ibmhmc.la		\
 			$(ipmilan_LIB)		\
 			meatware.la		\
@@ -112,8 +113,7 @@ plugin_LTLIBRARIES =	apcmaster.la	\
 			ssh.la			\
 			suicide.la		\
 			$(vacm_LIB)		\
-			wti_nps.la		\
-			wti_mpc.la
+			wti_nps.la
 
 apcmaster_la_SOURCES	= apcmaster.c $(INCFILES)
 apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version
@@ -147,6 +147,10 @@ drac3_la_LIBADD		= -lcurl -lxml2 $(GLIBLIB)
 external_la_SOURCES	= external.c	$(INCFILES)
 external_la_LDFLAGS	= -export-dynamic -module -avoid-version
 external_la_LIBADD	= $(top_builddir)/replace/libreplace.la
+
+rhcs_la_SOURCES	= rhcs.c	$(INCFILES)
+rhcs_la_LDFLAGS	= -export-dynamic -module -avoid-version
+rhcs_la_LIBADD	= $(top_builddir)/replace/libreplace.la
 
 ibmhmc_la_SOURCES	= ibmhmc.c	$(INCFILES)
 ibmhmc_la_LDFLAGS	= -export-dynamic -module -avoid-version
@@ -198,16 +202,3 @@ suicide_la_LDFLAGS	= -export-dynamic -module -avoid-version
 stonithscriptdir        =  $(stonith_plugindir)/stonith2
 
 stonithscript_SCRIPTS  	= ribcl.py 
-
-# readme files
-
-stdocdir 		= $(docdir)/stonith
-
-README_FILES = README.bladehpi README.cyclades README.drac3 \
-				README.external README.ipmilan README.meatware \
-				README.rcd_serial README.riloe README.vacm \
-				README.wti_mpc
-
-EXTRA_DIST = $(README_FILES)
-
-stdoc_DATA		= $(README_FILES)

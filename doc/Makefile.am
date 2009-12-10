@@ -17,11 +17,33 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-MAINTAINERCLEANFILES    = Makefile.in
+MAINTAINERCLEANFILES    = Makefile.in hb_report.xml ha_logd.xml ha_logger.xml stonith.xml meatclient.xml
+
+CLEANFILES		= $(man_MANS)
+
+SUBDIRS			= stonith
 
 hanoarchdir		= $(datadir)/heartbeat
 
-hanoarch_SCRIPTS	= utillib.sh ha_cf_support.sh \
-				openais_conf_support.sh combine-logs.pl
-sbin_SCRIPTS		= hb_report
+man_MANS		=
 
+if BUILD_DOC
+man_MANS		+= hb_report.8 ha_logd.8 ha_logger.1 stonith.8 meatclient.8
+endif
+
+EXTRA_DIST		= $(man_MANS)
+
+STYLESHEET_PREFIX 	?= http://docbook.sourceforge.net/release/xsl/current
+MANPAGES_STYLESHEET 	?= $(STYLESHEET_PREFIX)/manpages/docbook.xsl
+HTML_STYLESHEET 	?= $(STYLESHEET_PREFIX)/xhtml/docbook.xsl
+FO_STYLESHEET 		?= $(STYLESHEET_PREFIX)/fo/docbook.xsl
+
+XSLTPROC_OPTIONS 	?= --xinclude
+XSLTPROC_MANPAGES_OPTIONS ?= $(XSLTPROC_OPTIONS)
+XSLTPROC_HTML_OPTIONS 	?= $(XSLTPROC_OPTIONS)
+XSLTPROC_FO_OPTIONS 	?= $(XSLTPROC_OPTIONS)
+
+%.5 %.8 %.1: %.xml
+	$(XSLTPROC) \
+	$(XSLTPROC_MANPAGES_OPTIONS) \
+	$(MANPAGES_STYLESHEET) $<

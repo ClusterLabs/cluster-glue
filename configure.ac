@@ -19,7 +19,7 @@ dnl     checks for compiler characteristics
 dnl     checks for library functions
 dnl     checks for system services
 
-AC_INIT(glue, 1.0.0, linux-ha-dev@lists.linux-ha.org)
+AC_INIT(cluster-glue, 1.0.0, linux-ha-dev@lists.linux-ha.org)
 
 PKG_FEATURES=""
 HB_PKG=heartbeat
@@ -402,11 +402,14 @@ AC_SUBST(HB_RA_DIR)
 
 stonith_plugindir="${libdir}/stonith/plugins"
 stonith_ext_plugindir="${stonith_plugindir}/external"
+stonith_rhcs_plugindir="${stonith_plugindir}/rhcs"
 AC_DEFINE_UNQUOTED(ST_TEXTDOMAIN, "stonith", Stonith plugin domain) 
 AC_DEFINE_UNQUOTED(STONITH_MODULES, "$stonith_plugindir", Location of stonith plugins)
-AC_DEFINE_UNQUOTED(STONITH_EXT_PLUGINDIR, "$stonith_ext_plugindir", Location of non-pluing stonith scripts)
+AC_DEFINE_UNQUOTED(STONITH_EXT_PLUGINDIR, "$stonith_ext_plugindir", Location of non-plugin stonith scripts)
+AC_DEFINE_UNQUOTED(STONITH_RHCS_PLUGINDIR, "$stonith_rhcs_plugindir", Location of RHCS fence scripts)
 AC_SUBST(stonith_plugindir)
 AC_SUBST(stonith_ext_plugindir)
+AC_SUBST(stonith_rhcs_plugindir)
 
 dnl Old names for new things
 AC_DEFINE_UNQUOTED(HA_CCMUSER,   "$GLUE_DAEMON_USER",  User to run daemons as) 
@@ -482,6 +485,13 @@ AC_PATH_PROGS(MAILCMD, mailx mail)
 AC_PATH_PROGS(EGREP, egrep)
 AC_PATH_PROGS(PKGCONFIG, pkg-config)
 AC_PATH_PROGS(XML2CONFIG, xml2-config)
+
+AC_PATH_PROGS(XSLTPROC, xsltproc)
+AM_CONDITIONAL(BUILD_DOC, test "x$XSLTPROC" != "x" )
+if test "x$XSLTPROC" = "x"; then
+   AC_MSG_WARN([xsltproc not installed, unable to (re-)build manual pages])
+fi
+
 AC_PATH_PROGS(VALGRIND_BIN, valgrind, /usr/bin/valgrind)
 AC_DEFINE_UNQUOTED(VALGRIND_BIN, "$VALGRIND_BIN", Valgrind command)
 
@@ -491,6 +501,7 @@ AC_SUBST(SHELL)
 AC_SUBST(PING)
 AC_SUBST(TEST)
 AC_SUBST(RPM)
+AC_SUBST(XSLTPROC)
 
 AC_MSG_CHECKING(ifconfig option to list interfaces)
 for IFCONFIG_A_OPT in  "-A" "-a" ""
@@ -785,6 +796,77 @@ dnl ========================================================================
 AC_CHECK_FUNCS(g_log_set_default_handler)
 AC_CHECK_FUNCS(getopt, AC_DEFINE(HAVE_DECL_GETOPT,  1, [Have getopt function]))
 AC_CHECK_FUNCS(getpeereid)
+
+dnl **********************************************************************
+dnl Check for various argv[] replacing functions on various OSs
+dnl
+dnl Borrowed from Proftpd
+dnl Proftpd is Licenced under the terms of the GNU General Public Licence
+dnl and is available from http://www.proftpd.org/
+dnl
+
+AC_CHECK_FUNCS(setproctitle)
+AC_CHECK_HEADERS(libutil.h)
+AC_CHECK_LIB(util, setproctitle,
+        [AC_DEFINE(HAVE_SETPROCTITLE,1,[ ])
+                ac_cv_func_setproctitle="yes" ; LIBS="$LIBS -lutil"])
+
+if test "$ac_cv_func_setproctitle" = "yes"; then
+  pf_argv_set="PF_ARGV_NONE"
+fi
+
+if test "$pf_argv_set" = ""; then
+  AC_CHECK_HEADERS(sys/pstat.h)
+  if test "$ac_cv_header_pstat_h" = "yes"; then
+    AC_CHECK_FUNCS(pstat)
+
+    if test "$ac_cv_func_pstat" = "yes"; then
+        pf_argv_set="PF_ARGV_PSTAT"
+    else
+        pf_argv_set="PF_ARGV_WRITEABLE"
+    fi
+  fi
+
+  if test "$pf_argv_set" = ""; then
+    AC_EGREP_HEADER([#define.*PS_STRINGS.*],sys/exec.h,
+                        have_psstrings="yes",have_psstrings="no")
+    if test "$have_psstrings" = "yes"; then
+        pf_argv_set="PF_ARGV_PSSTRINGS"
+    fi
+  fi
+
+  if test "$pf_argv_set" = ""; then
+    AC_CACHE_CHECK(whether __progname and __progname_full are available,
+                    pf_cv_var_progname,
+                    AC_TRY_LINK([extern char *__progname, *__progname_full;],
+                        [__progname = "foo"; __progname_full = "foo bar";],
+                        pf_cv_var_progname="yes", pf_cv_var_progname="no"))
+
+    if test "$pf_cv_var_progname" = "yes"; then
+        AC_DEFINE(HAVE___PROGNAME,1,[ ])
+    fi
+
+    AC_CACHE_CHECK(which argv replacement method to use,
+                    pf_cv_argv_type,
+                    AC_EGREP_CPP(yes,[
+#if defined(__GNU_HURD__)
+  yes
+#endif
+  ],pf_cv_argv_type="new", pf_cv_argv_type="writeable"))
+
+    if test "$pf_cv_argv_type" = "new"; then
+        pf_argv_set="PF_ARGV_NEW"
+    fi
+
+    if test "$pf_argv_set" = ""; then
+        pf_argv_set="PF_ARGV_WRITEABLE"
+    fi
+  fi
+fi
+AC_DEFINE_UNQUOTED(PF_ARGV_TYPE, $pf_argv_set,
+        mechanism to pretty-print ps output: setproctitle-equivalent)
+
+dnl End of tests borrowed from Proftpd
 
 dnl ========================================================================
 dnl   ltdl
@@ -1208,8 +1290,6 @@ lib/Makefile							\
          lib/plugins/stonith/ribcl.py				\
          lib/plugins/stonith/external/Makefile			\
             lib/plugins/stonith/external/drac5			\
-            lib/plugins/stonith/external/hmchttp		\
-            lib/plugins/stonith/external/ibmrsa			\
             lib/plugins/stonith/external/kdumpcheck		\
             lib/plugins/stonith/external/riloe			\
             lib/plugins/stonith/external/ssh			\
@@ -1229,6 +1309,13 @@ logd/logd					        	\
 replace/Makefile				        	\
 hb_report/Makefile				        	\
    hb_report/hb_report				        	\
+doc/Makefile							\
+   doc/hb_report.xml						\
+   doc/ha_logd.xml						\
+   doc/ha_logger.xml						\
+   doc/stonith.xml						\
+   doc/meatclient.xml						\
+   doc/stonith/Makefile
 )
 
 dnl Now process the entire list of files added by previous 

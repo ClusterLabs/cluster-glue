@@ -1,0 +1,134 @@
+<?xml version="1.0"?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN" "http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<refentry id="re-ha_logd">
+  <refentryinfo>
+    <date>December 8, 2009</date>
+    <productname>@PACKAGE_NAME@</productname>
+    <productnumber>@VERSION@</productnumber>
+    <authorgroup>
+       <author>
+	<firstname>Alan</firstname>
+	<surname>Robertson</surname>
+	<contrib>ha_logd</contrib>
+	<email>alanr@unix.sh</email>
+      </author>
+      <author>
+	<surname>Shi</surname>
+	<firstname>Guochun</firstname>
+	<contrib>ha_logd</contrib>
+	<email>gshi@ncsa.uiuc.edu</email>
+      </author>
+      <author>
+	<surname>Lars</surname>
+	<firstname>Marowsky-Bree</firstname>
+	<contrib>ha_logd</contrib>
+	<email>lmb@suse.de</email>
+      </author>
+      <author>
+	<firstname>Florian</firstname>
+	<surname>Haas</surname>
+	<contrib>man page</contrib>
+	<email>florian.haas@linbit.com</email>
+      </author>
+    </authorgroup>
+  </refentryinfo>
+  <refmeta>
+    <refentrytitle>ha_logd</refentrytitle>
+    <manvolnum>8</manvolnum>
+    <refmiscinfo class="manual">System administration utilities</refmiscinfo>
+  </refmeta>
+  <refnamediv>
+    <refname>ha_logd</refname>
+    <refpurpose>Logging Daemon for High-Availability Linux</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>ha_logd</command>
+      <arg choice="opt"><option>-s</option></arg>
+      <arg choice="opt"><option>-k</option></arg>
+      <arg choice="opt"><option>-d</option></arg>
+      <arg choice="opt"><option>-h</option></arg>
+      <arg choice="opt"><option>-c</option> <replaceable>file</replaceable></arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+  <refsection id="rs-ha_logd-description">
+    <title>Description</title>
+    <para><command>ha_logd</command> is a logging daemon for
+    Linux-HA. It receives messages from a local domain socket
+    <filename>@HA_LOGDAEMON_IPC@</filename>, and writes them to
+    appropriate files and syslog if enabled. The reason for utilizing
+    this logging daemon is that occasionally Heartbeat suffers from
+    disk I/O delays.  By sending log messages to a logging daemon,
+    heartbeat can avoid such I/O delays.</para>
+  </refsection>
+  <refsection id="rs-ha_logd-options">
+    <title>Options</title>
+    <para>The following options are supported:</para>
+    <variablelist>
+      <varlistentry>
+	<term>
+	  <option>-s</option>
+	</term>
+	<listitem>
+	  <para>Show <command>ha_logd</command> status (either
+	  <token>running</token> or <token>stopped</token>)</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>
+	  <option>-k</option>
+	</term>
+	<listitem>
+	  <para>Stop (kill) the daemon</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>
+	  <option>-d</option>
+	</term>
+	<listitem>
+	  <para>Daemonize (without this option,
+	  <command>ha_logd</command> will run in the
+	  foreground)</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>
+	  <option>-h</option>
+	</term>
+	<listitem>
+	  <para>Show a brief usage message</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>
+	  <option>-c</option> <replaceable>file</replaceable>
+	</term>
+	<listitem>
+	  <para>Configuration file. You may configure a regular log
+	  file, debug log file, log facility, and entity. For details,
+	  see the example <filename>ha_logd.cf</filename> file found
+	  in the documentation.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsection>
+  <refsection id="rs-ha_logd-files">
+    <title>Files</title>
+    <itemizedlist>
+      <listitem>
+	<para><filename>@GLUE_STATE_DIR@/ha_logd.pid</filename> &ndash; PID file</para>
+      </listitem>
+      <listitem>
+	<para><filename>ha_logd.cf</filename> &ndash; example configuration file</para>
+      </listitem>
+    </itemizedlist>
+  </refsection>
+  <refsection id="rs-ha_logd-seealso">
+    <title>See also</title>
+    <para>
+      <citerefentry><refentrytitle>heartbeat</refentrytitle><manvolnum>8</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>ha_logger</refentrytitle><manvolnum>1</manvolnum></citerefentry>
+    </para>
+  </refsection>
+</refentry>

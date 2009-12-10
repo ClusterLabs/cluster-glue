@@ -23,13 +23,11 @@
 # Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
 #
 
-. /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs
-
 #set -x
 hostlist=`echo $hostlist | tr ',' ' '`
 
-trap '[ ! -e "$COOKIEFILE" ] || rmtempfile "$COOKIEFILE"' 0
-COOKIEFILE=`maketempfile` || exit 1
+trap '[ ! -e "$COOKIEFILE" ] || rm -f "$COOKIEFILE"' 0
+COOKIEFILE=`mktemp` || exit 1
 
 : ${CURLBIN="/usr/bin/curl"}
 : ${user=admin}

@@ -26,16 +26,16 @@
 
 Name:           cluster-glue
 Summary:        Reusable cluster components
-Version:        1.0
-Release:        1
+Version:        1.0.2
+Release:	0-rc1%{?dist}
 License:        GPL v2 or later; LGPL v2.1 or later
 Url:            http://www.linux-ha.org
 Group:		Productivity/Clustering/HA
-Source:         cluster-glue.tar.gz
+Source:         cluster-glue.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 AutoReqProv:    on
 BuildRequires:  automake autoconf libtool e2fsprogs-devel glib2-devel pkgconfig python-devel libxml2-devel
-BuildRequires:  libnet net-snmp-devel OpenIPMI-devel openhpi-devel
+BuildRequires:  libnet net-snmp-devel OpenIPMI-devel openhpi-devel 
 
 Obsoletes:	heartbeat-common
 Requires(pre):    /usr/sbin/groupadd /usr/bin/getent /usr/sbin/useradd
@@ -53,14 +53,14 @@ useful for writing cluster managers such as Pacemaker.
 Provides a local resource manager that understands the OCF and LSB
 standards, and an interface to common STONITH devices.
 
-%package -n libglue1
+%package -n libglue2
 License:        GPL v2 only; GPL v2 or later; LGPL v2.1 or later
 Summary:        The Pacemaker scalable High-Availability cluster resource manager
 Group:		Productivity/Clustering/HA
 Obsoletes:	libheartbeat2
 Requires:       %{name} = %{version}-%{release}
 
-%description -n libglue1
+%description -n libglue2
 A collection of libraries that are useful for writing cluster managers 
 such as Pacemaker.
 
@@ -69,7 +69,7 @@ License:        GPL v2 only; GPL v2 or later; LGPL v2.1 or later
 Summary:        The Pacemaker scalable High-Availability cluster resource manager
 Group:		Development/Libraries/C and C++
 Requires:       %{name} = %{version}-%{release}
-Requires:       libglue1 = %{version}-%{release}
+Requires:       libglue2 = %{version}-%{release}
 Obsoletes:	libheartbeat-devel
 
 %description -n libglue-devel
@@ -87,9 +87,9 @@ export CFLAGS
 
 ./autogen.sh
 %if 0%{?suse_version} < 1020
-%configure --enable-fatal-warnings=no --with-daemon-group=%{gname} --with-daemon-user=%{uname}
+%configure --enable-fatal-warnings=yes --with-daemon-group=%{gname} --with-daemon-user=%{uname}
 %else
-%configure --enable-fatal-warnings=no --with-daemon-group=%{gname} --with-daemon-user=%{uname} --docdir=%{_docdir}
+%configure --enable-fatal-warnings=yes --with-daemon-group=%{gname} --with-daemon-user=%{uname} --docdir=%{_docdir}
 %endif
 export MAKE="make %{?jobs:-j%jobs}"
 make %{?jobs:-j%jobs}
@@ -140,10 +140,10 @@ else
         %{uname} 2>/dev/null || :
 fi
 
-%post -n libglue1
+%post -n libglue2
 /sbin/ldconfig  
   
-%postun -n libglue1
+%postun -n libglue2
 /sbin/ldconfig
 
 %files
@@ -180,17 +180,12 @@ fi
 
 %{_sysconfdir}/init.d/logd
 
-%if 0%{?suse_version} < 1020
-%doc %{_datadir}/doc/stonith
-%else
-%doc %{_docdir}/stonith
-%endif
-
 %doc %{_mandir}/man8/*
 %doc %{_mandir}/man1/*
 %doc AUTHORS
 %doc COPYING
 %doc logd/logd.cf
+%doc doc/stonith
 
 /sbin/rclogd
 
@@ -205,7 +200,7 @@ fi
 %{_libdir}/stonith/plugins/stonith2/*.py
 %{_libdir}/stonith/plugins/xen0-ha-dom0-stonith-helper
 
-%files -n libglue1
+%files -n libglue2
 %defattr(-,root,root)
 %{_libdir}/lib*.so.*
 %doc AUTHORS
@@ -214,11 +209,10 @@ fi
 %files -n libglue-devel
 %defattr(-,root,root)
 
-%dir %{_libdir}/glue
-%dir %{_libdir}/glue/plugins
-%dir %{_libdir}/glue/plugins/test
 %dir %{_libdir}/heartbeat
-%dir %{_datadir}/glue
+%dir %{_libdir}/heartbeat/plugins
+%dir %{_libdir}/heartbeat/plugins/test
+%dir %{_datadir}/heartbeat
 
 %{_libdir}/lib*.so
 %{_libdir}/heartbeat/ipctest
@@ -231,8 +225,8 @@ fi
 %{_includedir}/heartbeat
 %{_includedir}/stonith
 %{_includedir}/pils
-%{_datadir}/glue/lrmtest
-%{_libdir}/glue/plugins/test/test.so
+%{_datadir}/heartbeat/lrmtest
+%{_libdir}/heartbeat/plugins/test/test.so
 %doc AUTHORS
 %doc COPYING
 %doc COPYING.LIB

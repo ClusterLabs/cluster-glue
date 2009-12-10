@@ -48,6 +48,7 @@
 #define	LOG(args...) PILCallLog(StonithPIsys->imports->log, args)
 
 #define EXTPINAME_S 	"external"
+#define RHCSPINAME_S 	"rhcs"
 
 PILPluginUniv*		StonithPIsys = NULL;
 static GHashTable*	Splugins = NULL;
@@ -110,7 +111,8 @@ stonith_new(const char * type)
 	}
 
 	if (((subplugin = strchr(typecopy, '/')) != NULL) && 
-	    (strncmp(EXTPINAME_S, typecopy, strlen(EXTPINAME_S)) == 0)) {
+	    (strncmp(EXTPINAME_S, typecopy, strlen(EXTPINAME_S)) == 0 ||
+	    strncmp(RHCSPINAME_S, typecopy, strlen(RHCSPINAME_S)) == 0)) {
 		*subplugin++ = 0; /* make two strings */
 	}
 
@@ -160,136 +162,129 @@ qsort_string_cmp(const void *a, const void *b)
  *	Return list of STONITH types valid in stonith_new()
  */
 
+static char **
+get_plugin_list(const char *pltype)
+{
+	char **	typelist = NULL;
+	const char **extPI, **p;
+	int numextPI, i;
+	Stonith * ext;
+
+	/* let the external plugin return a list */
+	if ((ext = stonith_new(pltype)) == NULL) {
+		LOG(PIL_CRIT, "Cannot create new external "
+			"plugin object");
+		return NULL;
+	}
+	if ((extPI = stonith_get_confignames(ext)) == NULL) {
+		LOG(PIL_INFO, "Cannot get %s plugin subplugins", pltype);
+		stonith_delete(ext);
+		return NULL;
+	}
+
+	/* count the external plugins */
+	for (numextPI = 0, p = extPI; *p; p++, numextPI++);
+
+	/* sort the external plugins */
+	qsort(extPI, numextPI, sizeof(char *), qsort_string_cmp);
+
+	typelist = (char **)
+		MALLOC((numextPI+1)*sizeof(char *));
+	if (typelist == NULL) {
+		LOG(PIL_CRIT, "Out of memory");
+		stonith_delete(ext);
+		return NULL;
+	}
+
+	memset(typelist, 0, (numextPI + 1)*sizeof(char *)); 
+
+	/* copy external plugins */
+	for (i = 0; i < numextPI; i++) {
+		int len = strlen(pltype) + 
+			strlen(extPI[i]) + 2;
+		typelist[i] = MALLOC(len);
+		if (typelist[i] == NULL) {
+			LOG(PIL_CRIT, "Out of memory");
+			stonith_delete(ext);
+			goto err;
+		}
+		snprintf(typelist[i], len, "%s/%s"
+		,	pltype, extPI[i]);
+	}
+
+	stonith_delete(ext);
+	return typelist;
+err:
+	stonith_free_hostlist(typelist);
+	return NULL;
+}
+
 char **
 stonith_types(void)
 {
-	int plugincount;
-	static char **	lasttypelist = NULL;
-	char **		newtypelist;
-	int		extplugin = -1;
+	int i, j, cur=0, rl_size, sub_pl = 0;
+	static char **	rl = NULL;
+	char **		new_list, **sub_list = NULL;
 
 	if (!init_pluginsys()) {
 		return NULL;
 	}
 
-	if (lasttypelist) {
-		stonith_free_hostlist(lasttypelist);
-		lasttypelist = NULL;
-	}
-
-	newtypelist = PILListPlugins(StonithPIsys, STONITH_TYPE_S, NULL);
-	if (newtypelist == NULL) {
+	new_list = PILListPlugins(StonithPIsys, STONITH_TYPE_S, NULL);
+	if (new_list == NULL) {
 		return NULL;
 	}
+	for (i=0; new_list[i]; ++i)
+		; /* count */
+	rl_size = i+1;
 
-	/* look for 'external' plugin */
-	for (plugincount=0; newtypelist[plugincount] != NULL; ++plugincount) {
-		if (strcmp(newtypelist[plugincount], EXTPINAME_S) == 0) {
-			extplugin = plugincount;
+	rl = (char**)MALLOC(rl_size * sizeof(char *));
+	if (rl == NULL) {
+		LOG(PIL_CRIT, "Out of memory");
+		goto types_exit;
+	}
+
+	for (i=0; new_list[i]; ++i) {
+		/* look for 'external' and 'rhcs' plugins */
+		if (strcmp(new_list[i], EXTPINAME_S) == 0) {
+			sub_list = get_plugin_list(EXTPINAME_S);
+			sub_pl = 1;
+		} else if (strcmp(new_list[i], RHCSPINAME_S) == 0) {
+			sub_list = get_plugin_list(RHCSPINAME_S);
+			sub_pl = 1;
+		}
+		if (sub_pl) {
+			if (sub_list) {
+				for (j=0; sub_list[j]; ++j)
+					; /* count */
+				rl_size += j;
+				rl = (char**)REALLOC(rl, rl_size*sizeof(char *));
+				for (j=0; sub_list[j]; ++j) {
+					rl[cur++] = sub_list[j];
+				}
+				FREE(sub_list);
+				sub_list = NULL;
+			}
+			sub_pl = 0;
+		} else {
+			rl[cur] = STRDUP(new_list[i]);
+			if (rl[cur] == NULL) {
+				LOG(PIL_CRIT, "Out of memory");
+				goto types_exit_mem;
+			}
+			cur++;
 		}
 	}
 
-	if (extplugin >= 0) {
-		/* 'external' plugin exists, adjust types list by replacing
-		 * 'external' with sorted list of 'external/subplugin' */
-		const char **extPI, **p;
-		int numextPI, i, index;
-		Stonith * ext;
-
-		/* let the external plugin return a list */
-		if ((ext = stonith_new(EXTPINAME_S)) == NULL) {
-			LOG(PIL_CRIT, "Cannot create new external "
-				"plugin object");
-			goto types_exit;
-		}
-		if ((extPI = stonith_get_confignames(ext)) == NULL) {
-			LOG(PIL_CRIT, "Cannot get external plugin subplugins");
-			stonith_delete(ext);
-			goto types_exit;
-		}
-
-		/* count the external plugins */
-		for (numextPI = 0, p = extPI; *p; p++, numextPI++);
-
-		/* sort the external plugins */
-		qsort(extPI, numextPI, sizeof(char *), qsort_string_cmp);
-
-		/* allocate types list (don't need numextPI+plugincount+1
-		 * because 'external' is being removed from list */
-		lasttypelist = (char **)
-			MALLOC((numextPI+plugincount) * sizeof(char *));
-		if (lasttypelist == NULL) {
-			LOG(PIL_CRIT, "Out of memory");
-			stonith_delete(ext);
-			goto types_exit;
-		}
-
-		memset(lasttypelist, 0, (numextPI+plugincount)*sizeof(char *)); 
-
-		/* copy plugins up to but not including 'external' */
-		for (index = 0, i = 0; i < extplugin; index++, i++) {
-			lasttypelist[index] = STRDUP(newtypelist[i]);
-			if (lasttypelist[index] == NULL) {
-				LOG(PIL_CRIT, "Out of memory");
-				stonith_delete(ext);
-				goto types_exit_mem;
-			}
-		}
-
-		/* copy external plugins */
-		for (i = 0; i < numextPI; index++, i++) {
-			int len = strlen(EXTPINAME_S) + 
-				strlen(extPI[i]) + 2;
-			lasttypelist[index] = MALLOC(len * sizeof(char *));
-			if (lasttypelist[index] == NULL) {
-				LOG(PIL_CRIT, "Out of memory");
-				stonith_delete(ext);
-				goto types_exit_mem;
-			}
-			snprintf(lasttypelist[index], len, "%s/%s"
-			,	EXTPINAME_S, extPI[i]);
-		}
-
-		/* copy plugins after 'external' */
-		for (i = extplugin+1; i < plugincount; index++, i++) {
-			lasttypelist[index] = STRDUP(newtypelist[i]);
-			if (lasttypelist[index] == NULL) {
-				LOG(PIL_CRIT, "Out of memory");
-				stonith_delete(ext);
-				goto types_exit_mem;
-			}
-		}
-
-		stonith_delete(ext);
-	}else{
-		/* 'external' plugin doesn't exist, copy types list */
-		char **from, **to;
-
-		lasttypelist = (char**)MALLOC((plugincount+1) * sizeof(char *));
-		if (lasttypelist == NULL) {
-			LOG(PIL_CRIT, "Out of memory");
-			goto types_exit;
-		}
-	
-		for (from = newtypelist, to = lasttypelist
-		; *from
-		; ++from, ++to) {
-			*to = STRDUP(*from);
-			if (*to == NULL) {
-				LOG(PIL_CRIT, "Out of memory");
-				goto types_exit_mem;
-			}
-		}
-		*to = NULL;
-	}
+	rl[cur] = NULL;
 	goto types_exit;
 
 types_exit_mem:
-	stonith_free_hostlist(lasttypelist);
-	lasttypelist = NULL;
+	stonith_free_hostlist(rl);
+	rl = NULL;
 types_exit:
-	PILFreePluginList(newtypelist);
-	return lasttypelist;
+	PILFreePluginList(new_list);
+	return rl;
 }
 
 /* Destroy the STONITH object... */

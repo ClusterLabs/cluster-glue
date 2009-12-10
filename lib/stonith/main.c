@@ -30,7 +30,7 @@
 #include <pils/plugin.h>
 #include <glib.h>
 
-#define	OPTIONS	"c:F:p:t:T:snSlLvhd"
+#define	OPTIONS	"c:F:p:t:T:snSlLmvhd"
 #define	EQUAL	'='
 
 extern char *	optarg;
@@ -69,6 +69,11 @@ usage(const char * cmd, int exit_status, const char * devtype)
 
 		fprintf(stream, "\t %s [-svh] "
 		"-t stonith-device-type "
+		"-m\n"
+		, cmd);
+
+		fprintf(stream, "\t %s [-svh] "
+		"-t stonith-device-type "
 		"{-p stonith-device-parameters | "
 		"-F stonith-device-parameters-file | "
 		"name=value...} "
@@ -92,6 +97,7 @@ usage(const char * cmd, int exit_status, const char * devtype)
 		fprintf(stream, "\t-s\tsilent\n");
 		fprintf(stream, "\t-v\tverbose\n");
 		fprintf(stream, "\t-n\toutput the config names of stonith-device-parameters\n");
+		fprintf(stream, "\t-m\tdisplay meta-data of the stonith device type\n");
 		fprintf(stream, "\t-h\tdisplay detailed help message with stonith device description(s)\n");
 	}
 
@@ -225,6 +231,7 @@ main(int argc, char** argv)
 	int		j;
 	int		count = 1;
 	int		help = 0;
+	int		metadata = 0;
 
 	/* The bladehpi stonith plugin makes use of openhpi which is
 	 * threaded.  The mix of memory allocation without thread
@@ -262,6 +269,9 @@ main(int argc, char** argv)
 				break;
 
 		case 'h':	help++;
+				break;
+
+		case 'm':	metadata++;
 				break;
 
 		case 'l':	++listhosts;
@@ -355,7 +365,7 @@ main(int argc, char** argv)
 	argcount = argc - optind;
 
 	if (!(argcount == 1 || (argcount < 1
-	&&	(status||listhosts||listtypes||listparanames)))) {
+	&&	(status||listhosts||listtypes||listparanames||metadata)))) {
 		++errors;
 	}
 
@@ -379,13 +389,24 @@ main(int argc, char** argv)
 		exit(0);
 	}
 
+#ifndef LOG_PERROR
+#	define LOG_PERROR	0
+#endif
+	openlog(cmdname, (LOG_CONS|(silent ? 0 : LOG_PERROR)), LOG_USER);
 	if (SwitchType == NULL) {
 		fprintf(stderr,	"Must specify device type (-t option)\n");
 		usage(cmdname, 1, NULL);
 	}
-
 	s = stonith_new(SwitchType);
-	if (!listparanames && optfile == NULL && parameters == NULL && nvcount == 0) {
+	if (s == NULL) {
+		syslog(LOG_ERR, "Invalid device type: '%s'", SwitchType);
+		exit(S_OOPS);
+	}
+	if (debug) {
+		stonith_set_debug(s, debug);
+	}
+
+	if (!listparanames && !metadata && optfile == NULL && parameters == NULL && nvcount == 0) {
 		const char**	names;
 		int		needs_parms = 1;
 
@@ -404,18 +425,6 @@ main(int argc, char** argv)
 		}
 	}
 
-#ifndef LOG_PERROR
-#	define LOG_PERROR	0
-#endif
-	openlog(cmdname, (LOG_CONS|(silent ? 0 : LOG_PERROR)), LOG_USER);
-	if (s == NULL) {
-		syslog(LOG_ERR, "Invalid device type: '%s'", SwitchType);
-		exit(S_OOPS);
-	}
-	if (debug) {
-		stonith_set_debug(s, debug);
-	}
-
 	if (listparanames) {
 		const char**	names;
 		int		i;
@@ -427,6 +436,18 @@ main(int argc, char** argv)
 			}
 		}
 		printf("\n");
+		stonith_delete(s); 
+		s=NULL;
+		exit(0);
+	}
+
+	if (metadata) {
+		const char*	meta;
+		meta = stonith_get_info(s, ST_CONF_XML);
+
+		if (meta != NULL) {
+			printf("%s\n", meta);
+		}
 		stonith_delete(s); 
 		s=NULL;
 		exit(0);

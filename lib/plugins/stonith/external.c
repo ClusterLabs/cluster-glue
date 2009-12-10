@@ -126,6 +126,7 @@ external_status(StonithPlugin  *s)
 	struct pluginDevice *	sd;
 	const char *		op = "status";
 	int			rc;
+	char *			output = NULL;
 	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
@@ -139,10 +140,22 @@ external_status(StonithPlugin  *s)
 		return(S_OOPS);
 	}
 	
-	rc = external_run_cmd(sd, op, NULL);
-	if (Debug) {
-		LOG(PIL_DEBUG, "%s: running '%s %s' returned %d",
+	rc = external_run_cmd(sd, op, &output);
+	if (rc != 0) {
+		LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
 			__FUNCTION__, sd->subplugin, op, rc);
+		if (output) {
+			LOG(PIL_CRIT, "plugin output: %s", output);
+		}
+	}
+	else {
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: running '%s %s' returned %d",
+				__FUNCTION__, sd->subplugin, op, rc);
+		}
+	}
+	if (output) {
+		FREE(output);
 	}
 	return rc;
 }
@@ -185,17 +198,18 @@ external_hostlist(StonithPlugin  *s)
 	}
 
 	rc = external_run_cmd(sd, op, &output);
-	if (Debug) {
-		LOG(PIL_DEBUG, "%s: running '%s %s' returned %d",
-			__FUNCTION__, sd->subplugin, op, rc);
-	}
 	if (rc != 0) {
 		LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
 			__FUNCTION__, sd->subplugin, op, rc);
 		if (output) {
+			LOG(PIL_CRIT, "plugin output: %s", output);
 			FREE(output);
 		}
 		return NULL;
+	}
+	if (Debug) {
+		LOG(PIL_DEBUG, "%s: running '%s %s' returned %d",
+			__FUNCTION__, sd->subplugin, op, rc);
 	}
 
 	if (!output) {
@@ -252,6 +266,7 @@ external_reset_req(StonithPlugin * s, int request, const char * host)
 	int			rc;
 	char *			args1and2;
 	int			argslen;
+	char *			output = NULL;
 	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
@@ -301,21 +316,29 @@ external_reset_req(StonithPlugin * s, int request, const char * host)
 		return S_OOPS;
 	}
 	
-	rc = external_run_cmd(sd, args1and2, NULL);
-	if (Debug) {
-		LOG(PIL_DEBUG, "%s: running '%s %s' returned %d",
-			__FUNCTION__, sd->subplugin, op, rc);
-	}
-
+	rc = external_run_cmd(sd, args1and2, &output);
 	FREE(args1and2);
-
 	if (rc != 0) {
 		LOG(PIL_CRIT, "%s: '%s %s' for host %s failed with rc %d",
 			__FUNCTION__, sd->subplugin, op, host, rc);
-		return(S_RESETFAIL);
+		if (output) {
+			LOG(PIL_CRIT, "plugin output: %s", output);
+			FREE(output);
+		}
+		return S_RESETFAIL;
+	}
+	else {
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: running '%s %s' returned %d",
+				__FUNCTION__, sd->subplugin, op, rc);
+		}
+		if (output) {
+			LOG(PIL_INFO, "plugin output: %s", output);
+			FREE(output);
+		}
+		return S_OK;
 	}
 	
-	return S_OK;
 }
 
 static int
@@ -469,15 +492,21 @@ external_get_confignames(StonithPlugin* p)
 		int	namecount;
 
 		rc = external_run_cmd(sd, op, &output);
-		if (Debug) {
-			LOG(PIL_DEBUG, "%s: '%s %s' returned %d",
-				__FUNCTION__, sd->subplugin, op, rc);
-		}
 		if (rc != 0) {
 			LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
 				__FUNCTION__, sd->subplugin, op, rc);
-			if (output) { FREE(output); }
+			if (output) {
+				LOG(PIL_CRIT, "plugin output: %s", output);
+				FREE(output);
+			}
 			return NULL;
+		}
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: '%s %s' returned %d",
+				__FUNCTION__, sd->subplugin, op, rc);
+			if (output) {
+				LOG(PIL_DEBUG, "plugin output: %s", output);
+			}
 		}
 		
 		namecount = get_num_tokens(output);
@@ -579,12 +608,19 @@ external_getinfo(StonithPlugin * s, int reqtype)
 	}
 
 	rc = external_run_cmd(sd, op, &ret);
-	if (Debug) {
-		LOG(PIL_DEBUG, "%s: '%s %s' returned %d",
+	if (rc != 0) {
+		LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
 			__FUNCTION__, sd->subplugin, op, rc);
+		if (ret) {
+			LOG(PIL_CRIT, "plugin output: %s", ret);
+			FREE(ret);
+		}
 	}
-
-	if (rc == 0) {
+	else {
+		if (Debug) {
+			LOG(PIL_DEBUG, "%s: '%s %s' returned %d",
+				__FUNCTION__, sd->subplugin, op, rc);
+		}
 		if (sd->outputbuf != NULL) {
 			FREE(sd->outputbuf);
 		}

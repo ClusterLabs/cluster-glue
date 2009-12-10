@@ -132,7 +132,7 @@ cl_malloc_hogger(int kbytes)
 void
 cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 {
-#ifdef DEFAULT_REALTIME
+#ifdef DEFAULT_REALTIME_POLICY
 	struct sched_param	sp;
 	int			staticp;
 #endif
@@ -159,9 +159,9 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 		return;
 	}
 
-#ifdef DEFAULT_REALTIME
+#ifdef DEFAULT_REALTIME_POLICY
 	if (spolicy < 0) {
-		spolicy = DEFAULT_REALTIME;
+		spolicy = DEFAULT_REALTIME_POLICY;
 	}
 
 	if (priority <= 0) {
@@ -234,7 +234,7 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 void
 cl_make_normaltime(void)
 {
-#ifdef DEFAULT_REALTIME
+#ifdef DEFAULT_REALTIME_POLICY
 	struct sched_param	sp;
 
 	memset(&sp, 0, sizeof(sp));

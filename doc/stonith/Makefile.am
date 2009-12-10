@@ -1,7 +1,3 @@
-#
-# Author: Sun Jiang Dong <sunjd@cn.ibm.com>
-# Copyright (c) 2004 International Business Machines
-#
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
@@ -16,11 +12,21 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
-MAINTAINERCLEANFILES = Makefile.in
+MAINTAINERCLEANFILES    = Makefile.in
 
-testcasesdir		= 	$(datadir)/heartbeat/lrmtest/testcases
-testcases_SCRIPTS	=	common.filter ra-list.sh rscmgmt.log_filter xmllint.sh
-testcases_DATA	=	BSC metadata metadata.exp rscexec \
-			rscexec.exp rscmgmt rscmgmt.exp
-#			shouldn't need this next line...
-EXTRA_DIST =		$(testcases_SCRIPTS) $(testcases_DATA)
+stdocdir		= $(docdir)/stonith
+
+stdoc_DATA 		= README.bladehpi \
+			  README.cyclades \
+			  README.drac3 \
+			  README.dracmc \
+			  README.external \
+			  README.ibmrsa \
+			  README.ibmrsa-telnet \
+			  README.ipmilan \
+			  README.meatware \
+			  README.rcd_serial \
+			  README.riloe \
+			  README.vacm \
+			  README.wti_mpc \
+			  README_kdumpcheck.txt

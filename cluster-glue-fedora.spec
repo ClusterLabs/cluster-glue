@@ -7,21 +7,18 @@
 
 # When downloading directly from Mercurial, it will automatically add this prefix
 # Invoking 'hg archive' wont but you can add one with: hg archive -t tgz -p "Reusable-Cluster-Components-" -r $upstreamversion $upstreamversion.tar.gz
-%global specversion 9
 %global upstreamprefix Reusable-Cluster-Components-
 %global upstreamversion d97b9dea436e
 
-# Keep around for when/if required
-#global alphatag %{upstreamversion}.hg
-
 Name:		cluster-glue
 Summary:	Reusable cluster components
-Version:	1.0
-Release:	%{?alphatag:0.}%{specversion}%{?alphatag:.%{alphatag}}%{?dist}
+Version:	1.0.2
+Release:	0-rc1%{?dist}
 License:	GPLv2+ and LGPLv2+
 Url:		http://www.clusterlabs.org
 Group:		System Environment/Base
-Source0:	cluster-glue.tar.gz
+Source0:	cluster-glue.tar.bz2
+Requires:	perl-TimeDate
 
 # Directives to allow upgrade from combined heartbeat packages in Fedora11
 Provides:       heartbeat-stonith = 3.0.0-1
@@ -62,7 +59,7 @@ BuildRequires: libuuid-devel
 ./autogen.sh
 
 %{configure}	CFLAGS="${CFLAGS} $(echo '%{optflags}')" \
-		--enable-fatal-warnings=no \
+		--enable-fatal-warnings=yes \
 		--with-daemon-group=%{gname} \
 		--with-daemon-user=%{uname} \
 		--localstatedir=%{_var} \
@@ -127,7 +124,7 @@ standards, and an interface to common STONITH devices.
 %dir %attr (0700, nobody, %{nogroup})	%{_var}/lib/heartbeat/cores/nobody
 %dir %attr (0700, %{uname}, %{gname})	%{_var}/lib/heartbeat/cores/%{uname}
 %if 0%{?fedora} 
-%doc %{_docdir}/glue/stonith
+%doc %{_docdir}/%{name}/stonith
 %else
 %doc %{_docdir}/stonith
 %endif
@@ -180,11 +177,10 @@ such as Pacemaker.
 
 %files -n cluster-glue-libs-devel
 %defattr(-,root,root)
-%dir %{_libdir}/glue
-%dir %{_libdir}/glue/plugins
-%dir %{_libdir}/glue/plugins/test
+%dir %{_libdir}/heartbeat/plugins
+%dir %{_libdir}/heartbeat/plugins/test
 %dir %{_libdir}/heartbeat
-%dir %{_datadir}/glue
+%dir %{_datadir}/heartbeat
 %{_libdir}/lib*.so
 %{_libdir}/heartbeat/ipctest
 %{_libdir}/heartbeat/ipctransientclient
@@ -196,8 +192,8 @@ such as Pacemaker.
 %{_includedir}/heartbeat
 %{_includedir}/stonith
 %{_includedir}/pils
-%{_datadir}/glue/lrmtest
-%{_libdir}/glue/plugins/test/test.so
+%{_datadir}/heartbeat/lrmtest
+%{_libdir}/heartbeat/plugins/test/test.so
 %doc AUTHORS
 %doc COPYING
 %doc COPYING.LIB

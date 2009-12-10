@@ -16,20 +16,31 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
 
-MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure DRF/config-h.in \
-			  DRF/stamp-h.in libtool.m4 ltdl.m4 libltdl.tar
+-include Makefile
 
-SUBDIRS			= include $(LIBLTDL_DIR) replace lib lrm logd hb_report doc
+PACKAGE		?= cluster-glue
+TARFILE		= $(PACKAGE).tar.bz2
 
-install-exec-local:
-	$(INSTALL) -d $(DESTDIR)/$(HA_COREDIR)
-	-$(INSTALL) -d -m 700 -o root $(DESTDIR)/$(HA_COREDIR)/root
-	-$(INSTALL) -d -m 700 -o nobody $(DESTDIR)/$(HA_COREDIR)/nobody
-	$(INSTALL) -d -m 700 $(DESTDIR)/$(HA_COREDIR)/$(GLUE_DAEMON_USER)
-	-chown $(GLUE_DAEMON_USER) $(DESTDIR)/$(HA_COREDIR)/$(GLUE_DAEMON_USER)
-# Use chown because $(GLUE_DAEMON_USER) may not exist yet
+RPM_ROOT	= $(shell pwd)
+RPM_OPTS	= --define "_sourcedir $(RPM_ROOT)" 	\
+		  --define "_specdir $(RPM_ROOT)" 	\
+		  --define "_srcrpmdir $(RPM_ROOT)"
 
-dist-clean-local:
-	rm -f autoconf automake autoheader $(TARFILE)
 
-.PHONY: 
+getdistro = $(shell test -e /etc/SuSE-release || echo fedora; test -e /etc/SuSE-release && echo suse)
+DISTRO ?= $(call getdistro)
+
+hgarchive:
+	rm -f $(TARFILE)
+	hg archive -t tbz2 $(TARFILE)
+	echo `date`: Rebuilt $(TARFILE)
+
+srpm:	hgarchive
+	rm -f *.src.rpm
+	@echo To create custom builds, edit the flags and options in $(PACKAGE)-$(DISTRO).spec first
+	rpmbuild -bs --define "dist .$(DISTRO)" $(RPM_OPTS) $(PACKAGE)-$(DISTRO).spec
+
+rpm:	srpm
+	rpmbuild $(RPM_OPTS) --rebuild $(RPM_ROOT)/*.src.rpm
+
+

@@ -7,49 +7,6 @@
 #                 terminal server with telnet and switches power of named
 #                 blade servers appropriatelly.
 #
-# Author: Alex Tsariounov <alext@novell.com>
-#
-# Based on ibmrsa-telnet external stonith plugin by Andreas Mock
-# (andreas.mock@web.de), Copyright by Adreas Mock and released as part
-# of HAv2.
-#
-# History:
-#   2009-10-12  First release.
-#
-# Description:
-#     Dell offers the Drac/MC in their blade enclosures.  The
-# Drac/MC can be accessed in different ways.  One way to interface to it
-# is to connect the blade enclosure's Drac/MC serial port to a Cyclades
-# terminal server.  You can then access the Drac/MC via telnet via the
-# Cyclades.  Once logged in, you can use 'help' to show all available
-# commands.  With the 'serveraction' command, you can control both
-# hard and soft resets as well as power to a particular blade.  The
-# blades are named 'Server-X', where 'X' is a number which corresponds
-# to the blade number in the enclosure.  This plugin allows using the
-# Drac/MC with stonith.  It uses python's standards 'telnetlib' library
-# to log in and issue commands.  The code is very similar to the original
-# ibmrsa-telnet plugin released by Andreas and was quite easy to
-# modify for this application.
-#     One complication is that the Cyclades only allows one active
-# connection.  If someone or something has a connection active, the
-# terminal server closes the new attempted connection.  Since this
-# situation can be common, for example if trying to stonith two blades
-# or when the plugin is started by multiple cluster nodes, there is a
-# built in retry mechanism for login.  On 10 retries, the code gives up
-# and throws.
-#     When running this resource, it is best to not run it as a clone,
-# rather as a normal, single-instance resource.  Make sure to create a
-# location constraint that excludes the node that is to be fenced.
-#
-#  For example:
-#
-#    primitive fence_node1 stonith:external/dracmc-telnet \
-#             nodename=node1 cyclades_ip=10.0.0.1 cyclades_port=7001 \
-#             servername=Server-1 username=USERID password=PASSWORD \
-#             op monitor interval="200m" timeout="60s"
-#    location loc-fence_node1 fence_node1 -inf: node1
-#    commit
-#
 # Required parameters:
 #  nodename:      The name of the server you want to touch on your network
 #  cyclades_ip:   The IP address of the cyclades terminal server
@@ -58,10 +15,14 @@
 #  username:      The login user name for the DRAC/MC
 #  password:      The login password for the DRAC/MC
 #
-# cib-snippet:
-#   See end of this file for a xml snippet to configure this
-#   stonith device.
+# Author: Alex Tsariounov <alext@novell.com>
 #
+# Based on ibmrsa-telnet external stonith plugin by Andreas Mock
+# (andreas.mock@web.de), Copyright by Adreas Mock and released as part
+# of HAv2.
+#
+# History:
+#   2009-10-12  First release.
 #
 # Copyright (c) 2009 Novell, Inc.
 # All Rights Reserved.
@@ -439,49 +400,3 @@ if __name__ == '__main__':
     stonith = DracMCStonithPlugin()
     rc = stonith.process(sys.argv[1:])
     sys.exit(rc)
-
-
-##############################################################################
-# Code snippet for cib
-#  It's useful to give a location preference so that the stonith agent
-#  is run on the/an other node. This is not necessary as one node can kill
-#  itself via the DRAC/MC. However, if this node becomes crazy, then it is
-#  not guranteed that a self-stonith will be successful.
-#
-#  You have to adjust parameters, scores and timeout values to fit your
-#  HA environment.
-##############################################################################
-#<?xml version="1.0" ?>
-#<cib>
-#    <configuration>
-#        <resources>
-#            <primitive id="r_stonith-node01" class="stonith" type="external/dracmc-telnet" provider="heartbeat" resource_stickiness="0">
-#                <operations>
-#                    <op name="monitor" interval="200m" timeout="60s" prereq="nothing" id="r_stonith-node01-mon"/>
-#                    <op name="start" timeout="180" id="r_stonith-node01-start"/>
-#                    <op name="stop" timeout="180" id="r_stonith-node01-stop"/>
-#                </operations>
-#                <instance_attributes id="r_stonith-node01">
-#                    <attributes>
-#                        <nvpair id="r_stonith-node01-nodename" name="nodename" value="node01"/>
-#                        <nvpair id="r_stonith-node01-cyclades_ip" name="cyclades_ip" value="192.168.0.1"/>
-#                        <nvpair id="r_stonith-node01-cyclades_port" name="cyclades_port" value="7032"/>
-#                        <nvpair id="r_stonith-node01-servername" name="servername" value="Server-7"/>
-#                        <nvpair id="r_stonith-node01-username" name="username" value="USERID"/>
-#                        <nvpair id="r_stonith-node01-password" name="password" value="PASSWORD"/>
-#                        <nvpair id="r_stonith-node01-type" name="type" value="dellblade"/>
-#                    </attributes>
-#                </instance_attributes>
-#            </primitive>
-#        </resources>
-#        <constraints>
-#            <rsc_location id="r_stonith-node01_prefer_node02" rsc="r_stonith-node01">
-#                <rule id="r_stonith-node01_prefer_node02_rule" score="50">
-#                    <expression attribute="#uname" id="r_stonith-node01_prefer_node02_expr" operation="eq" value="node02"/>
-#                </rule>
-#            </rsc_location>
-#        </constraints>
-#
-#    </configuration>
-#</cib>
-#
