@@ -27,7 +27,7 @@
 Name:           cluster-glue
 Summary:        Reusable cluster components
 Version:        1.0.2
-Release:	0-rc1%{?dist}
+Release:	0rc1%{?dist}
 License:        GPL v2 or later; LGPL v2.1 or later
 Url:            http://www.linux-ha.org
 Group:		Productivity/Clustering/HA
@@ -87,12 +87,14 @@ export CFLAGS
 
 ./autogen.sh
 %if 0%{?suse_version} < 1020
-%configure --enable-fatal-warnings=yes --with-daemon-group=%{gname} --with-daemon-user=%{uname}
+%configure \
+    --enable-fatal-warnings=yes \
+    --with-daemon-group=%{gname} \
+    --with-daemon-user=%{uname}
 %else
 %configure --enable-fatal-warnings=yes --with-daemon-group=%{gname} --with-daemon-user=%{uname} --docdir=%{_docdir}
 %endif
-export MAKE="make %{?jobs:-j%jobs}"
-make %{?jobs:-j%jobs}
+make %{?_smp_mflags}
 ###########################################################
 
 %install
@@ -180,12 +182,12 @@ fi
 
 %{_sysconfdir}/init.d/logd
 
-%doc %{_mandir}/man8/*
 %doc %{_mandir}/man1/*
+%doc %{_mandir}/man8/*
 %doc AUTHORS
 %doc COPYING
 %doc logd/logd.cf
-%doc doc/stonith
+%doc doc/stonith/README*
 
 /sbin/rclogd
 

@@ -13,7 +13,7 @@
 Name:		cluster-glue
 Summary:	Reusable cluster components
 Version:	1.0.2
-Release:	0-rc1%{?dist}
+Release:	0rc1%{?dist}
 License:	GPLv2+ and LGPLv2+
 Url:		http://www.clusterlabs.org
 Group:		System Environment/Base
@@ -58,15 +58,15 @@ BuildRequires: libuuid-devel
 
 ./autogen.sh
 
-%{configure}	CFLAGS="${CFLAGS} $(echo '%{optflags}')" \
-		--enable-fatal-warnings=yes \
-		--with-daemon-group=%{gname} \
-		--with-daemon-user=%{uname} \
-		--localstatedir=%{_var} \
-		--libdir=%{_libdir}
+%configure \
+    --enable-fatal-warnings=yes \
+    --with-daemon-group=%{gname} \
+    --with-daemon-user=%{uname} \
+    --localstatedir=%{_var} \
+    --libdir=%{_libdir}
 
 %build
-make %{_smp_mflags}
+make %{?_smp_mflags}
 
 %install
 rm -rf %{buildroot}
@@ -123,13 +123,10 @@ standards, and an interface to common STONITH devices.
 %dir %attr (0700, root, root)		%{_var}/lib/heartbeat/cores/root
 %dir %attr (0700, nobody, %{nogroup})	%{_var}/lib/heartbeat/cores/nobody
 %dir %attr (0700, %{uname}, %{gname})	%{_var}/lib/heartbeat/cores/%{uname}
-%if 0%{?fedora} 
-%doc %{_docdir}/%{name}/stonith
-%else
-%doc %{_docdir}/stonith
-%endif
-%doc %{_mandir}/man8/*
-%doc %{_mandir}/man1/*
+%{_mandir}/man1/*
+%{_mandir}/man8/*
+%doc doc/stonith/README*
+%doc logd/logd.cf
 %doc AUTHORS
 %doc COPYING
 
