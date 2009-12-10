@@ -1314,7 +1314,8 @@ doc/Makefile							\
    doc/ha_logd.xml						\
    doc/ha_logger.xml						\
    doc/stonith.xml						\
-   doc/meatclient.xml
+   doc/meatclient.xml						\
+   doc/stonith/Makefile
 )
 
 dnl Now process the entire list of files added by previous 
