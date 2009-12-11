@@ -20,7 +20,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 testcasesdir		= 	$(datadir)/heartbeat/lrmtest/testcases
 testcases_SCRIPTS	=	common.filter ra-list.sh rscmgmt.log_filter xmllint.sh
-testcases_DATA	=	BSC metadata metadata.exp rscexec \
+testcases_DATA	=	BSC basicset metadata metadata.exp rscexec \
 			rscexec.exp rscmgmt rscmgmt.exp
 #			shouldn't need this next line...
 EXTRA_DIST =		$(testcases_SCRIPTS) $(testcases_DATA)
