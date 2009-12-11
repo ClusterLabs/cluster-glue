@@ -5,6 +5,9 @@
 %define uname hacluster
 %define nogroup nobody
 
+# Directory where we install documentation
+%global glue_docdir %{_defaultdocdir}/%{name}-%{version}
+
 # When downloading directly from Mercurial, it will automatically add this prefix
 # Invoking 'hg archive' wont but you can add one with: hg archive -t tgz -p "Reusable-Cluster-Components-" -r $upstreamversion $upstreamversion.tar.gz
 %global upstreamprefix Reusable-Cluster-Components-
@@ -59,12 +62,25 @@ BuildRequires: libuuid-devel
 
 ./autogen.sh
 
+# RHEL <= 5 does not support ./configure --docdir=,
+# hence, use this ugly hack
+%if 0%{?centos} <= 5 || 0%{?rhel} <= 5
+export docdir=%{glue_docdir}
 %configure \
     --enable-fatal-warnings=yes \
     --with-daemon-group=%{gname} \
     --with-daemon-user=%{uname} \
     --localstatedir=%{_var} \
     --libdir=%{_libdir}
+%else
+%configure \
+    --enable-fatal-warnings=yes \
+    --with-daemon-group=%{gname} \
+    --with-daemon-user=%{uname} \
+    --localstatedir=%{_var} \
+    --libdir=%{_libdir} \
+    --docdir=%{glue_docdir}
+%endif
 
 %build
 make %{?_smp_mflags}
