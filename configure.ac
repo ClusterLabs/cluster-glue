@@ -389,6 +389,8 @@ AC_DEFINE_UNQUOTED(HA_PLUGIN_DIR,"$libdir/heartbeat/plugins", Where to find plug
 AC_DEFINE_UNQUOTED(LRM_PLUGIN_DIR,"$libdir/heartbeat/plugins/RAExec", Where to find LRM plugins)
 
 AC_DEFINE_UNQUOTED(LSB_RA_DIR,"$INITDIR", Location for LSB RAs)
+LSB_RA_DIR=$INITDIR
+AC_SUBST(LSB_RA_DIR)
 
 AC_DEFINE_UNQUOTED(HA_SYSCONFDIR, "$sysconfdir", Location of system configuration files)
 
