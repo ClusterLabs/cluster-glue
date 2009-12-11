@@ -40,6 +40,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <time.h>
 #include <sched.h>
 #include <sys/types.h>
 #include <sys/stat.h>
