@@ -24,6 +24,9 @@
 %define gname haclient
 %define uname hacluster
 
+# Directory where we install documentation
+%global glue_docdir %{_defaultdocdir}/%{name}
+
 Name:           cluster-glue
 Summary:        Reusable cluster components
 Version:        1.0.2
@@ -87,11 +90,22 @@ CFLAGS="${CFLAGS} ${RPM_OPT_FLAGS}"
 export CFLAGS
 
 ./autogen.sh
+# SLES <= 10 does not support ./configure --docdir=,
+# hence, use this ugly hack
+%if 0%{?suse_version} < 1020
+export docdir=%{glue_docdir}
+%configure \
+    --enable-fatal-warnings=yes \
+    --with-daemon-group=%{gname} \
+    --with-daemon-user=%{uname}
+%else
 %configure \
     --enable-fatal-warnings=yes \
     --with-daemon-group=%{gname} \
     --with-daemon-user=%{uname} \
-    --docdir=%{_docdir}/%{name}
+    --docdir=%{glue_docdir}
+%endif
+
 make %{?_smp_mflags}
 ###########################################################
 
