@@ -166,7 +166,7 @@ closefiles(void)
 
 	/* close all descriptors except stdin/out/err and channels to logd */
 	for (fd = getdtablesize(); fd > STDERR_FILENO; fd--) {
-		if (!cl_log_is_logd_fd(fd))
+		/*if (!cl_log_is_logd_fd(fd))*/
 			close(fd);
 	}
 }
