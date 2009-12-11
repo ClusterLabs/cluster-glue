@@ -861,9 +861,9 @@ init_stop(const char *pid_file)
 	return rc;
 }
 
-static const char usagemsg[] = "[-srkhV]\n\ts: status\n\tr: restart"
+static const char usagemsg[] = "[-srkhv]\n\ts: status\n\tr: restart"
 	"\n\tk: kill\n\tm: register to apphbd\n\ti: the interval of apphb\n\t"
-	"h: help\n\tV: debug\n";
+	"h: help\n\tv: debug\n";
 
 void
 usage(const char* cmd, int exit_status)
