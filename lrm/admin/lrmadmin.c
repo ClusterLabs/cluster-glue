@@ -47,12 +47,12 @@
 #include <clplumbing/GSource.h>
 #include <clplumbing/Gmain_timeout.h>
 
-static const char *optstring = "A:D:X:dEF:dg:p:M:O:P:c:S:LI:CT:n:h";
+static const char *optstring = "A:D:X:dE:F:dg:p:M:O:P:c:S:LI:CT:n:h";
 
 #ifdef HAVE_GETOPT_H
 static struct option long_options[] = {
 	{"daemon",		0, NULL, 'd'},
-	{"executera",		0, NULL, 'E'},
+	{"executera",		1, NULL, 'E'},
 	{"flush",		1, NULL, 'F'},
 	{"state",		1, NULL, 'S'},
 	{"listall",		0, NULL, 'L'},
@@ -164,9 +164,10 @@ static const char *simple_help_screen =
 				}
 
 /* the begin of the internal used function list */
-static int resource_operation(ll_lrm_t * lrmd, int argc, int optind, 
-			      char * argv[]);
-static int add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
+static int resource_operation(ll_lrm_t * lrmd, char *rsc_id,
+			      int argc, int optind, char * argv[]);
+static int add_resource(ll_lrm_t * lrmd, char *rsc_id,
+					int argc, int optind, char * argv[]);
 static int fail_resource(ll_lrm_t * lrmd, char *rsc_id, int optc, char *opts[]);
 static int get_param(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
 static int set_param(ll_lrm_t * lrmd, int argc, int optind, char * argv[]);
@@ -247,14 +248,13 @@ int main(int argc, char **argv)
 			case 'A':
 				OPTION_OBSCURE_CHECK 
 				lrmadmin_cmd = ADD_RSC;
+				strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				break;
 
 			case 'D':
 				OPTION_OBSCURE_CHECK 
 				lrmadmin_cmd = DEL_RSC;
-				if (optarg) {
-					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
-				}
+				strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				break;
 
 			case 'X':
@@ -287,14 +287,13 @@ int main(int argc, char **argv)
 			case 'F':
 				OPTION_OBSCURE_CHECK 
 				lrmadmin_cmd = FLUSH;
-				if (optarg) {
-					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
-				}
+				strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				break;
 
 			case 'E':
 				OPTION_OBSCURE_CHECK 
 				lrmadmin_cmd = EXECUTE_RA;
+				strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				break;
 
 			case 'M':
@@ -310,9 +309,7 @@ int main(int argc, char **argv)
 			case 'S':
 				OPTION_OBSCURE_CHECK 
 				lrmadmin_cmd = RSC_STATE;
-				if (optarg) {
-					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
-				}
+				strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				break;
 
 			case 'L':
@@ -322,10 +319,8 @@ int main(int argc, char **argv)
 
 			case 'I':
 				OPTION_OBSCURE_CHECK 
-				if (optarg) {
-					strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
-				}
 				lrmadmin_cmd = INF_RSC;
+				strncpy(rscid_arg_tmp, optarg, RID_LEN-1);
 				break;
 
 			case 'p':
@@ -393,7 +388,7 @@ int main(int argc, char **argv)
 	
 	switch (lrmadmin_cmd) {
 		case EXECUTE_RA:
-			call_id = resource_operation(lrmd, argc, optind, argv);
+			call_id = resource_operation(lrmd, rscid_arg_tmp, argc, optind, argv);
 			if (call_id < 0) {
 				if ( call_id == -2 ) {
 					cl_log(LOG_ERR, "Failed to operate "
@@ -446,7 +441,7 @@ int main(int argc, char **argv)
 			break;
 
 		case ADD_RSC:
-			if (add_resource(lrmd, argc, optind, argv) == 0) {
+			if (add_resource(lrmd, rscid_arg_tmp, argc, optind, argv) == 0) {
 				printf("Succeeded in adding this resource.\n");
 			} else {
 				printf("Failed to add this resource.\n");
@@ -662,9 +657,8 @@ lrm_op_done_callback(lrm_op_t* op)
 }
 
 static int 
-resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
+resource_operation(ll_lrm_t * lrmd, char *rsc_id, int argc, int optind, char * argv[])
 {
-	char rsc_id[RID_LEN];
 	GHashTable * params_ht = NULL;
 	lrm_op_t op = lrm_zero_op;
 	lrm_rsc_t * lrm_rsc;
@@ -675,15 +669,13 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 		return -2;
 	}
 
-	rsc_id[RID_LEN-1] = '\0';
-	strncpy(rsc_id, argv[optind], RID_LEN-1);
 	lrm_rsc = lrmd->lrm_ops->get_rsc(lrmd, rsc_id);	
 	if (!lrm_rsc) {
 		return -1;
 	}
 
-	op.op_type = argv[optind+1];
-	op.timeout = atoi(argv[optind+2]);
+	op.op_type = argv[optind];
+	op.timeout = atoi(argv[optind+1]);
 
  	/* When op.timeout!=0, plus additional 1s. Or lrmadmin may time out before
 	   the normal operation result returned from lrmd. This may be redudant, 
@@ -691,22 +683,22 @@ resource_operation(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 	if (0 < op.timeout ) {
 		TIMEOUT = op.timeout + 1000;
 	}
-	op.interval = atoi(argv[optind+3]);
+	op.interval = atoi(argv[optind+2]);
 	op.user_data = NULL;
 	op.user_data_len = 0;
-	if (0 == strcmp(argv[optind+4], "EVERYTIME")) {
+	if (0 == strcmp(argv[optind+3], "EVERYTIME")) {
 		op.target_rc = EVERYTIME;
 	}
 	else
-	if (0 == strcmp(argv[optind+4], "CHANGED")) {
+	if (0 == strcmp(argv[optind+3], "CHANGED")) {
 		op.target_rc = CHANGED;
 	}
 	else {
-		op.target_rc = atoi(argv[optind+4]);
+		op.target_rc = atoi(argv[optind+3]);
 	}
 
 	if ((argc - optind) > 3) {
-		if (0 > transfer_cmd_params(argc, optind+5, argv, 
+		if (0 > transfer_cmd_params(argc, optind+4, argv, 
 				lrm_rsc->class, &params_ht) ) {
 			return -2;
 		}
@@ -771,30 +763,26 @@ ra_provider(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
 }
 
 static int 
-add_resource(ll_lrm_t * lrmd, int argc, int optind, char * argv[])
+add_resource(ll_lrm_t * lrmd, char *rsc_id, int argc, int optind, char * argv[])
 {
-	char rsc_id[RID_LEN];
-	const char * class = argv[optind+1];
-	const char * type = argv[optind+2];
-	const char * provider = argv[optind+3];
+	const char * class = argv[optind];
+	const char * type = argv[optind+1];
+	const char * provider = argv[optind+2];
 	GHashTable * params_ht = NULL;
 	int tmp_ret;
 
-	if ((argc - optind) < 4) {
+	if ((argc - optind) < 3) {
 		cl_log(LOG_ERR,"Not enough parameters.");
 		return -2;
 	}
 	
-	rsc_id[RID_LEN-1]='\0';
-	strncpy(rsc_id, argv[optind], RID_LEN-1);
-
 	if (0 == strncmp(provider, "NULL", strlen("NULL"))) {
 		provider=NULL;
 	}
 	
 	/* delete Hashtable */
-	if ((argc - optind) > 4) {
-		if ( 0 > transfer_cmd_params(argc, optind+4, argv, class,
+	if ((argc - optind) > 3) {
+		if ( 0 > transfer_cmd_params(argc, optind+3, argv, class,
 					&params_ht) ) {
 			return -1;
 		}
