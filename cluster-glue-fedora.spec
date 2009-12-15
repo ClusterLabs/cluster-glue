@@ -109,10 +109,10 @@ standards, and an interface to common STONITH devices.
 %defattr(-,root,root)
 %dir %{_datadir}/heartbeat
 %{_sysconfdir}/init.d/logd
-%{_datadir}/heartbeat/ha_cf_support.sh
-%{_datadir}/heartbeat/openais_conf_support.sh
-%{_datadir}/heartbeat/utillib.sh
-%{_datadir}/heartbeat/combine-logs.pl
+%{_datadir}/%{name}/ha_cf_support.sh
+%{_datadir}/%{name}/openais_conf_support.sh
+%{_datadir}/%{name}/utillib.sh
+%{_datadir}/%{name}/combine-logs.pl
 
 %{_sbindir}/ha_logger
 %{_sbindir}/hb_report
@@ -194,7 +194,7 @@ such as Pacemaker.
 %dir %{_libdir}/heartbeat/plugins
 %dir %{_libdir}/heartbeat/plugins/test
 %dir %{_libdir}/heartbeat
-%dir %{_datadir}/heartbeat
+%dir %{_datadir}/%{name}
 %{_libdir}/lib*.so
 %{_libdir}/heartbeat/ipctest
 %{_libdir}/heartbeat/ipctransientclient
@@ -206,7 +206,7 @@ such as Pacemaker.
 %{_includedir}/heartbeat
 %{_includedir}/stonith
 %{_includedir}/pils
-%{_datadir}/heartbeat/lrmtest
+%{_datadir}/%{name}/lrmtest
 %{_libdir}/heartbeat/plugins/test/test.so
 %doc AUTHORS
 %doc COPYING
