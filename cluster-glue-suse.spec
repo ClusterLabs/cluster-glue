@@ -96,11 +96,13 @@ export CFLAGS
 export docdir=%{glue_docdir}
 %configure \
     --enable-fatal-warnings=yes \
+    --with-package-name=%{name} \
     --with-daemon-group=%{gname} \
     --with-daemon-user=%{uname}
 %else
 %configure \
     --enable-fatal-warnings=yes \
+    --with-package-name=%{name} \
     --with-daemon-group=%{gname} \
     --with-daemon-user=%{uname} \
     --docdir=%{glue_docdir}
@@ -240,7 +242,7 @@ fi
 %{_includedir}/stonith
 %{_includedir}/pils
 %{_datadir}/%{name}/lrmtest
-%{_libdir}/%{name}/plugins/test/test.so
+%{_libdir}/heartbeat/plugins/test/test.so
 %doc AUTHORS
 %doc COPYING
 %doc COPYING.LIB
