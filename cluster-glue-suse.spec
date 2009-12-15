@@ -179,11 +179,11 @@ fi
 %dir %{_libdir}/stonith/plugins
 %dir %{_libdir}/stonith/plugins/stonith2
 
-%dir %{_datadir}/heartbeat
-%{_datadir}/heartbeat/ha_cf_support.sh
-%{_datadir}/heartbeat/openais_conf_support.sh
-%{_datadir}/heartbeat/utillib.sh
-%{_datadir}/heartbeat/combine-logs.pl
+%dir %{_datadir}/%{name}
+%{_datadir}/%{name}/ha_cf_support.sh
+%{_datadir}/%{name}/openais_conf_support.sh
+%{_datadir}/%{name}/utillib.sh
+%{_datadir}/%{name}/combine-logs.pl
 
 %{_sbindir}/ha_logger
 %{_sbindir}/hb_report
@@ -226,7 +226,7 @@ fi
 %dir %{_libdir}/heartbeat
 %dir %{_libdir}/heartbeat/plugins
 %dir %{_libdir}/heartbeat/plugins/test
-%dir %{_datadir}/heartbeat
+%dir %{_datadir}/%{name}
 
 %{_libdir}/lib*.so
 %{_libdir}/heartbeat/ipctest
@@ -239,8 +239,8 @@ fi
 %{_includedir}/heartbeat
 %{_includedir}/stonith
 %{_includedir}/pils
-%{_datadir}/heartbeat/lrmtest
-%{_libdir}/heartbeat/plugins/test/test.so
+%{_datadir}/%{name}/lrmtest
+%{_libdir}/%{name}/plugins/test/test.so
 %doc AUTHORS
 %doc COPYING
 %doc COPYING.LIB
