@@ -18,7 +18,7 @@
 #
 MAINTAINERCLEANFILES = Makefile.in
 
-testcasesdir		= 	$(datadir)/heartbeat/lrmtest/testcases
+testcasesdir		= 	$(datadir)/$(PACKAGE_NAME)/lrmtest/testcases
 testcases_SCRIPTS	=	common.filter ra-list.sh rscmgmt.log_filter xmllint.sh
 testcases_DATA	=	BSC basicset metadata metadata.exp rscexec \
 			rscexec.exp rscmgmt rscmgmt.exp
