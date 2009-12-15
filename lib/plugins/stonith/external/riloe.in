@@ -34,6 +34,7 @@ import socket
 import xml.dom.minidom
 from httplib import HTTPSConnection
 import time
+import re
 
 def my_err(msg):
     print "ERROR: %s" % msg
@@ -338,6 +339,9 @@ def send_request(req,proc_f):
     if not result:
         fatal("no response from %s"%rihost)
     for reply in result:
+        # work around the iLO bug, i.e. element RIBCL closed twice
+        if re.search("</RIBCL", reply) and re.search("<RIBCL.*/>", reply):
+            reply = re.sub("<(RIBCL.*)/>", r"<\1>", reply)
         try:
             doc = xml.dom.minidom.parseString(reply)
         except xml.parsers.expat.ExpatError,msg:
