@@ -1293,7 +1293,6 @@ lib/Makefile							\
          lib/plugins/stonith/external/Makefile			\
             lib/plugins/stonith/external/drac5			\
             lib/plugins/stonith/external/kdumpcheck		\
-            lib/plugins/stonith/external/riloe			\
             lib/plugins/stonith/external/ssh			\
             lib/plugins/stonith/external/xen0-ha		\
 lrm/Makefile					        	\
