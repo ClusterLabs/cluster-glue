@@ -706,7 +706,22 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	char			cmd[FILENAME_MAX+64];
 	struct stat		buf;
 	int			slen;
+	char *path, *new_path, *logtag;
+	int new_path_len, logtag_len;
 	gboolean		nodata;
+
+	/* external plugins need path to ha_log.sh */
+	path = getenv("PATH");
+	new_path_len = strlen(path)+strlen(GLUE_SHARED_DIR)+2;
+	new_path = (char *)g_malloc(new_path_len);
+	snprintf(new_path, new_path_len, "%s:%s", path, GLUE_SHARED_DIR);
+	setenv("PATH", new_path, 1);
+	g_free(new_path);
+	/* set the logtag appropriately */
+	logtag_len = strlen(PIL_PLUGIN_S)+strlen(sd->subplugin)+2;
+	logtag = (char *)g_malloc(logtag_len);
+	snprintf(logtag, logtag_len, "%s/%s", PIL_PLUGIN_S, sd->subplugin);
+	setenv("HA_LOGTAG", logtag, 1);
 
 	rc = snprintf(cmd, FILENAME_MAX, "%s/%s", 
 		STONITH_EXT_PLUGINDIR, sd->subplugin);

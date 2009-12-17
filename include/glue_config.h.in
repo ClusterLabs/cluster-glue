@@ -12,6 +12,9 @@
 /* Where to keep state files and sockets */
 #undef GLUE_STATE_DIR
 
+/* Location of shared data */
+#undef GLUE_SHARED_DIR
+
 /* User to run daemons as */
 #undef HA_CCMUSER
 

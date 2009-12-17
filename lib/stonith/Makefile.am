@@ -55,4 +55,7 @@ libstonith_la_LIBADD	= $(top_builddir)/lib/pils/libpils.la	\
 			$(top_builddir)/replace/libreplace.la	\
 			$(GLIBLIB)
 
-EXTRA_DIST              = sbd.h
+helperdir		= 	$(datadir)/$(PACKAGE_NAME)
+helper_SCRIPTS		= ha_log.sh
+
+EXTRA_DIST              = $(helper_SCRIPTS) sbd.h
