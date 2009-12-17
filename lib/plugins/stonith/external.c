@@ -126,7 +126,6 @@ external_status(StonithPlugin  *s)
 	struct pluginDevice *	sd;
 	const char *		op = "status";
 	int			rc;
-	char *			output = NULL;
 	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
@@ -140,22 +139,16 @@ external_status(StonithPlugin  *s)
 		return(S_OOPS);
 	}
 	
-	rc = external_run_cmd(sd, op, &output);
+	rc = external_run_cmd(sd, op, NULL);
 	if (rc != 0) {
 		LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
 			__FUNCTION__, sd->subplugin, op, rc);
-		if (output) {
-			LOG(PIL_CRIT, "plugin output: %s", output);
-		}
 	}
 	else {
 		if (Debug) {
 			LOG(PIL_DEBUG, "%s: running '%s %s' returned %d",
 				__FUNCTION__, sd->subplugin, op, rc);
 		}
-	}
-	if (output) {
-		FREE(output);
 	}
 	return rc;
 }
@@ -266,7 +259,6 @@ external_reset_req(StonithPlugin * s, int request, const char * host)
 	int			rc;
 	char *			args1and2;
 	int			argslen;
-	char *			output = NULL;
 	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
@@ -316,25 +308,17 @@ external_reset_req(StonithPlugin * s, int request, const char * host)
 		return S_OOPS;
 	}
 	
-	rc = external_run_cmd(sd, args1and2, &output);
+	rc = external_run_cmd(sd, args1and2, NULL);
 	FREE(args1and2);
 	if (rc != 0) {
 		LOG(PIL_CRIT, "%s: '%s %s' for host %s failed with rc %d",
 			__FUNCTION__, sd->subplugin, op, host, rc);
-		if (output) {
-			LOG(PIL_CRIT, "plugin output: %s", output);
-			FREE(output);
-		}
 		return S_RESETFAIL;
 	}
 	else {
 		if (Debug) {
 			LOG(PIL_DEBUG, "%s: running '%s %s' returned %d",
 				__FUNCTION__, sd->subplugin, op, rc);
-		}
-		if (output) {
-			LOG(PIL_INFO, "plugin output: %s", output);
-			FREE(output);
 		}
 		return S_OK;
 	}
@@ -566,7 +550,7 @@ static const char *
 external_getinfo(StonithPlugin * s, int reqtype)
 {
 	struct pluginDevice* sd;
-	char *		ret = NULL;
+	char *		output = NULL;
 	const char *	op;
 	int rc;
   
@@ -607,13 +591,13 @@ external_getinfo(StonithPlugin * s, int reqtype)
 			return NULL;
 	}
 
-	rc = external_run_cmd(sd, op, &ret);
+	rc = external_run_cmd(sd, op, &output);
 	if (rc != 0) {
 		LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
 			__FUNCTION__, sd->subplugin, op, rc);
-		if (ret) {
-			LOG(PIL_CRIT, "plugin output: %s", ret);
-			FREE(ret);
+		if (output) {
+			LOG(PIL_CRIT, "plugin output: %s", output);
+			FREE(output);
 		}
 	}
 	else {
@@ -624,8 +608,8 @@ external_getinfo(StonithPlugin * s, int reqtype)
 		if (sd->outputbuf != NULL) {
 			FREE(sd->outputbuf);
 		}
-		sd->outputbuf =  ret;
-		return(ret);
+		sd->outputbuf =  output;
+		return(output);
 	}
 	return(NULL);
 }
@@ -722,6 +706,7 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	char			cmd[FILENAME_MAX+64];
 	struct stat		buf;
 	int			slen;
+	gboolean		nodata;
 
 	rc = snprintf(cmd, FILENAME_MAX, "%s/%s", 
 		STONITH_EXT_PLUGINDIR, sd->subplugin);
@@ -769,25 +754,36 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		goto err;
 	}
 
-	data = NULL;
-	slen=0;
-	data = MALLOC(1);
-	while(data && !feof(file)) {
-		data[slen]=EOS;
-		read_len = fread(buff, 1, BUFF_LEN, file);
-		if (read_len > 0) {
-			data=REALLOC(data, slen+read_len+1);
-			if (data == NULL) {
-				break;
+	if (output) {
+		slen=0;
+		data = MALLOC(1);
+		data[slen] = EOS;
+	}
+	while (!feof(file)) {
+		nodata = TRUE;
+		if (output) {
+			read_len = fread(buff, 1, BUFF_LEN, file);
+			if (read_len > 0) {
+				data = REALLOC(data, slen+read_len+1);
+				if (data == NULL) {
+					break;
+				}
+				memcpy(data + slen, buff, read_len);
+				slen += read_len;
+				data[slen] = EOS;
+				nodata = FALSE;
 			}
-			memcpy(data+slen, buff, read_len);
-			slen += read_len;
-			data[slen] = EOS;
-		}else{
+		} else {
+			if (fgets(buff, BUFF_LEN, file)) {	
+				LOG(PIL_INFO, "%s: '%s' output: %s", __FUNCTION__, cmd, buff);
+				nodata = FALSE;
+			}
+		}
+		if (nodata) {
 			sleep(1);
 		}
 	}
-	if (!data) {
+	if (output && !data) {
 		LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
 		goto err;
 	}
@@ -797,14 +793,12 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	if (rc != 0) {
 		LOG(PIL_INFO, "%s: Calling '%s' returned %d", __FUNCTION__, cmd, rc);
 	}
-	if (Debug && data) {
+	if (Debug && output && data) {
 		LOG(PIL_DEBUG, "%s: '%s' output: %s", __FUNCTION__, cmd, data);
 	}
 
 	if (output) {
 		*output = data;
-	} else {
-		FREE(data);
 	}
 	
 	if (sd->cmd_opts) {
