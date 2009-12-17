@@ -356,6 +356,10 @@ GLUE_STATE_DIR=${localstatedir}/run
 AC_DEFINE_UNQUOTED(GLUE_STATE_DIR,"$GLUE_STATE_DIR", Where to keep state files and sockets)
 AC_SUBST(GLUE_STATE_DIR)
 
+GLUE_SHARED_DIR=${datadir}/"$PACKAGE_NAME"
+AC_DEFINE_UNQUOTED(GLUE_SHARED_DIR,"$GLUE_SHARED_DIR", Location for scripts)
+AC_SUBST(GLUE_SHARED_DIR)
+
 AC_DEFINE_UNQUOTED(HA_VARRUNDIR,"$GLUE_STATE_DIR", Where Heartbeat keeps state files and sockets - old name)
 AC_SUBST(HA_VARRUNDIR)
 
