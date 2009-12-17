@@ -29,6 +29,7 @@
 #include <stonith/stonith.h>
 #include <pils/plugin.h>
 #include <glib.h>
+#include <libxml/entities.h>
 
 #define	OPTIONS	"c:F:p:t:T:snSlLmvhd"
 #define	EQUAL	'='
@@ -38,8 +39,31 @@ extern int	optind, opterr, optopt;
 
 static int	debug = 0;
 
+static const char META_TEMPLATE[] =
+"<?xml version=\"1.0\"?>\n"
+"<!DOCTYPE resource-agent SYSTEM \"ra-api-1.dtd\">\n"
+"<resource-agent name=\"%s\">\n"
+"<version>1.0</version>\n"
+"<longdesc lang=\"en\">\n"
+"%s\n"
+"</longdesc>\n"	
+"<shortdesc lang=\"en\">%s</shortdesc>\n"
+"%s\n"
+"<actions>\n"
+"<action name=\"start\"   timeout=\"15\" />\n"
+"<action name=\"stop\"    timeout=\"15\" />\n"
+"<action name=\"status\"  timeout=\"15\" />\n"
+"<action name=\"monitor\" timeout=\"15\" interval=\"15\" start-delay=\"15\" />\n"
+"<action name=\"meta-data\"  timeout=\"15\" />\n"
+"</actions>\n"
+"<special tag=\"heartbeat\">\n"
+"<version>2.0</version>\n"
+"</special>\n"
+"</resource-agent>\n";
+
 void usage(const char * cmd, int exit_status, const char * devtype);
 void confhelp(const char * cmd, FILE* stream, const char * devtype);
+void print_stonith_meta(Stonith * stonith_obj, const char *rsc_type);
 
 /*
  * Note that we don't use the cl_log logging code because the STONITH
@@ -201,6 +225,43 @@ confhelp(const char * cmd, FILE* stream, const char * devtype)
 		fprintf(stderr, "Invalid device type: '%s'\n", devtype);
 	}
 	
+}
+
+void
+print_stonith_meta(Stonith * stonith_obj, const char *rsc_type)
+{
+	const char * meta_param = NULL;
+	const char * meta_longdesc = NULL;
+	const char * meta_shortdesc = NULL;
+	char *xml_meta_longdesc = NULL;
+	char *xml_meta_shortdesc = NULL;
+	static const char * no_parameter_info = "<!-- no value -->";
+
+	meta_longdesc = stonith_get_info(stonith_obj, ST_DEVICEDESCR);
+	if (meta_longdesc == NULL) {
+	    fprintf(stderr, "stonithRA plugin: no long description");
+	    meta_longdesc = no_parameter_info;
+	}
+	xml_meta_longdesc = (char *)xmlEncodeEntitiesReentrant(NULL, (const unsigned char *)meta_longdesc);
+
+	meta_shortdesc = stonith_get_info(stonith_obj, ST_DEVICENAME);
+	if (meta_shortdesc == NULL) {
+	    fprintf(stderr, "stonithRA plugin: no short description");
+	    meta_shortdesc = no_parameter_info;
+	}
+	xml_meta_shortdesc = (char *)xmlEncodeEntitiesReentrant(NULL, (const unsigned char *)meta_shortdesc);
+	
+	meta_param = stonith_get_info(stonith_obj, ST_CONF_XML);
+	if (meta_param == NULL) {
+	    fprintf(stderr, "stonithRA plugin: no list of parameters");
+	    meta_param = no_parameter_info;
+	}
+	
+	printf(META_TEMPLATE,
+		 rsc_type, xml_meta_longdesc, xml_meta_shortdesc, meta_param);
+
+	xmlFree(xml_meta_longdesc);
+	xmlFree(xml_meta_shortdesc);
 }
 
 #define	MAXNVARG	50
@@ -442,12 +503,7 @@ main(int argc, char** argv)
 	}
 
 	if (metadata) {
-		const char*	meta;
-		meta = stonith_get_info(s, ST_CONF_XML);
-
-		if (meta != NULL) {
-			printf("%s\n", meta);
-		}
+		print_stonith_meta(s,SwitchType);
 		stonith_delete(s); 
 		s=NULL;
 		exit(0);
