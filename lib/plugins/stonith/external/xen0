@@ -38,7 +38,7 @@ CheckIfDead() {
 CheckHostList() {
     if [ "x" = "x$hostlist" ]
     then
-        echo "hostlist isn't set"
+        ha_log err "hostlist isn't set"
         exit 1
     fi
 }
@@ -46,7 +46,7 @@ CheckHostList() {
 CheckDom0() {
     if [ "x" = "x$dom0" ]
     then
-        echo "dom0 isn't set"
+        ha_log err "dom0 isn't set"
         exit 1
     fi
 }
@@ -66,7 +66,7 @@ $h
 
         if [ "x" = "x$node" ]
         then
-            echo "Syntax error in host list"
+            ha_log err "Syntax error in host list"
             exit 1
         fi
         
@@ -85,7 +85,7 @@ $h
                  kill_node=`$SSH_COMMAND $dom0 "grep ^[[:space:]]*name $cfg" | cut -f 2 -d '=' |  sed -e 's,",,g'`
                  if [ "x" = "x$kill_node" ]
                  then
-                     echo "Couldn't find a node name to stop"
+                     ha_log err "Couldn't find a node name to stop"
                      exit 1
                  fi
 

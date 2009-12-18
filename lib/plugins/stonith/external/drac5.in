@@ -6,29 +6,18 @@
 # License:      GNU General Public License (GPL)
 #
 
-#DEBUGF=/var/log/ha-drac.log
-#touch $DEBUGF
-#chmod 600 $DEBUGF
-
-#exec 2>>$DEBUGF
-
-#function debug() {
-#	cat >&2
-#}
-
-#echo "started with: $@" | debug
-
-trap 'if [ -n "$outf" ]; then cat "$outf" >&2; rm -f "$outf"; fi' 0
-outf=`mktemp` || exit 1
+trap 'if [ -n "$outf" ]; then ha_log.sh err "`cat $outf`"; rm -f "$outf"; fi' 0
+outf=`mktemp` || {
+	ha_log.sh err "mktemp failed"
+	exit 1
+}
 
 sshlogin() {
 	if [ x = "x$ipaddr" -o x = "x$userid" ]
 	then
-		echo "ipaddr or userid missing; check configuration"
+		ha_log.sh err "ipaddr or userid missing; check configuration"
 		return 1
 	fi
-
-	test -f /etc/ha.d/drac.debug && set -x
 	@SSH@ -q -x -n $userid@$ipaddr racadm serveraction "$1" >$outf 2>&1
 }
 

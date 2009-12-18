@@ -56,12 +56,12 @@ GetOutletNumber() {
 	if [ -f "$outlet_config" ]; then
     	    local outlet_num=`grep $nodename $outlet_config | tr -d ' ' | cut -f2 -d'='`
 	    if [ -z "$outlet_num" ]; then
-		echo "ERROR: Outlet number not found for node $nodename. Check configuration file $outlet_config" >&2
+		ha_log.sh err "Outlet number not found for node $nodename. Check configuration file $outlet_config"
 		return 0
 	    fi
 	    return $outlet_num
 	else
-	    echo "ERROR: File $outlet_config not found." >&2
+	    ha_log.sh err "File $outlet_config not found."
 	    return 0
 	fi
     else
@@ -81,7 +81,7 @@ GetOutletNumber() {
 	    return $outlet_num
 	done
 	
-	echo "ERROR: Outlet number not found for node $nodename. Result: $snmp_result" >&2
+	ha_log.sh err "Outlet number not found for node $nodename. Result: $snmp_result"
 	return 0
     fi
 }
@@ -99,7 +99,7 @@ SendCommand() {
         local check_result=`echo "$set_result" | grep "Timeout"`	    
 
         if [ ! -z "$check_result" ]; then
-    	    echo "ERROR: Write SNMP value $oid.$outlet=$command. Result: $set_result" >&2
+    	    ha_log.sh err "Write SNMP value $oid.$outlet=$command. Result: $set_result"
 	fi
 	    
 	return 0
@@ -119,7 +119,7 @@ gethosts)
 	    snmp_check=`echo "$snmp_result" | grep "Timeout"`
 
 	    if [ ! -z "$snmp_check" ]; then
-		echo "ERROR: Cannot read list of nodes from device. Result: $snmp_result" >&2
+		ha_log.sh err "Cannot read list of nodes from device. Result: $snmp_result"
 		exit 1
 	    else
 		hostlist=`echo "$snmp_result" | cut -f2 -d'"' | tr ' ' '_' | tr '\012' ' '`

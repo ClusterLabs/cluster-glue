@@ -31,17 +31,20 @@
 import sys
 import os
 import socket
+import subprocess
 import xml.dom.minidom
 from httplib import HTTPSConnection
 import time
 import re
 
+def log_msg(level,msg):
+    subprocess.call("ha_log.sh %s '%s'" % (level,msg), shell=True)
 def my_err(msg):
-    print "ERROR: %s" % msg
+    log_msg("err", msg)
 def my_warn(msg):
-    print "WARNING: %s" % msg
+    log_msg("warn", msg)
 def my_debug(msg):
-    print "DEBUG: %s" % msg
+    log_msg("debug", msg)
 def fatal(msg):
     my_err(msg)
     sys.exit(1)
@@ -51,7 +54,7 @@ argv = sys.argv
 try:
     cmd = argv[1]
 except IndexError:
-    print "Not enough arguments"
+    my_err("Not enough arguments")
     sys.exit(1)
 
 legacy_RI_HOST     = os.environ.get('RI_HOST',     '')
@@ -324,7 +327,6 @@ def send_request(req,proc_f):
     while True:
         try:
             reply = c.sock.recv(1024)
-            #print "RECV:",reply
             if not reply:
                 break
             result.append(reply)

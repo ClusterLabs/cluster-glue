@@ -63,7 +63,7 @@ reset)	SetTargetRole stopped || exit 1
 	;;
 status) exit 0
 	;;
-*)	logger "$0: Called with unknown command: $CMD"
+*)	ha_log.sh err "Called with unknown command: $CMD"
    	exit 1
 	;;
 esac

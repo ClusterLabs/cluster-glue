@@ -27,8 +27,6 @@
 # Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
 #
 
-
-
 RESET="power reset"
 POWEROFF="power off"
 POWERON="power on"
@@ -41,11 +39,11 @@ have_ipmi() {
 
 do_ipmi() {
 	have_ipmi || {
-		echo "ipmitool not installed"
+		ha_log.sh err "ipmitool not installed"
 		return 1
 	}
 	if [ -z "${ipaddr}" -o -z "${userid}" -o -z "${passwd}" ]; then
-		echo "ipaddr, userid or password missing; check configuration"
+		ha_log.sh err "ipaddr, userid or password missing; check configuration"
 		return 1
 	fi
 
@@ -54,10 +52,13 @@ do_ipmi() {
 		interface="lan"
 	fi
 
-	${IPMITOOL} -I ${interface} -H ${ipaddr} -U "${userid}" -P "${passwd}" ${1} || {
-		echo "error executing ipmi command"
+	if outp=`${IPMITOOL} -I ${interface} -H ${ipaddr} -U "${userid}" -P "${passwd}" ${1} 2>&1`; then
+		ha_log.sh debug "ipmitool output: `echo $outp`"
+		return 0
+	else
+		ha_log.sh err "error executing ipmitool: `echo $outp`"
 		return 1
-	}
+	fi
 }
 
 # Rewrite the hostname to accept "," as a delimeter for hostnames too.
