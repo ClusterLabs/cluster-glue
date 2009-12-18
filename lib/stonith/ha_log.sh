@@ -56,23 +56,32 @@ ha_log() {
 	loglevel=$1
 	shift
 	prn_level=`level_pres $loglevel`
+	msg="$prn_level: $@"
 
 	# add parent pid to the logtag
 	if [ "$HA_LOGTAG" ]; then
 		HA_LOGTAG="$HA_LOGTAG[$PPID]"
 	fi
 
-	# should remove this probably
-	if [ "x$HA_debug" = "x0" -a "x$loglevel" = xdebug ] ; then
+	# if we're connected to a tty, then output to stderr
+	if tty >/dev/null; then
+		if [ "x$HA_debug" = "x0" -a "x$loglevel" = xdebug ] ; then
+			return 0
+		fi
+		if [ "$HA_LOGTAG" ]; then
+			echo "$HA_LOGTAG: $msg"
+		else
+			echo "$msg"
+		fi >&2
 		return 0
 	fi
 
 	[ "x$HA_LOGD" = "xyes" ] &&
-		ha_logger -t "$HA_LOGTAG" "$prn_level: $@" &&
+		ha_logger -t "$HA_LOGTAG" "$msg" &&
 		return 0
 
 	if [ -n "$HA_LOGFACILITY" ]; then
-		logger -t "$HA_LOGTAG" -p $HA_LOGFACILITY.$loglevel "$prn_level: $@"
+		logger -t "$HA_LOGTAG" -p $HA_LOGFACILITY.$loglevel "$msg"
 	fi	
 	dest=${HA_LOGFILE:-$HA_DEBUGLOG}
 	if [ -n "$dest" ]; then
