@@ -107,7 +107,7 @@ standards, and an interface to common STONITH devices.
 
 %files
 %defattr(-,root,root)
-%dir %{_datadir}/heartbeat
+%dir %{_datadir}/%{name}
 %{_sysconfdir}/init.d/logd
 %{_datadir}/%{name}/ha_cf_support.sh
 %{_datadir}/%{name}/openais_conf_support.sh
