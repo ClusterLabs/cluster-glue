@@ -120,6 +120,7 @@ struct pluginDevice {
 static struct Etoken StatusOutput[] = { 
 	{ "Outlet\t\tName\t\tStatus\t\tUsers\t\tInterval (s)", 1, 0},
 	{ "Outlet\tName\t\t\tStatus\t\tInterval (s)\tUsers", 2, 0},
+	{ "Outlet             Name             Status          Post-on Delay(s)", 3, 0},
 	{ NULL, 0, 0} 
 };
 
@@ -259,8 +260,7 @@ static int CYCNametoOutlet(struct pluginDevice *sd, const char *host, int *outle
 		if ((err == S_OK) &&
 		    (sscanf(savebuf,"%3d %16s %10s %3s", &outlet, 
 			name, locked, on) > 0)) {
-			if (strstr(locked, "ocked")
-			&& !strncasecmp(name, host, strlen(host))) {
+			if (!strncasecmp(name, host, strlen(host))) {
 				if (numoutlet >= maxoutlet) {
 					LOG(PIL_CRIT, "too many outlets");
 					return 0;
@@ -320,16 +320,14 @@ cyclades_hostlist(StonithPlugin  *s)
 		if ((err == S_OK) &&
 		    (sscanf(savebuf,"%3d %16s %10s %3s", &outlet, 
 			name, locked, on) > 0)) {
-			if (strstr(locked, "ocked")) {
-				nm = (char *) STRDUP (name);
-				if (!nm) {
-					goto out_of_memory;
-				}
-				g_strdown(nm);
-				NameList[numnames] = nm;
-				numnames++;
-				NameList[numnames] = NULL;
+			nm = (char *) STRDUP (name);
+			if (!nm) {
+				goto out_of_memory;
 			}
+			g_strdown(nm);
+			NameList[numnames] = nm;
+			numnames++;
+			NameList[numnames] = NULL;
 		}
 
 	} while (err == S_OK);
