@@ -383,6 +383,7 @@ main(int argc, char** argv)
 	}
 	if (debug) {
 		PILpisysSetDebugLevel(debug);
+		setenv("HA_debug","2",0);
 	}
 	if (optfile && parameters) {
 		fprintf(stderr

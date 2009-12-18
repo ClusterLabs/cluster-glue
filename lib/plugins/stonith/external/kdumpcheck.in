@@ -30,25 +30,6 @@ USERNAME="kdumpchecker"
 #Initialize identity file-path options for ssh command
 IDENTITY_OPTS=""
 
-#For debug print.
-DEBUG=1
-if [ -n "${DEBUG}" ]; then
-    DEBUG_FILE=/var/log/ha-kdumpcheck.log
-    touch ${DEBUG_FILE}
-    chmod 600 ${DEBUG_FILE}
-
-    exec 2>> ${DEBUG_FILE}
-    OUTPUT='>&2'
-fi
-
-print_debug() {
-    if [ -n "${DEBUG}" ]; then
-        cat >&2
-    else
-        cat > /dev/null 2>&1
-    fi
-}
-
 #Rewrite the hostlist to accept "," as a delimeter for hostnames too.
 hostlist=`echo ${hostlist} | tr ',' ' '`
 
@@ -58,7 +39,7 @@ hostlist=`echo ${hostlist} | tr ',' ' '`
 ##
 check_hostlist() {
     if [ -z "${hostlist}" ]; then
-        echo "`date`::ERROR: hostlist is empty." | print_debug
+        ha_log.sh err "hostlist is empty"
         exit 6 #ERR_CONFIGURED
     fi
 }
@@ -71,7 +52,7 @@ get_username() {
     kdump_conf="/etc/kdump.conf"
 
     if [ ! -f "${kdump_conf}" ]; then
-        echo "`date`::DEBUG: ${kdump_conf} doesn't exist." | print_debug
+        ha_log.sh debug "${kdump_conf} doesn't exist"
         return 0
     fi
 
@@ -85,7 +66,7 @@ get_username() {
         USERNAME="${tmp}"
     fi
 
-    echo "`date`::DEBUG: kdump check user name is ${USERNAME}." | print_debug
+    ha_log.sh debug "kdump check user name is ${USERNAME}."
 }
 
 ##
@@ -96,7 +77,7 @@ check_identity_file() {
     IDENTITY_OPTS=""
     if [ -n "${identity_file}" ]; then
         if [ ! -f "${identity_file}" ]; then
-            echo "`date`::ERROR: ${identity_file} doesn't exist." | print_debug
+            ha_log.sh err "${identity_file} doesn't exist."
             exit 6 #ERR_CONFIGURED
         fi
         IDENTITY_OPTS="-i ${identity_file}"
@@ -113,8 +94,8 @@ check_identity_file() {
             fi
         done
         if [ ${flg_file_exists} -eq 0 ]; then
-            echo "`date`::ERROR: ${USERNAME}'s identity file for ssh command" \
-                " doesn't exist." | print_debug
+            ha_log.sh err "${USERNAME}'s identity file for ssh command" \
+                " doesn't exist."
             exit 6 #ERR_CONFIGURED
         fi
     fi
@@ -130,9 +111,9 @@ check_user_existence() {
     grep -q "^${USERNAME}:" /etc/passwd > /dev/null 2>&1
     ret=$?
     if [ ${ret} != 0 ]; then
-        echo "`date`::ERROR: user ${USERNAME} doesn't exist." \
+        ha_log.sh err "user ${USERNAME} doesn't exist." \
             "please confirm \"kdump_check_user\" setting in /etc/kdump.conf." \
-            "(default user name is \"kdumpchecker\")" | print_debug
+            "(default user name is \"kdumpchecker\")"
         exit 6 #ERR_CONFIGURED
     fi
 }
@@ -161,11 +142,10 @@ check_kdump() {
     # kdump_check_user's public key in authorized_keys file on target node.
     #    command="test -s /proc/vmcore", \
     #    no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty
-    echo "`date`::DEBUG: execute the command" \
-            "[${exec_cmd} ${target_node}]." | print_debug
+    ha_log.sh debug "execute the command [${exec_cmd} ${target_node}]."
     ${exec_cmd} ${target_node} > /dev/null 2>&1
     ret=$?
-    echo "`date`::DEBUG: the command's result is ${ret}." | print_debug
+    ha_log.sh debug "the command's result is ${ret}."
 
     #ret ->   0 : vmcore file's size is not zero. the node is kdumping.
     #ret ->   1 : the node is _not_ kdumping (vmcore didn't exist or

@@ -52,8 +52,8 @@ import os
 import time
 import telnetlib
 import random
+import subprocess
 
-LOGFILE = False
 LOGINRETRIES = 10
 
 class TimeoutException(Exception):
@@ -141,12 +141,6 @@ class DracMC(telnetlib.Telnet):
 
 
 class DracMCStonithPlugin:
-    def _open_debug_file(self):
-        try:
-            self._f = file('/var/log/dracmc-debug.log', 'a')
-        except:
-            pass
-
     def __init__(self):
         # define the external stonith plugin api
         self._required_cmds = \
@@ -175,17 +169,6 @@ class DracMCStonithPlugin:
             except IndexError:
                 self._parameters[name] = ''
 
-        # enable debugging log file if you need
-        self._f = None   # File Object for Debugging
-        # uncomment the next line if you want to have a  debug file.
-        # WARNING: Only for debugging. The way how the file is opened
-        # is NOT secure.
-        if LOGFILE: self._open_debug_file()
-
-    def __del__(self):
-        if self._f:
-            self._f.close()
-
     def _get_timestamp(self):
         ct = time.time()
         msecs = (ct - long(ct)) * 1000
@@ -193,11 +176,7 @@ class DracMCStonithPlugin:
                             time.localtime(ct)), msecs)
 
     def _echo_debug(self, *args):
-        f = self._f
-        if f:
-            f.write("%s: %s: %s\n" % (self._get_timestamp(), self._appl,
-                    ' '.join(args)))
-            f.flush()
+        subprocess.call("ha_log.sh debug '%s'" % ' '.join(args), shell=True)
 
     def echo(self, *args):
         what = ''.join([str(x) for x in args])
@@ -207,9 +186,7 @@ class DracMCStonithPlugin:
         self._echo_debug("STDOUT:", what)
 
     def echo_log(self, level, *args):
-        what = "%s: %s: %s" % (level, self._appl, ' '.join(args))
-        self.echo(what)
-        self._echo_debug(what)
+        subprocess.call("ha_log.sh %s '%s'" % (level,' '.join(args)), shell=True)
 
     def _get_connection(self):
         if not self._connection:
@@ -253,7 +230,7 @@ class DracMCStonithPlugin:
         self._connection.powercycle()
         self._end_connection()
         self._echo_debug(self._connection.get_history())
-        self.echo_log("INFO", "Reset of node '%s' done" %
+        self.echo_log("info", "Reset of node '%s' done" %
                               (self._parameters['nodename'],))
         return(0)
 
@@ -262,7 +239,7 @@ class DracMCStonithPlugin:
         self._connection.on()
         self._end_connection()
         self._echo_debug(self._connection.get_history())
-        self.echo_log("INFO", "Switched node '%s' ON" %
+        self.echo_log("info", "Switched node '%s' ON" %
                               (self._parameters['nodename'],))
         return(0)
 
@@ -271,7 +248,7 @@ class DracMCStonithPlugin:
         self._connection.off()
         self._end_connection()
         self._echo_debug(self._connection.get_history())
-        self.echo_log("INFO", "Switched node '%s' OFF" %
+        self.echo_log("info", "Switched node '%s' OFF" %
                               (self._parameters['nodename'],))
         return(0)
 
@@ -361,7 +338,7 @@ class DracMCStonithPlugin:
         return(0)
 
     def not_implemented(self, cmd):
-        self.echo_log("ERROR", "Command '%s' not implemented." % (cmd,))
+        self.echo_log("err", "Command '%s' not implemented." % (cmd,))
         return(1)
 
     def usage(self):
@@ -373,15 +350,13 @@ class DracMCStonithPlugin:
     def process(self, argv):
         self._echo_debug("========== Start =============")
         if len(argv) < 1:
-            self.echo_log("ERROR", 'At least one commandline argument required.')
-            self.echo(self.usage())
+            self.echo_log("err", 'At least one commandline argument required.')
             return(1)
         cmd = argv[0]
         self._echo_debug("cmd:", cmd)
         if cmd not in self._required_cmds_list and \
            cmd not in self._optional_cmds_list:
-            self.echo_log("ERROR", "Command '%s' not supported." % (cmd,))
-            self.echo(self.usage())
+            self.echo_log("err", "Command '%s' not supported." % (cmd,))
             return(1)
         try:
             cmd = cmd.lower().replace('-', '_')
@@ -389,9 +364,9 @@ class DracMCStonithPlugin:
             rc = func()
             return(rc)
         except Exception, args:
-            self.echo_log("ERROR", 'Exception raised:', str(args))
+            self.echo_log("err", 'Exception raised:', str(args))
             if self._connection:
-                self.echo_log(self._connection.get_history())
+                self.echo_log("err", self._connection.get_history())
                 self._connection.close()
             return(1)
 
