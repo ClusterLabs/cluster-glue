@@ -692,6 +692,8 @@ ext_del_from_env(gpointer key, gpointer value, gpointer user_data)
 	unsetenv((char *)key);
 }
 
+#define LOGTAG_VAR "HA_LOGTAG"
+
 /* Run the command with op as command line argument(s) and return the exit
  * status + the output */
 static int 
@@ -706,22 +708,9 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	char			cmd[FILENAME_MAX+64];
 	struct stat		buf;
 	int			slen;
-	char *path, *new_path, *logtag;
+	char *path, *new_path, *logtag, *savevar = NULL;
 	int new_path_len, logtag_len;
 	gboolean		nodata;
-
-	/* external plugins need path to ha_log.sh */
-	path = getenv("PATH");
-	new_path_len = strlen(path)+strlen(GLUE_SHARED_DIR)+2;
-	new_path = (char *)g_malloc(new_path_len);
-	snprintf(new_path, new_path_len, "%s:%s", path, GLUE_SHARED_DIR);
-	setenv("PATH", new_path, 1);
-	g_free(new_path);
-	/* set the logtag appropriately */
-	logtag_len = strlen(PIL_PLUGIN_S)+strlen(sd->subplugin)+2;
-	logtag = (char *)g_malloc(logtag_len);
-	snprintf(logtag, logtag_len, "%s/%s", PIL_PLUGIN_S, sd->subplugin);
-	setenv("HA_LOGTAG", logtag, 1);
 
 	rc = snprintf(cmd, FILENAME_MAX, "%s/%s", 
 		STONITH_EXT_PLUGINDIR, sd->subplugin);
@@ -759,6 +748,23 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		g_hash_table_foreach(sd->cmd_opts, ext_add_to_env, NULL);
 	}
 
+	/* external plugins need path to ha_log.sh */
+	path = getenv("PATH");
+	new_path_len = strlen(path)+strlen(GLUE_SHARED_DIR)+2;
+	new_path = (char *)g_malloc(new_path_len);
+	snprintf(new_path, new_path_len, "%s:%s", path, GLUE_SHARED_DIR);
+	setenv("PATH", new_path, 1);
+	g_free(new_path);
+
+	/* set the logtag appropriately */
+	logtag_len = strlen(PIL_PLUGIN_S)+strlen(sd->subplugin)+2;
+	logtag = (char *)g_malloc(logtag_len);
+	snprintf(logtag, logtag_len, "%s/%s", PIL_PLUGIN_S, sd->subplugin);
+	if (getenv(LOGTAG_VAR)) {
+		savevar = g_strdup(getenv(LOGTAG_VAR));
+	}
+	setenv(LOGTAG_VAR, logtag, 1);
+
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: Calling '%s'", __FUNCTION__, cmd );
 	}
@@ -766,7 +772,8 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	if (NULL==file) {
 		LOG(PIL_CRIT, "%s: Calling '%s' failed",
 			__FUNCTION__, cmd);
-		goto err;
+		rc = -1;
+		goto out;
 	}
 
 	if (output) {
@@ -800,9 +807,9 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	}
 	if (output && !data) {
 		LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
-		goto err;
+		rc = -1;
+		goto out;
 	}
-	
 
 	rc = pclose(file);
 	if (rc != 0) {
@@ -812,27 +819,27 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		LOG(PIL_DEBUG, "%s: '%s' output: %s", __FUNCTION__, cmd, data);
 	}
 
-	if (output) {
-		*output = data;
+out:
+	if (savevar) {
+		setenv(LOGTAG_VAR, savevar, 1);
+		g_free(savevar);
+	} else {
+		unsetenv(LOGTAG_VAR);
 	}
-	
-	if (sd->cmd_opts) {
-		g_hash_table_foreach(sd->cmd_opts, ext_del_from_env, NULL); 
-	}
-
-	return(rc);
-
-err:
 	if (sd->cmd_opts)  {
 		g_hash_table_foreach(sd->cmd_opts, ext_del_from_env, NULL);
 	}
-	if (data) {
-		FREE(data);
+	if (!rc) {
+		if (output) {
+			*output = data;
+		}
+	} else {
+		if (data) {
+			FREE(data);
+		}
+		if (output) {
+			*output = NULL;
+		}
 	}
-	if (output) {
-		*output = NULL;
-	}
-	
-	return(-1);
-
+	return rc;
 }
