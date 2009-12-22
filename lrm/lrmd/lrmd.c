@@ -3089,7 +3089,7 @@ perform_ra_op(lrmd_op_t* op)
 			return HA_OK;
 
 		case 0:		/* Child */
-#ifdef DEFAULT_REALTIME
+#ifdef DEFAULT_REALTIME_POLICY
 			if (sched_getscheduler(0) != SCHED_OTHER) {
 				struct sched_param sp;
 				lrmd_debug(LOG_DEBUG,
