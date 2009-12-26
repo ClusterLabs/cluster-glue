@@ -45,8 +45,10 @@ Obsoletes:	heartbeat-common
 Requires(pre):    /usr/sbin/groupadd /usr/bin/getent /usr/sbin/useradd
 
 # SLES10 needs tcpd-devel but doesn't have libcurl
+# in SLES10 docbook has no dependency on sgml-skel
 %if 0%{?suse_version} < 1020
 BuildRequires:  tcpd-devel
+BuildRequires:  sgml-skel
 %else
 BuildRequires:  libcurl-devel 
 %endif
