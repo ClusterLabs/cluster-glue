@@ -57,10 +57,12 @@ apcmastersnmp_LIB =
 endif
 if IPMILAN_BUILD
 OPENIPMI_LIB = -lOpenIPMI -lOpenIPMIposix -lOpenIPMIutils
+libipmilan_LIB = libipmilan.la
 ipmilan_LIB = ipmilan.la
 ipmilan_TEST = ipmilantest
 else
 OPENIPMI_LIB =
+libipmilan_LIB =
 ipmilan_LIB =
 endif
 #
@@ -87,7 +89,7 @@ noinst_PROGRAMS = $(ipmilan_TEST)
 ipmilantest_SOURCES = ipmilan_test.c 
 ipmilantest_LDADD = $(top_builddir)/lib/pils/libpils.la \
 		    $(top_builddir)/lib/stonith/libstonith.la \
-		    $(ipmilan_LIB) \
+		    $(libipmilan_LIB) \
 		    $(OPENIPMI_LIB)
 
 ## libraries
@@ -114,6 +116,7 @@ plugin_LTLIBRARIES =	apcmaster.la	\
 			suicide.la		\
 			$(vacm_LIB)		\
 			wti_nps.la
+noinst_LTLIBRARIES = $(libipmilan_LIB)
 
 apcmaster_la_SOURCES	= apcmaster.c $(INCFILES)
 apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version
@@ -159,6 +162,10 @@ ibmhmc_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 ipmilan_la_SOURCES	= ipmilan.c ipmilan.h ipmilan_command.c	$(INCFILES)
 ipmilan_la_LDFLAGS	= -export-dynamic -module -avoid-version
 ipmilan_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(OPENIPMI_LIB) $(GLIBLIB)
+
+libipmilan_la_SOURCES	= ipmilan.c ipmilan.h ipmilan_command.c	$(INCFILES)
+libipmilan_la_LDFLAGS	= -version-info 1:0:0
+libipmilan_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(OPENIPMI_LIB) $(GLIBLIB)
 
 meatware_la_SOURCES	= meatware.c $(INCFILES)
 meatware_la_LDFLAGS	= -export-dynamic -module -avoid-version
