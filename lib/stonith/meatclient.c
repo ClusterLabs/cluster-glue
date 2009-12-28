@@ -37,14 +37,14 @@
 #include <stonith/stonith.h>
 #include <glib.h>
 
-#define OPTIONS "c:"
+#define OPTIONS "c:w"
 
 void usage(const char * cmd);
 
 void
 usage(const char * cmd)
 {
-	fprintf(stderr, "usage: %s [-c node]\n", cmd);
+	fprintf(stderr, "usage: %s -c node [-w]\n", cmd);
 	exit(S_INVAL);
 }
 
@@ -60,7 +60,7 @@ main(int argc, char** argv)
 	char *		opthost = NULL;
 	int		clearhost = 0;
 
-	int		c, argcount;
+	int		c, argcount, waitmode;
 	int		errors = 0;
 
 	if ((cmdname = strrchr(argv[0], '/')) == NULL) {
@@ -74,12 +74,14 @@ main(int argc, char** argv)
 		case 'c':	opthost = optarg;
 				++clearhost;
 				break;
+		case 'w':	++waitmode;
+				break;
 		default:	++errors;
 				break;
 		}
 	}
 	argcount = argc - optind;
-	if (!(argcount == 0)) {
+	if (!(argcount == 0) || !opthost) {
 		errors++;
 	}
 
@@ -99,13 +101,23 @@ main(int argc, char** argv)
 
 		snprintf(meatpipe, 256, "%s.%s", meatpipe_pr, opthost);
 
-		fd = open(meatpipe, O_WRONLY | O_NONBLOCK);
-
-		if (fd < 0) {
-			snprintf(line, sizeof(line)
-			,	"Meatware_IPC failed: %s", meatpipe);
-			perror(line);
-			exit(S_BADHOST);
+		if (waitmode) {
+			gboolean waited=FALSE;
+			while(1) {
+				fd = open(meatpipe, O_WRONLY | O_NONBLOCK);
+				if (fd >= 0)
+					break;
+				if (!waitmode || (errno != ENOENT && errno != ENXIO)) {
+					if (waited) printf("\n");
+					snprintf(line, sizeof(line)
+					,	"Meatware_IPC failed: %s", meatpipe);
+					perror(line);
+					exit(S_BADHOST);
+				}
+				printf("."); fflush(stdout); waited=TRUE;
+				sleep(1);
+			}
+			if (waited) printf("\n");
 		}
 
 		printf("\nWARNING!\n\n"
