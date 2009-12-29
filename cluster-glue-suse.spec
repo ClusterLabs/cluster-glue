@@ -161,6 +161,12 @@ else
         %{uname} 2>/dev/null || :
 fi
 
+%preun
+%stop_on_removal logd
+
+%post
+%{insserv_force_if_yast logd}
+
 %postun
 %insserv_cleanup
 
