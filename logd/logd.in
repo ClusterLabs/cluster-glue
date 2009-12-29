@@ -23,7 +23,6 @@
 # Description: ha_logd is a non-blocking logging daemon.
 #	It can log messages either to a file or through syslog
 #	daemon.
-#
 # Short-Description: ha_logd logging daemon
 # Provides: ha_logd
 # Required-Start: $network $syslog $remote_fs
