@@ -42,6 +42,7 @@ BuildRequires:  libnet net-snmp-devel OpenIPMI-devel openhpi-devel
 BuildRequires:  libxslt docbook_4 docbook-xsl-stylesheets
 
 Obsoletes:	heartbeat-common
+Provides:	heartbeat-common
 Requires(pre):    /usr/sbin/groupadd /usr/bin/getent /usr/sbin/useradd
 
 # SLES10 needs tcpd-devel but doesn't have libcurl
@@ -64,6 +65,7 @@ License:        GPL v2 only; GPL v2 or later; LGPL v2.1 or later
 Summary:        The Pacemaker scalable High-Availability cluster resource manager
 Group:		Productivity/Clustering/HA
 Obsoletes:	libheartbeat2
+Provides:	libheartbeat2
 Requires:       %{name} = %{version}-%{release}
 
 %description -n libglue2
@@ -77,6 +79,7 @@ Group:		Development/Libraries/C and C++
 Requires:       %{name} = %{version}-%{release}
 Requires:       libglue2 = %{version}-%{release}
 Obsoletes:	libheartbeat-devel
+Provides:	libheartbeat-devel
 
 %description -n libglue-devel
 Headers and shared libraries for a useful for writing cluster managers 
