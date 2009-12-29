@@ -158,6 +158,9 @@ else
         %{uname} 2>/dev/null || :
 fi
 
+%postun
+%insserv_cleanup
+
 %post -n libglue2
 /sbin/ldconfig  
   
