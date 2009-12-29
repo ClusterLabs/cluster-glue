@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 #
 # 	ha_log.sh for stonith external plugins
