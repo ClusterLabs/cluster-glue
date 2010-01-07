@@ -83,7 +83,7 @@ export docdir=%{glue_docdir}
 %endif
 
 %build
-make %{?_smp_mflags}
+make %{?jobs:-j%jobs}
 
 %install
 rm -rf %{buildroot}
