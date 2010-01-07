@@ -99,26 +99,25 @@ main(int argc, char** argv)
 		char line[256];
 		char meatpipe[256];
 
+		gboolean waited=FALSE;
+
 		snprintf(meatpipe, 256, "%s.%s", meatpipe_pr, opthost);
 
-		if (waitmode) {
-			gboolean waited=FALSE;
-			while(1) {
-				fd = open(meatpipe, O_WRONLY | O_NONBLOCK);
-				if (fd >= 0)
-					break;
-				if (!waitmode || (errno != ENOENT && errno != ENXIO)) {
-					if (waited) printf("\n");
-					snprintf(line, sizeof(line)
-					,	"Meatware_IPC failed: %s", meatpipe);
-					perror(line);
-					exit(S_BADHOST);
-				}
-				printf("."); fflush(stdout); waited=TRUE;
-				sleep(1);
+		while(1) {
+			fd = open(meatpipe, O_WRONLY | O_NONBLOCK);
+			if (fd >= 0)
+				break;
+			if (!waitmode || (errno != ENOENT && errno != ENXIO)) {
+				if (waited) printf("\n");
+				snprintf(line, sizeof(line)
+				,	"Meatware_IPC failed: %s", meatpipe);
+				perror(line);
+				exit(S_BADHOST);
 			}
-			if (waited) printf("\n");
+			printf("."); fflush(stdout); waited=TRUE;
+			sleep(1);
 		}
+		if (waited) printf("\n");
 
 		printf("\nWARNING!\n\n"
 			"If node \"%s\" has not been manually power-cycled or "
