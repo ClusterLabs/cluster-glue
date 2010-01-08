@@ -19,14 +19,14 @@
 #
 MAINTAINERCLEANFILES = Makefile.in
 
-EXTRA_DIST           = drac5 ibmrsa-telnet ipmi rackpdu vmware xen0 \
+EXTRA_DIST           = drac5 dracmc-telnet ibmrsa-telnet ipmi rackpdu vmware xen0 \
 			xen0-ha-dom0-stonith-helper sbd kdumpcheck
 
 extdir		     = $(stonith_ext_plugindir)
 
 helperdir	     = $(stonith_plugindir)
 
-ext_SCRIPTS	     = drac5 ibmrsa ibmrsa-telnet ipmi riloe ssh vmware rackpdu xen0 hmchttp \
+ext_SCRIPTS	     = drac5 dracmc-telnet ibmrsa ibmrsa-telnet ipmi riloe ssh vmware rackpdu xen0 hmchttp \
 			xen0-ha sbd kdumpcheck
 
 helper_SCRIPTS	     = xen0-ha-dom0-stonith-helper
