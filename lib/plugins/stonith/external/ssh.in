@@ -73,13 +73,12 @@ off)
 	exit 1
 	;;
 reset)
+	h_target=`echo $2 | tr A-Z a-z`
 	for h in $hostlist
 	do
-	  if
-            [ "$h" != "$2" ]
-          then
+		h=`echo $h | tr A-Z a-z`
+		[ "$h" != "$h_target" ] &&
             continue
-          fi
           if
             case ${livedangerously} in
               [Yy]*)	is_host_up $h;;
