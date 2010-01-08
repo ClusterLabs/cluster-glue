@@ -498,19 +498,13 @@ static void
 logd_make_daemon(gboolean daemonize)
 {
 	long			pid;
-	const char *		devnull = "/dev/null";
 
-
-
-	if (daemonize){		
-		pid = fork();
-		if (pid < 0) {
+	if (daemonize) {
+		if (daemon(0,0)) {
 			fprintf(stderr, "%s: could not start daemon\n"
 				,	cmdname);
 			perror("fork");
 			exit(LSB_EXIT_GENERIC);
-		}else if (pid > 0) {
-			exit(LSB_EXIT_OK);
 		}
 	}
 	
@@ -542,13 +536,6 @@ logd_make_daemon(gboolean daemonize)
 		 */
 		mask = (mode_t)(((~logd_config.logmode) & 0777) & (~0111));
 		umask(mask);
-		
-		close(FD_STDIN);
-		(void)open(devnull, O_RDONLY);		/* Stdin:  fd 0 */
-		close(FD_STDOUT);
-		(void)open(devnull, O_WRONLY);		/* Stdout: fd 1 */
-		close(FD_STDERR);
-		(void)open(devnull, O_WRONLY);		/* Stderr: fd 2 */
 	}
 }
 
