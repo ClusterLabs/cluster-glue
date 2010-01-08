@@ -175,9 +175,11 @@ on)
 reset|off)
     check_hostlist
     ret=1
+	h_target=`echo $2 | tr A-Z a-z`
     for hostname in ${hostlist}
     do
-        if [ "${hostname}" != "$2" ]; then
+		hostname=`echo $hostname | tr A-Z a-z`
+        if [ "${hostname}" != "$h_target" ]; then
             continue
         fi
         while [ 1 ]
