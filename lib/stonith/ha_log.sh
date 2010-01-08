@@ -33,6 +33,7 @@ PROG=`basename $0`
 : ${HA_LOGFACILITY=daemon}
 : ${HA_LOGFILE=""}
 : ${HA_DEBUGLOG=""}
+: ${HA_debug="0"}
 
 hadate() {
   date "+$HA_DATEFMT"
