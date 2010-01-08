@@ -62,47 +62,24 @@ do_ipmi() {
 }
 
 # Rewrite the hostname to accept "," as a delimeter for hostnames too.
-hostname=`echo ${hostname} | tr ',' ' '`
 
 case ${1} in
 gethosts)
-	for h in ${hostname} ; do
-		echo ${h}
-	done
+	echo $hostname
 	exit 0
 	;;
 on)
-	res=1
-	for h in ${hostname}; do
-		if [ "${h}" != "${2}" ]; then
-			continue
-		fi
-		do_ipmi "${POWERON}"
-		res=$?
-	done
-	exit ${res}
+	do_ipmi "${POWERON}"
+	exit
 	;;
 off)
-	res=1
-	for h in ${hostname}; do
-		if [ "${h}" != "${2}" ]; then
-			continue
-		fi
-		do_ipmi "${POWEROFF}"
-		res=$?
-	done
-	exit ${res}
+	do_ipmi "${POWEROFF}"
+	exit
 	;;
 reset)
 	res=1
-	for h in ${hostname}; do
-		if [ "${h}" != "${2}" ]; then
-			continue
-		fi
-		do_ipmi "${RESET}"
-		res=$?
-	done
-	exit $res
+	do_ipmi "${RESET}"
+	exit
 	;;
 status)
 	do_ipmi "${STATUS}"
