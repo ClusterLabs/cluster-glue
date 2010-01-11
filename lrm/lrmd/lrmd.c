@@ -273,6 +273,10 @@ lrmd_op_destroy(lrmd_op_t* op)
 		free(op->rsc_id);
 		op->rsc_id = NULL;
 	}
+	if( op->app_name ) {
+		free(op->app_name);
+		op->app_name = NULL;
+	}
 	op->exec_pid = 0;
 	if ( op->rapop != NULL ) {
 		op->rapop->lrmd_op = NULL;
@@ -339,6 +343,7 @@ lrmd_op_copy(const lrmd_op_t* op)
 	ret->rapop = NULL;
 	ret->msg = ha_msg_copy(op->msg);
 	ret->rsc_id = strdup(op->rsc_id);
+	ret->app_name = strdup(op->app_name);
 	ret->rapop = NULL;
 	ret->first_line_ra_stdout[0] = EOS;
 	ret->repeat_timeout_tag = 0;
@@ -1457,10 +1462,10 @@ static void
 remove_repeat_op_from_client(gpointer key, gpointer value, gpointer user_data)
 {
 	lrmd_rsc_t* rsc = (lrmd_rsc_t*)value;
-	pid_t pid = GPOINTER_TO_UINT(user_data); /* pointer cast as int */
+	char *app_name = (char *)user_data;
 
-	(void)flush_all(&(rsc->repeat_op_list),pid);
-	if( flush_all(&(rsc->op_list),pid) ) {
+	(void)flush_all(&(rsc->repeat_op_list),app_name);
+	if( flush_all(&(rsc->op_list),app_name) ) {
 		set_rsc_flushing_ops(rsc); /* resource busy */
 	}
 }
@@ -1483,7 +1488,7 @@ unregister_client(lrmd_client_t* client)
 
 	/* Search all resources for repeating ops this client owns */
 	g_hash_table_foreach(resources
-	,	remove_repeat_op_from_client, GUINT_TO_POINTER(client->pid));
+	,	remove_repeat_op_from_client, client->app_name);
 
 	lrmd_debug(LOG_DEBUG, "%s: client %s [pid:%d] is unregistered"
 	, 	__FUNCTION__
@@ -1983,8 +1988,8 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		return -1;
 	}
 	LRMAUDIT();
-	(void)flush_all(&(rsc->repeat_op_list),0);
-	if( flush_all(&(rsc->op_list),0) ) {
+	(void)flush_all(&(rsc->repeat_op_list),NULL);
+	if( flush_all(&(rsc->op_list),NULL) ) {
 		set_rsc_removal_pending(rsc);
 		LRMAUDIT();
 		return HA_OK; /* resource is busy, delay removal */
@@ -2229,7 +2234,7 @@ on_msg_cancel_op(lrmd_client_t* client, struct ha_msg* msg)
 }
 
 static gboolean
-flush_all(GList** listp, int client_pid)
+flush_all(GList** listp, char *app_name)
 {
 	GList* node = NULL;
 	lrmd_op_t* op = NULL;
@@ -2241,7 +2246,7 @@ flush_all(GList** listp, int client_pid)
 		if( flush_op(op) == POSTPONED ) {
 			rsc_busy = TRUE;
 			node = g_list_next(node);
-		} else if (!client_pid || op->client_id == client_pid) {
+		} else if (!app_name || !strcmp(op->app_name,app_name)) {
 			node = *listp = g_list_remove(*listp, op);
 			remove_op_history(op);
 			lrmd_op_destroy(op);
@@ -2336,6 +2341,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	op->call_id = call_id;
 	op->client_id = client->pid;
+	op->app_name = strdup(client->app_name);
 	op->rsc_id = strdup(rsc->id);
 	op->interval = interval;
 	op->delay = delay;
@@ -2601,7 +2607,7 @@ record_op_completion(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	}
 	rsc->last_op_done->repeat_timeout_tag = (guint)0;
 
-	client = lookup_client(op->client_id);
+	client = lookup_client_by_name(op->app_name);
 	if (!client) {
 		lrmd_debug(LOG_DEBUG, "%s: cannot record %s: client is gone."
 		,	__FUNCTION__, small_op_info(op)); 
@@ -2639,7 +2645,7 @@ to_repeatlist(lrmd_rsc_t* rsc, lrmd_op_t* op)
 static void 
 remove_op_history(lrmd_op_t* op)
 {
-	lrmd_client_t* client = lookup_client(op->client_id);
+	lrmd_client_t* client = lookup_client_by_name(op->app_name);
 	lrmd_rsc_t* rsc = NULL;
 	char *op_id, *last_op_id;
 	lrmd_op_t* old_op = NULL;
@@ -3480,7 +3486,7 @@ send_msg(struct ha_msg* msg, lrmd_client_t* client)
 void
 notify_client(lrmd_op_t* op)
 {
-	lrmd_client_t* client = lookup_client(op->client_id);
+	lrmd_client_t* client = lookup_client_by_name(op->app_name);
 
 	if (client) {
 		/* send the result to client */
