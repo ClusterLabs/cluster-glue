@@ -80,7 +80,7 @@ static void hash_to_str(GHashTable * , GString *);
 static void hash_to_str_foreach(gpointer key, gpointer value, gpointer userdata);
 static void warning_on_active_rsc(gpointer key, gpointer value, gpointer user_data);
 static void check_queue_duration(lrmd_op_t* op);
-static gboolean flush_all(GList** listp, int client_pid);
+static gboolean flush_all(GList** listp, char *app_name);
 static gboolean cancel_op(GList** listp,int cancel_op_id);
 static int prepare_failmsg(struct ha_msg* msg,
 			int fail_rc, const char *fail_reason);
