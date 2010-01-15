@@ -3615,7 +3615,7 @@ handle_pipe_ra_stdout(int fd, gpointer user_data)
 		if (  (0==STRNCMP_CONST(rapop->op_type, "meta-data"))
 		    ||(0==STRNCMP_CONST(rapop->op_type, "monitor")) 
 		    ||(0==STRNCMP_CONST(rapop->op_type, "status")) ) {
-			lrmd_debug2(LOG_DEBUG, "RA output: (%s:%s:stdout) %s"
+			lrmd_debug(LOG_DEBUG, "RA output: (%s:%s:stdout) %s"
 				, lrm_str(rapop->rsc_id), rapop->op_type, data);
 		} else {
 			lrmd_log(LOG_INFO, "RA output: (%s:%s:stdout) %s"
