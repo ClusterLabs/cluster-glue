@@ -32,7 +32,7 @@ Summary:        Reusable cluster components
 Version:        1.0.2
 Release:	0rc2a%{?dist}
 License:        GPL v2 or later; LGPL v2.1 or later
-Url:            http://www.linux-ha.org
+Url:            http://linux-ha.org/wiki
 Group:		Productivity/Clustering/HA
 Source:         cluster-glue.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build

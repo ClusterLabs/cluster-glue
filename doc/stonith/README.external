@@ -65,22 +65,18 @@ in /var/lib/heartbeat/crm/cib.xml:
 
          <clone id="DoFencing">
             <instance_attributes>
-               <attributes>
-                  <nvpair name="clone_max" value="2"/>
-                  <nvpair name="clone_node_max" value="1"/>
-               </attributes>
+               <nvpair name="clone_max" value="2"/>
+               <nvpair name="clone_node_max" value="1"/>
             </instance_attributes>
             <primitive id="child_DoFencing" class="stonith" type="external/yourplugin" provider="heartbeat">
                <operations>
-                  <op name="monitor" interval="5s" timeout="20s" prereq="nothing"/>
-                  <op name="start" timeout="20s" prereq="nothing"/>
+                  <op name="monitor" interval="5s" timeout="20s" requires="nothing"/>
+                  <op name="start" timeout="20s" requires="nothing"/>
                </operations>
                <instance_attributes>
-                  <attributes>
-                     <nvpair name="parm1-name" value="parm1-value"/>
-                     <nvpair name="parm2-name" value="parm2-value"/>
+                  <nvpair name="parm1-name" value="parm1-value"/>
+                  <nvpair name="parm2-name" value="parm2-value"/>
 		     <!-- ... -->
-                  </attributes>
                </instance_attributes>
             </primitive>
          </clone>
@@ -90,4 +86,5 @@ the CIB are passed to the script as environment variables.  For the
 example above, the parameters are passed as parm1-name=parm1-value,
 parm2-name=parm2-value and so on.
 
-Additional information can be found at http://www.linux-ha.org/ExternalStonithPlugins.
+Additional information can be found at
+http://linux-ha.org/wiki/ExternalStonithPlugins.

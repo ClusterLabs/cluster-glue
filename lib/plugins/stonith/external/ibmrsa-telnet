@@ -2,7 +2,7 @@
 # vim: set filetype=python
 #######################################################################
 #
-# ibmrsa-telnet - External stonith plugin for HAv2 (http://www.linux-ha.org/)
+# ibmrsa-telnet - External stonith plugin for HAv2 (http://linux-ha.org/wiki)
 #                 Connects to IBM RSA Board via telnet and switches power
 #                 of server appropriately.
 #

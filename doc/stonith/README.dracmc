@@ -1,4 +1,4 @@
-dracmc-telnet - External stonith plugin for HAv2 (http://www.linux-ha.org)
+dracmc-telnet - External stonith plugin for HAv2 (http://linux-ha.org/wiki)
                 Connects to Dell Drac/MC Blade Enclosure via a Cyclades
                 terminal server with telnet and switches power of named
                 blade servers appropriatelly.
