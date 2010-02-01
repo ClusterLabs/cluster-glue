@@ -57,13 +57,13 @@ switches; the downside is that access to the shared storage
 device becomes a Single Point of Failure. 
 
 It requires sbd to be configured.  Please read
-http://www.linux-ha.org/SBD_Fencing!
+http://linux-ha.org/wiki/SBD_Fencing!
 
 DESC
     exit 0
     ;;
 getinfo-devurl)
-    echo "http://www.linux-ha.org/SBD_Fencing"
+    echo "http://linux-ha.org/wiki/SBD_Fencing"
     exit 0
     ;;
 getinfo-xml)

@@ -118,7 +118,7 @@ cl_set_traditional_compression(gboolean value)
 		". Realtime behavior will likely be impacted(!)");
 		cl_log(LOG_INFO
 		,	"See %s for more information."
-		,	HAURL("ha.cf/TraditionalCompressionDirective"));
+		,	HAURL("Ha.cf#traditional_compression_-_controls_compression_mode"));
 	}
 }
 

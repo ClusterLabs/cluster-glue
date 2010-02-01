@@ -380,7 +380,7 @@ HA_LOGDAEMON_IPC="${localstatedir}/lib/heartbeat/log_daemon"
 AC_DEFINE_UNQUOTED(HA_LOGDAEMON_IPC, "$HA_LOGDAEMON_IPC", Logging Daemon IPC socket name)
 AC_SUBST(HA_LOGDAEMON_IPC)
 
-HA_URLBASE="http://linux-ha.org/"
+HA_URLBASE="http://linux-ha.org/wiki"
 AC_DEFINE_UNQUOTED(HA_URLBASE, "$HA_URLBASE", Web site base URL)
 AC_SUBST(HA_URLBASE)
 

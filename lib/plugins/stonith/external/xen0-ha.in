@@ -48,7 +48,7 @@ getinfo-devdescr)
     exit 0
     ;;
 getinfo-devurl)
-    echo "http://www.linux-ha.org/DomUClusters"
+    echo "http://linux-ha.org/wiki/DomUClusters"
     exit 0
     ;;
 getinfo-xml)

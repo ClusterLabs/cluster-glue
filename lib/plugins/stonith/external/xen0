@@ -196,7 +196,7 @@ getinfo-devdescr)
     exit 0
     ;;
 getinfo-devurl)
-    echo "http://openssh.org http://www.xensource.com/ http://www.linux-ha.org"
+    echo "http://openssh.org http://www.xensource.com/ http://linux-ha.org/wiki"
     exit 0
     ;;
 getinfo-xml)
