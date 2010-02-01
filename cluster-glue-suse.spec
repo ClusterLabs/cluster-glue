@@ -215,6 +215,7 @@ fi
 %doc %{_mandir}/man8/*
 %doc AUTHORS
 %doc COPYING
+%doc ChangeLog
 %doc logd/logd.cf
 %doc doc/stonith/README*
 

@@ -147,6 +147,7 @@ standards, and an interface to common STONITH devices.
 %doc logd/logd.cf
 %doc AUTHORS
 %doc COPYING
+%doc ChangeLog
 
 # cluster-glue-libs
 
