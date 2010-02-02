@@ -1,3 +1,6 @@
+* Tue Feb 02 2010 Dejan Muhamedagic <dejan@suse.de>
+- bugfix release 1.0.3
+- lrmd: don't flush operations which don't belong to the requesting client (lf#2161)
 * Mon Feb 01 2010 Dejan Muhamedagic <dejan@suse.de> and MANY others
 - stable release 1.0.2
 - clplumbing: fix a potential resource leak in cl_random (bnc#525393)
