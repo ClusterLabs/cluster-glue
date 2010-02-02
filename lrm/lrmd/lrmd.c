@@ -2243,6 +2243,10 @@ flush_all(GList** listp, char *app_name)
 	node = g_list_first(*listp);
 	while( node ) {
 		op = (lrmd_op_t*)node->data;
+		if (app_name && strcmp(op->app_name,app_name)) {
+			node = g_list_next(node);
+			continue; /* not the client's operation */
+		}
 		if( flush_op(op) == POSTPONED ) {
 			rsc_busy = TRUE;
 			node = g_list_next(node);
