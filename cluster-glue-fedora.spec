@@ -15,7 +15,7 @@
 
 Name:		cluster-glue
 Summary:	Reusable cluster components
-Version:	1.0.2
+Version:	1.0.3
 Release:	1%{?dist}
 License:	GPLv2+ and LGPLv2+
 Url:		http://www.clusterlabs.org

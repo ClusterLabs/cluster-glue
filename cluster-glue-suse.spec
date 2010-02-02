@@ -29,7 +29,7 @@
 
 Name:           cluster-glue
 Summary:        Reusable cluster components
-Version:        1.0.2
+Version:        1.0.3
 Release:	1%{?dist}
 License:        GPL v2 or later; LGPL v2.1 or later
 Url:            http://linux-ha.org/wiki
