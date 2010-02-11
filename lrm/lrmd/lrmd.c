@@ -2801,12 +2801,11 @@ flush_op(lrmd_op_t* op)
 		return HA_FAIL;
 	}
 
-	if (HA_OK != ha_msg_mod_int(op->msg,F_LRM_OPSTATUS,(int)LRM_OP_CANCELLED)){
-		LOG_FAILED_TO_ADD_FIELD("opstatus");
-		return HA_FAIL;
-	}
-
 	if( op->exec_pid == -1 ) {
+		if (HA_OK != ha_msg_mod_int(op->msg,F_LRM_OPSTATUS,(int)LRM_OP_CANCELLED)){
+			LOG_FAILED_TO_ADD_FIELD("opstatus");
+			return HA_FAIL;
+		}
 		return HA_OK;
 	} else {
 		lrmd_debug(LOG_DEBUG, "%s: process for %s still "
