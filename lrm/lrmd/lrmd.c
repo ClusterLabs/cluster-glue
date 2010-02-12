@@ -535,7 +535,7 @@ lrmd_dump_all_clients(void)
 
 	incall = TRUE;
 
-	lrmd_debug(LOG_DEBUG, "%d clients are connecting to lrmd."
+	lrmd_debug(LOG_DEBUG, "%d clients connected to lrmd"
 	 ,	g_hash_table_size(clients)); 
 
 	g_hash_table_foreach(clients, lrmd_client_dump, NULL);
@@ -712,7 +712,7 @@ lrmd_dump_all_resources(void)
 	}
 	incall = TRUE;
 
-	lrmd_debug(LOG_DEBUG, "%d resources are managed by lrmd."
+	lrmd_debug(LOG_DEBUG, "%d resources are managed by lrmd"
 	,	g_hash_table_size(resources)); 
 	g_hash_table_foreach(resources, dump_id_rsc_pair, text);
 	incall = FALSE;
@@ -977,7 +977,7 @@ sigterm_action(int nsig, gpointer user_data)
 	if (can_shutdown()) {
 		lrm_shutdown();
 	} else {
-		lrmd_debug(LOG_DEBUG, "sigterm_action: can't shutdown now.");
+		lrmd_log(LOG_INFO, "sigterm_action: shutdown postponed, some operations are still running");
 	}
 	return TRUE;
 }
@@ -1197,7 +1197,7 @@ init_start ()
 	 */
 	set_sigchld_proctrack(G_PRIORITY_HIGH,10*DEFAULT_MAXDISPATCHTIME);
 
-	lrmd_debug(LOG_DEBUG, "Enabling coredumps");
+	lrmd_log(LOG_INFO, "enabling coredumps");
 	/* Although lrmd can count on the parent to enable coredump, still
 	 * set it here for test, when start manually.
 	 */
@@ -1418,8 +1418,8 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	if (TRUE == shutdown_in_progress ) {
 		send_ret_msg(ch,HA_FAIL);
 		ha_msg_del(msg);
-		lrmd_debug(LOG_DEBUG, "on_receive_cmd: return HA_FAIL because"\
-			 " lrmd is in shutdown.");
+		lrmd_log(LOG_INFO, "%s: new requests denied," \
+			" we're about to shutdown", __FUNCTION__);
 		return TRUE;
 	}
 
@@ -2177,7 +2177,7 @@ cancel_op(GList** listp,int cancel_op_id)
 	; node; node = g_list_next(node) ) {
 		op = (lrmd_op_t*)node->data;
 		if( op->call_id == cancel_op_id ) {
-			lrmd_debug(LOG_DEBUG
+			lrmd_log(LOG_INFO
 			,"%s: %s cancelled"
 			, __FUNCTION__, op_info(op));
 			rc = flush_op(op);
@@ -2226,7 +2226,7 @@ on_msg_cancel_op(lrmd_client_t* client, struct ha_msg* msg)
 		}
 	}
 	if( op_cancelled == HA_FAIL ) {
-		lrmd_debug(LOG_DEBUG, "%s: no operation with id %d",
+		lrmd_log(LOG_INFO, "%s: no operation with id %d",
 			__FUNCTION__, cancel_op_id);
 	}
 	LRMAUDIT();
@@ -2613,7 +2613,7 @@ record_op_completion(lrmd_rsc_t* rsc, lrmd_op_t* op)
 
 	client = lookup_client_by_name(op->app_name);
 	if (!client) {
-		lrmd_debug(LOG_DEBUG, "%s: cannot record %s: client is gone."
+		lrmd_log(LOG_INFO, "%s: cannot record %s: the client is gone"
 		,	__FUNCTION__, small_op_info(op)); 
 		LRMAUDIT();
 		return;
@@ -2811,7 +2811,7 @@ flush_op(lrmd_op_t* op)
 		}
 		return HA_OK;
 	} else {
-		lrmd_debug(LOG_DEBUG, "%s: process for %s still "
+		lrmd_log(LOG_INFO, "%s: process for %s still "
 			"running, flush delayed"
 			,__FUNCTION__,small_op_info(op));
 		return POSTPONED;
@@ -2852,7 +2852,7 @@ perform_op(lrmd_rsc_t* rsc)
 	}
 
 	if (rsc_frozen(rsc)) {
-		lrmd_log(LOG_DEBUG,"%s: resource %s is frozen, "
+		lrmd_log(LOG_INFO,"%s: resource %s is frozen, "
 		"no ops allowed to run"
 		, __FUNCTION__, rsc->id);
 		return HA_OK;
@@ -2867,14 +2867,14 @@ perform_op(lrmd_rsc_t* rsc)
 	while (NULL != node) {
 		op = node->data;
 		if (-1 != op->exec_pid)	{
-			lrmd_debug(LOG_DEBUG, "%s:%d: %s for rsc is already running."
+			lrmd_log(LOG_INFO, "%s:%d: %s for rsc is already running."
 			, __FUNCTION__, __LINE__, op_info(op));
 			if( rsc->delay_timeout > 0 ) {
 				lrmd_log(LOG_INFO
 				,	"%s:%d: operations on resource %s already delayed"
 				, __FUNCTION__, __LINE__, lrm_str(rsc->id));
 			} else {
-				lrmd_debug(LOG_DEBUG
+				lrmd_log(LOG_INFO
 				, 	"%s:%d: postponing "
 					"all ops on resource %s by %d ms"
 				, __FUNCTION__, __LINE__
@@ -3016,7 +3016,7 @@ perform_ra_op(lrmd_op_t* op)
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
 	if (!op->interval || is_logmsg_due(op)) { /* log non-repeating ops */
-		lrmd_log(LOG_INFO,"rsc:%s:%d: %s",rsc->id,op->call_id,op_type);
+		lrmd_log(LOG_INFO,"rsc:%s:%d: %s",rsc->id,op->call_id,probe_str(op,op_type));
 	} else {
 		lrmd_debug(LOG_DEBUG,"rsc:%s:%d: %s",rsc->id,op->call_id,op_type);
 	}
@@ -3704,7 +3704,7 @@ handle_pipe_ra_stderr(int fd, gpointer user_data)
 
 	if (data!=NULL) { 
 		lrmd_log(LOG_INFO, "RA output: (%s:%s:stderr) %s"
-			, lrm_str(rapop->rsc_id), rapop->op_type, data);
+			, lrm_str(rapop->rsc_id), probe_str(rapop->lrmd_op,rapop->op_type), data);
 		g_free(data);
 	}
 

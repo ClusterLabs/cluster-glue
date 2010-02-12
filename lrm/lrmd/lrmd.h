@@ -166,7 +166,8 @@ typedef struct ra_pipe_op  ra_pipe_op_t;
 #define is_logmsg_due(op) \
 	(longclockto_ms(sub_longclock(time_longclock(), op->t_lastlogmsg))/1000 >= \
 		(unsigned long)LOGMSG_INTERVAL)
-
+#define probe_str(op,op_type) \
+	((!op->interval && !strcmp(op_type,"monitor")) ? "probe" : "monitor")
 
 struct lrmd_rsc
 {
