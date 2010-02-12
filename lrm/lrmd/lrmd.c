@@ -2779,6 +2779,9 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 		}
 	}
 	LRMAUDIT();
+	if (shutdown_in_progress && can_shutdown()) {
+		lrm_shutdown();
+	}
 	return HA_OK;
 }
 
@@ -2844,7 +2847,7 @@ perform_op(lrmd_rsc_t* rsc)
 
 	LRMAUDIT();
 	CHECK_ALLOCATED(rsc, "resource", HA_FAIL);
-	if (TRUE == shutdown_in_progress && can_shutdown()) {
+	if (shutdown_in_progress && can_shutdown()) {
 		lrm_shutdown();
 	}
 
