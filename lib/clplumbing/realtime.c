@@ -51,10 +51,10 @@ static void cl_rtmalloc_setup(void);
  * as per suggestion from mlockall(2)
  */
 #ifdef _POSIX_MEMLOCK
-static int
-cl_stack_hogger(char * inbuf, int kbytes)
+static unsigned char
+cl_stack_hogger(unsigned char * inbuf, int kbytes)
 {
-	char	buf[1024];
+	unsigned char	buf[1024];
 	
 	if (inbuf == NULL) {
 		memset(buf, HOGRET, sizeof(buf));
@@ -143,7 +143,7 @@ cl_make_realtime(int spolicy, int priority,  int stackgrowK, int heapgrowK)
 
 #ifdef _POSIX_MEMLOCK
 	if (stackgrowK > 0) {
-		int	ret;
+		unsigned char ret;
 		if ((ret=cl_stack_hogger(NULL, stackgrowK)) != HOGRET) {
 			cl_log(LOG_INFO, "Stack hogger failed 0x%x"
 			,	ret);
