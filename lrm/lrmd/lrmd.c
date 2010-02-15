@@ -1527,14 +1527,14 @@ on_repeat_op_readytorun(gpointer data)
 	CHECK_ALLOCATED(op, "op", FALSE );
 
 	if (op->exec_pid == 0) {
-		lrmd_log(LOG_ERR, "%s: exec_pid is 0. A internal error!"
+		lrmd_log(LOG_ERR, "%s: exec_pid is 0 (internal error)"
 		,	__FUNCTION__);
 		return FALSE;
 	}
 
 	lrmd_debug2(LOG_DEBUG
-	, 	"%s: remove an operation %s from the repeat operation list and "
-		"add it to the operation list."
+	, 	"%s: remove operation %s from the repeat operation list and "
+		"add it to the operation list"
 	, 	__FUNCTION__, op_info(op));
 
 	if( op->rsc_id ) {
@@ -2642,8 +2642,8 @@ to_repeatlist(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	rsc->repeat_op_list = 
 		g_list_append (rsc->repeat_op_list, repeat_op);
 	lrmd_debug2(LOG_DEBUG
-	, "on_op_done:repeat %s is added to repeat op list to wait" 
-	, op_info(op));
+	, "%s: repeat %s is added to repeat op list to wait" 
+	, __FUNCTION__, op_info(op));
 }
 
 static void 
@@ -2712,6 +2712,7 @@ add_op_to_runlist(lrmd_rsc_t* rsc, lrmd_op_t* op)
 int
 on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 {
+	int rc = HA_OK;
 	int target_rc, last_rc, op_rc;
 	int rc_changed;
 	op_status_t op_status;
@@ -2774,6 +2775,7 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	if( !rsc->op_list ) {
 		if( rsc_removal_pending(rsc) ) {
 			lrmd_rsc_destroy(rsc);
+			rc = -1; /* let the caller know that the rsc is gone */
 		} else {
 			rsc_reset_state(rsc);
 		}
@@ -2782,7 +2784,7 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	if (shutdown_in_progress && can_shutdown()) {
 		lrm_shutdown();
 	}
-	return HA_OK;
+	return rc;
 }
 
 /*
@@ -2859,7 +2861,7 @@ perform_op(lrmd_rsc_t* rsc)
 	}
 
 	if (NULL == rsc->op_list) {
-		lrmd_debug2(LOG_DEBUG,"perform_op: no op to perform?");
+		lrmd_debug2(LOG_DEBUG,"%s: no op to perform?", __FUNCTION__);
 		return HA_OK;
 	}
 
@@ -3313,8 +3315,9 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		}
 	}
 
-	on_op_done(rsc,op);
-	perform_op(rsc);
+	if (on_op_done(rsc,op) >= 0) {
+		perform_op(rsc);
+	}
 	reset_proctrack_data(p);
 	LRMAUDIT();
 }
