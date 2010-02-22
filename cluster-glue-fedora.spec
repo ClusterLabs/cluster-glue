@@ -18,7 +18,7 @@ Summary:	Reusable cluster components
 Version:	1.0.3
 Release:	1%{?dist}
 License:	GPLv2+ and LGPLv2+
-Url:		http://www.clusterlabs.org
+Url:		http://www.linux-ha.org/wiki/Cluster_Glue
 Group:		System Environment/Base
 Source0:	cluster-glue.tar.bz2
 Requires:	perl-TimeDate
