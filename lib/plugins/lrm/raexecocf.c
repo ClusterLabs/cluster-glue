@@ -348,7 +348,7 @@ add_OCF_prefix(GHashTable * env_params, GHashTable * new_env_params)
 static void
 add_prefix_foreach(gpointer key, gpointer value, gpointer user_data)
 {
-	const int MAX_LENGTH_OF_ENV = 50;
+	const int MAX_LENGTH_OF_ENV = 128;
 	int prefix = STRLEN_CONST("OCF_RESKEY_");
 	GHashTable * new_hashtable = (GHashTable *) user_data;
 	char * newkey;
