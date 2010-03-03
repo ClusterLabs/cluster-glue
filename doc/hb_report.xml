@@ -14,7 +14,7 @@
 </refnamediv>
 <refsynopsisdiv>
 <simpara><emphasis role="strong">hb_report</emphasis> -f {time|"cts:"testnum} [-t time] [-u user] [-l file]
-       [-n nodes] [-E files] [-p patt] [-L patt] [-e prog] [-MSDCAVv] dest</simpara>
+       [-n nodes] [-E files] [-p patt] [-L patt] [-e prog] [-MSDCAVdv] [dest]</simpara>
 </refsynopsisdiv>
 <refsect1 id="_description">
 <title>DESCRIPTION</title>
@@ -34,7 +34,20 @@ dest
         The destination directory. Must be an absolute path. The
         resulting tarball is placed in the parent directory and
         contains the last directory element of this path. Typically
-        something like /tmp/standby-failed.
+        something like /tmp/standby-failed. If left out, the tarball
+        is created in your home directory named "hb_report-current_date",
+        for instance hb_report-Wed-03-Mar-2010.
+</simpara>
+</listitem>
+</varlistentry>
+<varlistentry>
+<term>
+<emphasis role="strong">-d</emphasis>
+</term>
+<listitem>
+<simpara>
+        Don&#8217;t create the compressed tar, but leave the result in a
+        directory.
 </simpara>
 </listitem>
 </varlistentry>
