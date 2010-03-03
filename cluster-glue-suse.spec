@@ -231,6 +231,9 @@ fi
 %{_libdir}/stonith/plugins/stonith2/*.so
 %{_libdir}/stonith/plugins/stonith2/*.py
 %{_libdir}/stonith/plugins/xen0-ha-dom0-stonith-helper
+%exclude %{_libdir}/stonith/plugins/external/ssh
+%exclude %{_libdir}/stonith/plugins/stonith2/null.so
+%exclude %{_libdir}/stonith/plugins/stonith2/ssh.so
 
 %files -n libglue2
 %defattr(-,root,root)
@@ -259,6 +262,9 @@ fi
 %{_includedir}/pils
 %{_datadir}/%{name}/lrmtest
 %{_libdir}/heartbeat/plugins/test/test.so
+%{_libdir}/stonith/plugins/external/ssh
+%{_libdir}/stonith/plugins/stonith2/null.so
+%{_libdir}/stonith/plugins/stonith2/ssh.so
 %doc AUTHORS
 %doc COPYING
 %doc COPYING.LIB
