@@ -132,6 +132,7 @@ getinfo-devname)
 getinfo-devdescr)
 	echo "ssh-based Linux host reset"
 	echo "Fine for testing, but not suitable for production!"
+	echo "Only reboot action supported, no poweroff, and, surprisingly enough, no poweron."
 	exit 0
 	;;
 getinfo-devurl)
