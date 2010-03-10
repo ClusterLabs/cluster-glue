@@ -26,6 +26,9 @@ INCFILES		= stonith_expect_helpers.h	\
 			stonith_signal.h		\
 			stonith_config_xml.h
 
+idir=$(includedir)/stonith
+
+i_HEADERS	        = $(INCFILES)
 
 INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 			-I$(top_builddir)/linux-ha -I$(top_srcdir)/linux-ha  \
