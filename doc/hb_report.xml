@@ -14,7 +14,7 @@
 </refnamediv>
 <refsynopsisdiv>
 <simpara><emphasis role="strong">hb_report</emphasis> -f {time|"cts:"testnum} [-t time] [-u user] [-l file]
-       [-n nodes] [-E files] [-p patt] [-L patt] [-e prog] [-MSDCAVdv] [dest]</simpara>
+       [-n nodes] [-E files] [-p patt] [-L patt] [-e prog] [-MSDCZAVsvhd] [dest]</simpara>
 </refsynopsisdiv>
 <refsect1 id="_description">
 <title>DESCRIPTION</title>
@@ -86,7 +86,7 @@ dest
         does not belong to the cluster, that may be difficult. Also,
         OpenAIS doesn&#8217;t contain a list of nodes and if Pacemaker is
         not running, there is no way to find it out automatically.
-        This option is cummulative (i.e. use -n "a b" or -n a -n b).
+        This option is cumulative (i.e. use -n "a b" or -n a -n b).
 </simpara>
 </listitem>
 </varlistentry>
@@ -107,7 +107,7 @@ dest
 </term>
 <listitem>
 <simpara>
-        Extra log files to collect. This option is cummulative. By
+        Extra log files to collect. This option is cumulative. By
         default, /var/log/messages are collected along with the
         cluster logs.
 </simpara>
@@ -141,13 +141,8 @@ dest
 </term>
 <listitem>
 <simpara>
-        Regular expression to match variables to be sanitized
-        (replaced by a string of asterisks). If you don&#8217;t want
-        information to be exposed in your report, you can specify
-        here a set of patterns to match variables in the CIB and
-        pengine files. stonith_host directives in ha.cf are also
-        sanitized. Logs are not sanitized.  This option is
-        cummulative (default: "passw.*").
+        Additional patterns to match parameter name which contain
+        sensitive information. This option is additive (default: "passw.*").
 </simpara>
 </listitem>
 </varlistentry>
@@ -187,6 +182,17 @@ dest
         don&#8217;t try to start slave collectors on other members of the
         cluster. Under normal circumstances this option is not
         needed. Use if ssh(1) does not work to other nodes.
+</simpara>
+</listitem>
+</varlistentry>
+<varlistentry>
+<term>
+<emphasis role="strong">-Z</emphasis>
+</term>
+<listitem>
+<simpara>
+        If destination directories exist, remove them instead of exiting
+        (this is default for CTS).
 </simpara>
 </listitem>
 </varlistentry>
@@ -473,14 +479,19 @@ contain spaces.</simpara>
 </refsect1>
 <refsect1 id="_should_i_send_all_this_to_the_rest_of_internet">
 <title>Should I send all this to the rest of Internet?</title>
-<simpara>We make an effort to remove sensitive data from the configuration
-(CIB, ha.cf, and transition graphs). By default, parameters
-starting matching <emphasis>passw.<emphasis role="strong"></emphasis> are replaced by a string of <emphasis></emphasis></emphasis>. Use
-the <literal>-p</literal> option to specify additional regular expressions to
-match variable names which may contain information you don&#8217;t want
-to leak. For example:</simpara>
+<simpara>By default, the sensitive data in CIB and PE files is not mangled
+by <literal>hb_report</literal> because that makes PE input files mostly useless.
+If you still have no other option but to send the report to a
+public mailing list and do not want the sensitive data to be
+included, use the <literal>-s</literal> option. Without this option, <literal>hb_report</literal>
+will issue a warning if it finds information which should not be
+exposed. By default, parameters matching <emphasis>passw.*</emphasis> are considered
+sensitive.  Use the <literal>-p</literal> option to specify additional regular
+expressions to match variable names which may contain information
+you don&#8217;t want to leak. For example:</simpara>
 <literallayout class="monospaced"># hb_report -f 18:00 -p "user.*" -p "secret.*" /var/tmp/report</literallayout>
-<simpara>Logs and other files are not filtered.</simpara>
+<simpara>Heartbeat&#8217;s ha.cf is always sanitized. Logs and other files are
+not filtered.</simpara>
 </refsect1>
 <refsect1 id="_logs">
 <title>LOGS</title>
