@@ -153,6 +153,10 @@ if not rihost:
 if not realhost:
     fatal("Host controlled by this ILO device not specified")
 
+if not power_method in ("power","button"):
+    my_err('unknown power method %s, setting to "power"')
+    power_method = "power"
+
 # XML elements
 E_RIBCL = "RIBCL"
 E_LOGIN = "LOGIN"
