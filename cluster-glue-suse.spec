@@ -113,12 +113,12 @@ export docdir=%{glue_docdir}
     --docdir=%{glue_docdir}
 %endif
 
-make %{?_smp_mflags}
+make %{?_smp_mflags} docdir=%{glue_docdir}
 ###########################################################
 
 %install
 ###########################################################
-make DESTDIR=$RPM_BUILD_ROOT install
+make DESTDIR=$RPM_BUILD_ROOT docdir=%{glue_docdir} install
 # Dont package static libs or compiled python
 find $RPM_BUILD_ROOT -name '*.a' -type f -print0 | xargs -0 rm -f
 find $RPM_BUILD_ROOT -name '*.la' -type f -print0 | xargs -0 rm -f

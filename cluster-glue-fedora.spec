@@ -83,11 +83,12 @@ export docdir=%{glue_docdir}
 %endif
 
 %build
-make %{?jobs:-j%jobs}
+make %{?jobs:-j%jobs} docdir=%{glue_docdir}
 
 %install
 rm -rf %{buildroot}
-make install DESTDIR=%{buildroot}
+make install DESTDIR=%{buildroot} docdir=%{glue_docdir}
+
 
 ## tree fix up
 # Dont package static libs
