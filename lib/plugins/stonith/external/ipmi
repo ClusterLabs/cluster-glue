@@ -43,7 +43,7 @@ have_ipmi() {
 }
 
 # Wrapper function for ipmitool that sets the correct host IP address,
-# username, and passwordm and invokes ipmitool with any arguments
+# username, and password, and invokes ipmitool with any arguments
 # passed in
 run_ipmitool() {
 	have_ipmi || {
