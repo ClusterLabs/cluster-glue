@@ -42,13 +42,16 @@ have_ipmi() {
 	test -x "${IPMITOOL}"
 }
 
-do_ipmi() {
+# Wrapper function for ipmitool that sets the correct host IP address,
+# username, and passwordm and invokes ipmitool with any arguments
+# passed in
+run_ipmitool() {
 	have_ipmi || {
 		ha_log.sh err "ipmitool not installed"
 		return 1
 	}
 	if [ -z "${ipaddr}" -o -z "${userid}" -o -z "${passwd}" ]; then
-		ha_log.sh err "ipaddr, userid or password missing; check configuration"
+		ha_log.sh err "ipaddr, userid or passwd missing; check configuration"
 		return 1
 	fi
 
@@ -57,7 +60,16 @@ do_ipmi() {
 		interface="lan"
 	fi
 
-	if outp=`${IPMITOOL} -I ${interface} -H ${ipaddr} -U "${userid}" -P "${passwd}" ${1} 2>&1`; then
+	action="$*"
+
+	${IPMITOOL} -I ${interface} -H ${ipaddr} -U "${userid}" -P "${passwd}" ${action} 2>&1
+}
+
+# Yet another convenience wrapper that invokes run_ipmitool, captures
+# its output, logs the output, returns either 0 (on success) or 1 (on
+# any error)
+do_ipmi() {
+	if outp=`run_ipmitool $*`; then
 		ha_log.sh debug "ipmitool output: `echo $outp`"
 		return 0
 	else
@@ -65,6 +77,23 @@ do_ipmi() {
 		return 1
 	fi
 }
+
+# Check if the managed node is powered on. To do so, issue the "power
+# status" command. Should return either "Chassis Power is on" or
+# "Chassis Power is off".
+ipmi_is_power_on() {
+	local outp
+	outp=`run_ipmitool ${STATUS}`
+	case "${outp}" in
+	    *on)
+		return 0
+		;;
+	    *off)
+		return 1
+		;;
+	esac
+}
+
 
 # Rewrite the hostname to accept "," as a delimeter for hostnames too.
 
@@ -82,10 +111,18 @@ off)
 	exit
 	;;
 reset)
-	do_ipmi "${RESET}"
+	if ipmi_is_power_on; then
+		do_ipmi "${RESET}"
+	else
+		do_ipmi "${POWERON}"
+	fi
 	exit
 	;;
 status)
+	# "status" reflects the status of the stonith _device_, not
+	# the managed node. Hence, only check if we can contact the
+	# IPMI device with "power status" command, don't pay attention
+	# to whether the node is in fact powered on or off.
 	do_ipmi "${STATUS}"
 	exit $?
 	;;
