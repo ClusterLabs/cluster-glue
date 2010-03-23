@@ -3025,10 +3025,14 @@ perform_ra_op(lrmd_op_t* op)
 	op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
 	params = merge_str_tables(rsc->params,op_params);
 	ha_msg_mod_str_table(op->msg, F_LRM_PARAM, params);
-	free_str_table(op_params);
-	op_params = NULL;
-	free_str_table(params);
-	params = NULL;
+	if (op_params) {
+		free_str_table(op_params);
+		op_params = NULL;
+	}
+	if (params) {
+		free_str_table(params);
+		params = NULL;
+	}
 	op->t_perform = time_longclock();
 	check_queue_duration(op);
 
@@ -3878,8 +3882,10 @@ gen_op_info(const lrmd_op_t* op, gboolean add_params)
 			param_gstr = g_string_new("");
 			op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
 			hash_to_str(op_params, param_gstr);
-			free_str_table(op_params);
-			op_params = NULL;
+			if (op_params) {
+				free_str_table(op_params);
+				op_params = NULL;
+			}
 
 			snprintf(info+strlen(info), sizeof(info)-strlen(info)
 				,", its parameters: %s",param_gstr->str);
