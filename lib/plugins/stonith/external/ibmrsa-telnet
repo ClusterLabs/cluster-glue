@@ -88,29 +88,29 @@ class RSABoard(telnetlib.Telnet):
         return line
 
     def login(self, user, passwd):
-        self.write("\r")
-        line = self.expect(['^login : ', '^username: '], self._timeout)
+        time.sleep(1)
+        line = self.expect(['\nlogin : ', '\nusername: '], self._timeout)
         self.write(user)
         self.write('\r')
-        line = self.expect(['^Password: ', '^password: '], self._timeout)
+        line = self.expect(['\nPassword: ', '\npassword: '], self._timeout)
         self.write(passwd)
         self.write('\r')
-        line = self.expect(['^system>', '^> '], self._timeout)
+        line = self.expect(['\nsystem>', '> '], self._timeout)
 
     def reset(self):
         self.write('power cycle\r')
-        line = self.expect(['^ok'], self._timeout)
-        line = self.expect(['^system>', '^> '], self._timeout)
+        line = self.expect(['\nok'], self._timeout)
+        line = self.expect(['\nsystem>', '> '], self._timeout)
 
     def on(self):
         self.write('power on\r')
-        line = self.expect(['^ok'], self._timeout)
-        line = self.expect(['^system>', '^> '], self._timeout)
+        line = self.expect(['\nok'], self._timeout)
+        line = self.expect(['\nsystem>', '> '], self._timeout)
 
     def off(self):
         self.write('power off\r')
-        line = self.expect(['^ok'], self._timeout)
-        line = self.expect(['^system>', '^> '], self._timeout)
+        line = self.expect(['\nok'], self._timeout)
+        line = self.expect(['\nsystem>', '> '], self._timeout)
 
     def exit(self):
         self.write('exit\r')
