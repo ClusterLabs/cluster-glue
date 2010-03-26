@@ -154,7 +154,7 @@ class RSAStonithPlugin:
                             time.localtime(ct)), msecs)
 
     def _echo_debug(self, *args):
-        subprocess.call("ha_log.sh debug '%s'" % ' '.join(args), shell=True)
+        self.echo_log('debug', *args)
 
     def echo(self, *args):
         what = ''.join([str(x) for x in args])
@@ -164,7 +164,7 @@ class RSAStonithPlugin:
         self._echo_debug("STDOUT:", what)
 
     def echo_log(self, level, *args):
-        subprocess.call("ha_log.sh %s '%s'" % (level,' '.join(args)), shell=True)
+        subprocess.call(('ha_log.sh', level) +  args)
 
     def _get_connection(self):
         if not self._connection:
@@ -172,6 +172,7 @@ class RSAStonithPlugin:
             self._echo_debug("Connect to '%s'" %
                   (self._parameters['ip_address'],))
             c.open(self._parameters['ip_address'])
+            self._echo_debug("Connection established")
             c.login(self._parameters['username'],
                     self._parameters['password'])
             self._connection = c
