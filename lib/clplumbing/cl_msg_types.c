@@ -1027,6 +1027,8 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 		msg->vlens[j] =  string_list_pack_length(list);
 		g_list_free((GList*)value); /*we don't free each element
 					      because they are used in new list*/
+		free(name); /* this name is no longer necessary
+			       because msg->names[j] is reused */
 		
 	} else { 
 		cl_log(LOG_ERR, "field already exists "
