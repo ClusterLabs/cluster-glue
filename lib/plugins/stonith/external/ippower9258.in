@@ -1,0 +1,316 @@
+#!/bin/sh
+#
+# External STONITH module using IP Power 9258 or compatible devices.
+#
+# Copyright (c) 2010 Helmut Weymann (Helmut (at) h-weymann (dot) de)
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like. Any license provided herein, whether implied or
+# otherwise, applies only to this software file. Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+
+#
+# Basic commands & parameters independent from individual device 
+
+DEVICE="IP Power 9258"
+IPPowerOn="1"
+IPPowerOff="0"
+IPGetPower="Set.cmd?CMD=GetPower"
+IPSetPower="Set.cmd?CMD=SetPower"
+IPPort_name="P"
+IPPort0=60
+HTTP_COMMAND="wget -q -O - --"
+LOG_ERROR="ha_log.sh err"
+LOG_WARNING="ha_log.sh warn"
+LOG_INFO="ha_log.sh info"
+LOG_DEBUG="ha_log.sh debug"
+MY_COOKIES="cookies.txt"
+MY_TEMPFILE="temp.htm"
+PORT_STATUS="iocontrol.htm"
+UNDEFINED_HOSTNAME="*not-defined*"
+
+#
+# check MY_ROOT_PATH for IP Power 9258 and create it if necessary
+MY_ROOT_PATH="@GLUE_STATE_DIR@/heartbeat/rsctmp/ippower9258"
+
+#
+# script functions
+#
+
+get_challenge() {
+	#
+	# device sends a challenge for md5 encryption of username, password and challenge
+	send_web_command - "http://$deviceip/" | grep Challenge | grep input | cut -d '"' -f 6
+}
+
+get_cookie_from_device(){
+	# the form on the login page has these fields:
+	# Username, Password, Challenge, Response, ScreenWidth
+	#
+    challenge=`get_challenge`
+	response=`echo -n "$username$password$challenge" | md5sum | cut -b -32`
+	postdata="Username=$username&Password=&Challenge=&Response=$response&ScreenWidth=1024"
+	send_web_command " $MY_PATH/$MY_TEMPFILE --post-data=$postdata" "http://$deviceip/tgi/login.tgi"
+	if grep -qs "Invalid User name or Password" $MY_PATH/$MY_TEMPFILE
+	then
+		$LOG_ERROR "Login to device $deviceip failed."
+		$LOG_ERROR "Received Challenge = <<<$challenge>>>."
+		$LOG_ERROR "Sent postdata = <<<$postdata>>>."
+		exit 1
+	fi
+}
+
+get_data_from_device() {
+	# If successful all device info is available in MY_PATH
+	rm -f "$MY_PATH/$PORT_STATUS"
+	send_web_command "$MY_PATH/$PORT_STATUS" "http://$deviceip/$PORT_STATUS"
+	if grep -qs "Cookie Time Out" $MY_PATH/$PORT_STATUS
+	then
+		$LOG_ERROR "received no port data from $deviceip (Cookie Time Out)"
+		exit 1
+	fi
+}
+
+send_http_request() {
+	# ececution of http commands supported by the device
+	$HTTP_COMMAND "http://$username:$password@$deviceip/$1"
+}
+
+send_web_command(){
+	# ececution of web commands through the web-interface
+	WEB_COMMAND="wget -q --keep-session-cookies"
+	WEB_COMMAND="$WEB_COMMAND --load-cookies $MY_PATH/$MY_COOKIES"
+	WEB_COMMAND="$WEB_COMMAND --save-cookies $MY_PATH/$MY_COOKIES"
+	$WEB_COMMAND -O $1 -- $2
+}
+
+name2port() {
+	local name=$1
+	local i=$IPPort0
+	for h in $device_hostlist ; do
+		if [ $h = $name ]; then
+			echo $IPPort_name$i
+			return
+		fi
+		i=`expr $i + 1`
+	done
+	echo "invalid"
+}
+
+set_port() {
+	#
+	# port status is always set. Even if requested status is current status.
+	# host status is not considered.
+	local host=$1
+	local requested_status=$2 # 0 or 1
+	local port=`name2port $host`
+	if [ "$port" = "invalid" ]
+	then
+		$LOG_ERROR "Host $host is not in hostlist ($hostlist) for $deviceip."
+		exit 1
+	fi
+	ret=`send_http_request "$IPSetPower+$port=$requested_status" | cut -b 11`
+	if [ "$ret" != "$requested_status" ]
+	then
+		$LOG_ERROR "$DEVICE at $deviceip responds with wrong status $ret for host $host at port $port."
+		exit 1
+	fi
+	return 0
+}
+
+build_device_hostlist() {
+	# 
+	# hostnames are available from http://$deviceip/iocontrol.htm"
+	# check for number of ports
+	#
+	device_hostlist=$(
+	w3m -dump $MY_PATH/$PORT_STATUS | grep 'Power[1-8]' |
+	sed 's/[^[]*\[//;s/\].*//;s/ *//' |
+	while read h; do
+		[ -z "$h" ] &&
+			echo $UNDEFINED_HOSTNAME ||
+			echo $h
+	done
+	)
+	if [ x = x"$device_hostlist" ]; then
+		$LOG_ERROR "cannot get hostlist for $deviceip"
+		exit 1
+	fi
+	$LOG_DEBUG "Got new hostlist ($device_hostlist) from $deviceip"
+}
+
+filter_device_hostlist() {
+	# check the given hostlist against the device hostlist
+	local host
+	for host in $device_hostlist; do
+		[ "$host" != "$UNDEFINED_HOSTNAME" ] &&
+			echo $host
+	done
+}
+
+check_hostlist() {
+	# check the given hostlist against the device hostlist
+	local cnt=`echo "$hostlist" | wc -w`
+	local cnt2=0
+	local host
+	for host in $hostlist; do
+		if [ `name2port $host` != "invalid" ]; then
+			cnt2=$((cnt2+1))
+		else
+			$LOG_ERROR "host $host not defined at $deviceip"
+		fi
+	done
+	[ $cnt -ne $cnt2 ] &&
+		exit 1
+}
+
+get_http_status() {
+	pattern="P60=[01],P61=[01],P62=[01],P63=[01],P64=[01],P65=[01],P66=[01],P67=[01]"
+	ret=`send_http_request "$IPGetPower" | grep $pattern`
+	if [ "X$ret" = "X" ]
+	then
+		$LOG_ERROR "$DEVICE at $deviceip returns invalid or no string."
+		exit 1
+	fi
+}
+
+hostlist=`echo $hostlist | tr ',' ' '`
+case $1 in
+gethosts|on|off|reset|status)
+	# need environment from stonithd
+	# and device information from individual device
+	#
+	# default device username is admin
+	# IP Power 9258 does not allow user management.
+	#
+	if [ "X$username" = "X" ]
+	then
+		username="admin"
+	fi
+
+	mkdir -p $MY_ROOT_PATH
+	tmp_path="$deviceip" # ensure a simple unique pathname
+	MY_PATH="$MY_ROOT_PATH/$tmp_path"
+	mkdir -p $MY_PATH
+	get_cookie_from_device
+	get_data_from_device
+	build_device_hostlist
+	if [ "X$hostlist" = "X" ]; then
+		hostlist="`filter_device_hostlist`"
+	else
+		check_hostlist
+	fi
+	;;
+*)
+	# the client is asking for meta-data
+	;;
+esac
+
+target=`echo $2 | sed 's/[.].*//'`
+# the necessary actions for stonithd
+case $1 in
+gethosts)
+	echo $hostlist
+	;;
+on)
+	set_port $target $IPPowerOn
+	;;
+off)
+	set_port $target $IPPowerOff
+	;;
+reset)
+	set_port $target $IPPowerOff
+	sleep 5
+	set_port $target $IPPowerOn
+	;;
+status)
+	# werify http command interface
+	get_http_status
+	;;
+getconfignames)
+	# return all the config names
+	for ipparam in deviceip username password hostlist
+	do
+		echo $ipparam
+	done
+	;;
+getinfo-devid)
+	echo "IP Power 9258"
+	;;
+getinfo-devname)
+	echo "IP Power 9258 power switch"
+	;;
+getinfo-devdescr)
+	echo "Power switch IP Power 9258 with 4 or 8 power outlets."
+	echo "WARNING: It is different from IP Power 9258 HP"
+	;;
+getinfo-devurl)
+	echo "http://www.aviosys.com/manual.htm"
+	;;
+getinfo-xml)
+	cat << IPPOWERXML
+<parameters>
+<parameter name="deviceip" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+IP address or hostname of the device.
+</shortdesc>
+<longdesc lang="en">
+The IP Address or the hostname of the device.
+</longdesc>
+</parameter>
+
+<parameter name="password" unique="0" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Password
+</shortdesc>
+<longdesc lang="en">
+The password to log in with.
+</longdesc>
+</parameter>
+
+<parameter name="hostlist" unique="0" required="0">
+<content type="string" />
+<shortdesc lang="en">
+Hostlist
+</shortdesc>
+<longdesc lang="en">
+The list of hosts that the device controls.
+If you leave this list empty, we will retrieve the hostnames from the device.
+</longdesc>
+</parameter>
+
+<parameter name="username" unique="0" required="0">
+<content type="string" default="admin"/>
+<shortdesc lang="en">
+Account Name
+</shortdesc>
+<longdesc lang="en">
+The user to log in with.
+</longdesc>
+</parameter>
+
+</parameters>
+IPPOWERXML
+	;;
+*)
+	$LOG_ERROR "Unexpected command $1 for $DEVICE at $deviceip."
+	exit 1;
+	;;
+esac
