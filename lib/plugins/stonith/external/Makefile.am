@@ -27,6 +27,6 @@ extdir		     = $(stonith_ext_plugindir)
 helperdir	     = $(stonith_plugindir)
 
 ext_SCRIPTS	     = drac5 dracmc-telnet ibmrsa ibmrsa-telnet ipmi riloe ssh vmware rackpdu xen0 hmchttp \
-			xen0-ha sbd kdumpcheck
+			xen0-ha sbd kdumpcheck ippower9258
 
 helper_SCRIPTS	     = xen0-ha-dom0-stonith-helper
