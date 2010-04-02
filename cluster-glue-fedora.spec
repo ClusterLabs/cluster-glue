@@ -15,8 +15,8 @@
 
 Name:		cluster-glue
 Summary:	Reusable cluster components
-Version:	1.0.3
-Release:	1%{?dist}
+Version:	1.0.4
+Release:	0rc1%{?dist}
 License:	GPLv2+ and LGPLv2+
 Url:		http://www.linux-ha.org/wiki/Cluster_Glue
 Group:		System Environment/Base
