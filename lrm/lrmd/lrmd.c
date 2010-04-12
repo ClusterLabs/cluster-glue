@@ -3507,7 +3507,7 @@ notify_client(lrmd_op_t* op)
 		/* send the result to client */
 		send_cbk_msg(op->msg, client);
 	} else {
-		lrmd_log(LOG_ERR
+		lrmd_log(LOG_WARNING
 		,	"%s: client for the operation %s does not exist"
 			" and client requested notification."
 		,	__FUNCTION__,	op_info(op));
