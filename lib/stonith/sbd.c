@@ -878,7 +878,7 @@ main(int argc, char** argv)
 	}
 
 	cl_log_set_entity(cmdname);
-	cl_log_enable_stderr(1);
+	cl_log_enable_stderr(0);
 	cl_log_set_facility(LOG_DAEMON);
 	
 	get_uname();
