@@ -1,3 +1,6 @@
+* Mon Apr 15 2010 Dejan Muhamedagic <dejan@suse.de>
+- stable release 1.0.5
+- clplumbing: revert changeset 81ad41d14f72 which breaks the ABI
 * Mon Apr 12 2010 Dejan Muhamedagic <dejan@suse.de>
 - stable release 1.0.4
 - clplumbing: fix memory leak in cl_msg/lrmd (lf#1841,2389)
