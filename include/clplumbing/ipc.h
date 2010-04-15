@@ -132,8 +132,6 @@ struct IPC_CHANNEL{
 	int		ch_status;	/* identify the status of channel.*/
 	int		refcount;	/* reference count */
 	pid_t		farside_pid;	/* far side pid */
-	uid_t		farside_uid;	/* far side uid */
-	gid_t		farside_gid;	/* far side gid */
 	void*		ch_private;	/* channel private data. */
 					/* (may contain conn. info.) */
 	IPC_Ops*	ops;		/* IPC_Channel function table.*/

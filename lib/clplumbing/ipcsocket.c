@@ -2204,8 +2204,6 @@ channel_new(int sockfd, int conntype, const char *path_name) {
   temp_ch->low_flow_mark = -1;
   temp_ch->conntype = conntype;
   temp_ch->refcount = 0;
-  temp_ch->farside_uid = -1;
-  temp_ch->farside_gid = -1;
 
   return temp_ch;
   
@@ -2343,20 +2341,14 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 	}
 	if (auth_info == NULL
 	||	(auth_info->uid == NULL && auth_info->gid == NULL)) {
-		ret = IPC_OK;    /* no restriction for authentication */
+		return IPC_OK;    /* no restriction for authentication */
 	  }
 
 	/* Get the credential information for our peer */
 	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 	if (getsockopt(conn_info->s, SOL_SOCKET, SO_PEERCRED, &cred, &n) != 0
 	||	(size_t)n != sizeof(cred)) {
-		return ret;
-	}
-
-	ch->farside_uid = cred.uid;
-	ch->farside_gid = cred.gid;
-	if (ret == IPC_OK) {
-		return ret;
+		return IPC_FAIL;
 	}
 #if 0
 	cl_log(LOG_DEBUG, "SO_PEERCRED returned [%d, (%ld:%ld)]"
@@ -2427,19 +2419,13 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 
 	if (auth_info == NULL
 	||	(auth_info->uid == NULL && auth_info->gid == NULL)) {
-		ret = IPC_OK;    /* no restriction for authentication */
+		return IPC_OK;    /* no restriction for authentication */
 	}
 	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 
 	if (getpeereid(conn_info->s, &euid, &egid) < 0) {
 		cl_perror("getpeereid() failure");
-		return ret;
-	}
-
-	ch->farside_uid = euid;
-	ch->farside_gid = egid;
-	if (ret == IPC_OK) {
-		return ret;
+		return IPC_FAIL;
 	}
 
 	/* Check credentials against authorization information */
@@ -2538,7 +2524,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 #endif
 
   struct SOCKET_CH_PRIVATE *conn_info;
-  int ret = IPC_FAIL;
+  int ret = IPC_OK;
   char         buf;
   
   /* Compute size without padding */
@@ -2557,7 +2543,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 
   if (auth_info == NULL
   ||	(auth_info->uid == NULL && auth_info->gid == NULL)) {
-    ret = IPC_OK;    /* no restriction for authentication */
+    return IPC_OK;    /* no restriction for authentication */
   }
   conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 
@@ -2580,19 +2566,12 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
       || cmsg->cmsg_len < CMSGSIZE
       || cmsg->cmsg_type != SCM_CREDS) {
       cl_perror("can't get credential information from peer");
-      return ret;
+      return IPC_FAIL;
     }
 
   /* Avoid alignment issues - just copy it! */
   memcpy(&cred, CMSG_DATA(cmsg), sizeof(cred));
 
-  ch->farside_uid = cred.crEuid;
-  ch->farside_gid = cred.crEgid;
-  if (ret == IPC_OK) {
-      return ret;
-  }
-
-  ret = IPC_OK;
 
   if (	auth_info->uid
   &&	g_hash_table_lookup(auth_info->uid, &(cred.crEuid)) == NULL) {
@@ -2639,7 +2618,7 @@ static int
 socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 {
 	int len = 0;
-	int ret = IPC_FAIL;
+	int ret = IPC_OK;
 	struct stat stat_buf;
 	struct sockaddr_un *peer_addr = NULL;
 	struct SOCKET_CH_PRIVATE *ch_private = NULL;	
@@ -2657,35 +2636,25 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 		
 	} else if (auth_info == NULL
 	    ||	(auth_info->uid == NULL && auth_info->gid == NULL)) {
-		ret = IPC_OK;    /* no restriction for authentication */
+		return IPC_OK;    /* no restriction for authentication */
 
-	}
-
-	if(ch_private == NULL) {
+	} else if(ch_private == NULL) {
 		cl_log(LOG_ERR, "No channel private data available");
-		return ret;
+		return IPC_FAIL;
 		
 	} else if(peer_addr == NULL) {	
 		cl_log(LOG_ERR, "No peer information available");
-		return ret;
+		return IPC_FAIL;
 	}
 	
 	len = SUN_LEN(peer_addr);
 
 	if(len < 1) {
 		cl_log(LOG_ERR, "No peer information available");
-		return ret;
+		return IPC_FAIL;
 	}
 	peer_addr->sun_path[len] = 0;
 	stat(peer_addr->sun_path, &stat_buf);
-
-	ch->farside_uid = stat_buf.st_uid;
-	ch->farside_gid = stat_buf.st_gid;
-	if (ret == IPC_OK) {
-		return ret;
-	}
-
-	ret = IPC_OK;
 
 	if ((auth_info->uid == NULL || g_hash_table_size(auth_info->uid) == 0)
 	    && auth_info->gid != NULL
@@ -2735,9 +2704,6 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 
 	conn_info = (struct SOCKET_CH_PRIVATE *) ch->ch_private;
 
-	ch->farside_uid = conn_info->farside_uid;
-	ch->farside_gid = conn_info->farside_gid;
-
 	if (auth_info == NULL
 	  || (auth_info->uid == NULL && auth_info->gid == NULL)) {
 		return IPC_OK;	/* no restriction for authentication */
@@ -2785,18 +2751,12 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 
 	if (auth_info == NULL
 	  || (auth_info->uid == NULL && auth_info->gid == NULL)) {
-		rc = IPC_OK;	/* no restriction for authentication */
+		return IPC_OK;	/* no restriction for authentication */
 	}
 
 	if (getpeerucred(conn_info->s, &ucred) < 0) {
 		cl_perror("getpeereid() failure");
-		return rc;
-	}
-
-	ch->farside_uid = ucred_geteuid(ucred);
-	ch->farside_gid = ucred_getegid(ucred);
-	if (rc == IPC_OK) {
-		return rc;
+		return IPC_FAIL;
 	}
 
 	/* Check credentials against authorization information */
