@@ -132,8 +132,6 @@ struct IPC_CHANNEL{
 	int		ch_status;	/* identify the status of channel.*/
 	int		refcount;	/* reference count */
 	pid_t		farside_pid;	/* far side pid */
-	uid_t		farside_uid;	/* far side uid */
-	gid_t		farside_gid;	/* far side gid */
 	void*		ch_private;	/* channel private data. */
 					/* (may contain conn. info.) */
 	IPC_Ops*	ops;		/* IPC_Channel function table.*/
@@ -180,6 +178,18 @@ struct IPC_CHANNEL{
 	int		conntype;
 	
 	char		failreason[MAXFAILREASON];
+
+	/* New members to support Multi-level ACLs for the CIB,
+	 * available since libplumb.so.2.1.0, added at the
+	 * end of the struct to maintain backwards ABI compatibility.
+	 *
+	 * If you don't like to care for library versions,
+	 * create your IPC channels with
+	 *  c = ipc_wait_conn_constructor(IPC_UDS_CRED, ...),
+	 * and these members will be available.
+	 */
+	uid_t		farside_uid;	/* far side uid */
+	gid_t		farside_gid;	/* far side gid */
 };
 
 struct IPC_QUEUE{
@@ -614,9 +624,18 @@ struct IPC_OPS{
  *    the pointer to a new waiting connection or NULL if the connection
  *			can't be created.
  * Note:
- *    current implementation only supports unix domain socket 
- *    whose type is IPC_DOMAIN_SOCKET 
- *
+ *    current implementation supports
+ *    IPC_ANYTYPE:       This is what program code should typically use.
+ *                       Internally it is an alias to IPC_UDS_CRED.
+ *    IPC_UDS_CRED:      Unix Domain Sockets,
+ *                       farside uid + gid credentials is available.
+ *                       Available since libplumb.so.2.1.0.
+ *    IPC_DOMAIN_SOCKET: An other alias to Unix Domain Sockets;
+ *                       internally it is equivalent to both above.
+ *                       Using this explicitly, your code will work
+ *                       even with libplumb.so.2.0.0.
+ *                       Which also means that you MUST NOT use the
+ *                       farside_uid/gid functionality then.
  */
 extern IPC_WaitConnection * ipc_wait_conn_constructor(const char * ch_type
 ,	GHashTable* ch_attrs);
@@ -639,9 +658,8 @@ extern IPC_WaitConnection * ipc_wait_conn_constructor(const char * ch_type
  *	or NULL if the channel can't be created.
  *
  * Note:
- *   current implementation only support unix domain socket 
- *   whose type is IPC_DOMAIN_SOCKET 
- *
+ *    See comments for ipc_wait_conn_constructor above
+ *    for currently implemented ch_type channel types.
  */
 extern IPC_Channel  * ipc_channel_constructor(const char * ch_type
 ,	GHashTable* ch_attrs);
@@ -751,12 +769,19 @@ void	ipc_bufpool_unref(struct ipc_bufpool* pool);
 
 void	set_ipc_time_debug_flag(gboolean flag);
 
-#define	IPC_PATH_ATTR		"path"		/* pathname attribute */
-#define	IPC_DOMAIN_SOCKET	"uds"		/* Unix domain socket */
-#define IPC_MODE_ATTR           "sockmode"      /* socket mode attribute */
+/* pathname attribute */
+#define	IPC_PATH_ATTR		"path"
+/* socket mode attribute */
+#define IPC_MODE_ATTR           "sockmode"
+/* Unix domain socket, used by old code.
+ * See also the comment block above ipc_wait_conn_constructor() */
+#define	IPC_DOMAIN_SOCKET	"uds"
+/* Unix domain socket with farside uid + gid credentials.
+ * Available since libplumb.so.2.1.0 */
+#define	IPC_UDS_CRED		"uds_c"
 
-#ifdef IPC_DOMAIN_SOCKET
-#	define	IPC_ANYTYPE		IPC_DOMAIN_SOCKET
+#ifdef IPC_UDS_CRED
+#	define	IPC_ANYTYPE		IPC_UDS_CRED
 #else
 #	error "No IPC types defined(!)"
 #endif

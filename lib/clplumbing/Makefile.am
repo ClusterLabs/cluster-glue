@@ -63,7 +63,7 @@ libplumb_la_SOURCES	= 		\
 
 libplumb_la_LIBADD      = $(top_builddir)/replace/libreplace.la \
 			$(top_builddir)/lib/pils/libpils.la
-libplumb_la_LDFLAGS	= -version-info 2:0:0
+libplumb_la_LDFLAGS	= -version-info 3:0:1
 
 libplumbgpl_la_SOURCES	= setproctitle.c
 libplumbgpl_la_LIBADD   = $(top_builddir)/replace/libreplace.la \
