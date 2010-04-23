@@ -62,6 +62,7 @@ struct IPC_WAIT_CONNECTION *
 ipc_wait_conn_constructor(const char * ch_type, GHashTable* ch_attrs)
 {
   if (strcmp(ch_type, "domain_socket") == 0
+  ||	strcmp(ch_type, IPC_UDS_CRED) == 0
   ||	strcmp(ch_type, IPC_ANYTYPE) == 0
   ||	strcmp(ch_type, IPC_DOMAIN_SOCKET) == 0) {
     return socket_wait_conn_new(ch_attrs);
@@ -73,6 +74,7 @@ struct IPC_CHANNEL *
 ipc_channel_constructor(const char * ch_type, GHashTable* ch_attrs)
 {
   if	(strcmp(ch_type, "domain_socket") == 0
+  ||	strcmp(ch_type, IPC_UDS_CRED) == 0
   ||	strcmp(ch_type, IPC_ANYTYPE) == 0
   ||	strcmp(ch_type, IPC_DOMAIN_SOCKET) == 0) {
 
