@@ -1,0 +1,72 @@
+#!/bin/bash
+# Author:      Lars Marowsky-Bree
+#
+# Copyright 2008 Lars Marowsky-Bree
+# License:      GNU General Public License (GPL)
+
+# This is not an external/stonith plugin by itself, but instead a helper
+# script which gets installed in Dom0.
+
+# TODO:
+# - Error handling
+#   - How to handle if the DomU resource doesn't exist?
+#   - Does this truly work with split-brain?
+#   - Is the handling of non-existent resources adequate?
+#   ...
+# Basically: more testing. This is proof-of-concept and works, but deserves
+# validation.
+
+CMD="$1"
+DOMU="$2"
+TIMEOUT="$3"
+
+# Make sure the timeout is an integer:
+if [ "0$TIMEOUT" -eq 0 ]; then
+	TIMEOUT=300
+fi
+
+SetTargetRole() {
+	local new_role="$1"
+	crm_resource -r $DOMU --meta -p target_role -v $new_role
+
+	local timeout="$TIMEOUT"
+
+	# We only need to wait for "stopped".
+	if [ "$new_role" != "stopped" ]; then
+		return 0
+	fi
+
+	while [ $timeout -gt 0 ]; do
+		local rc
+		crm_resource -W -r $DOMU 2>&1 | grep -q "is NOT running"
+		rc=$?
+		if [ $rc -eq 0 ]; then
+			return 0
+		fi
+		timeout=$[timeout-1];
+		sleep 1
+	done
+	return 1
+}
+
+
+case $CMD in
+on)	SetTargetRole started
+	exit $?
+	;;
+off)	SetTargetRole stopped
+	exit $?
+	;;
+reset)	SetTargetRole stopped || exit 1
+	SetTargetRole started
+	exit $?
+	;;
+status) exit 0
+	;;
+*)	ha_log.sh err "Called with unknown command: $CMD"
+   	exit 1
+	;;
+esac
+
+exit 1
+

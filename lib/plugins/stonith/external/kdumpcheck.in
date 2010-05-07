@@ -1,0 +1,274 @@
+#!/bin/sh
+#
+# External STONITH module to check kdump.
+#
+# Copyright (c) 2008 NIPPON TELEGRAPH AND TELEPHONE CORPORATION
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+
+SSH_COMMAND="@SSH@ -q -x -o PasswordAuthentication=no -o StrictHostKeyChecking=no -n"
+#Set default user name.
+USERNAME="kdumpchecker"
+#Initialize identity file-path options for ssh command
+IDENTITY_OPTS=""
+
+#Rewrite the hostlist to accept "," as a delimeter for hostnames too.
+hostlist=`echo ${hostlist} | tr ',' ' '`
+
+##
+# Check the parameter hostlist is set or not.
+# If not, exit with 6 (ERR_CONFIGURED).
+##
+check_hostlist() {
+    if [ -z "${hostlist}" ]; then
+        ha_log.sh err "hostlist is empty"
+        exit 6 #ERR_CONFIGURED
+    fi
+}
+
+##
+# Set kdump check user name to USERNAME.
+#   always return 0.
+##
+get_username() {
+    kdump_conf="/etc/kdump.conf"
+
+    if [ ! -f "${kdump_conf}" ]; then
+        ha_log.sh debug "${kdump_conf} doesn't exist"
+        return 0
+    fi
+
+    tmp=""
+    while read config_opt config_val; do
+        if [ "${config_opt}" = "kdump_check_user" ]; then
+                tmp="${config_val}"
+        fi
+    done < "${kdump_conf}"
+    if [ -n "${tmp}" ]; then
+        USERNAME="${tmp}"
+    fi
+
+    ha_log.sh debug "kdump check user name is ${USERNAME}."
+}
+
+##
+# Check the specified or default identity file exists or not.
+# If not, exit with 6 (ERR_CONFIGURED).
+##
+check_identity_file() {
+    IDENTITY_OPTS=""
+    if [ -n "${identity_file}" ]; then
+        if [ ! -f "${identity_file}" ]; then
+            ha_log.sh err "${identity_file} doesn't exist."
+            exit 6 #ERR_CONFIGURED
+        fi
+        IDENTITY_OPTS="-i ${identity_file}"
+    else
+        flg_file_exists=0
+        homedir=`eval echo "~${USERNAME}"`
+        for filename in "${homedir}/.ssh/id_rsa" \
+                        "${homedir}/.ssh/id_dsa" \
+                        "${homedir}/.ssh/identity"
+        do
+            if [ -f "${filename}" ]; then
+                flg_file_exists=1
+                IDENTITY_OPTS="${IDENTITY_OPTS} -i ${filename}"
+            fi
+        done
+        if [ ${flg_file_exists} -eq 0 ]; then
+            ha_log.sh err "${USERNAME}'s identity file for ssh command" \
+                " doesn't exist."
+            exit 6 #ERR_CONFIGURED
+        fi
+    fi
+}
+
+##
+# Check the user to check doing kdump exists or not.
+# If not, exit with 6 (ERR_CONFIGURED).
+##
+check_user_existence() {
+
+    # Get kdump check user name and check whether he exists or not.
+    grep -q "^${USERNAME}:" /etc/passwd > /dev/null 2>&1
+    ret=$?
+    if [ ${ret} != 0 ]; then
+        ha_log.sh err "user ${USERNAME} doesn't exist." \
+            "please confirm \"kdump_check_user\" setting in /etc/kdump.conf." \
+            "(default user name is \"kdumpchecker\")"
+        exit 6 #ERR_CONFIGURED
+    fi
+}
+
+##
+# Check the target node is kdumping or not.
+#   arg1 : target node name.
+#   ret  : 0 -> the target is kdumping.
+#        : 1 -> the target is _not_ kdumping.
+#        : else -> failed to check.
+##
+check_kdump() {
+    target_node="$1"
+
+    # Get kdump check user name.
+    get_username
+    check_user_existence
+    exec_cmd="${SSH_COMMAND} -l ${USERNAME}"
+
+    # Specify kdump check user's identity file for ssh command.
+    check_identity_file
+    exec_cmd="${exec_cmd} ${IDENTITY_OPTS}"
+
+    # Now, check the target!
+    # In advance, Write the following setting at the head of
+    # kdump_check_user's public key in authorized_keys file on target node.
+    #    command="test -s /proc/vmcore", \
+    #    no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty
+    ha_log.sh debug "execute the command [${exec_cmd} ${target_node}]."
+    ${exec_cmd} ${target_node} > /dev/null 2>&1
+    ret=$?
+    ha_log.sh debug "the command's result is ${ret}."
+
+    #ret ->   0 : vmcore file's size is not zero. the node is kdumping.
+    #ret ->   1 : the node is _not_ kdumping (vmcore didn't exist or
+    #             its size is zero). It still needs to be STONITH'ed.
+    #ret -> 255 : ssh command is failed.
+    #      else : Maybe command strings in authorized_keys is wrong...
+    return ${ret}
+}
+
+###
+#
+#  Main function.
+#
+###
+case $1 in
+gethosts)
+    check_hostlist
+    for hostname in ${hostlist} ; do
+        echo "${hostname}"
+    done
+    exit 0
+    ;;
+on)
+    # This plugin does only check whether a target node is kdumping or not.
+    exit 1
+    ;;
+reset|off)
+    check_hostlist
+    ret=1
+	h_target=`echo $2 | tr A-Z a-z`
+    for hostname in ${hostlist}
+    do
+		hostname=`echo $hostname | tr A-Z a-z`
+        if [ "${hostname}" != "$h_target" ]; then
+            continue
+        fi
+        while [ 1 ]
+        do
+            check_kdump "$2"
+            ret=$?
+            if [ ${ret} -ne 255 ]; then
+                exit ${ret}
+            fi
+            #255 means ssh command itself is failed.
+            #For example, connection failure as if network doesn't start yet
+            #in 2nd kernel on the target node.
+            #So, retry to check after a little while.
+            sleep 1
+        done
+    done
+    exit ${ret}
+    ;;
+status)
+    check_hostlist
+    for hostname in ${hostlist}
+    do
+        if ping -w1 -c1 "${hostname}" 2>&1 | grep "unknown host"
+        then
+            exit 1
+        fi
+    done
+    get_username
+    check_user_existence
+    check_identity_file
+    exit 0
+    ;;
+getconfignames)
+    echo "hostlist identity_file"
+    exit 0
+    ;;
+getinfo-devid)
+    echo "kdump check STONITH device"
+    exit 0
+    ;;
+getinfo-devname)
+    echo "kdump check STONITH external device"
+    exit 0
+    ;;
+getinfo-devdescr)
+    echo "ssh-based kdump checker"
+    echo "To check whether a target node is dumping or not."
+    exit 0
+    ;;
+getinfo-devurl)
+    echo "kdump -> http://lse.sourceforge.net/kdump/"
+    echo "ssh   -> http://openssh.org"
+    exit 0
+    ;;
+getinfo-xml)
+    cat << SSHXML
+<parameters>
+<parameter name="hostlist" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Hostlist
+</shortdesc>
+<longdesc lang="en">
+The list of hosts that the STONITH device controls
+</longdesc>
+</parameter>
+
+<parameter name="identity_file" unique="1" required="0">
+<content type="string" />
+<shortdesc lang="en">
+Identity file's full path for kdump check user
+</shortdesc>
+<longdesc lang="en">
+The full path of kdump check user's identity file for ssh command.
+The identity in the specified file have to be restricted to execute
+only the following command.
+"test -s /proc/vmcore"
+Default: kdump check user's default identity file path.
+NOTE: You can specify kdump check user name in /etc/kdump.conf.
+      The parameter name is "kdump_check_user".
+      Default user is "kdumpchecker".
+</longdesc>
+</parameter>
+
+</parameters>
+SSHXML
+    exit 0
+    ;;
+*)
+    exit 1
+    ;;
+esac

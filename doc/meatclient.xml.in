@@ -1,0 +1,77 @@
+<?xml version="1.0"?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN" "http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<refentry id="re-meatclient">
+  <refentryinfo>
+    <date>December 4, 2009</date>
+    <productname>Cluster Glue</productname>
+    <productnumber>@VERSION@</productnumber>
+    <authorgroup>
+      <author>
+	<firstname>Gregor</firstname>
+	<surname>Binder</surname>
+	<contrib>meatclient</contrib>
+	<email>gbinder@sysfive.com</email>
+      </author>
+      <author>
+	<firstname>Michael</firstname>
+	<surname>M&ouml;rz</surname>
+	<contrib>man page</contrib>
+	<email>mimem@debian.org</email>
+      </author>
+      <author>
+	<firstname>Simon</firstname>
+	<surname>Horman</surname>
+	<contrib>man page</contrib>
+	<email>horms@vergenet.net</email>
+      </author>
+      <author>
+	<firstname>Florian</firstname>
+	<surname>Haas</surname>
+	<contrib>man page</contrib>
+	<email>florian.haas@linbit.com</email>
+      </author>
+    </authorgroup>
+  </refentryinfo>
+  <refmeta>
+    <refentrytitle>meatclient</refentrytitle>
+    <manvolnum>8</manvolnum>
+    <refmiscinfo class="manual">System administration utilities</refmiscinfo>
+  </refmeta>
+  <refnamediv>
+    <refname>meatclient</refname>
+    <refpurpose>Manually confirm that a node has been removed from the
+    cluster</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <para><command>meatclient</command> <option>-c</option> <replaceable>nodename</replaceable></para>
+  </refsynopsisdiv>
+  <refsection id="rs-meatclient-description">
+    <title>Description</title>
+    <para><command>meatclient</command> confirms that a node has been
+    manually removed from the cluster. It instructs the cluster
+    manager, via the meatware STONITH plugin, that it is safe to
+    continue cluster operations.</para>
+  </refsection>
+  <refsection id="rs-meatclient-options">
+    <title>Options</title>
+    <para>The following options are supported:</para>
+    <variablelist>
+      <varlistentry>
+	<term>
+	  <option>-c</option> <replaceable>nodename</replaceable>
+	</term>
+	<listitem>
+	  <para><replaceable>nodename</replaceable> is the name of the
+	  cluster node that has been fenced.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsection>
+  <refsection id="rs-meatclient-seealso">
+    <title>See also</title>
+    <para>
+      <citerefentry><refentrytitle>heartbeat</refentrytitle><manvolnum>8</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>stonith</refentrytitle><manvolnum>8</manvolnum></citerefentry>
+    </para>
+  </refsection>
+</refentry>
