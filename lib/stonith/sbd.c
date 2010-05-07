@@ -43,12 +43,14 @@ static char		sbd_version  = 0x02;
 
 /* Tunable defaults: */
 static unsigned long	timeout_watchdog 	= 5;
+static unsigned long	timeout_watchdog_warn 	= 3;
 static int		timeout_allocate 	= 2;
 static int		timeout_loop	    	= 1;
 static int		timeout_msgwait		= 10;
 
 static int	watchdog_use		= 0;
 static int	go_daemon		= 0;
+static int	debug			= 0;
 static const char *watchdogdev		= "/dev/watchdog";
 static char *	local_uname;
 
@@ -74,11 +76,14 @@ usage(void)
 "-W		Use watchdog (recommended) (watch only)\n"
 "-w <dev>	Specify watchdog device (optional) (watch only)\n"
 "-D		Run as background daemon (optional) (watch only)\n"
+"-v		Enable some verbose debug logging (optional)\n"
 "\n"
 "-1 <N>		Set watchdog timeout to N seconds (optional) (create only)\n"
 "-2 <N>		Set slot allocation timeout to N seconds (optional) (create only)\n"
 "-3 <N>		Set daemon loop timeout to N seconds (optional) (create only)\n"
 "-4 <N>		Set msgwait timeout to N seconds (optional) (create only)\n"
+"-5 <N>		Warn if loop latency exceeds threshold (optional) (watch only)\n"
+"			(default is 3, set to 0 to disable)\n"
 "Commands:\n"
 "create		initialize N slots on <dev> - OVERWRITES DEVICE!\n"
 "list		List all allocated slots on device, and messages.\n"
@@ -764,6 +769,7 @@ daemonize(void)
 	struct sector_mbox_s	*s_mbox = NULL;
 	int			mbox;
 	int			rc = 0;
+	time_t			t0, t1, latency;
 
 	mbox = slot_allocate(local_uname);
 	if (mbox < 0) {
@@ -784,6 +790,9 @@ daemonize(void)
 		watchdog_init();
 	
 	while (1) {
+		t0 = time(NULL);
+		sleep(timeout_loop);
+
 		if (mbox_read(mbox, s_mbox) < 0) {
 			cl_log(LOG_ERR, "mbox read failed.");
 			do_reset();
@@ -817,7 +826,19 @@ daemonize(void)
 			}
 		}
 		watchdog_tickle();
-		sleep(timeout_loop);
+
+		t1 = time(NULL);
+		latency = t1 - t0;
+
+		if (timeout_watchdog_warn 
+				&& (latency > timeout_watchdog_warn)) {
+			cl_log(LOG_WARNING, "Latency: %d exceeded threshold %d",
+				(int)latency, (int)timeout_watchdog_warn);
+		} else if (debug) {
+			cl_log(LOG_INFO, "Latency: %d",
+				(int)latency);
+		}
+
 	}
 
 out:
@@ -883,10 +904,13 @@ main(int argc, char** argv)
 	
 	get_uname();
 
-	while ((c = getopt (argc, argv, "DWhw:d:n:1:2:3:4:")) != -1) {
+	while ((c = getopt (argc, argv, "DWhvw:d:n:1:2:3:4:5:")) != -1) {
 		switch (c) {
 		case 'D':
 			go_daemon = 1;
+			break;
+		case 'v':
+			debug = 1;
 			break;
 		case 'W':
 			watchdog_use = 1;
@@ -911,6 +935,9 @@ main(int argc, char** argv)
 			break;
 		case '4':
 			timeout_msgwait = atoi(optarg);
+			break;
+		case '5':
+			timeout_watchdog_warn = atoi(optarg);
 			break;
 		case 'h':
 			usage();
