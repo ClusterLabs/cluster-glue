@@ -192,7 +192,6 @@ struct lrmd_op
 	char*			rsc_id;
 	gboolean		is_copy;
 	pid_t			client_id;
-	char*		app_name;
 	int			call_id;
 	int			exec_pid;
 	guint			repeat_timeout_tag;

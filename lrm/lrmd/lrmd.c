@@ -267,15 +267,13 @@ lrmd_op_destroy(lrmd_op_t* op)
 		,	__FUNCTION__, op->exec_pid, small_op_info(op));	
 		return;
 	}
+	lrmd_debug2(LOG_DEBUG, "%s: free the %s with address %p"
+		  ,__FUNCTION__, op_info(op), op);
 	ha_msg_del(op->msg);
 	op->msg = NULL;
 	if( op->rsc_id ) {
 		free(op->rsc_id);
 		op->rsc_id = NULL;
-	}
-	if( op->app_name ) {
-		free(op->app_name);
-		op->app_name = NULL;
 	}
 	op->exec_pid = 0;
 	if ( op->rapop != NULL ) {
@@ -287,9 +285,6 @@ lrmd_op_destroy(lrmd_op_t* op)
 	if( op->repeat_timeout_tag ) {
 		Gmain_timeout_remove(op->repeat_timeout_tag);
 	}
-
-	lrmd_debug3(LOG_DEBUG, "%s: free the op whose address is %p"
-		  ,__FUNCTION__, op);
 	free(op);
 }
 
@@ -343,7 +338,6 @@ lrmd_op_copy(const lrmd_op_t* op)
 	ret->rapop = NULL;
 	ret->msg = ha_msg_copy(op->msg);
 	ret->rsc_id = strdup(op->rsc_id);
-	ret->app_name = strdup(op->app_name);
 	ret->rapop = NULL;
 	ret->first_line_ra_stdout[0] = EOS;
 	ret->repeat_timeout_tag = 0;
@@ -1462,12 +1456,9 @@ static void
 remove_repeat_op_from_client(gpointer key, gpointer value, gpointer user_data)
 {
 	lrmd_rsc_t* rsc = (lrmd_rsc_t*)value;
-	char *app_name = (char *)user_data;
+	pid_t pid = GPOINTER_TO_UINT(user_data); /* pointer cast as int */
 
-	(void)flush_all(&(rsc->repeat_op_list),app_name);
-	if( flush_all(&(rsc->op_list),app_name) ) {
-		set_rsc_flushing_ops(rsc); /* resource busy */
-	}
+	(void)flush_all(&(rsc->repeat_op_list),pid);
 }
 
 /* Remove all direct pointer references to 'client' before destroying it */
@@ -1483,12 +1474,13 @@ unregister_client(lrmd_client_t* client)
 		,	client->app_name, client->pid);
 		return HA_FAIL;
 	}
-	/* Remove from clients */
-	g_hash_table_remove(clients, (gpointer)&client->pid);
 
 	/* Search all resources for repeating ops this client owns */
 	g_hash_table_foreach(resources
-	,	remove_repeat_op_from_client, client->app_name);
+	,	remove_repeat_op_from_client, GUINT_TO_POINTER(client->pid));
+
+	/* Remove from clients */
+	g_hash_table_remove(clients, (gpointer)&client->pid);
 
 	lrmd_debug(LOG_DEBUG, "%s: client %s [pid:%d] is unregistered"
 	, 	__FUNCTION__
@@ -1988,8 +1980,8 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 		return -1;
 	}
 	LRMAUDIT();
-	(void)flush_all(&(rsc->repeat_op_list),NULL);
-	if( flush_all(&(rsc->op_list),NULL) ) {
+	(void)flush_all(&(rsc->repeat_op_list),0);
+	if( flush_all(&(rsc->op_list),0) ) {
 		set_rsc_removal_pending(rsc);
 		LRMAUDIT();
 		return HA_OK; /* resource is busy, delay removal */
@@ -2234,7 +2226,7 @@ on_msg_cancel_op(lrmd_client_t* client, struct ha_msg* msg)
 }
 
 static gboolean
-flush_all(GList** listp, char *app_name)
+flush_all(GList** listp, int client_pid)
 {
 	GList* node = NULL;
 	lrmd_op_t* op = NULL;
@@ -2243,14 +2235,14 @@ flush_all(GList** listp, char *app_name)
 	node = g_list_first(*listp);
 	while( node ) {
 		op = (lrmd_op_t*)node->data;
-		if (app_name && strcmp(op->app_name,app_name)) {
+		if (client_pid && op->client_id != client_pid) {
 			node = g_list_next(node);
 			continue; /* not the client's operation */
 		}
 		if( flush_op(op) == POSTPONED ) {
 			rsc_busy = TRUE;
 			node = g_list_next(node);
-		} else if (!app_name || !strcmp(op->app_name,app_name)) {
+		} else if (!client_pid || op->client_id == client_pid) {
 			node = *listp = g_list_remove(*listp, op);
 			remove_op_history(op);
 			lrmd_op_destroy(op);
@@ -2345,7 +2337,6 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	}
 	op->call_id = call_id;
 	op->client_id = client->pid;
-	op->app_name = strdup(client->app_name);
 	op->rsc_id = strdup(rsc->id);
 	op->interval = interval;
 	op->delay = delay;
@@ -2573,6 +2564,9 @@ replace_last_op(lrmd_client_t* client, lrmd_rsc_t* rsc, lrmd_op_t* op)
 		return;
 	client_last_op = g_hash_table_lookup(rsc->last_op_table, client->app_name);
 	if (!client_last_op) {
+		lrmd_debug2(LOG_DEBUG
+		, "%s: new last op table for client %s"
+		, __FUNCTION__, client->app_name);
 		client_last_op = g_hash_table_new_full(	g_str_hash
 		, 	g_str_equal, free, NULL);
 		g_hash_table_insert(rsc->last_op_table
@@ -2588,14 +2582,20 @@ replace_last_op(lrmd_client_t* client, lrmd_rsc_t* rsc, lrmd_op_t* op)
 			, __FUNCTION__, __LINE__);
 	}
 	if (old_op) {
+		lrmd_debug2(LOG_DEBUG
+		, "%s: replace last op %s for client %s"
+		, __FUNCTION__, op_hash_key, client->app_name);
 		g_hash_table_replace(client_last_op,op_hash_key,(gpointer)new_op);
 		lrmd_op_destroy(old_op);
 	} else {
+		lrmd_debug2(LOG_DEBUG
+		, "%s: add last op %s for client %s"
+		, __FUNCTION__, op_hash_key, client->app_name);
 		g_hash_table_insert(client_last_op,op_hash_key,(gpointer)new_op);
 	}
 }
 
-static void
+static int
 record_op_completion(lrmd_rsc_t* rsc, lrmd_op_t* op)
 {
 	lrmd_client_t* client;
@@ -2608,21 +2608,21 @@ record_op_completion(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	if (!(rsc->last_op_done = lrmd_op_copy(op))) {
 		lrmd_log(LOG_ERR, "%s:%d out of memory" 
 			, __FUNCTION__, __LINE__);
+		return 1;
 	}
 	rsc->last_op_done->repeat_timeout_tag = (guint)0;
 
-	client = lookup_client_by_name(op->app_name);
+	client = lookup_client(op->client_id);
 	if (!client) {
 		lrmd_log(LOG_INFO, "%s: cannot record %s: the client is gone"
 		,	__FUNCTION__, small_op_info(op)); 
 		LRMAUDIT();
-		return;
+		return 1;
 	}
 	/* insert (or replace) the new op in last_op_table for the client */
 	replace_last_op(client,rsc,op);
-	if (op->interval) /* copy op to the repeat list */
-		to_repeatlist(rsc,op);
 	LRMAUDIT();
+	return 0;
 }
 
 static void
@@ -2649,7 +2649,7 @@ to_repeatlist(lrmd_rsc_t* rsc, lrmd_op_t* op)
 static void 
 remove_op_history(lrmd_op_t* op)
 {
-	lrmd_client_t* client = lookup_client_by_name(op->app_name);
+	lrmd_client_t* client = lookup_client(op->client_id);
 	lrmd_rsc_t* rsc = NULL;
 	char *op_id, *last_op_id;
 	lrmd_op_t* old_op = NULL;
@@ -2659,10 +2659,14 @@ remove_op_history(lrmd_op_t* op)
 	if( !(rsc = lookup_rsc(op->rsc_id)) ) {
 		return;
 	}
+	lrmd_debug2(LOG_DEBUG, "%s: remove history of the op %s"
+		  ,__FUNCTION__, op_info(op));
 	mk_op_id(op,op_id);
 	if (rsc->last_op_done != NULL ) {
 		mk_op_id(rsc->last_op_done,last_op_id);
 		if( !strcmp(op_id,last_op_id) ) {
+			lrmd_debug2(LOG_DEBUG, "%s: remove history of the last op done %s"
+				  ,__FUNCTION__, op_info(rsc->last_op_done));
 			lrmd_op_destroy(rsc->last_op_done);
 			rsc->last_op_done = NULL;
 		}
@@ -2671,9 +2675,13 @@ remove_op_history(lrmd_op_t* op)
 	if( client &&
 		(client_last_op = g_hash_table_lookup(rsc->last_op_table
 			, 			client->app_name)) ) {
+		lrmd_debug2(LOG_DEBUG, "%s: found client %s in the last op table"
+			  ,__FUNCTION__, client->app_name);
 		old_op = g_hash_table_lookup(client_last_op, op_id);
 		if (old_op) {
 			g_hash_table_remove(client_last_op,	op_id);
+			lrmd_debug2(LOG_DEBUG, "%s: remove history of the client's last %s"
+				  ,__FUNCTION__, op_info(old_op));
 			lrmd_op_destroy(old_op);
 		}
 	}
@@ -2758,7 +2766,10 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	,	__FUNCTION__, op_info(op));
 
 	if (op_status != LRM_OP_CANCELLED) {
-		record_op_completion(rsc,op); /*record the outcome of the op */
+		if( !record_op_completion(rsc,op) ) { /*record the outcome of the op */
+			if (op->interval) /* copy op to the repeat list */
+				to_repeatlist(rsc,op);
+		}
 	} else {
 		remove_op_history(op);
 	}
@@ -3501,7 +3512,7 @@ send_msg(struct ha_msg* msg, lrmd_client_t* client)
 void
 notify_client(lrmd_op_t* op)
 {
-	lrmd_client_t* client = lookup_client_by_name(op->app_name);
+	lrmd_client_t* client = lookup_client(op->client_id);
 
 	if (client) {
 		/* send the result to client */

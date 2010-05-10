@@ -73,14 +73,14 @@ static gboolean free_str_op_pair(gpointer key
 static lrmd_op_t* lrmd_op_copy(const lrmd_op_t* op);
 static void send_last_op(gpointer key, gpointer value, gpointer user_data);
 static void replace_last_op(lrmd_client_t* client, lrmd_rsc_t* rsc, lrmd_op_t* op);
-static void record_op_completion(lrmd_rsc_t* rsc, lrmd_op_t* op);
+static int record_op_completion(lrmd_rsc_t* rsc, lrmd_op_t* op);
 static void to_repeatlist(lrmd_rsc_t* rsc, lrmd_op_t* op);
 static void remove_op_history(lrmd_op_t* op);
 static void hash_to_str(GHashTable * , GString *);
 static void hash_to_str_foreach(gpointer key, gpointer value, gpointer userdata);
 static void warning_on_active_rsc(gpointer key, gpointer value, gpointer user_data);
 static void check_queue_duration(lrmd_op_t* op);
-static gboolean flush_all(GList** listp, char *app_name);
+static gboolean flush_all(GList** listp, int client_pid);
 static gboolean cancel_op(GList** listp,int cancel_op_id);
 static int prepare_failmsg(struct ha_msg* msg,
 			int fail_rc, const char *fail_reason);
