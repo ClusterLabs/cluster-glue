@@ -10,7 +10,7 @@
 # Main code
 
 is_heartbeat() {
-    which cl_status 2>/dev/null &&
+    which cl_status >/dev/null 2>&1 &&
 		cl_status hbstatus >/dev/null 2>&1
 }
 
