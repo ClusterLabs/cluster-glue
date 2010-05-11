@@ -707,6 +707,7 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 	/* Get client connection. */
 #if HB_IPC_METHOD == HB_IPC_SOCKET
 	peer_addr = g_new(struct sockaddr_un, 1);
+	*peer_addr->sun_path = '\0';
 	sin_size = sizeof(struct sockaddr_un);
 	new_sock = accept(s, (struct sockaddr *)peer_addr, &sin_size);
 #elif HB_IPC_METHOD == HB_IPC_STREAM
@@ -868,7 +869,9 @@ socket_destroy_channel(struct IPC_CHANNEL * ch)
 		struct SOCKET_CH_PRIVATE *priv = (struct SOCKET_CH_PRIVATE *)
 			ch->ch_private;
 		if(priv->peer_addr != NULL) {
-			unlink(priv->peer_addr->sun_path);
+			if (*priv->peer_addr->sun_path) {
+				unlink(priv->peer_addr->sun_path);
+			}
 			g_free((void*)(priv->peer_addr));
 		}
 #endif
