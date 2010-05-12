@@ -9,11 +9,6 @@
 
 # Main code
 
-is_heartbeat() {
-    which cl_status >/dev/null 2>&1 &&
-		cl_status hbstatus >/dev/null 2>&1
-}
-
 case $1 in
 gethosts)
     echo `sbd -d $sbd_device list | cut -f2`
@@ -28,23 +23,6 @@ status)
     	ha_log err "sbd could not list nodes from $sbd_device"
     	exit 1
     fi
-    nodes=$(
-    if is_heartbeat; then
-	crm_node -H -p
-    else
-	crm_node -p
-    fi)
-    if [ -z "$nodes" ]; then
-        # No active nodes; strange, but maybe not running pacemaker?
-	ha_log warn "no active nodes reported by the CRM"
-    	exit 0
-    fi
-    for N in $nodes ; do
-    	if ! sbd -d $sbd_device ping $N >/dev/null 2>&1 ; then
-	    ha_log err "node $N not accessible through $sbd_device"
-	    exit 1
-	fi
-    done
     exit 0
     ;;
 on)
