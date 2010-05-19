@@ -187,7 +187,7 @@ getinfo-devdescr)
 	exit 0
 	;;
 getinfo-devurl)
-	echo "http://www.it-consultant.su/rackpdu"
+	echo "http://www.apcc.com/products/family/index.cfm?id=30"
 	exit 0
 	;;
 getinfo-xml)
