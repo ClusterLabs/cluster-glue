@@ -25,6 +25,7 @@ stdoc_DATA 		= README.bladehpi \
 			  README.ibmrsa-telnet \
 			  README.ipmilan \
 			  README.meatware \
+			  README.rackpdu \
 			  README.rcd_serial \
 			  README.riloe \
 			  README.vacm \
