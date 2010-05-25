@@ -29,3 +29,11 @@ lrmadmin_SOURCES  	= 	lrmadmin.c
 lrmadmin_LDFLAGS 	= 	$(COMMONLIBS)
 lrmadmin_LDADD = $(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 lrmadmin_DEPENDENCIES = $(top_builddir)/lib/$(LRM_DIR)/liblrm.la
+
+if BUILD_HELP
+man8_MANS =	$(sbin_PROGRAMS:%=%.8)
+%.8:	%
+	echo Creating $@
+	chmod a+x $<
+	help2man --output $@ --no-info --section 8 --name "Part of the Pacemaker cluster resource manager" $(top_builddir)/lrm/admin/$<
+endif

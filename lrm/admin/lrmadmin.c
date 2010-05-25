@@ -47,7 +47,7 @@
 #include <clplumbing/GSource.h>
 #include <clplumbing/Gmain_timeout.h>
 
-static const char *optstring = "A:D:X:dE:F:dg:p:M:O:P:c:S:LI:CT:n:h";
+static const char *optstring = "A:D:X:dE:F:dg:p:M:O:P:c:S:LI:CT:n:hv";
 
 #ifdef HAVE_GETOPT_H
 static struct option long_options[] = {
@@ -68,6 +68,7 @@ static struct option long_options[] = {
 	{"set_lrmd_param",	1, NULL, 'p'},
 	{"get_lrmd_param",	1, NULL, 'g'},
 	{"help",		0, NULL, 'h'},
+	{"version",		0, NULL, 'v'},
 	{NULL,			0, NULL, 0}
 };
 #endif /* HAVE_GETOPT_H */
@@ -139,23 +140,24 @@ static int call_id = 0;
 static int TIMEOUT = -1; /* the unit is ms */
 
 static const char *simple_help_screen =
-"lrmadmin {-d|--deamon}\n"
-"         {-A|--add} <rscid> <raclass> <ratype> <provider|NULL> [<rsc_params_list>]\n"
-"         {-D|--delete} <rscid>\n"
-"         {-F|--flush} <rscid>\n"
-"         {-X|--fail} <rscid> [<fail_rc> [<fail_reason>]]\n"
-"         {-E|--execute} <rscid> <operator> <timeout> <interval> <target_rc|EVERYTIME|CHANGED> [<operator_parameters_list>]\n"
-"         {-S|--state} <rscid> [-n <fake_name>]\n"
-"         {-L|--listall}\n"
-"         {-I|--information} <rsc_id>\n"
-"         {-C|--raclass_supported}\n"
-"         {-T|--ratype_supported} <raclass>\n"
-"         {-O|--all metadata of this class} <raclass>\n"
-"         {-M|--metadata} <raclass> <ratype> <provider|NULL>\n"
-"         {-P|--provider} <raclass> <ratype>\n"
-"         {-p|--set_lrmd_param} <name> <value>\n"
-"         {-g|--get_lrmd_param} <name>\n"
-"         {-h|--help}\n";
+"lrmadmin -d,--deamon\n"
+"         -A,--add <rscid> <raclass> <ratype> <provider|NULL> [<rsc_params_list>]\n"
+"         -D,--delete <rscid>\n"
+"         -F,--flush <rscid>\n"
+"         -X,--fail <rscid> [<fail_rc> [<fail_reason>]]\n"
+"         -E,--execute <rscid> <operator> <timeout> <interval> <target_rc|EVERYTIME|CHANGED> [<operator_parameters_list>]\n"
+"         -S,--state <rscid> [-n <fake_name>]\n"
+"         -L,--listall\n"
+"         -I,--information <rsc_id>\n"
+"         -C,--raclass_supported\n"
+"         -T,--ratype_supported <raclass>\n"
+"         -O,--all metadata of this class <raclass>\n"
+"         -M,--metadata <raclass> <ratype> <provider|NULL>\n"
+"         -P,--provider <raclass> <ratype>\n"
+"         -p,--set_lrmd_param <name> <value>\n"
+"         -g,--get_lrmd_param <name>\n"
+"         -v,--version\n"
+"         -h,--help\n";
 
 #define OPTION_OBSCURE_CHECK \
 				if ( lrmadmin_cmd != NULL_OP ) { \
@@ -339,6 +341,9 @@ int main(int argc, char **argv)
 				}
 				break;
 
+			case 'v':
+			    printf("%s\n",GLUE_VERSION);
+			    return 0;
 			case 'h':
 				OPTION_OBSCURE_CHECK 
 				printf("%s",simple_help_screen);
