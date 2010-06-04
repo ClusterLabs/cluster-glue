@@ -96,13 +96,15 @@ SendCommand() {
 
     if [ $outlet -gt 0 ]; then
         local set_result=`snmpset -v1 -c $community $pduip $oid.$outlet i $command 2>&1`
-        local check_result=`echo "$set_result" | grep "Timeout"`	    
-
-        if [ ! -z "$check_result" ]; then
-    	    ha_log.sh err "Write SNMP value $oid.$outlet=$command. Result: $set_result"
-	fi
-	    
-	return 0
+        if [ $? -ne 0 ]; then
+            ha_log.sh err "Write SNMP to $pduip value $oid.$outlet=$command failed. Result: $set_result"
+            return 1
+        fi
+        if echo "$set_result" | grep -qs "Timeout"; then
+            ha_log.sh err "Write SNMP to $pduip value $oid.$outlet=$command timed out. Result: $set_result"
+            return 1
+        fi
+        return 0
     else
         return 1
     fi
@@ -115,12 +117,14 @@ innode=$2
 case $incommand in
 gethosts)
 	if [ "$hostlist" = "AUTO" ]; then
-	    snmp_result=`snmpwalk -v1 -c $community $pduip $names_oid 2>&1`
-	    snmp_check=`echo "$snmp_result" | grep "Timeout"`
-
-	    if [ ! -z "$snmp_check" ]; then
-		ha_log.sh err "Cannot read list of nodes from device. Result: $snmp_result"
-		exit 1
+	    local snmp_result=`snmpwalk -v1 -c $community $pduip $names_oid 2>&1`
+        if [ $? -ne 0 ]; then
+            ha_log.sh err "snmpwalk $community $pduip $names_oid failed. Result: $snmp_result"
+            exit 1
+        fi
+        if echo "$snmp_result" | grep -qs "Timeout"; then
+            ha_log.sh err "snmpwalk $community $pduip $names_oid timed out. Result: $snmp_result"
+            exit 1
 	    else
 		hostlist=`echo "$snmp_result" | cut -f2 -d'"' | tr ' ' '_' | tr '\012' ' '`
 	    fi
