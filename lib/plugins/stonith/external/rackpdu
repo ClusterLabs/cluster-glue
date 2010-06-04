@@ -95,7 +95,8 @@ SendCommand() {
     local outlet=$?
 
     if [ $outlet -gt 0 ]; then
-        local set_result=`snmpset -v1 -c $community $pduip $oid.$outlet i $command 2>&1`
+        local set_result
+        set_result=`snmpset -v1 -c $community $pduip $oid.$outlet i $command 2>&1`
         if [ $? -ne 0 ]; then
             ha_log.sh err "Write SNMP to $pduip value $oid.$outlet=$command failed. Result: $set_result"
             return 1
@@ -117,7 +118,8 @@ innode=$2
 case $incommand in
 gethosts)
 	if [ "$hostlist" = "AUTO" ]; then
-	    local snmp_result=`snmpwalk -v1 -c $community $pduip $names_oid 2>&1`
+	    local snmp_result
+	    snmp_result=`snmpwalk -v1 -c $community $pduip $names_oid 2>&1`
         if [ $? -ne 0 ]; then
             ha_log.sh err "snmpwalk $community $pduip $names_oid failed. Result: $snmp_result"
             exit 1
