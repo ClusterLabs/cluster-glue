@@ -66,12 +66,16 @@ GetOutletNumber() {
 	fi
     else
 	# Get outlet number from device
-    
+ 
 	local outlet_num=1
-	local snmp_result=`snmpwalk -v1 -c $community $pduip $names_oid 2>&1`
+	local snmp_result
+	snmp_result=`snmpwalk -v1 -c $community $pduip $names_oid 2>&1`
+	if [ $? -ne 0 ]; then
+	    ha_log.sh err "snmpwalk $community $pduip $names_oid failed. Result: $snmp_result"
+	    return 0
+	fi
 
 	local names=`echo "$snmp_result" | cut -f2 -d'"' | tr ' ' '_' | tr '\012' ' '`
-
 	for name in $names; do
 	    if [ "$name" != "$nodename" ]; then
 		local outlet_num=`expr $outlet_num + 1`
