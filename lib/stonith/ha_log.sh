@@ -79,8 +79,9 @@ ha_log() {
 	fi
 
 	[ "x$HA_LOGD" = "xyes" ] &&
-		ha_logger -t "$HA_LOGTAG" "$msg" &&
-		return 0
+		cat<<EOF | ha_logger -t "$HA_LOGTAG" && return 0
+$msg
+EOF
 
 	if [ -n "$HA_LOGFACILITY" ]; then
 		logger -t "$HA_LOGTAG" -p $HA_LOGFACILITY.$loglevel "$msg"
