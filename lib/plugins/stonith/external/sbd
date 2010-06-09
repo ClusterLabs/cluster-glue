@@ -20,7 +20,7 @@ off|reset)
     ;;
 status)
     if ! sbd -d $sbd_device list >/dev/null 2>&1 ; then
-    	ha_log err "sbd could not list nodes from $sbd_device"
+    	ha_log.sh err "sbd could not list nodes from $sbd_device"
     	exit 1
     fi
     exit 0
