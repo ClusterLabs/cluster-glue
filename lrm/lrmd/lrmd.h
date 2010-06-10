@@ -197,6 +197,7 @@ struct lrmd_op
 	guint			repeat_timeout_tag;
 	int			interval;
 	int			delay;
+	gboolean		is_cancelled;
 	int			copyparams;
 	struct ha_msg*		msg;
 	ra_pipe_op_t *		rapop;
