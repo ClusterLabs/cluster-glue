@@ -347,6 +347,7 @@ lrmd_op_copy(const lrmd_op_t* op)
  	ret->t_done = op->t_done;
  	ret->t_rcchange = op->t_rcchange;
 	ret->is_copy = TRUE;
+	ret->is_cancelled = FALSE;
 	return ret;
 }
 
@@ -421,11 +422,12 @@ lrmd_op_dump(const lrmd_op_t* op, const char * text)
 	ha_msg_value_int(op->msg, F_LRM_TARGETRC, &target_rc);
 	lrmd_debug(LOG_DEBUG
 	,	"%s: lrmd_op: %s status: %s, target_rc=%s, client pid %d call_id"
-	": %d, child pid: %d (%s) %s"
+	": %d, child pid: %d (%s) %s %s"
 	,	text,	op_info(op), op_status_to_str(op_status)
 	,	op_target_rc_to_str(target_rc)
 	,	op->client_id, op->call_id, op->exec_pid, pidstat
-	,	(op->is_copy ? "copy" : "original"));
+	,	(op->is_copy ? "copy" : "original")
+	,	(op->is_cancelled ? "cancelled" : ""));
 	lrmd_debug(LOG_DEBUG
 	,	"%s: lrmd_op2: rt_tag: %d, interval: %d, delay: %d"
 	,	text,  op->repeat_timeout_tag
@@ -2765,7 +2767,7 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	, 	"%s:%s is removed from op list"
 	,	__FUNCTION__, op_info(op));
 
-	if (op_status != LRM_OP_CANCELLED) {
+	if (!op->is_cancelled) {
 		if( !record_op_completion(rsc,op) ) { /*record the outcome of the op */
 			if (op->interval) /* copy op to the repeat list */
 				to_repeatlist(rsc,op);
@@ -2824,6 +2826,7 @@ flush_op(lrmd_op_t* op)
 		}
 		return HA_OK;
 	} else {
+		op->is_cancelled = TRUE; /* mark the op as cancelled */
 		lrmd_log(LOG_INFO, "%s: process for %s still "
 			"running, flush delayed"
 			,__FUNCTION__,small_op_info(op));
@@ -3232,19 +3235,6 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		/* delete the op */
 		lrmd_op_destroy(op);
 		reset_proctrack_data(p);
-		LRMAUDIT();
-		return;
-	}
-
-	if (HA_OK == ha_msg_value_int(op->msg, F_LRM_OPSTATUS, &op_status)
-	&& (op_status_t)op_status == LRM_OP_CANCELLED ) {
-		lrmd_debug(LOG_DEBUG, "on_ra_proc_finished: "
-			"%s cancelled.", op_info(op));
-		on_op_done(rsc,op);
-		reset_proctrack_data(p);
-		if (debug_level >= 2) {	
-			dump_data_for_debug();
-		}
 		LRMAUDIT();
 		return;
 	}
