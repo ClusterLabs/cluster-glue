@@ -2903,8 +2903,8 @@ perform_op(lrmd_rsc_t* rsc)
 		if (child_count >= max_child_count) {
 			if ((int)rsc->delay_timeout > 0) {
 				lrmd_log(LOG_INFO
-				,	"%s:%d: operations on resource %s already delayed"
-				, __FUNCTION__, __LINE__, lrm_str(rsc->id));
+				,	"%s:%d: max_child_count (%d) reached and operations on resource %s already delayed"
+				, __FUNCTION__, __LINE__, max_child_count, lrm_str(rsc->id));
 			} else {
 				lrmd_debug(LOG_NOTICE
 				, 	"max_child_count (%d) reached, postponing "
