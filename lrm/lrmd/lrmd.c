@@ -348,6 +348,7 @@ lrmd_op_copy(const lrmd_op_t* op)
  	ret->t_rcchange = op->t_rcchange;
 	ret->is_copy = TRUE;
 	ret->is_cancelled = FALSE;
+	ret->weight = op->weight;
 	return ret;
 }
 
@@ -2342,6 +2343,7 @@ on_msg_perform_op(lrmd_client_t* client, struct ha_msg* msg)
 	op->rsc_id = strdup(rsc->id);
 	op->interval = interval;
 	op->delay = delay;
+	op->weight = no_child_count(rsc) ? 0 : 1;
 
 	op->msg = ha_msg_copy(msg);
 
@@ -3074,7 +3076,7 @@ perform_ra_op(lrmd_op_t* op)
 			return HA_FAIL;
 
 		default:	/* Parent */
-			child_count++;
+			child_count += op->weight;
 			NewTrackedProc(pid, 1
 			,	debug_level ?
 				((op->interval && !is_logmsg_due(op)) ? PT_LOGNORMAL : PT_LOGVERBOSE) : PT_LOGNONE
@@ -3207,14 +3209,17 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	int op_status;
 
 	LRMAUDIT();
-	if (--child_count < 0) {
+
+	CHECK_ALLOCATED(p, "ProcTrack p", );
+	op = proctrack_data(p);
+
+	child_count -= op->weight;
+	if (child_count < 0) {
 		lrmd_log(LOG_ERR, "%s:%d: child count is less than zero: %d"
 			, __FUNCTION__, __LINE__, child_count);
 		child_count = 0;
 	}
 
-	CHECK_ALLOCATED(p, "ProcTrack p", );
-	op = proctrack_data(p);
 	lrmd_debug2(LOG_DEBUG, "on_ra_proc_finished: accessing the op whose "
 		  "address is %p", op);
 	CHECK_ALLOCATED(op, "op", );
