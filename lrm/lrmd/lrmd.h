@@ -168,6 +168,9 @@ typedef struct ra_pipe_op  ra_pipe_op_t;
 		(unsigned long)LOGMSG_INTERVAL)
 #define probe_str(op,op_type) \
 	((op && !op->interval && !strcmp(op_type,"monitor")) ? "probe" : op_type)
+/* exclude stonith class from child count */
+#define no_child_count(rsc) \
+	(strcmp((rsc)->class,"stonith") == 0)
 
 struct lrmd_rsc
 {
@@ -198,6 +201,7 @@ struct lrmd_op
 	int			interval;
 	int			delay;
 	gboolean		is_cancelled;
+	int			weight;
 	int			copyparams;
 	struct ha_msg*		msg;
 	ra_pipe_op_t *		rapop;
