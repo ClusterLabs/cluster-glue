@@ -67,6 +67,7 @@
 #define F_LRM_TARGETRC		"lrm_targetrc"
 #define F_LRM_LASTRC		"lrm_lastrc"
 #define F_LRM_STATUS		"lrm_status"
+#define F_LRM_RSCDELETED		"lrm_rscdeleted"
 #define F_LRM_METADATA		"lrm_metadata"
 #define F_LRM_USERDATA		"lrm_userdata"
 #define F_LRM_DELAY		"lrm_delay"
@@ -114,7 +115,6 @@
 #define MAX_PARAM_LEN 		1024
 
 
-							
 GHashTable* copy_str_table(GHashTable* hash_table);
 GHashTable* merge_str_tables(GHashTable* old, GHashTable* new);
 void free_str_table(GHashTable* hash_table);

@@ -87,8 +87,6 @@ struct msg_map
 #define NO_MSG 1
 #define send_msg_now(p) \
 	(p->reply_time==REPLY_NOW)
-/* magic number, must be different from other return codes! */
-#define POSTPONED 32
 
 struct msg_map msg_maps[] = {
 	{REGISTER,	REPLY_NOW,	on_msg_register},
@@ -1986,8 +1984,9 @@ on_msg_del_rsc(lrmd_client_t* client, struct ha_msg* msg)
 	(void)flush_all(&(rsc->repeat_op_list),0);
 	if( flush_all(&(rsc->op_list),0) ) {
 		set_rsc_removal_pending(rsc);
+		lrmd_log(LOG_INFO, "resource %s busy, removal pending", rsc->id);
 		LRMAUDIT();
-		return HA_OK; /* resource is busy, delay removal */
+		return HA_RSCBUSY; /* resource is busy, removal delayed */
 	}
 	lrmd_rsc_destroy(rsc);
 	LRMAUDIT();
@@ -2176,7 +2175,7 @@ cancel_op(GList** listp,int cancel_op_id)
 			,"%s: %s cancelled"
 			, __FUNCTION__, op_info(op));
 			rc = flush_op(op);
-			if( rc != POSTPONED && rc != HA_FAIL ) {
+			if( rc != HA_RSCBUSY && rc != HA_FAIL ) {
 				notify_client(op); /* send notification now */
 				*listp = g_list_remove(*listp, op);
 				remove_op_history(op);
@@ -2216,12 +2215,15 @@ on_msg_cancel_op(lrmd_client_t* client, struct ha_msg* msg)
 
 	if( cancel_op(&(rsc->repeat_op_list), cancel_op_id) != HA_OK ) {
 		op_cancelled = cancel_op(&(rsc->op_list), cancel_op_id);
-		if(op_cancelled == POSTPONED) {
-			op_cancelled = HA_OK;
-		}
 	}
 	if( op_cancelled == HA_FAIL ) {
 		lrmd_log(LOG_INFO, "%s: no operation with id %d",
+			__FUNCTION__, cancel_op_id);
+	} else if( op_cancelled == HA_RSCBUSY ) {
+		lrmd_log(LOG_INFO, "%s: operation %d running, cancel pending",
+			__FUNCTION__, cancel_op_id);
+	} else {
+		lrmd_debug(LOG_DEBUG, "%s: operation %d cancelled",
 			__FUNCTION__, cancel_op_id);
 	}
 	LRMAUDIT();
@@ -2242,7 +2244,7 @@ flush_all(GList** listp, int client_pid)
 			node = g_list_next(node);
 			continue; /* not the client's operation */
 		}
-		if( flush_op(op) == POSTPONED ) {
+		if( flush_op(op) == HA_RSCBUSY ) {
 			rsc_busy = TRUE;
 			node = g_list_next(node);
 		} else if (!client_pid || op->client_id == client_pid) {
@@ -2282,6 +2284,9 @@ on_msg_flush_all(lrmd_client_t* client, struct ha_msg* msg)
 	(void)flush_all(&(rsc->repeat_op_list),0);
 	if( flush_all(&(rsc->op_list),0) ) {
 		set_rsc_flushing_ops(rsc); /* resource busy */
+		lrmd_log(LOG_INFO, "resource %s busy, all flush pending", rsc->id);
+		LRMAUDIT();
+		return HA_RSCBUSY;
 	}
 	LRMAUDIT();
 	return HA_OK;
@@ -2778,17 +2783,24 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 		remove_op_history(op);
 	}
 
+	if (rsc_removal_pending(rsc)) {
+		if (HA_OK != ha_msg_add_int(op->msg,F_LRM_RSCDELETED,1)) {
+			LOG_FAILED_TO_ADD_FIELD(F_LRM_RSCDELETED);
+		}
+	}
 	if (op_status != LRM_OP_DONE
 		|| (op_rc == -1)
 		|| (op_rc == target_rc)
 		|| (target_rc == EVERYTIME)
 		|| ((target_rc == CHANGED) && rc_changed)
+		|| rsc_removal_pending(rsc)
 	) {
 		notify_client(op);
 	}
 	lrmd_op_destroy(op);
 	if( !rsc->op_list ) {
 		if( rsc_removal_pending(rsc) ) {
+			lrmd_log(LOG_INFO, "late removal of resource %s", rsc->id);
 			lrmd_rsc_destroy(rsc);
 			rc = -1; /* let the caller know that the rsc is gone */
 		} else {
@@ -2832,7 +2844,7 @@ flush_op(lrmd_op_t* op)
 		lrmd_log(LOG_INFO, "%s: process for %s still "
 			"running, flush delayed"
 			,__FUNCTION__,small_op_info(op));
-		return POSTPONED;
+		return HA_RSCBUSY;
 	}
 }
 
