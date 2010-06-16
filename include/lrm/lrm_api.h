@@ -149,6 +149,7 @@ typedef struct{
 	unsigned long		t_rcchange; /* last rc change (as age) */
 	unsigned long		exec_time; /* time it took the op to run */
 	unsigned long		queue_time; /* time spent in queue */
+	int			rsc_deleted; /* resource just deleted? */
 }lrm_op_t;
 
 extern const lrm_op_t lrm_zero_op;	/* an all-zeroes lrm_op_t value */
@@ -171,6 +172,9 @@ typedef enum {
 enum { DEFAULT_FAIL_RC = EXECRA_UNKNOWN_ERROR };
 #define DEFAULT_FAIL_REASON "asynchronous monitor error"
 #define ASYNC_OP_NAME "asyncmon"
+
+/* in addition to HA_OK and HA_FAIL */
+#define	HA_RSCBUSY		2
 
 struct rsc_ops
 {

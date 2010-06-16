@@ -186,7 +186,6 @@ struct lrmd_rsc
 	GHashTable*	last_op_table;	/* Last operation of each type	*/
 	lrmd_op_t*	last_op_done;	/* The last finished op of the resource */
 	guint		delay_timeout;  /* The delay value of op_list execution */
-	GList*		requestors;	/* a list of client pids to send replies to */
 	int			state;  /* status of the resource */
 };
 

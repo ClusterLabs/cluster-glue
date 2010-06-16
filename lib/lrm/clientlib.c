@@ -884,6 +884,7 @@ static int
 lrm_delete_rsc (ll_lrm_t* lrm, const char* rsc_id)
 {
 	struct ha_msg* msg = NULL;
+	int rc;
 
 	/* check whether the rsc_id is available */
 	if (NULL == rsc_id || RID_LEN <= strlen(rsc_id))	{
@@ -911,12 +912,13 @@ lrm_delete_rsc (ll_lrm_t* lrm, const char* rsc_id)
 	}
 	ha_msg_del(msg);
 	/* check the response of the msg */
-	if (HA_OK != get_ret_from_ch(ch_cmd)) {
+	rc = get_ret_from_ch(ch_cmd);
+	if (rc != HA_OK && rc != HA_RSCBUSY) {
 		LOG_GOT_FAIL_RET(LOG_ERR, DELRSC);
 		return HA_FAIL;
 	}
 
-	return HA_OK;
+	return rc;
 }
 
 static IPC_Channel*
@@ -1098,7 +1100,7 @@ rsc_flush_ops (lrm_rsc_t* rsc)
 
 	rc = get_ret_from_ch(ch_cmd);
 
-	return rc>0?HA_OK:HA_FAIL;
+	return rc>0?rc:HA_FAIL;
 }
 static gint 
 compare_call_id(gconstpointer a, gconstpointer b)
@@ -1403,6 +1405,8 @@ msg_to_op(struct ha_msg* msg)
 	
 	/* op->params */
 	op->params = ha_msg_value_str_table(msg, F_LRM_PARAM);
+
+	ha_msg_value_int(msg, F_LRM_RSCDELETED, &op->rsc_deleted);
 
 	return op;
 }
