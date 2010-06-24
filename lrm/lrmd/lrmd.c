@@ -2897,6 +2897,11 @@ perform_op(lrmd_rsc_t* rsc)
 	while (NULL != node) {
 		op = node->data;
 		if (-1 != op->exec_pid)	{
+			if (!g_list_next(node)) {
+				/* this is the only operation, no need to do
+				 * anything further */
+				break;
+			}
 			lrmd_log(LOG_INFO, "%s:%d: %s for rsc is already running."
 			, __FUNCTION__, __LINE__, op_info(op));
 			if( rsc->delay_timeout > 0 ) {
