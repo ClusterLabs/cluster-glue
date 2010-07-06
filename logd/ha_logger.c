@@ -46,13 +46,14 @@ usage(void)
 	       "ha_logger [-t tag] [-D <ha-log/ha-debug>] [message]\n");
 	return;
 }
+#define BUFSIZE 1024
 int
 main(int argc, char** argv)
 {
 	int	priority; 
 	char*	entity = NULL;
 	int	c;
-	char	buf[1024];
+	char	buf[BUFSIZE];
 	const char* logtype = "ha-log";
 
 	
@@ -96,49 +97,24 @@ main(int argc, char** argv)
 	}	
 	
 	if (argc > 0){
-		
-		register char *p, *endp;
-		int len;
-		
-		for (p = buf, endp = buf + sizeof(buf) - 2; *argv;) {
-			len = strlen(*argv);
-			if (p + len > endp && p > buf) {
+		register char *p;
+
+		for (p = *argv; *argv; argv++, p = *argv) {
+			while (strlen(p) > BUFSIZE-1) {
+				memcpy(buf, p, BUFSIZE-1);
+				*(buf+BUFSIZE-1) = '\0';
 				if (LogToDaemon(priority,buf,
-						strnlen(buf, 1024),FALSE) ==HA_OK){
-					continue;
-				}else{
+						BUFSIZE,FALSE) != HA_OK){
 					return EXIT_FAIL;
 				}
-				/* NOTREACHED */
-				/* p = buf; */
+				p += BUFSIZE-1;
 			}
-			if (len > sizeof(buf) - 1) {
-				if (LogToDaemon(priority,*argv,
-						strnlen(*argv, 1024),FALSE) ==HA_OK){
-					argv++;
-					continue;
-				}else{
-					return EXIT_FAIL;
-				}
-				
-			} else {
-				if (p != buf){
-					*p++ = ' ';
-				}
-				memcpy(p, *argv++, len);
-				*(p += len) = '\0';
-			}
-		}
-		if (p != buf) {
-			if (LogToDaemon(priority,buf,
-					strnlen(buf, 1024),FALSE) ==HA_OK){
-				return EXIT_OK;
-			}else{
+			if (LogToDaemon(priority,p,
+					strnlen(p, BUFSIZE),FALSE) != HA_OK){
 				return EXIT_FAIL;
 			}
 		}
-		
-
+		return EXIT_OK;
 	}else {
 		while (fgets(buf, sizeof(buf), stdin) != NULL) {
 			/* glibc is buggy and adds an additional newline,
