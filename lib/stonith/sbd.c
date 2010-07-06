@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <time.h>
 #include <clplumbing/cl_log.h>
 #include <clplumbing/coredumps.h>
 #include <clplumbing/realtime.h>
