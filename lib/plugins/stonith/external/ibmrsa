@@ -7,7 +7,7 @@
 # This STONITH module depends on IBMmpcli.
 #
 
-trap 'if [ -n "$outf" ]; then ha_log.sh err "`cat $outf`"; rm -f "$outf"; fi' 0
+trap 'rm -f "$outf"' 0
 outf=`mktemp` || {
 	ha_log.sh err 'mktemp failed'
 	exit 1
@@ -36,7 +36,7 @@ mpcli() {
 	cat
 	) | /opt/IBMmpcli/bin/MPCLI.sh | grep -w $goodstg >/dev/null 2>&1
 	rc=$?
-	grep -w $failstg $outf
+	grep -w $failstg $outf >/dev/null
 	if [ $rc -eq 0 -a $? -eq 1 ]; then
 		return 0
 	else
