@@ -23,7 +23,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 # 
 
-# Build version: @BUILD_VERSION@
+# Build version: @GLUE_BUILD_VERSION@
 
 PROG=`basename $0`
 

@@ -31,7 +31,7 @@
 #include <glib.h>
 #include <libxml/entities.h>
 
-#define	OPTIONS	"c:F:p:t:T:EsnSlLmvhd"
+#define	OPTIONS	"c:F:p:t:T:EsnSlLmvhVd"
 #define	EQUAL	'='
 
 extern char *	optarg;
@@ -61,6 +61,7 @@ static const char META_TEMPLATE[] =
 "</special>\n"
 "</resource-agent>\n";
 
+void version();
 void usage(const char * cmd, int exit_status, const char * devtype);
 void confhelp(const char * cmd, FILE* stream, const char * devtype);
 void print_stonith_meta(Stonith * stonith_obj, const char *rsc_type);
@@ -71,6 +72,13 @@ void print_stonith_meta(Stonith * stonith_obj, const char *rsc_type);
  *
  *	:-(
  */
+
+void
+version()
+{
+	printf("stonith: %s (%s)", GLUE_VERSION, GLUE_BUILD_VERSION);
+	exit(0);
+}
 
 void
 usage(const char * cmd, int exit_status, const char * devtype)
@@ -377,6 +385,9 @@ main(int argc, char** argv)
 				break;
 
 		case 'v':	++verbose;
+				break;
+
+		case 'V':	version();
 				break;
 
 		default:	++errors;
