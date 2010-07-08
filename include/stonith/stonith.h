@@ -123,6 +123,7 @@ void	stonith_free_hostlist	(char** hostlist);
 int	stonith_get_status	(Stonith* s);
 int	stonith_req_reset	(Stonith* s, int operation, const char* node);
 
+StonithNVpair* stonith_env_to_NVpair(Stonith* s);
 
 /* Stonith 1 compatibility:  Convert string to an NVpair set */
 StonithNVpair*

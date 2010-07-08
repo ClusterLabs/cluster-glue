@@ -31,7 +31,7 @@
 #include <glib.h>
 #include <libxml/entities.h>
 
-#define	OPTIONS	"c:F:p:t:T:snSlLmvhd"
+#define	OPTIONS	"c:F:p:t:T:EsnSlLmvhd"
 #define	EQUAL	'='
 
 extern char *	optarg;
@@ -100,6 +100,7 @@ usage(const char * cmd, int exit_status, const char * devtype)
 		"-t stonith-device-type "
 		"{-p stonith-device-parameters | "
 		"-F stonith-device-parameters-file | "
+		"-E | "
 		"name=value...} "
 		"[-c count] "
 		"-lS\n"
@@ -109,6 +110,7 @@ usage(const char * cmd, int exit_status, const char * devtype)
 		"-t stonith-device-type "
 		"{-p stonith-device-parameters | "
 		"-F stonith-device-parameters-file | "
+		"-E | "
 		"name=value...} "
 		"[-c count] "
 		"-T {reset|on|off} nodename\n"
@@ -283,6 +285,7 @@ main(int argc, char** argv)
 	int		listhosts = 0;
 	int		listtypes = 0;
 	int 		listparanames = 0;
+	int 		params_from_env = 0;
 
 	int		c;
 	int		errors = 0;
@@ -327,6 +330,9 @@ main(int argc, char** argv)
 				break;
 
 		case 'F':	optfile = optarg;
+				break;
+
+		case 'E':	params_from_env = 1;
 				break;
 
 		case 'h':	help++;
@@ -385,9 +391,10 @@ main(int argc, char** argv)
 		PILpisysSetDebugLevel(debug);
 		setenv("HA_debug","2",0);
 	}
-	if (optfile && parameters) {
+	if ((optfile && parameters) || (optfile && params_from_env)
+			|| (params_from_env && parameters)) {
 		fprintf(stderr
-		,	"Cannot include both -F and -p options\n");
+		,	"Please use just one of -F, -p, and -E options\n");
 		usage(cmdname, 1, NULL);
 	}
 
@@ -408,6 +415,12 @@ main(int argc, char** argv)
 		if (optfile)  {
 			fprintf(stderr
 			,	"Cannot include both -F and name=value "
+			"style arguments\n");
+			usage(cmdname, 1, NULL);
+		}
+		if (params_from_env)  {
+			fprintf(stderr
+			,	"Cannot use both -E and name=value "
 			"style arguments\n");
 			usage(cmdname, 1, NULL);
 		}
@@ -468,7 +481,8 @@ main(int argc, char** argv)
 		stonith_set_debug(s, debug);
 	}
 
-	if (!listparanames && !metadata && optfile == NULL && parameters == NULL && nvcount == 0) {
+	if (!listparanames && !metadata && optfile == NULL &&
+			parameters == NULL && !params_from_env && nvcount == 0) {
 		const char**	names;
 		int		needs_parms = 1;
 
@@ -478,7 +492,7 @@ main(int argc, char** argv)
 
 		if (needs_parms) {
 			fprintf(stderr
-			,	"Must specify either -p option, -F option or "
+			,	"Must specify either -p option, -F option, -E option, or "
 			"name=value style arguments\n");
 			if (s != NULL) {
 				stonith_delete(s); 
@@ -523,6 +537,20 @@ main(int argc, char** argv)
 #endif
 			stonith_delete(s); s=NULL;
 			exit(S_BADCONFIG);
+		}
+	}else if (params_from_env) {
+		/* Configure Stonith object from the environment */
+		StonithNVpair *		pairs;
+		if ((pairs = stonith_env_to_NVpair(s)) == NULL) {
+			fprintf(stderr
+			,	"Out of memory\n");
+			stonith_delete(s); s=NULL;
+			exit(1);
+		}
+		if ((rc = stonith_set_config(s, pairs)) != S_OK) {
+			fprintf(stderr
+			,	"Invalid config info for %s device"
+			,	SwitchType);
 		}
 	}else if (parameters) {
 		/* Configure Stonith object from the -p argument */

@@ -517,6 +517,47 @@ freeandexit:
 	return NULL;
 }
 
+StonithNVpair*
+stonith_env_to_NVpair(Stonith* s)
+{
+	/* Read the config names values from the environment */
+	const char **	config_names;
+	int		n_names;
+	int		j;
+	StonithNVpair*	ret;
+
+	if ((config_names = stonith_get_confignames(s)) == NULL) {
+		return NULL;
+	}
+	for (n_names=0; config_names[n_names] != NULL; ++n_names) {
+		/* Just count */;
+	}
+	ret = (StonithNVpair*) (MALLOC((n_names+1)*sizeof(StonithNVpair)));
+	if (ret == NULL) {
+		return NULL;
+	}
+	memset(ret, 0, (n_names+1)*sizeof(StonithNVpair));
+	for (j=0; j < n_names; ++j) {
+		char *env_value;
+		if ((ret[j].s_name = STRDUP(config_names[j])) == NULL) {
+			goto freeandexit;
+		}
+		env_value = getenv(config_names[j]);
+		if (env_value) {
+			if ((ret[j].s_value = STRDUP(env_value)) == NULL) {
+				goto freeandexit;
+			}
+		} else {
+			ret[j].s_value = NULL;
+		}
+	}
+	ret[j].s_name = NULL;
+	return ret;
+freeandexit:
+	free_NVpair(ret); ret = NULL;
+	return NULL;
+}
+
 static int NVcur = -1;
 static int NVmax = -1;
 static gboolean NVerr = FALSE;
