@@ -543,13 +543,14 @@ main(int argc, char** argv)
 		StonithNVpair *		pairs;
 		if ((pairs = stonith_env_to_NVpair(s)) == NULL) {
 			fprintf(stderr
-			,	"Out of memory\n");
+			,	"Invalid config info for %s device.\n"
+			,	SwitchType);
 			stonith_delete(s); s=NULL;
 			exit(1);
 		}
 		if ((rc = stonith_set_config(s, pairs)) != S_OK) {
 			fprintf(stderr
-			,	"Invalid config info for %s device"
+			,	"Invalid config info for %s device\n"
 			,	SwitchType);
 		}
 	}else if (parameters) {
@@ -565,7 +566,7 @@ main(int argc, char** argv)
 		}
 		if ((rc = stonith_set_config(s, pairs)) != S_OK) {
 			fprintf(stderr
-			,	"Invalid config info for %s device"
+			,	"Invalid config info for %s device\n"
 			,	SwitchType);
 		}
 	}else{
