@@ -427,19 +427,19 @@ AC_SUBST(LRM_DIR)
 
 AC_PATH_PROGS(HG, hg false)
 AC_MSG_CHECKING(build version)
-BUILD_VERSION=unknown
+GLUE_BUILD_VERSION=unknown
 if test -f $srcdir/.hg_archival.txt; then
-   BUILD_VERSION=`cat $srcdir/.hg_archival.txt | awk '/node:/ { print $2 }'`
+   GLUE_BUILD_VERSION=`cat $srcdir/.hg_archival.txt | awk '/node:/ { print $2 }'`
 elif test -x $HG -a -d .hg; then
-   BUILD_VERSION=`$HG id -itb`
+   GLUE_BUILD_VERSION=`$HG id -itb`
    if test $? != 0; then
-       BUILD_VERSION=unknown
+       GLUE_BUILD_VERSION=unknown
    fi
 fi
 
-AC_DEFINE_UNQUOTED(BUILD_VERSION, "$BUILD_VERSION", Build version)
-AC_MSG_RESULT($BUILD_VERSION)
-AC_SUBST(BUILD_VERSION)
+AC_DEFINE_UNQUOTED(GLUE_BUILD_VERSION, "$GLUE_BUILD_VERSION", Build version)
+AC_MSG_RESULT($GLUE_BUILD_VERSION)
+AC_SUBST(GLUE_BUILD_VERSION)
 
 
 dnl check if there are getpid() inconsistency
@@ -1336,7 +1336,7 @@ dnl *****************
 
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE configuration:])
-AC_MSG_RESULT([  Version                  = ${VERSION} (Build: $BUILD_VERSION)])
+AC_MSG_RESULT([  Version                  = ${VERSION} (Build: $GLUE_BUILD_VERSION)])
 AC_MSG_RESULT([  Features                 =${PKG_FEATURES}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([  Prefix                   = ${prefix}])

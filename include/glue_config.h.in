@@ -77,8 +77,11 @@
 /* Compiling for Linux platform */
 #undef ON_LINUX
 
-/* Current pacemaker version */
+/* Current glue version */
 #undef GLUE_VERSION
+
+/* Build version */
+#undef GLUE_BUILD_VERSION
 
 /* Location of non-pluing stonith scripts */
 #undef STONITH_EXT_PLUGINDIR
@@ -93,4 +96,3 @@
 #undef ST_TEXTDOMAIN
 
 #undef HA_HBCONF_DIR
-
