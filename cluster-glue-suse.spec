@@ -40,6 +40,7 @@ AutoReqProv:    on
 BuildRequires:  automake autoconf libtool e2fsprogs-devel glib2-devel pkgconfig python-devel libxml2-devel
 BuildRequires:  libnet net-snmp-devel OpenIPMI-devel openhpi-devel
 BuildRequires:  libxslt docbook_4 docbook-xsl-stylesheets
+BuildRequires:  help2man
 
 Obsoletes:	heartbeat-common
 Provides:	heartbeat-common
