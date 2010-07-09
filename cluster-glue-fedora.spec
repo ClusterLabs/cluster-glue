@@ -39,6 +39,7 @@ BuildRequires: automake autoconf libtool pkgconfig which
 BuildRequires: bzip2-devel glib2-devel python-devel libxml2-devel
 BuildRequires: OpenIPMI-devel openssl-devel
 BuildRequires: libxslt docbook-dtds docbook-style-xsl
+BuildRequires: help2man
 
 %if 0%{?fedora} 
 BuildRequires:    libcurl-devel libnet-devel
