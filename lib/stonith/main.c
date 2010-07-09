@@ -76,7 +76,7 @@ void print_stonith_meta(Stonith * stonith_obj, const char *rsc_type);
 void
 version()
 {
-	printf("stonith: %s (%s)", GLUE_VERSION, GLUE_BUILD_VERSION);
+	printf("stonith: %s (%s)\n", GLUE_VERSION, GLUE_BUILD_VERSION);
 	exit(0);
 }
 
