@@ -1,6 +1,23 @@
+* Fri Jul  9 2010 Dejan Muhamedagic <dejan@suse.de>
+- stable release 1.0.6
+- clplumbing: Add identity info of the user on the other side of socket
+- ha_logger: log strings longer than 1024
+- lrmd: remove operation history on client unregister (lf#2161)
+- lrmd: don't allow cancelled operations to get back to the repeating op list (lf#2417)
+- lrmd: exclude stonith resources from child count (bnc#612387)
+- lrmd,clientlib: asynchronous resource delete notification (lf#2439)
+- stonith: add -V (version) to stonith
+- stonith: add -E option to get the configuration from the environment
+- stonith: ha_log: feed the message to stdout and not on command line
+- stonith: external/sbd,xen0: fix wrong reference from ha_log to ha_log.sh (deb#585120)
+- stonith: external/sbd: reduce monitoring
+- stonith: external/rackpdu: check the snmpset and snmpwalk exit codes
+- hb_report: create cib.txt after sanitizing the CIB (lf#2415)
+
 * Mon Apr 15 2010 Dejan Muhamedagic <dejan@suse.de>
 - stable release 1.0.5
 - clplumbing: revert changeset 81ad41d14f72 which breaks the ABI
+
 * Mon Apr 12 2010 Dejan Muhamedagic <dejan@suse.de>
 - stable release 1.0.4
 - clplumbing: fix memory leak in cl_msg/lrmd (lf#1841,2389)
@@ -29,9 +46,11 @@
 - hb_report: when creating cts reports get information from the log
 - hb_report: new option -d to keep the directory
 - hb_report: don't give up early when creating backtraces (lf#2350)
+
 * Tue Feb 02 2010 Dejan Muhamedagic <dejan@suse.de>
 - bugfix release 1.0.3
 - lrmd: don't flush operations which don't belong to the requesting client (lf#2161)
+
 * Mon Feb 01 2010 Dejan Muhamedagic <dejan@suse.de> and MANY others
 - stable release 1.0.2
 - clplumbing: fix a potential resource leak in cl_random (bnc#525393)
