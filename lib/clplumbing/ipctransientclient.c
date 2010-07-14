@@ -159,11 +159,11 @@ transient_client_callback(IPC_Channel* server, void* private_data)
 
 			if(lpc < MAX_MESSAGES && strcmp(messages[lpc], buffer) != 0)
 			{
-				cl_log(LOG_ERR, "[Client] Recieved someone else's message [%s] instead of [%s]", buffer, messages[lpc]);
+				cl_log(LOG_ERR, "[Client] Received someone else's message [%s] instead of [%s]", buffer, messages[lpc]);
 			}
 			else if(lpc >= MAX_MESSAGES)
 			{
-				cl_log(LOG_ERR, "[Client] Recieved an extra message [%s]", buffer);
+				cl_log(LOG_ERR, "[Client] Receivedan extra message [%s]", buffer);
 			}
 			
 			lpc++;

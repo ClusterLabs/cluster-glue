@@ -1597,11 +1597,11 @@ execra_code2string(uniform_ret_execra_t code)
 		case EXECRA_FAILED_MASTER:
 			return "master (failed)";
 		case EXECRA_RA_DEAMON_DEAD1:
-			return "status: deamon dead";
+			return "status: daemon dead";
 		case EXECRA_RA_DEAMON_DEAD2:
-			return "status: deamon dead";
+			return "status: daemon dead";
 		case EXECRA_RA_DEAMON_STOPPED:
-			return "status: deamon stopped";
+			return "status: daemon stopped";
 		case EXECRA_STATUS_UNKNOWN:
 			return "status: unknown";
 		default:
