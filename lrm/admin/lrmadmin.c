@@ -140,7 +140,7 @@ static int call_id = 0;
 static int TIMEOUT = -1; /* the unit is ms */
 
 static const char *simple_help_screen =
-"lrmadmin -d,--deamon\n"
+"lrmadmin -d,--daemon\n"
 "         -A,--add <rscid> <raclass> <ratype> <provider|NULL> [<rsc_params_list>]\n"
 "         -D,--delete <rscid>\n"
 "         -F,--flush <rscid>\n"

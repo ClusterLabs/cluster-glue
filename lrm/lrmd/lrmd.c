@@ -2705,7 +2705,7 @@ add_op_to_runlist(lrmd_rsc_t* rsc, lrmd_op_t* op)
 	rsc->op_list = g_list_append(rsc->op_list, op);
 	if (g_list_length(rsc->op_list) >= 4) {
 		lrmd_log(LOG_WARNING
-		,	"operations list for %s is suspicously"
+		,	"operations list for %s is suspiciously"
 		" long [%d]"
 		,	rsc->id
 		,	g_list_length(rsc->op_list));

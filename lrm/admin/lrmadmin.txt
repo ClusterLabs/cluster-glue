@@ -4,7 +4,7 @@ NAME
 	lrmadmin  - Local Resource Manager Commander-line Daministrator Tools
 
 SYNOPSIS
-lrmadmin {-d|--deamon}
+lrmadmin {-d|--daemon}
 	 {-A|--add} <rscid> <rsc_class> <rsc_type> [<rsc_params_list>] 
 	 {-D|--delete} <rscid>
 	 {-F|--flush} <rscid>
@@ -20,8 +20,8 @@ lrmadmin {-d|--deamon}
 
 Detailed Explanation for Options 
 
-Lrmd deamon options
-	 {-d|--deamon}
+Lrmd daemon options
+	 {-d|--daemon}
 #		-s	    The status of lrmd: running or not running
 #		-r	    Reset lrmd (?)
 
