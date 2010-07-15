@@ -61,7 +61,7 @@ static const char META_TEMPLATE[] =
 "</special>\n"
 "</resource-agent>\n";
 
-void version();
+void version(void);
 void usage(const char * cmd, int exit_status, const char * devtype);
 void confhelp(const char * cmd, FILE* stream, const char * devtype);
 void print_stonith_meta(Stonith * stonith_obj, const char *rsc_type);
