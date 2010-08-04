@@ -87,5 +87,6 @@ static void do_reset(void);
 static void do_off(void);
 static void make_daemon(void);
 static int daemonize(void);
+static void maximize_priority(void);
 static void get_uname(void);
 

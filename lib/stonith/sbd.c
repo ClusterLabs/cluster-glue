@@ -19,11 +19,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <asm/unistd.h>
 #include <ctype.h>
 #include <string.h>
 #include <syslog.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ptrace.h>
 #include <fcntl.h>
 #include <time.h>
 #include <clplumbing/cl_log.h>
@@ -51,6 +53,7 @@ static int		timeout_msgwait		= 10;
 
 static int	watchdog_use		= 0;
 static int	go_daemon		= 0;
+static int	skip_rt			= 0;
 static int	debug			= 0;
 static const char *watchdogdev		= "/dev/watchdog";
 static char *	local_uname;
@@ -74,6 +77,7 @@ usage(void)
 "-h		Display this help.\n"
 "-n <node>	Set local node name; defaults to uname -n (optional)\n"
 "\n"
+"-R		Do NOT enable realtime priority (debugging only)\n"
 "-W		Use watchdog (recommended) (watch only)\n"
 "-w <dev>	Specify watchdog device (optional) (watch only)\n"
 "-D		Run as background daemon (optional) (watch only)\n"
@@ -161,6 +165,53 @@ watchdog_close(void)
 			cl_perror("Watchdog close(2) failed.");
 		}
 		watchdogfd = -1;
+	}
+}
+
+/* This duplicates some code from linux/ioprio.h since these are not included
+ * even in linux-kernel-headers. Sucks. See also
+ * /usr/src/linux/Documentation/block/ioprio.txt and ioprio_set(2) */
+extern int sys_ioprio_set(int, int, int);
+static int ioprio_set(int which, int who, int ioprio);
+static inline int ioprio_set(int which, int who, int ioprio)
+{
+        return syscall(__NR_ioprio_set, which, who, ioprio);
+}
+
+enum {
+        IOPRIO_CLASS_NONE,
+        IOPRIO_CLASS_RT,
+        IOPRIO_CLASS_BE,
+        IOPRIO_CLASS_IDLE,
+};
+
+enum {
+        IOPRIO_WHO_PROCESS = 1,
+        IOPRIO_WHO_PGRP,
+        IOPRIO_WHO_USER,
+};
+
+#define IOPRIO_BITS             (16)
+#define IOPRIO_CLASS_SHIFT      (13)
+#define IOPRIO_PRIO_MASK        ((1UL << IOPRIO_CLASS_SHIFT) - 1)
+
+#define IOPRIO_PRIO_CLASS(mask) ((mask) >> IOPRIO_CLASS_SHIFT)
+#define IOPRIO_PRIO_DATA(mask)  ((mask) & IOPRIO_PRIO_MASK)
+#define IOPRIO_PRIO_VALUE(class, data)  (((class) << IOPRIO_CLASS_SHIFT) | data)
+
+static void
+maximize_priority(void)
+{
+	if (skip_rt) {
+		cl_log(LOG_INFO, "Not elevating to realtime (-R specified).");
+		return;
+	}
+
+	cl_make_realtime(-1, -1, 256, 256);
+
+	if (ioprio_set(IOPRIO_WHO_PROCESS, getpid(),
+			IOPRIO_PRIO_VALUE(IOPRIO_CLASS_RT, 1)) != 0) {
+		cl_perror("ioprio_set() call failed.");
 	}
 }
 
@@ -751,6 +802,9 @@ make_daemon(void)
 
 	cl_log_enable_stderr(FALSE);
 
+	/* This is the child; ensure privileges have not been lost. */
+	maximize_priority();
+
 	umask(022);
 	close(0);
 	(void)open(devnull, O_RDONLY);
@@ -759,8 +813,6 @@ make_daemon(void)
 	close(2);
 	(void)open(devnull, O_WRONLY);
 	cl_cdtocoredir();
-	cl_make_realtime(-1, -1, 128, 128);
-
 }
 
 
@@ -789,7 +841,7 @@ daemonize(void)
 
 	if (watchdog_use != 0)
 		watchdog_init();
-	
+
 	while (1) {
 		t0 = time(NULL);
 		sleep(timeout_loop);
@@ -905,10 +957,13 @@ main(int argc, char** argv)
 	
 	get_uname();
 
-	while ((c = getopt (argc, argv, "DWhvw:d:n:1:2:3:4:5:")) != -1) {
+	while ((c = getopt (argc, argv, "DRWhvw:d:n:1:2:3:4:5:")) != -1) {
 		switch (c) {
 		case 'D':
 			go_daemon = 1;
+			break;
+		case 'R':
+			skip_rt = 1;
 			break;
 		case 'v':
 			debug = 1;
@@ -957,6 +1012,7 @@ main(int argc, char** argv)
 		goto out;
 	}
 
+	maximize_priority();
 	if (open_device(devname) < 0) {
 		exit_status = -1;
 		goto out;
