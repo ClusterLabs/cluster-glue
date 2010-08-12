@@ -611,7 +611,7 @@ main(int argc, char** argv)
 	for (j=0; j < count; ++j) {
 		rc = stonith_get_status(s);
 
-		if ((tmp = stonith_get_info(s, ST_DEVICEID)) == NULL) {
+		if ((tmp = stonith_get_info(s, ST_DEVICEID)) != NULL) {
 			SwitchType = tmp;
 		}
 
