@@ -702,7 +702,7 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	const int		BUFF_LEN=4096;
 	char			buff[BUFF_LEN];
 	int			read_len = 0;
-	int			rc;
+	int			status, rc;
 	char * 			data = NULL;
 	FILE *			file;
 	char			cmd[FILENAME_MAX+64];
@@ -811,9 +811,23 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		goto out;
 	}
 
-	rc = pclose(file);
-	if (rc != 0) {
-		LOG(PIL_INFO, "%s: Calling '%s' returned %d", __FUNCTION__, cmd, rc);
+	status = pclose(file);
+	if (WIFEXITED(status)) {
+		rc = WEXITSTATUS(status);
+		LOG(rc ? PIL_INFO : PIL_CRIT,
+			"%s: Calling '%s' returned %d", __FUNCTION__, cmd, rc);
+	} else {
+		if (WIFSIGNALED(status)) {
+			LOG(PIL_CRIT, "%s: '%s' got signal %d",
+				__FUNCTION__, cmd, WTERMSIG(status));
+		} else if (WIFSTOPPED(status)) {
+			LOG(PIL_INFO, "%s: '%s' stopped with signal %d",
+				__FUNCTION__, cmd, WSTOPSIG(status));
+		} else {
+			LOG(PIL_CRIT, "%s: '%s' exited abnormally (core dumped?)",
+				__FUNCTION__, cmd);
+		}
+		rc = -1;
 	}
 	if (Debug && output && data) {
 		LOG(PIL_DEBUG, "%s: '%s' output: %s", __FUNCTION__, cmd, data);
