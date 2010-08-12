@@ -609,19 +609,19 @@ main(int argc, char** argv)
 
 
 	for (j=0; j < count; ++j) {
-		rc = stonith_get_status(s);
+		rc = S_OK;
 
-		if ((tmp = stonith_get_info(s, ST_DEVICEID)) != NULL) {
-			SwitchType = tmp;
-		}
+		if (status) {
+		        rc = stonith_get_status(s);
 
-		if (status && !silent) {
-			if (rc == S_OK) {
-				syslog(LOG_ERR, "%s device OK.", SwitchType);
-			}else{
-				/* Uh-Oh */
-				syslog(LOG_ERR, "%s device not accessible."
-				,	SwitchType);
+			if (!silent) {
+				if (rc == S_OK) {
+					syslog(LOG_ERR, "%s device OK.", SwitchType);
+				}else{
+					/* Uh-Oh */
+					syslog(LOG_ERR, "%s device not accessible."
+					,	SwitchType);
+				}
 			}
 		}
 
@@ -632,6 +632,7 @@ main(int argc, char** argv)
 			if (hostlist == NULL) {
 				syslog(LOG_ERR, "Could not list hosts for %s."
 				,	SwitchType);
+				rc = -1;
 			}else{
 				char **	this;
 
