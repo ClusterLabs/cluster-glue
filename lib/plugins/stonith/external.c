@@ -415,7 +415,7 @@ external_set_config(StonithPlugin* s, StonithNVpair *list)
 
 		for (p = sd->confignames; *p; p++) {
 			if (OurImports->GetValue(list, *p) == NULL) {
-				LOG(PIL_INFO, "Cannot get parameter %s from "
+				LOG(PIL_DEBUG, "Cannot get parameter %s from "
 					"StonithNVpair", *p);
 			}
 		}
@@ -814,8 +814,10 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	status = pclose(file);
 	if (WIFEXITED(status)) {
 		rc = WEXITSTATUS(status);
-		LOG(rc ? PIL_INFO : PIL_CRIT,
-			"%s: Calling '%s' returned %d", __FUNCTION__, cmd, rc);
+		if (rc != 0) {
+			LOG(PIL_CRIT,
+				"%s: Calling '%s' returned %d", __FUNCTION__, cmd, rc);
+		}
 	} else {
 		if (WIFSIGNALED(status)) {
 			LOG(PIL_CRIT, "%s: '%s' got signal %d",
