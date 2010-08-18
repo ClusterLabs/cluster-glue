@@ -65,6 +65,8 @@ void version(void);
 void usage(const char * cmd, int exit_status, const char * devtype);
 void confhelp(const char * cmd, FILE* stream, const char * devtype);
 void print_stonith_meta(Stonith * stonith_obj, const char *rsc_type);
+void print_types();
+void print_confignames(Stonith *s);
 
 /*
  * Note that we don't use the cl_log logging code because the STONITH
@@ -276,6 +278,39 @@ print_stonith_meta(Stonith * stonith_obj, const char *rsc_type)
 
 #define	MAXNVARG	50
 
+void
+print_types()
+{
+	char **	typelist;
+
+	typelist = stonith_types();
+	if (typelist == NULL) {
+		syslog(LOG_ERR, "Could not list Stonith types.");
+	}else{
+		char **	this;
+
+		for(this=typelist; *this; ++this) {
+			printf("%s\n", *this);
+		}
+	}
+}
+
+void
+print_confignames(Stonith *s)
+{
+	const char**	names;
+	int		i;
+
+	names = stonith_get_confignames(s);
+
+	if (names != NULL) {
+		for (i=0; names[i]; ++i) {
+			printf("%s  ", names[i]);
+		}
+	}
+	printf("\n");
+}
+
 int
 main(int argc, char** argv)
 {
@@ -283,7 +318,6 @@ main(int argc, char** argv)
 	int		rc;
 	Stonith *	s;
 	const char *	SwitchType = NULL;
-	const char *	tmp;
 	const char *	optfile = NULL;
 	const char *	parameters = NULL;
 	int		reset_type = ST_GENERIC_RESET;
@@ -417,21 +451,9 @@ main(int argc, char** argv)
 		if ((eqpos=strchr(argv[optind], EQUAL)) == NULL) {
 			break;
 		}
-		if (parameters)  {
+		if (parameters || optfile || params_from_env)  {
 			fprintf(stderr
-			,	"Cannot include both -p and name=value "
-			"style arguments\n");
-			usage(cmdname, 1, NULL);
-		}
-		if (optfile)  {
-			fprintf(stderr
-			,	"Cannot include both -F and name=value "
-			"style arguments\n");
-			usage(cmdname, 1, NULL);
-		}
-		if (params_from_env)  {
-			fprintf(stderr
-			,	"Cannot use both -E and name=value "
+			,	"Cannot mix name=value and -p, -F, or -E "
 			"style arguments\n");
 			usage(cmdname, 1, NULL);
 		}
@@ -460,18 +482,7 @@ main(int argc, char** argv)
 	}
 
 	if (listtypes) {
-		char **	typelist;
-
-		typelist = stonith_types();
-		if (typelist == NULL) {
-			syslog(LOG_ERR, "Could not list Stonith types.");
-		}else{
-			char **	this;
-
-			for(this=typelist; *this; ++this) {
-				printf("%s\n", *this);
-			}
-		}
+		print_types();
 		exit(0);
 	}
 
@@ -513,16 +524,7 @@ main(int argc, char** argv)
 	}
 
 	if (listparanames) {
-		const char**	names;
-		int		i;
-		names = stonith_get_confignames(s);
-
-		if (names != NULL) {
-			for (i=0; names[i]; ++i) {
-				printf("%s  ", names[i]);
-			}
-		}
-		printf("\n");
+		print_confignames(s);
 		stonith_delete(s); 
 		s=NULL;
 		exit(0);
@@ -612,7 +614,7 @@ main(int argc, char** argv)
 		rc = S_OK;
 
 		if (status) {
-		        rc = stonith_get_status(s);
+			rc = stonith_get_status(s);
 
 			if (!silent) {
 				if (rc == S_OK) {
