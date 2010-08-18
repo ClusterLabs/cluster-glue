@@ -155,10 +155,27 @@ static const char * NOTpluginID = "Cyclades device has been destroyed";
 
 #include "stonith_config_xml.h"
 
+#define XML_SERIALPORT_SHORTDESC \
+	XML_PARM_SHORTDESC_BEGIN("en") \
+	ST_SERIALPORT \
+	XML_PARM_SHORTDESC_END
+
+#define XML_SERIALPORT_LONGDESC \
+	XML_PARM_LONGDESC_BEGIN("en") \
+	"The serial port of the IPDU which can powercycle the node" \
+	XML_PARM_LONGDESC_END
+
+#define XML_SERIALPORT_PARM \
+	XML_PARAMETER_BEGIN(ST_SERIALPORT, "string", "1") \
+	  XML_SERIALPORT_SHORTDESC \
+	  XML_SERIALPORT_LONGDESC \
+	XML_PARAMETER_END
+
 static const char *cycladesXML = 
   XML_PARAMETERS_BEGIN
     XML_IPADDR_PARM
     XML_LOGIN_PARM
+    XML_SERIALPORT_PARM
   XML_PARAMETERS_END;
 
 static int
