@@ -60,9 +60,30 @@ run_ipmitool() {
 		interface="lan"
 	fi
 
+        case "${passwd_method}" in
+            param|'')
+                passwd_method=param
+                M="-P"
+                ;;
+            env)
+                M="-E"
+                ;;
+            file)
+                M="-f"
+                ;;
+            *)
+		ha_log.sh err "invalid passwd_method: \"${passwd_method}\""
+		return 1
+        esac
+
 	action="$*"
 
-	${IPMITOOL} -I ${interface} -H ${ipaddr} -U "${userid}" -P "${passwd}" ${action} 2>&1
+        if [ $passwd_method = env ]
+        then
+            IPMI_PASSWORD="${passwd}" ${IPMITOOL} -I ${interface} -H ${ipaddr} -U "${userid}" -E ${action} 2>&1
+        else
+            ${IPMITOOL} -I ${interface} -H ${ipaddr} -U "${userid}" $M "${passwd}" ${action} 2>&1
+        fi
 }
 
 # Yet another convenience wrapper that invokes run_ipmitool, captures
@@ -93,7 +114,6 @@ ipmi_is_power_on() {
 		;;
 	esac
 }
-
 
 # Rewrite the hostname to accept "," as a delimeter for hostnames too.
 
@@ -192,6 +212,19 @@ Password
 </shortdesc>
 <longdesc lang="en">
 The password used for logging in to the STONITH device.
+</longdesc>
+</parameter>
+
+<parameter name="passwd_method" unique="1">
+<content type="string" default="param"/>
+<shortdesc lang="en">
+Method for passing passwd parameter
+</shortdesc>
+<longdesc lang="en">
+Method for passing the passwd parameter to ipmitool
+  param: pass as parameter (-P)
+  env:   pass via environment (-E)
+  file:  value of "passwd" is actually a file name, pass with (-f)
 </longdesc>
 </parameter>
 
