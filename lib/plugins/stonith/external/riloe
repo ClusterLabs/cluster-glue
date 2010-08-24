@@ -14,6 +14,9 @@
 # Rewritten by Dejan Muhamedagic <dejan@suse.de>
 # Now, the plugin actually reads replies from iLO.
 #
+# Extended by Jochen Roeder <jochen.roeder@novell.com> 
+# to enable access via proxies
+#
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
 # License as published by the Free Software Foundation; either
@@ -33,7 +36,8 @@ import os
 import socket
 import subprocess
 import xml.dom.minidom
-from httplib import HTTPSConnection
+import httplib
+import ssl
 import time
 import re
 
@@ -70,6 +74,12 @@ realhost = os.environ.get('hostlist',     legacy_RI_HOST)
 rihost   = os.environ.get('ilo_hostname', legacy_RI_HOSTRI)
 ilouser  = os.environ.get('ilo_user',     legacy_RI_LOGIN)
 ilopass  = os.environ.get('ilo_password', legacy_RI_PASSWORD)
+iloproxyhost  = os.environ.get('ilo_proxyhost', '')
+try:
+    iloproxyport  = int(os.environ.get('ilo_proxyport', 3128))
+except ValueError:
+    my_err("ilo_proxyport is not a number")
+    sys.exit(1)
 
 xmlinfo = '''<parameters>
  <parameter name="hostlist" unique="1" required="1">
@@ -127,6 +137,22 @@ xmlinfo = '''<parameters>
    about half a minute.
   </longdesc>
  </parameter>
+<parameter name="ilo_proxyhost" unique="0" required="0">
+  <content type="string" default=""/>
+  <shortdesc lang="en">Proxy hostname</shortdesc>
+  <longdesc lang="en">
+  proxy hostname if required to access ILO board
+  </longdesc>
+ </parameter>
+<parameter name="ilo_proxyport" unique="0" required="0">
+  <content type="string" default="3128"/>
+  <shortdesc lang="en">Proxy port</shortdesc>
+  <longdesc lang="en">
+  proxy port if required to access ILO board
+  parameter will be ignored if proxy hostname is not set
+  </longdesc>
+ </parameter>
+
 </parameters>'''
 
 info = {
@@ -143,7 +169,7 @@ if cmd in info:
     sys.exit(0)
 
 if cmd == 'getconfignames':
-    for arg in [ "hostlist", "ilo_hostname", "ilo_user", "ilo_password", "ilo_can_reset", "ilo_protocol", "ilo_powerdown_method"]:
+    for arg in [ "hostlist", "ilo_hostname", "ilo_user", "ilo_password", "ilo_can_reset", "ilo_protocol", "ilo_powerdown_method", "ilo_proxyhost", "ilo_proxyport"]:
         print arg
     sys.exit(0)
 
@@ -302,7 +328,23 @@ def proc_resp(doc):
 def open_ilo(host):
     # open https connection
     try:
-        return HTTPSConnection(host)
+        if iloproxyhost != "" and iloproxyport != 0: 
+            proxy=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            proxy.connect((iloproxyhost, iloproxyport))
+            proxy_connect='CONNECT %s:%s HTTP/1.1\r\n'%(host,443)
+            user_agent='User-Agent: python\r\n'
+            proxy_pieces=proxy_connect+user_agent+'\r\n'
+            proxy.sendall(proxy_pieces)
+            response=proxy.recv(8192) 
+            status=response.split()[1]
+            if status!=str(200):  
+                fatal("Error status=: %s" %(response))
+            sock = ssl.wrap_socket(proxy) 
+            h=httplib.HTTPConnection('localhost')
+            h.sock=sock
+            return h
+        else:
+            return httplib.HTTPSConnection(host)
     except socket.gaierror, msg:
         fatal("%s: %s" %(msg,host))
     except socket.sslerror, msg:
