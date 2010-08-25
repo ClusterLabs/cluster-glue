@@ -478,21 +478,14 @@ prio2str(int priority)
 static char * syslog_timestamp(TIME_T t);
 
 static void
-append_log( const char * fname, const char * entity, int entity_pid
+append_log(FILE * fp, const char * entity, int entity_pid
 ,	TIME_T timestamp, const char * pristr, const char * msg)
 {
-	FILE *			fp = fopen(fname,"a");
 	static int		got_uname = FALSE;
 	static struct utsname	un;
 
-	if (!fp) {
-		syslog(LOG_ERR, "Cannot append to %s: %s", fname
-		,	strerror(errno)); 
-		return;
-	}
 	if (!syslogformatfile) {
 		print_logline(fp, entity, entity_pid, timestamp, pristr, msg);
-		fclose(fp);
 		return;
 	}
 	if (!got_uname) {
@@ -507,7 +500,20 @@ append_log( const char * fname, const char * entity, int entity_pid
 	,	(pristr ? pristr : "")
 	,	(pristr ? ": " : "")
 	,	msg);
-	fclose(fp);
+}
+
+/*
+ * Just open the given file name
+ */
+static FILE * 
+open_log_file(const char * fname)
+{
+	FILE * fp = fopen(fname ,"a");
+	if (!fp) {
+		syslog(LOG_ERR, "Failed to open log file %s: %s\n" , 
+		       fname, strerror(errno)); 
+	}
+	return fp;
 }
 
 /*
@@ -552,11 +558,27 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 	}
 
 	if (debugfile_name != NULL) {
-		append_log(debugfile_name,entity,entity_pid,ts,pristr,buf);
+		static FILE * debug_fp = NULL;
+		if (!debug_fp) {
+			/* As performance optimization we keep the file-handle
+			 * open all the time */
+			debug_fp = open_log_file(debugfile_name);
+		}
+		if (debug_fp)
+			append_log(debug_fp ,entity, entity_pid, ts, pristr, 
+				   buf);
 	}
 
 	if (priority != LOG_DEBUG && logfile_name != NULL) {
-		append_log(logfile_name,entity,entity_pid,ts,pristr,buf);
+		static FILE * log_fp = NULL;
+		if (!log_fp) {
+			/* As performance optimization we keep the file-handle
+			 * open all the time */
+			log_fp = open_log_file(logfile_name);
+		}
+		if (log_fp)
+			append_log(log_fp ,entity, entity_pid, ts, pristr, 
+				   buf);
 	}
 
 	if (needprivs) {
