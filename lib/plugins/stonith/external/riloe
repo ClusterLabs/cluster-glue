@@ -385,7 +385,7 @@ def send_request(req,proc_f):
     t_end = time.time()
 
     if not result:
-        fatal("no response from %s within %0.2f s"%(rihost,(t_end-t_begin))
+        fatal("no response from %s"%rihost)
     for reply in result:
         # work around the iLO bug, i.e. element RIBCL closed twice
         if re.search("</RIBCL", reply) and re.search("<RIBCL.*/>", reply):
