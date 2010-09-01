@@ -144,11 +144,6 @@ execra( const char * rsc_id, const char * rsc_type, const char * provider,
 	const char * op_type, const int timeout, GHashTable * params)
 {
 	UpstartJobCommand cmd;
-	FILE *fp;
-	GHashTableIter iter;
-	gchar *k, *v;
-
-	fp = fopen ("/tmp/test.log", "a+");
 
 	if (!g_strcmp0(op_type, "meta-data")) {
 		printf("%s", get_resource_meta(rsc_type, provider));
@@ -157,9 +152,6 @@ execra( const char * rsc_id, const char * rsc_type, const char * provider,
 		gboolean running = upstart_job_is_running (rsc_type);
 		printf("%s", running ? "running" : "stopped");
 		
-		fprintf(fp, "Job running: %s\n", running ? "Yes" : "No");
-		fclose(fp);
-
 		if (running)
 			exit(EXECRA_OK);
 		else
@@ -178,16 +170,10 @@ execra( const char * rsc_id, const char * rsc_type, const char * provider,
 	 * between failure modes (can't contact upstart, no such job,
 	 * or failure to do action. */
 	if (upstart_job_do(rsc_type, cmd)) {
-		fprintf (fp, "Action %s on %s succeeded :)", op_type, rsc_type);
-		fclose(fp);
 		exit(EXECRA_OK);
 	} else {
-		fprintf (fp, "Action %s failed, probably invalid job spec :(", op_type, rsc_type);
-		fclose(fp);
 		exit(EXECRA_NO_RA);
 	}
-
-	fclose (fp);
 }
 
 static uniform_ret_execra_t
