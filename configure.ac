@@ -1089,6 +1089,15 @@ if test x$ac_cv_header_bzlib_h != xyes; then
 fi
 
 dnl ========================================================================
+dnl    Upstart via DBus
+dnl ========================================================================
+
+PKG_CHECK_MODULES(DBUS, [dbus-1, dbus-glib-1])
+AC_SUBST(DBUS_CFLAGS)
+AC_SUBST(DBUS_LIBS)
+
+
+dnl ========================================================================
 dnl checks for library functions to replace them
 dnl
 dnl     NoSuchFunctionName:
@@ -1295,6 +1304,7 @@ lib/Makefile							\
    lib/plugins/Makefile						\
       lib/plugins/InterfaceMgr/Makefile				\
       lib/plugins/lrm/Makefile					\
+         lib/plugins/lrm/dbus/Makefile				\
       lib/plugins/stonith/Makefile				\
          lib/plugins/stonith/ribcl.py				\
          lib/plugins/stonith/external/Makefile			\
