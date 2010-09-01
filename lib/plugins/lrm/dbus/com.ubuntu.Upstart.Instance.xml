@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- upstart
+
+     com.ubuntu.Upstart.Instance.xml - interface definition for interface
+     objects
+
+     Copyright © 2009 Canonical Ltd.
+     Author: Scott James Remnant <scott@netsplit.com>.
+
+     This file is free software; Canonical Ltd gives unlimited permission
+     to copy and/or distribute it, with or without modifications, as long
+     as this notice is preserved.
+
+     Communication and interaction with Upstart through this interface is
+     permitted without restriction.
+  -->
+
+<!DOCTYPE node PUBLIC
+  "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+  "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+
+<node>
+  <interface name="com.ubuntu.Upstart0_6.Instance">
+    <!-- Methods to directly control instances.  Unlike the equivalent methods
+         for a Job, these are not permitted to pass or set environment. -->
+    <method name="Start">
+      <annotation name="com.netsplit.Nih.Method.Async" value="true" />
+      <arg name="wait" type="b" direction="in" />
+    </method>
+    <method name="Stop">
+      <annotation name="com.netsplit.Nih.Method.Async" value="true" />
+      <arg name="wait" type="b" direction="in" />
+    </method>
+    <method name="Restart">
+      <annotation name="com.netsplit.Nih.Method.Async" value="true" />
+      <arg name="wait" type="b" direction="in" />
+    </method>
+
+    <!-- Basic information about an Instance -->
+    <property name="name" type="s" access="read" />
+    <property name="goal" type="s" access="read" />
+    <property name="state" type="s" access="read" />
+    <property name="processes" type="a(si)" access="read" />
+  </interface>
+</node>
