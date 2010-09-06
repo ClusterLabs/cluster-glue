@@ -1,3 +1,4 @@
+if UPSTART
 BINDINGS=Upstart_Instance.h \
 	Upstart_Job.h \
 	Upstart.h
@@ -12,3 +13,4 @@ clean-local:
 	rm -f $(BINDINGS)
 
 EXTRA_DIST = *.xml
+endif
