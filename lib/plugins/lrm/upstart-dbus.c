@@ -344,7 +344,7 @@ upstart_job_do(const gchar *name, UpstartJobCommand cmd)
 			cmd_name = "Start";
 			dbus_g_proxy_call (job, cmd_name, &error,
 				G_TYPE_STRV, no_args,
-				G_TYPE_BOOLEAN, FALSE,
+				G_TYPE_BOOLEAN, TRUE,
 				G_TYPE_INVALID,
 				DBUS_TYPE_G_OBJECT_PATH, &instance_path,
 				G_TYPE_INVALID);
@@ -354,7 +354,7 @@ upstart_job_do(const gchar *name, UpstartJobCommand cmd)
 			cmd_name = "Stop";
 			dbus_g_proxy_call(job, cmd_name, &error,
 				G_TYPE_STRV, no_args,
-				G_TYPE_BOOLEAN, FALSE,
+				G_TYPE_BOOLEAN, TRUE,
 				G_TYPE_INVALID,
 				G_TYPE_INVALID);
 			break;
@@ -362,7 +362,7 @@ upstart_job_do(const gchar *name, UpstartJobCommand cmd)
 			cmd_name = "Restart";
 			dbus_g_proxy_call (job, cmd_name, &error,
 				G_TYPE_STRV, no_args,
-				G_TYPE_BOOLEAN, FALSE,
+				G_TYPE_BOOLEAN, TRUE,
 				G_TYPE_INVALID,
 				DBUS_TYPE_G_OBJECT_PATH, &instance_path,
 				G_TYPE_INVALID);
