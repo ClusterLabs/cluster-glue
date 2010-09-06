@@ -1100,6 +1100,7 @@ if test x$enable_upstart = xyes; then
    PKG_CHECK_MODULES(DBUS, [dbus-1, dbus-glib-1])
    AC_SUBST(DBUS_CFLAGS)
    AC_SUBST(DBUS_LIBS)
+   AC_PATH_PROGS(DBUS_BINDING_TOOL, dbus-binding-tool)
 fi
 AM_CONDITIONAL(UPSTART, test x$enable_upstart = xyes)
 

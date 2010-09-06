@@ -6,7 +6,7 @@ BINDINGS=Upstart_Instance.h \
 all-local:
 	for header in $(BINDINGS); do \
 		input=com.ubuntu.`echo $$header | sed 's/\.h//' | tr _ .`.xml; \
-		dbus-binding-tool --mode=glib-client $$input > $$header; \
+		$(DBUS_BINDING_TOOL) --mode=glib-client $$input > $$header; \
 	done
 
 clean-local:
