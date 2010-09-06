@@ -129,6 +129,10 @@ AC_ARG_ENABLE([bundled-ltdl],
 [  --enable-bundled-ltdl  Configure, build and install the standalone ltdl library bundled with ${PACKAGE} [default=no]]) 
 LTDL_LIBS=""
 
+AC_ARG_ENABLE([upstart],
+AS_HELP_STRING([--enable-upstart],
+               [Enable Upstart support in lrmd. [default=no]]))
+
 INITDIR=""
 AC_ARG_WITH(initdir,
     [  --with-initdir=DIR      directory for init (rc) scripts [${INITDIR}]],
@@ -1092,9 +1096,12 @@ dnl ========================================================================
 dnl    Upstart via DBus
 dnl ========================================================================
 
-PKG_CHECK_MODULES(DBUS, [dbus-1, dbus-glib-1])
-AC_SUBST(DBUS_CFLAGS)
-AC_SUBST(DBUS_LIBS)
+if test x$enable_upstart = xyes; then
+   PKG_CHECK_MODULES(DBUS, [dbus-1, dbus-glib-1])
+   AC_SUBST(DBUS_CFLAGS)
+   AC_SUBST(DBUS_LIBS)
+fi
+AM_CONDITIONAL(UPSTART, test x$enable_upstart = xyes)
 
 
 dnl ========================================================================
