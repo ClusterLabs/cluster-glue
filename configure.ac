@@ -21,7 +21,7 @@ dnl     checks for system services
 
 AC_INIT(cluster-glue, 1.0.6, linux-ha-dev@lists.linux-ha.org)
 
-PKG_FEATURES=""
+FEATURES=""
 HB_PKG=heartbeat
 
 AC_CONFIG_AUX_DIR(.)
@@ -533,7 +533,7 @@ fi
 
 AM_CONDITIONAL(BUILD_HELP, test x"${HELP2MAN}" != x"")
 if test x"${HELP2MAN}" != x""; then
-   PKG_FEATURES="$PKG_FEATURES manpages"
+   FEATURES="$FEATURES manpages"
 fi
 
 dnl ===============================================
@@ -1337,7 +1337,7 @@ dnl *****************
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE configuration:])
 AC_MSG_RESULT([  Version                  = ${VERSION} (Build: $GLUE_BUILD_VERSION)])
-AC_MSG_RESULT([  Features                 =${PKG_FEATURES}])
+AC_MSG_RESULT([  Features                 =${FEATURES}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([  Prefix                   = ${prefix}])
 AC_MSG_RESULT([  Executables              = ${sbindir}])
