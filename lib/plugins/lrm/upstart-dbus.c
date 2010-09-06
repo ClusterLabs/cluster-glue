@@ -44,6 +44,8 @@
 #define UPSTART_IFACE "com.ubuntu.Upstart0_6"
 #define UPSTART_JOB_IFACE UPSTART_IFACE ".Job"
 #define UPSTART_INSTANCE_IFACE UPSTART_IFACE ".Instance"
+#define UPSTART_ERROR_ALREADY_STARTED UPSTART_IFACE ".Error.AlreadyStarted"
+#define UPSTART_ERROR_UNKNOWN_INSTANCE UPSTART_IFACE ".Error.UnknownInstance"
 
 static DBusGConnection *
 get_connection(void)
@@ -339,7 +341,8 @@ upstart_job_do(const gchar *name, UpstartJobCommand cmd)
 
 		switch (cmd) {
 		case UPSTART_JOB_START:
-			dbus_g_proxy_call (job, "Start", &error,
+			cmd_name = "Start";
+			dbus_g_proxy_call (job, cmd_name, &error,
 				G_TYPE_STRV, no_args,
 				G_TYPE_BOOLEAN, FALSE,
 				G_TYPE_INVALID,
@@ -348,14 +351,16 @@ upstart_job_do(const gchar *name, UpstartJobCommand cmd)
 			g_free (instance_path);
 			break;
 		case UPSTART_JOB_STOP:
-			dbus_g_proxy_call(job, "Stop", &error,
+			cmd_name = "Stop";
+			dbus_g_proxy_call(job, cmd_name, &error,
 				G_TYPE_STRV, no_args,
 				G_TYPE_BOOLEAN, FALSE,
 				G_TYPE_INVALID,
 				G_TYPE_INVALID);
 			break;
 		case UPSTART_JOB_RESTART:
-			dbus_g_proxy_call (job, "Restart", &error,
+			cmd_name = "Restart";
+			dbus_g_proxy_call (job, cmd_name, &error,
 				G_TYPE_STRV, no_args,
 				G_TYPE_BOOLEAN, FALSE,
 				G_TYPE_INVALID,
@@ -370,8 +375,17 @@ upstart_job_do(const gchar *name, UpstartJobCommand cmd)
 		if (error) {
 			g_warning("Could not issue %s: %s", cmd_name,
 				error->message);
+
+			/* ignore "already started" or "not running" errors */
+			if (dbus_g_error_has_name(error,
+					UPSTART_ERROR_ALREADY_STARTED) ||
+				dbus_g_error_has_name(error,
+					UPSTART_ERROR_UNKNOWN_INSTANCE)) {
+				retval = TRUE;
+			} else {
+				retval = FALSE;
+			}
 			g_error_free(error);
-			retval = FALSE;
 		} else {
 			retval = TRUE;
 		}
