@@ -37,7 +37,6 @@ import socket
 import subprocess
 import xml.dom.minidom
 import httplib
-import ssl
 import time
 import re
 
@@ -339,6 +338,7 @@ def open_ilo(host):
             status=response.split()[1]
             if status!=str(200):  
                 fatal("Error status=: %s" %(response))
+            import ssl
             sock = ssl.wrap_socket(proxy) 
             h=httplib.HTTPConnection('localhost')
             h.sock=sock
@@ -351,6 +351,8 @@ def open_ilo(host):
         fatal("%s for %s" %(msg,host))
     except socket.error, msg:
         fatal("%s while talking to %s" %(msg,host))
+    except ImportError, msg:
+        fatal("ssl support missing (%s)" %msg)
 
 def send_request(req,proc_f):
     '''
