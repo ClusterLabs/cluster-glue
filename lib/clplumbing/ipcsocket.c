@@ -1715,6 +1715,36 @@ socket_get_send_fd(struct IPC_CHANNEL *ch)
 	return socket_get_recv_fd(ch);
 }
 
+static void
+socket_adjust_buf(struct IPC_CHANNEL *ch, int optname, unsigned q_len)
+{
+	const char *direction = optname == SO_SNDBUF ? "snd" : "rcv";
+	int fd = socket_get_send_fd(ch);
+	unsigned byte;
+
+	/* Arbitrary scaling.
+	 * DEFAULT_MAX_QLEN is 64, default socket buf is often 64k to 128k,
+	 * at least on those linux I checked.
+	 * Keep that ratio, and allow for some overhead. */
+	if (q_len == 0)
+		/* client does not want anything,
+		 * reduce system buffers as well */
+		byte = 4096;
+	else if (q_len < 512)
+		byte = (32 + q_len) * 1024;
+	else
+		byte = q_len * 1024;
+
+	if (0 == setsockopt(fd, SOL_SOCKET, optname, &byte, sizeof(byte))) {
+		cl_log(LOG_DEBUG, "adjusted %sbuf size to %u", direction, byte);
+	} else {
+		/* If this fails, you may need to adjust net.core.rmem_max,
+		 * ...wmem_max, or equivalent */
+		cl_log(LOG_WARNING, "adjust %sbuf size to %u failed: %s",
+			direction, byte, strerror(errno));
+	}
+}
+
 static int
 socket_set_send_qlen (struct IPC_CHANNEL* ch, int q_len)
 {
@@ -1722,9 +1752,9 @@ socket_set_send_qlen (struct IPC_CHANNEL* ch, int q_len)
   if (ch->send_queue == NULL) {
     return IPC_FAIL;
   }
+  socket_adjust_buf(ch, SO_SNDBUF, q_len);
   ch->send_queue->max_qlen = q_len;
-  return IPC_OK;  
- 
+  return IPC_OK;
 }
 
 static int
@@ -1734,7 +1764,7 @@ socket_set_recv_qlen (struct IPC_CHANNEL* ch, int q_len)
   if (ch->recv_queue == NULL) {
     return IPC_FAIL;
   }
-  
+  socket_adjust_buf(ch, SO_RCVBUF, q_len);
   ch->recv_queue->max_qlen = q_len;
   return IPC_OK;
 }
