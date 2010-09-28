@@ -951,7 +951,6 @@ cl_msg_list_add_string(struct ha_msg* msg, const char* name, const char* value)
 {
 	GList* list = NULL;
 	int ret;
-	char buf[MAXMSG];
 	
 	if(!msg || !name || !value){
 		cl_log(LOG_ERR, "cl_msg_list_add_string: input invalid");
@@ -959,8 +958,7 @@ cl_msg_list_add_string(struct ha_msg* msg, const char* name, const char* value)
 	}
 	
 	
-	strncpy(buf, value, MAXMSG);
-	list = g_list_append(list, buf);
+	list = g_list_append(list, UNCONST_CAST_POINTER(gpointer, value));
 	if (!list){
 		cl_log(LOG_ERR, "cl_msg_list_add_string: append element to"
 		       "a glist failed");
