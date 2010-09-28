@@ -168,12 +168,9 @@ size_t
 string_list_pack_length(const GList* _list)
 {
 	size_t i;
-	GList* list = NULL;
+	GList* list = UNCONST_CAST_POINTER(GList *, _list);
 	size_t total_length = 0;
 	
-	memcpy(&list, &_list, sizeof(GList*));
-	(void)list;
-
 	if (list == NULL){
 		cl_log(LOG_WARNING, "string_list_pack_length():"
 		       "list is NULL");
@@ -438,16 +435,14 @@ list_copy(const GList* _list)
 {
 	size_t i;
 	GList* newlist = NULL;
-	GList* list;
-
-	memcpy(&list, &_list, sizeof(GList*));
+	GList* list = UNCONST_CAST_POINTER(GList *, _list);
 
 	for (i = 0; i < g_list_length(list); i++){
 		char* dup_element = NULL;
 		char* element = g_list_nth_data(list, i);
 		int len;
 		if (element == NULL){
-			cl_log(LOG_WARNING, "list_cleanup:"
+			cl_log(LOG_WARNING, "list_copy:"
 			       "element is NULL");
 			continue;
 		}
