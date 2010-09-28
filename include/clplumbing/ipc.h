@@ -40,7 +40,6 @@
 
 /* constants */
 #define DEFAULT_MAX_QLEN 64
-#define MAX_MESSAGE_SIZE 4096
 #define MAX_MSGPAD 128
 /* channel and connection status */
 #define IPC_CONNECT		1	/* Connected: can read, write */
