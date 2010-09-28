@@ -633,6 +633,21 @@ errout:
 	rsc = NULL;
 	return rsc;
 }
+
+static void
+dump_op(gpointer key, gpointer val, gpointer data)
+{
+	lrmd_op_t* lrmd_op = (lrmd_op_t*) val;
+
+	lrmd_op_dump(lrmd_op, "rsc->last_op_table");
+}
+static void
+dump_op_table(gpointer key, gpointer val, gpointer data)
+{
+	GHashTable* table = (GHashTable*) val;
+
+	g_hash_table_foreach(table, dump_op, data);
+}
 static void
 lrmd_rsc_dump(char* rsc_id, const char * text)
 {
@@ -652,6 +667,12 @@ lrmd_rsc_dump(char* rsc_id, const char * text)
 	if(!rsc) {
 		return;
 	}
+
+	/* Avoid infinite recursion loops... */
+	if (incall) {
+		return;
+	}
+	incall = TRUE;
 	/* TODO: Dump params and last_op_table FIXME */
 
 	lrmd_debug(LOG_DEBUG, "%s: BEGIN resource dump", text);
@@ -661,12 +682,6 @@ lrmd_rsc_dump(char* rsc_id, const char * text)
 	,	lrm_str(rsc->type)
 	,	lrm_str(rsc->class)
 	,	lrm_str(rsc->provider));
-
-	/* Avoid infinite recursion loops... */
-	if (incall) {
-		return;
-	}
-	incall = TRUE;
 
 	lrmd_debug(LOG_DEBUG, "%s: rsc->op_list...", text);
 	for(oplist = g_list_first(rsc->op_list); oplist;
@@ -686,6 +701,12 @@ lrmd_rsc_dump(char* rsc_id, const char * text)
 	}
 	else {
 		lrmd_debug(LOG_DEBUG, "%s: rsc->last_op_done==NULL", text);
+	}
+	if (rsc->last_op_table) {
+		g_hash_table_foreach(rsc->last_op_table,dump_op_table,NULL);
+	}
+	else {
+		lrmd_debug(LOG_DEBUG, "%s: rsc->last_op_table==NULL", text);
 	}
 	lrmd_debug(LOG_DEBUG, "%s: END resource dump", text);
 	incall = FALSE;
