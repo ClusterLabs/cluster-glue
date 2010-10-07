@@ -1736,7 +1736,10 @@ socket_adjust_buf(struct IPC_CHANNEL *ch, int optname, unsigned q_len)
 		byte = q_len * 1024;
 
 	if (0 == setsockopt(fd, SOL_SOCKET, optname, &byte, sizeof(byte))) {
-		cl_log(LOG_DEBUG, "adjusted %sbuf size to %u", direction, byte);
+		if (debug_level > 1) {
+			cl_log(LOG_DEBUG, "adjusted %sbuf size to %u",
+					direction, byte);
+		}
 	} else {
 		/* If this fails, you may need to adjust net.core.rmem_max,
 		 * ...wmem_max, or equivalent */
