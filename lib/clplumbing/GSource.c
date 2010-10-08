@@ -965,9 +965,11 @@ G_main_add_SignalHandler(int priority, int signal,
 		source = NULL;
 		sig_src = NULL;
 	} else {
-		cl_log(LOG_INFO
-		, "%s: Added signal handler for signal %d"
-		,	__FUNCTION__, signal);
+		if (debug_level > 1) {
+			cl_log(LOG_DEBUG
+			, "%s: Added signal handler for signal %d"
+			,	__FUNCTION__, signal);
+		}
 		G_main_signal_list[signal] = sig_src;
 		CL_SIGNAL(signal, G_main_signal_handler);
 		/*
@@ -1309,7 +1311,9 @@ G_main_add_TriggerHandler(int priority,
 		source = NULL;
 		trig_src = NULL;
 	} else {
-		cl_log(LOG_INFO, "G_main_add_TriggerHandler: Added signal manual handler");
+		if (debug_level > 1) {
+			cl_log(LOG_DEBUG, "G_main_add_TriggerHandler: Added signal manual handler");
+		}
 	}
 	
 	return trig_src;
