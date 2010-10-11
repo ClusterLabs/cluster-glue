@@ -63,7 +63,13 @@ get_ra_pathname(const char* class_path, const char* type, const char* provider,
 		}
 	}else{
 		/*the type includes path, just copy it to pathname*/
-		g_strlcpy(pathname, type, RA_MAX_NAME_LENGTH);
+		if ( *type == '/' ) {
+			g_strlcpy(pathname, type, RA_MAX_NAME_LENGTH);
+		} else {
+			*pathname = '\0';
+			cl_log(LOG_ERR, "%s: relative paths not allowed: %s",
+			__FUNCTION__, type);
+		}
 	}
 
 	g_free(type_dup);
