@@ -122,7 +122,6 @@ innode=$2
 case $incommand in
 gethosts)
 	if [ "$hostlist" = "AUTO" ]; then
-	    local snmp_result
 	    snmp_result=`snmpwalk -v1 -c $community $pduip $names_oid 2>&1`
         if [ $? -ne 0 ]; then
             ha_log.sh err "snmpwalk $community $pduip $names_oid failed. Result: $snmp_result"
