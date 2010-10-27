@@ -1,0 +1,110 @@
+<?xml version="1.0"?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN" "http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd">
+<refentry id="re-ha_logger">
+  <refentryinfo>
+    <date>December 8, 2009</date>
+    <productname>@PACKAGE_NAME@</productname>
+    <productnumber>@VERSION@</productnumber>
+    <authorgroup>
+       <author>
+	<firstname>Alan</firstname>
+	<surname>Robertson</surname>
+	<contrib>ha_logd</contrib>
+	<email>alanr@unix.sh</email>
+      </author>
+      <author>
+	<surname>Shi</surname>
+	<firstname>Guochun</firstname>
+	<contrib>ha_logd</contrib>
+	<email>gshi@ncsa.uiuc.edu</email>
+      </author>
+      <author>
+	<surname>Lars</surname>
+	<firstname>Marowsky-Bree</firstname>
+	<contrib>ha_logd</contrib>
+	<email>lmb@suse.de</email>
+      </author>
+      <author>
+	<firstname>Florian</firstname>
+	<surname>Haas</surname>
+	<contrib>man page</contrib>
+	<email>florian.haas@linbit.com</email>
+      </author>
+    </authorgroup>
+  </refentryinfo>
+  <refmeta>
+    <refentrytitle>ha_logger</refentrytitle>
+    <manvolnum>1</manvolnum>
+    <refmiscinfo class="manual">User commands</refmiscinfo>
+  </refmeta>
+  <refnamediv>
+    <refname>ha_logger</refname>
+    <refpurpose>Log a message to files and/or syslog through the HA
+    Logging Daemon</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>ha_logger</command>
+      <arg choice="opt">
+	<option>-D</option>
+	<group choice="plain">
+	  <arg>ha-log</arg>
+	  <arg>ha-debug</arg>
+	</group>
+      </arg>
+      <arg choice="opt">
+	<option>-t</option>
+	<replaceable>tag</replaceable>
+      </arg>
+      <arg choice="plain" rep="repeat">
+	<replaceable>message</replaceable>
+      </arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+  <refsection id="rs-ha_logger-description">
+    <title>Description</title>
+    <para><command>ha_logger</command> is used to log a message to
+    files/syslog through the HA Logging Daemon.</para>
+  </refsection>
+  <refsection id="rs-ha_logger-options">
+    <title>Options</title>
+    <para>The following options are supported:</para>
+    <variablelist>
+      <varlistentry>
+	<term>
+	  <option>-D</option> <token>ha-log</token>|<token>ha-debug</token>
+	</term>
+	<listitem>
+	  <para>Log the message to different
+	  files. <token>ha-log</token> will log the message to the log
+	  file and the debug file, while <token>ha-debug</token> will
+	  log the message to the debug file only.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>
+	  <option>-t</option> <replaceable>tag</replaceable>
+	</term>
+	<listitem>
+	  <para>Mark every line in the log with the specified
+	  <replaceable>tag</replaceable>.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>
+	  <replaceable>message</replaceable>
+	</term>
+	<listitem>
+	  <para>The message that should be logged.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsection>
+  <refsection id="rs-ha_logger-seealso">
+    <title>See also</title>
+    <para>
+      <citerefentry><refentrytitle>heartbeat</refentrytitle><manvolnum>8</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>ha_logd</refentrytitle><manvolnum>8</manvolnum></citerefentry>
+    </para>
+  </refsection>
+</refentry>

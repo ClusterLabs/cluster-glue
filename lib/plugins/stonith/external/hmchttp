@@ -1,0 +1,218 @@
+#!/bin/sh
+# External STONITH module for HMC web console
+#
+# Copyright (c) 2007 Xinwei Hu <hxinwei@gmail.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+
+#set -x
+hostlist=`echo $hostlist | tr ',' ' '`
+
+trap '[ ! -e "$COOKIEFILE" ] || rm -f "$COOKIEFILE"' 0
+COOKIEFILE=`mktemp` || exit 1
+
+: ${CURLBIN="/usr/bin/curl"}
+: ${user=admin}
+: ${password=admin}
+
+check_parameter() {
+  if [ ! -x $CURLBIN ]
+  then
+    ha_log.sh err "Curl can't be found in normal place. Set CURLBIN to override the default value"
+    exit 1
+  fi
+
+  if [ -z $hmc_ipaddr ]
+  then
+    ha_log.sh err "The address of HMC web console is not specified"
+    exit 1
+  fi
+}
+
+HMCUSERNAME=$user
+HMCPASSWORD=$password
+
+HMC_LOGIN_COMMAND="$CURLBIN -3 -k -c $COOKIEFILE -d user=$HMCUSERNAME -d password=$HMCPASSWORD -d lang=0 -d submit=Log+in "
+HMC_LOGOUT_COMMAND="$CURLBIN -3 -k -b $COOKIEFILE -d submit=Log+out "
+HMC_TOC_COMMAND="$CURLBIN -3 -k -b $COOKIEFILE -d form=2 "
+HMC_POWERON_COMMAND="$CURLBIN -3 -k -b $COOKIEFILE -d form=60 -d sp=255 -d is=0 -d om=4 -d id=1 -d ip=2 -d plt=1 -d pm=0 -d on=Save+settings+and+power+on "
+HMC_POWERSTATE_COMMAND="$CURLBIN -3 -k -b $COOKIEFILE -d form=60 "
+HMC_POWEROFF_COMMAND="$CURLBIN -3 -k -b $COOKIEFILE -d form=30 -d submit=Continue "
+HMC_REBOOT_COMMAND="$CURLBIN -3 -k -b $COOKIEFILE -d form=74 -d submit=Continue "
+
+hmc_login() {
+  iamin=0
+  while [ $iamin -eq 0 ]; do
+    $HMC_LOGIN_COMMAND https://$hmc_ipaddr/cgi-bin/cgi >/dev/null 2>&1
+    $HMC_TOC_COMMAND https://$hmc_ipaddr/cgi-bin/cgi 2>/dev/null | grep -q "Too many users"
+    iamin=$?
+    sleep 2
+  done 
+}
+hmc_logout() {
+  $HMC_LOGOUT_COMMAND https://$hmc_ipaddr/cgi-bin/cgi 2>/dev/null
+}
+
+hmc_reboot() {
+  check_parameter
+  $HMC_REBOOT_COMMAND https://$hmc_ipaddr/cgi-bin/cgi 2>/dev/null
+}
+hmc_poweron() {
+  r=1
+  while [ 0 -ne $r ]; do
+  $HMC_POWERON_COMMAND https://$hmc_ipaddr/cgi-bin/cgi 2>/dev/null | grep -q "Operation completed successfully"
+  r=$?
+  done
+}
+hmc_poweroff() {
+  check_parameter
+  $HMC_POWEROFF_COMMAND https://$hmc_ipaddr/cgi-bin/cgi 2>/dev/null
+}
+hmc_powerstate() {
+  check_parameter
+  r=`$HMC_POWERSTATE_COMMAND https://$hmc_ipaddr/cgi-bin/cgi 2>/dev/null| grep "Current system power state:" | sed 's/<br>//g' | awk '{print $5}'`
+  echo $r
+}
+
+hmc_poweroffon() {
+  check_parameter
+  hmc_poweroff
+  while [ 1 ]; do
+    r=`hmc_powerstate`
+    ha_log.sh debug "power state: $r"
+    if [ $r = "Off" ]; then
+      break
+    fi
+    sleep 5
+  done
+  sleep 3
+  hmc_poweron
+}
+
+case $1 in
+gethosts)
+	for h in $hostlist; do
+		echo $h
+	done
+	exit 0
+	;;
+status)
+	if
+          ping -w1 -c1 "$hmc_ipaddr" 2>&1
+        then
+	  exit 0
+	fi
+	exit 1
+	;;
+getconfignames)
+	for f in hostlist hmc_ipaddr user password; do
+		echo $f
+	done
+	exit 0
+	;;
+getinfo-devid)
+	echo "HMC web console STONITH device"
+	exit 0
+	;;
+getinfo-devname)
+	echo "HMC web console STONITH external device"
+	exit 0
+	;;
+getinfo-devdescr)
+	echo "HMC web console based host power control"
+	echo "Use for i5, p5, pSeries and OpenPower systems that are managed via "
+	echo "web console through a direct connection to system's HMC port."
+	exit 0
+	;;
+getinfo-devurl)
+	echo "http://www.ibm.com"
+	exit 0
+	;;
+getinfo-xml)
+	cat << HMCXML
+<parameters>
+
+<parameter name="hostlist" unique="1" required="1">
+<content type="string"/>
+<shortdesc lang="en">Hostlist</shortdesc>
+<longdesc lang="en">
+The list of hosts that the STONITH device controls
+</longdesc>
+</parameter>
+
+<parameter name="hmc_ipaddr" unique="1" required="1">
+<content type="string"/>
+<shortdesc lang="en">HMC IPAddr</shortdesc>
+<longdesc lang="en">
+The IP address of the HMC web console
+</longdesc>
+</parameter>
+
+<parameter name="user" unique="1" required="1">
+<content type="string"/>
+<shortdesc lang="en">User</shortdesc>
+<longdesc lang="en">
+User name to log into HMC web console
+</longdesc>
+</parameter>
+
+<parameter name="password" unique="1" required="1">
+<content type="string"/>
+<shortdesc lang="en">Password</shortdesc>
+<longdesc lang="en">
+The password of user name to log into HMC web console
+</longdesc>
+</parameter>
+
+</parameters>
+HMCXML
+	exit 0
+	;;
+esac
+
+case $1 in
+on|off|reset|powerstate|poweroffon)
+  hmc_login
+  case $1 in
+  on)
+	hmc_poweron $hmc_ipaddr
+	;;
+  off)
+	hmc_poweroff $hmc_ipaddr
+	;;
+  reset)
+#	hmc_reboot $hmc_ipaddr
+	hmc_poweroffon $hmc_ipaddr
+	;;
+  powerstate)
+	hmc_powerstate
+	;;
+  poweroffon)
+	hmc_poweroffon
+	;;
+  esac
+  hmc_logout
+  exit 0
+  ;;
+*)
+	exit 1
+	;;
+esac

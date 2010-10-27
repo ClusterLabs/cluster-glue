@@ -1,0 +1,98 @@
+/* include/config.h.in.  Generated from configure.in by autoheader.  */
+
+/* Location for daemons */
+#undef GLUE_DAEMON_DIR
+
+/* Group to run daemons as */
+#undef GLUE_DAEMON_GROUP
+
+/* User to run daemons as */
+#undef GLUE_DAEMON_USER
+
+/* Where to keep state files and sockets */
+#undef GLUE_STATE_DIR
+
+/* Location of shared data */
+#undef GLUE_SHARED_DIR
+
+/* User to run daemons as */
+#undef HA_CCMUSER
+
+/* Group to run daemons as */
+#undef HA_APIGROUP
+
+/* Location for daemons */
+#undef HA_LIBHBDIR
+
+/* top directory of area to drop core files in */
+#undef HA_COREDIR
+
+/* Logging Daemon IPC socket name */
+#undef HA_LOGDAEMON_IPC
+
+/* Default logging facility */
+#undef HA_LOG_FACILITY
+
+/* Default plugin search path */
+#undef PILS_BASE_PLUGINDIR
+
+/* Where to find plugins */
+#undef HA_PLUGIN_DIR
+
+/* Location of system configuration files */
+#undef HA_SYSCONFDIR
+
+/* Web site base URL */
+#undef HA_URLBASE
+
+/* Whatever this used to mean */
+#undef HA_VARLIBHBDIR
+
+#undef HA_VARLIBDIR
+
+/* System lock directory */
+#undef HA_VARLOCKDIR
+
+/* Where Heartbeat keeps state files and sockets - old name */
+#undef HA_VARRUNDIR
+
+/* Location for v1 Heartbeat RAs */
+#undef HB_RA_DIR
+
+/* Where to find LRM plugins */
+#undef LRM_PLUGIN_DIR
+
+/* Location for LSB RAs */
+#undef LSB_RA_DIR
+
+/* Location for OCF RAs */
+#undef OCF_RA_DIR
+
+/* OCF root directory - specified by the OCF standard */
+#undef OCF_ROOT_DIR
+
+/* Compiling for Darwin platform */
+#undef ON_DARWIN
+
+/* Compiling for Linux platform */
+#undef ON_LINUX
+
+/* Current glue version */
+#undef GLUE_VERSION
+
+/* Build version */
+#undef GLUE_BUILD_VERSION
+
+/* Location of non-pluing stonith scripts */
+#undef STONITH_EXT_PLUGINDIR
+
+/* Location of RHCS stonith scripts */
+#undef STONITH_RHCS_PLUGINDIR
+
+/* Location of stonith plugins */
+#undef STONITH_MODULES
+
+/* Stonith plugin domain */
+#undef ST_TEXTDOMAIN
+
+#undef HA_HBCONF_DIR

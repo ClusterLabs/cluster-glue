@@ -1,0 +1,124 @@
+* Fri Jul  9 2010 Dejan Muhamedagic <dejan@suse.de>
+- stable release 1.0.6
+- clplumbing: Add identity info of the user on the other side of socket
+- ha_logger: log strings longer than 1024
+- lrmd: remove operation history on client unregister (lf#2161)
+- lrmd: don't allow cancelled operations to get back to the repeating op list (lf#2417)
+- lrmd: exclude stonith resources from child count (bnc#612387)
+- lrmd,clientlib: asynchronous resource delete notification (lf#2439)
+- stonith: add -V (version) to stonith
+- stonith: add -E option to get the configuration from the environment
+- stonith: ha_log: feed the message to stdout and not on command line
+- stonith: external/sbd,xen0: fix wrong reference from ha_log to ha_log.sh (deb#585120)
+- stonith: external/sbd: reduce monitoring
+- stonith: external/rackpdu: check the snmpset and snmpwalk exit codes
+- hb_report: create cib.txt after sanitizing the CIB (lf#2415)
+
+* Mon Apr 15 2010 Dejan Muhamedagic <dejan@suse.de>
+- stable release 1.0.5
+- clplumbing: revert changeset 81ad41d14f72 which breaks the ABI
+
+* Mon Apr 12 2010 Dejan Muhamedagic <dejan@suse.de>
+- stable release 1.0.4
+- clplumbing: fix memory leak in cl_msg/lrmd (lf#1841,2389)
+- clplumbing: Add identity info of the user on the other side of socket
+- clplumbing: Fix erroneous "Stack hogger failed 0xffffffff" warnings
+- lrmd: fix possible null pointer dereference
+- lrmd: raise severity from debug to info for some log messages
+- lrmd: on shutdown exit once all operations finished (lf#2340)
+- lrmd: don't add the cancel option in flush to the running operations (bnc#578644)
+- lrmd: check if tables exist before free_str_table and prevent 
+  segfault (bnc#587887)
+- stonith: new external/ippower9258 plugin
+- stonith: external/sbd: fix status operation
+- stonith: external/sbd: add support for heartbeat
+- stonith: external/ibmrsa-telnet: fix ha_log.sh invocation
+- stonith: external/ibmrsa-telnet: fix expect regex
+- stonith: external/ipmi: make reset work when the node is off
+- stonith: external/riloe: log error message on unrecognized power method
+- hb_report: don't create dot files if there are more than 20 PE files
+- hb_report: make dot and png files for PE inputs (if there are
+  not too many)
+- hb_report: do not filter CIB/PE files by default (use -s to
+  force filtering)
+- hb_report: add -Z option to force destination directory cleanup
+- hb_report: allow for default destination
+- hb_report: when creating cts reports get information from the log
+- hb_report: new option -d to keep the directory
+- hb_report: don't give up early when creating backtraces (lf#2350)
+
+* Tue Feb 02 2010 Dejan Muhamedagic <dejan@suse.de>
+- bugfix release 1.0.3
+- lrmd: don't flush operations which don't belong to the requesting client (lf#2161)
+
+* Mon Feb 01 2010 Dejan Muhamedagic <dejan@suse.de> and MANY others
+- stable release 1.0.2
+- clplumbing: fix a potential resource leak in cl_random (bnc#525393)
+- clplumbing: change the default log format to syslog format
+- lrmd: log outcome of monitor once an hour
+- lrmd: lookup clients by name (lf#2161)
+- lrmd: remove operation history on client unregister (lf#2161)
+- lrmd: fix return code on LSB class RA exec failure (lf#2194)
+- lrmd: close the logd fd too when executing agents (lf#2267)
+- lrmd: restore reset scheduler for children (bnc#551971,lf#2296)
+- lrmd: reset scheduler and priority for children (resource operations)
+- lrmadmin: fix -E option
+- lrmadmin moved to the sbindir
+- stonith: support for RHCS fence agents
+- stonith: external/dracmc-telnet: stonith plugin for Dell 
+  Drac/MC Blade Enclosure and Cyclades terminal server
+- stonith: sbd plugin
+- stonith: apcmastersnmp plugin (bnc#518689)
+- stonith: bladehpi plugin (bnc#510299)
+- stonith: WTS MPC: new SNMP based plugin
+- stonith: meatclient: add -w option to wait until we can connect
+- stonith: add -m option to stonith(8) to display metadata (lf#2279)
+- stonith: external: log using ha_log.sh (lf#2294,1971)
+- stonith: external: log output of plugins (bnc#548699,bnc#553340)
+- stonith: external: log messages immediately on manage and status calls
+- stonith: external: remove dependency on .ocf-shellfuncs (lf#2249)
+- stonith: external/riloe: make sure that host is turned on after power
+  off/on reset (lf#2282)
+- stonith: external/riloe: fix check for ilo_can_reset
+- stonith: external/riloe: workaround for the iLO double close in RIBCL (bnc#553340)
+- stonith: external/ipmi: add explanation on reset and power off (LF 2071)
+- stonith: external/ibmrsa-telnet: add support for later RSA cards
+- stonith: cyclades: fix for support for newer PM10 firmware (lf#1938)
+- stonith: wti_nps: add support for internet power switch model (bnc#539912)
+- stonith: wti_mpc: support for MIB versions 1 and 3
+- stonith: external/sbd: fix definition of sector_size for s390x (bnc#542827)
+- stonith: external/sbd: make nodename comparison case insensitive (bnc#534445)
+- stonith: external/sbd: describe "dump" command in help (bnc#529575)
+- stonith: external/sbd: Accept -h (bnc#529574)
+- stonith: external/xen0: add run_dump parameter to dump core before resetting a node
+- hb_report: add man page hb_report.8
+- hb_report: add -V (version) option
+- hb_report: add support for corosync
+- hb_report: add -v option (debugging)
+- hb_report: options -C and -D are obsoleted
+- hb_report: combine log/events if there is no loghost
+- hb_report: extract important events from the logs
+- logd: add init script
+- rpm spec: start logd by default
+- doc: new README for wti_mpc
+- doc: move stonith README files to the doc directory
+- doc: convert man pages to xml
+- build: /usr/share/heartbeat replaced by /usr/share/cluster-glue
+- build: enable IPMI and hpi support
+- build: include time.h in ipcsocket.c and proctrack.c (lf#2263)
+- build: output documentation directory from configure (lf#2276)
+
+* Thu Oct 23 2008 Lars Marowsky-Bree <lmb@suse.de> and MANY others
+- beta release 2.99.2
+- stonith: external/kdumpcheck: new plugin
+- stonith: external/drac5: new plugin
+- stonith: drac3: initialize curl properly and workaround xml parsing problem (lf#1730)
+- stonith external/riloe: a new implementation for HP iLO devices
+
+* Tue Sep 23 2008 Lars Marowsky-Bree <lmb@suse.de> and MANY others
+- beta release 2.99.1
+- stonith: bladehpi: fix a mix of a threaded library and not threaded stonithd (bnc#389344)
+- stonith: external/riloe: fix check for ilo_can_reset
+
+* Tue Aug 19 2008 Andrew Beekhof <abeekhof@suse.de> and MANY others
+- beta release 2.99.0

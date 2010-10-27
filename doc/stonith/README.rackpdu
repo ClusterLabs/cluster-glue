@@ -1,0 +1,21 @@
+APC Rack PDU
+
+The product information pages:
+
+http://www.apcc.com/products/family/index.cfm?id=70
+
+The User's Guide:
+
+http://www.apcmedia.com/salestools/ASTE-6Z6KAV_R1_EN.pdf
+
+Apparently, an existing http or telnet session will make the
+plugin fail.
+
+In case your nodes are equipped with multiple power supplies, the
+PDU supports synchronous operation on multiple outlets on up to
+four Switched Rack PDUs. See the User's Guide for more
+information on how to setup outlet groups.
+
+NB: There has been a report by one user that in case a link
+between two PDUs in the chain is broken, the PDU returns success
+even though it failed. This needs to be verified.

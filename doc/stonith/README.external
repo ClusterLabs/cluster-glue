@@ -1,0 +1,90 @@
+EXTERNAL module for Linux-HA STONITH
+
+
+This stonith plugin runs an external command written in your favorite
+language to shutdown the given host.  The external command should return
+a zero exit status after a successful shutdown, or non-zero exit status
+for a shutdown failure.  Failures notifications will be sent to syslog.
+
+To create your own external plugin, write a script that supports the
+following actions:
+
+	reset
+	on			(optional)
+	off			(optional)
+	gethosts
+	status
+	getconfignames
+	getinfo-devid
+	getinfo-devname
+	getinfo-devdescr
+	getinfo-devurl
+	getinfo-xml
+
+and place it in the /usr/lib/stonith/plugins/external directory - the
+script must be a regular executable file that is NOT writable by group
+or others in order to be recognized as an external plugin.  If the
+action requires information to be returned, such as the list of hosts
+or config names or any of the getinfo calls, simply write the 
+information to stdout.  When complete, return zero to indicate the
+action succeeded or non-zero to indicate the action failed.  You can
+use the ssh (sh) and riloe (pyhton) scripts already in that directory
+as working examples.
+
+To make sure that your external plugin is recognized, run "stonith -L"
+and look for its name in the output, something along the lines of:
+
+	external/yourplugin 
+
+To configure the plugin on an R1 (legacy) cluster, add a line similar
+to the following to /etc/ha.d/ha.cf:
+
+	stonith external/yourplugin /etc/ha.d/yourplugin.cfg
+
+where /etc/ha.d/yourplugin.cfg contains a single line with all of your
+plugin's parameters:
+
+	parm1-value parm2-value ...
+
+Another way to configure the plugin on a legacy cluster is to add a line
+similiar to the following to /etc/ha.d/ha.cf instead:
+
+	stonith_host * external/yourplugin parm1-value parm2-value ...
+
+where all of your plugin's parameters are placed at the end of the line.
+
+Please note that all parameters come in to the plugin in name/value
+(environment variable) form, but in R1 configurations, they appear as a
+list of parameters.  They are ordered in the config file or on the
+stonith_host line according to the ordering specified in the output of
+the getconfignames operation.
+
+To configure the plugin on an R2 cluster, place lines similar to the
+following into the <resources> section of your CIB, which is contained
+in /var/lib/heartbeat/crm/cib.xml:
+
+         <clone id="DoFencing">
+            <instance_attributes>
+               <nvpair name="clone_max" value="2"/>
+               <nvpair name="clone_node_max" value="1"/>
+            </instance_attributes>
+            <primitive id="child_DoFencing" class="stonith" type="external/yourplugin" provider="heartbeat">
+               <operations>
+                  <op name="monitor" interval="5s" timeout="20s" requires="nothing"/>
+                  <op name="start" timeout="20s" requires="nothing"/>
+               </operations>
+               <instance_attributes>
+                  <nvpair name="parm1-name" value="parm1-value"/>
+                  <nvpair name="parm2-name" value="parm2-value"/>
+		     <!-- ... -->
+               </instance_attributes>
+            </primitive>
+         </clone>
+
+Whatever <nvpair> parameters specified in the <attributes> section of
+the CIB are passed to the script as environment variables.  For the
+example above, the parameters are passed as parm1-name=parm1-value,
+parm2-name=parm2-value and so on.
+
+Additional information can be found at
+http://linux-ha.org/wiki/ExternalStonithPlugins.

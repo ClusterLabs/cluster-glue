@@ -1,0 +1,85 @@
+STONITH module for WTI MPC
+--------------------------
+
+
+****Introduction.
+
+wti_mpc module uses snmp for controlling the MPC power distribution unit. It has
+been tested with MPC-8H and MPC-18H and should be compatible with the whole
+MPC series:
+    * MPC-20*
+    * MPC-16*
+    * MPC-18*
+    * MPC-8*
+    
+****Unit configuration.
+    
+wti_mpc STONITH modules uses SNMP v1, therefore it should be configured on the 
+device side. To do so, you should login to device, go to "Network 
+configuration" (/N), select "SNMP access" (25) and turn it on (enable/1). At the
+SNMP access screen set "Version" (2) to "V1/V2 Only", set "Read only" (3) to
+"No and set any "Community" (10) you want. You may also set other options as
+you need. You may check your setup by issuing the following command:
+
+    snmpwalk -v1 -c <community> <host> .1.3.6.1.2.1.1.1.0
+
+and result should be something like this:
+
+    SNMPv2-MIB::sysDescr.0 = STRING: Linux 85.195.135.236 2.4.18_mvl30-cllf #1991 Sun Mar 16 14:39:29 PST 2008 ppc
+    
+
+****Plugin configuration.
+
+    Plugin declares the following configuration variables:
+    
+    *ipaddr - 	   ip address or hostname of a MPC unit.
+    *port   - 	   ip port, should be 161, as MPC listens for incoming SNMP 
+		   packets on that port. It is made for future use actually.
+    *community -   Community that you've specified on previous step.
+    *mib_version - Should be 3 for MPC devices with firmware version 1.62
+                   and later. 1 is for firmware version 1.44 and below.
+                   2 is unused right now, if you have device, with mib V2 
+                   feel free to contact me and I'll add it.
+                   
+****MIB version issue
+
+    WTI guys have several time changed OIDs, used by MPC devices. I own two
+types of the devices:
+	*With firmware v 1.44 which is compatible with MIB version 1
+	*With firmware v 1.62 which is compatible with MIB version 3
+	
+I suppose there are exist MIB v2, but i cannot find it and I'd not able 
+to test it.
+Anyway, this plugin supports both V1 and V3 versions, and the correct version 
+is selected by the "mib-version" configuration parameter. Default value is "1",
+so if you do not specify this parameter or assign a unsupported value to it,
+it will fall back to mib version 1.
+
+****Outlets and groups
+
+    MPC devices forces unique names of the outlets. This is a big problem 
+for STONITH plugin, cause it uses nodes unames as outlet names, so in case
+you have a node with several power plugs, you should have set the node uname
+as name of all the plugs. The MPC device simply doesn't allows this. 
+    So, this plugin works with a GROUPS instead of a PLUGS. You may give
+any unique names for your physical outlets on the MPC, but you MUST create
+a plug group, name it using node's uname and include plugs, corresponding to
+that particular node to this group. It should be done even for node with
+single power supply. Some example:
+
+    Let's pretend you have a node "atest", with two power cords, connected
+to plugs A1 and B1. You have to create a group ("Plug grouping parameters" (/G)
+-> Add Plug Group to directory (2)), name it "atest" ("Plug Group Name (1)) and
+assign plugs A1 and B1 to that group ("Plug access" (2)). Now save your
+configuration and try to retrieve host list:
+
+     stonith -t wti_mpc ipaddr=<host> port=161 community=<community>  mib-version=<version> -l
+
+result should be: 
+    
+    atest
+    
+
+------------------
+(C) Denis Chapligin <chollya@satgate.net>, SatGate, 2009
+
