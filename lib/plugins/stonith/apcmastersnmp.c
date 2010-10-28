@@ -171,7 +171,7 @@ struct pluginDevice {
 };
 
 /* for checking hardware (issue a warning if mismatch) */
-static const char* APC_tested_ident[] = {"AP9606","AP7920","AP7921","AP_other_well_tested"};
+static const char* APC_tested_ident[] = {"AP9606","AP7920","AP7921","AP7900","AP_other_well_tested"};
 
 /* constant strings */
 static const char *pluginid = "APCMS-SNMP-Stonith";
