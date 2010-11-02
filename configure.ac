@@ -717,6 +717,18 @@ if test x"$ac_cv_HAVE_SYSLOG_FACILITYNAMES" = x"yes"; then
     AC_DEFINE(HAVE_SYSLOG_FACILITYNAMES,1,[ ])
 fi
 
+dnl Check for POSIX signals
+dnl
+AC_CACHE_CHECK([have POSIX signals],ac_cv_HAVE_POSIX_SIGNALS,[
+AC_TRY_COMPILE([
+#include <signal.h>
+],
+[ struct sigaction act, oact; sigaction(0, &act, &oact); return 0;],
+ac_cv_HAVE_POSIX_SIGNALS=yes,ac_cv_HAVE_POSIX_SIGNALS=no,ac_cv_HAVE_POSIX_SIGNALS=cross)])
+if test x"$ac_cv_HAVE_POSIX_SIGNALS" = x"yes"; then
+    AC_DEFINE(HAVE_POSIX_SIGNALS,1,[ ])
+fi
+
 dnl 'reboot()' system call: one argument (e.g. Linux) or two (e.g. Solaris)?
 dnl
 AC_CACHE_CHECK([number of arguments in reboot system call],
