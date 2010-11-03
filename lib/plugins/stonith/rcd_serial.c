@@ -43,7 +43,7 @@
 #define PIL_PLUGINLICENSE 	LICENSE_LGPL
 #define PIL_PLUGINLICENSEURL 	URL_LGPL
 
-#define	ST_DTRRTS		"dtr|rts"
+#define	ST_DTRRTS		"dtr_rts"
 #define	ST_MSDURATION		"msduration"
 #define MAX_RCD_SERIALLINE	512
 
