@@ -28,6 +28,7 @@
 #include <syslog.h>
 #include <stonith/stonith.h>
 #include <pils/plugin.h>
+#include <clplumbing/cl_log.h>
 #include <glib.h>
 #include <libxml/entities.h>
 
@@ -38,6 +39,10 @@ extern char *	optarg;
 extern int	optind, opterr, optopt;
 
 static int	debug = 0;
+
+#define LOG_TERMINAL 0
+#define LOG_CLLOG 1
+static int	log_destination = LOG_TERMINAL;
 
 static const char META_TEMPLATE[] =
 "<?xml version=\"1.0\"?>\n"
@@ -68,11 +73,26 @@ void print_stonith_meta(Stonith * stonith_obj, const char *rsc_type);
 void print_types(void);
 void print_confignames(Stonith *s);
 
+void log_buf(int severity, char *buf);
+void log_msg(int severity, const char * fmt, ...)G_GNUC_PRINTF(2,3);
+void trans_log(int priority, const char * fmt, ...)G_GNUC_PRINTF(2,3);
+
+static int pil_loglevel_to_syslog_severity[] = {
+	/* Indices: <none>=0, PIL_FATAL=1, PIL_CRIT=2, PIL_WARN=3,
+	   PIL_INFO=4, PIL_DEBUG=5 
+	*/
+	LOG_EMERG, LOG_ALERT, LOG_CRIT, LOG_WARNING, LOG_INFO, LOG_DEBUG
+	};
+
 /*
  * Note that we don't use the cl_log logging code because the STONITH
  * command is intended to be shipped without the clplumbing libraries.
  *
  *	:-(
+ *
+ * The stonith command has so far always been shipped along with
+ * the clplumbing library, so we'll use cl_log
+ * If that ever changes, we'll use something else
  */
 
 void
@@ -285,7 +305,7 @@ print_types()
 
 	typelist = stonith_types();
 	if (typelist == NULL) {
-		syslog(LOG_ERR, "Could not list Stonith types.");
+		log_msg(LOG_ERR, "Could not list Stonith types.");
 	}else{
 		char **	this;
 
@@ -309,6 +329,45 @@ print_confignames(Stonith *s)
 		}
 	}
 	printf("\n");
+}
+
+void
+log_buf(int severity, char *buf)
+{
+	if (log_destination == LOG_TERMINAL) {
+		if (severity != LOG_DEBUG || debug) {
+			fprintf(stderr, "%s: %s\n", prio2str(severity),buf);
+		}
+	} else {
+		cl_log(severity, "%s", buf);
+	}
+}
+
+void
+log_msg(int severity, const char * fmt, ...)
+{
+	va_list         ap;
+	char            buf[MAXLINE];
+
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf)-1, fmt, ap);
+	va_end(ap);
+	log_buf(severity, buf);
+}
+
+void
+trans_log(int priority, const char * fmt, ...)
+{
+	int				severity;
+	va_list         ap;
+	char            buf[MAXLINE];
+
+	severity = pil_loglevel_to_syslog_severity[ priority % sizeof
+		(pil_loglevel_to_syslog_severity) ];
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf)-1, fmt, ap);
+	va_end(ap);
+	log_buf(severity, buf);
 }
 
 int
@@ -429,6 +488,17 @@ main(int argc, char** argv)
 		}
 	}
 
+	/* if we're invoked by stonithd, log through cl_log */
+	if (!isatty(fileno(stdin))) {
+		log_destination = LOG_CLLOG;
+		cl_log_set_entity("stonith");
+		cl_log_enable_stderr(debug?TRUE:FALSE);
+		cl_log_set_facility(HA_LOG_FACILITY);
+
+		/* Use logd if it's enabled by heartbeat */
+		cl_inherit_logging_environment(0);
+	}
+
 	if (help && !errors) {
 		usage(cmdname, 0, SwitchType);
 	}
@@ -486,22 +556,19 @@ main(int argc, char** argv)
 		exit(0);
 	}
 
-#ifndef LOG_PERROR
-#	define LOG_PERROR	0
-#endif
-	openlog(cmdname, (LOG_CONS|(silent ? 0 : LOG_PERROR)), LOG_USER);
 	if (SwitchType == NULL) {
-		fprintf(stderr,	"Must specify device type (-t option)\n");
+		log_msg(LOG_ERR,"Must specify device type (-t option)");
 		usage(cmdname, 1, NULL);
 	}
 	s = stonith_new(SwitchType);
 	if (s == NULL) {
-		syslog(LOG_ERR, "Invalid device type: '%s'", SwitchType);
+		log_msg(LOG_ERR,"Invalid device type: '%s'", SwitchType);
 		exit(S_OOPS);
 	}
 	if (debug) {
 		stonith_set_debug(s, debug);
 	}
+	stonith_set_log(s, (PILLogFun)trans_log);
 
 	if (!listparanames && !metadata && optfile == NULL &&
 			parameters == NULL && !params_from_env && nvcount == 0) {
@@ -541,11 +608,11 @@ main(int argc, char** argv)
 	if (optfile) {
 		/* Configure the Stonith object from a file */
 		if ((rc=stonith_set_config_file(s, optfile)) != S_OK) {
-			syslog(LOG_ERR
+			log_msg(LOG_ERR
 			,	"Invalid config file for %s device."
 			,	SwitchType);
 #if 0
-			syslog(LOG_INFO, "Config file syntax: %s"
+			log_msg(LOG_INFO, "Config file syntax: %s"
 			,	s->s_ops->getinfo(s, ST_CONF_FILE_SYNTAX));
 #endif
 			stonith_delete(s); s=NULL;
@@ -618,10 +685,10 @@ main(int argc, char** argv)
 
 			if (!silent) {
 				if (rc == S_OK) {
-					syslog(LOG_ERR, "%s device OK.", SwitchType);
+					log_msg(LOG_INFO, "%s device OK.", SwitchType);
 				}else{
 					/* Uh-Oh */
-					syslog(LOG_ERR, "%s device not accessible."
+					log_msg(LOG_ERR, "%s device not accessible."
 					,	SwitchType);
 				}
 			}
@@ -632,7 +699,7 @@ main(int argc, char** argv)
 
 			hostlist = stonith_get_hostlist(s);
 			if (hostlist == NULL) {
-				syslog(LOG_ERR, "Could not list hosts for %s."
+				log_msg(LOG_ERR, "Could not list hosts for %s."
 				,	SwitchType);
 				rc = -1;
 			}else{
