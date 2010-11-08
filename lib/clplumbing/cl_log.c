@@ -74,7 +74,6 @@ IPC_Message* ChildLogIPCMessage(int priority, const char *buf, int bstrlen,
 void	FreeChildLogIPCMessage(IPC_Message* msg);
 gboolean send_dropped_message(gboolean use_pri_str, IPC_Channel *chan);
 
-const char * prio2str(int priority);
 static int		use_logging_daemon =  FALSE;
 static int		conn_logd_time = 0;
 static char		cl_log_entity[MAXENTITY]= DFLT_ENTITY;
