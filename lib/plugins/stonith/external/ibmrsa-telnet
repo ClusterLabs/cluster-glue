@@ -76,8 +76,9 @@ class RSABoard(telnetlib.Telnet):
         return "%s,%03d" % (time.strftime("%Y-%m-%d %H:%M:%S",
                             time.localtime(ct)), msecs)
 
-    def write(self, buffer):
-        self._history.append(self._get_timestamp() + ': WRITE: ' + repr(buffer))
+    def write(self, buffer, nolog = False):
+        self._history.append(self._get_timestamp() + ': WRITE: ' +
+            (nolog and '******' or repr(buffer)))
         telnetlib.Telnet.write(self, buffer)
 
     def expect(self, what, timeout=20):
@@ -93,7 +94,7 @@ class RSABoard(telnetlib.Telnet):
         self.write(user)
         self.write('\r')
         line = self.expect(['\nPassword: ', '\npassword: '], self._timeout)
-        self.write(passwd)
+        self.write(passwd, nolog = True)
         self.write('\r')
         line = self.expect(['\nsystem>', '> '], self._timeout)
 
