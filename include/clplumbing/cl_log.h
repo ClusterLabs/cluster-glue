@@ -39,7 +39,6 @@ void            cl_log(int priority, const char * fmt, ...) G_GNUC_PRINTF(2,3);
 void            cl_perror(const char * fmt, ...) G_GNUC_PRINTF(1,2);
 void		cl_log_enable_stderr(int truefalse);
 void		cl_log_enable_stdout(int truefalse);
-int		cl_set_logging_wqueue_maxlen(int);
 gboolean	cl_log_test_logd(void);
 void		cl_log_set_uselogd(int truefalse);
 void		cl_log_enable_syslog_filefmt(int truefalse);
@@ -48,7 +47,6 @@ void		cl_log_set_facility(int facility);
 void		cl_log_set_entity(const char *	entity);
 void		cl_log_set_logfile(const char *	path);
 void		cl_log_set_debugfile(const char * path);
-void		inherit_compress(void);
 void		cl_inherit_logging_environment(int maxqlen);
 int		cl_log_set_logd_channel_source( void (*create_callback)(struct IPC_CHANNEL* chan),
 						GDestroyNotify destroy_callback);
