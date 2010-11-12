@@ -63,31 +63,4 @@ void cl_log_args(int argc, char **argv);
 int cl_log_is_logd_fd(int fd);
 const char * prio2str(int priority);
 
-
-typedef struct CircularBuffer_s 
-{
-	const char*	name;
-	size_t		size;
-	gboolean	empty_after_dump;
-	GQueue*		queue;
-	
-} CircularBuffer_t;
-
-typedef struct CircularBufferEntry_s 
-{
-	int level;
-	char *buf;
-	
-} CircularBufferEntry_t;
-
-CircularBuffer_t *NewCircularBuffer(
-	const char *name, unsigned int size, gboolean empty_after_dump);
-void LogToCircularBuffer(
-	CircularBuffer_t *buffer, int level, const char *fmt, ...) G_GNUC_PRINTF(3,4);
-
-void EmptyCircularBuffer(CircularBuffer_t *buffer);
-
-/* the prototype is designed to be easy to give to G_main_add_SignalHandler() */
-gboolean DumpCircularBuffer(int nsig, gpointer buffer);
-
 #endif
