@@ -69,10 +69,11 @@ static gboolean		syslogformatfile = TRUE;
 int LogToDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 
 static int LogToLoggingDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
-IPC_Message* ChildLogIPCMessage(int priority, const char *buf, int bstrlen, 
+static IPC_Message* ChildLogIPCMessage(int priority, const char *buf, int bstrlen, 
 				gboolean use_priority_str, IPC_Channel* ch);
-void	FreeChildLogIPCMessage(IPC_Message* msg);
-gboolean send_dropped_message(gboolean use_pri_str, IPC_Channel *chan);
+static void	FreeChildLogIPCMessage(IPC_Message* msg);
+static gboolean send_dropped_message(gboolean use_pri_str, IPC_Channel *chan);
+static int cl_set_logging_wqueue_maxlen(int qlen);
 
 static int		use_logging_daemon =  FALSE;
 static int		conn_logd_time = 0;
@@ -172,7 +173,7 @@ cl_log_set_logdtime(int logdtime)
 #define TRADITIONAL_COMPRESSION "HA_traditional_compression"
 #define COMPRESSION	 "HA_compression"
 
-void
+static void
 inherit_compress(void)
 {
 	char* inherit_env = NULL;
@@ -733,7 +734,7 @@ ha_timestamp(TIME_T t)
 }
 
 
-int
+static int
 cl_set_logging_wqueue_maxlen(int qlen)
 {
 	int sendrc;
@@ -896,7 +897,7 @@ LogToLoggingDaemon(int priority, const char * buf,
 }
 
 
-gboolean
+static gboolean
 send_dropped_message(gboolean use_pri_str, IPC_Channel *chan)
 {
 	int sendrc;
@@ -943,7 +944,7 @@ childlog_dump_ipcmsg_stats(void)
 	
 }
 
-IPC_Message*
+static IPC_Message*
 ChildLogIPCMessage(int priority, const char *buf, int bufstrlen, 
 		   gboolean use_prio_str, IPC_Channel* ch)
 {
@@ -1008,7 +1009,7 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 }
 
 
-void
+static void
 FreeChildLogIPCMessage(IPC_Message* msg)
 {
 	if (msg == NULL) {
