@@ -925,25 +925,6 @@ send_dropped_message(gboolean use_pri_str, IPC_Channel *chan)
 }
 
 
-
-
-static int childlog_ipcmsg_allocated = 0;
-static int childlog_ipcmsg_freed = 0;
-void	childlog_dump_ipcmsg_stats(void);
-void
-childlog_dump_ipcmsg_stats(void)
-{
-	
-	cl_log(LOG_INFO, "childlog ipcmsg allocated:%d, freed=%d, diff =%d",
-	       childlog_ipcmsg_allocated,
-	       childlog_ipcmsg_freed,
-	       childlog_ipcmsg_allocated - childlog_ipcmsg_freed);
-	
-	return;
-	
-	
-}
-
 static IPC_Message*
 ChildLogIPCMessage(int priority, const char *buf, int bufstrlen, 
 		   gboolean use_prio_str, IPC_Channel* ch)
@@ -1003,8 +984,6 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	ret->msg_done = FreeChildLogIPCMessage;
 	ret->msg_ch = ch;
 
-	childlog_ipcmsg_allocated++;
-
 	return ret;
 }
 
@@ -1020,9 +999,7 @@ FreeChildLogIPCMessage(IPC_Message* msg)
 	
 	memset(msg, 0, sizeof (*msg));
 	free(msg);
-	
-	childlog_ipcmsg_freed ++;
-	
+		
 	return;
 
 }
