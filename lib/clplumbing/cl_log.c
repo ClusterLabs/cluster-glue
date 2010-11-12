@@ -155,8 +155,8 @@ cl_log_get_logdtime(void)
 
 void
 cl_log_set_logdtime(int logdtime)
-{	
-	conn_logd_time = logdtime;	
+{
+	conn_logd_time = logdtime;
 	return;
 }
 
@@ -270,7 +270,7 @@ add_logging_channel_mainloop(IPC_Channel* chan)
 	
 	if (chp == NULL){
 		cl_log(LOG_INFO, "adding logging channel to mainloop failed");
-	}	
+	}
 
 	logging_chan_in_main_loop = TRUE;
 	
@@ -292,14 +292,14 @@ create_logging_channel(void)
 {
 	GHashTable*	attrs;
 	char		path[] = IPC_PATH_ATTR;
-	char		sockpath[] = HA_LOGDAEMON_IPC;	
+	char		sockpath[] = HA_LOGDAEMON_IPC;
 	IPC_Channel*	chan;
 	static gboolean	complained_yet = FALSE;
 	
 	attrs = g_hash_table_new(g_str_hash, g_str_equal);
-	g_hash_table_insert(attrs, path, sockpath);	
+	g_hash_table_insert(attrs, path, sockpath);
 
-	chan =ipc_channel_constructor(IPC_ANYTYPE, attrs);       	
+	chan =ipc_channel_constructor(IPC_ANYTYPE, attrs);
 	
 	g_hash_table_destroy(attrs);	
 	
@@ -326,7 +326,7 @@ create_logging_channel(void)
 
 	if (create_logging_channel_callback){
 		create_logging_channel_callback(chan);
-	}		
+	}
 	
 	
 	return chan;
@@ -348,7 +348,7 @@ cl_log_test_logd(void)
 		logging_daemon_chan = chan = NULL;
 	}
 	
-	logging_daemon_chan = chan = create_logging_channel();			
+	logging_daemon_chan = chan = create_logging_channel();
 	
 	if (chan == NULL){
 		return FALSE;
@@ -358,7 +358,7 @@ cl_log_test_logd(void)
 		if (!logging_chan_in_main_loop){
 			chan->ops->destroy(chan);
 		}
-		logging_daemon_chan = chan = NULL;	
+		logging_daemon_chan = chan = NULL;
 		return FALSE;
 	}
 	
@@ -399,18 +399,18 @@ cl_log_set_entity(const char *	entity)
 void
 cl_log_set_logfile(const char *	path)
 {
-    if(path != NULL && strcasecmp("/dev/null", path) == 0) {
-	path = NULL;
-    }
+	if(path != NULL && strcasecmp("/dev/null", path) == 0) {
+		path = NULL;
+	}
 	logfile_name = path;
 }
 void
 cl_log_set_debugfile(const char * path)
 {
-    if(path != NULL && strcasecmp("/dev/null", path) == 0) {
-	path = NULL;
-    }
-    debugfile_name = path;
+	if(path != NULL && strcasecmp("/dev/null", path) == 0) {
+		path = NULL;
+	}
+	debugfile_name = path;
 }
 
 
