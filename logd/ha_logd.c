@@ -87,18 +87,18 @@ static gboolean needs_shutdown = FALSE;
 static struct {
 	char		debugfile[MAXLINE];
 	char		logfile[MAXLINE];
-	char		entity[MAXLINE];
+	char		entity[MAXENTITY];
 	int		log_facility;
 	mode_t		logmode;
 	gboolean	syslogfmtmsgs;
 } logd_config =
 	{
-		"",
-		"",
-		"logd",
-		HA_LOG_FACILITY,
-		0644,
-		FALSE
+		.debugfile = "",
+		.logfile   = "",
+		.entity    = "logd",
+		.log_facility = HA_LOG_FACILITY,
+		.logmode  = 0644,
+		.syslogfmtmsgs = FALSE
 	};
 
 static void	logd_log(const char * fmt, ...) G_GNUC_PRINTF(1,2);
@@ -199,8 +199,13 @@ set_entity(const char * option)
 		logd_config.entity[0] = EOS;
 		return FALSE;
 	}
-	cl_log(LOG_INFO, "setting entity to %s", option);
-	strncpy(logd_config.entity, option, MAXLINE);
+	strncpy(logd_config.entity, option, MAXENTITY);
+	logd_config.entity[MAXENTITY-1] = '\0';
+	if (strlen(option) >= MAXENTITY)
+		cl_log(LOG_WARN, "setting entity to %s (truncated from %s)",
+			logd_config.entity, option);
+	else
+		cl_log(LOG_INFO, "setting entity to %s", logd_config.entity);
 	return TRUE;
 
 }
