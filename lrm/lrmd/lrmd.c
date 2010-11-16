@@ -1407,6 +1407,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	struct msg_map *msgmap_p, in_type;
 	lrmd_client_t* client = NULL;
 	struct ha_msg* msg = NULL;
+	char *msg_s;
 
 	client = (lrmd_client_t*)user_data;
 
@@ -1445,7 +1446,11 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 		LOG_FAILED_TO_GET_FIELD(F_LRM_TYPE);
 		return TRUE;
 	}
-	lrmd_debug2(LOG_DEBUG,"dumping request: %s",msg2string(msg));
+	msg_s = msg2string(msg);
+	if( msg_s ) {
+		lrmd_debug2(LOG_DEBUG,"dumping request: %s",msg_s);
+		free(msg_s);
+	}
 
 	if (!(msgmap_p = bsearch(&in_type, msg_maps,
 			MSG_NR, sizeof(struct msg_map), msg_type_cmp)
