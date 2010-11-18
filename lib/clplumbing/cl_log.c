@@ -645,9 +645,8 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 	}
 	
 	if (syslog_enabled) {
-		snprintf(common_log_entity, "%s",
-			*cl_log_syslogprefix ? cl_log_syslogprefix : entity,
-			MAXENTITY);
+		snprintf(common_log_entity, MAXENTITY, "%s",
+			*cl_log_syslogprefix ? cl_log_syslogprefix : entity);
 
 		/* The extra trailing '\0' is supposed to work around some
 		 * "known syslog bug that ends up concatinating entries".
