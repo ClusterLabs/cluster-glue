@@ -42,6 +42,7 @@ void		cl_log_enable_stdout(int truefalse);
 gboolean	cl_log_test_logd(void);
 void		cl_log_set_uselogd(int truefalse);
 void		cl_log_enable_syslog_filefmt(int truefalse);
+void		cl_log_use_buffered_io(int truefalse);
 gboolean	cl_log_get_uselogd(void);
 void		cl_log_set_facility(int facility);
 void		cl_log_set_entity(const char *	entity);
@@ -59,8 +60,12 @@ void		cl_glib_msg_handler(const gchar *log_domain
 ,		gpointer user_data);
 
 void		cl_flush_logs(void);
-void cl_log_args(int argc, char **argv);
-int cl_log_is_logd_fd(int fd);
-const char * prio2str(int priority);
+void		cl_log_args(int argc, char **argv);
+int		cl_log_is_logd_fd(int fd);
+const char *	prio2str(int priority);
+
+/* We now keep the file handles open for a potentially very long time.
+ * Sometimes we may need to close them explicitly. */
+void            cl_log_close_log_files(void);
 
 #endif

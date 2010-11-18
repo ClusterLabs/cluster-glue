@@ -80,6 +80,7 @@ static int		conn_logd_time = 0;
 static char		cl_log_entity[MAXENTITY]= DFLT_ENTITY;
 static char		common_log_entity[MAXENTITY]= DFLT_ENTITY;
 static int		cl_log_facility = LOG_USER;
+static int		use_buffered_io = 0;
 
 static void		cl_opensyslog(void);
 static int		syslog_enabled = 0;
@@ -403,6 +404,7 @@ cl_log_set_logfile(const char *	path)
 		path = NULL;
 	}
 	logfile_name = path;
+	cl_log_close_log_files();
 }
 void
 cl_log_set_debugfile(const char * path)
@@ -411,6 +413,7 @@ cl_log_set_debugfile(const char * path)
 		path = NULL;
 	}
 	debugfile_name = path;
+	cl_log_close_log_files();
 }
 
 
@@ -502,18 +505,98 @@ append_log(FILE * fp, const char * entity, int entity_pid
 	,	msg);
 }
 
-/*
- * Just open the given file name
+/* As performance optimization we try to keep the file descriptor
+ * open all the time, but as logrotation needs to work, the calling
+ * program actually needs a signal handler.
+ *
+ * To be able to keep files open even without signal handler,
+ * we remember the stat info, and close/reopen if the inode changed.
+ * We keep the number of stat() calls to one per file per minute.
+ * logrotate should be configured for delayed compression, if any.
  */
-static FILE * 
-open_log_file(const char * fname)
+
+struct log_file_context {
+	FILE *fp;
+	struct stat stat_buf;
+};
+
+static struct log_file_context log_file, debug_file;
+
+static void close_log_file(struct log_file_context *lfc)
 {
-	FILE * fp = fopen(fname ,"a");
-	if (!fp) {
-		syslog(LOG_ERR, "Failed to open log file %s: %s\n" , 
-		       fname, strerror(errno)); 
+	/* ignore errors, we cannot do anything about them anyways */
+	fflush(lfc->fp);
+	fsync(fileno(lfc->fp));
+	fclose(lfc->fp);
+	lfc->fp = NULL;
+}
+
+void cl_log_close_log_files(void)
+{
+	if (log_file.fp)
+		close_log_file(&log_file);
+	if (debug_file.fp)
+		close_log_file(&debug_file);
+}
+
+static void maybe_close_log_file(const char *fname, struct log_file_context *lfc)
+{
+	struct stat buf;
+	if (!lfc->fp)
+		return;
+	if (stat(fname, &buf) || buf.st_ino != lfc->stat_buf.st_ino) {
+		close_log_file(lfc);
+		cl_log(LOG_INFO, "log-rotate detected on logfile %s", fname);
 	}
-	return fp;
+}
+
+/* Default to unbuffered IO.  logd or others can use cl_log_use_buffered_io(1)
+ * to enable fully buffered mode, and then use fflush appropriately.
+ */
+static void open_log_file(const char *fname, struct log_file_context *lfc)
+{
+	lfc->fp = fopen(fname ,"a");
+	if (!lfc->fp) {
+		syslog(LOG_ERR, "Failed to open log file %s: %s\n" ,
+		       fname, strerror(errno));
+	} else {
+		setvbuf(lfc->fp, NULL,
+				use_buffered_io ? _IOFBF : _IONBF,
+				BUFSIZ);
+		fstat(fileno(lfc->fp), &lfc->stat_buf);
+	}
+}
+
+static void maybe_reopen_log_files(const char *log_fname, const char *debug_fname)
+{
+	static TIME_T last_stat_time;
+
+	if (log_file.fp || debug_file.fp) {
+		TIME_T now = time(NULL);
+		if (now - last_stat_time > 59) {
+			/* Don't use an exact minute, have it jitter around a
+			 * bit against cron or others.  Note that, if there
+			 * is no new log message, it can take much longer
+			 * than this to notice logrotation and actually close
+			 * our file handle on the possibly already rotated,
+			 * or even deleted.
+			 *
+			 * As long as at least one minute pases between
+			 * renaming the log file, and further processing,
+			 * no message will be lost, so this should do fine:
+			 * (mv ha-log ha-log.1; sleep 60; gzip ha-log.1)
+			 */
+			maybe_close_log_file(log_fname, &log_file);
+			maybe_close_log_file(debug_fname, &debug_file);
+			last_stat_time = now;
+		}
+	}
+
+	if (log_fname && !log_file.fp)
+		open_log_file(log_fname, &log_file);
+
+	if (debug_fname && !debug_file.fp)
+		open_log_file(debug_fname, &debug_file);
 }
 
 /*
@@ -557,29 +640,13 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 		}
 	}
 
-	if (debugfile_name != NULL) {
-		static FILE * debug_fp = NULL;
-		if (!debug_fp) {
-			/* As performance optimization we keep the file-handle
-			 * open all the time */
-			debug_fp = open_log_file(debugfile_name);
-		}
-		if (debug_fp)
-			append_log(debug_fp ,entity, entity_pid, ts, pristr, 
-				   buf);
-	}
+	maybe_reopen_log_files(logfile_name, debugfile_name);
 
-	if (priority != LOG_DEBUG && logfile_name != NULL) {
-		static FILE * log_fp = NULL;
-		if (!log_fp) {
-			/* As performance optimization we keep the file-handle
-			 * open all the time */
-			log_fp = open_log_file(logfile_name);
-		}
-		if (log_fp)
-			append_log(log_fp ,entity, entity_pid, ts, pristr, 
-				   buf);
-	}
+	if (debug_file.fp)
+		append_log(debug_file.fp, entity, entity_pid, ts, pristr, buf);
+
+	if (priority != LOG_DEBUG && log_file.fp)
+		append_log(log_file.fp, entity, entity_pid, ts, pristr, buf);
 
 	if (needprivs) {
 		return_to_dropped_privs();
@@ -805,6 +872,10 @@ LogToLoggingDaemon(int priority, const char * buf,
 	int			sendrc = IPC_FAIL;
 	int			intval = conn_logd_time;
 	
+	/* make sure we don't hold file descriptors open
+	 * we don't intend to use again */
+	cl_log_close_log_files();
+
 	if (chan == NULL) {
 		longclock_t	lnow = time_longclock();
 		
