@@ -41,6 +41,7 @@
 int LogToDaemon(int priority, const char * buf, int bstrlen, gboolean use_pri_str);
 extern IPC_Channel * get_log_chan(void);
 
+static GMainLoop* loop;
 
 static gboolean
 send_log_msg(gpointer data)
@@ -55,11 +56,13 @@ send_log_msg(gpointer data)
 	
 	if (chan == NULL){
 		cl_log(LOG_ERR, "logging channel is NULL");
+		g_main_quit(loop);
 		return FALSE;
 
 	}
 	if (count >= maxcount){
 		cl_log(LOG_INFO, "total message dropped: %d", dropmsg);
+		g_main_quit(loop);
 		return FALSE;
 	}
 	
@@ -97,7 +100,6 @@ main(int argc, char** argv)
 {
 
 	long maxcount;
-	GMainLoop* loop;
 	
 	if (argc < 2){
 		usage(argv[0]);
@@ -106,6 +108,7 @@ main(int argc, char** argv)
 	
 	maxcount = atoi(argv[1]);
 	
+	cl_log_set_entity("logtest");
 	cl_log_set_facility(HA_LOG_FACILITY);
 	cl_log_set_uselogd(TRUE);
 	
