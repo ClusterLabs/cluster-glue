@@ -708,6 +708,21 @@ logd_term_action(int sig, gpointer userdata)
         return TRUE;
 }
 
+/*
+ * Handle SIGHUP to re-open log files
+ */
+static gboolean
+logd_hup_action(int sig, gpointer userdata)
+{
+	cl_log_close_log_files();
+	if (write_process_pid)
+		/* do we want to propagate the HUP,
+		 * or do we assume that it was a killall anyways? */
+		CL_KILL(write_process_pid, SIGHUP);
+	else
+		cl_log(LOG_INFO, "SIGHUP received, re-opened log files");
+	return TRUE;
+}
 
 static void
 read_msg_process(IPC_Channel* chan)
@@ -747,6 +762,8 @@ read_msg_process(IPC_Channel* chan)
 
 	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT, chan, FALSE,NULL,NULL,NULL);
 	
+	G_main_add_SignalHandler(G_PRIORITY_DEFAULT, SIGHUP, 
+				 logd_hup_action, mainloop, NULL);
 	g_main_run(mainloop);
 	
 	return;
@@ -862,6 +879,9 @@ write_msg_process(IPC_Channel* readchan)
 
 	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGTERM, 
 				 logd_term_write_action, mainloop, NULL);
+				 
+	G_main_add_SignalHandler(G_PRIORITY_DEFAULT, SIGHUP, 
+				 logd_hup_action, mainloop, NULL);
 	
 	g_main_run(mainloop);
 	
