@@ -46,6 +46,7 @@ void		cl_log_use_buffered_io(int truefalse);
 gboolean	cl_log_get_uselogd(void);
 void		cl_log_set_facility(int facility);
 void		cl_log_set_entity(const char *	entity);
+void		cl_log_set_syslogprefix(const char *prefix);
 void		cl_log_set_logfile(const char *	path);
 void		cl_log_set_debugfile(const char * path);
 void		cl_inherit_logging_environment(int maxqlen);
