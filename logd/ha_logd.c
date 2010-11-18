@@ -755,10 +755,9 @@ read_msg_process(IPC_Channel* chan)
 static gboolean
 direct_log(IPC_Channel* ch, gpointer user_data)
 {
-	
 	IPC_Message*		ipcmsg;
 	GMainLoop*		loop;
-	
+	int			pri = LOG_DEBUG + 1;
 
 	loop =(GMainLoop*)user_data;
 	
@@ -796,7 +795,9 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 			,	copy.use_pri_str
 			,	copy.entity, copy.entity_pid
 			,	copy.timestamp);
-		
+
+			if (copy.priority < pri)
+				pri = copy.priority;
 
 			(void)logd_log;
 /*
@@ -815,6 +816,11 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 		}
 		
 	}
+	/* current message backlog processed,
+	 * about to return to mainloop,
+	 * fflush and potentially fsync stuff */
+	cl_log_do_fflush(pri <= LOG_ERR);
+
 	if(needs_shutdown) {
 		cl_log(LOG_INFO, "Exiting write process");
 		g_main_quit(loop);
@@ -1013,14 +1019,17 @@ main(int argc, char** argv, char** envp)
 		return -1;
 	case 0:
 		/*child*/
+		cl_log_use_buffered_io(1);
 		set_proc_title("ha_logd: write process");
 		write_msg_process(chanspair[WRITE_PROC_CHAN]);		
 		break;
 	default:
-		/*parent*/		
+		/*parent*/
 		set_proc_title("ha_logd: read process");
 		write_process_pid = pid;
-		
+		/* we don't expect to log anything in the parent. */
+		cl_log_close_log_files();
+
 		read_msg_process(chanspair[READ_PROC_CHAN]);
 		break;
 	}

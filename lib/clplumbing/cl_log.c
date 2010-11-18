@@ -161,6 +161,12 @@ cl_log_set_logdtime(int logdtime)
 	return;
 }
 
+void
+cl_log_use_buffered_io(int truefalse)
+{
+	use_buffered_io = truefalse;
+	cl_log_close_log_files();
+}
 
 #define ENVPRE		"HA_"
 
@@ -655,7 +661,19 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 	return;
 }
 
-
+void cl_log_do_fflush(int do_fsync)
+{
+	if (log_file.fp) {
+		fflush(log_file.fp);
+		if (do_fsync)
+			fsync(fileno(log_file.fp));
+	}
+	if (debug_file.fp) {
+		fflush(debug_file.fp);
+		if (do_fsync)
+			fsync(fileno(debug_file.fp));
+	}
+}
 
 /*
  * This function can cost us realtime unless use_logging_daemon

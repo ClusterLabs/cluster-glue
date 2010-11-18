@@ -64,6 +64,11 @@ void		cl_log_args(int argc, char **argv);
 int		cl_log_is_logd_fd(int fd);
 const char *	prio2str(int priority);
 
+/* cl_log_use_buffered_io and cl_log_do_fflush as optimization for logd,
+ * so it may buffer a few message lines, then fflush them out in one write.
+ * Set do_fsync != 0, if you even want it to fsync. */
+void            cl_log_do_fflush(int do_fsync);
+void            cl_log_use_buffered_io(int truefalse);
 /* We now keep the file handles open for a potentially very long time.
  * Sometimes we may need to close them explicitly. */
 void            cl_log_close_log_files(void);
