@@ -515,8 +515,12 @@ logd_make_daemon(gboolean daemonize)
 	
 	if (cl_lock_pidfile(LOGD_PIDFILE) < 0 ){
 		pid = cl_read_pidfile(LOGD_PIDFILE);
-		fprintf(stderr, "%s: already running [pid %ld].\n",
-			cmdname, pid);
+		if (pid > 0)
+			fprintf(stderr, "%s: already running [pid %ld].\n",
+				cmdname, pid);
+		else
+			fprintf(stderr, "%s: problem creating pid file %s\n",
+				cmdname, LOGD_PIDFILE);
 		exit(LSB_EXIT_OK);
 	}
 	
