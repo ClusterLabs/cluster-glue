@@ -202,7 +202,7 @@ set_entity(const char * option)
 	strncpy(logd_config.entity, option, MAXENTITY);
 	logd_config.entity[MAXENTITY-1] = '\0';
 	if (strlen(option) >= MAXENTITY)
-		cl_log(LOG_WARN, "setting entity to %s (truncated from %s)",
+		cl_log(LOG_WARNING, "setting entity to %s (truncated from %s)",
 			logd_config.entity, option);
 	else
 		cl_log(LOG_INFO, "setting entity to %s", logd_config.entity);
