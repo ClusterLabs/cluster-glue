@@ -83,7 +83,7 @@ ha_log() {
 $msg
 EOF
 
-	if [ -n "$HA_LOGFACILITY" ]; then
+	if [ -n "$HA_LOGFACILITY" -a "$HA_LOGFACILITY" != none ]; then
 		logger -t "$HA_LOGTAG" -p $HA_LOGFACILITY.$loglevel "$msg"
 	fi	
 	dest=${HA_LOGFILE:-$HA_DEBUGLOG}
