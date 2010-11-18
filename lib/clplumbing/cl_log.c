@@ -56,6 +56,7 @@
 #endif
 
 #define	DFLT_ENTITY	"cluster"
+#define	DFLT_PREFIX	""
 #define NULLTIME 	0
 #define QUEUE_SATURATION_FUZZ 10
 
@@ -78,6 +79,7 @@ static int cl_set_logging_wqueue_maxlen(int qlen);
 static int		use_logging_daemon =  FALSE;
 static int		conn_logd_time = 0;
 static char		cl_log_entity[MAXENTITY]= DFLT_ENTITY;
+static char		cl_log_syslogprefix[MAXENTITY] = DFLT_PREFIX;
 static char		common_log_entity[MAXENTITY]= DFLT_ENTITY;
 static int		cl_log_facility = LOG_USER;
 static int		use_buffered_io = 0;
@@ -404,6 +406,20 @@ cl_log_set_entity(const char *	entity)
 }
 
 void
+cl_log_set_syslogprefix(const char *prefix)
+{
+	if (prefix == NULL) {
+		prefix = DFLT_PREFIX;
+	}
+	strncpy(cl_log_syslogprefix, prefix, MAXENTITY);
+	cl_log_syslogprefix[MAXENTITY-1] = '\0';
+	if (syslog_enabled) {
+		syslog_enabled = 0;
+		cl_opensyslog();
+	}
+}
+
+void
 cl_log_set_logfile(const char *	path)
 {
 	if(path != NULL && strcasecmp("/dev/null", path) == 0) {
@@ -619,31 +635,30 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 	const char *	pristr;
 	int	needprivs = !cl_have_full_privs();
 
-	if (entity == NULL){
-		entity =cl_log_entity;
-	}
-	
 	pristr = use_priority_str ? prio2str(priority) : NULL;
+	
+	if (!entity)
+		entity = *cl_log_entity	? cl_log_entity : DFLT_ENTITY;
 
 	if (needprivs) {
 		return_to_orig_privs();
 	}
 	
 	if (syslog_enabled) {
-		if (entity) {
-			strncpy(common_log_entity, entity, MAXENTITY);
-		} else {
-			strncpy(common_log_entity, DFLT_ENTITY,MAXENTITY);
-		}
+		snprintf(common_log_entity, "%s",
+			*cl_log_syslogprefix ? cl_log_syslogprefix : entity,
+			MAXENTITY);
 
-		common_log_entity[MAXENTITY-1] = '\0';
-
-		if (pristr) {
-			syslog(priority, "[%d]: %s: %s%c",
-			       entity_pid, pristr,  buf, 0);
-		}else {
-			syslog(priority, "[%d]: %s%c", entity_pid, buf, 0);
-		}
+		/* The extra trailing '\0' is supposed to work around some
+		 * "known syslog bug that ends up concatinating entries".
+		 * Knowledge about which syslog package, version, platform and
+		 * what exactly the bug was has been lost, but leaving it in
+		 * won't do any harm either. */
+		syslog(priority, "%s[%d]: %s%s%s%c",
+			*cl_log_syslogprefix ? entity : "",
+			entity_pid,
+			pristr ?: "",  pristr ? ": " : "",
+			buf, 0);
 	}
 
 	maybe_reopen_log_files(logfile_name, debugfile_name);
@@ -657,7 +672,6 @@ cl_direct_log(int priority, const char* buf, gboolean use_priority_str,
 	if (needprivs) {
 		return_to_dropped_privs();
 	}
-	
 	return;
 }
 
