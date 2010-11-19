@@ -26,10 +26,11 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 ## include files
 
 ## binaries
-sbin_PROGRAMS		= stonith meatclient 
+sbin_PROGRAMS		= stonith meatclient
 if ON_LINUX
 sbin_PROGRAMS		+= sbd
 endif
+sbin_SCRIPTS		= stonith_logger
 
 stonith_SOURCES		= main.c
 
@@ -57,7 +58,4 @@ libstonith_la_LIBADD	= $(top_builddir)/lib/pils/libpils.la	\
 			$(top_builddir)/replace/libreplace.la	\
 			$(GLIBLIB)
 
-helperdir		= 	$(datadir)/$(PACKAGE_NAME)
-helper_SCRIPTS		= ha_log.sh
-
-EXTRA_DIST              = $(helper_SCRIPTS) sbd.h
+EXTRA_DIST              = sbd.h

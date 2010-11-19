@@ -41,7 +41,7 @@ import time
 import re
 
 def log_msg(level,msg):
-    subprocess.call("ha_log.sh %s '%s'" % (level,msg), shell=True)
+    subprocess.call("stonith_logger %s '%s'" % (level,msg), shell=True)
 def my_err(msg):
     log_msg("err", msg)
 def my_warn(msg):

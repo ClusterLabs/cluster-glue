@@ -6,16 +6,16 @@
 # License:      GNU General Public License (GPL)
 #
 
-trap 'if [ -n "$outf" ]; then ha_log.sh err "`cat $outf`"; rm -f "$outf"; fi' 0
+trap 'if [ -n "$outf" ]; then stonith_logger err "`cat $outf`"; rm -f "$outf"; fi' 0
 outf=`mktemp` || {
-	ha_log.sh err "mktemp failed"
+	stonith_logger err "mktemp failed"
 	exit 1
 }
 
 sshlogin() {
 	if [ x = "x$ipaddr" -o x = "x$userid" ]
 	then
-		ha_log.sh err "ipaddr or userid missing; check configuration"
+		stonith_logger err "ipaddr or userid missing; check configuration"
 		return 1
 	fi
 	@SSH@ -q -x -n $userid@$ipaddr racadm serveraction "$1" >$outf 2>&1
