@@ -36,13 +36,13 @@ COOKIEFILE=`mktemp` || exit 1
 check_parameter() {
   if [ ! -x $CURLBIN ]
   then
-    ha_log.sh err "Curl can't be found in normal place. Set CURLBIN to override the default value"
+    stonith_logger err "Curl can't be found in normal place. Set CURLBIN to override the default value"
     exit 1
   fi
 
   if [ -z $hmc_ipaddr ]
   then
-    ha_log.sh err "The address of HMC web console is not specified"
+    stonith_logger err "The address of HMC web console is not specified"
     exit 1
   fi
 }
@@ -97,7 +97,7 @@ hmc_poweroffon() {
   hmc_poweroff
   while [ 1 ]; do
     r=`hmc_powerstate`
-    ha_log.sh debug "power state: $r"
+    stonith_logger debug "power state: $r"
     if [ $r = "Off" ]; then
       break
     fi

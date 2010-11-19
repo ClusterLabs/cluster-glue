@@ -9,7 +9,7 @@
 
 trap 'rm -f "$outf"' 0
 outf=`mktemp` || {
-	ha_log.sh err 'mktemp failed'
+	stonith_logger err 'mktemp failed'
 	exit 1
 }
 
@@ -18,12 +18,12 @@ chkmpcli() {
 }
 mpcli() {
 	chkmpcli || {
-		ha_log.sh err "IBM mpcli not installed"
+		stonith_logger err "IBM mpcli not installed"
 		return 1
 	}
 	if [ x = "x$ipaddr" -o x = "x$userid" -o x = "x$passwd" ]
 	then
-		ha_log.sh err "ipaddr, userid, or passwd missing; check configuration"
+		stonith_logger err "ipaddr, userid, or passwd missing; check configuration"
 		return 1
 	fi
 	type=${type:-"ibm"}
@@ -40,7 +40,7 @@ mpcli() {
 	if [ $rc -eq 0 -a $? -eq 1 ]; then
 		return 0
 	else
-		ha_log.sh err "MPCLI.sh failed: `cat $outf`"
+		stonith_logger err "MPCLI.sh failed: `cat $outf`"
 		return 1
 	fi
 }

@@ -39,7 +39,7 @@ hostlist=`echo ${hostlist} | tr ',' ' '`
 ##
 check_hostlist() {
     if [ -z "${hostlist}" ]; then
-        ha_log.sh err "hostlist is empty"
+        stonith_logger err "hostlist is empty"
         exit 6 #ERR_CONFIGURED
     fi
 }
@@ -52,7 +52,7 @@ get_username() {
     kdump_conf="/etc/kdump.conf"
 
     if [ ! -f "${kdump_conf}" ]; then
-        ha_log.sh debug "${kdump_conf} doesn't exist"
+        stonith_logger debug "${kdump_conf} doesn't exist"
         return 0
     fi
 
@@ -66,7 +66,7 @@ get_username() {
         USERNAME="${tmp}"
     fi
 
-    ha_log.sh debug "kdump check user name is ${USERNAME}."
+    stonith_logger debug "kdump check user name is ${USERNAME}."
 }
 
 ##
@@ -77,7 +77,7 @@ check_identity_file() {
     IDENTITY_OPTS=""
     if [ -n "${identity_file}" ]; then
         if [ ! -f "${identity_file}" ]; then
-            ha_log.sh err "${identity_file} doesn't exist."
+            stonith_logger err "${identity_file} doesn't exist."
             exit 6 #ERR_CONFIGURED
         fi
         IDENTITY_OPTS="-i ${identity_file}"
@@ -94,7 +94,7 @@ check_identity_file() {
             fi
         done
         if [ ${flg_file_exists} -eq 0 ]; then
-            ha_log.sh err "${USERNAME}'s identity file for ssh command" \
+            stonith_logger err "${USERNAME}'s identity file for ssh command" \
                 " doesn't exist."
             exit 6 #ERR_CONFIGURED
         fi
@@ -111,7 +111,7 @@ check_user_existence() {
     grep -q "^${USERNAME}:" /etc/passwd > /dev/null 2>&1
     ret=$?
     if [ ${ret} != 0 ]; then
-        ha_log.sh err "user ${USERNAME} doesn't exist." \
+        stonith_logger err "user ${USERNAME} doesn't exist." \
             "please confirm \"kdump_check_user\" setting in /etc/kdump.conf." \
             "(default user name is \"kdumpchecker\")"
         exit 6 #ERR_CONFIGURED
@@ -142,10 +142,10 @@ check_kdump() {
     # kdump_check_user's public key in authorized_keys file on target node.
     #    command="test -s /proc/vmcore", \
     #    no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty
-    ha_log.sh debug "execute the command [${exec_cmd} ${target_node}]."
+    stonith_logger debug "execute the command [${exec_cmd} ${target_node}]."
     ${exec_cmd} ${target_node} > /dev/null 2>&1
     ret=$?
-    ha_log.sh debug "the command's result is ${ret}."
+    stonith_logger debug "the command's result is ${ret}."
 
     #ret ->   0 : vmcore file's size is not zero. the node is kdumping.
     #ret ->   1 : the node is _not_ kdumping (vmcore didn't exist or

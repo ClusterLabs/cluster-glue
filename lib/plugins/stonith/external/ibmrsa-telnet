@@ -165,7 +165,7 @@ class RSAStonithPlugin:
         self._echo_debug("STDOUT:", what)
 
     def echo_log(self, level, *args):
-        subprocess.call(('ha_log.sh', level) +  args)
+        subprocess.call(('stonith_logger', level) +  args)
 
     def _get_connection(self):
         if not self._connection:
