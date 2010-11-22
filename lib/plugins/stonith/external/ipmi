@@ -47,11 +47,11 @@ have_ipmi() {
 # passed in
 run_ipmitool() {
 	have_ipmi || {
-		stonith_logger err "ipmitool not installed"
+		ha_log.sh err "ipmitool not installed"
 		return 1
 	}
 	if [ -z "${ipaddr}" -o -z "${userid}" -o -z "${passwd}" ]; then
-		stonith_logger err "ipaddr, userid or passwd missing; check configuration"
+		ha_log.sh err "ipaddr, userid or passwd missing; check configuration"
 		return 1
 	fi
 
@@ -72,7 +72,7 @@ run_ipmitool() {
                 M="-f"
                 ;;
             *)
-		stonith_logger err "invalid passwd_method: \"${passwd_method}\""
+		ha_log.sh err "invalid passwd_method: \"${passwd_method}\""
 		return 1
         esac
 
@@ -91,10 +91,10 @@ run_ipmitool() {
 # any error)
 do_ipmi() {
 	if outp=`run_ipmitool $*`; then
-		stonith_logger debug "ipmitool output: `echo $outp`"
+		ha_log.sh debug "ipmitool output: `echo $outp`"
 		return 0
 	else
-		stonith_logger err "error executing ipmitool: `echo $outp`"
+		ha_log.sh err "error executing ipmitool: `echo $outp`"
 		return 1
 	fi
 }
