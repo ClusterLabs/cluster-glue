@@ -56,12 +56,12 @@ GetOutletNumber() {
 	if [ -f "$outlet_config" ]; then
     	    local outlet_num=`grep $nodename $outlet_config | tr -d ' ' | cut -f2 -d'='`
 	    if [ -z "$outlet_num" ]; then
-		stonith_logger err "Outlet number not found for node $nodename. Check configuration file $outlet_config"
+		ha_log.sh err "Outlet number not found for node $nodename. Check configuration file $outlet_config"
 		return 0
 	    fi
 	    return $outlet_num
 	else
-	    stonith_logger err "File $outlet_config not found."
+	    ha_log.sh err "File $outlet_config not found."
 	    return 0
 	fi
     else
@@ -71,7 +71,7 @@ GetOutletNumber() {
 	local snmp_result
 	snmp_result=`snmpwalk -v1 -c $community $pduip $names_oid 2>&1`
 	if [ $? -ne 0 ]; then
-	    stonith_logger err "snmpwalk $community $pduip $names_oid failed. Result: $snmp_result"
+	    ha_log.sh err "snmpwalk $community $pduip $names_oid failed. Result: $snmp_result"
 	    return 0
 	fi
 
@@ -85,7 +85,7 @@ GetOutletNumber() {
 	    return $outlet_num
 	done
 	
-	stonith_logger err "Outlet number not found for node $nodename. Result: $snmp_result"
+	ha_log.sh err "Outlet number not found for node $nodename. Result: $snmp_result"
 	return 0
     fi
 }
@@ -102,11 +102,11 @@ SendCommand() {
         local set_result
         set_result=`snmpset -v1 -c $community $pduip $oid.$outlet i $command 2>&1`
         if [ $? -ne 0 ]; then
-            stonith_logger err "Write SNMP to $pduip value $oid.$outlet=$command failed. Result: $set_result"
+            ha_log.sh err "Write SNMP to $pduip value $oid.$outlet=$command failed. Result: $set_result"
             return 1
         fi
         if echo "$set_result" | grep -qs "Timeout"; then
-            stonith_logger err "Write SNMP to $pduip value $oid.$outlet=$command timed out. Result: $set_result"
+            ha_log.sh err "Write SNMP to $pduip value $oid.$outlet=$command timed out. Result: $set_result"
             return 1
         fi
         return 0
@@ -124,11 +124,11 @@ gethosts)
 	if [ "$hostlist" = "AUTO" ]; then
 	    snmp_result=`snmpwalk -v1 -c $community $pduip $names_oid 2>&1`
         if [ $? -ne 0 ]; then
-            stonith_logger err "snmpwalk $community $pduip $names_oid failed. Result: $snmp_result"
+            ha_log.sh err "snmpwalk $community $pduip $names_oid failed. Result: $snmp_result"
             exit 1
         fi
         if echo "$snmp_result" | grep -qs "Timeout"; then
-            stonith_logger err "snmpwalk $community $pduip $names_oid timed out. Result: $snmp_result"
+            ha_log.sh err "snmpwalk $community $pduip $names_oid timed out. Result: $snmp_result"
             exit 1
 	    else
 		hostlist=`echo "$snmp_result" | cut -f2 -d'"' | tr ' ' '_' | tr '\012' ' '`

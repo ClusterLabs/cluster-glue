@@ -176,7 +176,7 @@ class DracMCStonithPlugin:
                             time.localtime(ct)), msecs)
 
     def _echo_debug(self, *args):
-        subprocess.call("stonith_logger debug '%s'" % ' '.join(args), shell=True)
+        subprocess.call("ha_log.sh debug '%s'" % ' '.join(args), shell=True)
 
     def echo(self, *args):
         what = ''.join([str(x) for x in args])
@@ -186,7 +186,7 @@ class DracMCStonithPlugin:
         self._echo_debug("STDOUT:", what)
 
     def echo_log(self, level, *args):
-        subprocess.call("stonith_logger %s '%s'" % (level,' '.join(args)), shell=True)
+        subprocess.call("ha_log.sh %s '%s'" % (level,' '.join(args)), shell=True)
 
     def _get_connection(self):
         if not self._connection:
