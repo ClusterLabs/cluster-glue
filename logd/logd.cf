@@ -18,6 +18,7 @@
 #
 #
 #	Facility to use for syslog()/logger 
+#   (set to 'none' to disable syslog logging)
 #	Default: daemon
 #logfacility	daemon
 
