@@ -750,11 +750,13 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 
 	/* external plugins need path to ha_log.sh */
 	path = getenv("PATH");
-	new_path_len = strlen(path)+strlen(GLUE_SHARED_DIR)+2;
-	new_path = (char *)g_malloc(new_path_len);
-	snprintf(new_path, new_path_len, "%s:%s", path, GLUE_SHARED_DIR);
-	setenv("PATH", new_path, 1);
-	g_free(new_path);
+	if (strncmp(GLUE_SHARED_DIR,path,strlen(GLUE_SHARED_DIR))) {
+		new_path_len = strlen(path)+strlen(GLUE_SHARED_DIR)+2;
+		new_path = (char *)g_malloc(new_path_len);
+		snprintf(new_path, new_path_len, "%s:%s", GLUE_SHARED_DIR, path);
+		setenv("PATH", new_path, 1);
+		g_free(new_path);
+	}
 
 	/* set the logtag appropriately */
 	logtag_len = strlen(PIL_PLUGIN_S)+strlen(sd->subplugin)+2;
