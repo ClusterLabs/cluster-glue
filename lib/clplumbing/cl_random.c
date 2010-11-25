@@ -38,97 +38,6 @@
 #include <sys/time.h>
 #include <sys/times.h>
 
-#define	MAXRAND 100	/* How many do we try and keep around? */
-
-typedef int	rand_t;
-
-static int	first = 0;
-static int	last = 0;
-static rand_t	randomness[MAXRAND];
-
-/* How many random numbers do we currently have ? */
-#define NUMRNUMS	((first <= last) ? (last-first)	\
-			:	((MAXRAND-first)+(last+1)))
-
-#define IS_QUEUEFULL	(NUMRNUMS == MAXRAND)
-#define IS_QUEUEEMPTY	(first == last)
-
-
-
-static gboolean	randgen_scheduled = FALSE;
-static gboolean	inityet = FALSE;
-
-static void		cl_init_random(void);
-
-
-static rand_t
-gen_a_random(void)
-{
-	if (!inityet) {
-		cl_init_random();
-	}
-	return	rand();
-}
-
-
-static gboolean
-add_a_random(gpointer notused)
-{
-	if (IS_QUEUEFULL) {
-		return FALSE;
-	}
-	++last;
-	if (last >= MAXRAND) {
-		last = 0;
-	}
-	randomness[last] = gen_a_random();
-	return !IS_QUEUEFULL;
-}
-
-
-static void
-get_more_random(void)
-{
-	if (randgen_scheduled || IS_QUEUEFULL) {
-		return;
-	}
-	if (g_main_loop_is_running(NULL)) {
-		randgen_scheduled = TRUE;
-		Gmain_timeout_add_full(G_PRIORITY_LOW+1, 10, add_a_random, NULL, NULL);
-	}
-}
-
-int
-get_next_random(void)
-{
-	rand_t	ret;
-	if (IS_QUEUEEMPTY) {
-		ret = gen_a_random();
-	}else{
-		ret = randomness[first];
-		++first;
-		if (first >= MAXRAND) {
-			first = 0;
-		}
-	}
-	get_more_random();
-	return ret;
-}
-
-static void
-cl_init_random(void)
-{
-	if (inityet) {
-		return;
-	}
-	inityet=TRUE;
-	srand(cl_randseed());
-	first = 0;
-	last = 0;
-	get_more_random();
-}
-
-
 /* Used to provide seed to the random number generator */
 unsigned int
 cl_randseed(void)
@@ -231,4 +140,25 @@ cl_randseed(void)
 	horrid = (long) &tv;
 	return (unsigned int) horrid; /* pointer to local variable exposed */
 #endif
+}
+
+static gboolean        inityet = FALSE;
+
+static void
+cl_init_random(void)
+{
+	if (inityet)
+		return;
+
+	inityet=TRUE;
+	srand(cl_randseed());
+}
+
+int
+get_next_random(void)
+{
+	if (!inityet)
+		cl_init_random();
+
+	return	rand();
 }
