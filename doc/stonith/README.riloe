@@ -1,3 +1,8 @@
+Note for iLO 3 users
+
+This plugin doesn't support the iLO version 3. Please use ipmilan
+or external/ipmi, iLO3 should support IPMI.
+
 Alain St-Denis wrote the riloe plugin. Here is short usage:
 
 primitive st0 stonith:external/riloe \
@@ -20,3 +25,12 @@ ilo_powerdown_method:
 	"power". The "button" method is easier on the host, but
 	requires ACPI.  "power" should be more reliable, but not to
 	be used excessively for testing.
+
+ilo_proxyhost (string): Proxy hostname
+	proxy hostname if required to access ILO board
+
+ilo_proxyport (string, [3128]): Proxy port
+	proxy port if required to access ILO board
+	parameter will be ignored if proxy hostname is not set
+
+
