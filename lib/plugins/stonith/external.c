@@ -338,6 +338,9 @@ external_parse_config_info(struct pluginDevice* sd, StonithNVpair * info)
 	 * whitespace can be passed to the plugins... */
 	for (nv = info; nv->s_name; nv++) {
 		key = STRDUP(nv->s_name);
+		if (!nv->s_name || !nv->s_value) {
+			continue;
+		}
 		if (!key) {
 			goto err_mem;
 		}
