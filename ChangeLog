@@ -1,3 +1,29 @@
+* Tue Nov 30 2010 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
+- stable release 1.0.7
+- clplumbing: ipc: adjust socket buffers size when adjusting ipc queue length
+- logd: add a SIGHUP signal handler to timely close/open log files
+- logd: use buffered io with fflush and fsync
+- logd: reopen logfiles on inode change (logrotate)
+- clplumbing: cl_log: keep logfiles open, but default to non-buffered io (lf#2470)
+- clplumbing: cl_log: add new optional common syslog message prefix
+- stonith: use ST_DEVICEID for the short description in meta-data
+- stonith: external: interpret properly exit codes from external stonith
+  plugins (bnc#630357)
+- stonith: external: avoid false out of memory error if a parameter isn't set (bnc#646205)
+- stonith: external: check if PATH already contains GLUE_SHARED_DIR
+  (memory leak, lf#2484)
+- stonith(8): reduce the number of stonith plugin invocations (bnc#630357)
+- stonith(8): use cl_log for logging if invoked by stonithd (pcmk 1.1)
+- stonith: external/sbd: make sbd use realtime priority for IO (works only with CFQ)
+- stonith: cyclades: add the serial_port parameter to the meta-data
+- stonith: external/riloe: add support for http proxies
+- stonith: external/ipmi: provide opt param "passwd_method" to hide
+  the ipmi password from config and logs
+- stonith: external/nut: support for the Network UPS Tools
+- stonith: external/rackpdu: remove displaced local command
+- stonith: rcd_serial: rename dtr|rts parameter to dtr_rts
+- configure: test for POSIX signals (fixes rcd_serial)
+
 * Fri Jul  9 2010 Dejan Muhamedagic <dejan@suse.de>
 - stable release 1.0.6
 - clplumbing: Add identity info of the user on the other side of socket
