@@ -1,0 +1,259 @@
+#!/bin/sh
+#
+# External STONITH module for a libvirt managed hypervisor (kvm/Xen).
+# Uses libvirt as a STONITH device to control guest.
+#
+# Copyright (c) 2010 Holger Teutsch <holger.teutsch@web.de>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+
+# start a domain
+libvirt_start() {
+    out=$($VIRSH -c $hypervisor_uri start $domain_id 2>&1)
+    if [ $? -eq 0 ]
+    then
+        ha_log.sh notice "Domain $domain_id was started"
+        return 0
+    fi
+
+    if echo "$out" | grep -i 'Domain is already active' > /dev/null 2>&1
+    then
+        ha_log.sh notice "Domain $domain_id is already active"
+        return 0
+    fi
+
+    ha_log.sh err "Failed to start domain $domain_id"
+    ha_log.sh err "$out"
+    return 1
+}
+
+# stop a domain
+# return
+#   0: success
+#   1: error
+#   2: was already stopped
+libvirt_stop() {
+    out=$($VIRSH -c $hypervisor_uri destroy $domain_id 2>&1)
+    if [ $? -eq 0 ]
+    then
+        ha_log.sh notice "Domain $domain_id was stopped"
+        return 0
+    fi
+
+    if echo "$out" | grep -i 'domain is not running' > /dev/null 2>&1
+    then
+        ha_log.sh notice "Domain $domain_id is already stopped"
+        return 2
+    fi
+
+    ha_log.sh err "Failed to stop domain $domain_id"
+    ha_log.sh err "$out"
+    return 1
+}
+
+# get status of stonith device (*NOT* of the domain).
+# If we can retrieve some info from the hypervisor
+# the stonith device is OK.
+libvirt_status() {
+    out=$($VIRSH -c $hypervisor_uri version 2>&1)
+    if [ $? -eq 0 ]
+    then
+        out=`echo "$out" | tail -1`
+        ha_log.sh notice "$hypervisor_uri: $out"
+        return 0
+    fi
+
+    ha_log.sh err "Failed to get status for $hypervisor_uri"
+    ha_log.sh err "$out"
+    return 1
+}
+
+# check config and set variables
+# does not return on error
+libvirt_check_config() {
+    VIRSH=`which virsh 2>/dev/null`
+
+    if [ ! -x "$VIRSH" ]
+    then
+        ha_log.sh err "virsh not installed"
+        exit 1
+    fi
+
+    if [ -z "$hostlist" -o -z "$hypervisor_uri" ]
+    then
+        ha_log.sh err "hostlist or hypervisor_uri missing; check configuration"
+        exit 1
+    fi
+}
+
+# set variable domain_id for the host specified as arg
+libvirt_set_domain_id ()
+{
+    for h in $hostlist
+    do
+        case $h in
+            $1:*)
+            domain_id=`expr $h : '.*:\(.*\)'`
+            return
+            ;;
+
+            $1)
+            domain_id=$1
+            return
+        esac
+    done
+
+    ha_log.sh err "Should never happen: Called for host $1 but $1 is not in $hostlist."
+    exit 1
+}
+
+libvirt_info() {
+cat << LVIRTXML
+<parameters>
+<parameter name="hostlist" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+List of hostname[:domain_id]..
+</shortdesc>
+<longdesc lang="en">
+List of controlled hosts: hostname[:domain_id]..
+The optional domain_id defaults to the hostname. 
+</longdesc>
+</parameter>
+
+<parameter name="hypervisor_uri" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Hypervisor URI
+</shortdesc>
+<longdesc lang="en">
+URI for connection to the hypervisor.
+driver[+transport]://[username@][hostlist][:port]/[path][?extraparameters]
+e.g.
+qemu+ssh://my_kvm_server.mydomain.my/system   (uses ssh for root)
+xen://my_kvm_server.mydomain.my/              (uses TLS for client)
+
+virsh must be installed (e.g. libvir-client package) and access control must
+be configured for your selected URI.
+</longdesc>
+</parameter>
+</parameters>
+LVIRTXML
+exit 0
+}
+
+#############
+# Main code #
+#############
+
+# don't fool yourself when testing with stonith(8)
+# and transport ssh
+unset SSH_AUTH_SOCK
+
+# support , as a separator as well
+hostlist=`echo $hostlist| sed -e 's/,/ /g'`
+
+case $1 in
+    gethosts)
+    hostnames=`echo $hostlist|sed -e 's/:[^ ]*//g'`
+    for h in $hostnames
+    do
+        echo $h
+    done
+    exit 0
+    ;;
+
+    on)
+    libvirt_check_config
+    libvirt_set_domain_id $2
+
+    libvirt_start
+    exit $?
+    ;;
+
+    off)
+    libvirt_check_config
+    libvirt_set_domain_id $2
+
+    libvirt_stop
+    [ $? = 1 ] && exit 1
+    exit 0
+    ;;
+
+    reset)
+    # libvirt has no reset so we do a power cycle
+    libvirt_check_config
+    libvirt_set_domain_id $2
+
+    libvirt_stop
+    rc=$?
+    [ $rc = 1 ] && exit 1
+
+    # stonith reset seems to require a power on even if it was off
+    # before so the next line is commented out
+    # [ $rc = 2 ] && exit 0
+
+    sleep 2
+    libvirt_start
+    exit $?
+    ;;
+
+    status)
+    libvirt_check_config
+    libvirt_status
+    exit $?
+    ;;
+
+    getconfignames)
+    echo "hostlist hypervisor_uri"
+    exit 0
+    ;;
+
+    getinfo-devid)
+    echo "libvirt STONITH device"
+    exit 0
+    ;;
+
+    getinfo-devname)
+    echo "libvirt STONITH external device"
+    exit 0
+    ;;
+
+    getinfo-devdescr)
+    echo "libvirt-based Linux host reset for Xen/KVM guest domain through hypervisor"
+    exit 0
+    ;;
+
+    getinfo-devurl)
+    echo "http://libvirt.org/uri.html http://linux-ha.org/wiki"
+    exit 0
+    ;;
+
+    getinfo-xml)
+    libvirt_info
+    echo 0;
+    ;;
+
+    *)
+    exit 1
+    ;;
+esac
+
