@@ -75,7 +75,8 @@ GetOutletNumber() {
 	    return 0
 	fi
 
-	local names=`echo "$snmp_result" | cut -f2 -d'"' | tr ' ' '_' | tr '\012' ' '`
+	local names
+	names=`echo "$snmp_result" | cut -f2 -d'"' | tr ' ' '_' | tr '\012' ' '`
 	for name in $names; do
 	    if [ "$name" != "$nodename" ]; then
 		local outlet_num=`expr $outlet_num + 1`
