@@ -104,17 +104,19 @@ usage(void)
 static void
 watchdog_init_interval(void)
 {
+	int	timeout = timeout_watchdog;
+
 	if (watchdogfd < 0) {
 		return;
 	}
-
-	if (ioctl(watchdogfd, WDIOC_SETTIMEOUT, &timeout_watchdog) < 0) {
+	
+	if (ioctl(watchdogfd, WDIOC_SETTIMEOUT, &timeout) < 0) {
 		cl_perror( "WDIOC_SETTIMEOUT"
-		": Failed to set watchdog timer to %lu seconds.",
-		timeout_watchdog);
+		": Failed to set watchdog timer to %u seconds.",
+		timeout);
 	} else {
-		cl_log(LOG_INFO, "Set watchdog timeout to %lu seconds.",
-			timeout_watchdog);
+		cl_log(LOG_INFO, "Set watchdog timeout to %u seconds.",
+			timeout);
 	}
 }
 
