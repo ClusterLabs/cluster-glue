@@ -337,6 +337,10 @@ external_parse_config_info(struct pluginDevice* sd, StonithNVpair * info)
 	/* TODO: Maybe treat "" as delimeters too so
 	 * whitespace can be passed to the plugins... */
 	for (nv = info; nv->s_name; nv++) {
+		if (!nv->s_name || !nv->s_value) {
+			continue;
+		}
+
 		key = STRDUP(nv->s_name);
 		if (!nv->s_name || !nv->s_value) {
 			continue;
