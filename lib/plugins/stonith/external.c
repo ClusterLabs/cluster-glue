@@ -342,9 +342,6 @@ external_parse_config_info(struct pluginDevice* sd, StonithNVpair * info)
 		}
 
 		key = STRDUP(nv->s_name);
-		if (!nv->s_name || !nv->s_value) {
-			continue;
-		}
 		if (!key) {
 			goto err_mem;
 		}
