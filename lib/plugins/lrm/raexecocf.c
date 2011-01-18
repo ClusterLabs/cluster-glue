@@ -230,16 +230,20 @@ get_resource_list(GList ** rsc_info)
 			free(namelist[file_num]);
 			continue;
 		}
-		
-		stat(namelist[file_num]->d_name, &prop);
-		if (S_ISDIR(prop.st_mode)) {
+
+		snprintf(subdir,FILENAME_MAX,"%s/%s",
+			 RA_PATH, namelist[file_num]->d_name);
+
+		if (stat(subdir, &prop) == -1) {
+			cl_perror("%s:%s:%d: stat failed for %s" 
+				  , __FILE__, __FUNCTION__, __LINE__, subdir);
+			free(namelist[file_num]);
+			continue;
+		} else if (!S_ISDIR(prop.st_mode)) {
 			free(namelist[file_num]);
 			continue;
 		}
 
-		snprintf(subdir,FILENAME_MAX,"%s/%s",
-			 RA_PATH, namelist[file_num]->d_name);
-			 
 		get_runnable_list(subdir,&ra_subdir);
 
 		merge_string_list(rsc_info,ra_subdir);
