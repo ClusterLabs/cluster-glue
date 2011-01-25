@@ -202,8 +202,10 @@ meatware_reset_req(StonithPlugin * s, int request, const char * host)
 		return S_OOPS;
 	}
 
+	alarm(600);
 	memset(line, 0, 256);
 	rc = read(fd, line, 256);
+	alarm(0);
 
 	if (rc < 0) {
 		LOG(PIL_CRIT, "read error on FIFO for Meatware_reset_host");
