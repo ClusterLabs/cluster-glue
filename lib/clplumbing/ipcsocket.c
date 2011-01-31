@@ -232,6 +232,7 @@ static struct IPC_CHANNEL* socket_server_channel_new(int sockfd);
 
 static struct IPC_CHANNEL * channel_new(int sockfd, int conntype, const char *pathname);
 static int client_channel_new_auth(int sockfd);
+static int verify_creds(struct IPC_AUTH *auth_info, uid_t uid, gid_t gid);
 
 typedef void (*DelProc)(IPC_Message*);
 
@@ -2359,6 +2360,26 @@ socket_message_new(struct IPC_CHANNEL *ch, int msg_len)
  *
  ***********************************************************************/
 
+static int
+verify_creds(struct IPC_AUTH *auth_info, uid_t uid, gid_t gid)
+{
+	int ret = IPC_FAIL;
+
+	if (!auth_info || (!auth_info->uid && !auth_info->gid)) {
+		return IPC_OK;
+	}
+	if (	auth_info->uid
+	&&	(g_hash_table_lookup(auth_info->uid
+		,	GUINT_TO_POINTER((guint)uid)) != NULL)) {
+		ret = IPC_OK;
+	}else if (auth_info->gid
+	&&	(g_hash_table_lookup(auth_info->gid
+		,	GUINT_TO_POINTER((guint)gid)) != NULL)) {
+		ret = IPC_OK;
+  	}
+	return ret;
+}
+
 
 /***********************************************************************
  * SO_PEERCRED VERSION... (Linux)
@@ -2406,16 +2427,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 
   
 	/* verify the credential information. */
-	if (	auth_info->uid
-	&&	(g_hash_table_lookup(auth_info->uid
-		,	GUINT_TO_POINTER((guint)cred.uid)) != NULL)) {
-		ret = IPC_OK;
-	}else if (auth_info->gid
-	&&	(g_hash_table_lookup(auth_info->gid
-		,	GUINT_TO_POINTER((guint)cred.gid)) != NULL)) {
-		ret = IPC_OK;
-  	}
-	return ret;
+	return verify_creds(auth_info, cred.uid, cred.gid);
 }
 
 /* get farside pid for our peer process */
@@ -2474,22 +2486,9 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 
 	ch->farside_uid = euid;
 	ch->farside_gid = egid;
-	if (ret == IPC_OK) {
-		return ret;
-	}
 
-	/* Check credentials against authorization information */
-
-	if (	auth_info->uid
-	&&	(g_hash_table_lookup(auth_info->uid
-		,	GUINT_TO_POINTER((guint)euid)) != NULL)) {
-		ret = IPC_OK;
-	}else if (auth_info->gid
-	&&	(g_hash_table_lookup(auth_info->gid
-		,	GUINT_TO_POINTER((guint)egid)) != NULL)) {
-		ret = IPC_OK;
-  	}
-	return ret;
+	/* verify the credential information. */
+	return verify_creds(auth_info, euid, egid);
 }
 
 static
@@ -2628,18 +2627,8 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
       return ret;
   }
 
-  ret = IPC_OK;
-
-  if (	auth_info->uid
-  &&	g_hash_table_lookup(auth_info->uid, &(cred.crEuid)) == NULL) {
-		ret = IPC_FAIL;
-  }
-  if (	auth_info->gid
-  &&	g_hash_table_lookup(auth_info->gid, &(cred.crEgid)) == NULL) {
-		ret = IPC_FAIL;
-  }
-
-  return ret;
+  /* verify the credential information. */
+  return verify_creds(auth_info, cred.crEuid, cred.crEgid);
 }
 
 /*
@@ -2721,8 +2710,6 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 		return ret;
 	}
 
-	ret = IPC_OK;
-
 	if ((auth_info->uid == NULL || g_hash_table_size(auth_info->uid) == 0)
 	    && auth_info->gid != NULL
 	    && g_hash_table_size(auth_info->gid) != 0) {
@@ -2731,20 +2718,9 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 		       " on this platform.");
 		return IPC_BROKEN;
 	}
-	
-	if (auth_info->uid != NULL && g_hash_table_size(auth_info->uid) > 0
-	    && g_hash_table_lookup(
-		    auth_info->uid, GUINT_TO_POINTER(stat_buf.st_uid))==NULL) {
-		ret = IPC_FAIL;
-		
-	}
-	if (auth_info->gid != NULL && g_hash_table_size(auth_info->gid) > 0
-	    && g_hash_table_lookup(
-		    auth_info->gid, GUINT_TO_POINTER(stat_buf.st_gid))==NULL) {
-		ret = IPC_FAIL;
-	}
 
-	return ret;
+	/* verify the credential information. */
+	return verify_creds(auth_info, stat_buf.st_uid, stat_buf.st_gid);
 }
 
 
@@ -2774,22 +2750,9 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 	ch->farside_uid = conn_info->farside_uid;
 	ch->farside_gid = conn_info->farside_gid;
 
-	if (auth_info == NULL
-	  || (auth_info->uid == NULL && auth_info->gid == NULL)) {
-		return IPC_OK;	/* no restriction for authentication */
-	}
-
 	/* verify the credential information. */
-	if (	auth_info->uid
-	&&	(g_hash_table_lookup(auth_info->uid,
-		  GUINT_TO_POINTER((guint)conn_info->farside_uid)) != NULL)) {
-		return IPC_OK;
-	}else if (auth_info->gid
-	&&	(g_hash_table_lookup(auth_info->gid,
-		  GUINT_TO_POINTER((guint)conn_info->farside_gid)) != NULL)) {
-		return IPC_OK;
-	}
-	return IPC_FAIL;
+	return verify_creds(auth_info,
+		conn_info->farside_uid, conn_info->farside_gid);
 }
 
 static
@@ -2835,20 +2798,10 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 		return rc;
 	}
 
-	/* Check credentials against authorization information */
-
-	if (auth_info->uid
-	  && (g_hash_table_lookup(auth_info->uid,
-		  GUINT_TO_POINTER((guint)ucred_geteuid(ucred))) != NULL)) {
-		rc = IPC_OK;
-	}else if (auth_info->gid
-	  && (g_hash_table_lookup(auth_info->gid,
-		  GUINT_TO_POINTER((guint)ucred_getegid(ucred))) != NULL)) {
-		rc = IPC_OK;
-  	}
-
+	/* verify the credential information. */
+	rc = verify_creds(auth_info,
+		ucred_geteuid(ucred), ucred_getegid(ucred));
 	ucred_free(ucred);
-
 	return rc;
 }
 
