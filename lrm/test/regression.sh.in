@@ -93,7 +93,7 @@ HA_logfacility=""
 export HA_logfile HA_debugfile HA_use_logd HA_logfacility
 
 mkdir -p $OUTDIR
-. /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs
+. ${OCF_ROOT}/resource.d/heartbeat/.ocf-shellfuncs
 
 args=`getopt hq $*`
 [ $? -ne 0 ] && usage
