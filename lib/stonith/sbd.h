@@ -52,9 +52,9 @@ struct sector_node_s {
 #define MBOX_TO_SECTOR(mbox) (2+mbox*2)
 
 static void usage(void);
-static void watchdog_init_interval(void);
-static void watchdog_tickle(void);
-static void watchdog_init(void);
+static int watchdog_init_interval(void);
+static int watchdog_tickle(void);
+static int watchdog_init(void);
 static void watchdog_close(void);
 static int open_device(const char* devname);
 static signed char cmd2char(const char *cmd);

@@ -101,57 +101,59 @@ usage(void)
 , cmdname);
 }
 
-static void
+static int
 watchdog_init_interval(void)
 {
 	int	timeout = timeout_watchdog;
 
 	if (watchdogfd < 0) {
-		return;
+		return 0;
 	}
 	
 	if (ioctl(watchdogfd, WDIOC_SETTIMEOUT, &timeout) < 0) {
 		cl_perror( "WDIOC_SETTIMEOUT"
 		": Failed to set watchdog timer to %u seconds.",
 		timeout);
+		return -1;
 	} else {
 		cl_log(LOG_INFO, "Set watchdog timeout to %u seconds.",
 			timeout);
 	}
+	return 0;
 }
 
-static void
+static int
 watchdog_tickle(void)
 {
 	if (watchdogfd >= 0) {
 		if (write(watchdogfd, "", 1) != 1) {
 			cl_perror("Watchdog write failure: %s!",
 					watchdogdev);
-			/* TODO: Should we force the crash, or wait for
-			 * the watchdog to time us out? */
+			return -1;
 		}
 	}
+	return 0;
 }
 
-static void
+static int
 watchdog_init(void)
 {
 	if (watchdogfd < 0 && watchdogdev != NULL) {
 		watchdogfd = open(watchdogdev, O_WRONLY);
 		if (watchdogfd >= 0) {
-			if (fcntl(watchdogfd, F_SETFD, FD_CLOEXEC)) {
-				cl_perror("Error setting the "
-				"close-on-exec flag for watchdog");
-			}
 			cl_log(LOG_NOTICE, "Using watchdog device: %s",
 					watchdogdev);
-			watchdog_init_interval();
-			watchdog_tickle();
+			if ((watchdog_init_interval() < 0)
+			    || (watchdog_tickle() < 0)) {
+				return -1;
+			}
 		}else{
 			cl_perror("Cannot open watchdog device: %s",
 					watchdogdev);
+			return -1;
 		}
 	}
+	return 0;
 }
 
 static void
@@ -839,10 +841,13 @@ daemonize(void)
 		rc = -1; goto out;
 	}
 
-	make_daemon();
+	if (watchdog_use != 0) {
+		if (watchdog_init() < 0) {
+			rc = -1; goto out;
+		}
+	}
 
-	if (watchdog_use != 0)
-		watchdog_init();
+	make_daemon();
 
 	while (1) {
 		t0 = time(NULL);
@@ -880,7 +885,10 @@ daemonize(void)
 				break;
 			}
 		}
-		watchdog_tickle();
+		if (watchdog_tickle() < 0) {
+			cl_log(LOG_ERR, "Tickling the watchdog failed!");
+			do_reset();
+		}
 
 		t1 = time(NULL);
 		latency = t1 - t0;
