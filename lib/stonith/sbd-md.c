@@ -472,6 +472,7 @@ static int inquisitor(void)
 	int servant_count = 0;
 	int servant_finished = 0;
 	int good_servant = 0;
+	int inconsistent = 0;
 
 	DBGPRINT("emporer is watching you\n");
 
@@ -527,12 +528,37 @@ static int inquisitor(void)
 					break;
 				} else {
 					DBGPRINT("process %d finished\n", pid);
+					tdevname = lookup_servant_by_pid(pid)->devname;
+					lookup_servant_by_pid(pid)->pid = 0;
 					servant_finished++;
 					if (WIFEXITED(status)
 					    && WEXITSTATUS(status) == 0) {
 						DBGPRINT("exit with %d\n",
 							 WEXITSTATUS(status));
 						good_servant++;
+						do {
+							struct sector_header_s header;
+							unsigned long timeout_watchdog_old = timeout_watchdog;
+						    int timeout_loop_old = timeout_loop;
+							int timeout_msgwait_old = timeout_msgwait;	
+
+							CALL_WITH_DEVNAME(header_read, tdevname, &header);
+							if (rc != 0) {
+								/* Servant reports good a while ago, 
+								   this should not happen.*/
+								DBGPRINT("header_read failed\n");
+								exit(1);
+							}
+							if (good_servant == 1) {
+								inconsistent = 0;
+							} else {
+								if (timeout_loop_old != timeout_loop ||
+										timeout_watchdog_old != timeout_watchdog ||
+										timeout_msgwait_old != timeout_msgwait)
+									inconsistent = 1;
+							}
+
+						} while (0);
 					}
 				}
 			}
@@ -545,6 +571,13 @@ static int inquisitor(void)
 		DBGPRINT("we are good to proceed\n");
 	} else {
 		DBGPRINT("no enough good servant\n");
+		return -1;
+	}
+
+	if (inconsistent) {
+		DBGPRINT("Timeout configurations are different on different SBD devices\n");
+		DBGPRINT("This may running into problem in long run.\n");
+		DBGPRINT("You have to correct them and re-start SBD again.\n");
 		return -1;
 	}
 
