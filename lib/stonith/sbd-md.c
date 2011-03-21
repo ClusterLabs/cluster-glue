@@ -640,6 +640,7 @@ static int messenger(const char *name, const char *msg)
 	int status = 0;
 	int servant_count = 0;
 	int servant_finished = 0;
+	int successed_delivery = 0;
 	sigset_t procmask;
 	siginfo_t sinfo;
 	struct servants_list_item *s = servants_leader;
@@ -678,12 +679,27 @@ static int messenger(const char *name, const char *msg)
 				} else {
 					DBGPRINT("process %d finished\n", pid);
 					servant_finished++;
+					if (WIFEXITED(status)
+						&& WEXITSTATUS(status) == 0) {
+						DBGPRINT("exit with %d\n",
+								WEXITSTATUS(status));
+						successed_delivery++;
+					}
+					if (successed_delivery >= (servant_count / 2 + 1)) {
+						DBGPRINT("we have done good enough\n");
+						return 0;
+					}
 				}
 			}
 		}
 		DBGPRINT("signal %d handled\n", sig);
 	}
-	return 0;
+	if (successed_delivery >= (servant_count / 2 + 1)) {
+		return 0;
+	} else {
+		DBGPRINT("Message is not delivery via more then a half devices\n");
+		return 1;
+	}
 }
 
 static int dump_headers(void);
