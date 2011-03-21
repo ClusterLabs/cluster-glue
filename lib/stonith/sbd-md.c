@@ -75,6 +75,27 @@ do { \
     if (rc == -1) break; \
 } while (0)
 
+typedef int (*functionp_t)(const char* devname, void* argp);
+
+int assign_servant_ex(const char* devname, functionp_t functionp, void* argp);
+int assign_servant_ex(const char* devname, functionp_t functionp, void* argp)
+{
+	int pid = 0;
+	int rc = 0;
+	DBGPRINT("fork servant for %s\n", devname);
+	pid = fork();
+	if (pid == 0) {		/* child */
+		rc = (*functionp)(devname, argp);
+		if (rc == -1) exit(1);
+		else exit(0);
+	} else if (pid != -1) {		/* parent */
+		return pid;
+	} else {
+		DBGPRINT("Failed to fork servant\n");
+		exit(1);
+	}
+}
+
 static int init_devices(void);
 static int init_devices()
 {
@@ -88,6 +109,28 @@ static int init_devices()
 		s = s->next;
 	}
 	return 0;
+}
+
+struct slot_msg_arg_t {
+	const char* name;
+	const char* msg;
+};
+int slot_msg_wrapper(const char* devname, void* argp);
+int slot_msg_wrapper(const char* devname, void* argp)
+{
+  int rc = 0;
+  struct slot_msg_arg_t* arg = (struct slot_msg_arg_t*)argp;
+  CALL_WITH_DEVNAME(slot_msg, devname, arg->name, arg->msg);
+  return rc;
+}
+
+int slot_ping_wrapper(const char* devname, void* argp);
+int slot_ping_wrapper(const char* devname, void* argp)
+{
+	int rc = 0;
+	const char* name = (const char*)argp;
+	CALL_WITH_DEVNAME(slot_ping, devname, name);
+	return rc;
 }
 
 static int allocate_slots(const char *name);
@@ -147,26 +190,12 @@ static int ping_via_slots(const char *name)
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
 
 	while (s != NULL) {
-		DBGPRINT("fork servant for %s\n", s->devname);
-		pid = fork();
-		if (pid == 0) {
-			int rc = 0;
-			CALL_WITH_DEVNAME(slot_ping, s->devname, name);
-			if (rc == -1)
-				exit(1);
-			else
-				exit(0);
-		} else if (pid != -1) { /* parent */
-			DBGPRINT("servant for %s is delivering the ping\n",
-				 s->devname);
-			s->pid = pid;
-			servant_count++;
-		} else {
-			 DBGPRINT("failed to fork, exit\n");
-			 exit(1);
-		}
+		pid = assign_servant_ex(s->devname, &slot_ping_wrapper, (void*)name);
+		s -> pid = pid;
+		servant_count++;
 		s = s->next;
 	}
+
 	while (servant_finished < servant_count) {
 		sig = sigwaitinfo(&procmask, &sinfo);
 		DBGPRINT("get signal %d\n", sig);
@@ -492,23 +521,11 @@ static int inquisitor(void)
 
 	s = servants_leader;
 	while (s != NULL) {
-		DBGPRINT("fork servant for %s\n", s->devname);
-		pid = fork();
-		if (pid == 0) {	/* child */
-			rc = servant(s->devname, (void*)1);
-			if (rc == -1)
-				exit(1);
-			else
-				exit(0);
-		} else if (pid != -1) {	/* parent */
-			DBGPRINT("servant for %s is working\n", s->devname);
-			servant_count++;
-		} else {
-			DBGPRINT("Failed to fork servant\n");
-			exit(1);
-		}
+		pid = assign_servant_ex(s->devname, &servant, (void*)1);
+		servant_count++;
 		s = s->next;
 	}
+
 	while (servant_finished < servant_count) {
 		sig = sigwaitinfo(&procmask, &sinfo);
 		DBGPRINT("get signal %d\n", sig);
@@ -667,31 +684,19 @@ static int messenger(const char *name, const char *msg)
 	sigset_t procmask;
 	siginfo_t sinfo;
 	struct servants_list_item *s = servants_leader;
-	int rc = 0;
+	struct slot_msg_arg_t slot_msg_arg = {name, msg};
 
 	sigemptyset(&procmask);
 	sigaddset(&procmask, SIGCHLD);
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
 
 	while (s != NULL) {
-		DBGPRINT("fork servant for %s\n", s->devname);
-		pid = fork();
-		if (pid == 0) {	/* child */
-			CALL_WITH_DEVNAME(slot_msg, s->devname, name, msg);
-			if (rc == -1)
-				exit(1);
-			else
-				exit(0);
-		} else if (pid != -1) {	/* parent */
-			DBGPRINT("servant for %s is working\n", s->devname);
-			s->pid = pid;
-			servant_count++;
-		} else {
-			DBGPRINT("Failed to fork servant\n");
-			exit(1);
-		}
+		pid = assign_servant_ex(s->devname, &slot_msg_wrapper, &slot_msg_arg);
+		s->pid = pid;
+		servant_count++;
 		s = s->next;
 	}
+	
 	while (servant_finished < servant_count) {
 		sig = sigwaitinfo(&procmask, &sinfo);
 		DBGPRINT("get signal %d\n", sig);
