@@ -51,42 +51,61 @@ struct sector_node_s {
 #define SLOT_TO_SECTOR(slot) (1+slot*2)
 #define MBOX_TO_SECTOR(mbox) (2+mbox*2)
 
-static void usage(void);
-static int watchdog_init_interval(void);
-static int watchdog_tickle(void);
-static int watchdog_init(void);
-static void watchdog_close(void);
-static int open_device(const char* devname);
-static signed char cmd2char(const char *cmd);
-static void * sector_alloc(void);
-static const char* char2cmd(const char cmd);
-static int sector_write(int sector, const void *data);
-static int sector_read(int sector, void *data);
-static int slot_read(int slot, struct sector_node_s *s_node);
-static int slot_write(int slot, const struct sector_node_s *s_node);
-static int mbox_write(int mbox, const struct sector_mbox_s *s_mbox);
-static int mbox_read(int mbox, struct sector_mbox_s *s_mbox);
-static int mbox_write_verify(int mbox, const struct sector_mbox_s *s_mbox);
+void usage(void);
+int watchdog_init_interval(void);
+int watchdog_tickle(void);
+int watchdog_init(void);
+void watchdog_close(void);
+int open_device(const char* devname);
+signed char cmd2char(const char *cmd);
+void * sector_alloc(void);
+const char* char2cmd(const char cmd);
+int sector_write(int sector, const void *data);
+int sector_read(int sector, void *data);
+int slot_read(int slot, struct sector_node_s *s_node);
+int slot_write(int slot, const struct sector_node_s *s_node);
+int mbox_write(int mbox, const struct sector_mbox_s *s_mbox);
+int mbox_read(int mbox, struct sector_mbox_s *s_mbox);
+int mbox_write_verify(int mbox, const struct sector_mbox_s *s_mbox);
 /* After a call to header_write(), certain data fields will have been
  * converted to on-disk byte-order; the header should not be accessed
  * afterwards anymore! */
-static int header_write(struct sector_header_s *s_header);
-static int header_read(struct sector_header_s *s_header);
-static int valid_header(const struct sector_header_s *s_header);
-static struct sector_header_s * header_get(void);
-static int init_device(void);
-static int slot_lookup(const struct sector_header_s *s_header, const char *name);
-static int slot_unused(const struct sector_header_s *s_header);
-static int slot_allocate(const char *name);
-static int slot_list(void);
-static int slot_ping(const char *name);
-static int slot_msg(const char *name, const char *cmd);
-static int header_dump(void);
-static void sysrq_trigger(char t);
-static void do_reset(void);
-static void do_off(void);
-static void make_daemon(void);
-static int daemonize(void);
-static void maximize_priority(void);
-static void get_uname(void);
+int header_write(struct sector_header_s *s_header);
+int header_read(struct sector_header_s *s_header);
+int valid_header(const struct sector_header_s *s_header);
+struct sector_header_s * header_get(void);
+int init_device(void);
+int slot_lookup(const struct sector_header_s *s_header, const char *name);
+int slot_unused(const struct sector_header_s *s_header);
+int slot_allocate(const char *name);
+int slot_list(void);
+int slot_ping(const char *name);
+int slot_msg(const char *name, const char *cmd);
+int header_dump(void);
+void sysrq_trigger(char t);
+void do_reset(void);
+void do_off(void);
+void make_daemon(void);
+void maximize_priority(void);
+void get_uname(void);
+
+/* Tunable defaults: */
+extern unsigned long    timeout_watchdog;
+extern unsigned long    timeout_watchdog_warn;
+extern int      timeout_allocate;
+extern int      timeout_loop;
+extern int      timeout_msgwait;
+extern int  watchdog_use;
+extern int  go_daemon;
+extern int  skip_rt;
+extern int  debug;
+extern const char *watchdogdev;
+extern char*  local_uname;
+
+/* Global, non-tunable variables: */
+extern int  sector_size;
+extern int  watchdogfd;
+extern int  devfd;
+extern char *devname;
+extern char *cmdname;
 
