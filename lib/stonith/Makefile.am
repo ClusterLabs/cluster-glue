@@ -28,7 +28,7 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 ## binaries
 sbin_PROGRAMS		= stonith meatclient 
 if ON_LINUX
-sbin_PROGRAMS		+= sbd
+sbin_PROGRAMS		+= sbd sbd-md
 endif
 
 stonith_SOURCES		= main.c
@@ -44,6 +44,12 @@ meatclient_LDADD	= $(GLIBLIB)
 sbd_SOURCES		= sbd.c sbd-common.c
 sbd_CFLAGS		= -D_GNU_SOURCE
 sbd_LDADD		= $(GLIBLIB)					\
+			$(top_builddir)/lib/clplumbing/libplumb.la	\
+			$(top_builddir)/lib/clplumbing/libplumbgpl.la
+
+sbd_md_SOURCES		= sbd-md.c sbd-common.c
+sbd_md_CFLAGS		= -D_GNU_SOURCE
+sbd_md_LDADD		= $(GLIBLIB)					\
 			$(top_builddir)/lib/clplumbing/libplumb.la	\
 			$(top_builddir)/lib/clplumbing/libplumbgpl.la
 

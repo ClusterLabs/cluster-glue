@@ -42,6 +42,12 @@ struct sector_node_s {
 	char 	name[64];
 };
 
+struct servants_list_item {
+	const char* devname;
+	int         pid;
+	struct servants_list_item *next;
+};
+
 #define SBD_MSG_EMPTY	0x00
 #define SBD_MSG_TEST	0x01
 #define SBD_MSG_RESET	0x02
@@ -106,6 +112,6 @@ extern char*  local_uname;
 extern int  sector_size;
 extern int  watchdogfd;
 extern int  devfd;
-extern char *devname;
-extern char *cmdname;
+extern const char* devname;
+extern const char* cmdname;
 
