@@ -1,0 +1,280 @@
+#!/bin/sh
+#
+# External STONITH module for APC Switched Rack PDU
+#
+# Copyright (c) 2008 Sergey Maznichenko <msergeyb@gmail.com> <inbox@it-consultant.su>
+# Version 1.2
+#
+# See http://www.it-consultant.su/rackpdu
+# for additional information
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+
+SWITCH_ON="1"
+SWITCH_OFF="2"
+SWITCH_RESET="3"
+
+DEFAULT_NAMES_OID=".1.3.6.1.4.1.318.1.1.12.3.3.1.1.2"
+DEFAULT_COMMAND_OID=".1.3.6.1.4.1.318.1.1.12.3.3.1.1.4"
+
+if [ -z "$oid" ]; then
+    oid=$DEFAULT_COMMAND_OID
+fi
+
+if [ -z "$names_oid" ]; then
+    names_oid=$DEFAULT_NAMES_OID
+fi
+
+if [ -z "$outlet_config" ]; then
+    outlet_config="none"
+fi
+
+GetOutletNumber() {
+    local nodename=$1
+
+    if [ "$outlet_config" != "none" ]; then
+	# Get outlet number from file
+
+	if [ -f "$outlet_config" ]; then
+    	    local outlet_num=`grep $nodename $outlet_config | tr -d ' ' | cut -f2 -d'='`
+	    if [ -z "$outlet_num" ]; then
+		ha_log.sh err "Outlet number not found for node $nodename. Check configuration file $outlet_config"
+		return 0
+	    fi
+	    return $outlet_num
+	else
+	    ha_log.sh err "File $outlet_config not found."
+	    return 0
+	fi
+    else
+	# Get outlet number from device
+ 
+	local outlet_num=1
+	local snmp_result
+	snmp_result=`snmpwalk -v1 -c $community $pduip $names_oid 2>&1`
+	if [ $? -ne 0 ]; then
+	    ha_log.sh err "snmpwalk $community $pduip $names_oid failed. Result: $snmp_result"
+	    return 0
+	fi
+
+	local names
+	names=`echo "$snmp_result" | cut -f2 -d'"' | tr ' ' '_' | tr '\012' ' '`
+	for name in $names; do
+	    if [ "$name" != "$nodename" ]; then
+		local outlet_num=`expr $outlet_num + 1`
+		continue
+    	    fi
+
+	    return $outlet_num
+	done
+	
+	ha_log.sh err "Outlet number not found for node $nodename. Result: $snmp_result"
+	return 0
+    fi
+}
+
+SendCommand() {
+
+    local host=$1
+    local command=$2
+    
+    GetOutletNumber $host
+    local outlet=$?
+
+    if [ $outlet -gt 0 ]; then
+        local set_result
+        set_result=`snmpset -v1 -c $community $pduip $oid.$outlet i $command 2>&1`
+        if [ $? -ne 0 ]; then
+            ha_log.sh err "Write SNMP to $pduip value $oid.$outlet=$command failed. Result: $set_result"
+            return 1
+        fi
+        if echo "$set_result" | grep -qs "Timeout"; then
+            ha_log.sh err "Write SNMP to $pduip value $oid.$outlet=$command timed out. Result: $set_result"
+            return 1
+        fi
+        return 0
+    else
+        return 1
+    fi
+}
+
+hostlist=`echo $hostlist | tr ',' ' '`
+incommand=$1
+innode=$2
+
+case $incommand in
+gethosts)
+	if [ "$hostlist" = "AUTO" ]; then
+	    snmp_result=`snmpwalk -v1 -c $community $pduip $names_oid 2>&1`
+        if [ $? -ne 0 ]; then
+            ha_log.sh err "snmpwalk $community $pduip $names_oid failed. Result: $snmp_result"
+            exit 1
+        fi
+        if echo "$snmp_result" | grep -qs "Timeout"; then
+            ha_log.sh err "snmpwalk $community $pduip $names_oid timed out. Result: $snmp_result"
+            exit 1
+	    else
+		hostlist=`echo "$snmp_result" | cut -f2 -d'"' | tr ' ' '_' | tr '\012' ' '`
+	    fi
+	fi
+	
+	for h in $hostlist ; do
+    	    echo $h
+	done
+
+	exit 0
+	;;
+on)
+	if
+	    SendCommand $innode $SWITCH_ON
+	then
+	    exit 0
+	else
+	    exit 1
+	fi
+	;;
+off)
+	if
+	    SendCommand $innode $SWITCH_OFF
+	then
+	    exit 0
+	else
+	    exit 1
+	fi
+	;;
+reset)
+	if
+	    SendCommand $innode $SWITCH_RESET
+	then
+	    exit 0
+	else
+	    exit 1
+	fi
+	;;
+status)
+        if [ -z "$pduip" ]; then
+    	    exit 1
+	fi
+
+	if ping -w1 -c1 $pduip >/dev/null 2>&1; then
+    	    exit 0
+	else
+	    exit 1
+	fi
+	;;
+getconfignames)
+	echo "hostlist pduip community"
+	exit 0
+	;;
+getinfo-devid)
+	echo "rackpdu STONITH device"
+	exit 0
+	;;
+getinfo-devname)
+	echo "rackpdu STONITH external device"
+	exit 0
+	;;
+getinfo-devdescr)
+	echo "APC Switched Rack PDU"
+	exit 0
+	;;
+getinfo-devurl)
+	echo "http://www.apcc.com/products/family/index.cfm?id=30"
+	exit 0
+	;;
+getinfo-xml)
+	cat << PDUXML
+<parameters>
+    <parameter name="hostlist" unique="1" required="1">
+	<content type="string" default="AUTO" />
+	<shortdesc lang="en">Hostlist</shortdesc>
+	<longdesc lang="en">
+The list of hosts that the STONITH device controls (comma or space separated).
+If you set value of this parameter to AUTO, list of hosts will be get from Rack PDU device.
+	</longdesc>
+    </parameter>
+
+    <parameter name="pduip" unique="1" required="1">
+	<content type="string" />
+	<shortdesc lang="en">Name or IP address of Rack PDU device.</shortdesc>
+	<longdesc lang="en">Name or IP address of Rack PDU device.</longdesc>
+    </parameter>
+
+    <parameter name="community" unique="1" required="1">
+	<content type="string" default="private" />
+	<shortdesc lang="en">Name of write community.</shortdesc>
+	<longdesc lang="en">Name of write community.</longdesc>
+    </parameter>
+
+    <parameter name="oid" unique="1" required="0">
+    <content type="string" />
+    <shortdesc lang="en">
+	The OID without the outlet number.
+    </shortdesc>
+    <longdesc lang="en">
+The SNMP OID for the PDU. minus the outlet number.
+Try .1.3.6.1.4.1.318.1.1.12.3.3.1.1.4 (default value)
+or use mib from ftp://ftp.apcc.com/apc/public/software/pnetmib/mib/
+Varies on different APC hardware and firmware.
+Warning! No dot at the end of OID
+    </longdesc>
+    </parameter>
+
+    <parameter name="names_oid" unique="1" required="0">
+	<content type="string" />
+	<shortdesc lang="en">The OID for getting names of outlets.</shortdesc>
+	<longdesc lang="en">
+The SNMP OID for getting names of outlets.
+It is required to recognize outlet number by nodename.
+Try ".1.3.6.1.4.1.318.1.1.12.3.3.1.1.2" (default value)
+or use mib from ftp://ftp.apcc.com/apc/public/software/pnetmib/mib/
+Names of nodes must be equal names of outlets, in other way use outlet_config parameter.
+If you set 'names_oid' parameter then parameter outlet_config must not be use.
+Varies on different APC hardware and firmware.
+Warning! No dot at the end of OID
+	</longdesc>
+    </parameter>
+
+    <parameter name="outlet_config" unique="1" required="0">
+    <content type="string" />
+    <shortdesc lang="en">Configuration file. Other way to recognize outlet number by nodename.</shortdesc>
+    <longdesc lang="en">
+Configuration file. Other way to recognize outlet number by nodename.
+Configuration file which contains
+node_name=outlet_number
+strings.
+
+Example:
+server1=1
+server2=2
+
+If you use outlet_config parameter then names_oid parameter can have any value and it is not uses.
+    </longdesc>
+    </parameter>
+
+</parameters>
+PDUXML
+	exit 0
+	;;
+*)
+	exit 1
+	;;
+esac

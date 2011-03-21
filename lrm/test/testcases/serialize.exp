@@ -1,0 +1,100 @@
+.TRY List resources
+Currently no resources are managed by LRM.
+.SETENV dflt_timeout=2500
+.TRY Add resource r1 class=ocf type=lrmregtest provider=heartbeat args=delay=2
+Succeeded in adding this resource.
+.BG 2
+.BG test line 10/job 1 runs in background
+.SLEEP 1
+.BG test line 15/job 2 runs in background
+.SLEEP 1
+.BGREPEAT 4
+.BG test line 18/job 1 runs in background
+.BG test line 18/job 2 runs in background
+.BG test line 18/job 3 runs in background
+.BG test line 18/job 4 runs in background
+.SLEEP 11
+.TRY Show state r1
+resource state:LRM_RSC_IDLE
+The resource 2 operations' information:
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=3000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=2  
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=11000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=2  
+.TRY Exec r1 op=stop timeout=2500 interval=0 target=EVERYTIME args=
+> stop succeed (status=0,rc=0): [null]
+
+.TRY Show state r1
+resource state:LRM_RSC_IDLE
+The resource 3 operations' information:
+   operation 'start' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=3000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=2  
+   operation 'monitor' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=11000, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=2  
+   operation 'stop' [call_id=(removed)]:
+      start_delay=0, interval=0, timeout=2500, app_name=lrmadmin
+      rc=0 (ok), op_status=0 (succeed)
+      parameters: delay=2  
+.TRY Delete resource r1
+Succeeded in deleting this resource.
+.SETENV dflt_rsc=r2 dflt_timeout=10500
+.TRY Add resource r2 class=ocf type=lrmregtest provider=heartbeat args=ignore_TERM=1 delay=9
+Succeeded in adding this resource.
+.TRY Exec r2 op=start timeout=10500 interval=0 target=EVERYTIME args=
+> start succeed (status=0,rc=0): [null]
+
+.BG 
+.BG test line 31/job 1 runs in background
+.TRY Exec r2 op=monitor timeout=10500 interval=0 target=EVERYTIME args=
+ERROR: This operation has timed out - no result from lrmd.
+.TRY Delete resource r2
+Succeeded in deleting this resource.
+.BG test line 10/job 1 finished (exit code: 0):
+==========test:10:1 start output==========
+.TRY Exec r1 op=start timeout=2500 interval=0 target=EVERYTIME args=
+> start succeed (status=0,rc=0): [null]
+
+==========test:10:1   end output==========
+.BG test line 15/job 2 finished (exit code: 0):
+==========test:15:2 start output==========
+.TRY Exec r1 op=start timeout=3000 interval=0 target=EVERYTIME args=
+> start succeed (status=0,rc=0): [null]
+
+==========test:15:2   end output==========
+.BG test line 18/job 1 finished (exit code: 0):
+==========test:18:1 start output==========
+.TRY Exec r1 op=monitor timeout=11000 interval=0 target=EVERYTIME args=
+> monitor succeed (status=0,rc=0): [null]
+
+==========test:18:1   end output==========
+.BG test line 18/job 2 finished (exit code: 0):
+==========test:18:2 start output==========
+.TRY Exec r1 op=monitor timeout=11000 interval=0 target=EVERYTIME args=
+> monitor succeed (status=0,rc=0): [null]
+
+==========test:18:2   end output==========
+.BG test line 18/job 3 finished (exit code: 0):
+==========test:18:3 start output==========
+.TRY Exec r1 op=monitor timeout=11000 interval=0 target=EVERYTIME args=
+> monitor succeed (status=0,rc=0): [null]
+
+==========test:18:3   end output==========
+.BG test line 18/job 4 finished (exit code: 0):
+==========test:18:4 start output==========
+.TRY Exec r1 op=monitor timeout=11000 interval=0 target=EVERYTIME args=
+> monitor succeed (status=0,rc=0): [null]
+
+==========test:18:4   end output==========
+.BG test line 31/job 1 finished (exit code: 0):
+==========test:31:1 start output==========
+.TRY Exec r2 op=monitor timeout=500 interval=0 target=EVERYTIME args=
+ERROR: This operation has timed out - no result from lrmd.
+==========test:31:1   end output==========

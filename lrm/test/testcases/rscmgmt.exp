@@ -1,0 +1,87 @@
+.TRY List resources
+Currently no resources are managed by LRM.
+.TRY Add resource r1 class=ocf type=lrmregtest provider=heartbeat args=
+Succeeded in adding this resource.
+.TRY Show info r1
+
+Resource ID:r1
+Resource agent class:ocf
+Resource agent type:lrmregtest
+Resource agent provider:heartbeat
+.TRY List resources
+
+Resource ID:r1
+Resource agent class:ocf
+Resource agent type:lrmregtest
+Resource agent provider:heartbeat
+.TRY Delete resource r1
+Succeeded in deleting this resource.
+.SETENV dflt_class=lsb dflt_type=lrmregtest
+.TRY List resources
+Currently no resources are managed by LRM.
+.TRY Add resource r1 class=lsb type=lrmregtest provider=heartbeat args=
+Succeeded in adding this resource.
+.TRY List resources
+
+Resource ID:r1
+Resource agent class:lsb
+Resource agent type:lrmregtest
+Resource agent provider:heartbeat
+.TRY Delete resource r1
+Succeeded in deleting this resource.
+.SETENV dflt_class=heartbeat dflt_type=lrmregtest
+.TRY List resources
+Currently no resources are managed by LRM.
+.TRY Add resource r1 class=heartbeat type=lrmregtest provider=heartbeat args=
+Succeeded in adding this resource.
+.TRY List resources
+
+Resource ID:r1
+Resource agent class:heartbeat
+Resource agent type:lrmregtest
+Resource agent provider:heartbeat
+.TRY Delete resource r1
+Succeeded in deleting this resource.
+.TRY List resources
+Currently no resources are managed by LRM.
+.SETENV dflt_class=ocf
+.TRY Add resource r1 class=ocf type=lrmregtest provider=heartbeat args=
+Succeeded in adding this resource.
+.TRY Add resource r1 class=heartbeat type=lrmregtest provider=heartbeat args=
+ERROR: lrm_add_rsc(): got a return code HA_FAIL from a reply message of addrsc with function get_ret_from_msg.
+Failed to add this resource.
+.TRY Add resource r1 class=ocf type=lrmregtest provider=heartbeat args=
+ERROR: lrm_add_rsc(): got a return code HA_FAIL from a reply message of addrsc with function get_ret_from_msg.
+Failed to add this resource.
+.TRY Delete resource r1
+Succeeded in deleting this resource.
+.TRY Add resource r1 class=lsb type=lrmregtest provider=heartbeat args=
+Succeeded in adding this resource.
+.TRY List resources
+
+Resource ID:r1
+Resource agent class:lsb
+Resource agent type:lrmregtest
+Resource agent provider:heartbeat
+.TRY Add resource r2 class=ocf type=lrmregtest provider=heartbeat args=
+Succeeded in adding this resource.
+.TRY List resources
+
+Resource ID:r1
+Resource agent class:lsb
+Resource agent type:lrmregtest
+Resource agent provider:heartbeat
+
+Resource ID:r2
+Resource agent class:ocf
+Resource agent type:lrmregtest
+Resource agent provider:heartbeat
+.TRY Delete resource r1
+Succeeded in deleting this resource.
+.TRY Delete resource r2
+Succeeded in deleting this resource.
+.TRY List resources
+Currently no resources are managed by LRM.
+.TRY Delete resource r1
+ERROR: lrm_delete_rsc(): got a return code HA_FAIL from a reply message of delrsc with function get_ret_from_msg.
+Failed to delete this resource.

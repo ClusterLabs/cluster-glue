@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# This STONITH script drives the shared-storage stonith plugin.
+#
+# Author:	Lars Marowsky-Bree
+# Copyright:	2008 Lars Marowsky-Bree
+# License:      GNU General Public License (GPL)
+#
+
+# Main code
+
+case $1 in
+gethosts)
+    echo `sbd -d $sbd_device list | cut -f2`
+    exit 0
+    ;;
+off|reset)
+    sbd -d $sbd_device message $2 $1
+    exit $?
+    ;;
+status)
+    if ! sbd -d $sbd_device list >/dev/null 2>&1 ; then
+    	ha_log.sh err "sbd could not list nodes from $sbd_device"
+    	exit 1
+    fi
+    exit 0
+    ;;
+on)
+    exit 1
+    ;;
+getconfignames)
+    echo "sbd_device"
+    exit 0
+    ;;
+getinfo-devid)
+    echo "Shared storage STONITH device"
+    exit 0
+    ;;
+getinfo-devname)
+    echo "Shared storage STONITH device"
+    exit 0
+    ;;
+getinfo-devdescr)
+    cat << DESC
+sbd uses a shared storage device as a medium to communicate
+fencing requests. This allows clusters without network power
+switches; the downside is that access to the shared storage
+device becomes a Single Point of Failure. 
+
+It requires sbd to be configured.  Please read
+http://linux-ha.org/wiki/SBD_Fencing!
+
+DESC
+    exit 0
+    ;;
+getinfo-devurl)
+    echo "http://linux-ha.org/wiki/SBD_Fencing"
+    exit 0
+    ;;
+getinfo-xml)
+    cat << SSHXML
+<parameters>
+<parameter name="sbd_device" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+SBD device
+</shortdesc>
+<longdesc lang="en">
+The block device used for the SBD partition.
+</longdesc>
+</parameter>
+</parameters>
+SSHXML
+    exit 0
+    ;;
+*)
+    exit 1
+    ;;
+esac

@@ -1,0 +1,55 @@
+ibmrsa-telnet - External stonith plugin for HAv2 (http://linux-ha.org/wiki)
+                Connects to IBM RSA Board via telnet and switches power
+                of server appropriately.
+
+Description:
+
+ IBM offers Remote Supervisor Adapters II for several
+ servers. These RSA boards can be accessed in different ways.
+ One of that is via telnet. Once logged in you can use 'help' to
+ show all available commands. With 'power' you can reset, power on and
+ off the controlled server. This command is used in combination
+ with python's standard library 'telnetlib' to do it automatically.
+
+Code snippet for cib
+
+ It's useful to give a location preference so that the stonith agent
+ is run on the/an other node. This is not necessary as one node can kill
+ itself via RSA Board. But: If this node becomes crazy my experiences
+ showed that the node is not able to shoot itself anymore properly.
+
+ You have to adjust parameters, scores and timeout values to fit your
+ HA environment.
+
+<?xml version="1.0" ?>
+<cib>
+    <configuration>
+        <resources>
+            <primitive id="r_stonith-node01" class="stonith" type="external/ibmrsa" provider="heartbeat" resource_stickiness="0">
+                <operations>
+                    <op name="monitor" interval="60" timeout="300" prereq="nothing" id="r_stonith-node01-mon"/>
+                    <op name="start" timeout="180" id="r_stonith-node01-start"/>
+                    <op name="stop" timeout="180" id="r_stonith-node01-stop"/>
+                </operations>
+                <instance_attributes id="r_stonith-node01">
+                    <attributes>
+                        <nvpair id="r_stonith-node01-nodename" name="nodename" value="node01"/>
+                        <nvpair id="r_stonith-node01-ipaddr" name="ipaddr" value="192.168.0.1"/>
+                        <nvpair id="r_stonith-node01-userid" name="userid" value="userid"/>
+                        <nvpair id="r_stonith-node01-passwd" name="passwd" value="password"/>
+                        <nvpair id="r_stonith-node01-type" name="type" value="ibm"/>
+                    </attributes>
+                </instance_attributes>
+            </primitive>
+        </resources>
+        <constraints>
+            <rsc_location id="r_stonith-node01_not_on_node01" rsc="r_stonith-node01">
+                <rule id="r_stonith-node01_not_on_node01_rule" score="-INFINITY">
+                    <expression attribute="#uname" id="r_stonith-node01_not_on_node01_expr" operation="eq" value="node01"/>
+                </rule>
+            </rsc_location>
+        </constraints>
+
+    </configuration>
+</cib>
+

@@ -1,0 +1,113 @@
+#!/bin/sh
+#
+# External STONITH module for DRAC5 adapters.
+#
+# Author:  Jun Wang
+# License:      GNU General Public License (GPL)
+#
+
+trap 'if [ -n "$outf" ]; then ha_log.sh err "`cat $outf`"; rm -f "$outf"; fi' 0
+outf=`mktemp` || {
+	ha_log.sh err "mktemp failed"
+	exit 1
+}
+
+sshlogin() {
+	if [ x = "x$ipaddr" -o x = "x$userid" ]
+	then
+		ha_log.sh err "ipaddr or userid missing; check configuration"
+		return 1
+	fi
+	@SSH@ -q -x -n $userid@$ipaddr racadm serveraction "$1" >$outf 2>&1
+}
+
+drac_reset() {
+	sshlogin hardreset
+}
+
+drac_on() {
+	sshlogin poweron
+}
+
+drac_off() {
+	sshlogin poweroff
+}
+
+drac_status() {
+	sshlogin powerstatus
+}
+
+case $1 in
+gethosts)
+	echo $hostname
+	;;
+on)
+	drac_poweron
+	;;
+off)
+	drac_poweroff
+	;;
+reset)
+	drac_reset
+	;;
+status)
+	drac_status
+	;;
+getconfignames)
+	for i in hostname ipaddr userid; do
+		echo $i
+	done
+	;;
+getinfo-devid)
+	echo "DRAC5 STONITH device"
+	;;
+getinfo-devname)
+	echo "DRAC5 STONITH device"
+	;;
+getinfo-devdescr)
+	echo "DRAC5 host reset/poweron/poweroff"
+	;;
+getinfo-devurl)
+	echo "http://www.dell.com"
+	;;
+getinfo-xml)
+	cat <<EOF
+<parameters>
+
+<parameter name="hostname" unique="1">
+<content type="string" />
+<shortdesc lang="en">
+Hostname
+</shortdesc>
+<longdesc lang="en">
+The hostname of the host to be managed by this STONITH device
+</longdesc>
+</parameter>
+
+<parameter name="ipaddr" unique="1">
+<content type="string" />
+<shortdesc lang="en">
+IP Address
+</shortdesc>
+<longdesc lang="en">
+The IP address of the STONITH device
+</longdesc>
+</parameter>
+
+<parameter name="userid" unique="1">
+<content type="string" />
+<shortdesc lang="en">
+Login
+</shortdesc>
+<longdesc lang="en">
+The username used for logging in to the STONITH device
+</longdesc>
+</parameter>
+
+</parameters>
+EOF
+	;;
+*)
+	exit 1
+	;;
+esac

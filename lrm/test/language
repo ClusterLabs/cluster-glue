@@ -1,0 +1,16 @@
+The meta language and how it translates to the lrmadmin options:
+
+list:-L
+add:-A %r %C %T %P
+del:-D %r
+flush:-F %r
+state:-S %r
+info:-I %r
+exec:-E %r %o %t %i %e
+
+classes:-C
+types:-T %C
+classmeta:-O %C
+meta:-M %C %T %P
+provider:-P %C %T
+

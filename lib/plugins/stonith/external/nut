@@ -1,0 +1,302 @@
+#!/bin/sh
+
+# External STONITH module that uses the NUT daemon to control an external UPS.
+# See the comments below, and the various NUT man pages, for how this
+# script works. It should work unchanged with most modern "smart" APC UPSes in
+# a Redhat/Fedora/RHEL-style distribution with the nut package installed.
+
+# Author: William Seligman <seligman@nevis.columbia.edu>
+# License: GPLv2
+
+# As you're designing your UPS and STONITH set-up, it may help to consider that
+# there can be potentially three computers involved:
+#   1) the machine running this STONITH module;
+#   2) the machine being controlled by this STONITH module ($hostname);
+#   3) the machine that can send commands to the UPS.
+
+# On my cluster, all the UPSes have SNMP smartcards, so every host can communicate
+# with every UPS; in other words, machines (1) and (3) are the same. If your UPSes 
+# are controlled via serial or USB connections, then you might have a
+# situation in which $hostname is plugged into a UPS, which has a serial connection
+# to some master "power-control" computer, and can potentially be STONITHed
+# by any other machine in your cluster.
+
+# In general, you'll probably need the nut daemon running on both the hosts (1) and
+# (3) in the above list. The NUT daemon will also have to run on (2) if you want the
+# reset command to gracefully reboot $hostname.
+
+# The NUT command default locations. In the RHEL-type nut packages, these binaries 
+# are in /usr/bin.
+RHELUPSCMD="/usr/bin/upscmd"
+RHELUPSC="/usr/bin/upsc"
+
+# Defaults for APC smart UPSes:
+
+# Reset = reboot $hostname; this will be a graceful reboot if the host 
+# is running NUT and monitoring $ups.
+APCRESET="shutdown.return"
+
+# Poweroff = turn off $hostname immediately by cutting the power on $ups.
+# For a graceful shutdown, use shutdown.stayoff instead of load.off,
+# but it might take a few minutes to shutdown in this way.
+APCPOWEROFF="load.off"
+
+# Poweron = turn on the power to $ups, which will presumably turn on $hostname.
+# (Did you set $hostname's BIOS to boot up on AC power restore, as opposed to
+# "last state"?)
+APCPOWERON="load.on"
+
+# Status = returns a short string with the $ups status; OL = on-line, OFF = off-line, etc.
+APCSTATUSVAR="ups.status"
+
+
+# Stick in the defaults, if needed.
+if [ -z "${poweron}" ]; then
+    poweron=${APCPOWERON}
+fi
+if [ -z "${poweroff}" ]; then
+    poweroff=${APCPOWEROFF}
+fi
+if [ -z "${reset}" ]; then
+    reset=${APCRESET}
+fi
+if [ -z "${statusvar}" ]; then
+    statusvar=${APCSTATUSVAR}
+fi
+if [ -z "${upscmd}" ]; then
+    upscmd=${RHELUPSCMD}
+fi
+if [ -z "${upsc}" ]; then
+    upsc=${RHELUPSC}
+fi
+
+
+# Define the command to fetch the UPS status.
+STATUSCMD="${upsc} ${ups} ${statusvar}"
+
+usage() {
+	echo "Usage: $0 {on|off|reset|status|gethosts|getconfignames|getinfo-devid|getinfo-devname|getinfo-devdescr|getinfo-devurl|getinfo-xml}"
+}
+
+# Can we find the NUT binary?
+have_nut() {
+	test -x "${upscmd}"
+}
+have_upsc() {
+	test -x "${upsc}"
+}
+
+do_nut() {
+	have_nut || {
+		echo "Can't find NUT upscmd command"
+		return 1
+	}
+	if [ -z "${username}" -o -z "${password}" -o -z "${ups}" ]; then
+		echo "username, password or ups name missing; check configuration"
+		return 1
+	fi
+	# Execute the command given in argument 1.
+	${upscmd} -u ${username} -p ${password} ${ups} ${1} || {
+		echo "error executing nut command"
+		return 1
+	}
+}
+
+case ${1} in
+gethosts)
+	echo ${hostname}
+	exit 0
+	;;
+on)
+	result=1
+	do_nut "${poweron}"
+	result=$?
+	exit ${result}
+	;;
+off)
+	result=1
+	do_nut "${poweroff}"
+	result=$?
+	exit ${result}
+	;;
+reset)
+	result=1
+	do_nut "${reset}"
+	result=$?
+	exit $result
+	;;
+status)
+	have_upsc || {
+		echo "Can't find NUT upsc command"
+		exit 1
+	}
+	${STATUSCMD}
+	exit $?
+	;;
+getconfignames)
+	echo "hostname ups username password poweron poweroff reset statusvar upscmd upsc"
+	exit 0
+	;;
+getinfo-devid)
+	echo "NUT STONITH device"
+	exit 0
+	;;
+getinfo-devname)
+	echo "NUT STONITH external device"
+	exit 0
+	;;
+getinfo-devdescr)
+	echo "A STONITH device based on NUT (Network UPS Tools)."
+	echo " "
+	echo "For this STONITH script to work, the following conditions have"
+	echo "to be met:"
+	echo " "
+	echo "- NUT has to be installed on both the host running this script"
+	echo "  and the host that controls the UPS (on RHEL systems, NUT is"
+	echo "  in packages nut and nut-client) and the nut daemon services"
+	echo "  (normally called the ups or upsd service) must be running"
+	echo "  on both systems."
+	echo " "
+	echo "- The UPS name has to be defined in ups.conf on the host"
+	echo "  that controls the UPS."
+	echo " "
+	echo "- The username/password to access the UPS must be defined in"
+	echo "  upsd.users on the host that controls the UPS, with the instcmds"
+	echo "  for poweron, poweroff, and reset allowed."
+	echo " "
+	echo "- The host that is running this script must be allowed access"
+	echo "  via upsd.conf and upsd.users on the host the controls the UPS."
+	echo " "
+	echo "On RHEL systems, the files listed above are in /etc/ups."
+	echo " "
+	echo "The defaults will probably work with APC UPS devices. It might"
+	echo "work on others; 'upscmd -l (ups)' and 'upsc (ups)' will list"
+	echo "the commands and variables, and you can change the values"
+	echo "for poweron, poweroff, reset, and statusvar to suit your UPS."
+	echo "Change upscmd and upsc if your NUT binaries are not in /usr/bin."
+	exit 0
+	;;
+getinfo-devurl)
+	echo "http://www.networkupstools.org/"
+	exit 0
+	;;
+getinfo-xml)
+cat << nutXML
+<parameters>
+
+<parameter name="hostname" unique="1" required="1">
+<content type="string" default="" />
+<shortdesc lang="en">Hostname</shortdesc>
+<longdesc lang="en">
+The name of the host to be managed by this STONITH device. 
+The nut daemon must be running on the host controllng the
+UPS _and_ on the host running this script; this script does
+not start/stop the daemons for you.
+</longdesc>
+</parameter>
+
+<parameter name="ups" required="1">
+<content type="string" default="" />
+<shortdesc lang="en">UPS name</shortdesc>
+<longdesc lang="en">
+The name of the UPS as defined in ups.conf on the host
+controlling the UPS. The format for this option is 
+upsname[@controlhost[:port]]. The default controlhost is 
+"localhost".
+</longdesc>
+</parameter>
+
+<parameter name="username" required="1">
+<content type="string" default="" />
+<shortdesc lang="en">Username</shortdesc>
+<longdesc lang="en">
+The username used for accessing the UPS. This is defined in 
+upsd.conf on the host controlling the UPS.
+</longdesc>
+</parameter>
+
+<parameter name="password" required="1">
+<content type="string" default="" />
+<shortdesc lang="en">Password</shortdesc>
+<longdesc lang="en">
+The password used for logging in to the UPS for the host 
+controlling the UPS, as defined in upsd.conf on that host.
+</longdesc>
+</parameter>
+
+<parameter name="poweron">
+<content type="string" default="$APCPOWERON" />
+<shortdesc lang="en">UPS Power On command</shortdesc>
+<longdesc lang="en">
+The NUT hardware command to turn on the UPS. The default  
+should work for most "smart" APC UPSes. For a list of 
+commands that your UPS can support, type 'upscmd -l (ups)' 
+on the command line.</longdesc>
+</parameter>
+
+<parameter name="poweroff">
+<content type="string" default="$APCPOWEROFF" />
+<shortdesc lang="en">UPS Power Off command</shortdesc>
+<longdesc lang="en">
+The NUT hardware command to turn off the UPS. On most APC
+"smart" UPSes, the command shutdown.stayoff will result 
+in a graceful shutdown, provided the host is running the
+nut daemon, but this might take a few minutes; load.off 
+will cut the power immediately. For a list of commands that
+your UPS can support, type 'upscmd -l (ups)' on the command
+line.
+</longdesc>
+</parameter>
+
+<parameter name="reset">
+<content type="string" default="$APCRESET" />
+<shortdesc lang="en">UPS Reset command</shortdesc>
+<longdesc lang="en">
+The NUT hardware command to reset the host. On most APC 
+"smart" UPSes, the command shutdown.return will result
+in a graceful shutdown, with power restored after perhaps 
+a short interval. For a list of commands that your UPS can
+ support, type 'upscmd -l (ups)' on the command line.
+</longdesc>
+</parameter>
+
+<parameter name="statusvar">
+<content type="string" default="$APCSTATUSVAR" />
+<shortdesc lang="en">UPS Status variable</shortdesc>
+<longdesc lang="en">
+The NUT variable that returns the status of the UPS. On APC 
+UPSes, the value of ups.status will be "OL" if the UPS is 
+"on-line." For a list of variables that your UPS supports, 
+type 'upsc (ups)' on the command line.
+</longdesc>
+</parameter>
+
+<parameter name="upscmd">
+<content type="string" default="$RHELUPSCMD" />
+<shortdesc lang="en">upscmd binary location</shortdesc>
+<longdesc lang="en">
+The full path to the NUT binary command 'upscmd'. On RHEL
+systems with the nut RPM installed, this location is
+/usr/bin/upscmd.
+</longdesc>
+</parameter>
+
+<parameter name="upsc">
+<content type="string" default="$RHELUPSC" />
+<shortdesc lang="en">upsc binary location</shortdesc>
+<longdesc lang="en">
+The full path to the NUT binary command 'upsc'. On RHEL
+systems with the nut RPM installed, this location is
+/usr/bin/upsc.
+</longdesc>
+</parameter>
+
+</parameters>
+nutXML
+exit 0
+;;
+*)
+	usage
+	exit 1
+	;;
+esac

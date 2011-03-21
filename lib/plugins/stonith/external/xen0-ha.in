@@ -1,0 +1,96 @@
+#!/bin/bash
+#
+# This STONITH script integrates a cluster running within DomUs
+# with the CRM/Pacemaker cluster running in Dom0.
+#
+# Author:	Lars Marowsky-Bree
+# Copyright:	2008 Lars Marowsky-Bree
+# License:      GNU General Public License (GPL)
+#
+
+SSH_COMMAND="@SSH@ -q -x -n"
+HVM_HELPER="@stonith_plugindir@/xen0-ha-dom0-stonith-helper"
+
+# Rewrite the hostlist to accept "," as a delimeter for hostnames too.
+hostlist=`echo $hostlist | tr ',' ' '`
+
+# Runs a command on the host, waiting for it to return
+RunHVMCommand() {
+    $SSH_COMMAND $dom0_cluster_ip "$HVM_HELPER $1 $2 $stop_timeout"
+}
+
+# Main code
+case $1 in
+gethosts)
+    echo $hostlist
+    exit 0
+    ;;
+on|off|reset|status)
+    RunHVMCommand $1 $2
+    exit $?
+    ;;
+getconfignames)
+    echo "hostlist dom0_cluster_ip timeout"
+    exit 0
+    ;;
+getinfo-devid)
+    echo "xen0-ha DomU/Dom0 device"
+    exit 0
+    ;;
+getinfo-devname)
+    echo "xen0-ha DomU/Dom0 external device"
+    exit 0
+    ;;
+getinfo-devdescr)
+    echo "Allows STONITH to control DomUs managed by a CRM/Pacemaker Dom0."
+    echo "Requires Xen + CRM/Pacemaker at both layers."
+    echo "Proof-of-concept code!"
+    exit 0
+    ;;
+getinfo-devurl)
+    echo "http://linux-ha.org/wiki/DomUClusters"
+    exit 0
+    ;;
+getinfo-xml)
+    cat << SSHXML
+<parameters>
+<parameter name="hostlist" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Hostlist
+</shortdesc>
+<longdesc lang="en">
+The list of controlled DomUs, separated by whitespace.
+These must be configured as Xen RA resources with a name with a matching
+id.
+For example: "xen-1 xen-2 xen-3"
+</longdesc>
+</parameter>
+<parameter name="dom0_cluster_ip" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Dom0 cluster ip
+</shortdesc>
+<longdesc lang="en">
+The cluster IP address associated with Dom0. 
+Root user must be able to ssh to that node.
+</longdesc>
+</parameter>
+<parameter name="stop_timeout">
+<content type="integer" />
+<shortdesc lang="en">
+Stop timeout
+</shortdesc>
+<longdesc lang="en">
+The timeout, in seconds, for which to wait for Dom0 to report that the
+DomU has been stopped, before aborting with a failure.
+</longdesc>
+</parameter>
+</parameters>
+SSHXML
+    exit 0
+    ;;
+*)
+    exit 1
+    ;;
+esac

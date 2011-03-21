@@ -1,0 +1,55 @@
+lead=".TRY"
+describe_list() {
+	echo $lead List resources
+}
+describe_add() {
+	echo $lead Add resource \
+		${rsc:-$dflt_rsc} \
+		class=${class:-$dflt_class} type=${type:-$dflt_type} \
+		provider=${provider:-$dflt_provider} \
+		args=$args
+}
+describe_del() {
+	echo $lead Delete resource \
+		${rsc:-$dflt_rsc}
+}
+describe_flush() {
+	echo $lead Flush resource \
+		${rsc:-$dflt_rsc}
+}
+describe_state() {
+	echo $lead Show state \
+		${rsc:-$dflt_rsc}
+}
+describe_info() {
+	echo $lead Show info \
+		${rsc:-$dflt_rsc}
+}
+describe_exec() {
+	echo $lead Exec \
+		${rsc:-$dflt_rsc} \
+		op=${operation:-$dflt_operation} \
+		timeout=${timeout:-$dflt_timeout} interval=${interval:-$dflt_interval} \
+		target=${targetrc:-$dflt_targetrc} args=$args
+}
+
+describe_classes() {
+	echo $lead List classes
+}
+describe_types() {
+	echo $lead List types \
+		class=${class:-$dflt_class}
+}
+describe_classmeta() {
+	echo $lead Meta-data \
+		class=${class:-$dflt_class}
+}
+describe_meta() {
+	echo $lead Show meta-data \
+		class=${class:-$dflt_class} \
+		type=${type:-$dflt_type} provider=${provider:-$dflt_provider}
+}
+describe_provider() {
+	echo $lead Show provider \
+		class=${class:-$dflt_class} type=${type:-$dflt_type}
+}

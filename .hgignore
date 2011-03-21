@@ -1,0 +1,92 @@
+syntax: glob
+
+# Autofoo entries
+*.o
+*.la
+*.lo
+*.loT
+*.pyc
+.libs
+.deps
+*.cache
+.cvsignore
+compile
+configure
+configure.status
+configure.lineno
+depcomp
+aclocal.m4
+libtool
+ltmain.sh
+ltconfig
+libltdl
+mkinstalldirs
+install-sh
+missing
+py-compile
+autom4te*
+libtool.m4
+ltdl.m4
+libltdl.tar
+autoconf
+autoheader
+automake
+include/glue_config.h
+include/stamp-h1
+include/pils/plugin.h
+include/stamp-h2
+ylwrap
+
+# BEAM Entries
+*.beam
+parser-messages
+MISC_ERRORS
+cscope.files
+cscope.out
+patches
+updates
+logs
+
+# OS and Editor Artifacts
+.DS_Store
+*.diff
+*.patch
+*~
+
+# Project build targets
+lib/clplumbing/base64_md5_test
+lib/clplumbing/ipctest
+lib/clplumbing/ipctransientclient
+lib/clplumbing/ipctransientserver
+logd/ha_logd
+logd/ha_logger
+logd/logtest
+lrm/admin/lrmadmin
+lrm/lrmd/lrmd
+lrm/test/apitest
+lrm/test/callbacktest
+lrm/test/plugintest
+lrm/test/lrmregtest
+lrm/test/lrmregtest-heartbeat
+lrm/test/lrmregtest-lsb
+lrm/test/regression.sh
+lrm/test/LRMBasicSanityCheck
+lrm/test/simple_ops
+
+# Misc
+GPATH
+GRTAGS
+GSYMS
+GTAGS
+HTML
+TAGS
+.gres.*
+*.orig
+.gdb_history
+
+# Entries better done as regexp's to avoid matching too broadly
+syntax: regexp
+^config\.*
+README$
+Makefile$
+Makefile.in$

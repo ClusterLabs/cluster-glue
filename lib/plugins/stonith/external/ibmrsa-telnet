@@ -1,0 +1,320 @@
+#!/usr/bin/python
+# vim: set filetype=python
+#######################################################################
+#
+# ibmrsa-telnet - External stonith plugin for HAv2 (http://linux-ha.org/wiki)
+#                 Connects to IBM RSA Board via telnet and switches power
+#                 of server appropriately.
+#
+# Author: Andreas Mock (andreas.mock@web.de)
+#
+# History:
+#   2007-10-19  Fixed bad commandline handling in case of stonithing
+#   2007-10-11  First release.
+#
+# Comment: Please send bug fixes and enhancements.
+#  I hope the functionality of communicating via telnet is encapsulated
+#  enough so that someone can use it for similar purposes.
+#
+# Description: IBM offers Remote Supervisor Adapters II for several
+#  servers. These RSA boards can be accessed in different ways.
+#  One of that is via telnet. Once logged in you can use 'help' to
+#  show all available commands. With 'power' you can reset, power on and
+#  off the controlled server. This command is used in combination
+#  with python's standard library 'telnetlib' to do it automatically.
+#
+# cib-snippet: Please see README.ibmrsa-telnet for examples.
+#
+# Copyright (c) 2007 Andreas Mock (andreas.mock@web.de)
+#                    All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 or later of the GNU General Public
+# License as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+#######################################################################
+import sys
+import os
+import time
+import telnetlib
+import subprocess
+
+class TimeoutException(Exception):
+    def __init__(self, value=None):
+        Exception.__init__(self)
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+class RSABoard(telnetlib.Telnet):
+    def __init__(self, *args, **kwargs):
+        telnetlib.Telnet.__init__(self, *args, **kwargs)
+        self._timeout = 10
+        self._loggedin = 0
+        self._history = []
+        self._appl = os.path.basename(sys.argv[0])
+
+    def _get_timestamp(self):
+        ct = time.time()
+        msecs = (ct - long(ct)) * 1000
+        return "%s,%03d" % (time.strftime("%Y-%m-%d %H:%M:%S",
+                            time.localtime(ct)), msecs)
+
+    def write(self, buffer, nolog = False):
+        self._history.append(self._get_timestamp() + ': WRITE: ' +
+            (nolog and '******' or repr(buffer)))
+        telnetlib.Telnet.write(self, buffer)
+
+    def expect(self, what, timeout=20):
+        line = telnetlib.Telnet.expect(self, what, timeout)
+        self._history.append(self._get_timestamp() + ': READ : ' + repr(line))
+        if not line:
+            raise TimeoutException("Timeout while waiting for '%s'." % (what, ))
+        return line
+
+    def login(self, user, passwd):
+        time.sleep(1)
+        line = self.expect(['\nlogin : ', '\nusername: '], self._timeout)
+        self.write(user)
+        self.write('\r')
+        line = self.expect(['\nPassword: ', '\npassword: '], self._timeout)
+        self.write(passwd, nolog = True)
+        self.write('\r')
+        line = self.expect(['\nsystem>', '> '], self._timeout)
+
+    def reset(self):
+        self.write('power cycle\r')
+        line = self.expect(['\nok'], self._timeout)
+        line = self.expect(['\nsystem>', '> '], self._timeout)
+
+    def on(self):
+        self.write('power on\r')
+        line = self.expect(['\nok'], self._timeout)
+        line = self.expect(['\nsystem>', '> '], self._timeout)
+
+    def off(self):
+        self.write('power off\r')
+        line = self.expect(['\nok'], self._timeout)
+        line = self.expect(['\nsystem>', '> '], self._timeout)
+
+    def exit(self):
+        self.write('exit\r')
+
+    def get_history(self):
+        return "\n".join(self._history)
+
+
+class RSAStonithPlugin:
+    def __init__(self):
+        # define the external stonith plugin api
+        self._required_cmds = \
+            'reset gethosts status getconfignames getinfo-devid ' \
+            'getinfo-devname getinfo-devdescr getinfo-devurl ' \
+            'getinfo-xml'
+        self._optional_cmds = 'on off'
+        self._required_cmds_list = self._required_cmds.split()
+        self._optional_cmds_list = self._optional_cmds.split()
+
+        # who am i
+        self._appl = os.path.basename(sys.argv[0])
+
+        # telnet connection object
+        self._connection = None
+
+        # the list of configuration names
+        self._confignames = ['nodename', 'ip_address', 'username', 'password']
+
+        # catch the parameters provided by environment
+        self._parameters = {}
+        for name in self._confignames:
+            try:
+                self._parameters[name] = os.environ.get(name, '').split()[0]
+            except IndexError:
+                self._parameters[name] = ''
+
+    def _get_timestamp(self):
+        ct = time.time()
+        msecs = (ct - long(ct)) * 1000
+        return "%s,%03d" % (time.strftime("%Y-%m-%d %H:%M:%S",
+                            time.localtime(ct)), msecs)
+
+    def _echo_debug(self, *args):
+        self.echo_log('debug', *args)
+
+    def echo(self, *args):
+        what = ''.join([str(x) for x in args])
+        sys.stdout.write(what)
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+        self._echo_debug("STDOUT:", what)
+
+    def echo_log(self, level, *args):
+        subprocess.call(('ha_log.sh', level) +  args)
+
+    def _get_connection(self):
+        if not self._connection:
+            c = RSABoard()
+            self._echo_debug("Connect to '%s'" %
+                  (self._parameters['ip_address'],))
+            c.open(self._parameters['ip_address'])
+            self._echo_debug("Connection established")
+            c.login(self._parameters['username'],
+                    self._parameters['password'])
+            self._connection = c
+
+    def _end_connection(self):
+        if self._connection:
+            self._connection.exit()
+            self._connection.close()
+
+    def reset(self):
+        self._get_connection()
+        self._connection.reset()
+        self._end_connection()
+        self._echo_debug(self._connection.get_history())
+        self.echo_log("info", "Reset of node '%s' done" %
+                              (self._parameters['nodename'],))
+        return(0)
+
+    def on(self):
+        self._get_connection()
+        self._connection.on()
+        self._end_connection()
+        self._echo_debug(self._connection.get_history())
+        self.echo_log("info", "Switched node '%s' ON" %
+                              (self._parameters['nodename'],))
+        return(0)
+
+    def off(self):
+        self._get_connection()
+        self._connection.off()
+        self._end_connection()
+        self._echo_debug(self._connection.get_history())
+        self.echo_log("info", "Switched node '%s' OFF" %
+                              (self._parameters['nodename'],))
+        return(0)
+
+    def gethosts(self):
+        self.echo(self._parameters['nodename'])
+        return(0)
+
+    def status(self):
+        self._get_connection()
+        self._end_connection()
+        self._echo_debug(self._connection.get_history())
+        return(0)
+
+    def getconfignames(self):
+        for name in ['nodename', 'ip_address', 'username', 'password']:
+            self.echo(name)
+        return(0)
+
+    def getinfo_devid(self):
+        self.echo("External Stonith Plugin for IBM RSA Boards")
+        return(0)
+
+    def getinfo_devname(self):
+        self.echo("External Stonith Plugin for IBM RSA Boards connecting "
+                  "via Telnet")
+        return(0)
+
+    def getinfo_devdescr(self):
+        self.echo("External stonith plugin for HAv2 which connects to "
+                  "a RSA board on IBM servers via telnet. Commands to "
+                  "turn on/off power and to reset server are sent "
+                  "appropriately. "
+                  "(c) 2007 by Andreas Mock (andreas.mock@web.de)")
+        return(0)
+
+    def getinfo_devurl(self):
+        self.echo("http://www.ibm.com/Search/?q=remote+supervisor+adapter")
+
+    def getinfo_xml(self):
+        info = """<parameters>
+            <parameter name="nodename" unique="1" required="1">
+                <content type="string" />
+                <shortdesc lang="en">nodename to shoot</shortdesc>
+                <longdesc lang="en">
+                Name of the node which has to be stonithed in case.
+                </longdesc>
+            </parameter>
+            <parameter name="ip_address" unique="1" required="1">
+                <content type="string" />
+                <shortdesc lang="en">hostname or ip address of RSA</shortdesc>
+                <longdesc lang="en">
+                Hostname or ip address of RSA board used to reset node.
+                </longdesc>
+            </parameter>
+            <parameter name="username" unique="1" required="1">
+                <content type="string" />
+                <shortdesc lang="en">username to login on RSA board</shortdesc>
+                <longdesc lang="en">
+                Username to login on RSA board.
+                </longdesc>
+            </parameter>
+            <parameter name="password" unique="1" required="1">
+                <content type="string" />
+                <shortdesc lang="en">password to login on RSA board</shortdesc>
+                <longdesc lang="en">
+                Password to login on RSA board.
+                </longdesc>
+            </parameter>
+        </parameters>
+        """
+        self.echo(info)
+        return(0)
+
+    def not_implemented(self, cmd):
+        self.echo_log("err", "Command '%s' not implemented." % (cmd,))
+        return(1)
+
+    def usage(self):
+        usage = "Call me with one of the allowed commands: %s, %s" % (
+        ', '.join(self._required_cmds_list),
+        ', '.join(self._optional_cmds_list))
+        return usage
+
+    def process(self, argv):
+        self._echo_debug("========== Start =============")
+        if len(argv) < 1:
+            self.echo_log("err", 'At least one commandline argument required.')
+            return(1)
+        cmd = argv[0]
+        self._echo_debug("cmd:", cmd)
+        if cmd not in self._required_cmds_list and \
+           cmd not in self._optional_cmds_list:
+            self.echo_log("err", "Command '%s' not supported." % (cmd,))
+            return(1)
+        try:
+            cmd = cmd.lower().replace('-', '_')
+            func = getattr(self, cmd, self.not_implemented)
+            rc = func()
+            return(rc)
+        except Exception, args:
+            self.echo_log("err", 'Exception raised:', str(args))
+            if self._connection:
+                self.echo_log("err", self._connection.get_history())
+                self._connection.close()
+            return(1)
+
+
+if __name__ == '__main__':
+    stonith = RSAStonithPlugin()
+    rc = stonith.process(sys.argv[1:])
+    sys.exit(rc)
