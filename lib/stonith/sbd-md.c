@@ -47,12 +47,11 @@
 
 struct servants_list_item *servants_leader = NULL;
 
-
 /* signals reserved for multi-disk sbd */
-#define SIG_LIVENESS (SIGRTMIN + 1) /* report liveness of the disk */
-#define SIG_EXITREQ  (SIGRTMIN + 2) /* exit request to inquisitor */
-#define SIG_TEST     (SIGRTMIN + 3) /* trigger self test */
-#define SIG_RESTART  (SIGRTMIN + 4) /* trigger restart of all failed disk */
+#define SIG_LIVENESS (SIGRTMIN + 1)	/* report liveness of the disk */
+#define SIG_EXITREQ  (SIGRTMIN + 2)	/* exit request to inquisitor */
+#define SIG_TEST     (SIGRTMIN + 3)	/* trigger self test */
+#define SIG_RESTART  (SIGRTMIN + 4)	/* trigger restart of all failed disk */
 /* FIXME: should add dynamic check of SIG_XX >= SIGRTMAX */
 
 /* Helper Macros, to reuse existing functions */
@@ -94,28 +93,16 @@ static int init_devices()
 	struct servants_list_item *s = servants_leader;
 	while (s != NULL) {
 		DBGPRINT("init device %s\n", s->devname);
-		do { 
-			    int old_devfd = devfd; 
-			    const char* old_devname = devname; 
-			    rc = 0; 
-			    devname = s->devname; 
-			    rc = open_device(devname); 
-			    if (rc == -1) break; 
-			    rc = init_device( ); 
-			    close(devfd); 
-			    devfd = old_devfd; devname = old_devname; 
-			    if (rc == -1) break; 
-		} while (0);
-
-/*		CALL_WITH_DEVNAME(init_device, s->devname); */
-		if (rc == -1) return rc;
+		CALL_WITH_DEVNAME(init_device, s->devname);
+		if (rc == -1)
+			return rc;
 		s = s->next;
 	}
 	return 0;
 }
 
-static int
-allocate_slots(const char* name)
+static int allocate_slots(const char *name);
+static int allocate_slots(const char *name)
 {
 	int rc = 0;
 	struct servants_list_item *s = servants_leader;
@@ -129,7 +116,8 @@ allocate_slots(const char* name)
 		rc = slot_allocate(name);
 		close(devfd);
 		devname = NULL;
-		if (rc == -1) return rc;
+		if (rc == -1)
+			return rc;
 		DBGPRINT("allocation on %s done\n", s->devname);
 		s = s->next;
 	}
@@ -144,15 +132,15 @@ static int list_slots()
 	while (s != NULL) {
 		DBGPRINT("list slots on device %s\n", s->devname);
 		CALL_WITH_DEVNAME(slot_list, s->devname);
-		if (rc == -1) return rc;
+		if (rc == -1)
+			return rc;
 		s = s->next;
 	}
 	return 0;
 }
 
-static int ping_via_slots(const char* name);
-static int
-ping_via_slots(const char* name)
+static int ping_via_slots(const char *name);
+static int ping_via_slots(const char *name)
 {
 	int sig = 0;
 	int pid = 0;
@@ -175,11 +163,13 @@ ping_via_slots(const char* name)
 		if (pid == 0) {
 			int rc = 0;
 			CALL_WITH_DEVNAME(slot_ping, s->devname, name);
-			if (rc == -1) exit(1);
-			else exit(0);
+			if (rc == -1)
+				exit(1);
+			else
+				exit(0);
 		} else {
 			DBGPRINT("servant for %s is delivering the ping\n",
-					s->devname);
+				 s->devname);
 			s->pid = pid;
 			servant_count++;
 		}
@@ -193,12 +183,17 @@ ping_via_slots(const char* name)
 				if (pid == -1 && errno == ECHILD) {
 					break;
 				} else {
-					DBGPRINT("A ping is delivered to %s via %s. ",
-							name, lookup_servant_by_pid(pid)->devname);
+					DBGPRINT
+					    ("A ping is delivered to %s via %s. ",
+					     name,
+					     lookup_servant_by_pid(pid)->
+					     devname);
 					if (!status)
-						DBGPRINT("They responed to the emporer\n");
+						DBGPRINT
+						    ("They responed to the emporer\n");
 					else
-						DBGPRINT("There's no response\n");
+						DBGPRINT
+						    ("There's no response\n");
 					servant_finished++;
 				}
 			}
@@ -208,13 +203,13 @@ ping_via_slots(const char* name)
 	return 0;
 }
 
-static int
-servant(const char* diskname, int prepare_only)
+static int servant(const char *diskname, int prepare_only);
+static int servant(const char *diskname, int prepare_only)
 {
-	struct sector_mbox_s	*s_mbox = NULL;
-	int		mbox;
-	int 	rc = 0;
-	time_t	t0, t1, latency;
+	struct sector_mbox_s *s_mbox = NULL;
+	int mbox;
+	int rc = 0;
+	time_t t0, t1, latency;
 	union sigval signal_value;
 	sigset_t servant_masks;
 
@@ -238,7 +233,7 @@ servant(const char* diskname, int prepare_only)
 	/* FIXME: check error */
 	sigprocmask(SIG_SETMASK, &servant_masks, NULL);
 
-	devfd = open(devname, O_SYNC|O_RDWR|O_DIRECT);
+	devfd = open(devname, O_SYNC | O_RDWR | O_DIRECT);
 	if (devfd == -1) {
 		cl_perror("Opening disk %s failed.", devname);
 		return -1;
@@ -246,22 +241,28 @@ servant(const char* diskname, int prepare_only)
 	ioctl(devfd, BLKSSZGET, &sector_size);
 	if (sector_size == 0) {
 		cl_perror("Get sector size failed.\n");
-		close(devfd); return -1;
+		close(devfd);
+		return -1;
 	}
 
 	mbox = slot_allocate(local_uname);
 	if (mbox < 0) {
-		cl_log(LOG_ERR, "No slot allocated, and automatic allocation failed for disk %s.", devname);
-		rc = -1; goto out;
+		cl_log(LOG_ERR,
+		       "No slot allocated, and automatic allocation failed for disk %s.",
+		       devname);
+		rc = -1;
+		goto out;
 	}
 	cl_log(LOG_INFO, "Monitoring slot %d on disk %s", mbox, devname);
 
 	s_mbox = sector_alloc();
 	if (mbox_write(mbox, s_mbox) < 0) {
-		rc = -1; goto out;
+		rc = -1;
+		goto out;
 	}
 
-	if (prepare_only) goto out;
+	if (prepare_only)
+		goto out;
 
 	memset(&signal_value, 0, sizeof(signal_value));
 
@@ -274,8 +275,9 @@ servant(const char* diskname, int prepare_only)
 		}
 
 		if (s_mbox->cmd > 0) {
-			cl_log(LOG_INFO, "Received command %s from %s on disk %s",
-					char2cmd(s_mbox->cmd), s_mbox->from, devname);
+			cl_log(LOG_INFO,
+			       "Received command %s from %s on disk %s",
+			       char2cmd(s_mbox->cmd), s_mbox->from, devname);
 
 			switch (s_mbox->cmd) {
 			case SBD_MSG_TEST:
@@ -297,8 +299,9 @@ servant(const char* diskname, int prepare_only)
 				   An "unknown" message might result
 				   from a partial write.
 				   log it and clear the slot.
-				*/
-				cl_log(LOG_ERR, "Unknown message on disk %s", devname);
+				 */
+				cl_log(LOG_ERR, "Unknown message on disk %s",
+				       devname);
 				memset(s_mbox, 0, sizeof(*s_mbox));
 				mbox_write(mbox, s_mbox);
 				break;
@@ -308,30 +311,31 @@ servant(const char* diskname, int prepare_only)
 
 		t1 = time(NULL);
 		latency = t1 - t0;
-		if (timeout_watchdog_warn
-				&& (latency > timeout_watchdog_warn)) {
-			cl_log(LOG_WARNING, "Latency: %d exceeded threshold %d on disk %s",
-					(int)latency, (int)timeout_watchdog_warn, devname);
+		if (timeout_watchdog_warn && (latency > timeout_watchdog_warn)) {
+			cl_log(LOG_WARNING,
+			       "Latency: %d exceeded threshold %d on disk %s",
+			       (int)latency, (int)timeout_watchdog_warn,
+			       devname);
 		} else if (debug) {
-			cl_log(LOG_INFO, "Latency: %d on disk %s",
-					(int)latency, devname);
+			cl_log(LOG_INFO, "Latency: %d on disk %s", (int)latency,
+			       devname);
 		}
 	}
-out:
+ out:
 	free(s_mbox);
-	close(devfd); devfd = -1;
+	close(devfd);
+	devfd = -1;
 	return rc;
 }
 
-int recruit_servant(const char* devname, int pid);
-int
-recruit_servant(const char* devname, int pid)
+int recruit_servant(const char *devname, int pid);
+int recruit_servant(const char *devname, int pid)
 {
 	struct servants_list_item *s = servants_leader;
 	struct servants_list_item *p = servants_leader;
 	struct servants_list_item *newbie;
 	while (s != NULL) {
-		if ( s == p) {
+		if (s == p) {
 			s = s->next;
 		} else {
 			p = s;
@@ -343,15 +347,16 @@ recruit_servant(const char* devname, int pid)
 	memset(newbie, 0, sizeof(*newbie));
 	newbie->devname = strdup(devname);
 	newbie->pid = pid;
-	if (p == NULL) servants_leader = newbie;
-	else p->next = newbie;
+	if (p == NULL)
+		servants_leader = newbie;
+	else
+		p->next = newbie;
 	return 0;
 }
 
 #if 0
-int disband_servant_by_dev(const char* devname);
-int
-disband_servant_by_dev(const char* devname)
+int disband_servant_by_dev(const char *devname);
+int disband_servant_by_dev(const char *devname)
 {
 	int pid;
 	struct servants_list_item *s = servants_leader;
@@ -359,7 +364,7 @@ disband_servant_by_dev(const char* devname)
 	while (s != NULL) {
 		if (!strncasecmp(s->devname, devname, strlen(s->devname))) {
 			pid = s->pid;
-			free((char*)(s->devname));
+			free((char *)(s->devname));
 			if (s == p)
 				servants_leader = s->next;
 			else
@@ -379,47 +384,47 @@ disband_servant_by_dev(const char* devname)
 }
 #endif
 
-struct servants_list_item* lookup_servant_by_dev(const char* devname);
-struct servants_list_item*
-lookup_servant_by_dev(const char* devname)
+struct servants_list_item *lookup_servant_by_dev(const char *devname);
+struct servants_list_item *lookup_servant_by_dev(const char *devname)
 {
 	struct servants_list_item *s = servants_leader;
 	while (s != NULL) {
-		if (strncasecmp(s->devname, devname, strlen(s->devname))) return s;
-		else s = s->next;
+		if (strncasecmp(s->devname, devname, strlen(s->devname)))
+			return s;
+		else
+			s = s->next;
 	}
 	return s;
 }
 
-struct servants_list_item* lookup_servant_by_pid(int pid);
-struct servants_list_item*
-lookup_servant_by_pid(int pid)
+struct servants_list_item *lookup_servant_by_pid(int pid);
+struct servants_list_item *lookup_servant_by_pid(int pid)
 {
 	struct servants_list_item *s = servants_leader;
 	while (s != NULL) {
-		if (s->pid == pid) return s;
-		else s = s->next;
+		if (s->pid == pid)
+			return s;
+		else
+			s = s->next;
 	}
 	return s;
 }
 
-int assign_servant(const char* devname);
-int
-assign_servant(const char* devname)
+int assign_servant(const char *devname);
+int assign_servant(const char *devname)
 {
 	int pid = 0;
 	pid = fork();
-	if (pid == 0) { /* child */
+	if (pid == 0) {		/* child */
 		servant(devname, 0);
 		exit(0);
-	} else { /* parent */
+	} else {		/* parent */
 		return pid;
 	}
 }
 
 void deploy_servants(int live);
-void
-deploy_servants(int live)
+void deploy_servants(int live)
 {
 	struct servants_list_item *s = servants_leader;
 	int r = 0;
@@ -445,8 +450,8 @@ deploy_servants(int live)
 	}
 }
 
-static int
-inquisitor(void)
+static int inquisitor(void);
+static int inquisitor(void)
 {
 	int rc, sig, pid, i;
 
@@ -456,7 +461,7 @@ inquisitor(void)
 	int *reports;
 	int has_new;
 	int status;
-	const char* tdevname;
+	const char *tdevname;
 	struct servants_list_item *s = servants_leader;
 	int servant_count = 0;
 	int servant_finished = 0;
@@ -471,12 +476,12 @@ inquisitor(void)
 	}
 
 	DBGPRINT("expect_report is %d\n", expect_report);
-	reports = malloc(sizeof(int)*expect_report);
+	reports = malloc(sizeof(int) * expect_report);
 	if (reports == 0) {
 		cl_log(LOG_ERR, "malloc failed");
 		exit(1);
 	}
-	memset(reports, 0, sizeof(int)*expect_report);
+	memset(reports, 0, sizeof(int) * expect_report);
 
 	sigemptyset(&procmask);
 	sigaddset(&procmask, SIGCHLD);
@@ -492,11 +497,13 @@ inquisitor(void)
 	while (s != NULL) {
 		DBGPRINT("fork servant for %s\n", s->devname);
 		pid = fork();
-		if (pid == 0) { /* child */
+		if (pid == 0) {	/* child */
 			rc = servant(s->devname, 1);
-			if (rc == -1) exit(1);
-			else exit(0);
-		} else { /* parent */
+			if (rc == -1)
+				exit(1);
+			else
+				exit(0);
+		} else {	/* parent */
 			DBGPRINT("servant for %s is working\n", s->devname);
 			servant_count++;
 		}
@@ -512,17 +519,20 @@ inquisitor(void)
 				} else {
 					DBGPRINT("process %d finished\n", pid);
 					servant_finished++;
-					if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
-						DBGPRINT("exit with %d\n", WEXITSTATUS(status));
-						good_servant ++;
+					if (WIFEXITED(status)
+					    && WEXITSTATUS(status) == 0) {
+						DBGPRINT("exit with %d\n",
+							 WEXITSTATUS(status));
+						good_servant++;
 					}
 				}
 			}
 		}
 		DBGPRINT("signal %d handled\n", sig);
 	}
-	DBGPRINT("total %d, finished %d, report good %d\n", servant_count, servant_finished, good_servant);
-	if (good_servant >= servant_count/2 + 1) {
+	DBGPRINT("total %d, finished %d, report good %d\n", servant_count,
+		 servant_finished, good_servant);
+	if (good_servant >= servant_count / 2 + 1) {
 		DBGPRINT("we are good to proceed\n");
 	} else {
 		DBGPRINT("no enough good servant\n");
@@ -546,17 +556,26 @@ inquisitor(void)
 				if (pid == -1 && errno == ECHILD) {
 					break;
 				} else {
-					if (WIFEXITED(status)) { /* terminated normally */
-						DBGPRINT("terminated normally\n");
-						lookup_servant_by_pid(pid)->pid = 0;
-					} else if (WIFSIGNALED(status)) { /* by signal */
+					if (WIFEXITED(status)) {	/* terminated normally */
+						DBGPRINT
+						    ("terminated normally\n");
+						lookup_servant_by_pid(pid)->
+						    pid = 0;
+					} else if (WIFSIGNALED(status)) {	/* by signal */
 						if (WTERMSIG(status) != SIGKILL) {
-							DBGPRINT("something wrong, restart it\n");
-							tdevname = lookup_servant_by_pid(pid)->devname;
-						   	lookup_servant_by_pid(pid)->pid = assign_servant(tdevname);
+							DBGPRINT
+							    ("something wrong, restart it\n");
+							tdevname =
+							    lookup_servant_by_pid
+							    (pid)->devname;
+							lookup_servant_by_pid
+							    (pid)->pid =
+							    assign_servant
+							    (tdevname);
 						} else {
 							DBGPRINT("killed\n");
-							lookup_servant_by_pid(pid)->pid = 0;
+							lookup_servant_by_pid
+							    (pid)->pid = 0;
 						}
 					}
 				}
@@ -572,13 +591,17 @@ inquisitor(void)
 					break;
 				}
 			}
-			if (!has_new) continue;
+			if (!has_new)
+				continue;
 			for (i = 0; i < expect_report; i++) {
 				if (reports[i] == 0) {
 					if (i >= expect_report / 2 + 1) {
-						DBGPRINT("enough reports, purify the planet\n");
+						DBGPRINT
+						    ("enough reports, purify the planet\n");
 						watchdog_tickle();
-						memset(reports, 0, sizeof(int)*expect_report);
+						memset(reports, 0,
+						       sizeof(int) *
+						       expect_report);
 					} else {
 						DBGPRINT("still wait\n");
 					}
@@ -591,7 +614,7 @@ inquisitor(void)
 			DBGPRINT("USR1 recieved\n");
 			deploy_servants(1);
 			DBGPRINT("servants restarted\n");
-			memset(reports, 0, sizeof(int)*expect_report);
+			memset(reports, 0, sizeof(int) * expect_report);
 			watchdog_tickle();
 		} else {
 			DBGPRINT("ignore anything else can be ignored\n");
@@ -600,8 +623,8 @@ inquisitor(void)
 	}
 }
 
-static int
-messenger(const char* name, const char* msg)
+static int messenger(const char *name, const char *msg);
+static int messenger(const char *name, const char *msg)
 {
 	int sig = 0;
 	int pid = 0;
@@ -620,11 +643,13 @@ messenger(const char* name, const char* msg)
 	while (s != NULL) {
 		DBGPRINT("fork servant for %s\n", s->devname);
 		pid = fork();
-		if (pid == 0) { /* child */
+		if (pid == 0) {	/* child */
 			CALL_WITH_DEVNAME(slot_msg, s->devname, name, msg);
-			if (rc == -1) exit(1);
-			else exit(0);
-		} else { /* parent */
+			if (rc == -1)
+				exit(1);
+			else
+				exit(0);
+		} else {	/* parent */
 			DBGPRINT("servant for %s is working\n", s->devname);
 			s->pid = pid;
 			servant_count++;
@@ -649,30 +674,30 @@ messenger(const char* name, const char* msg)
 	return 0;
 }
 
-static int
-dump_headers(void)
+static int dump_headers(void);
+static int dump_headers(void)
 {
 	int rc = 0;
 	struct servants_list_item *s = servants_leader;
 	while (s != NULL) {
 		DBGPRINT("Dumping header on disk %s\n", s->devname);
 		CALL_WITH_DEVNAME(header_dump, s->devname);
-		if (rc == -1) return rc;
+		if (rc == -1)
+			return rc;
 		DBGPRINT("Header on disk %s is dumped\n", s->devname);
 		s = s->next;
 	}
 	return rc;
 }
 
-int
-main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-	int		exit_status = 0;
-	int		c;
+	int exit_status = 0;
+	int c;
 
 	if ((cmdname = strrchr(argv[0], '/')) == NULL) {
 		cmdname = argv[0];
-	}else{
+	} else {
 		++cmdname;
 	}
 
@@ -682,7 +707,7 @@ main(int argc, char** argv)
 
 	get_uname();
 
-	while ((c = getopt (argc, argv, "DRWhvw:d:n:1:2:3:4:5:")) != -1) {
+	while ((c = getopt(argc, argv, "DRWhvw:d:n:1:2:3:4:5:")) != -1) {
 		switch (c) {
 		case 'D':
 			go_daemon = 1;
@@ -722,7 +747,7 @@ main(int argc, char** argv)
 			break;
 		case 'h':
 			usage();
-			return(0);
+			return (0);
 		default:
 			exit_status = -1;
 			goto out;
@@ -731,7 +756,7 @@ main(int argc, char** argv)
 	}
 
 	/* There must at least be one command following the options: */
-	if ( (argc - optind) < 1) {
+	if ((argc - optind) < 1) {
 		fprintf(stderr, "Not enough arguments.\n");
 		exit_status = -1;
 		goto out;
@@ -739,28 +764,28 @@ main(int argc, char** argv)
 
 	maximize_priority();
 
-	if (strcmp(argv[optind],"create") == 0) {
+	if (strcmp(argv[optind], "create") == 0) {
 		exit_status = init_devices();
-	} else if (strcmp(argv[optind],"dump") == 0) {
+	} else if (strcmp(argv[optind], "dump") == 0) {
 		exit_status = dump_headers();
-	} else if (strcmp(argv[optind],"allocate") == 0) {
-		exit_status = allocate_slots(argv[optind+1]);
-	} else if (strcmp(argv[optind],"list") == 0) {
+	} else if (strcmp(argv[optind], "allocate") == 0) {
+		exit_status = allocate_slots(argv[optind + 1]);
+	} else if (strcmp(argv[optind], "list") == 0) {
 		exit_status = list_slots();
-	} else if (strcmp(argv[optind],"message") == 0) {
-		exit_status = messenger(argv[optind+1], argv[optind+2]);
-	} else if (strcmp(argv[optind],"ping") == 0) {
-		exit_status = ping_via_slots(argv[optind+1]);
-	} else if (strcmp(argv[optind],"watch") == 0) {
+	} else if (strcmp(argv[optind], "message") == 0) {
+		exit_status = messenger(argv[optind + 1], argv[optind + 2]);
+	} else if (strcmp(argv[optind], "ping") == 0) {
+		exit_status = ping_via_slots(argv[optind + 1]);
+	} else if (strcmp(argv[optind], "watch") == 0) {
 		exit_status = inquisitor();
 	} else {
 		exit_status = -1;
 	}
 
-out:
+ out:
 	if (exit_status < 0) {
 		usage();
-		return(1);
+		return (1);
 	}
-	return(0);
+	return (0);
 }
