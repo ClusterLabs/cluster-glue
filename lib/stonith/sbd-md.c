@@ -206,9 +206,10 @@ static int ping_via_slots(const char *name)
 	return 0;
 }
 
-static int servant(const char *diskname, int prepare_only);
-static int servant(const char *diskname, int prepare_only)
+static int servant(const char *diskname, void* argp);
+static int servant(const char *diskname, void* argp)
 {
+	int prepare_only = (int)argp;
 	struct sector_mbox_s *s_mbox = NULL;
 	int mbox;
 	int rc = 0;
@@ -419,7 +420,7 @@ int assign_servant(const char *devname)
 	int pid = 0;
 	pid = fork();
 	if (pid == 0) {		/* child */
-		servant(devname, 0);
+		servant(devname, (void*)0);
 		exit(0);
 	} else if (pid != -1) {		/* parent */
 		return pid;
@@ -505,7 +506,7 @@ static int inquisitor(void)
 		DBGPRINT("fork servant for %s\n", s->devname);
 		pid = fork();
 		if (pid == 0) {	/* child */
-			rc = servant(s->devname, 1);
+			rc = servant(s->devname, (void*)1);
 			if (rc == -1)
 				exit(1);
 			else
