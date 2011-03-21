@@ -75,17 +75,6 @@ do { \
     if (rc == -1) break; \
 } while (0)
 
-#define CALL_WITH_DEVFD(func, dfd, params...)\
-do { \
-    int rc; \
-    int old_devfd = devfd; \
-    devfd = dfd; \
-    rc = func ( params ); \
-    devfd = old_devfd; \
-    if (rc == -1) return -1; \
-    return 0; \
-} while (0)
-
 static int init_devices(void);
 static int init_devices()
 {
