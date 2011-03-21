@@ -167,11 +167,14 @@ static int ping_via_slots(const char *name)
 				exit(1);
 			else
 				exit(0);
-		} else {
+		} else if (pid != -1) { /* parent */
 			DBGPRINT("servant for %s is delivering the ping\n",
 				 s->devname);
 			s->pid = pid;
 			servant_count++;
+		} else {
+			 DBGPRINT("failed to fork, exit\n");
+			 exit(1);
 		}
 		s = s->next;
 	}
@@ -418,8 +421,11 @@ int assign_servant(const char *devname)
 	if (pid == 0) {		/* child */
 		servant(devname, 0);
 		exit(0);
-	} else {		/* parent */
+	} else if (pid != -1) {		/* parent */
 		return pid;
+	} else {
+		DBGPRINT("Failed to fork servant\n");
+		exit(1);
 	}
 }
 
@@ -503,9 +509,12 @@ static int inquisitor(void)
 				exit(1);
 			else
 				exit(0);
-		} else {	/* parent */
+		} else if (pid != -1) {	/* parent */
 			DBGPRINT("servant for %s is working\n", s->devname);
 			servant_count++;
+		} else {
+			DBGPRINT("Failed to fork servant\n");
+			exit(1);
 		}
 		s = s->next;
 	}
@@ -649,10 +658,13 @@ static int messenger(const char *name, const char *msg)
 				exit(1);
 			else
 				exit(0);
-		} else {	/* parent */
+		} else if (pid != -1) {	/* parent */
 			DBGPRINT("servant for %s is working\n", s->devname);
 			s->pid = pid;
 			servant_count++;
+		} else {
+			DBGPRINT("Failed to fork servant\n");
+			exit(1);
 		}
 		s = s->next;
 	}
