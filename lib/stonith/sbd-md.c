@@ -63,16 +63,14 @@ struct servants_list_item *servants_leader = NULL;
 
 #define CALL_WITH_DEVNAME(func, dvn, params...) \
 do { \
-    int old_devfd = devfd; \
-	const char* old_devname = devname; \
-	rc = 0; \
-    devname = dvn; \
-    rc = open_device(devname); \
-    if (rc == -1) break; \
-    rc = func ( params ); \
+	int devfd; \
+	rc = -1; \
+    devfd = open_device(dvn); \
+    if (devfd == -1) break; \
+    rc = func ( devfd, ##params ); \
     close(devfd); \
-	devfd = old_devfd; devname = old_devname; \
     if (rc == -1) break; \
+	rc = 0; \
 } while (0)
 
 typedef int (*functionp_t)(const char* devname, const void* argp);
@@ -137,17 +135,16 @@ static int allocate_slots(const char *name);
 static int allocate_slots(const char *name)
 {
 	int rc = 0;
+	int devfd;
 	struct servants_list_item *s = servants_leader;
 	while (s != NULL) {
 		DBGPRINT("allocate on device %s\n", s->devname);
-		rc = open_device(s->devname);
-		if (rc == -1) {
+		devfd = open_device(s->devname);
+		if (devfd == -1) {
 			return -1;
 		}
-		devname = s->devname;
-		rc = slot_allocate(name);
+		rc = slot_allocate(devfd, name);
 		close(devfd);
-		devname = NULL;
 		if (rc == -1)
 			return rc;
 		DBGPRINT("allocation on %s done\n", s->devname);
@@ -234,16 +231,12 @@ static int servant(const char *diskname, const void* argp)
 	time_t t0, t1, latency;
 	union sigval signal_value;
 	sigset_t servant_masks;
-
-	if (devfd != -1) {
-		close(devfd);
-	}
+	int devfd;
 
 	if (!diskname) {
 		cl_log(LOG_ERR, "Empty disk name %s.", diskname);
 		return -1;
 	}
-	devname = diskname;
 
 	/* Block most of the signals */
 	sigfillset(&servant_masks);
@@ -255,9 +248,9 @@ static int servant(const char *diskname, const void* argp)
 	/* FIXME: check error */
 	sigprocmask(SIG_SETMASK, &servant_masks, NULL);
 
-	devfd = open(devname, O_SYNC | O_RDWR | O_DIRECT);
+	devfd = open(diskname, O_SYNC | O_RDWR | O_DIRECT);
 	if (devfd == -1) {
-		cl_perror("Opening disk %s failed.", devname);
+		cl_perror("Opening disk %s failed.", diskname);
 		return -1;
 	}
 	ioctl(devfd, BLKSSZGET, &sector_size);
@@ -267,18 +260,18 @@ static int servant(const char *diskname, const void* argp)
 		return -1;
 	}
 
-	mbox = slot_allocate(local_uname);
+	mbox = slot_allocate(devfd, local_uname);
 	if (mbox < 0) {
 		cl_log(LOG_ERR,
 		       "No slot allocated, and automatic allocation failed for disk %s.",
-		       devname);
+		       diskname);
 		rc = -1;
 		goto out;
 	}
-	cl_log(LOG_INFO, "Monitoring slot %d on disk %s", mbox, devname);
+	cl_log(LOG_INFO, "Monitoring slot %d on disk %s", mbox, diskname);
 
 	s_mbox = sector_alloc();
-	if (mbox_write(mbox, s_mbox) < 0) {
+	if (mbox_write(devfd, mbox, s_mbox) < 0) {
 		rc = -1;
 		goto out;
 	}
@@ -291,7 +284,7 @@ static int servant(const char *diskname, const void* argp)
 	while (1) {
 		t0 = time(NULL);
 		sleep(timeout_loop);
-		if (mbox_read(mbox, s_mbox) < 0) {
+		if (mbox_read(devfd, mbox, s_mbox) < 0) {
 			cl_log(LOG_ERR, "mbox read failed.");
 			do_reset();
 		}
@@ -299,12 +292,12 @@ static int servant(const char *diskname, const void* argp)
 		if (s_mbox->cmd > 0) {
 			cl_log(LOG_INFO,
 			       "Received command %s from %s on disk %s",
-			       char2cmd(s_mbox->cmd), s_mbox->from, devname);
+			       char2cmd(s_mbox->cmd), s_mbox->from, diskname);
 
 			switch (s_mbox->cmd) {
 			case SBD_MSG_TEST:
 				memset(s_mbox, 0, sizeof(*s_mbox));
-				mbox_write(mbox, s_mbox);
+				mbox_write(devfd, mbox, s_mbox);
 				sigqueue(getppid(), SIG_TEST, signal_value);
 				break;
 			case SBD_MSG_RESET:
@@ -323,9 +316,9 @@ static int servant(const char *diskname, const void* argp)
 				   log it and clear the slot.
 				 */
 				cl_log(LOG_ERR, "Unknown message on disk %s",
-				       devname);
+				       diskname);
 				memset(s_mbox, 0, sizeof(*s_mbox));
-				mbox_write(mbox, s_mbox);
+				mbox_write(devfd, mbox, s_mbox);
 				break;
 			}
 		}
@@ -337,10 +330,10 @@ static int servant(const char *diskname, const void* argp)
 			cl_log(LOG_WARNING,
 			       "Latency: %d exceeded threshold %d on disk %s",
 			       (int)latency, (int)timeout_watchdog_warn,
-			       devname);
+			       diskname);
 		} else if (debug) {
 			cl_log(LOG_INFO, "Latency: %d on disk %s", (int)latency,
-			       devname);
+			       diskname);
 		}
 	}
  out:

@@ -44,8 +44,8 @@ char *	local_uname;
 /* Global, non-tunable variables: */
 int	sector_size		= 0;
 int	watchdogfd 		= -1;
-int	devfd;
-const char	*devname;
+
+/*const char	*devname;*/
 const char	*cmdname;
 
 void
@@ -205,6 +205,7 @@ maximize_priority(void)
 int
 open_device(const char* devname)
 {
+	int devfd;
 	if (!devname)
 		return -1;
 
@@ -221,7 +222,7 @@ open_device(const char* devname)
 		cl_perror("Get sector size failed.\n");
 		return -1;
 	}
-	return 0;
+	return devfd;
 }
 
 signed char
@@ -281,7 +282,7 @@ char2cmd(const char cmd)
 }
 
 int
-sector_write(int sector, const void *data)
+sector_write(int devfd, int sector, const void *data)
 {
 	if (lseek(devfd, sector_size*sector, 0) < 0) {
 		cl_perror("sector_write: lseek() failed");
@@ -296,7 +297,7 @@ sector_write(int sector, const void *data)
 }
 
 int
-sector_read(int sector, void *data)
+sector_read(int devfd, int sector, void *data)
 {
 	if (lseek(devfd, sector_size*sector, 0) < 0) {
 		cl_perror("sector_read: lseek() failed");
@@ -311,40 +312,40 @@ sector_read(int sector, void *data)
 }
 
 int
-slot_read(int slot, struct sector_node_s *s_node)
+slot_read(int devfd, int slot, struct sector_node_s *s_node)
 {
-	return sector_read(SLOT_TO_SECTOR(slot), s_node);
+	return sector_read(devfd, SLOT_TO_SECTOR(slot), s_node);
 }
 
 int
-slot_write(int slot, const struct sector_node_s *s_node)
+slot_write(int devfd, int slot, const struct sector_node_s *s_node)
 {
-	return sector_write(SLOT_TO_SECTOR(slot), s_node);
+	return sector_write(devfd, SLOT_TO_SECTOR(slot), s_node);
 }
 
 int
-mbox_write(int mbox, const struct sector_mbox_s *s_mbox)
+mbox_write(int devfd, int mbox, const struct sector_mbox_s *s_mbox)
 {
-	return sector_write(MBOX_TO_SECTOR(mbox), s_mbox);
+	return sector_write(devfd, MBOX_TO_SECTOR(mbox), s_mbox);
 }
 
 int
-mbox_read(int mbox, struct sector_mbox_s *s_mbox)
+mbox_read(int devfd, int mbox, struct sector_mbox_s *s_mbox)
 {
-	return sector_read(MBOX_TO_SECTOR(mbox), s_mbox);
+	return sector_read(devfd, MBOX_TO_SECTOR(mbox), s_mbox);
 }
 
 int
-mbox_write_verify(int mbox, const struct sector_mbox_s *s_mbox)
+mbox_write_verify(int devfd, int mbox, const struct sector_mbox_s *s_mbox)
 {
 	void *data;
 	int rc = 0;
 
-	if (sector_write(MBOX_TO_SECTOR(mbox), s_mbox) < 0)
+	if (sector_write(devfd, MBOX_TO_SECTOR(mbox), s_mbox) < 0)
 		return -1;
 
 	data = sector_alloc();
-	if (sector_read(MBOX_TO_SECTOR(mbox), data) < 0) {
+	if (sector_read(devfd, MBOX_TO_SECTOR(mbox), data) < 0) {
 		rc = -1;
 		goto out;
 	}
@@ -361,20 +362,20 @@ out:
 	return rc;
 }
 
-int header_write(struct sector_header_s *s_header)
+int header_write(int devfd, struct sector_header_s *s_header)
 {
 	s_header->sector_size = htonl(s_header->sector_size);
 	s_header->timeout_watchdog = htonl(s_header->timeout_watchdog);
 	s_header->timeout_allocate = htonl(s_header->timeout_allocate);
 	s_header->timeout_loop = htonl(s_header->timeout_loop);
 	s_header->timeout_msgwait = htonl(s_header->timeout_msgwait);
-	return sector_write(0, s_header);
+	return sector_write(devfd, 0, s_header);
 }
 
 int
-header_read(struct sector_header_s *s_header)
+header_read(int devfd, struct sector_header_s *s_header)
 {
-	if (sector_read(0, s_header) < 0)
+	if (sector_read(devfd, 0, s_header) < 0)
 		return -1;
 
 	s_header->sector_size = ntohl(s_header->sector_size);
@@ -410,18 +411,18 @@ valid_header(const struct sector_header_s *s_header)
 }
 
 struct sector_header_s *
-header_get(void)
+header_get(int devfd)
 {
 	struct sector_header_s *s_header;
 	s_header = sector_alloc();
 
-	if (header_read(s_header) < 0) {
-		cl_log(LOG_ERR, "Unable to read header from %s", devname);
+	if (header_read(devfd, s_header) < 0) {
+		cl_log(LOG_ERR, "Unable to read header from device %d", devfd);
 		return NULL;
 	}
 
 	if (valid_header(s_header) < 0) {
-		cl_log(LOG_ERR, "%s is not valid.", devname);
+		cl_log(LOG_ERR, "header on device %d is not valid.", devfd);
 		return NULL;
 	}
 
@@ -432,7 +433,7 @@ header_get(void)
 }
 
 int
-init_device(void)
+init_device(int devfd)
 {
 	struct sector_header_s	*s_header;
 	struct sector_node_s	*s_node;
@@ -457,20 +458,20 @@ init_device(void)
 	/* printf("st_size = %ld, st_blksize = %ld, st_blocks = %ld\n",
 			s.st_size, s.st_blksize, s.st_blocks); */
 
-	cl_log(LOG_INFO, "Creating version %d header on %s",
+	cl_log(LOG_INFO, "Creating version %d header on device %d",
 			s_header->version,
-			devname);
-	if (header_write(s_header) < 0) {
+			devfd);
+	if (header_write(devfd, s_header) < 0) {
 		rc = -1; goto out;
 	}
-	cl_log(LOG_INFO, "Initializing %d slots on %s",
+	cl_log(LOG_INFO, "Initializing %d slots on device %d",
 			s_header->slots,
-			devname);
+			devfd);
 	for (i=0;i < s_header->slots;i++) {
-		if (slot_write(i, s_node) < 0) {
+		if (slot_write(devfd, i, s_node) < 0) {
 			rc = -1; goto out;
 		}
-		if (mbox_write(i, s_mbox) < 0) {
+		if (mbox_write(devfd, i, s_mbox) < 0) {
 			rc = -1; goto out;
 		}
 	}
@@ -485,7 +486,7 @@ out:	free(s_node);
  * slot number. If not found, returns -1.
  * This is necessary because slots might not be continuous. */
 int
-slot_lookup(const struct sector_header_s *s_header, const char *name)
+slot_lookup(int devfd, const struct sector_header_s *s_header, const char *name)
 {
 	struct sector_node_s	*s_node = NULL;
 	int 			i;
@@ -499,7 +500,7 @@ slot_lookup(const struct sector_header_s *s_header, const char *name)
 	s_node = sector_alloc();
 
 	for (i=0; i < s_header->slots; i++) {
-		if (slot_read(i, s_node) < 0) {
+		if (slot_read(devfd, i, s_node) < 0) {
 			rc = -1; goto out;
 		}
 		if (s_node->in_use != 0) {
@@ -516,7 +517,7 @@ out:	free(s_node);
 }
 
 int
-slot_unused(const struct sector_header_s *s_header)
+slot_unused(int devfd, const struct sector_header_s *s_header)
 {
 	struct sector_node_s	*s_node;
 	int 			i;
@@ -525,7 +526,7 @@ slot_unused(const struct sector_header_s *s_header)
 	s_node = sector_alloc();
 
 	for (i=0; i < s_header->slots; i++) {
-		if (slot_read(i, s_node) < 0) {
+		if (slot_read(devfd, i, s_node) < 0) {
 			rc = -1; goto out;
 		}
 		if (s_node->in_use == 0) {
@@ -539,7 +540,7 @@ out:	free(s_node);
 
 
 int
-slot_allocate(const char *name)
+slot_allocate(int devfd, const char *name)
 {
 	struct sector_header_s	*s_header = NULL;
 	struct sector_node_s	*s_node = NULL;
@@ -552,7 +553,7 @@ slot_allocate(const char *name)
 		rc = -1; goto out;
 	}
 
-	s_header = header_get();
+	s_header = header_get(devfd);
 	if (!s_header) {
 		rc = -1; goto out;
 	}
@@ -561,18 +562,18 @@ slot_allocate(const char *name)
 	s_mbox = sector_alloc();
 
 	while (1) {
-		i = slot_lookup(s_header, name);
+		i = slot_lookup(devfd, s_header, name);
 		if (i >= 0) {
 			rc = i; goto out;
 		}
 
-		i = slot_unused(s_header);
+		i = slot_unused(devfd, s_header);
 		if (i >= 0) {
 			cl_log(LOG_INFO, "slot %d is unused - trying to own", i);
 			memset(s_node, 0, sizeof(*s_node));
 			s_node->in_use = 1;
 			strncpy(s_node->name, name, sizeof(s_node->name));
-			if (slot_write(i, s_node) < 0) {
+			if (slot_write(devfd, i, s_node) < 0) {
 				rc = -1; goto out;
 			}
 			sleep(timeout_allocate);
@@ -589,7 +590,7 @@ out:	free(s_node);
 }
 
 int
-slot_list(void)
+slot_list(int devfd)
 {
 	struct sector_header_s	*s_header = NULL;
 	struct sector_node_s	*s_node = NULL;
@@ -597,7 +598,7 @@ slot_list(void)
 	int 			i;
 	int			rc = 0;
 
-	s_header = header_get();
+	s_header = header_get(devfd);
 	if (!s_header) {
 		rc = -1; goto out;
 	}
@@ -606,11 +607,11 @@ slot_list(void)
 	s_mbox = sector_alloc();
 
 	for (i=0; i < s_header->slots; i++) {
-		if (slot_read(i, s_node) < 0) {
+		if (slot_read(devfd, i, s_node) < 0) {
 			rc = -1; goto out;
 		}
 		if (s_node->in_use > 0) {
-			if (mbox_read(i, s_mbox) < 0) {
+			if (mbox_read(devfd, i, s_mbox) < 0) {
 				rc = -1; goto out;
 			}
 			printf("%d\t%s\t%s\t%s\n",
@@ -626,7 +627,7 @@ out:	free(s_node);
 }
 
 int
-slot_msg(const char *name, const char *cmd)
+slot_msg(int devfd, const char *name, const char *cmd)
 {
 	struct sector_header_s	*s_header = NULL;
 	struct sector_mbox_s	*s_mbox = NULL;
@@ -638,7 +639,7 @@ slot_msg(const char *name, const char *cmd)
 		rc = -1; goto out;
 	}
 
-	s_header = header_get();
+	s_header = header_get(devfd);
 	if (!s_header) {
 		rc = -1; goto out;
 	}
@@ -647,7 +648,7 @@ slot_msg(const char *name, const char *cmd)
 		name = local_uname;
 	}
 
-	mbox = slot_lookup(s_header, name);
+	mbox = slot_lookup(devfd, s_header, name);
 	if (mbox < 0) {
 		cl_log(LOG_ERR, "slot_msg(): No slot found for %s.", name);
 		rc = -1; goto out;
@@ -665,7 +666,7 @@ slot_msg(const char *name, const char *cmd)
 
 	cl_log(LOG_INFO, "Writing %s to node slot %s",
 			cmd, name);
-	if (mbox_write_verify(mbox, s_mbox) < -1) {
+	if (mbox_write_verify(devfd, mbox, s_mbox) < -1) {
 		rc = -1; goto out;
 	}
 	if (strcasecmp(cmd, "exit") != 0) {
@@ -680,7 +681,7 @@ out:	free(s_mbox);
 }
 
 int
-slot_ping(const char *name)
+slot_ping(int devfd, const char *name)
 {
 	struct sector_header_s	*s_header = NULL;
 	struct sector_mbox_s	*s_mbox = NULL;
@@ -693,7 +694,7 @@ slot_ping(const char *name)
 		rc = -1; goto out;
 	}
 
-	s_header = header_get();
+	s_header = header_get(devfd);
 	if (!s_header) {
 		rc = -1; goto out;
 	}
@@ -702,7 +703,7 @@ slot_ping(const char *name)
 		name = local_uname;
 	}
 
-	mbox = slot_lookup(s_header, name);
+	mbox = slot_lookup(devfd, s_header, name);
 	if (mbox < 0) {
 		cl_log(LOG_ERR, "slot_msg(): No slot found for %s.", name);
 		rc = -1; goto out;
@@ -714,13 +715,13 @@ slot_ping(const char *name)
 	strncpy(s_mbox->from, local_uname, sizeof(s_mbox->from)-1);
 
 	cl_log(LOG_DEBUG, "Pinging node %s", name);
-	if (mbox_write(mbox, s_mbox) < -1) {
+	if (mbox_write(devfd, mbox, s_mbox) < -1) {
 		rc = -1; goto out;
 	}
 
 	rc = -1;
 	while (waited <= timeout_msgwait) {
-		if (mbox_read(mbox, s_mbox) < 0)
+		if (mbox_read(devfd, mbox, s_mbox) < 0)
 			break;
 		if (s_mbox->cmd != SBD_MSG_TEST) {
 			rc = 0;
@@ -809,10 +810,10 @@ make_daemon(void)
 }
 
 int
-header_dump(void)
+header_dump(int devfd)
 {
 	struct sector_header_s *s_header;
-	s_header = header_get();
+	s_header = header_get(devfd);
 	if (s_header == NULL)
 		return -1;
 
