@@ -484,6 +484,20 @@ int check_timeout_inconsistent(const char* devname)
 		return 0;
 }
 
+inline void cleanup_servant_by_pid(int pid)
+{
+	struct servants_list_item* s;
+	s = lookup_servant_by_pid(pid);
+	s->pid = 0;
+}
+
+inline void restart_servant_by_pid(int pid)
+{
+	struct servants_list_item* s;
+	s = lookup_servant_by_pid(pid);
+	s->pid = assign_servant(s->devname, servant, (const void*)SERVANT_DO_FULLJOB);
+}
+
 int inquisitor(void)
 {
 	int sig, pid, i;
@@ -545,7 +559,7 @@ int inquisitor(void)
 				} else {
 					DBGPRINT("process %d finished\n", pid);
 					tdevname = lookup_servant_by_pid(pid)->devname;
-					lookup_servant_by_pid(pid)->pid = 0;
+					cleanup_servant_by_pid(pid);
 					servant_finished++;
 					if (WIFEXITED(status)
 					    && WEXITSTATUS(status) == 0) {
@@ -599,29 +613,22 @@ int inquisitor(void)
 				if (pid == -1 && errno == ECHILD) {
 					break;
 				} else if (exiting == 1) {
-					lookup_servant_by_pid(pid)->pid = 0;
-					if (check_all_dead()) exit(0);
+					cleanup_servant_by_pid(pid);
+					if (check_all_dead())
+						exit(0);
 				} else {
 					if (WIFEXITED(status)) {	/* terminated normally */
 						DBGPRINT
 						    ("terminated normally\n");
-						lookup_servant_by_pid(pid)->
-						    pid = 0;
+						cleanup_servant_by_pid(pid);
 					} else if (WIFSIGNALED(status)) {	/* by signal */
 						if (WTERMSIG(status) != SIGKILL) {
 							DBGPRINT
 							    ("something wrong, restart it\n");
-							tdevname =
-							    lookup_servant_by_pid
-							    (pid)->devname;
-							lookup_servant_by_pid
-							    (pid)->pid =
-							    assign_servant
-							    (tdevname, servant, (const void*)0);
+							restart_servant_by_pid(pid);
 						} else {
 							DBGPRINT("killed\n");
-							lookup_servant_by_pid
-							    (pid)->pid = 0;
+							cleanup_servant_by_pid(pid);
 						}
 					}
 				}

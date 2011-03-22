@@ -137,3 +137,5 @@ void foreach_servants(int live);
 int inquisitor(void);
 int messenger(const char *name, const char *msg);
 int check_timeout_inconsistent(const char* devname);
+void restart_servant_by_pid(int pid);
+void cleanup_servant_by_pid(int pid);
