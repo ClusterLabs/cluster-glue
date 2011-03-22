@@ -61,21 +61,7 @@ struct servants_list_item *servants_leader = NULL;
 #define DBGPRINT(...) do {} while (0)
 #endif
 
-/*
-#define CALL_WITH_DEVNAME(func, dvn, params...) \
-do { \
-	int devfd; \
-	rc = -1; \
-    devfd = open_device(dvn); \
-    if (devfd == -1) break; \
-    rc = func ( devfd, ##params ); \
-    close(devfd); \
-    if (rc == -1) break; \
-	rc = 0; \
-} while (0)
-*/
-
-int assign_servant_ex(const char* devname, functionp_t functionp, const void* argp)
+int assign_servant(const char* devname, functionp_t functionp, const void* argp)
 {
 	int pid = 0;
 	int rc = 0;
@@ -199,7 +185,7 @@ int ping_via_slots(const char *name)
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
 
 	while (s != NULL) {
-		pid = assign_servant_ex(s->devname, &slot_ping_wrapper, (const void*)name);
+		pid = assign_servant(s->devname, &slot_ping_wrapper, (const void*)name);
 		s -> pid = pid;
 		servant_count++;
 		s = s->next;
@@ -382,36 +368,6 @@ int recruit_servant(const char *devname, int pid)
 	return 0;
 }
 
-#if 0
-int disband_servant_by_dev(const char *devname);
-int disband_servant_by_dev(const char *devname)
-{
-	int pid;
-	struct servants_list_item *s = servants_leader;
-	struct servants_list_item *p = servants_leader;
-	while (s != NULL) {
-		if (!strncasecmp(s->devname, devname, strlen(s->devname))) {
-			pid = s->pid;
-			free((char *)(s->devname));
-			if (s == p)
-				servants_leader = s->next;
-			else
-				p->next = s->next;
-			free(s);
-			return pid;
-		}
-		if (s == p) {
-			s = s->next;
-		} else {
-			p = s;
-			s = s->next;
-		}
-	}
-	/* no such servant */
-	return 0;
-}
-#endif
-
 struct servants_list_item *lookup_servant_by_dev(const char *devname)
 {
 	struct servants_list_item *s = servants_leader;
@@ -434,21 +390,6 @@ struct servants_list_item *lookup_servant_by_pid(int pid)
 			s = s->next;
 	}
 	return s;
-}
-
-int assign_servant(const char *devname)
-{
-	int pid = 0;
-	pid = fork();
-	if (pid == 0) {		/* child */
-		servant(devname, (void*)0);
-		exit(0);
-	} else if (pid != -1) {		/* parent */
-		return pid;
-	} else {
-		DBGPRINT("Failed to fork servant\n");
-		exit(1);
-	}
 }
 
 int check_all_dead(void)
@@ -483,7 +424,7 @@ void deploy_servants(int live)
 			if (r == -1 && errno == ESRCH) {
 				/* FIXME: process gone, start a new one */
 				if (live)
-					s->pid = assign_servant(s->devname);
+					s->pid = assign_servant(s->devname, servant, (const void*)0);
 			} else {
 				/* servants still working */
 				if (!live)
@@ -492,7 +433,7 @@ void deploy_servants(int live)
 		} else {
 			/* FIXME: start new one */
 			if (live)
-				s->pid = assign_servant(s->devname);
+				s->pid = assign_servant(s->devname, servant, (const void*)0);
 		}
 		s = s->next;
 	}
@@ -575,7 +516,7 @@ int inquisitor(void)
 
 	s = servants_leader;
 	while (s != NULL) {
-		pid = assign_servant_ex(s->devname, &servant, (const void*)1);
+		pid = assign_servant(s->devname, &servant, (const void*)1);
 		servant_count++;
 		s = s->next;
 	}
@@ -662,7 +603,7 @@ int inquisitor(void)
 							lookup_servant_by_pid
 							    (pid)->pid =
 							    assign_servant
-							    (tdevname);
+							    (tdevname, servant, (const void*)0);
 						} else {
 							DBGPRINT("killed\n");
 							lookup_servant_by_pid
@@ -736,7 +677,7 @@ int messenger(const char *name, const char *msg)
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
 
 	while (s != NULL) {
-		pid = assign_servant_ex(s->devname, &slot_msg_wrapper, &slot_msg_arg);
+		pid = assign_servant(s->devname, &slot_msg_wrapper, &slot_msg_arg);
 		s->pid = pid;
 		servant_count++;
 		s = s->next;

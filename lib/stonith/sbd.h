@@ -115,7 +115,7 @@ extern const char* cmdname;
 
 typedef int (*functionp_t)(const char* devname, const void* argp);
 
-int assign_servant_ex(const char* devname, functionp_t functionp, const void* argp);
+int assign_servant(const char* devname, functionp_t functionp, const void* argp);
 int init_devices(void);
 struct slot_msg_arg_t {
 	const char* name;
@@ -133,7 +133,6 @@ int servant(const char *diskname, const void* argp);
 int recruit_servant(const char *devname, int pid);
 struct servants_list_item *lookup_servant_by_dev(const char *devname);
 struct servants_list_item *lookup_servant_by_pid(int pid);
-int assign_servant(const char *devname);
 void deploy_servants(int live);
 int inquisitor(void);
 int messenger(const char *name, const char *msg);
