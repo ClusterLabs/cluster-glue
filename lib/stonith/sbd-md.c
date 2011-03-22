@@ -47,6 +47,11 @@
 
 struct servants_list_item *servants_leader = NULL;
 
+enum {
+	SERVANT_DEPLOY,
+	SERVANT_CALLBACK
+};
+
 /* signals reserved for multi-disk sbd */
 #define SIG_LIVENESS (SIGRTMIN + 1)	/* report liveness of the disk */
 #define SIG_EXITREQ  (SIGRTMIN + 2)	/* exit request to inquisitor */
@@ -417,7 +422,7 @@ int check_all_dead(void)
 }
 
 
-void deploy_servants(int live)
+void foreach_servants(int mission)
 {
 	struct servants_list_item *s = servants_leader;
 	int r = 0;
@@ -427,16 +432,16 @@ void deploy_servants(int live)
 			r = sigqueue(s->pid, 0, svalue);
 			if (r == -1 && errno == ESRCH) {
 				/* FIXME: process gone, start a new one */
-				if (live)
+				if (mission == SERVANT_DEPLOY)
 					s->pid = assign_servant(s->devname, servant, (const void*)0);
 			} else {
 				/* servants still working */
-				if (!live)
+				if (mission == SERVANT_CALLBACK)
 					sigqueue(s->pid, SIGKILL, svalue);
 			}
 		} else {
 			/* FIXME: start new one */
-			if (live)
+			if (mission == SERVANT_DEPLOY)
 				s->pid = assign_servant(s->devname, servant, (const void*)0);
 		}
 		s = s->next;
@@ -573,7 +578,7 @@ int inquisitor(void)
 	}
 
 	make_daemon();
-	deploy_servants(1);
+	foreach_servants(SERVANT_DEPLOY);
 	if (watchdog_use != 0)
 		watchdog_init();
 
@@ -581,7 +586,7 @@ int inquisitor(void)
 		sig = sigwaitinfo(&procmask, &sinfo);
 		DBGPRINT("get signal %d\n", sig);
 		if (sig == SIGINT || sig == SIG_EXITREQ) {
-			deploy_servants(0);
+			foreach_servants(SERVANT_CALLBACK);
 			watchdog_close();
 			exiting = 1;
 		} else if (sig == SIGCHLD) {
@@ -652,7 +657,7 @@ int inquisitor(void)
 				continue;
 			watchdog_tickle();
 			DBGPRINT("USR1 recieved\n");
-			deploy_servants(1);
+			foreach_servants(SERVANT_DEPLOY);
 			DBGPRINT("servants restarted\n");
 			memset(reports, 0, sizeof(int) * expect_report);
 			watchdog_tickle();
