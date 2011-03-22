@@ -128,6 +128,7 @@ int list_slots(void);
 int ping_via_slots(const char *name);
 int dump_headers(void);
 
+int check_all_dead(void);
 int servant(const char *diskname, const void* argp);
 int recruit_servant(const char *devname, int pid);
 struct servants_list_item *lookup_servant_by_dev(const char *devname);
