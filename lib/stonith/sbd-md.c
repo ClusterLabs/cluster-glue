@@ -75,10 +75,10 @@ do { \
     if (rc == -1) break; \
 } while (0)
 
-typedef int (*functionp_t)(const char* devname, void* argp);
+typedef int (*functionp_t)(const char* devname, const void* argp);
 
-int assign_servant_ex(const char* devname, functionp_t functionp, void* argp);
-int assign_servant_ex(const char* devname, functionp_t functionp, void* argp)
+int assign_servant_ex(const char* devname, functionp_t functionp, const void* argp);
+int assign_servant_ex(const char* devname, functionp_t functionp, const void* argp)
 {
 	int pid = 0;
 	int rc = 0;
@@ -115,17 +115,17 @@ struct slot_msg_arg_t {
 	const char* name;
 	const char* msg;
 };
-int slot_msg_wrapper(const char* devname, void* argp);
-int slot_msg_wrapper(const char* devname, void* argp)
+int slot_msg_wrapper(const char* devname, const void* argp);
+int slot_msg_wrapper(const char* devname, const void* argp)
 {
   int rc = 0;
-  struct slot_msg_arg_t* arg = (struct slot_msg_arg_t*)argp;
+  const struct slot_msg_arg_t* arg = (const struct slot_msg_arg_t*)argp;
   CALL_WITH_DEVNAME(slot_msg, devname, arg->name, arg->msg);
   return rc;
 }
 
-int slot_ping_wrapper(const char* devname, void* argp);
-int slot_ping_wrapper(const char* devname, void* argp)
+int slot_ping_wrapper(const char* devname, const void* argp);
+int slot_ping_wrapper(const char* devname, const void* argp)
 {
 	int rc = 0;
 	const char* name = (const char*)argp;
@@ -190,7 +190,7 @@ static int ping_via_slots(const char *name)
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
 
 	while (s != NULL) {
-		pid = assign_servant_ex(s->devname, &slot_ping_wrapper, (void*)name);
+		pid = assign_servant_ex(s->devname, &slot_ping_wrapper, (const void*)name);
 		s -> pid = pid;
 		servant_count++;
 		s = s->next;
@@ -224,8 +224,8 @@ static int ping_via_slots(const char *name)
 	return 0;
 }
 
-static int servant(const char *diskname, void* argp);
-static int servant(const char *diskname, void* argp)
+static int servant(const char *diskname, const void* argp);
+static int servant(const char *diskname, const void* argp)
 {
 	int prepare_only = (int)argp;
 	struct sector_mbox_s *s_mbox = NULL;
@@ -521,7 +521,7 @@ static int inquisitor(void)
 
 	s = servants_leader;
 	while (s != NULL) {
-		pid = assign_servant_ex(s->devname, &servant, (void*)1);
+		pid = assign_servant_ex(s->devname, &servant, (const void*)1);
 		servant_count++;
 		s = s->next;
 	}
