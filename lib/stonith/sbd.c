@@ -41,15 +41,15 @@
 
 #include "sbd.h"
 
-static int daemonize(void);
-static int daemonize(void)
+static int daemonize(int devfd);
+static int daemonize(int devfd)
 {
 	struct sector_mbox_s	*s_mbox = NULL;
 	int			mbox;
 	int			rc = 0;
 	time_t			t0, t1, latency;
 
-	mbox = slot_allocate(local_uname);
+	mbox = slot_allocate(devfd, local_uname);
 	if (mbox < 0) {
 		cl_log(LOG_ERR, "No slot allocated, and automatic allocation failed.");
 		rc = -1; goto out;
@@ -58,7 +58,7 @@ static int daemonize(void)
 
 	/* Clear mbox once on start */
 	s_mbox = sector_alloc();
-	if (mbox_write(mbox, s_mbox) < 0) {
+	if (mbox_write(devfd, mbox, s_mbox) < 0) {
 		rc = -1; goto out;
 	}
 
@@ -74,7 +74,7 @@ static int daemonize(void)
 		t0 = time(NULL);
 		sleep(timeout_loop);
 
-		if (mbox_read(mbox, s_mbox) < 0) {
+		if (mbox_read(devfd, mbox, s_mbox) < 0) {
 			cl_log(LOG_ERR, "mbox read failed.");
 			do_reset();
 		}
@@ -86,7 +86,7 @@ static int daemonize(void)
 			switch (s_mbox->cmd) {
 			case SBD_MSG_TEST:
 				memset(s_mbox, 0, sizeof(*s_mbox));
-				mbox_write(mbox, s_mbox);
+				mbox_write(devfd, mbox, s_mbox);
 				break;
 			case SBD_MSG_RESET:
 				do_reset();
@@ -136,6 +136,8 @@ main(int argc, char** argv)
 {
 	int		exit_status = 0;
 	int		c;
+	int		devfd;
+	const char* devname;
 
 	if ((cmdname = strrchr(argv[0], '/')) == NULL) {
 		cmdname = argv[0];
@@ -205,25 +207,25 @@ main(int argc, char** argv)
 	}
 
 	maximize_priority();
-	if (open_device(devname) < 0) {
+	if ((devfd = open_device(devname)) < 0) {
 		exit_status = -1;
 		goto out;
 	}
 
 	if (strcmp(argv[optind],"create") == 0) {
-		exit_status = init_device();
+		exit_status = init_device(devfd);
 	} else if (strcmp(argv[optind],"dump") == 0) {
-		exit_status = header_dump();
+		exit_status = header_dump(devfd);
 	} else if (strcmp(argv[optind],"allocate") == 0) {
-		exit_status = slot_allocate(argv[optind+1]);
+		exit_status = slot_allocate(devfd, argv[optind+1]);
 	} else if (strcmp(argv[optind],"list") == 0) {
-		exit_status = slot_list();
+		exit_status = slot_list(devfd);
 	} else if (strcmp(argv[optind],"message") == 0) {
-		exit_status = slot_msg(argv[optind+1], argv[optind+2]);
+		exit_status = slot_msg(devfd, argv[optind+1], argv[optind+2]);
 	} else if (strcmp(argv[optind],"ping") == 0) {
-		exit_status = slot_ping(argv[optind+1]);
+		exit_status = slot_ping(devfd, argv[optind+1]);
 	} else if (strcmp(argv[optind],"watch") == 0) {
-		exit_status = daemonize();
+		exit_status = daemonize(devfd);
 	} else {
 		exit_status = -1;
 	}
