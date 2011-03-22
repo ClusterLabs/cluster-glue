@@ -61,6 +61,7 @@ struct servants_list_item *servants_leader = NULL;
 #define DBGPRINT(...) do {} while (0)
 #endif
 
+/*
 #define CALL_WITH_DEVNAME(func, dvn, params...) \
 do { \
 	int devfd; \
@@ -72,6 +73,7 @@ do { \
     if (rc == -1) break; \
 	rc = 0; \
 } while (0)
+*/
 
 int assign_servant_ex(const char* devname, functionp_t functionp, const void* argp)
 {
@@ -94,12 +96,20 @@ int assign_servant_ex(const char* devname, functionp_t functionp, const void* ar
 int init_devices()
 {
 	int rc = 0;
+	int devfd;
 	struct servants_list_item *s = servants_leader;
 	while (s != NULL) {
 		DBGPRINT("init device %s\n", s->devname);
-		CALL_WITH_DEVNAME(init_device, s->devname);
-		if (rc == -1)
+		devfd = open_device(s->devname);
+		if (devfd == -1) {
+			return -1;
+		}
+		rc = init_device(devfd);
+		close(devfd);
+		if (rc == -1) {
+			fprintf(stderr, "failed to init device %s", s->devname);
 			return rc;
+		}
 		s = s->next;
 	}
 	return 0;
@@ -107,17 +117,27 @@ int init_devices()
 
 int slot_msg_wrapper(const char* devname, const void* argp)
 {
-  int rc = 0;
-  const struct slot_msg_arg_t* arg = (const struct slot_msg_arg_t*)argp;
-  CALL_WITH_DEVNAME(slot_msg, devname, arg->name, arg->msg);
-  return rc;
+	int rc = 0;
+	int devfd;
+	const struct slot_msg_arg_t* arg = (const struct slot_msg_arg_t*)argp;
+    devfd = open_device(devname);
+    if (devfd == -1) 
+		return -1;
+    rc = slot_msg(devfd, arg->name, arg->msg);
+    close(devfd);
+	return rc;
 }
 
 int slot_ping_wrapper(const char* devname, const void* argp)
 {
 	int rc = 0;
 	const char* name = (const char*)argp;
-	CALL_WITH_DEVNAME(slot_ping, devname, name);
+	int devfd;
+    devfd = open_device(devname);
+    if (devfd == -1)
+		return -1;
+    rc = slot_ping(devfd, name);
+    close(devfd);
 	return rc;
 }
 
@@ -146,9 +166,14 @@ int list_slots()
 {
 	int rc = 0;
 	struct servants_list_item *s = servants_leader;
+	int devfd;
 	while (s != NULL) {
 		DBGPRINT("list slots on device %s\n", s->devname);
-		CALL_WITH_DEVNAME(slot_list, s->devname);
+		devfd = open_device(s->devname);
+		if (devfd == -1)
+		   return -1;
+		rc = slot_list(devfd);
+		close(devfd);
 		if (rc == -1)
 			return rc;
 		s = s->next;
@@ -473,9 +498,40 @@ void deploy_servants(int live)
 	}
 }
 
+int check_timeout_inconsistent(const char* devname)
+{
+	int rc, devfd;
+	struct sector_header_s header;
+
+	unsigned long timeout_watchdog_old = timeout_watchdog;
+	int timeout_loop_old = timeout_loop;
+	int timeout_msgwait_old = timeout_msgwait;	
+
+	devfd = open_device(devname);
+	if (devfd == -1) {
+		/* Servant reports good a while ago, 
+		   this should not happen.*/
+		exit(1);
+	}
+	rc = header_read(devfd, &header);
+	close(devfd);
+	if (rc == -1) {
+		/* Servant reports good a while ago, 
+		   this should not happen.*/
+		exit(1);
+	}	
+
+	if (timeout_loop_old != timeout_loop ||
+			timeout_watchdog_old != timeout_watchdog ||
+			timeout_msgwait_old != timeout_msgwait)
+		return 1;
+	else
+		return 0;
+}
+
 int inquisitor(void)
 {
-	int rc, sig, pid, i;
+	int sig, pid, i;
 
 	sigset_t procmask;
 	siginfo_t sinfo;
@@ -540,29 +596,14 @@ int inquisitor(void)
 					    && WEXITSTATUS(status) == 0) {
 						DBGPRINT("exit normally%d\n");
 						good_servant++;
-						do {
-							struct sector_header_s header;
-							unsigned long timeout_watchdog_old = timeout_watchdog;
-						    int timeout_loop_old = timeout_loop;
-							int timeout_msgwait_old = timeout_msgwait;	
-
-							CALL_WITH_DEVNAME(header_read, tdevname, &header);
-							if (rc != 0) {
-								/* Servant reports good a while ago, 
-								   this should not happen.*/
-								DBGPRINT("header_read failed\n");
-								exit(1);
-							}
-							if (good_servant == 1) {
+						if (check_timeout_inconsistent(tdevname)) {
+							if (good_servant == 1)
 								inconsistent = 0;
-							} else {
-								if (timeout_loop_old != timeout_loop ||
-										timeout_watchdog_old != timeout_watchdog ||
-										timeout_msgwait_old != timeout_msgwait)
-									inconsistent = 1;
-							}
-
-						} while (0);
+							else
+								inconsistent = 1;
+						} else {
+							inconsistent = 0;
+						}
 					}
 				}
 			}
@@ -738,9 +779,14 @@ int dump_headers(void)
 {
 	int rc = 0;
 	struct servants_list_item *s = servants_leader;
+	int devfd;
 	while (s != NULL) {
 		DBGPRINT("Dumping header on disk %s\n", s->devname);
-		CALL_WITH_DEVNAME(header_dump, s->devname);
+		devfd = open_device(s->devname);
+		if (devfd == -1)
+			return -1;
+		rc = header_dump(devfd);
+		close(devfd);
 		if (rc == -1)
 			return rc;
 		DBGPRINT("Header on disk %s is dumped\n", s->devname);
