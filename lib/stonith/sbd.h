@@ -133,7 +133,7 @@ int servant(const char *diskname, const void* argp);
 int recruit_servant(const char *devname, int pid);
 struct servants_list_item *lookup_servant_by_dev(const char *devname);
 struct servants_list_item *lookup_servant_by_pid(int pid);
-void deploy_servants(int live);
+void foreach_servants(int live);
 int inquisitor(void);
 int messenger(const char *name, const char *msg);
 int check_timeout_inconsistent(const char* devname);
