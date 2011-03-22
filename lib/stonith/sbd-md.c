@@ -320,7 +320,7 @@ int servant(const char *diskname, const void* argp)
 			}
 		}
 		if (getppid() == 1) /* parent daemon has gone */
-			do_reset();
+			exit(0);
 		else
 			sigqueue(getppid(), SIG_LIVENESS, signal_value);
 
