@@ -308,7 +308,10 @@ int servant(const char *diskname, const void* argp)
 				break;
 			}
 		}
-		sigqueue(getppid(), SIG_LIVENESS, signal_value);
+		if (getppid() == 1) /* parent daemon has gone */
+			do_reset();
+		else
+			sigqueue(getppid(), SIG_LIVENESS, signal_value);
 
 		t1 = time(NULL);
 		latency = t1 - t0;
@@ -423,6 +426,29 @@ int assign_servant(const char *devname)
 	}
 }
 
+int check_all_dead(void);
+int check_all_dead(void)
+{
+	struct servants_list_item *s = servants_leader;
+	int r = 0;
+	union sigval svalue;
+	while (s != NULL) {
+		if (s->pid != 0) {
+			r = sigqueue(s->pid, 0, svalue);
+			if (r == -1 && errno == ESRCH) {
+				/*live*/
+			} else {
+				/*dead*/
+				return 0;
+			}
+		} else {
+		}
+		s = s->next;
+	}
+	return 1;
+}
+
+
 void deploy_servants(int live)
 {
 	struct servants_list_item *s = servants_leader;
@@ -465,6 +491,7 @@ int inquisitor(void)
 	int servant_finished = 0;
 	int good_servant = 0;
 	int inconsistent = 0;
+	int exiting = 0;
 
 	DBGPRINT("emporer is watching you\n");
 
@@ -572,11 +599,14 @@ int inquisitor(void)
 		if (sig == SIGINT || sig == SIG_EXITREQ) {
 			deploy_servants(0);
 			watchdog_close();
-			exit(0);
+			exiting = 1;
 		} else if (sig == SIGCHLD) {
 			while ((pid = waitpid(-1, &status, WNOHANG))) {
 				if (pid == -1 && errno == ECHILD) {
 					break;
+				} else if (exiting == 1) {
+					lookup_servant_by_pid(pid)->pid = 0;
+					if (check_all_dead()) exit(0);
 				} else {
 					if (WIFEXITED(status)) {	/* terminated normally */
 						DBGPRINT
@@ -603,6 +633,8 @@ int inquisitor(void)
 				}
 			}
 		} else if (sig == SIG_LIVENESS) {
+			if (exiting == 1)
+				continue;
 			for (i = 0; i < expect_report; i++) {
 				if (reports[i] == sinfo.si_pid) {
 					has_new = 0;
@@ -632,6 +664,8 @@ int inquisitor(void)
 			}
 		} else if (sig == SIG_TEST) {
 		} else if (sig == SIGUSR1) {
+			if (exiting == 1)
+				continue;
 			watchdog_tickle();
 			DBGPRINT("USR1 recieved\n");
 			deploy_servants(1);
