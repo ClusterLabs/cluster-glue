@@ -137,4 +137,4 @@ int assign_servant(const char *devname);
 void deploy_servants(int live);
 int inquisitor(void);
 int messenger(const char *name, const char *msg);
-
+int check_timeout_inconsistent(const char* devname);
