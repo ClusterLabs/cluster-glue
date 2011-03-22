@@ -73,9 +73,6 @@ do { \
 	rc = 0; \
 } while (0)
 
-typedef int (*functionp_t)(const char* devname, const void* argp);
-
-int assign_servant_ex(const char* devname, functionp_t functionp, const void* argp);
 int assign_servant_ex(const char* devname, functionp_t functionp, const void* argp)
 {
 	int pid = 0;
@@ -94,8 +91,7 @@ int assign_servant_ex(const char* devname, functionp_t functionp, const void* ar
 	}
 }
 
-static int init_devices(void);
-static int init_devices()
+int init_devices()
 {
 	int rc = 0;
 	struct servants_list_item *s = servants_leader;
@@ -109,11 +105,6 @@ static int init_devices()
 	return 0;
 }
 
-struct slot_msg_arg_t {
-	const char* name;
-	const char* msg;
-};
-int slot_msg_wrapper(const char* devname, const void* argp);
 int slot_msg_wrapper(const char* devname, const void* argp)
 {
   int rc = 0;
@@ -122,7 +113,6 @@ int slot_msg_wrapper(const char* devname, const void* argp)
   return rc;
 }
 
-int slot_ping_wrapper(const char* devname, const void* argp);
 int slot_ping_wrapper(const char* devname, const void* argp)
 {
 	int rc = 0;
@@ -131,8 +121,7 @@ int slot_ping_wrapper(const char* devname, const void* argp)
 	return rc;
 }
 
-static int allocate_slots(const char *name);
-static int allocate_slots(const char *name)
+int allocate_slots(const char *name)
 {
 	int rc = 0;
 	int devfd;
@@ -153,8 +142,7 @@ static int allocate_slots(const char *name)
 	return 0;
 }
 
-static int list_slots(void);
-static int list_slots()
+int list_slots()
 {
 	int rc = 0;
 	struct servants_list_item *s = servants_leader;
@@ -168,8 +156,7 @@ static int list_slots()
 	return 0;
 }
 
-static int ping_via_slots(const char *name);
-static int ping_via_slots(const char *name)
+int ping_via_slots(const char *name)
 {
 	int sig = 0;
 	int pid = 0;
@@ -221,8 +208,7 @@ static int ping_via_slots(const char *name)
 	return 0;
 }
 
-static int servant(const char *diskname, const void* argp);
-static int servant(const char *diskname, const void* argp)
+int servant(const char *diskname, const void* argp)
 {
 	int prepare_only = (int)argp;
 	struct sector_mbox_s *s_mbox = NULL;
@@ -343,7 +329,6 @@ static int servant(const char *diskname, const void* argp)
 	return rc;
 }
 
-int recruit_servant(const char *devname, int pid);
 int recruit_servant(const char *devname, int pid)
 {
 	struct servants_list_item *s = servants_leader;
@@ -399,7 +384,6 @@ int disband_servant_by_dev(const char *devname)
 }
 #endif
 
-struct servants_list_item *lookup_servant_by_dev(const char *devname);
 struct servants_list_item *lookup_servant_by_dev(const char *devname)
 {
 	struct servants_list_item *s = servants_leader;
@@ -412,7 +396,6 @@ struct servants_list_item *lookup_servant_by_dev(const char *devname)
 	return s;
 }
 
-struct servants_list_item *lookup_servant_by_pid(int pid);
 struct servants_list_item *lookup_servant_by_pid(int pid)
 {
 	struct servants_list_item *s = servants_leader;
@@ -425,7 +408,6 @@ struct servants_list_item *lookup_servant_by_pid(int pid)
 	return s;
 }
 
-int assign_servant(const char *devname);
 int assign_servant(const char *devname)
 {
 	int pid = 0;
@@ -441,7 +423,6 @@ int assign_servant(const char *devname)
 	}
 }
 
-void deploy_servants(int live);
 void deploy_servants(int live)
 {
 	struct servants_list_item *s = servants_leader;
@@ -468,8 +449,7 @@ void deploy_servants(int live)
 	}
 }
 
-static int inquisitor(void);
-static int inquisitor(void)
+int inquisitor(void)
 {
 	int rc, sig, pid, i;
 
@@ -665,8 +645,7 @@ static int inquisitor(void)
 	}
 }
 
-static int messenger(const char *name, const char *msg);
-static int messenger(const char *name, const char *msg)
+int messenger(const char *name, const char *msg)
 {
 	int sig = 0;
 	int pid = 0;
@@ -723,8 +702,7 @@ static int messenger(const char *name, const char *msg)
 	}
 }
 
-static int dump_headers(void);
-static int dump_headers(void)
+int dump_headers(void)
 {
 	int rc = 0;
 	struct servants_list_item *s = servants_leader;
