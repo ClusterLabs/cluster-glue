@@ -229,6 +229,7 @@ int servant(const char *diskname, const void* argp)
 	union sigval signal_value;
 	sigset_t servant_masks;
 	int devfd;
+	int ppid;
 
 	if (!diskname) {
 		cl_log(LOG_ERR, "Empty disk name %s.", diskname);
@@ -281,6 +282,12 @@ int servant(const char *diskname, const void* argp)
 	while (1) {
 		t0 = time(NULL);
 		sleep(timeout_loop);
+
+		ppid = getppid();
+
+		if (ppid == 1)
+			exit(0);
+
 		if (mbox_read(devfd, mbox, s_mbox) < 0) {
 			cl_log(LOG_ERR, "mbox read failed.");
 			do_reset();
@@ -295,7 +302,7 @@ int servant(const char *diskname, const void* argp)
 			case SBD_MSG_TEST:
 				memset(s_mbox, 0, sizeof(*s_mbox));
 				mbox_write(devfd, mbox, s_mbox);
-				sigqueue(getppid(), SIG_TEST, signal_value);
+				sigqueue(ppid, SIG_TEST, signal_value);
 				break;
 			case SBD_MSG_RESET:
 				do_reset();
@@ -304,7 +311,7 @@ int servant(const char *diskname, const void* argp)
 				do_off();
 				break;
 			case SBD_MSG_EXIT:
-				sigqueue(getppid(), SIG_EXITREQ, signal_value);
+				sigqueue(ppid, SIG_EXITREQ, signal_value);
 				break;
 			default:
 				/* FIXME:
@@ -319,10 +326,7 @@ int servant(const char *diskname, const void* argp)
 				break;
 			}
 		}
-		if (getppid() == 1) /* parent daemon has gone */
-			exit(0);
-		else
-			sigqueue(getppid(), SIG_LIVENESS, signal_value);
+		sigqueue(ppid, SIG_LIVENESS, signal_value);
 
 		t1 = time(NULL);
 		latency = t1 - t0;
