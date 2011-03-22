@@ -725,8 +725,8 @@ int messenger(const char *name, const char *msg)
 	if (successed_delivery >= (servant_count / 2 + 1)) {
 		return 0;
 	} else {
-		DBGPRINT("Message is not delivery via more then a half devices\n");
-		return 1;
+		fprintf(stderr, "Message is not delivery via more then a half of devices\n");
+		return -1;
 	}
 }
 
