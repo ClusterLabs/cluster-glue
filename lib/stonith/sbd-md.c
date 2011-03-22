@@ -52,6 +52,11 @@ enum {
 	SERVANT_CALLBACK
 };
 
+enum {
+	SERVANT_DO_FULLJOB = 0,
+	SERVANT_PREPARE_ONLY = 1
+};
+
 /* signals reserved for multi-disk sbd */
 #define SIG_LIVENESS (SIGRTMIN + 1)	/* report liveness of the disk */
 #define SIG_EXITREQ  (SIGRTMIN + 2)	/* exit request to inquisitor */
@@ -279,7 +284,7 @@ int servant(const char *diskname, const void* argp)
 		goto out;
 	}
 
-	if (prepare_only)
+	if (prepare_only == SERVANT_PREPARE_ONLY)
 		goto out;
 
 	memset(&signal_value, 0, sizeof(signal_value));
@@ -433,7 +438,7 @@ void foreach_servants(int mission)
 			if (r == -1 && errno == ESRCH) {
 				/* FIXME: process gone, start a new one */
 				if (mission == SERVANT_DEPLOY)
-					s->pid = assign_servant(s->devname, servant, (const void*)0);
+					s->pid = assign_servant(s->devname, servant, (const void*)SERVANT_DO_FULLJOB);
 			} else {
 				/* servants still working */
 				if (mission == SERVANT_CALLBACK)
@@ -442,7 +447,7 @@ void foreach_servants(int mission)
 		} else {
 			/* FIXME: start new one */
 			if (mission == SERVANT_DEPLOY)
-				s->pid = assign_servant(s->devname, servant, (const void*)0);
+				s->pid = assign_servant(s->devname, servant, (const void*)SERVANT_DO_FULLJOB);
 		}
 		s = s->next;
 	}
@@ -525,7 +530,7 @@ int inquisitor(void)
 
 	s = servants_leader;
 	while (s != NULL) {
-		pid = assign_servant(s->devname, &servant, (const void*)1);
+		pid = assign_servant(s->devname, &servant, (const void*)SERVANT_PREPARE_ONLY);
 		servant_count++;
 		s = s->next;
 	}
