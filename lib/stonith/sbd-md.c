@@ -426,7 +426,6 @@ int assign_servant(const char *devname)
 	}
 }
 
-int check_all_dead(void);
 int check_all_dead(void)
 {
 	struct servants_list_item *s = servants_leader;
@@ -441,7 +440,6 @@ int check_all_dead(void)
 				/*dead*/
 				return 0;
 			}
-		} else {
 		}
 		s = s->next;
 	}
@@ -540,8 +538,7 @@ int inquisitor(void)
 					servant_finished++;
 					if (WIFEXITED(status)
 					    && WEXITSTATUS(status) == 0) {
-						DBGPRINT("exit with %d\n",
-							 WEXITSTATUS(status));
+						DBGPRINT("exit normally%d\n");
 						good_servant++;
 						do {
 							struct sector_header_s header;
@@ -577,14 +574,15 @@ int inquisitor(void)
 	if (good_servant >= servant_count / 2 + 1) {
 		DBGPRINT("we are good to proceed\n");
 	} else {
-		DBGPRINT("no enough good servant\n");
+		fprintf(stderr, "Less than half of the SBD devices are available.\n");
+		fprintf(stderr, "SBD can not function normally.\n");
 		return -1;
 	}
 
 	if (inconsistent) {
-		DBGPRINT("Timeout configurations are different on different SBD devices\n");
-		DBGPRINT("This may running into problem in long run.\n");
-		DBGPRINT("You have to correct them and re-start SBD again.\n");
+		fprintf(stderr, "Timeout configurations are different on different SBD devices\n");
+		fprintf(stderr, "This may running into problem in long run.\n");
+		fprintf(stderr, "You have to correct them and re-start SBD again.\n");
 		return -1;
 	}
 
