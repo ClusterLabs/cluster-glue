@@ -52,6 +52,7 @@ static int		timeout_loop	    	= 1;
 static int		timeout_msgwait		= 10;
 
 static int	watchdog_use		= 0;
+static int	watchdog_set_timeout	= 1;
 static int	go_daemon		= 0;
 static int	skip_rt			= 0;
 static int	debug			= 0;
@@ -80,6 +81,7 @@ usage(void)
 "-R		Do NOT enable realtime priority (debugging only)\n"
 "-W		Use watchdog (recommended) (watch only)\n"
 "-w <dev>	Specify watchdog device (optional) (watch only)\n"
+"-T		Do NOT initialize the watchdog timeout (watch only)\n"
 "-D		Run as background daemon (optional) (watch only)\n"
 "-v		Enable some verbose debug logging (optional)\n"
 "\n"
@@ -109,12 +111,19 @@ watchdog_init_interval(void)
 	if (watchdogfd < 0) {
 		return 0;
 	}
-	
+
+	if (watchdog_set_timeout == 0) {
+		cl_log(LOG_INFO, "NOT setting watchdog timeout on explicit user request!");
+		return 0;
+	}
+
 	if (ioctl(watchdogfd, WDIOC_SETTIMEOUT, &timeout) < 0) {
 		cl_perror( "WDIOC_SETTIMEOUT"
 		": Failed to set watchdog timer to %u seconds.",
 		timeout);
-		return -1;
+		cl_log(LOG_CRIT, "Please validate your watchdog configuration!");
+		cl_log(LOG_CRIT, "Choose a different watchdog driver or specify -T to silence this check if you are sure.");
+		/* return -1; */
 	} else {
 		cl_log(LOG_INFO, "Set watchdog timeout to %u seconds.",
 			timeout);
@@ -977,6 +986,9 @@ main(int argc, char** argv)
 			break;
 		case 'v':
 			debug = 1;
+			break;
+		case 'T':
+			watchdog_set_timeout = 0;
 			break;
 		case 'W':
 			watchdog_use = 1;
