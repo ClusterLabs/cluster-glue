@@ -29,7 +29,7 @@ sbd_device=${SBD_DEVS//;/ -d }
 
 case $1 in
 gethosts)
-    echo `$SBD_BIN -d $sbd_device list | cut -f2`
+    echo `$SBD_BIN -d $sbd_device list | cut -f2 | sort | uniq`
     exit 0
     ;;
 off|reset)
