@@ -195,8 +195,7 @@ int ping_via_slots(const char *name)
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
 
 	while (s != NULL) {
-		pid = assign_servant(s->devname, &slot_ping_wrapper, (const void*)name);
-		s -> pid = pid;
+		s->pid = assign_servant(s->devname, &slot_ping_wrapper, (const void*)name);
 		servant_count++;
 		s = s->next;
 	}
@@ -559,7 +558,7 @@ int inquisitor(void)
 
 	s = servants_leader;
 	while (s != NULL) {
-		pid = assign_servant(s->devname, &servant, (const void*)SERVANT_PREPARE_ONLY);
+		s->pid = assign_servant(s->devname, &servant, (const void*)SERVANT_PREPARE_ONLY);
 		servant_count++;
 		s = s->next;
 	}
@@ -593,7 +592,7 @@ int inquisitor(void)
 							}
 						}
 					} else {
-						fprintf(stderr, "SIGCHLD for unknown child received, ignoring.\n");
+						fprintf(stderr, "SIGCHLD for unknown child %i received, ignoring.\n", pid);
 					}
 
 				}
@@ -720,8 +719,7 @@ int messenger(const char *name, const char *msg)
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
 
 	while (s != NULL) {
-		pid = assign_servant(s->devname, &slot_msg_wrapper, &slot_msg_arg);
-		s->pid = pid;
+		s->pid = assign_servant(s->devname, &slot_msg_wrapper, &slot_msg_arg);
 		servant_count++;
 		s = s->next;
 	}
