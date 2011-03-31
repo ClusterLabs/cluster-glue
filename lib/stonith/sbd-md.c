@@ -805,6 +805,9 @@ int main(int argc, char **argv)
 		case 'v':
 			debug = 1;
 			break;
+		case 'T':
+			watchdog_set_timeout = 0;
+			break;
 		case 'W':
 			watchdog_use = 1;
 			break;
