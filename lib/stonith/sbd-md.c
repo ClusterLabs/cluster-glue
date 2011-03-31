@@ -462,7 +462,7 @@ void foreach_servants(int mission)
 
 int check_timeout_inconsistent(const char* devname)
 {
-	int rc, devfd;
+	int devfd;
 	struct sector_header_s *s_header;
 
 	unsigned long timeout_watchdog_old = timeout_watchdog;
@@ -585,7 +585,7 @@ int inquisitor(void)
 						servant_finished++;
 						if (WIFEXITED(status)
 						    && WEXITSTATUS(status) == 0) {
-							DBGPRINT("exit normally%d\n");
+							DBGPRINT("exit normally %d\n", pid);
 							good_servant++;
 							if (check_timeout_inconsistent(tdevname)) {
 								if (good_servant == 1)
