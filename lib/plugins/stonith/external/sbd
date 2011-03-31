@@ -9,9 +9,20 @@
 
 # Main code
 
+if [ x$sbd_device = x ]; then
+	if [ -f /etc/sysconfig/sbd ]; then
+		source /etc/sysconfig/sbd
+		sbd_device=$SBD_DEVICE
+	fi
+fi
+
+SBD_DEVS=${sbd_device%;}
+
+sbd_device=${SBD_DEVS//;/ -d }
+
 case $1 in
 gethosts)
-    echo `sbd -d $sbd_device list | cut -f2`
+    echo `sbd -d $sbd_device list | cut -f2 | sort | uniq`
     exit 0
     ;;
 off|reset)
