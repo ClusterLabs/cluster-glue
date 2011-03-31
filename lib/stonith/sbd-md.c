@@ -463,7 +463,7 @@ void foreach_servants(int mission)
 int check_timeout_inconsistent(const char* devname)
 {
 	int rc, devfd;
-	struct sector_header_s header;
+	struct sector_header_s *s_header;
 
 	unsigned long timeout_watchdog_old = timeout_watchdog;
 	int timeout_loop_old = timeout_loop;
@@ -475,13 +475,17 @@ int check_timeout_inconsistent(const char* devname)
 		   this should not happen.*/
 		exit(1);
 	}
-	rc = header_read(devfd, &header);
+
+	s_header = header_get(devfd);
 	close(devfd);
-	if (rc == -1) {
+
+	if (s_header == NULL) {
 		/* Servant reports good a while ago, 
 		   this should not happen.*/
 		exit(1);
-	}	
+	} else {
+		free(s_header);
+	}
 
 	if (timeout_loop_old != timeout_loop ||
 			timeout_watchdog_old != timeout_watchdog ||
