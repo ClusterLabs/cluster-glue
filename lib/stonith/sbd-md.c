@@ -555,7 +555,6 @@ int inquisitor(void)
 	sigaddset(&procmask, SIG_TEST);
 	sigaddset(&procmask, SIGUSR1);
 	sigaddset(&procmask, SIGUSR2);
-	sigaddset(&procmask, SIGINT);
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
 
 	s = servants_leader;
@@ -627,7 +626,7 @@ int inquisitor(void)
 	while (1) {
 		sig = sigwaitinfo(&procmask, &sinfo);
 		DBGPRINT("get signal %d\n", sig);
-		if (sig == SIGINT || sig == SIG_EXITREQ) {
+		if (sig == SIG_EXITREQ) {
 			foreach_servants(SERVANT_CALLBACK);
 			watchdog_close();
 			exiting = 1;
