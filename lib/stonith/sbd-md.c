@@ -300,8 +300,8 @@ int servant(const char *diskname, const void* argp)
 			exit(0);
 
 		if (mbox_read(devfd, mbox, s_mbox) < 0) {
-			cl_log(LOG_ERR, "mbox read failed.");
-			do_reset();
+			cl_log(LOG_ERR, "mbox read failed in servant.");
+			exit(1);
 		}
 
 		if (s_mbox->cmd > 0) {
