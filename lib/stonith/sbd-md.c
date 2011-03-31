@@ -848,7 +848,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (servant_count != 1 || servant_count != 3) {
+	if (servant_count != 1 && servant_count != 3) {
 		fprintf(stderr, "You must specify either 1 or 3 devices via the -d option.\n");	
 	}
 
