@@ -254,6 +254,7 @@ int servant(const char *diskname, const void* argp)
 	sigdelset(&servant_masks, SIGILL);
 	sigdelset(&servant_masks, SIGSEGV);
 	sigdelset(&servant_masks, SIGBUS);
+	sigdelset(&servant_masks, SIGALRM);
 	/* FIXME: check error */
 	sigprocmask(SIG_SETMASK, &servant_masks, NULL);
 
