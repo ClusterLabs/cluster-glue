@@ -209,18 +209,20 @@ int ping_via_slots(const char *name)
 				if (pid == -1 && errno == ECHILD) {
 					break;
 				} else {
-					DBGPRINT
-					    ("A ping is delivered to %s via %s. ",
-					     name,
-					     lookup_servant_by_pid(pid)->
-					     devname);
-					if (!status)
+					struct servants_list_item *s;
+					s = lookup_servant_by_pid(pid);
+					if (s) {
 						DBGPRINT
-						    ("They responed to the emporer\n");
-					else
-						DBGPRINT
-						    ("There's no response\n");
-					servant_finished++;
+						    ("A ping is delivered to %s via %s. ",
+						     name, s->devname);
+						if (!status)
+							DBGPRINT
+							    ("They responed to the emporer\n");
+						else
+							DBGPRINT
+							    ("There's no response\n");
+						servant_finished++;
+					}
 				}
 			}
 		}
@@ -488,14 +490,28 @@ inline void cleanup_servant_by_pid(int pid)
 {
 	struct servants_list_item* s;
 	s = lookup_servant_by_pid(pid);
-	s->pid = 0;
+	if (s) {
+		s->pid = 0;
+	} else {
+		/* TODO: This points to an inconsistency in our internal
+		 * data - how to recover? */
+		cl_log(LOG_ERR, "Cannot cleanup after unknown pid %i",
+				pid);
+	}
 }
 
 inline void restart_servant_by_pid(int pid)
 {
 	struct servants_list_item* s;
 	s = lookup_servant_by_pid(pid);
-	s->pid = assign_servant(s->devname, servant, (const void*)SERVANT_DO_FULLJOB);
+	if (s) {
+		s->pid = assign_servant(s->devname, servant, (const void*)SERVANT_DO_FULLJOB);
+	} else {
+		/* TODO: This points to an inconsistency in our internal
+		 * data - how to recover? */
+		cl_log(LOG_ERR, "Cannot restart unknown pid %i",
+				pid);
+	}
 }
 
 int inquisitor(void)
@@ -557,23 +573,30 @@ int inquisitor(void)
 				if (pid == -1 && errno == ECHILD) {
 					break;
 				} else {
+					struct servants_list_item *s;
 					DBGPRINT("process %d finished\n", pid);
-					tdevname = lookup_servant_by_pid(pid)->devname;
-					cleanup_servant_by_pid(pid);
-					servant_finished++;
-					if (WIFEXITED(status)
-					    && WEXITSTATUS(status) == 0) {
-						DBGPRINT("exit normally%d\n");
-						good_servant++;
-						if (check_timeout_inconsistent(tdevname)) {
-							if (good_servant == 1)
+					s = lookup_servant_by_pid(pid);
+					if (s) {
+						tdevname = s->devname;
+						cleanup_servant_by_pid(pid);
+						servant_finished++;
+						if (WIFEXITED(status)
+						    && WEXITSTATUS(status) == 0) {
+							DBGPRINT("exit normally%d\n");
+							good_servant++;
+							if (check_timeout_inconsistent(tdevname)) {
+								if (good_servant == 1)
+									inconsistent = 0;
+								else
+									inconsistent = 1;
+							} else {
 								inconsistent = 0;
-							else
-								inconsistent = 1;
-						} else {
-							inconsistent = 0;
+							}
 						}
+					} else {
+						fprintf(stderr, "SIGCHLD for unknown child received, ignoring.\n");
 					}
+
 				}
 			}
 		}
