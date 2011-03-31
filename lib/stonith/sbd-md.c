@@ -57,6 +57,8 @@ enum {
 	SERVANT_PREPARE_ONLY = 1
 };
 
+static int	servant_count	= 0;
+
 /* signals reserved for multi-disk sbd */
 #define SIG_LIVENESS (SIGRTMIN + 1)	/* report liveness of the disk */
 #define SIG_EXITREQ  (SIGRTMIN + 2)	/* exit request to inquisitor */
@@ -182,7 +184,6 @@ int ping_via_slots(const char *name)
 	int sig = 0;
 	int pid = 0;
 	int status = 0;
-	int servant_count = 0;
 	int servant_finished = 0;
 	sigset_t procmask;
 	siginfo_t sinfo;
@@ -196,7 +197,6 @@ int ping_via_slots(const char *name)
 
 	while (s != NULL) {
 		s->pid = assign_servant(s->devname, &slot_ping_wrapper, (const void*)name);
-		servant_count++;
 		s = s->next;
 	}
 
@@ -358,7 +358,7 @@ int servant(const char *diskname, const void* argp)
 	return rc;
 }
 
-int recruit_servant(const char *devname, int pid)
+void recruit_servant(const char *devname, int pid)
 {
 	struct servants_list_item *s = servants_leader;
 	struct servants_list_item *p = servants_leader;
@@ -373,6 +373,11 @@ int recruit_servant(const char *devname, int pid)
 	}
 	DBGPRINT("p: %p, s: %p\n", p, s);
 	newbie = malloc(sizeof(*newbie));
+	if (!newbie) {
+		fprintf(stderr, "malloc failed in recruit_servant.");
+		exit(1);
+	}
+
 	memset(newbie, 0, sizeof(*newbie));
 	newbie->devname = strdup(devname);
 	newbie->pid = pid;
@@ -380,7 +385,8 @@ int recruit_servant(const char *devname, int pid)
 		servants_leader = newbie;
 	else
 		p->next = newbie;
-	return 0;
+
+	servant_count++;
 }
 
 struct servants_list_item *lookup_servant_by_dev(const char *devname)
@@ -519,13 +525,11 @@ int inquisitor(void)
 
 	sigset_t procmask;
 	siginfo_t sinfo;
-	int expect_report = 0;
 	int *reports;
 	int has_new;
 	int status;
 	const char *tdevname;
 	struct servants_list_item *s = servants_leader;
-	int servant_count = 0;
 	int servant_finished = 0;
 	int good_servant = 0;
 	int inconsistent = 0;
@@ -536,16 +540,14 @@ int inquisitor(void)
 	while (s != NULL) {
 		DBGPRINT("disk %s is watched by %d\n", s->devname, s->pid);
 		s = s->next;
-		expect_report++;
 	}
 
-	DBGPRINT("expect_report is %d\n", expect_report);
-	reports = malloc(sizeof(int) * expect_report);
+	reports = malloc(sizeof(int) * servant_count);
 	if (reports == 0) {
 		cl_log(LOG_ERR, "malloc failed");
 		exit(1);
 	}
-	memset(reports, 0, sizeof(int) * expect_report);
+	memset(reports, 0, sizeof(int) * servant_count);
 
 	sigemptyset(&procmask);
 	sigaddset(&procmask, SIGCHLD);
@@ -559,7 +561,6 @@ int inquisitor(void)
 	s = servants_leader;
 	while (s != NULL) {
 		s->pid = assign_servant(s->devname, &servant, (const void*)SERVANT_PREPARE_ONLY);
-		servant_count++;
 		s = s->next;
 	}
 
@@ -657,7 +658,7 @@ int inquisitor(void)
 		} else if (sig == SIG_LIVENESS) {
 			if (exiting == 1)
 				continue;
-			for (i = 0; i < expect_report; i++) {
+			for (i = 0; i < servant_count; i++) {
 				if (reports[i] == sinfo.si_pid) {
 					has_new = 0;
 					break;
@@ -669,15 +670,15 @@ int inquisitor(void)
 			}
 			if (!has_new)
 				continue;
-			for (i = 0; i < expect_report; i++) {
+			for (i = 0; i < servant_count; i++) {
 				if (reports[i] == 0) {
-					if (i >= expect_report / 2 + 1) {
+					if (i >= servant_count / 2 + 1) {
 						DBGPRINT
 						    ("enough reports, purify the planet\n");
 						watchdog_tickle();
 						memset(reports, 0,
 						       sizeof(int) *
-						       expect_report);
+						       servant_count);
 					} else {
 						DBGPRINT("still wait\n");
 					}
@@ -692,7 +693,7 @@ int inquisitor(void)
 			DBGPRINT("USR1 recieved\n");
 			foreach_servants(SERVANT_DEPLOY);
 			DBGPRINT("servants restarted\n");
-			memset(reports, 0, sizeof(int) * expect_report);
+			memset(reports, 0, sizeof(int) * servant_count);
 			watchdog_tickle();
 		} else {
 			DBGPRINT("ignore anything else can be ignored\n");
@@ -706,9 +707,8 @@ int messenger(const char *name, const char *msg)
 	int sig = 0;
 	int pid = 0;
 	int status = 0;
-	int servant_count = 0;
 	int servant_finished = 0;
-	int successed_delivery = 0;
+	int successful_delivery = 0;
 	sigset_t procmask;
 	siginfo_t sinfo;
 	struct servants_list_item *s = servants_leader;
@@ -720,7 +720,6 @@ int messenger(const char *name, const char *msg)
 
 	while (s != NULL) {
 		s->pid = assign_servant(s->devname, &slot_msg_wrapper, &slot_msg_arg);
-		servant_count++;
 		s = s->next;
 	}
 	
@@ -738,9 +737,9 @@ int messenger(const char *name, const char *msg)
 						&& WEXITSTATUS(status) == 0) {
 						DBGPRINT("exit with %d\n",
 								WEXITSTATUS(status));
-						successed_delivery++;
+						successful_delivery++;
 					}
-					if (successed_delivery >= (servant_count / 2 + 1)) {
+					if (successful_delivery >= (servant_count / 2 + 1)) {
 						DBGPRINT("we have done good enough\n");
 						return 0;
 					}
@@ -749,7 +748,7 @@ int messenger(const char *name, const char *msg)
 		}
 		DBGPRINT("signal %d handled\n", sig);
 	}
-	if (successed_delivery >= (servant_count / 2 + 1)) {
+	if (successful_delivery >= (servant_count / 2 + 1)) {
 		return 0;
 	} else {
 		fprintf(stderr, "Message is not delivery via more then a half of devices\n");
@@ -843,6 +842,10 @@ int main(int argc, char **argv)
 			goto out;
 			break;
 		}
+	}
+
+	if (servant_count != 1 || servant_count != 3) {
+		fprintf(stderr, "You must specify either 1 or 3 devices via the -d option.\n");	
 	}
 
 	/* There must at least be one command following the options: */
