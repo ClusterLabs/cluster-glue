@@ -37,6 +37,7 @@
 #include <clplumbing/realtime.h>
 #include <clplumbing/cl_reboot.h>
 #include <malloc.h>
+#include <time.h>
 #include <sys/utsname.h>
 #include <sys/ioctl.h>
 #include <linux/types.h>
@@ -538,10 +539,13 @@ int inquisitor(void)
 	int status;
 	const char *tdevname;
 	struct servants_list_item *s = servants_leader;
+	struct timespec timeout;
 	int servant_finished = 0;
 	int good_servant = 0;
 	int inconsistent = 0;
 	int exiting = 0;
+	time_t latency;
+	struct timespec t_last_tickle, t_now;
 
 	DBGPRINT("emporer is watching you\n");
 
@@ -631,8 +635,11 @@ int inquisitor(void)
 	if (watchdog_use != 0)
 		watchdog_init();
 
+	timeout.tv_sec = timeout_loop;
+	timeout.tv_nsec = 0;
+
 	while (1) {
-		sig = sigwaitinfo(&procmask, &sinfo);
+		sig = sigtimedwait(&procmask, &sinfo, &timeout);
 		DBGPRINT("get signal %d\n", sig);
 		if (sig == SIG_EXITREQ) {
 			foreach_servants(SERVANT_CALLBACK);
@@ -642,7 +649,7 @@ int inquisitor(void)
 			while ((pid = waitpid(-1, &status, WNOHANG))) {
 				if (pid == -1 && errno == ECHILD) {
 					break;
-				} else if (exiting == 1) {
+				} else if (exiting) {
 					cleanup_servant_by_pid(pid);
 					if (check_all_dead())
 						exit(0);
@@ -664,7 +671,7 @@ int inquisitor(void)
 				}
 			}
 		} else if (sig == SIG_LIVENESS) {
-			if (exiting == 1)
+			if (exiting)
 				continue;
 			for (i = 0; i < servant_count; i++) {
 				if (reports[i] == sinfo.si_pid) {
@@ -676,21 +683,24 @@ int inquisitor(void)
 					break;
 				}
 			}
-			if (!has_new)
-				continue;
-			for (i = 0; i < servant_count; i++) {
-				if (reports[i] == 0) {
-					if (i >= servant_count / 2 + 1) {
-						DBGPRINT
-						    ("enough reports, purify the planet\n");
-						watchdog_tickle();
-						memset(reports, 0,
-						       sizeof(int) *
-						       servant_count);
-					} else {
-						DBGPRINT("still wait\n");
+			if (has_new) {
+				for (i = 0; i < servant_count; i++) {
+					if (reports[i] == 0) {
+						if (i >= servant_count / 2 + 1) {
+							DBGPRINT
+							    ("enough reports, purify the planet\n");
+							watchdog_tickle();
+							clock_gettime(CLOCK_MONOTONIC,
+									&t_last_tickle);
+
+							memset(reports, 0,
+							       sizeof(int) *
+							       servant_count);
+						} else {
+							DBGPRINT("still wait\n");
+						}
+						break;
 					}
-					break;
 				}
 			}
 		} else if (sig == SIG_TEST) {
@@ -703,9 +713,32 @@ int inquisitor(void)
 			DBGPRINT("servants restarted\n");
 			memset(reports, 0, sizeof(int) * servant_count);
 			watchdog_tickle();
+		} else if (sig == -1) {
+			/* sigtimedwait() returned; no problem, we just
+			 * need to recheck our internal timers
+			 * periodically. */
 		} else {
 			DBGPRINT("ignore anything else can be ignored\n");
 			continue;
+		}
+
+		if (exiting)
+			continue;
+
+		clock_gettime(CLOCK_MONOTONIC, &t_now);
+		latency = t_now.tv_sec - t_last_tickle.tv_sec;
+		if (timeout_watchdog && (latency > timeout_watchdog)) {
+			/* We have not received sufficient liveness
+			 * messages for quite a while. We can only have
+			 * gotten here if the user is not using a
+			 * watchdog device, or if the watchdog has
+			 * failed us. */
+			do_reset();
+		}
+		if (timeout_watchdog_warn && (latency > timeout_watchdog_warn)) {
+			cl_log(LOG_WARNING,
+			       "Latency: No liveness for %d s exceeds threshold of %d s",
+			       (int)latency, (int)timeout_watchdog_warn);
 		}
 	}
 }
