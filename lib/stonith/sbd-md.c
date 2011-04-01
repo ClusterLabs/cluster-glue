@@ -232,7 +232,7 @@ int ping_via_slots(const char *name)
 
 int servant(const char *diskname, const void* argp)
 {
-	int prepare_only = (int)argp;
+	intptr_t prepare_only = (intptr_t)argp;
 	struct sector_mbox_s *s_mbox = NULL;
 	int mbox;
 	int rc = 0;
