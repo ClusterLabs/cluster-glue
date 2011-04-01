@@ -16,7 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #include <arpa/inet.h>
-
+#include <sys/types.h>
 
 /* Sector data types */
 struct sector_header_s {
@@ -44,7 +44,7 @@ struct sector_node_s {
 
 struct servants_list_item {
 	const char* devname;
-	int         pid;
+	pid_t pid;
 	struct servants_list_item *next;
 };
 
@@ -131,12 +131,12 @@ int dump_headers(void);
 
 int check_all_dead(void);
 int servant(const char *diskname, const void* argp);
-void recruit_servant(const char *devname, int pid);
+void recruit_servant(const char *devname, pid_t pid);
 struct servants_list_item *lookup_servant_by_dev(const char *devname);
-struct servants_list_item *lookup_servant_by_pid(int pid);
+struct servants_list_item *lookup_servant_by_pid(pid_t pid);
 void foreach_servants(int live);
 int inquisitor(void);
 int messenger(const char *name, const char *msg);
 int check_timeout_inconsistent(const char* devname);
-void restart_servant_by_pid(int pid);
-void cleanup_servant_by_pid(int pid);
+void restart_servant_by_pid(pid_t pid);
+void cleanup_servant_by_pid(pid_t pid);
