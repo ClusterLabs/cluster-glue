@@ -297,8 +297,11 @@ int servant(const char *diskname, const void* argp)
 
 		ppid = getppid();
 
-		if (ppid == 1)
-			exit(0);
+		if (ppid == 1) {
+			/* Our parent died unexpectedly. Triggering
+			 * self-fence. */
+			do_reset();
+		}
 
 		if (mbox_read(devfd, mbox, s_mbox) < 0) {
 			cl_log(LOG_ERR, "mbox read failed in servant.");
