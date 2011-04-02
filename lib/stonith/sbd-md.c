@@ -82,12 +82,14 @@ int assign_servant(const char* devname, functionp_t functionp, const void* argp)
 	pid = fork();
 	if (pid == 0) {		/* child */
 		rc = (*functionp)(devname, argp);
-		if (rc == -1) exit(1);
-		else exit(0);
+		if (rc == -1)
+			exit(1);
+		else
+			exit(0);
 	} else if (pid != -1) {		/* parent */
 		return pid;
 	} else {
-		DBGPRINT("Failed to fork servant\n");
+		cl_log(LOG_ERR,"Failed to fork servant");
 		exit(1);
 	}
 }
@@ -106,7 +108,7 @@ int init_devices()
 		rc = init_device(devfd);
 		close(devfd);
 		if (rc == -1) {
-			fprintf(stderr, "failed to init device %s", s->devname);
+			fprintf(stderr, "failed to init device %s\n", s->devname);
 			return rc;
 		}
 		s = s->next;
@@ -119,11 +121,11 @@ int slot_msg_wrapper(const char* devname, const void* argp)
 	int rc = 0;
 	int devfd;
 	const struct slot_msg_arg_t* arg = (const struct slot_msg_arg_t*)argp;
-    devfd = open_device(devname);
-    if (devfd == -1) 
+        devfd = open_device(devname);
+        if (devfd == -1) 
 		return -1;
-    rc = slot_msg(devfd, arg->name, arg->msg);
-    close(devfd);
+	rc = slot_msg(devfd, arg->name, arg->msg);
+	close(devfd);
 	return rc;
 }
 
@@ -132,11 +134,11 @@ int slot_ping_wrapper(const char* devname, const void* argp)
 	int rc = 0;
 	const char* name = (const char*)argp;
 	int devfd;
-    devfd = open_device(devname);
-    if (devfd == -1)
+	devfd = open_device(devname);
+	if (devfd == -1)
 		return -1;
-    rc = slot_ping(devfd, name);
-    close(devfd);
+	rc = slot_ping(devfd, name);
+	close(devfd);
 	return rc;
 }
 
