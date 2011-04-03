@@ -68,7 +68,8 @@ static int daemonize(int devfd)
 		}
 	}
 
-	make_daemon();
+	if (make_daemon() > 0)
+		exit(0);
 
 	while (1) {
 		t0 = time(NULL);

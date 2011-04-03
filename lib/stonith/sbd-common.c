@@ -786,10 +786,10 @@ do_off(void)
 	exit(1);
 }
 
-void
+pid_t
 make_daemon(void)
 {
-	long			pid;
+	pid_t			pid;
 	const char *		devnull = "/dev/null";
 
 	if (go_daemon > 0) {
@@ -800,7 +800,7 @@ make_daemon(void)
 			cl_perror("fork");
 			exit(1);
 		}else if (pid > 0) {
-			exit(0);
+			return pid;
 		}
 	}
 
@@ -817,6 +817,7 @@ make_daemon(void)
 	close(2);
 	(void)open(devnull, O_WRONLY);
 	cl_cdtocoredir();
+	return 0;
 }
 
 int
