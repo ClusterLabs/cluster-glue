@@ -48,16 +48,6 @@
 
 struct servants_list_item *servants_leader = NULL;
 
-enum {
-	SERVANT_DEPLOY,
-	SERVANT_CALLBACK
-};
-
-enum {
-	SERVANT_DO_FULLJOB = 0,
-	SERVANT_PREPARE_ONLY = 1
-};
-
 static int	servant_count	= 0;
 
 /* signals reserved for multi-disk sbd */
@@ -78,6 +68,7 @@ int assign_servant(const char* devname, functionp_t functionp, const void* argp)
 {
 	pid_t pid = 0;
 	int rc = 0;
+
 	DBGPRINT("fork servant for %s\n", devname);
 	pid = fork();
 	if (pid == 0) {		/* child */
@@ -98,8 +89,9 @@ int init_devices()
 {
 	int rc = 0;
 	int devfd;
-	struct servants_list_item *s = servants_leader;
-	while (s) {
+	struct servants_list_item *s;
+
+	for (s = servants_leader; s; s = s->next) {
 		DBGPRINT("init device %s\n", s->devname);
 		devfd = open_device(s->devname);
 		if (devfd == -1) {
@@ -111,7 +103,6 @@ int init_devices()
 			fprintf(stderr, "failed to init device %s\n", s->devname);
 			return rc;
 		}
-		s = s->next;
 	}
 	return 0;
 }
@@ -121,6 +112,7 @@ int slot_msg_wrapper(const char* devname, const void* argp)
 	int rc = 0;
 	int devfd;
 	const struct slot_msg_arg_t* arg = (const struct slot_msg_arg_t*)argp;
+
         devfd = open_device(devname);
         if (devfd == -1) 
 		return -1;
@@ -134,6 +126,7 @@ int slot_ping_wrapper(const char* devname, const void* argp)
 	int rc = 0;
 	const char* name = (const char*)argp;
 	int devfd;
+
 	devfd = open_device(devname);
 	if (devfd == -1)
 		return -1;
@@ -146,8 +139,9 @@ int allocate_slots(const char *name)
 {
 	int rc = 0;
 	int devfd;
-	struct servants_list_item *s = servants_leader;
-	while (s) {
+	struct servants_list_item *s;
+
+	for (s = servants_leader; s; s = s->next) {
 		DBGPRINT("allocate on device %s\n", s->devname);
 		devfd = open_device(s->devname);
 		if (devfd == -1) {
@@ -158,7 +152,6 @@ int allocate_slots(const char *name)
 		if (rc == -1)
 			return rc;
 		DBGPRINT("allocation on %s done\n", s->devname);
-		s = s->next;
 	}
 	return 0;
 }
@@ -166,18 +159,18 @@ int allocate_slots(const char *name)
 int list_slots()
 {
 	int rc = 0;
-	struct servants_list_item *s = servants_leader;
+	struct servants_list_item *s;
 	int devfd;
-	while (s) {
+
+	for (s = servants_leader; s; s = s->next) {
 		DBGPRINT("list slots on device %s\n", s->devname);
 		devfd = open_device(s->devname);
 		if (devfd == -1)
-		   return -1;
+			return -1;
 		rc = slot_list(devfd);
 		close(devfd);
 		if (rc == -1)
 			return rc;
-		s = s->next;
 	}
 	return 0;
 }
@@ -190,17 +183,15 @@ int ping_via_slots(const char *name)
 	int servants_finished = 0;
 	sigset_t procmask;
 	siginfo_t sinfo;
-
-	struct servants_list_item *s = servants_leader;
+	struct servants_list_item *s;
 
 	DBGPRINT("you shall know no fear\n");
 	sigemptyset(&procmask);
 	sigaddset(&procmask, SIGCHLD);
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
 
-	while (s) {
+	for (s = servants_leader; s; s = s->next) {
 		s->pid = assign_servant(s->devname, &slot_ping_wrapper, (const void*)name);
-		s = s->next;
 	}
 
 	while (servants_finished < servant_count) {
@@ -234,7 +225,6 @@ int ping_via_slots(const char *name)
 
 int servant(const char *diskname, const void* argp)
 {
-	intptr_t prepare_only = (intptr_t)argp;
 	struct sector_mbox_s *s_mbox = NULL;
 	int mbox;
 	int rc = 0;
@@ -260,15 +250,8 @@ int servant(const char *diskname, const void* argp)
 	/* FIXME: check error */
 	sigprocmask(SIG_SETMASK, &servant_masks, NULL);
 
-	devfd = open(diskname, O_SYNC | O_RDWR | O_DIRECT);
+	devfd = open_device(diskname);
 	if (devfd == -1) {
-		cl_perror("Opening disk %s failed.", diskname);
-		return -1;
-	}
-	ioctl(devfd, BLKSSZGET, &sector_size);
-	if (sector_size == 0) {
-		cl_perror("Get sector size failed.\n");
-		close(devfd);
 		return -1;
 	}
 
@@ -287,9 +270,6 @@ int servant(const char *diskname, const void* argp)
 		rc = -1;
 		goto out;
 	}
-
-	if (prepare_only == SERVANT_PREPARE_ONLY)
-		goto out;
 
 	memset(&signal_value, 0, sizeof(signal_value));
 
@@ -367,143 +347,130 @@ int servant(const char *diskname, const void* argp)
 void recruit_servant(const char *devname, pid_t pid)
 {
 	struct servants_list_item *s = servants_leader;
-	struct servants_list_item *p = servants_leader;
 	struct servants_list_item *newbie;
-	while (s) {
-		if (s == p) {
-			s = s->next;
-		} else {
-			p = s;
-			s = s->next;
-		}
-	}
-	DBGPRINT("p: %p, s: %p\n", p, s);
+
 	newbie = malloc(sizeof(*newbie));
 	if (!newbie) {
 		fprintf(stderr, "malloc failed in recruit_servant.");
 		exit(1);
 	}
-
 	memset(newbie, 0, sizeof(*newbie));
 	newbie->devname = strdup(devname);
 	newbie->pid = pid;
-	if (p == NULL)
+
+	if (!s) {
 		servants_leader = newbie;
-	else
-		p->next = newbie;
+	} else {
+		while (s->next)
+			s = s->next;
+		s->next = newbie;
+	}
 
 	servant_count++;
 }
 
 struct servants_list_item *lookup_servant_by_dev(const char *devname)
 {
-	struct servants_list_item *s = servants_leader;
-	while (s) {
+	struct servants_list_item *s;
+
+	for (s = servants_leader; s; s = s->next) {
 		if (strncasecmp(s->devname, devname, strlen(s->devname)))
-			return s;
-		else
-			s = s->next;
+			break;
 	}
 	return s;
 }
 
 struct servants_list_item *lookup_servant_by_pid(pid_t pid)
 {
-	struct servants_list_item *s = servants_leader;
-	while (s) {
+	struct servants_list_item *s;
+
+	for (s = servants_leader; s; s = s->next) {
 		if (s->pid == pid)
-			return s;
-		else
-			s = s->next;
+			break;
 	}
 	return s;
 }
 
 int check_all_dead(void)
 {
-	struct servants_list_item *s = servants_leader;
+	struct servants_list_item *s;
 	int r = 0;
 	union sigval svalue;
-	while (s) {
+
+	for (s = servants_leader; s; s = s->next) {
 		if (s->pid != 0) {
 			r = sigqueue(s->pid, 0, svalue);
-			if (r == -1 && errno == ESRCH) {
-				/*live*/
-			} else {
-				/*dead*/
-				return 0;
-			}
+			if (r == -1 && errno == ESRCH)
+				continue;
+			return 0;
 		}
-		s = s->next;
 	}
 	return 1;
 }
 
 
-void foreach_servants(int mission)
+void servants_start(void)
 {
-	struct servants_list_item *s = servants_leader;
+	struct servants_list_item *s;
 	int r = 0;
 	union sigval svalue;
-	while (s) {
+
+	for (s = servants_leader; s; s = s->next) {
 		if (s->pid != 0) {
 			r = sigqueue(s->pid, 0, svalue);
-			if (r == -1 && errno == ESRCH) {
-				/* FIXME: process gone, start a new one */
-				if (mission == SERVANT_DEPLOY)
-					s->pid = assign_servant(s->devname, servant, (const void*)SERVANT_DO_FULLJOB);
-			} else {
-				/* servants still working */
-				if (mission == SERVANT_CALLBACK)
-					sigqueue(s->pid, SIGKILL, svalue);
-			}
-		} else {
-			/* FIXME: start new one */
-			if (mission == SERVANT_DEPLOY)
-				s->pid = assign_servant(s->devname, servant, (const void*)SERVANT_DO_FULLJOB);
+			if ((r == -1 && errno != ESRCH))
+				continue;
 		}
-		s = s->next;
+		s->restarts = 0;
+		s->pid = assign_servant(s->devname, servant, NULL);
 	}
 }
 
-int check_timeout_inconsistent(const char* devname)
+void servants_kill(void)
+{
+	struct servants_list_item *s;
+	union sigval svalue;
+
+	for (s = servants_leader; s; s = s->next) {
+		if (s->pid != 0)
+			sigqueue(s->pid, SIGKILL, svalue);
+	}
+}
+
+int check_timeout_inconsistent(void)
 {
 	int devfd;
-	struct sector_header_s *s_header;
+	struct sector_header_s *hdr_cur, *hdr_last;
+	struct servants_list_item* s;
+	int inconsistent = 0;
 
-	unsigned long timeout_watchdog_old = timeout_watchdog;
-	int timeout_loop_old = timeout_loop;
-	int timeout_msgwait_old = timeout_msgwait;	
-
-	devfd = open_device(devname);
-	if (devfd == -1) {
-		/* Servant reports good a while ago, 
-		   this should not happen.*/
-		exit(1);
+	for (s = servants_leader; s; s = s->next) {
+		devfd = open_device(s->devname);
+		if (devfd < 0)
+			continue;
+		hdr_cur = header_get(devfd);
+		close(devfd);
+		if (!hdr_cur)
+			continue;
+		if (hdr_last) {
+			if (hdr_last->timeout_watchdog != hdr_cur->timeout_watchdog
+			    || hdr_last->timeout_allocate != hdr_cur->timeout_allocate
+			    || hdr_last->timeout_loop != hdr_cur->timeout_loop
+			    || hdr_last->timeout_msgwait != hdr_cur->timeout_msgwait)
+				inconsistent = 1;
+			free(hdr_last);
+		}
+		hdr_last = hdr_cur;
 	}
 
-	s_header = header_get(devfd);
-	close(devfd);
-
-	if (s_header == NULL) {
-		/* Servant reports good a while ago, 
-		   this should not happen.*/
-		exit(1);
-	} else {
-		free(s_header);
-	}
-
-	if (timeout_loop_old != timeout_loop ||
-			timeout_watchdog_old != timeout_watchdog ||
-			timeout_msgwait_old != timeout_msgwait)
-		return 1;
-	else
-		return 0;
+	free(hdr_last);
+	return inconsistent;
 }
 
 inline void cleanup_servant_by_pid(pid_t pid)
 {
 	struct servants_list_item* s;
+
 	s = lookup_servant_by_pid(pid);
 	if (s) {
 		s->pid = 0;
@@ -515,12 +482,20 @@ inline void cleanup_servant_by_pid(pid_t pid)
 	}
 }
 
-inline void restart_servant_by_pid(pid_t pid)
+void restart_servant_by_pid(pid_t pid)
 {
 	struct servants_list_item* s;
+
 	s = lookup_servant_by_pid(pid);
 	if (s) {
-		s->pid = assign_servant(s->devname, servant, (const void*)SERVANT_DO_FULLJOB);
+		if (s->restarts < 10) {
+			s->pid = assign_servant(s->devname, servant, NULL);
+			s->restarts++;
+		} else {
+			cl_log(LOG_WARN, "Max retry count reached: not restarting servant for %s",
+					s->devname);
+		}
+
 	} else {
 		/* TODO: This points to an inconsistency in our internal
 		 * data - how to recover? */
@@ -529,25 +504,37 @@ inline void restart_servant_by_pid(pid_t pid)
 	}
 }
 
-int inquisitor(void)
+void inquisitor_decouple(void)
+{
+	pid_t ppid = getppid();
+	union sigval signal_value;
+
+	/* During start-up, we only arm the watchdog once we've got
+	 * quorum at least once. */
+	if (watchdog_use) {
+		if (watchdog_init() < 0) {
+			exit(1);
+		}
+	}
+
+	if (ppid > 1) {
+		sigqueue(ppid, SIG_LIVENESS, signal_value);
+	}
+}
+
+void inquisitor_child(void)
 {
 	int sig, pid, i;
-
 	sigset_t procmask;
 	siginfo_t sinfo;
 	int *reports;
 	int status;
-	const char *tdevname;
-	struct servants_list_item *s;
 	struct timespec timeout;
-	int servants_finished = 0;
 	int good_servants = 0;
-	int inconsistent = 0;
 	int exiting = 0;
+	int decoupled = 0;
 	time_t latency;
 	struct timespec t_last_tickle, t_now;
-
-	DBGPRINT("inquisitor starting\n");
 
 	reports = malloc(sizeof(int) * servant_count);
 	if (!reports) {
@@ -565,77 +552,18 @@ int inquisitor(void)
 	sigaddset(&procmask, SIGUSR2);
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
 
-	s = servants_leader;
-	while (s) {
-		s->pid = assign_servant(s->devname, &servant, (const void*)SERVANT_PREPARE_ONLY);
-		DBGPRINT("disk %s is watched by %d\n", s->devname, s->pid);
-		s = s->next;
-	}
-
-	while (servants_finished < servant_count) {
-		sig = sigwaitinfo(&procmask, &sinfo);
-		DBGPRINT("got signal %d\n", sig);
-		if (sig == SIGCHLD) {
-			while ((pid = waitpid(-1, &status, WNOHANG))) {
-				if (pid == -1 && errno == ECHILD) {
-					break;
-				}
-				DBGPRINT("process %d finished\n", pid);
-				s = lookup_servant_by_pid(pid);
-				if (s) {
-					tdevname = s->devname;
-					cleanup_servant_by_pid(pid);
-					servants_finished++;
-					if (WIFEXITED(status)
-					    && WEXITSTATUS(status) == 0) {
-						DBGPRINT("exit normally %d\n", pid);
-						good_servants++;
-						if (check_timeout_inconsistent(tdevname)) {
-							if (good_servants == 1)
-								inconsistent = 0;
-							else
-								inconsistent = 1;
-						} else {
-							inconsistent = 0;
-						}
-					}
-				} else {
-					fprintf(stderr, "SIGCHLD for unknown child %i received, ignoring.\n", pid);
-				}
-			}
-		}
-		DBGPRINT("signal %d handled\n", sig);
-	}
-	DBGPRINT("total %d, finished %d, report good %d\n", servant_count,
-		 servants_finished, good_servants);
-	if (good_servants > servant_count/2) {
-		DBGPRINT("we are good to proceed\n");
-	} else {
-		fprintf(stderr, "Less than half of the SBD devices are available.\n");
-		fprintf(stderr, "SBD cannot start.\n");
-		return -1;
-	}
-
-	if (inconsistent) {
-		fprintf(stderr, "Timeout settings are different across SBD devices!\n");
-		fprintf(stderr, "You have to correct them and re-start SBD again.\n");
-		return -1;
-	}
-
-	make_daemon();
-	foreach_servants(SERVANT_DEPLOY);
-	if (watchdog_use != 0)
-		watchdog_init();
+	servants_start();
 
 	timeout.tv_sec = timeout_loop;
 	timeout.tv_nsec = 0;
 	good_servants = 0;
+	clock_gettime(CLOCK_MONOTONIC, &t_last_tickle);
 
 	while (1) {
 		sig = sigtimedwait(&procmask, &sinfo, &timeout);
-		DBGPRINT("get signal %d\n", sig);
+		DBGPRINT("got signal %d\n", sig);
 		if (sig == SIG_EXITREQ) {
-			foreach_servants(SERVANT_CALLBACK);
+			servants_kill();
 			watchdog_close();
 			exiting = 1;
 		} else if (sig == SIGCHLD) {
@@ -644,28 +572,11 @@ int inquisitor(void)
 					break;
 				} else if (exiting) {
 					cleanup_servant_by_pid(pid);
-					if (check_all_dead())
-						exit(0);
 				} else {
-					if (WIFEXITED(status)) {	/* terminated normally */
-						DBGPRINT
-						    ("terminated normally\n");
-						cleanup_servant_by_pid(pid);
-					} else if (WIFSIGNALED(status)) {	/* by signal */
-						if (WTERMSIG(status) != SIGKILL) {
-							DBGPRINT
-							    ("something wrong, restart it\n");
-							restart_servant_by_pid(pid);
-						} else {
-							DBGPRINT("killed\n");
-							cleanup_servant_by_pid(pid);
-						}
-					}
+					restart_servant_by_pid(pid);
 				}
 			}
 		} else if (sig == SIG_LIVENESS) {
-			if (exiting)
-				continue;
 			for (i = 0; i < servant_count; i++) {
 				if (reports[i] == sinfo.si_pid) {
 					break;
@@ -675,52 +586,104 @@ int inquisitor(void)
 					break;
 				}
 			}
-			if (good_servants > servant_count/2) {
-				DBGPRINT("Enough liveness messages\n");
-				watchdog_tickle();
-				clock_gettime(CLOCK_MONOTONIC, &t_last_tickle);
-				memset(reports, 0, sizeof(int) * servant_count);
-				good_servants = 0;
-			} else {
-				DBGPRINT("still wait\n");
-			}
 		} else if (sig == SIG_TEST) {
 		} else if (sig == SIGUSR1) {
 			if (exiting)
 				continue;
-			watchdog_tickle();
-			DBGPRINT("USR1 recieved\n");
-			foreach_servants(SERVANT_DEPLOY);
-			DBGPRINT("servants restarted\n");
-			memset(reports, 0, sizeof(int) * servant_count);
-			good_servants = 0;
-			watchdog_tickle();
-		} else if (sig == -1) {
-			/* sigtimedwait() returned; no problem, we just
-			 * need to recheck our internal timers
-			 * periodically. */
-		} else {
-			DBGPRINT("ignore anything else can be ignored\n");
-			continue;
+			servants_start();
 		}
 
-		if (exiting)
-			continue;
+		if (exiting) {
+			if (check_all_dead())
+				exit(0);
+			else
+				continue;
+		}
+
+		if (good_servants > servant_count/2) {
+			DBGPRINT("Enough liveness messages\n");
+			if (!decoupled) {
+				inquisitor_decouple();
+				decoupled = 1;
+			}
+
+			watchdog_tickle();
+			clock_gettime(CLOCK_MONOTONIC, &t_last_tickle);
+			memset(reports, 0, sizeof(int) * servant_count);
+			good_servants = 0;
+		}
 
 		clock_gettime(CLOCK_MONOTONIC, &t_now);
 		latency = t_now.tv_sec - t_last_tickle.tv_sec;
 		if (timeout_watchdog && (latency > timeout_watchdog)) {
-			/* We have not received sufficient liveness
-			 * messages for quite a while. We can only have
-			 * gotten here if the user is not using a
-			 * watchdog device, or if the watchdog has
-			 * failed us. */
+			if (!decoupled) {
+				/* We're still being watched by our
+				 * parent. We don't fence, but exit. */
+				cl_log(LOG_ERR, "SBD: Not enough votes to proceed. Aborting start-up.");
+				servants_kill();
+				exiting = 1;
+				continue;
+			}
 			do_reset();
 		}
 		if (timeout_watchdog_warn && (latency > timeout_watchdog_warn)) {
 			cl_log(LOG_WARNING,
 			       "Latency: No liveness for %d s exceeds threshold of %d s (healthy servants: %d)",
 			       (int)latency, (int)timeout_watchdog_warn, good_servants);
+		}
+	}
+	/* not reached */
+	exit(0);
+}
+
+int inquisitor(void)
+{
+	int sig, pid, inquisitor_pid;
+	int status;
+	sigset_t procmask;
+	siginfo_t sinfo;
+
+	DBGPRINT("inquisitor starting\n");
+
+	sigemptyset(&procmask);
+	sigaddset(&procmask, SIGCHLD);
+	sigaddset(&procmask, SIG_LIVENESS);
+	sigprocmask(SIG_BLOCK, &procmask, NULL);
+
+	if (check_timeout_inconsistent()) {
+		fprintf(stderr, "Timeout settings are different across SBD devices!\n");
+		fprintf(stderr, "You have to correct them and re-start SBD again.\n");
+		return -1;
+	}
+
+	inquisitor_pid = make_daemon();
+	if (inquisitor_pid == 0) {
+		inquisitor_child();
+	} 
+	
+	/* We're the parent. Wait for a happy signal from our child
+	 * before we proceed - we either get "SIG_LIVENESS" when the
+	 * inquisitor has completed the first successful round, or
+	 * ECHLD when it exits with an error. */
+
+	while (1) {
+		sig = sigwaitinfo(&procmask, &sinfo);
+		DBGPRINT("get signal %d\n", sig);
+		if (sig == SIGCHLD) {
+			while ((pid = waitpid(-1, &status, WNOHANG))) {
+				if (pid == -1 && errno == ECHILD) {
+					break;
+				}
+				/* We got here because the inquisitor
+				 * did not succeed. */
+				return -1;
+			}
+		} else if (sig == SIG_LIVENESS) {
+			/* Inquisitor started up properly. */
+			return 0;
+		} else {
+			fprintf(stderr, "Nobody expected the spanish inquisition!\n");
+			continue;
 		}
 	}
 	/* not reached */
@@ -736,16 +699,15 @@ int messenger(const char *name, const char *msg)
 	int successful_delivery = 0;
 	sigset_t procmask;
 	siginfo_t sinfo;
-	struct servants_list_item *s = servants_leader;
+	struct servants_list_item *s;
 	struct slot_msg_arg_t slot_msg_arg = {name, msg};
 
 	sigemptyset(&procmask);
 	sigaddset(&procmask, SIGCHLD);
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
 
-	while (s) {
+	for (s = servants_leader; s; s = s->next) {
 		s->pid = assign_servant(s->devname, &slot_msg_wrapper, &slot_msg_arg);
-		s = s->next;
 	}
 	
 	while (servants_finished < servant_count) {
@@ -774,6 +736,7 @@ int messenger(const char *name, const char *msg)
 		DBGPRINT("signal %d handled\n", sig);
 	}
 	if (successful_delivery > servant_count/2) {
+		/* TODO: Can this ever be reached? */
 		return 0;
 	} else {
 		fprintf(stderr, "Message is not delivery via more then a half of devices\n");
@@ -786,7 +749,8 @@ int dump_headers(void)
 	int rc = 0;
 	struct servants_list_item *s = servants_leader;
 	int devfd;
-	while (s) {
+
+	for (s = servants_leader; s; s = s->next) {
 		DBGPRINT("Dumping header on disk %s\n", s->devname);
 		devfd = open_device(s->devname);
 		if (devfd == -1)
@@ -796,7 +760,6 @@ int dump_headers(void)
 		if (rc == -1)
 			return rc;
 		DBGPRINT("Header on disk %s is dumped\n", s->devname);
-		s = s->next;
 	}
 	return rc;
 }
@@ -818,6 +781,10 @@ int main(int argc, char **argv)
 
 	get_uname();
 
+	/* TODO: Remove the conditional in make_daemon(); the new
+	 * servant bootstrapping no longer permits a non-daemon
+	 * execution. */
+	go_daemon = 1;
 	while ((c = getopt(argc, argv, "DRWhvw:d:n:1:2:3:4:5:")) != -1) {
 		switch (c) {
 		case 'D':

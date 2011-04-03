@@ -45,6 +45,7 @@ struct sector_node_s {
 struct servants_list_item {
 	const char* devname;
 	pid_t pid;
+	int restarts;
 	struct servants_list_item *next;
 };
 
@@ -91,7 +92,7 @@ int header_dump(int devfd);
 void sysrq_trigger(char t);
 void do_reset(void);
 void do_off(void);
-void make_daemon(void);
+pid_t make_daemon(void);
 void maximize_priority(void);
 void get_uname(void);
 
@@ -134,9 +135,12 @@ int servant(const char *diskname, const void* argp);
 void recruit_servant(const char *devname, pid_t pid);
 struct servants_list_item *lookup_servant_by_dev(const char *devname);
 struct servants_list_item *lookup_servant_by_pid(pid_t pid);
-void foreach_servants(int live);
+void servants_kill(void);
+void servants_start(void);
+void inquisitor_child(void);
 int inquisitor(void);
+void inquisitor_decouple(void);
 int messenger(const char *name, const char *msg);
-int check_timeout_inconsistent(const char* devname);
+int check_timeout_inconsistent(void);
 void restart_servant_by_pid(pid_t pid);
 void cleanup_servant_by_pid(pid_t pid);
