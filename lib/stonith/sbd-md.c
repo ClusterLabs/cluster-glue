@@ -420,7 +420,7 @@ void servants_start(void)
 	for (s = servants_leader; s; s = s->next) {
 		if (s->pid != 0) {
 			r = sigqueue(s->pid, 0, svalue);
-			if ((r == -1 && errno != ESRCH))
+			if ((r != -1 || errno != ESRCH))
 				continue;
 		}
 		s->restarts = 0;
