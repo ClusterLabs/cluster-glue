@@ -538,6 +538,8 @@ void inquisitor_child(void)
 	time_t latency;
 	struct timespec t_last_tickle, t_now;
 
+	set_proc_title("sbd: inquisitor");
+
 	reports = malloc(sizeof(int) * servant_count);
 	if (!reports) {
 		cl_log(LOG_ERR, "malloc failed");
@@ -562,7 +564,6 @@ void inquisitor_child(void)
 	clock_gettime(CLOCK_MONOTONIC, &t_last_tickle);
 
 	while (1) {
-		set_proc_title("sbd: inquisitor");
 		sig = sigtimedwait(&procmask, &sinfo, &timeout);
 		DBGPRINT("got signal %d\n", sig);
 		if (sig == SIG_EXITREQ) {
