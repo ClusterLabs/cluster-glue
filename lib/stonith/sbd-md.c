@@ -36,6 +36,7 @@
 #include <clplumbing/coredumps.h>
 #include <clplumbing/realtime.h>
 #include <clplumbing/cl_reboot.h>
+#include <clplumbing/setproctitle.h>
 #include <malloc.h>
 #include <time.h>
 #include <sys/utsname.h>
@@ -264,6 +265,7 @@ int servant(const char *diskname, const void* argp)
 		goto out;
 	}
 	cl_log(LOG_INFO, "Monitoring slot %d on disk %s", mbox, diskname);
+	set_proc_title("sbd: watcher: %s - slot: %d", diskname, mbox);
 
 	s_mbox = sector_alloc();
 	if (mbox_write(devfd, mbox, s_mbox) < 0) {
@@ -492,7 +494,7 @@ void restart_servant_by_pid(pid_t pid)
 			s->pid = assign_servant(s->devname, servant, NULL);
 			s->restarts++;
 		} else {
-			cl_log(LOG_WARN, "Max retry count reached: not restarting servant for %s",
+			cl_log(LOG_WARNING, "Max retry count reached: not restarting servant for %s",
 					s->devname);
 		}
 
@@ -560,6 +562,7 @@ void inquisitor_child(void)
 	clock_gettime(CLOCK_MONOTONIC, &t_last_tickle);
 
 	while (1) {
+		set_proc_title("sbd: inquisitor");
 		sig = sigtimedwait(&procmask, &sinfo, &timeout);
 		DBGPRINT("got signal %d\n", sig);
 		if (sig == SIG_EXITREQ) {
@@ -764,7 +767,7 @@ int dump_headers(void)
 	return rc;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char **argv, char **envp)
 {
 	int exit_status = 0;
 	int c;
@@ -845,6 +848,11 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Not enough arguments.\n");
 		exit_status = -1;
 		goto out;
+	}
+
+	if (init_set_proc_title(argc, argv, envp) < 0) {
+		fprintf(stderr, "Allocation of proc title failed.");
+		exit(1);
 	}
 
 	maximize_priority();
