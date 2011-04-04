@@ -572,6 +572,7 @@ void inquisitor_child(void)
 	timeout.tv_nsec = 0;
 	good_servants = 0;
 	clock_gettime(CLOCK_MONOTONIC, &t_last_tickle);
+	clock_gettime(CLOCK_MONOTONIC, &t_last_restarted);
 
 	while (1) {
 		sig = sigtimedwait(&procmask, &sinfo, &timeout);
