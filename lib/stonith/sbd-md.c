@@ -465,15 +465,11 @@ int check_timeout_inconsistent(void)
 		hdr_last = hdr_cur;
 	}
 
-	if (hdr_last) {
-		timeout_watchdog = hdr_last->timeout_watchdog;
-		timeout_allocate = hdr_last->timeout_allocate;
-		timeout_loop = hdr_last->timeout_loop;
-		timeout_msgwait = hdr_last->timeout_msgwait;
-	} else {
-		DBGPRINT("No available SBD devices\n");
+	if (!hdr_last) {
+		cl_log(LOG_ERR, "No devices were available at start-up.");
 		exit(1);
 	}
+
 	free(hdr_last);
 	return inconsistent;
 }
@@ -663,7 +659,7 @@ int inquisitor(void)
 	sigaddset(&procmask, SIG_LIVENESS);
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
 
-	if (check_timeout_inconsistent()) {
+	if (check_timeout_inconsistent() == 1) {
 		fprintf(stderr, "Timeout settings are different across SBD devices!\n");
 		fprintf(stderr, "You have to correct them and re-start SBD again.\n");
 		return -1;
