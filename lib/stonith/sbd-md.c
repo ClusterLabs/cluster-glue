@@ -65,6 +65,19 @@ static int	servant_count	= 0;
 #define DBGPRINT(...) do {} while (0)
 #endif
 
+int quorum_write(int good_servants)
+{
+	return (good_servants > servant_count/2);	
+}
+
+int quorum_read(int good_servants)
+{
+	if (servant_count >= 3) 
+		return (good_servants > servant_count/2);
+	else
+		return (good_servants >= 1);
+}
+
 int assign_servant(const char* devname, functionp_t functionp, const void* argp)
 {
 	pid_t pid = 0;
@@ -617,7 +630,7 @@ void inquisitor_child(void)
 				continue;
 		}
 
-		if (good_servants > servant_count/2) {
+		if (quorum_read(good_servants)) {
 			DBGPRINT("Enough liveness messages\n");
 			if (!decoupled) {
 				inquisitor_decouple();
@@ -734,7 +747,8 @@ int messenger(const char *name, const char *msg)
 		s->pid = assign_servant(s->devname, &slot_msg_wrapper, &slot_msg_arg);
 	}
 	
-	while (servants_finished < servant_count) {
+	while (!(quorum_write(successful_delivery) || 
+		(servants_finished == servant_count))) {
 		sig = sigwaitinfo(&procmask, &sinfo);
 		DBGPRINT("get signal %d\n", sig);
 		if (sig == SIGCHLD) {
@@ -750,17 +764,12 @@ int messenger(const char *name, const char *msg)
 								WEXITSTATUS(status));
 						successful_delivery++;
 					}
-					if (successful_delivery > servant_count/2) {
-						DBGPRINT("we have done good enough\n");
-						return 0;
-					}
 				}
 			}
 		}
 		DBGPRINT("signal %d handled\n", sig);
 	}
-	if (successful_delivery > servant_count/2) {
-		/* TODO: Can this ever be reached? */
+	if (quorum_write(successful_delivery)) {
 		return 0;
 	} else {
 		fprintf(stderr, "Message is not delivery via more then a half of devices\n");
@@ -859,9 +868,11 @@ int main(int argc, char **argv, char **envp)
 			break;
 		}
 	}
-
-	if (servant_count != 1 && servant_count != 3) {
-		fprintf(stderr, "You must specify either 1 or 3 devices via the -d option.\n");	
+	
+	if (servant_count < 1 || servant_count > 3) {
+		fprintf(stderr, "You must specify 1 to 3 devices via the -d option.\n");
+		exit_status = -1;
+		goto out;
 	}
 
 	/* There must at least be one command following the options: */
@@ -896,7 +907,7 @@ int main(int argc, char **argv, char **envp)
 		exit_status = -1;
 	}
 
- out:
+out:
 	if (exit_status < 0) {
 		usage();
 		return (1);
