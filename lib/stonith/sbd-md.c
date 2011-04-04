@@ -442,7 +442,7 @@ void servants_kill(void)
 int check_timeout_inconsistent(void)
 {
 	int devfd;
-	struct sector_header_s *hdr_cur, *hdr_last;
+	struct sector_header_s *hdr_cur = 0, *hdr_last = 0;
 	struct servants_list_item* s;
 	int inconsistent = 0;
 
