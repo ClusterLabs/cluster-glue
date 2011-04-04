@@ -1,0 +1,38 @@
+.TH HA_LOGGER 1 "5th Nov 2004"
+.SH NAME
+.B ha_logger 
+\- Log a message to files/syslog through the HA Logging Daemon
+.SH SYNOPSIS
+.B ha_logger
+.RI "[-D ha-log/ha-debug] [-t tag] [message ...]"
+.P
+.SH DESCRIPTION
+.B ha_logger 
+is used to log a message to files/syslog through the HA Logging Daemon
+.PP
+.IP "\fB-D\fP \fIha-log/ha-debug\fP"
+Log the message to different files. Ha-log will log the message to
+the log file and the debug file, while ha-debug will log the message
+to the debug file only.
+.IP "\fB-t\fP \fItag\fP"
+Mark every line in the log with the specified
+.IP \fBmessage\fP
+The message you want to log on.
+.PP
+.SH SEE ALSO
+ha_logd(8) heartbeat(8) 
+
+.SH DOCUMENTATION
+More information may be found at
+.UR http://linux-ha.org/wiki
+http://linux-ha.org/wiki
+.UE
+
+.SH AUTHORS
+.nf
+ Guochun Shi <gshi@ncsa.uiuc.edu>
+ Alan Robertson <alanr@unix.sh>
+ Lars Marowsky-Bree <lmb@suse.de>
+.fi
+
+

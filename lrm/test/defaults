@@ -1,0 +1,9 @@
+# defaults
+: ${dflt_rsc:=r1}
+: ${dflt_type:=lrmregtest}
+: ${dflt_class:=ocf}
+: ${dflt_provider:=heartbeat}
+: ${dflt_timeout:=1000}
+: ${dflt_interval:=0}
+: ${dflt_targetrc:=EVERYTIME}
+dflt_args=""

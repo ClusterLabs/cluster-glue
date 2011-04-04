@@ -1,0 +1,43 @@
+lrm_list() {
+	$LRMADMIN -L
+}
+lrm_add() {
+	$LRMADMIN -A ${rsc:-$dflt_rsc} \
+		${class:-$dflt_class} ${type:-$dflt_type} \
+		${provider:-$dflt_provider} \
+		$args
+}
+lrm_del() {
+	$LRMADMIN -D ${rsc:-$dflt_rsc}
+}
+lrm_flush() {
+	$LRMADMIN -F ${rsc:-$dflt_rsc}
+}
+lrm_state() {
+	$LRMADMIN -S ${rsc:-$dflt_rsc}
+}
+lrm_info() {
+	$LRMADMIN -I ${rsc:-$dflt_rsc}
+}
+lrm_exec() {
+	$LRMADMIN -E ${rsc:-$dflt_rsc} \
+		${operation:-$dflt_operation} \
+		${timeout:-$dflt_timeout} ${interval:-$dflt_interval} \
+		${targetrc:-$dflt_targetrc} $args
+}
+
+lrm_classes() {
+	$LRMADMIN -C
+}
+lrm_types() {
+	$LRMADMIN -T ${class:-$dflt_class}
+}
+lrm_classmeta() {
+	$LRMADMIN -O ${class:-$dflt_class}
+}
+lrm_meta() {
+	$LRMADMIN -M ${class:-$dflt_class} ${type:-$dflt_type} ${provider:-$dflt_provider}
+}
+lrm_provider() {
+	$LRMADMIN -P ${class:-$dflt_class} ${type:-$dflt_type}
+}

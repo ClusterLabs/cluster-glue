@@ -1,0 +1,157 @@
+#!/bin/sh
+#
+# Copyright (c) 2006 Dejan Muhamedagic <dmuhamedagic@at.ibm.com>, IBM Austria
+#
+# External STONITH module for IBM RSA adapters.
+# External STONITH module for IBM BMC.
+# This STONITH module depends on IBMmpcli.
+#
+
+trap 'rm -f "$outf"' 0
+outf=`mktemp` || {
+	ha_log.sh err 'mktemp failed'
+	exit 1
+}
+
+chkmpcli() {
+	test -x /opt/IBMmpcli/bin/MPCLI.sh
+}
+mpcli() {
+	chkmpcli || {
+		ha_log.sh err "IBM mpcli not installed"
+		return 1
+	}
+	if [ x = "x$ipaddr" -o x = "x$userid" -o x = "x$passwd" ]
+	then
+		ha_log.sh err "ipaddr, userid, or passwd missing; check configuration"
+		return 1
+	fi
+	type=${type:-"ibm"}
+
+	goodstg="SUCCESS"
+	failstg="FAILURE"
+	(
+	echo "logonip -h $ipaddr -u $userid -p $passwd -t $type"
+	echo "outputfile $outf"
+	cat
+	) | /opt/IBMmpcli/bin/MPCLI.sh | grep -w $goodstg >/dev/null 2>&1
+	rc=$?
+	grep -w $failstg $outf >/dev/null
+	if [ $rc -eq 0 -a $? -eq 1 ]; then
+		return 0
+	else
+		ha_log.sh err "MPCLI.sh failed: `cat $outf`"
+		return 1
+	fi
+}
+ibmrsa_reboot() {
+	echo restart -now | mpcli
+}
+ibmrsa_poweron() {
+	echo poweron | mpcli
+}
+ibmrsa_poweroff() {
+	echo poweroff | mpcli
+}
+ibmrsa_status() {
+	echo | mpcli
+}
+
+hostname=`echo ${hostname} | tr ',' ' '`
+
+case $1 in
+gethosts)
+	echo $hostname
+	;;
+on)
+	ibmrsa_poweron
+	;;
+off)
+	ibmrsa_poweroff
+	;;
+reset)
+	ibmrsa_reboot
+	;;
+status)
+	ibmrsa_status
+	;;
+getconfignames)
+	for i in hostname ipaddr userid passwd type; do
+		echo $i
+	done
+	;;
+getinfo-devid)
+	echo "IBM MP STONITH device"
+	;;
+getinfo-devname)
+	echo "IBM MP STONITH device"
+	;;
+getinfo-devdescr)
+	echo "IBM MP host reboot/poweron/poweroff"
+	;;
+getinfo-devurl)
+	echo "http://www.ibm.com"
+	;;
+getinfo-xml)
+	cat <<EOF
+<parameters>
+
+<parameter name="hostname" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Hostname
+</shortdesc>
+<longdesc lang="en">
+The hostname of the host to be managed by this STONITH device
+</longdesc>
+</parameter>
+
+<parameter name="ipaddr" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+IP Address
+</shortdesc>
+<longdesc lang="en">
+The IP address of the STONITH device
+</longdesc>
+</parameter>
+
+<parameter name="userid" unique="0" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Login
+</shortdesc>
+<longdesc lang="en">
+The username used to login into the STONITH device
+</longdesc>
+</parameter>
+
+<parameter name="passwd" unique="0" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Password
+</shortdesc>
+<longdesc lang="en">
+The password used to login into the STONITH device
+</longdesc>
+</parameter>
+
+<parameter name="type" unique="0" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Management processor type
+</shortdesc>
+<longdesc lang="en">
+The type of the management processor. Possible values are
+"ibm" (default, typically used for RSA) and "ipmi"
+(for IPMI compliant processors such as BMC).
+</longdesc>
+</parameter>
+
+</parameters>
+EOF
+	;;
+*)
+	exit 1
+	;;
+esac

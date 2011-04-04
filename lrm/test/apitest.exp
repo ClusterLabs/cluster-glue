@@ -1,0 +1,122 @@
+sigon...
+add_rsc...
+get_rsc...
+print resource
+	resource of id:ip248
+	type:IPv6addr
+	class:heartbeat
+	params:
+		1=3ffe:ffff:0:f101::3
+print end
+perform_op(start)...
+print op
+	op_type:start
+	params:
+		1=3ffe:ffff:0:f101::3
+	timeout:0
+	user_data:It is a start op!
+	op_status:0
+	app_name:null
+	output:null
+	rc:0
+print end
+perform_op(status)...
+print op
+	op_type:status
+	params:
+		1=3ffe:ffff:0:f101::3
+	timeout:0
+	user_data:It is a status op!
+	op_status:0
+	app_name:null
+	output:null
+	rc:0
+print end
+perform_op(stop)...
+print op
+	op_type:stop
+	params:
+		1=3ffe:ffff:0:f101::3
+	timeout:0
+	user_data:It is a stop op!
+	op_status:0
+	app_name:null
+	output:null
+	rc:0
+print end
+get_cur_state...
+	current state:Busy
+print op
+	op_type:start
+	params:
+		1=3ffe:ffff:0:f101::3
+	timeout:0
+	user_data:It is a start op!
+	op_status:-1
+	app_name:apitest
+	output:null
+	rc:0
+print end
+print op
+	op_type:status
+	params:
+		1=3ffe:ffff:0:f101::3
+	timeout:0
+	user_data:It is a status op!
+	op_status:-1
+	app_name:apitest
+	output:null
+	rc:0
+print end
+print op
+	op_type:stop
+	params:
+		1=3ffe:ffff:0:f101::3
+	timeout:0
+	user_data:It is a stop op!
+	op_status:-1
+	app_name:apitest
+	output:null
+	rc:0
+print end
+stop_op...
+get_cur_state...
+	current state:Busy
+print op
+	op_type:start
+	params:
+		1=3ffe:ffff:0:f101::3
+	timeout:0
+	user_data:null
+	op_status:-1
+	app_name:apitest
+	output:null
+	rc:0
+print end
+print op
+	op_type:stop
+	params:
+		1=3ffe:ffff:0:f101::3
+	timeout:0
+	user_data:null
+	op_status:-1
+	app_name:apitest
+	output:null
+	rc:0
+print end
+sleep a while...
+get_cur_state...
+	current state:Idel
+print op
+	op_type:stop
+	params:
+		1=3ffe:ffff:0:f101::3
+	timeout:0
+	user_data:null
+	op_status:0
+	app_name:apitest
+	output:null
+	rc:0
+print end
+delete_rsc...
+signoff...

@@ -1,0 +1,68 @@
+IP Power 9258 as external stonith device.
+=========================================
+
+Device Information
+==================
+
+	Warning:
+	========
+
+	Aviosys provides different types and versions of IP Power 9258.
+	The device is currently available with four or eight power outlets. 
+	This script was tested with firmware version: V1.55 2009/12/22
+
+	Especially "IP Power 9258 HP" uses a different http command interface.
+	======================================================================
+
+	Resources for device documentation: 
+
+	Manufacturer URL: http://www.aviosys.com/ippower9258.htm
+	Manual URL: http://www.aviosys.com/manual.htm
+	Manual current version URL:
+	http://www.aviosys.com/images/9258_manual_20081104.pdf
+
+The documentation of the http command interface defines three
+supported commands:
+
+	GetPower - useful for testing status of the device and of each port
+	SetPower - used to control status of each power outlet
+	SetSchedule+Power - useless for stonith
+
+Common documented structure of these three commands is
+
+	http://username:password@a.b.c.d/Set.cmd?CMD=command[+param=value...]
+	param is one or more of P60 to P67 and value is 0 or 1
+	expected response for GetPower is of the format
+	<html>P60=1,P61=0,P62=1,P63=1,P64=0,P65=0,P66=0,P67=0</html>
+	SetPower does respond with the same format but restricts the list
+	to the modified ports.
+	P60 to P67 represent the status of the power outlet 1 to 8: 0 <=>
+	power off; 1 <=> power on.
+
+IP Power 9258 allows to assign port names (pw1Name to pw8Name) to each
+port.  These names can be used with the web interface (web form with
+post-method).
+
+Script specific notes
+=====================
+
+There is no documented http command to retrieve port names via the
+http command interface.  We try to get the hostlist via the web
+interface.
+
+This script assumes a one to one mapping between names of hostlist and
+port attributes of power outlet:
+
+	1st hostname in hostlist connected to 1st power outlet with port
+	status P60 and port name pw1Name.
+	...
+	8th hostname in hostlist connected to 8th power outlet with port
+	status P67 and port name pw8Name.
+
+If the hostlist parameter is not defined, then all assigned outlets
+are inserted into the hostlist. Unused outlets should have empty
+names. The node names obviously have to match the corresponding outlet
+names. A reserved hostname is "*not-defined*".  This is a
+sript-internal placeholder for unused outlets.  It does not appear in
+the hostlist.
+

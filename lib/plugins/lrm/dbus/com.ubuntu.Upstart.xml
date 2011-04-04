@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- upstart
+
+     com.ubuntu.Upstart.xml - interface definition for manager object
+
+     Copyright © 2009 Canonical Ltd.
+     Author: Scott James Remnant <scott@netsplit.com>.
+
+     This file is free software; Canonical Ltd gives unlimited permission
+     to copy and/or distribute it, with or without modifications, as long
+     as this notice is preserved.
+
+     Communication and interaction with Upstart through this interface is
+     permitted without restriction.
+  -->
+
+<!DOCTYPE node PUBLIC
+  "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+  "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+
+<node name="/com/ubuntu/Upstart">
+  <interface name="com.ubuntu.Upstart0_6">
+    <!-- Reload all configuration sources -->
+    <method name="ReloadConfiguration">
+    </method>
+
+    <!-- Get object paths for jobs, while you can figure them out, it's
+         better form to use these -->
+    <method name="GetJobByName">
+      <arg name="name" type="s" direction="in" />
+      <arg name="job" type="o" direction="out" />
+    </method>
+    <method name="GetAllJobs">
+      <arg name="jobs" type="ao" direction="out" />
+    </method>
+
+    <!-- Signals for changes to the job list -->
+    <signal name="JobAdded">
+      <arg name="job" type="o" />
+    </signal>
+    <signal name="JobRemoved">
+      <arg name="job" type="o" />
+    </signal>
+
+    <!-- Event emission -->
+    <method name="EmitEvent">
+      <annotation name="com.netsplit.Nih.Method.Async" value="true" />
+      <arg name="name" type="s" direction="in" />
+      <arg name="env" type="as" direction="in" />
+      <arg name="wait" type="b" direction="in" />
+    </method>
+
+    <!-- Basic information about Upstart -->
+    <property name="version" type="s" access="read" />
+    <property name="log_priority" type="s" access="readwrite" />
+  </interface>
+</node>

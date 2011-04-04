@@ -1,0 +1,87 @@
+dracmc-telnet - External stonith plugin for HAv2 (http://linux-ha.org/wiki)
+                Connects to Dell Drac/MC Blade Enclosure via a Cyclades
+                terminal server with telnet and switches power of named
+                blade servers appropriatelly.
+
+Description:
+    Dell offers the Drac/MC in their blade enclosures.  The
+Drac/MC can be accessed in different ways.  One way to interface to it
+is to connect the blade enclosure's Drac/MC serial port to a Cyclades
+terminal server.  You can then access the Drac/MC via telnet via the
+Cyclades.  Once logged in, you can use 'help' to show all available
+commands.  With the 'serveraction' command, you can control both
+hard and soft resets as well as power to a particular blade.  The
+blades are named 'Server-X', where 'X' is a number which corresponds
+to the blade number in the enclosure.  This plugin allows using the
+Drac/MC with stonith.  It uses python's standards 'telnetlib' library
+to log in and issue commands.  The code is very similar to the original
+ibmrsa-telnet plugin released by Andreas and was quite easy to
+modify for this application.
+    One complication is that the Cyclades only allows one active
+connection.  If someone or something has a connection active, the
+terminal server closes the new attempted connection.  Since this
+situation can be common, for example if trying to stonith two blades
+or when the plugin is started by multiple cluster nodes, there is a
+built in retry mechanism for login.  On 10 retries, the code gives up
+and throws.
+    When running this resource, it is best to not run it as a clone,
+rather as a normal, single-instance resource.  Make sure to create a
+location constraint that excludes the node that is to be fenced.
+
+Required parameters:
+ nodename:      The name of the server you want to touch on your network
+ cyclades_ip:   The IP address of the cyclades terminal server
+ cyclades_port: The port for telnet to access on the cyclades (i.e. 7032)
+ servername:    The DRAC/MC server name of the blade (i.e. Server-7)
+ username:      The login user name for the DRAC/MC
+ password:      The login password for the DRAC/MC
+
+Example configuration
+
+These are examples: you should adjust parameters, scores and
+timeout values to fit your environment.
+
+crm shell:
+
+   primitive fence_node1 stonith:external/dracmc-telnet \
+            nodename=node1 cyclades_ip=10.0.0.1 cyclades_port=7001 \
+            servername=Server-1 username=USERID password=PASSWORD \
+            op monitor interval="200m" timeout="60s"
+   location loc-fence_node1 fence_node1 -inf: node1
+
+XML:
+
+<?xml version="1.0" ?>
+<cib>
+    <configuration>
+        <resources>
+            <primitive id="r_stonith-node01" class="stonith" type="external/dracmc-telnet" provider="heartbeat" resource_stickiness="0">
+                <operations>
+                    <op name="monitor" interval="200m" timeout="60s" prereq="nothing" id="r_stonith-node01-mon"/>
+                    <op name="start" timeout="180" id="r_stonith-node01-start"/>
+                    <op name="stop" timeout="180" id="r_stonith-node01-stop"/>
+                </operations>
+                <instance_attributes id="r_stonith-node01">
+                    <attributes>
+                        <nvpair id="r_stonith-node01-nodename" name="nodename" value="node01"/>
+                        <nvpair id="r_stonith-node01-cyclades_ip" name="cyclades_ip" value="192.168.0.1"/>
+                        <nvpair id="r_stonith-node01-cyclades_port" name="cyclades_port" value="7032"/>
+                        <nvpair id="r_stonith-node01-servername" name="servername" value="Server-7"/>
+                        <nvpair id="r_stonith-node01-username" name="username" value="USERID"/>
+                        <nvpair id="r_stonith-node01-password" name="password" value="PASSWORD"/>
+                        <nvpair id="r_stonith-node01-type" name="type" value="dellblade"/>
+                    </attributes>
+                </instance_attributes>
+            </primitive>
+        </resources>
+        <constraints>
+            <rsc_location id="r_stonith-node01_prefer_node02" rsc="r_stonith-node01">
+                <rule id="r_stonith-node01_prefer_node02_rule" score="50">
+                    <expression attribute="#uname" id="r_stonith-node01_prefer_node02_expr" operation="eq" value="node02"/>
+                </rule>
+            </rsc_location>
+        </constraints>
+
+    </configuration>
+</cib>
+

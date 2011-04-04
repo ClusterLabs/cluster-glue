@@ -1,0 +1,19 @@
+# 30 secs should be enough even on slow machines
+list
+%setenv dflt_timeout=30000
+# add 64 resources
+%repeat 64
+add rsc=r%i args="delay=0"
+# start all in background
+%bgrepeat 64
+exec rsc=r%i operation=start
+%sleep 1
+# and run a monitor on all in background
+%bgrepeat 64
+exec rsc=r%i operation=monitor
+%sleep 1
+# finally, stop all
+%repeat 64
+exec rsc=r%i operation=stop
+%repeat 64
+del rsc=r%i

@@ -1,0 +1,13 @@
+#!/bin/sh
+
+awk '
+n<2 && /ERROR: on_msg_add_rsc: same id resource exists./ {n++; next}
+m<1 && /ERROR: on_msg_del_rsc: no rsc with id/ {m++; next}
+{print}
+END{
+	if( n!=2 )
+		print "ERROR: missed on_msg_add_rsc errors";
+	if( m!=1 )
+		print "ERROR: missed on_msg_del_rsc errors";
+}
+'

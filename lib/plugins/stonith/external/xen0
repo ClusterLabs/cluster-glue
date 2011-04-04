@@ -1,0 +1,253 @@
+#!/bin/sh
+#
+# External STONITH module for Xen Dom0 through ssh.
+#
+# Description:  Uses Xen Dom0 Domain as a STONITH device
+#               to control DomUs.
+#
+#
+# Author:       Serge Dubrouski (sergeyfd@gmail.com)
+#               Inspired by Lars Marowsky-Bree's external/ssh agent.
+#
+# Copyright 2007 Serge Dubrouski <sergeyfd@gmail.com>
+# License:      GNU General Public License (GPL)
+#
+
+STOP_COMMAND="xm destroy"
+START_COMMAND="xm create"
+DUMP_COMMAND="xm dump-core"
+DEFAULT_XEN_DIR="/etc/xen"
+SSH_COMMAND="/usr/bin/ssh -q -x -n"
+
+# Rewrite the hostlist to accept "," as a delimeter for hostnames too.
+hostlist=`echo $hostlist | tr ',' ' '`
+
+CheckIfDead() {
+    for j in 1 2 3 4 5
+    do
+        if ! ping -w1 -c1 "$1" >/dev/null 2>&1
+        then
+            return 0
+        fi
+        sleep 1
+    done
+    
+    return 1
+}
+
+CheckHostList() {
+    if [ "x" = "x$hostlist" ]
+    then
+        ha_log.sh err "hostlist isn't set"
+        exit 1
+    fi
+}
+
+CheckDom0() {
+    if [ "x" = "x$dom0" ]
+    then
+        ha_log.sh err "dom0 isn't set"
+        exit 1
+    fi
+}
+
+RunCommand() {
+    CheckHostList
+    CheckDom0
+    
+    for h in $hostlist
+    do
+        CIFS=$IFS
+        IFS=:
+        read node cfg << -!
+$h
+-!
+        IFS=$CIFS
+
+        if [ "x" = "x$node" ]
+        then
+            ha_log.sh err "Syntax error in host list"
+            exit 1
+        fi
+        
+        if [ "x" = "x$cfg" ]
+        then
+            cfg="${DEFAULT_XEN_DIR}/${node}.cfg"
+        fi
+        
+        if [ "$node" != "$1" ]
+        then
+            continue
+        fi
+          
+        case $2 in
+            stop)
+                 kill_node=`$SSH_COMMAND $dom0 "grep ^[[:space:]]*name $cfg" | cut -f 2 -d '=' |  sed -e 's,",,g'`
+                 if [ "x" = "x$kill_node" ]
+                 then
+                     ha_log.sh err "Couldn't find a node name to stop"
+                     exit 1
+                 fi
+
+                 if [ "x$run_dump" != "x" ]
+                 then
+                     #Need to run core dump
+                     if [ "x$dump_dir" != "x" ]
+                     then
+			 #Dump with the specified core file
+			 TIMESTAMP=`date +%Y-%m%d-%H%M.%S`
+			 DOMAINNAME=`printf "%s" $kill_node`
+                         COREFILE=$dump_dir/$TIMESTAMP-$DOMAINNAME.core
+                         $SSH_COMMAND $dom0 "(mkdir -p $dump_dir; $DUMP_COMMAND $kill_node $COREFILE) >/dev/null 2>&1"
+                     else 
+                         $SSH_COMMAND $dom0 "$DUMP_COMMAND $kill_node >/dev/null 2>&1"
+		     fi
+                 fi
+                 $SSH_COMMAND $dom0 "(sleep 2; $STOP_COMMAND $kill_node) >/dev/null 2>&1 &"
+                break;;
+            start)
+                $SSH_COMMAND $dom0 "(sleep 2; $START_COMMAND $cfg) >/dev/null 2>&1 &"
+                break;;
+        esac
+        exit 0
+    done
+}
+
+
+# Main code
+
+case $1 in
+gethosts)
+    CheckHostList
+    
+    for h in $hostlist ; do
+        CIFS=$IFS
+        IFS=:
+        read node cfg << -!
+$h
+-!
+        IFS=$CIFS
+
+        echo $node
+    done
+    exit 0
+    ;;
+on)
+    RunCommand $2 start
+    exit $?
+    ;;
+off)
+    if RunCommand $2 stop
+    then
+        if CheckIfDead $2
+        then 
+            exit 0
+        fi
+    fi
+           
+    exit 1
+    ;;
+reset)
+    RunCommand $2 stop
+        
+    if CheckIfDead $2
+    then
+        RunCommand $2 start 
+        exit 0
+    fi
+
+    exit 1
+    ;;
+status)
+    CheckHostList
+    
+    for h in $hostlist
+    do
+        CIFS=$IFS
+        IFS=:
+        read node cfg << -!
+$h
+-!
+        IFS=$CIFS
+        
+        echo $node
+        if ping -w1 -c1 "$node" 2>&1 | grep "unknown host"
+        then
+            exit 1
+	fi
+    done
+    exit 0
+    ;;
+getconfignames)
+    echo "hostlist dom0"
+    exit 0
+    ;;
+getinfo-devid)
+    echo "xen0 STONITH device"
+    exit 0
+    ;;
+getinfo-devname)
+    echo "xen0 STONITH external device"
+    exit 0
+    ;;
+getinfo-devdescr)
+    echo "ssh-based Linux host reset for Xen DomU trough Dom0"
+    echo "Fine for testing, but not really suitable for production!"
+    exit 0
+    ;;
+getinfo-devurl)
+    echo "http://openssh.org http://www.xensource.com/ http://linux-ha.org/wiki"
+    exit 0
+    ;;
+getinfo-xml)
+    cat << SSHXML
+<parameters>
+<parameter name="hostlist" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Hostlist
+</shortdesc>
+<longdesc lang="en">
+The list of controlled nodes in a format node[:config_file].
+For example: "node1:/opt/xen/node1.cfg node2"
+If config file isn't set it defaults to /etc/xen/{node_name}.cfg
+</longdesc>
+</parameter>
+<parameter name="dom0" unique="1" required="1">
+<content type="string" />
+<shortdesc lang="en">
+Dom0
+</shortdesc>
+<longdesc lang="en">
+Name of the Dom0 Xen node. Root user shall be able to ssh to that node.
+</longdesc>
+</parameter>
+<parameter name="run_dump" unique="0" required="0">
+<content type="string" />
+<shortdesc lang="en">
+Run dump-core
+</shortdesc>
+<longdesc lang="en">
+If set plugin will call "xm dump-core" before killing DomU
+</longdesc>
+</parameter>
+<parameter name="dump_dir" unique="1" required="0">
+<content type="string" />
+<shortdesc lang="en">
+Run dump-core with the specified directory 
+</shortdesc>
+<longdesc lang="en">
+This parameter can indicate the dump destination.
+Should be set as a full path format, ex.) "/var/log/dump"
+The above example would dump the core, like;
+/var/log/dump/2009-0316-1403.37-domU.core
+</longdesc>
+</parameter>
+</parameters>
+SSHXML
+    exit 0
+    ;;
+*)
+    exit 1
+    ;;
+esac

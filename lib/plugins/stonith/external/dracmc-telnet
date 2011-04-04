@@ -1,0 +1,377 @@
+#!/usr/bin/env python
+# vim: set filetype=python
+#######################################################################
+#
+# dracmc-telnet - External stonith plugin for HAv2 (http://linux-ha.org/wiki)
+#                 Connects to Dell Drac/MC Blade Enclosure via a Cyclades
+#                 terminal server with telnet and switches power of named
+#                 blade servers appropriatelly.
+#
+# Required parameters:
+#  nodename:      The name of the server you want to touch on your network
+#  cyclades_ip:   The IP address of the cyclades terminal server
+#  cyclades_port: The port for telnet to access on the cyclades (i.e. 7032)
+#  servername:    The DRAC/MC server name of the blade (i.e. Server-7)
+#  username:      The login user name for the DRAC/MC
+#  password:      The login password for the DRAC/MC
+#
+# Author: Alex Tsariounov <alext@novell.com>
+#
+# Based on ibmrsa-telnet external stonith plugin by Andreas Mock
+# (andreas.mock@web.de), Copyright by Adreas Mock and released as part
+# of HAv2.
+#
+# History:
+#   2009-10-12  First release.
+#
+# Copyright (c) 2009 Novell, Inc.
+# All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 or later of the GNU General Public
+# License as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+#######################################################################
+import sys
+import os
+import time
+import telnetlib
+import random
+import subprocess
+
+LOGINRETRIES = 10
+
+class TimeoutException(Exception):
+    def __init__(self, value=None):
+        Exception.__init__(self)
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+class DracMC(telnetlib.Telnet):
+    def __init__(self, *args, **kwargs):
+        telnetlib.Telnet.__init__(self)
+        self._timeout = 4
+        self._loggedin = 0
+        self._history = []
+        self._appl = os.path.basename(sys.argv[0])
+        self._server = args[0]
+
+    def _get_timestamp(self):
+        ct = time.time()
+        msecs = (ct - long(ct)) * 1000
+        return "%s,%03d" % (time.strftime("%Y-%m-%d %H:%M:%S",
+                            time.localtime(ct)), msecs)
+
+    def write(self, buffer):
+        self._history.append(self._get_timestamp() + ': WRITE: ' + repr(buffer))
+        telnetlib.Telnet.write(self, buffer)
+
+    def read_until(self, what, timeout=2):
+        line = telnetlib.Telnet.read_until(self, what, timeout)
+        self._history.append(self._get_timestamp() + ': READ : ' + repr(line))
+        if not line.endswith(what):
+            raise TimeoutException("Timeout while waiting for '%s'." % (what, ))
+        return line
+
+    def login(self, user, passwd):
+        time.sleep(0.3)
+        try:
+            line = self.read_until('Login: ', self._timeout)
+            self.write(user)
+            self.write('\r')
+            line = self.read_until('Password: ', self._timeout)
+            self.write(passwd)
+            self.write('\r')
+        except:
+            self.write("\r")
+            line = self.read_until('Login: ', self._timeout)
+            self.write(user)
+            self.write('\r')
+            line = self.read_until('Password: ', self._timeout)
+            self.write(passwd)
+            self.write('\r')
+        try:
+            line = self.read_until('DRAC/MC:', self._timeout)
+        except:
+            self.write("\r")
+            line = self.read_until('DRAC/MC:', self._timeout)
+
+    def hardreset(self):
+        self.write('serveraction -s %s hardreset\r' % self._server)
+        line = self.read_until('OK', 10)
+        line = self.read_until('DRAC/MC:', self._timeout)
+            
+    def powercycle(self):
+        self.write('serveraction -s %s powercycle\r' % self._server)
+        line = self.read_until('OK', 10)
+        line = self.read_until('DRAC/MC:', self._timeout)
+
+    def on(self):
+        self.write('serveraction -s %s powerup\r' % self._server)
+        line = self.read_until('OK', 10)
+        line = self.read_until('DRAC/MC:', self._timeout)
+
+    def off(self):
+        self.write('serveraction -s %s powerdown\r' % self._server)
+        line = self.read_until('OK', 10)
+        line = self.read_until('DRAC/MC:', self._timeout)
+
+    def exit(self):
+        self.write('exit\r')
+
+    def get_history(self):
+        return "\n".join(self._history)
+
+
+class DracMCStonithPlugin:
+    def __init__(self):
+        # define the external stonith plugin api
+        self._required_cmds = \
+            'reset gethosts status getconfignames getinfo-devid ' \
+            'getinfo-devname getinfo-devdescr getinfo-devurl ' \
+            'getinfo-xml'
+        self._optional_cmds = 'on off'
+        self._required_cmds_list = self._required_cmds.split()
+        self._optional_cmds_list = self._optional_cmds.split()
+
+        # who am i
+        self._appl = os.path.basename(sys.argv[0])
+
+        # telnet connection object
+        self._connection = None
+
+        # the list of configuration names
+        self._confignames = ['nodename', 'cyclades_ip', 'cyclades_port',
+                             'servername', 'username', 'password']
+
+        # catch the parameters provided by environment
+        self._parameters = {}
+        for name in self._confignames:
+            try:
+                self._parameters[name] = os.environ.get(name, '').split()[0]
+            except IndexError:
+                self._parameters[name] = ''
+
+    def _get_timestamp(self):
+        ct = time.time()
+        msecs = (ct - long(ct)) * 1000
+        return "%s,%03d" % (time.strftime("%Y-%m-%d %H:%M:%S",
+                            time.localtime(ct)), msecs)
+
+    def _echo_debug(self, *args):
+        subprocess.call("ha_log.sh debug '%s'" % ' '.join(args), shell=True)
+
+    def echo(self, *args):
+        what = ''.join([str(x) for x in args])
+        sys.stdout.write(what)
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+        self._echo_debug("STDOUT:", what)
+
+    def echo_log(self, level, *args):
+        subprocess.call("ha_log.sh %s '%s'" % (level,' '.join(args)), shell=True)
+
+    def _get_connection(self):
+        if not self._connection:
+            c = DracMC(self._parameters['servername'])
+            self._echo_debug("Connecting to '%s:%s'" %
+                             (self._parameters['cyclades_ip'],
+                              self._parameters['cyclades_port']))
+            tries = 0
+            while tries < LOGINRETRIES:
+                try:
+                    c.open(self._parameters['cyclades_ip'],
+                           self._parameters['cyclades_port'])
+                    c.login(self._parameters['username'],
+                            self._parameters['password'])
+                except Exception, args:
+                    if "Connection reset by peer" in str(args):
+                        self._echo_debug("Someone is already logged in... retry=%s" % tries)
+                        c.close()
+                        time.sleep(random.uniform(1.0, 5.0))
+                    else:
+                        raise
+                else:
+                    break
+                tries += 1
+
+            if tries == LOGINRETRIES:
+                c.close()
+                raise Exception("Could not log in to %s:%s" %
+                                (self._parameters['cyclades_ip'],
+                                 self._parameters['cyclades_port']))
+            self._connection = c
+
+    def _end_connection(self):
+        if self._connection:
+            self._connection.exit()
+            self._connection.close()
+
+    def reset(self):
+        self._get_connection()
+        # self._connection.hardreset()
+        self._connection.powercycle()
+        self._end_connection()
+        self._echo_debug(self._connection.get_history())
+        self.echo_log("info", "Reset of node '%s' done" %
+                              (self._parameters['nodename'],))
+        return(0)
+
+    def on(self):
+        self._get_connection()
+        self._connection.on()
+        self._end_connection()
+        self._echo_debug(self._connection.get_history())
+        self.echo_log("info", "Switched node '%s' ON" %
+                              (self._parameters['nodename'],))
+        return(0)
+
+    def off(self):
+        self._get_connection()
+        self._connection.off()
+        self._end_connection()
+        self._echo_debug(self._connection.get_history())
+        self.echo_log("info", "Switched node '%s' OFF" %
+                              (self._parameters['nodename'],))
+        return(0)
+
+    def gethosts(self):
+        self.echo(self._parameters['nodename'])
+        return(0)
+
+    def status(self):
+        self._get_connection()
+        self._end_connection()
+        self._echo_debug(self._connection.get_history())
+        return(0)
+
+    def getconfignames(self):
+        for name in ['nodename', 'cyclades_ip', 'cyclades_port', 'servername',
+                     'username', 'password']:
+            self.echo(name)
+        return(0)
+
+    def getinfo_devid(self):
+        self.echo("External Stonith Plugin for Dell DRAC/MC via Cyclades")
+        return(0)
+
+    def getinfo_devname(self):
+        self.echo("External Stonith Plugin for Dell Drac/MC connecting "
+                  "via Telnet to a Cyclades port")
+        return(0)
+
+    def getinfo_devdescr(self):
+        self.echo("External stonith plugin for HAv2 which connects to "
+                  "a Dell DRAC/MC connected via a Cyclades port with telnet. "
+                  "Commands to turn on/off power and to reset server are sent "
+                  "appropriately. "
+                  "(c) 2009 by Novell, Inc. (alext@novell.com)")
+        return(0)
+
+    def getinfo_devurl(self):
+        self.echo("http://support.dell.com/support/edocs/software/smdrac3/dracmc/1.3/en/index.htm")
+
+    def getinfo_xml(self):
+        info = """<parameters>
+            <parameter name="nodename" unique="1" required="1">
+                <content type="string" />
+                <shortdesc lang="en">nodename to shoot</shortdesc>
+                <longdesc lang="en">
+                Name of the node to be stonithed.
+                </longdesc>
+            </parameter>
+            <parameter name="cyclades_ip" unique="1" required="1">
+                <content type="string" />
+                <shortdesc lang="en">hostname or ip address of cyclades</shortdesc>
+                <longdesc lang="en">
+                Hostname or IP address of Cyclades connected to DRAC/MC.
+                </longdesc>
+            </parameter>
+            <parameter name="cyclades_port" unique="1" required="1">
+                <content type="string" />
+                <shortdesc lang="en">telnet port to use on cyclades</shortdesc>
+                <longdesc lang="en">
+                Port used with the Cyclades telnet interface which is connected to the DRAC/MC.
+                </longdesc>
+            </parameter>
+            <parameter name="servername" unique="1" required="1">
+                <content type="string" />
+                <shortdesc lang="en">DRAC/MC name of blade to be stonithed</shortdesc>
+                <longdesc lang="en">
+                Name of server blade to be stonithed on the DRAC/MC (example: Server-7)
+                </longdesc>
+            </parameter>
+            <parameter name="username" unique="1" required="1">
+                <content type="string" />
+                <shortdesc lang="en">username to login on the DRAC/MC</shortdesc>
+                <longdesc lang="en">
+                Username to login to the DRAC/MC once connected via the Cyclades port.
+                </longdesc>
+            </parameter>
+            <parameter name="password" unique="1" required="1">
+                <content type="string" />
+                <shortdesc lang="en">password to login on the DRAC/MC</shortdesc>
+                <longdesc lang="en">
+                Password to login to the DRAC/MC once connected via the Cyclades port.
+                </longdesc>
+            </parameter>
+        </parameters>
+        """
+        self.echo(info)
+        return(0)
+
+    def not_implemented(self, cmd):
+        self.echo_log("err", "Command '%s' not implemented." % (cmd,))
+        return(1)
+
+    def usage(self):
+        usage = "Call me with one of the allowed commands: %s, %s" % (
+        ', '.join(self._required_cmds_list),
+        ', '.join(self._optional_cmds_list))
+        return usage
+
+    def process(self, argv):
+        self._echo_debug("========== Start =============")
+        if len(argv) < 1:
+            self.echo_log("err", 'At least one commandline argument required.')
+            return(1)
+        cmd = argv[0]
+        self._echo_debug("cmd:", cmd)
+        if cmd not in self._required_cmds_list and \
+           cmd not in self._optional_cmds_list:
+            self.echo_log("err", "Command '%s' not supported." % (cmd,))
+            return(1)
+        try:
+            cmd = cmd.lower().replace('-', '_')
+            func = getattr(self, cmd, self.not_implemented)
+            rc = func()
+            return(rc)
+        except Exception, args:
+            self.echo_log("err", 'Exception raised:', str(args))
+            if self._connection:
+                self.echo_log("err", self._connection.get_history())
+                self._connection.close()
+            return(1)
+
+
+if __name__ == '__main__':
+    stonith = DracMCStonithPlugin()
+    rc = stonith.process(sys.argv[1:])
+    sys.exit(rc)

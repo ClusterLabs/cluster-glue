@@ -1,0 +1,60 @@
+# LRM Admin Command-line Interface
+# It's a draft
+NAME
+	lrmadmin  - Local Resource Manager Commander-line Daministrator Tools
+
+SYNOPSIS
+lrmadmin {-d|--daemon}
+	 {-A|--add} <rscid> <rsc_class> <rsc_type> [<rsc_params_list>] 
+	 {-D|--delete} <rscid>
+	 {-F|--flush} <rscid>
+	 {-E|--execute} <rscid> <operator> <timeout> [<operator_parameters_list>]
+	 {-M|--monitor} -s <rscid> <operator> <timeout> <interval>
+			[<operator_parameters_list>]
+	 {-M|--monitor}	{-g|-c} <rscid>
+	 {-S|--status} <rscid>
+	 {-L|--listall}
+	 {-I|--information} <rsc_id>
+	 {-R|--rasupported}
+	 {-h|--help}
+
+Detailed Explanation for Options 
+
+Lrmd daemon options
+	 {-d|--daemon}
+#		-s	    The status of lrmd: running or not running
+#		-r	    Reset lrmd (?)
+
+Resource options
+	 {-A|--add} <rscid> <rsc_class> <rsc_type> [<rsc_params_list>] 
+		Add a resource.
+
+	 {-D|--delete} <rscid>
+	        Delete a resource
+
+	 {-E|--execute} <rscid> <operator> <timeout> [<operator_parameters_list>]
+		Let resource agent to performance the operation
+
+	 {-F|--flush} <rscid>
+		Clear all pending operation on the resource agnency      
+
+	 {-M|--monitor} {-s|-g} <rscid> <interval>
+		-s rscname	Set a monitors on the resource agent
+		-g		Get the information about the monitors on the 
+				resource agent
+
+	 {-S|--status} <rscid>
+		Get the status of current resource agent
+
+	 {-L|--listall}
+		List all available resource agent
+
+	 {-I|--information} <rsc_id>
+		List the information about a resource
+
+	 {-R|--rasupported}
+		List the support types of resource agent such as OCF and etc.
+
+Other options
+	 {-h|--help}
+		Display the help screen
