@@ -465,7 +465,12 @@ int check_timeout_inconsistent(void)
 		hdr_last = hdr_cur;
 	}
 
-	if (!hdr_last) {
+	if (hdr_last) {
+		timeout_watchdog = hdr_last->timeout_watchdog;
+		timeout_allocate = hdr_last->timeout_allocate;
+		timeout_loop = hdr_last->timeout_loop;
+		timeout_msgwait = hdr_last->timeout_msgwait;
+	} else { 
 		cl_log(LOG_ERR, "No devices were available at start-up.");
 		exit(1);
 	}
