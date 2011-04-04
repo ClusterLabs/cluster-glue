@@ -546,7 +546,7 @@ void inquisitor_child(void)
 	int exiting = 0;
 	int decoupled = 0;
 	time_t latency;
-	struct timespec t_last_tickle, t_now;
+	struct timespec t_last_tickle, t_now, t_last_restarted;
 
 	set_proc_title("sbd: inquisitor");
 
@@ -576,6 +576,7 @@ void inquisitor_child(void)
 	while (1) {
 		sig = sigtimedwait(&procmask, &sinfo, &timeout);
 		DBGPRINT("got signal %d\n", sig);
+
 		if (sig == SIG_EXITREQ) {
 			servants_kill();
 			watchdog_close();
@@ -604,6 +605,7 @@ void inquisitor_child(void)
 		} else if (sig == SIGUSR1) {
 			if (exiting)
 				continue;
+			clock_gettime(CLOCK_MONOTONIC, &t_last_restarted);
 			servants_start();
 		}
 
@@ -644,6 +646,13 @@ void inquisitor_child(void)
 			cl_log(LOG_WARNING,
 			       "Latency: No liveness for %d s exceeds threshold of %d s (healthy servants: %d)",
 			       (int)latency, (int)timeout_watchdog_warn, good_servants);
+		}
+		
+		latency = t_now.tv_sec - t_last_restarted.tv_sec;
+		if (sig = -1 && latency > 3600) {
+			/* Restart all children every hour */
+			clock_gettime(CLOCK_MONOTONIC, &t_last_restarted);
+			servants_start();
 		}
 	}
 	/* not reached */
