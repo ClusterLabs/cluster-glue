@@ -650,7 +650,7 @@ void inquisitor_child(void)
 		}
 		
 		latency = t_now.tv_sec - t_last_restarted.tv_sec;
-		if (sig = -1 && latency > 3600) {
+		if (latency > 3600) {
 			/* Restart all children every hour */
 			clock_gettime(CLOCK_MONOTONIC, &t_last_restarted);
 			servants_start();
