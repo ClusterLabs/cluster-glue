@@ -9,7 +9,7 @@
 
 # Main code
 
-if [ x$sbd_device = x ]; then
+if [ x"$sbd_device" = x ]; then
   if [ -f /etc/sysconfig/sbd ]; then
     source /etc/sysconfig/sbd
 	sbd_device=$SBD_DEVICE
@@ -17,14 +17,6 @@ if [ x$sbd_device = x ]; then
 fi
 
 SBD_DEVS=${sbd_device%;}
-
-echo $SBD_DEVS | grep -q ';'
-if [ $? -eq 1 ]; then
-  SBD_BIN="/usr/sbin/sbd"
-else
-  SBD_BIN="/usr/sbin/sbd-md"
-fi
-
 sbd_device=${SBD_DEVS//;/ -d }
 
 case $1 in
