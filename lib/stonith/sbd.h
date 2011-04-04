@@ -144,3 +144,6 @@ int messenger(const char *name, const char *msg);
 int check_timeout_inconsistent(void);
 void restart_servant_by_pid(pid_t pid);
 void cleanup_servant_by_pid(pid_t pid);
+int quorum_write(int good_servants);
+int quorum_read(int good_servants);
+
