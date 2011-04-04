@@ -465,6 +465,15 @@ int check_timeout_inconsistent(void)
 		hdr_last = hdr_cur;
 	}
 
+	if (hdr_last) {
+		timeout_watchdog = hdr_last->timeout_watchdog;
+		timeout_allocate = hdr_last->timeout_allocate;
+		timeout_loop = hdr_last->timeout_loop;
+		timeout_msgwait = hdr_last->timeout_msgwait;
+	} else {
+		DBGPRINT("No available SBD devices\n");
+		exit(1);
+	}
 	free(hdr_last);
 	return inconsistent;
 }
