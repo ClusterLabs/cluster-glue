@@ -56,7 +56,7 @@ usage(void)
 "Syntax:\n"
 "	%s <options> <command> <cmdarguments>\n"
 "Options:\n"
-"-d <devname>	Block device to use (mandatory)\n"
+"-d <devname>	Block device to use (mandatory; can be specified up to 3 times)\n"
 "-h		Display this help.\n"
 "-n <node>	Set local node name; defaults to uname -n (optional)\n"
 "\n"
