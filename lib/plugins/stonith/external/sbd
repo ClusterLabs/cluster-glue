@@ -74,10 +74,12 @@ getinfo-xml)
 <parameter name="sbd_device" unique="1" required="1">
 <content type="string" />
 <shortdesc lang="en">
-SBD device
+SBD device(s)
 </shortdesc>
 <longdesc lang="en">
-The block device used for the SBD partition.
+The block device used for the SBD partition. Up to three
+can be specified if separated by a semicolon. (Please check
+the documentation if specifying two.)
 </longdesc>
 </parameter>
 </parameters>
