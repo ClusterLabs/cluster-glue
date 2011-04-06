@@ -814,14 +814,10 @@ int main(int argc, char **argv, char **envp)
 
 	get_uname();
 
-	/* TODO: Remove the conditional in make_daemon(); the new
-	 * servant bootstrapping no longer permits a non-daemon
-	 * execution. */
-	go_daemon = 1;
 	while ((c = getopt(argc, argv, "DRWhvw:d:n:1:2:3:4:5:")) != -1) {
 		switch (c) {
 		case 'D':
-			go_daemon = 1;
+			/* Ignore for historical reasons */
 			break;
 		case 'R':
 			skip_rt = 1;

@@ -36,7 +36,6 @@ int		timeout_msgwait		= 10;
 
 int	watchdog_use		= 0;
 int	watchdog_set_timeout	= 1;
-int	go_daemon		= 0;
 int	skip_rt			= 0;
 int	debug			= 0;
 const char *watchdogdev		= "/dev/watchdog";
@@ -65,7 +64,6 @@ usage(void)
 "-W		Use watchdog (recommended) (watch only)\n"
 "-w <dev>	Specify watchdog device (optional) (watch only)\n"
 "-T		Do NOT initialize the watchdog timeout (watch only)\n"
-"-D		Run as background daemon (optional) (watch only)\n"
 "-v		Enable some verbose debug logging (optional)\n"
 "\n"
 "-1 <N>		Set watchdog timeout to N seconds (optional) (create only)\n"
@@ -792,16 +790,14 @@ make_daemon(void)
 	pid_t			pid;
 	const char *		devnull = "/dev/null";
 
-	if (go_daemon > 0) {
-		pid = fork();
-		if (pid < 0) {
-			cl_log(LOG_ERR, "%s: could not start daemon\n",
-					cmdname);
-			cl_perror("fork");
-			exit(1);
-		}else if (pid > 0) {
-			return pid;
-		}
+	pid = fork();
+	if (pid < 0) {
+		cl_log(LOG_ERR, "%s: could not start daemon\n",
+				cmdname);
+		cl_perror("fork");
+		exit(1);
+	}else if (pid > 0) {
+		return pid;
 	}
 
 	cl_log_enable_stderr(FALSE);

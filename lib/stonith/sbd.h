@@ -104,7 +104,6 @@ extern int      timeout_loop;
 extern int      timeout_msgwait;
 extern int  watchdog_use;
 extern int  watchdog_set_timeout;
-extern int  go_daemon;
 extern int  skip_rt;
 extern int  debug;
 extern const char *watchdogdev;
