@@ -765,6 +765,33 @@ out:	free(s_mbox);
 }
 
 void
+sysrq_init(void)
+{
+	FILE* procf;
+	int c;
+	procf = fopen("/proc/sys/kernel/sysrq", "r");
+	if (!procf) {
+		cl_perror("cannot open /proc/sys/kernel/sysrq for read.");
+		return;
+	}
+	fscanf(procf, "%d", &c);
+	fclose(procf);
+	if (c == 1)
+		return;
+	/* 8 for debugging dumps of processes, 
+	   128 for reboot/poweroff */
+	c |= 136; 
+	procf = fopen("/proc/sys/kernel/sysrq", "w");
+	if (!procf) {
+		printf("cannot open /proc/sys/kernel/sysrq for write\n");
+		return;
+	}
+	fprintf(procf, "%d", c);
+	fclose(procf);
+	return;
+}
+
+void
 sysrq_trigger(char t)
 {
 	FILE *procf;

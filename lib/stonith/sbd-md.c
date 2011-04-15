@@ -691,6 +691,9 @@ int inquisitor(void)
 
 	DBGPRINT("inquisitor starting\n");
 
+	/* Where's the best place for sysrq init ?*/
+	sysrq_init();
+
 	sigemptyset(&procmask);
 	sigaddset(&procmask, SIGCHLD);
 	sigaddset(&procmask, SIG_LIVENESS);

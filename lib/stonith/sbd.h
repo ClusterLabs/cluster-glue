@@ -63,6 +63,7 @@ void usage(void);
 int watchdog_init_interval(void);
 int watchdog_tickle(void);
 int watchdog_init(void);
+void sysrq_init(void);
 void watchdog_close(void);
 int open_device(const char* devname);
 signed char cmd2char(const char *cmd);
