@@ -474,10 +474,16 @@ init_device(int devfd)
 	cl_log(LOG_INFO, "Creating version %d header on device %d",
 			s_header->version,
 			devfd);
+	fprintf(stdout, "Creating version %d header on device %d\n",
+			s_header->version,
+			devfd);
 	if (header_write(devfd, s_header) < 0) {
 		rc = -1; goto out;
 	}
 	cl_log(LOG_INFO, "Initializing %d slots on device %d",
+			s_header->slots,
+			devfd);
+	fprintf(stdout, "Initializing %d slots on device %d\n",
 			s_header->slots,
 			devfd);
 	for (i=0;i < s_header->slots;i++) {
@@ -563,6 +569,7 @@ slot_allocate(int devfd, const char *name)
 
 	if (!name) {
 		cl_log(LOG_ERR, "slot_allocate(): No name specified.\n");
+		fprintf(stderr, "slot_allocate(): No name specified.\n");
 		rc = -1; goto out;
 	}
 
@@ -583,6 +590,7 @@ slot_allocate(int devfd, const char *name)
 		i = slot_unused(devfd, s_header);
 		if (i >= 0) {
 			cl_log(LOG_INFO, "slot %d is unused - trying to own", i);
+			fprintf(stdout, "slot %d is unused - trying to own\n", i);
 			memset(s_node, 0, sizeof(*s_node));
 			s_node->in_use = 1;
 			strncpy(s_node->name, name, sizeof(s_node->name));
@@ -592,6 +600,7 @@ slot_allocate(int devfd, const char *name)
 			sleep(timeout_allocate);
 		} else {
 			cl_log(LOG_ERR, "No more free slots.");
+			fprintf(stderr, "No more free slots.\n");
 			rc = -1; goto out;
 		}
 	}

@@ -58,7 +58,7 @@ static int	servant_count	= 0;
 #define SIG_RESTART  (SIGRTMIN + 4)	/* trigger restart of all failed disk */
 /* FIXME: should add dynamic check of SIG_XX >= SIGRTMAX */
 
-/* Helper Macros, to reuse existing functions */
+/* Debug Helper */
 #if 0
 #define DBGPRINT(...) fprintf(stderr, __VA_ARGS__)
 #else
@@ -106,7 +106,8 @@ int init_devices()
 	struct servants_list_item *s;
 
 	for (s = servants_leader; s; s = s->next) {
-		DBGPRINT("init device %s\n", s->devname);
+		fprintf(stdout, "Initializing device %s\n",
+				s->devname);
 		devfd = open_device(s->devname);
 		if (devfd == -1) {
 			return -1;
@@ -114,9 +115,10 @@ int init_devices()
 		rc = init_device(devfd);
 		close(devfd);
 		if (rc == -1) {
-			fprintf(stderr, "failed to init device %s\n", s->devname);
+			fprintf(stderr, "Failed to init device %s\n", s->devname);
 			return rc;
 		}
+		fprintf(stdout, "Device %s is initialized.\n", s->devname);
 	}
 	return 0;
 }
@@ -156,7 +158,9 @@ int allocate_slots(const char *name)
 	struct servants_list_item *s;
 
 	for (s = servants_leader; s; s = s->next) {
-		DBGPRINT("allocate on device %s\n", s->devname);
+		fprintf(stdout, "Trying to allocate slot for %s on device %s.\n", 
+				name,
+				s->devname);
 		devfd = open_device(s->devname);
 		if (devfd == -1) {
 			return -1;
@@ -165,7 +169,9 @@ int allocate_slots(const char *name)
 		close(devfd);
 		if (rc == -1)
 			return rc;
-		DBGPRINT("allocation on %s done\n", s->devname);
+		fprintf(stdout, "Slot for %s has been allocated on %s.\n",
+				name,
+				s->devname);
 	}
 	return 0;
 }
@@ -775,7 +781,7 @@ int messenger(const char *name, const char *msg)
 	if (quorum_write(successful_delivery)) {
 		return 0;
 	} else {
-		fprintf(stderr, "Message is not delivery via more then a half of devices\n");
+		fprintf(stderr, "Message is not delivered via more then a half of devices\n");
 		return -1;
 	}
 }
@@ -787,7 +793,7 @@ int dump_headers(void)
 	int devfd;
 
 	for (s = servants_leader; s; s = s->next) {
-		DBGPRINT("Dumping header on disk %s\n", s->devname);
+		fprintf(stdout, "==Dumping header on disk %s\n", s->devname);
 		devfd = open_device(s->devname);
 		if (devfd == -1)
 			return -1;
@@ -795,7 +801,7 @@ int dump_headers(void)
 		close(devfd);
 		if (rc == -1)
 			return rc;
-		DBGPRINT("Header on disk %s is dumped\n", s->devname);
+		fprintf(stdout, "==Header on disk %s is dumped\n", s->devname);
 	}
 	return rc;
 }
