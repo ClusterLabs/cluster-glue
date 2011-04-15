@@ -26,7 +26,11 @@ gethosts)
     exit 0
     ;;
 off|reset)
-    sbd -d $sbd_device message $2 $1
+	if [ x"$sbd_crashdump" = "xtrue" ]; then
+		sbd -d $sbd_device message crashdump $1
+	else
+		sbd -d $sbd_device message $2 $1
+	fi
     exit $?
     ;;
 status)
@@ -71,6 +75,17 @@ getinfo-devurl)
 getinfo-xml)
     cat << SSHXML
 <parameters>
+
+<parameter name="sbd_crashdump" unique="0" required="0">
+<content type="string" />
+<shortdesc lang="en">
+Crashdump instead of reboot.
+</shortdesc>
+<longdesc lang="en">
+Let SBD trigger a kernel crashdump instead of bruteforce reboot.
+</longdesc>
+</parameter>
+
 <parameter name="sbd_device" unique="1" required="1">
 <content type="string" />
 <shortdesc lang="en">
