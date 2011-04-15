@@ -54,6 +54,7 @@ struct servants_list_item {
 #define SBD_MSG_RESET	0x02
 #define SBD_MSG_OFF	0x03
 #define SBD_MSG_EXIT	0x04
+#define SBD_MSG_CRASHDUMP	0x05
 			
 #define SLOT_TO_SECTOR(slot) (1+slot*2)
 #define MBOX_TO_SECTOR(mbox) (2+mbox*2)
@@ -90,6 +91,7 @@ int slot_ping(int devfd, const char *name);
 int slot_msg(int devfd, const char *name, const char *cmd);
 int header_dump(int devfd);
 void sysrq_trigger(char t);
+void do_crashdump(void);
 void do_reset(void);
 void do_off(void);
 pid_t make_daemon(void);

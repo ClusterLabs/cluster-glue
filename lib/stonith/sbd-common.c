@@ -246,6 +246,8 @@ cmd2char(const char *cmd)
 		return SBD_MSG_OFF;
 	} else if (strcmp("exit", cmd) == 0) {
 		return SBD_MSG_EXIT;
+	} else if (strcmp("crashdump", cmd) == 0) {
+		return SBD_MSG_CRASHDUMP;
 	}
 	return -1;
 }
@@ -282,6 +284,9 @@ char2cmd(const char cmd)
 			break;
 		case SBD_MSG_EXIT:
 			return "exit";
+			break;
+		case SBD_MSG_CRASHDUMP:
+			return "crashdump";
 			break;
 		default:
 			return "undefined";
@@ -764,6 +769,15 @@ sysrq_trigger(char t)
 	fprintf(procf, "%c\n", t);
 	fclose(procf);
 	return;
+}
+
+void
+do_crashdump(void)
+{
+	sysrq_trigger('c');
+	/* is it possible to reach the following line? */
+	cl_reboot(5, "sbd is triggering crashdumping");
+	exit(1);
 }
 
 void

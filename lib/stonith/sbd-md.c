@@ -325,6 +325,9 @@ int servant(const char *diskname, const void* argp)
 			case SBD_MSG_EXIT:
 				sigqueue(ppid, SIG_EXITREQ, signal_value);
 				break;
+			case SBD_MSG_CRASHDUMP:
+				do_crashdump();
+				break;
 			default:
 				/* FIXME:
 				   An "unknown" message might result
