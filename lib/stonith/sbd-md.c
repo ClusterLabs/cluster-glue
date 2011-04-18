@@ -50,6 +50,7 @@
 struct servants_list_item *servants_leader = NULL;
 
 static int	servant_count	= 0;
+static int	servant_restart_interval = 3600;
 
 /* signals reserved for multi-disk sbd */
 #define SIG_LIVENESS (SIGRTMIN + 1)	/* report liveness of the disk */
@@ -672,7 +673,8 @@ void inquisitor_child(void)
 		}
 		
 		latency = t_now.tv_sec - t_last_restarted.tv_sec;
-		if (latency > 3600) {
+		if (servant_restart_interval > 0 
+				&& latency > servant_restart_interval) {
 			/* Restart all children every hour */
 			clock_gettime(CLOCK_MONOTONIC, &t_last_restarted);
 			servants_start();
@@ -826,7 +828,7 @@ int main(int argc, char **argv, char **envp)
 
 	get_uname();
 
-	while ((c = getopt(argc, argv, "DRWhvw:d:n:1:2:3:4:5:")) != -1) {
+	while ((c = getopt(argc, argv, "DRWhvw:d:n:1:2:3:4:5:t:")) != -1) {
 		switch (c) {
 		case 'D':
 			/* Ignore for historical reasons */
@@ -866,6 +868,9 @@ int main(int argc, char **argv, char **envp)
 			break;
 		case '5':
 			timeout_watchdog_warn = atoi(optarg);
+			break;
+		case 't':
+			servant_restart_interval = atoi(optarg);
 			break;
 		case 'h':
 			usage();
