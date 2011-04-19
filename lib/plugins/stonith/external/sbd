@@ -26,11 +26,11 @@ gethosts)
     exit 0
     ;;
 off|reset)
-	if [ x"$sbd_crashdump" = "xtrue" ]; then
-		sbd -d $sbd_device message crashdump $1
-	else
-		sbd -d $sbd_device message $2 $1
-	fi
+    message=$2
+    case "$crashdump" in
+	    yes|true|1|YES|TRUE|ja|on|ON) message="crashdump" ;;
+    esac
+    sbd -d $sbd_device message $message $1
     exit $?
     ;;
 status)
@@ -44,7 +44,7 @@ on)
     exit 1
     ;;
 getconfignames)
-    echo "sbd_device"
+    echo "sbd_device crashdump"
     exit 0
     ;;
 getinfo-devid)
@@ -62,8 +62,9 @@ fencing requests. This allows clusters without network power
 switches; the downside is that access to the shared storage
 device becomes a Single Point of Failure. 
 
-It requires sbd to be configured.  Please read
-http://linux-ha.org/wiki/SBD_Fencing!
+It requires sbd to be configured on all nodes.
+
+Please read http://linux-ha.org/wiki/SBD_Fencing!
 
 DESC
     exit 0
@@ -76,17 +77,22 @@ getinfo-xml)
     cat << SSHXML
 <parameters>
 
-<parameter name="sbd_crashdump" unique="0" required="0">
+<parameter name="crashdump">
 <content type="string" />
 <shortdesc lang="en">
-Crashdump instead of reboot.
+Crashdump instead of regular fence
 </shortdesc>
 <longdesc lang="en">
-Let SBD trigger a kernel crashdump instead of bruteforce reboot.
+If SBD is given a fence command, this option will instead perform a
+kernel crash of a reboot or power-off, which on a properly configured
+system can lead to a crashdump for analysis.
+
+This is less safe for production environments. Please use with caution
+and for debugging purposes only.
 </longdesc>
 </parameter>
 
-<parameter name="sbd_device" unique="1" required="1">
+<parameter name="sbd_device" unique="1">
 <content type="string" />
 <shortdesc lang="en">
 SBD device(s)
@@ -95,6 +101,9 @@ SBD device(s)
 The block device used for the SBD partition. Up to three
 can be specified if separated by a semicolon. (Please check
 the documentation if specifying two.)
+
+If not specified, will default to the value from /etc/sysconfig/sbd.
+
 </longdesc>
 </parameter>
 </parameters>
