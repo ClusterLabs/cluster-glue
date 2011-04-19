@@ -26,11 +26,11 @@ gethosts)
     exit 0
     ;;
 off|reset)
-    message=$2
+    message=$1
     case "$crashdump" in
 	    yes|true|1|YES|TRUE|ja|on|ON) message="crashdump" ;;
     esac
-    sbd -d $sbd_device message $message $1
+    sbd -d $sbd_device message $2 $message
     exit $?
     ;;
 status)
