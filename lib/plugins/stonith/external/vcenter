@@ -1,0 +1,265 @@
+#!/usr/bin/perl
+#
+# External STONITH module for VMWare vCenter/ESX
+#
+# Author:  Nhan Ngo Dinh
+# License: GNU General Public License (GPL)
+#
+
+require 5.010;
+
+use strict;
+use warnings;
+use VMware::VIRuntime;
+
+sub dielog {
+	my $msg = "[";
+	$msg .= "$ARGV[0]" if defined($ARGV[0]);
+	$msg .= " $ARGV[1]" if defined($ARGV[1]);
+	$msg .= "]";
+	( $_ ) = @_;
+	$msg .= " $_";
+	system("ha_log.sh", "err", "$msg");
+	die();
+}
+
+# Define command groups
+my @configCommands = qw{getconfignames getinfo-devid getinfo-devname getinfo-devdescr getinfo-devurl getinfo-xml};
+my @actionCommands = qw{reset on off};
+my @netCommands = (@actionCommands, qw{status gethosts});
+
+# Process command line arguments
+my $command = $ARGV[0] || dielog("No command specified\n");
+
+# Command belongs to the group of commands that do not require any connection to VMware vCenter
+if ($command ~~ @configCommands) {
+	if ($command eq "getconfignames") {
+		print "VI_SERVER\nVI_PORTNUMBER\nVI_PROTOCOL\nVI_SERVICEPATH\nVI_CREDSTORE\nHOSTLIST\nRESETPOWERON\n";
+	}
+	elsif ($command eq "getinfo-devid") {
+		print "VMware vCenter STONITH device\n";
+	}
+	elsif ($command eq "getinfo-devname") {
+		print "VMware vCenter STONITH device\n";
+	}
+	elsif ($command eq "getinfo-devdescr") {
+		print "VMWare vCenter STONITH device\n";
+	}
+	elsif ($command eq "getinfo-devurl") {
+		print "http://www.vmware.com/\n";
+	}
+	elsif ($command eq "getinfo-xml") {
+		print q{<parameters>
+<parameter name="HOSTLIST" required="1">
+<content type="string"/>
+<shortdesc lang="en">List of hosts and virtual machines (required)</shortdesc>
+<longdesc lang="en">
+The list of hosts that the VMware vCenter STONITH device controls.
+Syntax is:
+  hostname1[=VirtualMachineName1];hostname2[=VirtualMachineName2]
+
+NOTE: omit =VirtualMachineName if hostname and virtual machine names are identical
+
+Example:
+  cluster1=VMCL1;cluster2=VMCL2
+</longdesc>
+</parameter>
+<parameter name="VI_SERVER">
+<content type="string" default="localhost"/>
+<shortdesc lang="en">VMware vCenter address</shortdesc>
+<longdesc lang="en">
+The VMware vCenter address
+</longdesc>
+</parameter>
+<parameter name="VI_PROTOCOL">
+<content type="string" default="https"/>
+<shortdesc lang="en">VMware vCenter protocol</shortdesc>
+<longdesc lang="en">
+The VMware vCenter protocol
+</longdesc>
+</parameter>
+<parameter name="VI_PORTNUMBER">
+<content type="string" default="443"/>
+<shortdesc lang="en">VMware vCenter port number</shortdesc>
+<longdesc lang="en">
+The VMware vCenter port number
+</longdesc>
+</parameter>
+<parameter name="VI_SERVICEPATH">
+<content type="string" default="/sdk"/>
+<shortdesc lang="en">VMware vCenter service path</shortdesc>
+<longdesc lang="en">
+The VMware vCenter services path
+</longdesc>
+</parameter>
+<parameter name="VI_CREDSTORE" required="1">
+<content type="string"/>
+<shortdesc lang="en">VMware vCenter credentials store file</shortdesc>
+<longdesc lang="en">
+VMware vCenter credentials store file
+</longdesc>
+</parameter>
+<parameter name="RESETPOWERON">
+<content type="string" default="1"/>
+<shortdesc lang="en">PowerOnVM on reset</shortdesc>
+<longdesc lang="en">
+Enable/disable a PowerOnVM on reset when the target virtual machine is off
+Allowed values: 0, 1
+</longdesc>
+</parameter>
+</parameters>} . "\n";
+	}
+	else { dielog("Invalid command specified: $command\n"); }
+}
+
+# Command belongs to the group of commands that require connecting to VMware vCenter
+elsif ($command ~~ @netCommands) {
+
+	# A valid VI_CREDSTORE is required to avoid interactive prompt
+	( exists $ENV{'VI_CREDSTORE'} ) || dielog("VI_CREDSTORE not specified\n");
+
+	# HOSTLIST is mandatory
+	exists $ENV{'HOSTLIST'} || dielog("HOSTLIST not specified\n");
+
+	# Parse HOSTLIST to %host_to_vm and %vm_to_host
+	my @hostlist = split(';', $ENV{'HOSTLIST'});
+	my %host_to_vm = ();
+	my %vm_to_host = ();
+	foreach my $host (@hostlist) {
+		my @config = split(/=/, $host);
+		my $key = $config[0]; my $value = $config[1];
+		if (!defined($value)) { $value = $config[0]; }
+		$host_to_vm{$key} = $value;
+		$vm_to_host{(lc $value)} = $key;
+	}
+
+	eval {
+		# VI API: reads options from the environment variables into appropriate data structures for validation.
+		Opts::parse();
+		# VI API: ensures that input values from environment variable are complete, consistent and valid.
+		Opts::validate();
+		# VI API: establishes a session with the VirtualCenter Management Server or ESX Server Web service
+		Util::connect();
+	};
+	if ($@) {
+		# This is just a placeholder for any error handling procedure
+		dielog($@);
+	}
+
+	# Command belongs to the group of commands that performs actions on Virtual Machines
+	if ($command ~~ @actionCommands) {
+
+		my $targetHost = $ARGV[1] || dielog("No target specified\n");
+
+		# Require that specified target host exists in the specified HOSTLIST
+		if (exists $host_to_vm{$targetHost}) {
+
+			my $vm;
+			my $esx;
+			eval {
+				# VI API: searches the inventory tree for a VirtualMachine managed entity whose name matches
+				# the name of the virtual machine assigned to the target host in HOSTLIST
+				$vm = Vim::find_entity_view(view_type => "VirtualMachine", filter => { name => qr/\Q$host_to_vm{$targetHost}\E/i });
+
+				# VI API: retrieves the properties of the managed object reference runtime.host of the VirtualMachine
+				# managed entity obtained by the previous command
+				# NOTE: This is essentially a workaround to vSphere Perl SDK
+				# to allow pointing to the right HostSystem. This is probably
+				# done by changing the current HostSystem in the Web Service
+				# session context. WARNING: Do not use the same session for any
+				# other concurrent operation.
+				$esx = Vim::get_view(mo_ref => $vm->{"runtime"}{"host"})->name;
+			};
+			if ($@) {
+				if (ref($@) eq "SoapFault") { dielog("$@->detail\n"); }
+				dielog($@);
+			}
+
+			my $powerState = $vm->get_property('runtime.powerState')->val;
+			if ($powerState eq "suspended") {
+				# This implementation assumes that suspending a cluster node can cause
+				# severe failures on shared resources, thus any failover operation should
+				# be blocked.
+				dielog("Machine $esx:$vm->{'name'} is in a suspended state\n");
+			}
+
+			eval {
+				if ($command eq "reset") {
+					if ($powerState eq "poweredOn") {
+						$vm->ResetVM();
+						system("ha_log.sh", "info", "Machine $esx:$vm->{'name'} has been reset");
+					} else {
+						system("ha_log.sh", "warn", "Tried to ResetVM $esx:$vm->{'name'} that was $powerState");
+						# Start a virtual machine on reset only if explicitly allowed by RESETPOWERON
+						if ($powerState eq "poweredOff" && (! exists $ENV{'RESETPOWERON'} || $ENV{'RESETPOWERON'} ne 0)) {
+							$vm->PowerOnVM();
+							system("ha_log.sh", "info", "Machine $esx:$vm->{'name'} has been powered on");
+						} else {
+							dielog("Could not complete $esx:$vm->{'name'} power cycle");
+						}
+					}
+				}
+				elsif ($command eq "off") {
+					if ($powerState eq "poweredOn") {
+						$vm->PowerOffVM();
+						system("ha_log.sh", "info", "Machine $esx:$vm->{'name'} has been powered off");
+					} else {
+						system("ha_log.sh", "warn", "Tried to PowerOffVM $esx:$vm->{'name'} that was $powerState");
+
+					}
+				}
+				elsif ($command eq "on") {
+					if ($powerState eq "poweredOff") {
+						$vm->PowerOnVM();
+						system("ha_log.sh", "info", "Machine $esx:$vm->{'name'} has been powered on");
+					} else {
+						system("ha_log.sh", "warn", "Tried to PowerOnVM $esx:$vm->{'name'} that was $powerState");
+					}
+				}
+				else { dielog("Invalid command specified: $command\n"); }
+			};
+			if ($@) {
+				if (ref($@) eq "SoapFault") { dielog("$@->detail\n"); }
+				dielog($@);
+			}
+
+		} else { dielog("Invalid target specified\n"); }
+	} else {
+	# Command belongs to the group of commands that lookup the status of VMware vCenter and/or virtual machines
+		if ($command eq "status") {
+			eval {
+				# VI API: Searches the inventory tree for all VirtualMachine managed objects
+				my $vms = Vim::find_entity_views(view_type => "VirtualMachine");
+			};
+			if ($@) {
+				if (ref($@) eq "SoapFault") { dielog("$@->detail\n"); }
+				dielog($@);
+			}
+		}
+		elsif ($command eq "gethosts") {
+			# Create a regular expression to make vCenter find all the virtual machine matching
+			# mirtual machine names specified in HOSTLIST
+			# NOTE: this implementation make "gethosts" check that entries in HOSTLIST are consistent with VMware vCenter VM directory
+			my $regex = join "|", map { qr/\Q$_\E/i } values %host_to_vm;
+			eval {
+				my $vms = Vim::find_entity_views(view_type => "VirtualMachine", filter => { name => qr/^($regex)$/ });
+				foreach my $vm (@$vms) { print "$vm_to_host{(lc $vm->name)}\n" if exists $vm_to_host{(lc $vm->name)}; }
+			};
+			if ($@) {
+				if (ref($@) eq "SoapFault") { dielog("$@->detail\n"); }
+				dielog($@);
+			}
+		}
+		else { dielog("Invalid command specified: $command\n"); }
+	}
+	eval {
+		Util::disconnect();
+	};
+	if ($@) {
+		# This is just a placeholder for any error handling procedure
+		dielog($@);
+	}
+}
+else { dielog("Invalid command specified: $command\n"); }
+
+exit(0);
