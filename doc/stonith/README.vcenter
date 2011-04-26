@@ -1,0 +1,90 @@
+VMware vCenter/ESX STONITH Module
+=================================
+
+1. Intro
+--------
+
+VMware vCenter/ESX STONITH Module is intended to provide STONITH support to
+clusters in VMware Virtual Infrastructures. It is able to deal with virtual
+machines running on physically different HostSystems (e.g. ESX/ESXi) by using
+VMware vSphere Web Services SDK http://www.vmware.com/support/developer/vc-sdk/
+and connecting directly on each HostSystem or through a VMware vCenter: in this
+last case the module locates the specified virtual machine in the Virtual
+Infrastructure and performs actions required by cluster policies.
+
+2. Software requirements
+------------------------
+
+VMware vSphere CLI, which includes both CLI tools and Perl SDK
+http://www.vmware.com/support/developer/vcli/ . The plugin has been tested with
+version 4.1  http://www.vmware.com/download/download.do?downloadGroup=VCLI41
+
+
+3. vCenter/ESX authentication settings
+--------------------------------------
+
+Create the credentials file with credstore_admin.pl:
+
+/usr/lib/vmware-vcli/apps/general/credstore_admin.pl \
+  -s 10.1.1.1 -u myuser -p mypass
+
+This should create $HOME/.vmware/credstore/vicredentials.xml
+Copy it to a system folder, e.g. /etc
+
+cp -p $HOME/.vmware/credstore/vicredentials.xml /etc
+
+
+4. Testing
+----------
+
+The plugin can be invoked directly to perform a very first connection test
+(replace all the provided sample values):
+
+VI_SERVER=10.1.1.1 \
+  VI_CREDSTORE=/etc/vicredentials.xml \
+  HOSTLIST="hostname1=vmname1;hostname2=vmname2" \
+  RESETPOWERON=0 \
+  /usr/lib/stonith/plugins/external/vcenter gethosts
+
+If everything works correctly you should get:
+
+hostname1
+hostname2
+
+When invoked in this way, the plugin connects to VI_SERVER, authenticates with
+credentials stored in VI_CREDSTORE and tries to retrieve the list of virtual
+machines (case insensitive) matching vmname1 and vmname2 (and any other listed).
+When finished, it reports the list back by mapping virtual machine names to
+hostnames as provided in HOSTLIST. If you see the full list of hostnames as a
+result, then everything is going well. If otherwise you are having a partial or
+empty list, you have to check parameters.
+
+You can even test "reset", "off" and "on" commands, to test (carefully!) the
+full chain. E.g.
+
+VI_SERVER=10.1.1.1 \
+  VI_CREDSTORE=/etc/vicredentials.xml \
+  HOSTLIST="hostname1=vmname1;hostname2=vmname2" \
+  RESETPOWERON=0 \
+  /usr/lib/stonith/plugins/external/vcenter reset hostname2
+
+In the above examples the referring infrastructure is a vCenter with several
+ESXi nodes. Server IP and credentials are referred to vCenter.
+
+5. CRM configuration
+--------------------
+
+The following is a sample procedure to setup STONITH for an HA 2-node cluster
+(replace all the provided sample values):
+
+crm configure primitive vfencing stonith::external/vcenter params \
+  VI_SERVER="10.1.1.1" VI_CREDSTORE="/etc/vicredentials.xml" \
+  HOSTLIST="hostname1=vmname1;hostname2=vmname2" RESETPOWERON="0" \
+  op monitor interval="60s"
+
+crm configure clone Fencing vfencing
+
+crm configure property stonith-enabled="true"
+
+
+

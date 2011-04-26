@@ -30,4 +30,5 @@ stdoc_DATA 		= README.bladehpi \
 			  README.riloe \
 			  README.vacm \
 			  README.wti_mpc \
-			  README_kdumpcheck.txt
+			  README_kdumpcheck.txt \
+			  README.vcenter
