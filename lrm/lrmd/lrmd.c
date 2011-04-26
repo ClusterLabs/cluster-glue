@@ -3076,11 +3076,6 @@ perform_ra_op(lrmd_op_t* op)
 	}
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
-	if (!op->interval || is_logmsg_due(op)) { /* log non-repeating ops */
-		lrmd_log(LOG_INFO,"rsc:%s:%d: %s",rsc->id,op->call_id,probe_str(op,op_type));
-	} else {
-		lrmd_debug(LOG_DEBUG,"rsc:%s:%d: %s",rsc->id,op->call_id,op_type);
-	}
 	op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
 	params = merge_str_tables(rsc->params,op_params);
 	ha_msg_mod_str_table(op->msg, F_LRM_PARAM, params);
@@ -3125,8 +3120,12 @@ perform_ra_op(lrmd_op_t* op)
 				((op->interval && !is_logmsg_due(op)) ? PT_LOGNORMAL : PT_LOGVERBOSE) : PT_LOGNONE
 			,	op, &ManagedChildTrackOps);
 
-			if (op->interval && is_logmsg_due(op)) {
-				op->t_lastlogmsg = time_longclock();
+			if (!op->interval || is_logmsg_due(op)) { /* log non-repeating ops */
+				lrmd_log(LOG_INFO,"rsc:%s %s[%d] (pid %d)",
+					rsc->id,probe_str(op,op_type),op->call_id,pid);
+			} else {
+				lrmd_debug(LOG_DEBUG,"rsc:%s %s[%d] (pid %d)",
+					rsc->id,op_type,op->call_id,pid);
 			}
 			close(stdout_fd[1]);
 			close(stderr_fd[1]);
@@ -3315,8 +3314,8 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 
 	if( signo ) {
 		if( proctrack_timedout(p) ) {
-			lrmd_log(LOG_WARNING,	"%s: pid [%d] timed out"
-			, op_info(op), proctrack_pid(p));
+			lrmd_log(LOG_WARNING,	"%s: pid %d timed out"
+			, small_op_info(op), proctrack_pid(p));
 			op_status = LRM_OP_TIMEOUT;
 		} else {
 			op_status = LRM_OP_ERROR;
@@ -3324,20 +3323,16 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 	} else {
 		rc = RAExec->map_ra_retvalue(exitcode, op_type
 						 , op->first_line_ra_stdout);
-		if (rc != EXECRA_OK || debug_level > 0) {
+		if (!op->interval || is_logmsg_due(op) || debug_level > 0) { /* log non-repeating ops */
 			if (rc == exitcode) {
-				lrmd_debug2(rc == EXECRA_OK ? LOG_DEBUG : LOG_INFO
-				,	"%s: pid [%d] exited with"
-				" return code %d", op_info(op), proctrack_pid(p), rc);
+				lrmd_log(LOG_INFO
+				,	"%s: pid %d exited with"
+				" return code %d", small_op_info(op), proctrack_pid(p), rc);
 			}else{
-				lrmd_debug2(rc == EXECRA_OK ? LOG_DEBUG : LOG_INFO
-				,	"%s: pid [%d] exited with"
+				lrmd_log(LOG_INFO
+				,	"%s: pid %d exited with"
 				" return code %d (mapped from %d)"
-				,	op_info(op), proctrack_pid(p), rc, exitcode);
-			}
-			if (rc != EXECRA_OK || debug_level > 1) {
-				lrmd_debug2(LOG_INFO, "Resource Agent output: [%s]"
-				,	op->first_line_ra_stdout);
+				,	small_op_info(op), proctrack_pid(p), rc, exitcode);
 			}
 		}
 		if (EXECRA_EXEC_UNKNOWN_ERROR == rc || EXECRA_NO_RA == rc) {
@@ -3347,6 +3342,9 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 		} else {
 			op_status = LRM_OP_DONE;
 		}
+	}
+	if (op->interval && is_logmsg_due(op)) {
+		op->t_lastlogmsg = time_longclock();
 	}
 	if (HA_OK !=
 			ha_msg_mod_int(op->msg, F_LRM_OPSTATUS, op_status)) {
@@ -3921,11 +3919,17 @@ gen_op_info(const lrmd_op_t* op, gboolean add_params)
 		,op->call_id ,op->client_id);
 
 	}else{
-		snprintf(info, sizeof(info)
-		,"operation %s[%d] on %s::%s::%s for client %d"
-		,lrm_str(op_type), op->call_id
-		,lrm_str(rsc->class), lrm_str(rsc->type), lrm_str(rsc->id)
-		,op->client_id);
+		if (op->exec_pid > 1) {
+			snprintf(info, sizeof(info)
+			,"operation %s[%d] with pid %d on %s for client %d"
+			,lrm_str(op_type), op->call_id, op->exec_pid, lrm_str(rsc->id)
+			,op->client_id);
+		} else {
+			snprintf(info, sizeof(info)
+			,"operation %s[%d] on %s for client %d"
+			,lrm_str(op_type), op->call_id, lrm_str(rsc->id)
+			,op->client_id);
+		}
 
 		if( add_params ) {
 			param_gstr = g_string_new("");
@@ -3973,9 +3977,9 @@ check_queue_duration(lrmd_op_t* op)
 	if ( t_stay_in_list > WARNINGTIME_IN_LIST) 
 	{
 		lrmd_log(LOG_WARNING
-		,	"perform_ra_op: the operation %s stayed in operation "
+		,	"perform_ra_op: the %s stayed in operation "
 			"list for %lu ms (longer than %d ms)"
-		,	op_info(op), t_stay_in_list
+		,	small_op_info(op), t_stay_in_list
 		,	WARNINGTIME_IN_LIST
 		);
 		if (debug_level >= 2) {
