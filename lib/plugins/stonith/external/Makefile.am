@@ -19,7 +19,7 @@
 #
 MAINTAINERCLEANFILES = Makefile.in
 
-EXTRA_DIST           = drac5 dracmc-telnet ibmrsa-telnet ipmi rackpdu vmware xen0 \
+EXTRA_DIST           = drac5 dracmc-telnet ibmrsa-telnet ipmi rackpdu vmware vcenter xen0 \
 			xen0-ha-dom0-stonith-helper sbd kdumpcheck nut
 
 extdir		     = $(stonith_ext_plugindir)
