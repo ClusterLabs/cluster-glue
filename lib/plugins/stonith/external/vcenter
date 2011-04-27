@@ -10,7 +10,6 @@ require 5.010;
 
 use strict;
 use warnings;
-use VMware::VIRuntime;
 
 sub dielog {
 	my $msg = "[";
@@ -114,6 +113,8 @@ Allowed values: 0, 1
 
 # Command belongs to the group of commands that require connecting to VMware vCenter
 elsif ($command ~~ @netCommands) {
+
+	use VMware::VIRuntime;
 
 	# A valid VI_CREDSTORE is required to avoid interactive prompt
 	( exists $ENV{'VI_CREDSTORE'} ) || dielog("VI_CREDSTORE not specified\n");
