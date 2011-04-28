@@ -643,7 +643,11 @@ AC_CHECK_HEADERS(getopt.h)
 AC_CHECK_HEADERS(glib.h)
 AC_CHECK_HEADERS(grp.h)
 AC_CHECK_HEADERS(limits.h)
-AC_CHECK_HEADERS(linux/errqueue.h)
+AC_CHECK_HEADERS(linux/errqueue.h,,,
+	[#ifdef HAVE_LINUX_TYPES_H
+	 # include <linux/types.h>
+	 #endif
+	])
 AC_CHECK_HEADERS(malloc.h)
 AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(netinet/in.h)
