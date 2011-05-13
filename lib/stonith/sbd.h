@@ -141,7 +141,7 @@ void servants_kill(void);
 void servants_start(void);
 void inquisitor_child(void);
 int inquisitor(void);
-void inquisitor_decouple(void);
+int inquisitor_decouple(void);
 int messenger(const char *name, const char *msg);
 int check_timeout_inconsistent(void);
 void restart_servant_by_pid(pid_t pid);

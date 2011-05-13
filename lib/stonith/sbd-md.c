@@ -539,7 +539,7 @@ void restart_servant_by_pid(pid_t pid)
 	}
 }
 
-void inquisitor_decouple(void)
+int inquisitor_decouple(void)
 {
 	pid_t ppid = getppid();
 	union sigval signal_value;
@@ -548,13 +548,14 @@ void inquisitor_decouple(void)
 	 * quorum at least once. */
 	if (watchdog_use) {
 		if (watchdog_init() < 0) {
-			exit(1);
+			return -1;
 		}
 	}
 
 	if (ppid > 1) {
 		sigqueue(ppid, SIG_LIVENESS, signal_value);
 	}
+	return 0;
 }
 
 void inquisitor_child(void)
@@ -643,8 +644,13 @@ void inquisitor_child(void)
 		if (quorum_read(good_servants)) {
 			DBGPRINT("Enough liveness messages\n");
 			if (!decoupled) {
-				inquisitor_decouple();
-				decoupled = 1;
+				if (inquisitor_decouple() < 0) {
+					servants_kill();
+					exiting = 1;
+					continue;
+				} else {
+					decoupled = 1;
+				}
 			}
 
 			watchdog_tickle();
