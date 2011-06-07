@@ -33,9 +33,7 @@ endif
 
 stonith_SOURCES		= main.c
 
-stonith_LDADD		= libstonith.la $(top_builddir)/lib/pils/libpils.la $(GLIBLIB) \
-			$(top_builddir)/lib/clplumbing/libplumb.la	\
-			$(top_builddir)/lib/clplumbing/libplumbgpl.la
+stonith_LDADD		= libstonith.la $(top_builddir)/lib/pils/libpils.la $(GLIBLIB)
 stonith_LDFLAGS		=  @LIBADD_DL@ @LIBLTDL@ -export-dynamic @DLOPEN_FORCE_FLAGS@ @LIBADD_INTL@ 
 
 meatclient_SOURCES	= meatclient.c 
