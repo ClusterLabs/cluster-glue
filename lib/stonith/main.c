@@ -78,6 +78,7 @@ const char *prio2str(int priority);
 void log_buf(int severity, char *buf);
 void log_msg(int severity, const char * fmt, ...)G_GNUC_PRINTF(2,3);
 void trans_log(int priority, const char * fmt, ...)G_GNUC_PRINTF(2,3);
+void setup_cl_log(void);
 
 static int pil_loglevel_to_syslog_severity[] = {
 	/* Indices: <none>=0, PIL_FATAL=1, PIL_CRIT=2, PIL_WARN=3,
