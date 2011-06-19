@@ -26,9 +26,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <syslog.h>
-#include <ltdl.h>
 #include <stonith/stonith.h>
 #include <pils/plugin.h>
+#include <clplumbing/cl_log.h>
 #include <glib.h>
 #include <libxml/entities.h>
 
@@ -43,7 +43,6 @@ static int	debug = 0;
 #define LOG_TERMINAL 0
 #define LOG_CLLOG 1
 static int	log_destination = LOG_TERMINAL;
-static void (*logfun)(int, const char *, ...) G_GNUC_PRINTF(2,3);
 
 static const char META_TEMPLATE[] =
 "<?xml version=\"1.0\"?>\n"
@@ -74,11 +73,9 @@ void print_stonith_meta(Stonith * stonith_obj, const char *rsc_type);
 void print_types(void);
 void print_confignames(Stonith *s);
 
-const char *prio2str(int priority);
 void log_buf(int severity, char *buf);
 void log_msg(int severity, const char * fmt, ...)G_GNUC_PRINTF(2,3);
 void trans_log(int priority, const char * fmt, ...)G_GNUC_PRINTF(2,3);
-void setup_cl_log(void);
 
 static int pil_loglevel_to_syslog_severity[] = {
 	/* Indices: <none>=0, PIL_FATAL=1, PIL_CRIT=2, PIL_WARN=3,
@@ -300,7 +297,6 @@ print_stonith_meta(Stonith * stonith_obj, const char *rsc_type)
 }
 
 #define	MAXNVARG	50
-#define	MAXLINE		(512*10)
 
 void
 print_types()
@@ -335,27 +331,6 @@ print_confignames(Stonith *s)
 	printf("\n");
 }
 
-const char *
-prio2str(int priority)
-{
-	static const char *log_prio[8] = {
-		"EMERG",
-		"ALERT",
-		"CRIT",
-		"ERROR",
-		"WARN",
-		"notice",
-		"info",
-		"debug"
-	};
-	int		logpri;
-
-	logpri =  LOG_PRI(priority);
-
-	return (logpri < 0 || logpri >= DIMOF(log_prio)) ?
-		"(undef)" : log_prio[logpri];
-}
-
 void
 log_buf(int severity, char *buf)
 {
@@ -364,11 +339,7 @@ log_buf(int severity, char *buf)
 			fprintf(stderr, "%s: %s\n", prio2str(severity),buf);
 		}
 	} else {
-		if (logfun) {
-			(*logfun)(severity, "%s", buf);
-		} else {
-			syslog(severity, "%s", buf);
-		}
+		cl_log(severity, "%s", buf);
 	}
 }
 
@@ -397,41 +368,6 @@ trans_log(int priority, const char * fmt, ...)
 	vsnprintf(buf, sizeof(buf)-1, fmt, ap);
 	va_end(ap);
 	log_buf(severity, buf);
-}
-
-/*
- * due to possible symbol conflict with other system libraries
- * (in particular HMAC, MD5, and base64*) we just pick the
- * symbols we need here
- */
-
-void
-setup_cl_log(void)
-{
-	void *ldhandle;
-	void (*set_entity)(const char *);
-	void (*enable_stderr)(int);
-	void (*set_facility)(int);
-	void (*inherit_logging_environment)(int);
-
-	/* we won't bother closing it, this program doesn't run long */
-	ldhandle = lt_dlopen("libplumb.so");
-	if (!ldhandle) {
-		return;
-	}
-
-	*(void **) (&set_entity) = lt_dlsym(ldhandle, "cl_log_set_entity");
-	*(void **) (&enable_stderr) = lt_dlsym(ldhandle, "cl_log_enable_stderr");
-	*(void **) (&set_facility) = lt_dlsym(ldhandle, "cl_log_set_facility");
-	*(void **) (&inherit_logging_environment) = lt_dlsym(ldhandle, "cl_inherit_logging_environment");
-	*(void **) (&logfun) = lt_dlsym(ldhandle, "cl_log");
-
-	(*set_entity)("stonith");
-	(*enable_stderr)(debug?TRUE:FALSE);
-	(*set_facility)(HA_LOG_FACILITY);
-
-	/* Use logd if it's enabled by heartbeat */
-	(*inherit_logging_environment)(0);
 }
 
 int
@@ -555,7 +491,12 @@ main(int argc, char** argv)
 	/* if we're invoked by stonithd, log through cl_log */
 	if (!isatty(fileno(stdin))) {
 		log_destination = LOG_CLLOG;
-		setup_cl_log();
+		cl_log_set_entity("stonith");
+		cl_log_enable_stderr(debug?TRUE:FALSE);
+		cl_log_set_facility(HA_LOG_FACILITY);
+
+		/* Use logd if it's enabled by heartbeat */
+		cl_inherit_logging_environment(0);
 	}
 
 	if (help && !errors) {
