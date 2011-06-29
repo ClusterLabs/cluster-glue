@@ -194,7 +194,7 @@ The IP address of the STONITH device.
 </longdesc>
 </parameter>
 
-<parameter name="userid" unique="1">
+<parameter name="userid" unique="0">
 <content type="string" />
 <shortdesc lang="en">
 Login
@@ -204,7 +204,7 @@ The username used for logging in to the STONITH device.
 </longdesc>
 </parameter>
 
-<parameter name="passwd" unique="1">
+<parameter name="passwd" unique="0">
 <content type="string" />
 <shortdesc lang="en">
 Password
@@ -214,7 +214,7 @@ The password used for logging in to the STONITH device.
 </longdesc>
 </parameter>
 
-<parameter name="passwd_method" unique="1">
+<parameter name="passwd_method" unique="0">
 <content type="string" default="param"/>
 <shortdesc lang="en">
 Method for passing passwd parameter
@@ -227,7 +227,7 @@ Method for passing the passwd parameter to ipmitool
 </longdesc>
 </parameter>
 
-<parameter name="interface" unique="1">
+<parameter name="interface" unique="0">
 <content type="string" default="lan"/>
 <shortdesc lang="en">
 IPMI interface
