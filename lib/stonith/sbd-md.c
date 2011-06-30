@@ -87,6 +87,7 @@ int assign_servant(const char* devname, functionp_t functionp, const void* argp)
 	DBGPRINT("fork servant for %s\n", devname);
 	pid = fork();
 	if (pid == 0) {		/* child */
+		maximize_priority();
 		rc = (*functionp)(devname, argp);
 		if (rc == -1)
 			exit(1);
