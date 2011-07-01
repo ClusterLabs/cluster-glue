@@ -27,6 +27,12 @@
 /* top directory of area to drop core files in */
 #undef HA_COREDIR
 
+/* top directory for LRM related files */
+#undef LRM_VARLIBDIR
+
+/* CIB secrets */
+#undef LRM_CIBSECRETS
+
 /* Logging Daemon IPC socket name */
 #undef HA_LOGDAEMON_IPC
 

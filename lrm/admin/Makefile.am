@@ -25,6 +25,7 @@ halibdir			=	$(libdir)/@HB_PKG@
 COMMONLIBS			=	$(top_builddir)/lib/clplumbing/libplumb.la $(GLIBLIB)
 LRM_DIR			= 	lrm
 sbin_PROGRAMS 		= 	lrmadmin
+sbin_SCRIPTS 		= 	cibsecret
 lrmadmin_SOURCES  	= 	lrmadmin.c
 lrmadmin_LDFLAGS 	= 	$(COMMONLIBS)
 lrmadmin_LDADD = $(top_builddir)/lib/$(LRM_DIR)/liblrm.la

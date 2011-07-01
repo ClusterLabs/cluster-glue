@@ -31,7 +31,7 @@ COMMONLIBS	=  $(top_builddir)/lib/clplumbing/libplumb.la   \
 
 halib_PROGRAMS 	=  lrmd
 
-lrmd_SOURCES 	=  lrmd.c audit.c lrmd_fdecl.h lrmd.h
+lrmd_SOURCES 	=  lrmd.c audit.c cib_secrets.c lrmd_fdecl.h lrmd.h
 
 lrmd_LDFLAGS 	=  $(top_builddir)/lib/lrm/liblrm.la 		\
 		   $(COMMONLIBS) @LIBLTDL@			\
