@@ -206,6 +206,7 @@ fi
 %{_sbindir}/ha_logger
 %{_sbindir}/hb_report
 %{_sbindir}/lrmadmin
+%{_sbindir}/cibsecret
 %{_sbindir}/meatclient
 %{_sbindir}/stonith
 %{_sbindir}/sbd

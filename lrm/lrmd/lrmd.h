@@ -266,3 +266,8 @@ const char *gen_op_info(const lrmd_op_t* op, gboolean add_params);
 #	define LRMAUDIT() /*nothing*/
 #	define MEGALRMAUDIT() /*nothing*/
 #endif
+
+/*
+ * load parameters from an ini file (cib_secrets.c)
+ */
+int replace_secret_params(char* rsc_id, GHashTable* params);

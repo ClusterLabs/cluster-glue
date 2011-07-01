@@ -3217,6 +3217,21 @@ perform_ra_op(lrmd_op_t* op)
 			,	"perform_ra_op:calling RA plugin to perform %s, pid: [%d]"
 			,	op_info(op), getpid());		
 			params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
+			if (replace_secret_params(rsc->id, params) < 0) {
+				/* replacing secrets failed! */
+				if (!strcmp(op_type,"stop")) {
+					/* don't fail on stop! */
+					lrmd_log(LOG_INFO
+					, "%s:%d: proceeding with the stop operation for %s"
+					, __FUNCTION__, __LINE__, rsc->id);
+				} else {
+					lrmd_log(LOG_ERR
+					, "%s:%d: failed to get secrets for %s, "
+					"considering resource not configured"
+					, __FUNCTION__, __LINE__, rsc->id);
+					exit(EXECRA_NOT_CONFIGURED);
+				}
+			}
 			RAExec->execra (rsc->id,
 					rsc->type,
 					rsc->provider,

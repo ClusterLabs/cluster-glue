@@ -392,6 +392,14 @@ HA_COREDIR="${localstatedir}/lib/heartbeat/cores"
 AC_DEFINE_UNQUOTED(HA_COREDIR,"$HA_COREDIR", top directory of area to drop core files in)
 AC_SUBST(HA_COREDIR)
 
+LRM_VARLIBDIR="${localstatedir}/lib/heartbeat/lrm"
+AC_DEFINE_UNQUOTED(LRM_VARLIBDIR,"$LRM_VARLIBDIR", LRM directory)
+AC_SUBST(LRM_VARLIBDIR)
+
+LRM_CIBSECRETS="${localstatedir}/lib/heartbeat/lrm/secrets"
+AC_DEFINE_UNQUOTED(LRM_CIBSECRETS,"$LRM_CIBSECRETS", CIB secrets location)
+AC_SUBST(LRM_CIBSECRETS)
+
 AC_DEFINE_UNQUOTED(PILS_BASE_PLUGINDIR,"$libdir/heartbeat/plugins", Default plugin search path)
 AC_DEFINE_UNQUOTED(HA_PLUGIN_DIR,"$libdir/heartbeat/plugins", Where to find plugins)
 AC_DEFINE_UNQUOTED(LRM_PLUGIN_DIR,"$libdir/heartbeat/plugins/RAExec", Where to find LRM plugins)
@@ -1340,6 +1348,7 @@ lib/Makefile							\
 lrm/Makefile					        	\
    lrm/lrmd/Makefile				        	\
    lrm/admin/Makefile				        	\
+   lrm/admin/cibsecret				        	\
    lrm/test/Makefile				        	\
    lrm/test/regression.sh					\
    lrm/test/lrmregtest						\
