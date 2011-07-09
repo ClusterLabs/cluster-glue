@@ -56,12 +56,12 @@ static int check_md5_hash(char *hash, char *value);
 static void add_secret_params(gpointer key, gpointer value, gpointer user_data);
 static char *read_local_file(char *local_file);
 
-#define MAGIC "SecretMD5"
+#define MAGIC "lrm://"
 
 static int
 is_magic_value(char *p)
 {
-	return !strncmp(p, MAGIC, strlen(MAGIC));
+	return !strcmp(p, MAGIC);
 }
 
 #define MD5LEN 16
@@ -117,6 +117,7 @@ int
 replace_secret_params(char *rsc_id, GHashTable* params)
 {
 	char local_file[FILENAME_MAX+1], *start_pname;
+	char hash_file[FILENAME_MAX+1], *hash;
 	GList *secret_params = NULL, *l;
 	char *key, *pvalue, *secret_value;
 	int rc = 0;
@@ -167,14 +168,26 @@ replace_secret_params(char *rsc_id, GHashTable* params)
 			rc = -1;
 			continue;
 		}
-		if (!check_md5_hash(pvalue+strlen(MAGIC)+1, secret_value)) {
+		strcpy(hash_file, local_file);
+		if (strlen(hash_file) + 5 > FILENAME_MAX) {
 			lrmd_log(LOG_ERR
-				, "%s:%d: md5 sum for rsc %s parameter %s "
-				"does not match"
-				, __FUNCTION__, __LINE__, rsc_id, key);
-			g_free(secret_value);
-			rc = -1;
-			continue;
+				, "%s:%d: cannot build such a long name "
+				"for the sign file: %s.sign"
+				, __FUNCTION__, __LINE__, hash_file);
+		} else {
+			strncat(hash_file, ".sign", 5);
+			hash = read_local_file(hash_file);
+			if (!check_md5_hash(hash, secret_value)) {
+				lrmd_log(LOG_ERR
+					, "%s:%d: md5 sum for rsc %s parameter %s "
+					"does not match"
+					, __FUNCTION__, __LINE__, rsc_id, key);
+				g_free(secret_value);
+				g_free(hash);
+				rc = -1;
+				continue;
+			}
+			g_free(hash);
 		}
 		g_hash_table_replace(params, g_strdup(key), secret_value);
 	}
