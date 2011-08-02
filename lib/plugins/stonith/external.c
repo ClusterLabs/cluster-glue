@@ -141,7 +141,7 @@ external_status(StonithPlugin  *s)
 	
 	rc = external_run_cmd(sd, op, NULL);
 	if (rc != 0) {
-		LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
+		LOG(PIL_WARN, "%s: '%s %s' failed with rc %d",
 			__FUNCTION__, sd->subplugin, op, rc);
 	}
 	else {
@@ -820,8 +820,8 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	status = pclose(file);
 	if (WIFEXITED(status)) {
 		rc = WEXITSTATUS(status);
-		if (rc != 0) {
-			LOG(PIL_CRIT,
+		if (rc != 0 && Debug) {
+			LOG(PIL_DEBUG,
 				"%s: Calling '%s' returned %d", __FUNCTION__, cmd, rc);
 		}
 	} else {
