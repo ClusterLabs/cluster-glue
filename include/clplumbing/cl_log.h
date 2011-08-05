@@ -24,6 +24,24 @@
 #define	HA_OK		1
 #define	MAXLINE		(512*10)
 
+/* this is defined by the caller */
+struct logspam {
+	const char *id; /* identifier */
+	int max; /* maximum number of messages ... */
+	time_t window; /* ... within this timeframe */
+	time_t reset_time; /* log new messages after this time */
+	const char *advice; /* what to log in case messages get suppressed */
+};
+
+/* this is internal (oblique to the caller) */
+struct msg_ctrl {
+	struct logspam *lspam; /*  */
+	time_t *msg_slots; /* msg slot root (space for lspam->max) */
+	int last; /* last used msg slot [0..lspam->max-1]; -1 on init */
+	int cnt; /* current msg count [0..lspam->max] */
+	time_t suppress_t; /* messages blocked since this time */
+};
+
 struct IPC_CHANNEL;
 
 extern int		debug_level;
@@ -36,6 +54,10 @@ extern int		debug_level;
 
 void		cl_direct_log(int priority, const char* buf, gboolean, const char*, int, TIME_T);
 void            cl_log(int priority, const char * fmt, ...) G_GNUC_PRINTF(2,3);
+void            cl_limit_log(struct msg_ctrl *ml, int priority, const char * fmt, ...) G_GNUC_PRINTF(3,4);
+struct msg_ctrl *cl_limit_log_new(struct logspam *lspam);
+void            cl_limit_log_destroy(struct msg_ctrl *ml);
+void            cl_limit_log_reset(struct msg_ctrl *ml);
 void            cl_perror(const char * fmt, ...) G_GNUC_PRINTF(1,2);
 void		cl_log_enable_stderr(int truefalse);
 void		cl_log_enable_stdout(int truefalse);
