@@ -501,6 +501,7 @@ prio2str(int priority)
 		}
 
 static char * syslog_timestamp(TIME_T t);
+static void cl_limit_log_update(struct msg_ctrl *ml, time_t ts);
 
 static void
 append_log(FILE * fp, const char * entity, int entity_pid
@@ -736,6 +737,114 @@ cl_log(int priority, const char * fmt, ...)
 	
 	cl_log_depth--;
 	return;
+}
+
+/*
+ * Log a message only if there were not too many messages of this
+ * kind recently. This is too prevent log spamming in case a
+ * condition persists over a long period of time. The maximum
+ * number of messages for the timeframe and other details are
+ * provided in struct logspam (see cl_log.h).
+ *
+ * Implementation details:
+ * - max number of time_t slots is allocated; slots keep time
+ *   stamps of previous max number of messages
+ * - we check if the difference between now (i.e. new message just
+ *   arrived) and the oldest message is _less_ than the window
+ *   timeframe
+ * - it's up to the user to do cl_limit_log_new and afterwards
+ *   cl_limit_log_destroy, though the latter is usually not
+ *   necessary; the memory allocated with cl_limit_log_new stays
+ *   constant during the lifetime of the process
+ *
+ * NB on Thu Aug  4 15:26:49 CEST 2011:
+ * This interface is very new, use with caution and report bugs.
+ */
+
+struct msg_ctrl *
+cl_limit_log_new(struct logspam *lspam)
+{
+	struct msg_ctrl *ml;
+
+	ml = (struct msg_ctrl *)malloc(sizeof(struct msg_ctrl));
+	if (!ml) {
+		cl_log(LOG_ERR, "%s:%d: out of memory"
+			, __FUNCTION__, __LINE__);
+		return NULL;
+	}
+	ml->msg_slots = (time_t *)calloc(lspam->max, sizeof(time_t));
+	if (!ml->msg_slots) {
+		cl_log(LOG_ERR, "%s:%d: out of memory"
+			, __FUNCTION__, __LINE__);
+		return NULL;
+	}
+	ml->lspam = lspam;
+	cl_limit_log_reset(ml);
+	return ml; /* to be passed later to cl_limit_log() */
+}
+
+void
+cl_limit_log_destroy(struct msg_ctrl *ml)
+{
+	if (!ml)
+		return;
+	g_free(ml->msg_slots);
+	g_free(ml);
+}
+
+void
+cl_limit_log_reset(struct msg_ctrl *ml)
+{
+	ml->last = -1;
+	ml->cnt = 0;
+	ml->suppress_t = (time_t)0;
+	memset(ml->msg_slots, 0, ml->lspam->max * sizeof(time_t));
+}
+
+static void
+cl_limit_log_update(struct msg_ctrl *ml, time_t ts)
+{
+	ml->last = (ml->last + 1) % ml->lspam->max;
+	*(ml->msg_slots + ml->last) = ts;
+	if (ml->cnt < ml->lspam->max)
+		ml->cnt++;
+}
+
+void
+cl_limit_log(struct msg_ctrl *ml, int priority, const char * fmt, ...)
+{
+	va_list ap;
+	time_t last_ts, now = time(NULL);
+
+	if (!ml)
+		goto log_msg;
+	if (ml->suppress_t) {
+		if ((now - ml->suppress_t) < ml->lspam->reset_time)
+			return;
+		/* message blocking expired */
+		cl_limit_log_reset(ml);
+	}
+	last_ts = ml->last != -1 ? *(ml->msg_slots + ml->last) : (time_t)0;
+	if (
+		ml->cnt < ml->lspam->max || /* not so many messages logged */
+		(now - last_ts) > ml->lspam->window /* messages far apart */
+	) {
+		cl_limit_log_update(ml, now);
+		goto log_msg;
+	} else {
+		cl_log(LOG_INFO
+			, "'%s' messages logged too often, "
+			"suppressing messages of this kind for %ld seconds"
+			, ml->lspam->id, ml->lspam->reset_time);
+		cl_log(priority, "%s", ml->lspam->advice);
+		ml->suppress_t = now;
+		return;
+	}
+
+log_msg:
+	va_start(ap, fmt);
+	cl_log(priority, fmt, ap);
+	va_end(ap);
 }
 
 void
