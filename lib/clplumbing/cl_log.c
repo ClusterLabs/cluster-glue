@@ -814,6 +814,7 @@ void
 cl_limit_log(struct msg_ctrl *ml, int priority, const char * fmt, ...)
 {
 	va_list ap;
+	char buf[MAXLINE];
 	time_t last_ts, now = time(NULL);
 
 	if (!ml)
@@ -843,8 +844,9 @@ cl_limit_log(struct msg_ctrl *ml, int priority, const char * fmt, ...)
 
 log_msg:
 	va_start(ap, fmt);
-	cl_log(priority, fmt, ap);
+	vsnprintf(buf, MAXLINE, fmt, ap);
 	va_end(ap);
+	cl_log(priority, "%s", buf);
 }
 
 void
