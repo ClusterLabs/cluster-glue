@@ -130,6 +130,17 @@ static struct {
 	int	rsccount;
 }lrm_objectstats;
 
+/* define indexes into logmsg_ctrl_defs */
+#define OP_STAYED_TOO_LONG 0
+static struct logspam logmsg_ctrl_defs[] = {
+	{ "operation stayed too long in the queue",
+		10, 60, 120, /* max 10 messages in 60s, then delay for 120s */
+		"configuration advice: reduce operation contention "
+		"either by increasing lrmd max_children or by increasing intervals "
+		"of monitor operations"
+	},
+};
+
 #define set_fd_opts(fd,opts) do { \
 	int flag; \
 	if ((flag = fcntl(fd, F_GETFL)) >= 0) { \
@@ -3987,11 +3998,15 @@ static void
 check_queue_duration(lrmd_op_t* op)
 {
 	unsigned long t_stay_in_list = 0;
+	static struct msg_ctrl *ml;
+
 	CHECK_ALLOCATED(op, "op", );
 	t_stay_in_list = longclockto_ms(op->t_perform - op->t_addtolist);
-	if ( t_stay_in_list > WARNINGTIME_IN_LIST) 
+	if ( t_stay_in_list > WARNINGTIME_IN_LIST)
 	{
-		lrmd_log(LOG_WARNING
+		if (!ml)
+			ml = cl_limit_log_new(logmsg_ctrl_defs + OP_STAYED_TOO_LONG);
+		cl_limit_log(ml, LOG_WARNING
 		,	"perform_ra_op: the %s stayed in operation "
 			"list for %lu ms (longer than %d ms)"
 		,	small_op_info(op), t_stay_in_list
