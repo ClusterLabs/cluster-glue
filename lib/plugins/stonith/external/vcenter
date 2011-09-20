@@ -114,7 +114,8 @@ Allowed values: 0, 1
 # Command belongs to the group of commands that require connecting to VMware vCenter
 elsif ($command ~~ @netCommands) {
 
-	use VMware::VIRuntime;
+	eval { require VMware::VIRuntime; }
+	or dielog("Missing perl module VMware::VIRuntime. Download and install 'VMware Infrastructure (VI) Perl Toolkit', available at http://www.vmware.com/support/developer/viperltoolkit/ \n");
 
 	# A valid VI_CREDSTORE is required to avoid interactive prompt
 	( exists $ENV{'VI_CREDSTORE'} ) || dielog("VI_CREDSTORE not specified\n");
