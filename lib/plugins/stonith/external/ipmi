@@ -36,7 +36,7 @@ RESET="power reset"
 POWEROFF="power off"
 POWERON="power on"
 STATUS="power status"
-IPMITOOL=`which ipmitool 2>/dev/null`
+IPMITOOL=${ipmitool:-"`which ipmitool 2>/dev/null`}
 
 have_ipmi() {
 	test -x "${IPMITOOL}"
@@ -234,6 +234,16 @@ IPMI interface
 </shortdesc>
 <longdesc lang="en">
 IPMI interface to use, such as "lan" or "lanplus".
+</longdesc>
+</parameter>
+
+<parameter name="ipmitool" unique="0">
+<content type="string" default=""/>
+<shortdesc lang="en">
+IPMI command(ipmitool) 
+</shortdesc>
+<longdesc lang="en">
+Specify the full path to IPMI command.
 </longdesc>
 </parameter>
 
