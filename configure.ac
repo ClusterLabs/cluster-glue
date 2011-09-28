@@ -1322,6 +1322,7 @@ AC_SUBST(QUIET_LIBTOOL_OPTS)
 
 dnl The Makefiles and shell scripts we output
 AC_CONFIG_FILES(Makefile				        \
+config/Makefile						\
 include/Makefile						\
    include/pils/Makefile					\
    include/pils/plugin.h					\
