@@ -2,7 +2,7 @@
 #
 #
 # 	ha_log.sh for stonith external plugins
-#	(equivalent to ocf_log in .ocf-shellfuncs in resource-agents)
+#	(equivalent to ocf_log in ocf-shellfuncs in resource-agents)
 #
 # Copyright (c) 2004 SUSE LINUX AG, Lars Marowsky-Brée
 #                    All Rights Reserved.
