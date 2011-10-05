@@ -35,7 +35,7 @@
 #######################################################################
 # Initialization:
 
-. ${OCF_ROOT}/resource.d/heartbeat/.ocf-shellfuncs
+. ${OCF_ROOT}/lib/heartbeat/ocf-shellfuncs
 
 #######################################################################
 
