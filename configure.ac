@@ -453,19 +453,6 @@ AC_DEFINE_UNQUOTED(GLUE_BUILD_VERSION, "$GLUE_BUILD_VERSION", Build version)
 AC_MSG_RESULT($GLUE_BUILD_VERSION)
 AC_SUBST(GLUE_BUILD_VERSION)
 
-
-dnl check if there are getpid() inconsistency
-dnl	Note: reduce LIBS; in particular, ltdl can cause confusion.
-dnl	Possibly better:  move 'LIBS="$LIBS -lltdl"' from above to beyond here.
-dnl
-AC_MSG_CHECKING(for getpid() consistency in multi-process/threads program)
-ac_save_LIBS=$LIBS
-LIBS="-lpthread"
-AC_TRY_RUN(`cat $srcdir/config/pidtest.c`, 
-AC_MSG_RESULT(ok), 
-[AC_MSG_RESULT(fail); AC_DEFINE(GETPID_INCONSISTENT, 1 , [pid inconsistent])],)
-LIBS=$ac_save_LIBS
-
 dnl check byte order
 AC_MSG_CHECKING(for byteorder)
 AC_TRY_RUN(`cat $srcdir/config/byteorder_test.c`,
