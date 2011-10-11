@@ -79,6 +79,7 @@ AC_CHECK_SIZEOF(short)
 AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(long)
 AC_CHECK_SIZEOF(long long)
+AC_CHECK_SIZEOF(clock_t, [], [#include <sys/times.h>])
 AC_STRUCT_TIMEZONE
 
 dnl ===============================================
@@ -803,7 +804,7 @@ AC_CHECK_MEMBERS([struct tm.tm_gmtoff],,,[[#include <time.h>]])
 AC_CHECK_TYPES([nfds_t],,,[[#include <poll.h>]])
 
 AC_MSG_CHECKING(if clock_t is long enough)
-if test $ac_cv_sizeof_long -ge 8; then
+if test $ac_cv_sizeof_clock_t -ge 8; then
   AC_MSG_RESULT(yes)
   AC_DEFINE(CLOCK_T_IS_LONG_ENOUGH, 1, [Set if CLOCK_T is adequate by itself for the "indefinite future" (>= 100 years)])
 else

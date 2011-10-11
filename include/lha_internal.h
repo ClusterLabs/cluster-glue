@@ -169,4 +169,14 @@ inet_pton(int af, const char *src, void *dst);
 #	define	ASSERT(X)	{if(!(X)) ha_assert("X", __LINE__, __FILE__);}
 #endif
 
+/* shamelessly stolen from linux kernel */
+/* Force a compilation error if condition is true */
+#define BUILD_BUG_ON(condition) ((void)BUILD_BUG_ON_ZERO(condition))
+/* Force a compilation error if condition is true, but also produce a
+ * result (of value 0 and type size_t), so the expression can be used
+ * e.g. in a structure initializer (or where-ever else comma expressions
+ * aren't permitted). */
+#define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:-!!(e); }))
+#define BUILD_BUG_ON_NULL(e) ((void *)sizeof(struct { int:-!!(e); }))
+
 #endif /* LHA_INTERNAL_H */
