@@ -108,14 +108,21 @@ cl_times(void)	/* Make times(2) behave rationally on Linux */
 	}
 	errno = save_errno;
 #endif /* DISABLE_TIMES_KLUDGE */
-	return (unsigned long)ret;
+
+	/* sizeof(long) may be larger than sizeof(clock_t).
+	 * Don't jump from 0x7fffffff to 0xffffffff80000000
+	 * because of sign extension.
+	 * We do expect sizeof(clock_t) <= sizeof(long), however.
+	 */
+	BUILD_BUG_ON(sizeof(clock_t) > sizeof(unsigned long));
+#define CLOCK_T_MAX	(~0UL >> (8*(sizeof(unsigned long) - sizeof(clock_t))))
+	return (unsigned long)ret & CLOCK_T_MAX;
 }
 
 #ifdef CLOCK_T_IS_LONG_ENOUGH
 longclock_t
 time_longclock(void)
 {
-
 	/* See note below about deliberately ignoring errors... */
 	return (longclock_t)cl_times();
 }
@@ -124,8 +131,8 @@ time_longclock(void)
 
 #define	BITSPERBYTE	8
 #define	WRAPSHIFT	(BITSPERBYTE*sizeof(clock_t))
-#define MAXIMUMULONG	((unsigned long)~(0UL))
-#define MINJUMP		((MAXIMUMULONG/100UL)*99UL)
+#define	WRAPAMOUNT	(((longclock_t) 1) << WRAPSHIFT)
+#define	MINJUMP		((CLOCK_T_MAX/100UL)*99UL)
 
 longclock_t
 time_longclock(void)
@@ -137,19 +144,18 @@ time_longclock(void)
 	 * cl_log call is where it is; found by Simon Graham. */
 	static	gboolean	calledbefore	= FALSE;
 	static	unsigned long	lasttimes	= 0L;
-	static	unsigned long	wrapcount	= 0L;
 	static	unsigned long	callcount	= 0L;
 	static	longclock_t	lc_wrapcount	= 0L;
 	unsigned long		timesval;
 
 	++callcount;
 
-	timesval = (unsigned long) cl_times();
+	timesval = cl_times();
 
 	if (calledbefore && timesval < lasttimes)  {
-		clock_t		jumpbackby = lasttimes - timesval;
+		unsigned long jumpbackby = lasttimes - timesval;
 
-		if (jumpbackby < (clock_t)MINJUMP) {
+		if (jumpbackby < MINJUMP) {
 			/* Kernel weirdness */
 			cl_log(LOG_CRIT
 			,	"%s: clock_t from times(2) appears to"
@@ -172,8 +178,7 @@ time_longclock(void)
 			   to double update of wrapcount! */
 
 			lasttimes = timesval;
-			++wrapcount;
-			lc_wrapcount = ((longclock_t)wrapcount) << WRAPSHIFT;
+			lc_wrapcount += WRAPAMOUNT;
 
 			cl_log(LOG_INFO
 			,	"%s: clock_t wrapped around (uptime)."
@@ -184,7 +189,7 @@ time_longclock(void)
 		lasttimes = timesval;
 		calledbefore = TRUE;
 	}
-	return (lc_wrapcount | (longclock_t)timesval);
+	return (lc_wrapcount | timesval);
 }
 #endif	/* ! CLOCK_T_IS_LONG_ENOUGH */
 
