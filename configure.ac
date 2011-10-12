@@ -1182,12 +1182,12 @@ else
         CFLAGS="$CFLAGS -ggdb3 -O0"
 
 	# We had to eliminate -Wnested-externs because of libtool changes
+	# -Wcast-qual gives errors with GCC 4.6
         EXTRA_FLAGS="-fgnu89-inline
 		-fstack-protector-all
 		-Wall
 		-Waggregate-return
 		-Wbad-function-cast 
-		-Wcast-qual 
 		-Wcast-align 
 		-Wdeclaration-after-statement
 		-Wendif-labels
