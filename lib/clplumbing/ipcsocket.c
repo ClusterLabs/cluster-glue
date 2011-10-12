@@ -1117,7 +1117,6 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 
 	int		nbytes;
 	int		result;
-	struct IPC_MESSAGE* ipcmsg;
 
 	socket_resume_io(ch);
 	result = socket_resume_io_read(ch, &nbytes, TRUE);
@@ -1138,12 +1137,10 @@ socket_recv(struct IPC_CHANNEL * ch, struct IPC_MESSAGE** message)
 		ch->recv_queue->current_qlen = 0;
 		return IPC_FAIL;
 	}
-	ipcmsg = *message = (struct IPC_MESSAGE *) (element->data);
-	
-	
-#ifdef IPC_TIME_DEBUG		
-	ipc_time_debug(ch, ipcmsg, MSGPOS_DEQUEUE);	
-#endif	
+	*message = (struct IPC_MESSAGE *) (element->data);
+#ifdef IPC_TIME_DEBUG
+	ipc_time_debug(ch, *message, MSGPOS_DEQUEUE);
+#endif
 
 	CHECKFOO(1,ch, *message, SavedReadBody, "read message");
 	SocketIPCStats.nreceived++;

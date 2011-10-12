@@ -120,14 +120,12 @@ struct _syslog_code facilitynames[] =
 int
 cl_syslogfac_str2int(const char *fname)
 {
-	struct _syslog_code *fnames;
 	int i;
 
 	if(fname == NULL || strcmp("none", fname) == 0) {
 		return 0;
 	}
 	
-	fnames = (struct _syslog_code *) facilitynames;
 	for (i = 0; facilitynames[i].c_name != NULL; i++) {
 		if (strcmp(fname, facilitynames[i].c_name) == 0) {
 			return facilitynames[i].c_val;
@@ -140,10 +138,8 @@ cl_syslogfac_str2int(const char *fname)
 const char *
 cl_syslogfac_int2str(int fnum)
 {
-	struct _syslog_code *fnames;
 	int i;
 
-	fnames = (struct _syslog_code *) facilitynames;
 	for (i = 0; facilitynames[i].c_name != NULL; i++) {
 		if (facilitynames[i].c_val == fnum) {
 			return facilitynames[i].c_name;

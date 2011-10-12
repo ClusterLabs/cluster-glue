@@ -497,7 +497,6 @@ cl_poll_sigaction(int nsig, siginfo_t* info, void* v)
 int
 cl_poll_ignore(int fd)
 {
-	short	nsig;
 	int	flags;
 
 	if (debug) {
@@ -511,7 +510,6 @@ cl_poll_ignore(int fd)
 	if (!is_monitored[fd]) {
 		return 0;
 	}
-	nsig = monitorinfo[fd].nsig;
 
 	is_monitored[fd] = FALSE;
 	memset(monitorinfo+fd, 0, sizeof(monitorinfo[0]));

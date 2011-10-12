@@ -108,5 +108,6 @@ int main(void)
 		error_count++;
 	}
 
+        (void) rc; /* Suppress -Werror=unused-but-set-variable  */
 	return error_count;
 }

@@ -931,7 +931,6 @@ add_struct_field(struct ha_msg* msg, char* name, size_t namelen,
 		 void* value, size_t vallen, int depth)
 {	
 	int next;
-	struct ha_msg* childmsg;
 
 	if ( !msg || !name || !value
 	     || depth < 0){
@@ -939,8 +938,6 @@ add_struct_field(struct ha_msg* msg, char* name, size_t namelen,
 		       " invalid input argument");
 		return HA_FAIL;
 	}
-	
-	childmsg = (struct ha_msg*)value; 
 	
 	next = msg->nfields;
 	msg->names[next] = name;
@@ -964,7 +961,6 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 	int next;
 	int j;
 	GList* list = NULL;
-	int stringlen_add;
 
 	if ( !msg || !name || !value
 	     || namelen <= 0 
@@ -983,13 +979,8 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 	}
 	
 	if ( j >= msg->nfields){
-		int listlen;
 		list = (GList*)value;
 
-		listlen = string_list_pack_length(list);
-
-		stringlen_add = list_stringlen(namelen,listlen , value);
-		
 		next = msg->nfields;
 		msg->names[next] = name;
 		msg->nlens[next] = namelen;
@@ -1001,8 +992,7 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 	}  else if(  msg->types[j] == FT_LIST ){
 
 		GList* oldlist = (GList*) msg->values[j];
-		int oldlistlen = string_list_pack_length(oldlist);
-		int newlistlen;
+		int listlen;
 		size_t i; 
 		
 		for ( i =0; i < g_list_length((GList*)value); i++){
@@ -1014,12 +1004,10 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 			return HA_FAIL;
 		}
 		
-		newlistlen = string_list_pack_length(list);		
+		listlen = string_list_pack_length(list);		
 		
-		stringlen_add = newlistlen - oldlistlen;
-
 		msg->values[j] = list;
-		msg->vlens[j] =  string_list_pack_length(list);
+		msg->vlens[j] = listlen;
 		g_list_free((GList*)value); /*we don't free each element
 					      because they are used in new list*/
 		free(name); /* this name is no longer necessary
@@ -1069,7 +1057,6 @@ add_uncompress_field(struct ha_msg* msg, char* name, size_t namelen,
 		 void* value, size_t vallen, int depth)
 {	
 	int next;
-	struct ha_msg* childmsg;
 
 	if ( !msg || !name || !value
 	     || depth < 0){
@@ -1077,8 +1064,6 @@ add_uncompress_field(struct ha_msg* msg, char* name, size_t namelen,
 		       " invalid input argument");
 		return HA_FAIL;
 	}
-	
-	childmsg = (struct ha_msg*)value; 
 	
 	next = msg->nfields;
 	msg->names[next] = name;
