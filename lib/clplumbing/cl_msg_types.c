@@ -1518,7 +1518,6 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 	size_t	cp_vallen;
 	void	*cp_value = NULL;
 	int	next;
-	int	stringlen_add = 0 ;
 
 	if ( !msg || !name || !value
 	     || namelen <= 0 
@@ -1578,8 +1577,8 @@ add_string_field(struct ha_msg* msg, char* name, size_t namelen,
 		}
 		
 		fieldstringlen = fieldtypefuncs[internal_type].stringlen;
-		if (!fieldstringlen || (stringlen_add = 
-					fieldstringlen(cp_namelen, cp_vallen, cp_value)) <= 0 ){
+		if (!fieldstringlen ||
+					fieldstringlen(cp_namelen, cp_vallen, cp_value) <= 0 ){
 			
 			cl_log(LOG_ERR, "add_string_field: stringlen failed");
 			return HA_FAIL;
