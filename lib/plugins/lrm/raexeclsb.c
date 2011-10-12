@@ -370,6 +370,8 @@ get_resource_list(GList ** rsc_info)
 			*rsc_info = g_list_remove(*rsc_info, cur->data);
 			g_free(cur->data);
 		}
+#else
+                (void) is_lsb_script;
 #endif
 		cur = tmp;
 	}
@@ -504,6 +506,8 @@ get_resource_meta(const char* rsc_type,  const char* provider)
 			break;
 		}
 	}
+#else
+        (void) next_continue;
 #endif
 
 	/* Enter into the lsb-compliant comment block */

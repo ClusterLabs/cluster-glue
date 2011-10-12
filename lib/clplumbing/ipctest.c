@@ -1326,7 +1326,6 @@ static int
 mainloop_server(IPC_Channel* chan, int repcount)
 {
 	struct iterinfo info;
-	GCHSource*	msgchan;
 	guint		sendmsgsrc;
 
 	
@@ -1340,7 +1339,7 @@ mainloop_server(IPC_Channel* chan, int repcount)
 	chan->low_flow_mark = 2;
 
 	sendmsgsrc = g_idle_add(s_send_msg, &info);
-	msgchan = G_main_add_IPC_Channel(G_PRIORITY_DEFAULT, chan
+	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT, chan
 	,	FALSE, s_rcv_msg, &info, NULL);
 	cl_log(LOG_INFO, "Mainloop echo server: %d reps pid %d.", repcount, (int)getpid());
 	g_main_run(loop);

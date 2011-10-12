@@ -44,7 +44,6 @@ main(int argc, char *argv[])
 	lrm_op_t* op = NULL;
 	const char* rid = "ip248";
 	GHashTable* param = NULL;
-	int call_id;
 
 	lrm = ll_lrm_new("lrm");
 
@@ -94,7 +93,7 @@ main(int argc, char *argv[])
 	op->user_data_len = strlen(op->user_data)+1;
 	op->interval = 1000;
 	op->target_rc=EVERYTIME;
-	call_id = rsc->ops->perform_op(rsc,op);
+	rsc->ops->perform_op(rsc,op);
 	printf_op(op);
 
 	puts("perform_op(stop)...");

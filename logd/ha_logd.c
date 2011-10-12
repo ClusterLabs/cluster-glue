@@ -138,11 +138,10 @@ logd_log( const char * fmt, ...)
 {
 	char		buf[MAXLINE];
 	va_list		ap;
-	int		nbytes;
 	
 	buf[MAXLINE-1] = EOS;
 	va_start(ap, fmt);
-	nbytes=vsnprintf(buf, sizeof(buf)-1, fmt, ap);
+	vsnprintf(buf, sizeof(buf)-1, fmt, ap);
 	va_end(ap);
 	
 	fprintf(stderr, "%s", buf);

@@ -598,7 +598,6 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 {
 	
 	size_t	startlen = sizeof(MSG_START)-1;
-	int	internal_type;
 	
 
 	int (*addfield) (struct ha_msg* msg, char* name, size_t namelen,
@@ -632,8 +631,6 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		       "cannot add name/value to ha_msg");
 		return(HA_FAIL);
 	}
-	
-	internal_type = type;
 	
 	HA_MSG_ASSERT(type < DIMOF(fieldtypefuncs));
 	
