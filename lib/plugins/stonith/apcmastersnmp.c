@@ -75,7 +75,7 @@
 
 static StonithPlugin *	apcmastersnmp_new(const char *);
 static void	apcmastersnmp_destroy(StonithPlugin *);
-static const char **	apcmastersnmp_get_confignames(StonithPlugin *);
+static const char * const *	apcmastersnmp_get_confignames(StonithPlugin *);
 static int	apcmastersnmp_set_config(StonithPlugin *, StonithNVpair *);
 static const char *	apcmastersnmp_getinfo(StonithPlugin * s, int InfoType);
 static int	apcmastersnmp_status(StonithPlugin * );
@@ -700,7 +700,7 @@ apcmastersnmp_reset_req(StonithPlugin * s, int request, const char *host)
  * Get the configuration parameter names.
  */
 
-static const char **
+static const char * const *
 apcmastersnmp_get_confignames(StonithPlugin * s)
 {
 	static const char * ret[] = {ST_IPADDR, ST_PORT, ST_COMMUNITY, NULL};

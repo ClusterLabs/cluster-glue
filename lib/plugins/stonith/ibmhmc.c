@@ -131,7 +131,7 @@
 static StonithPlugin *	ibmhmc_new(const char *);
 static void		ibmhmc_destroy(StonithPlugin *);
 static const char *	ibmhmc_getinfo(StonithPlugin * s, int InfoType);
-static const char**	ibmhmc_get_confignames(StonithPlugin* p);
+static const char * const *	ibmhmc_get_confignames(StonithPlugin* p);
 static int		ibmhmc_status(StonithPlugin * );
 static int		ibmhmc_reset_req(StonithPlugin * s,int request,const char* host);
 static char **		ibmhmc_hostlist(StonithPlugin  *);
@@ -318,7 +318,7 @@ ibmhmc_hostlist(StonithPlugin  *s)
 }
 
 
-static const char**     
+static const char * const *
 ibmhmc_get_confignames(StonithPlugin* p)
 {
 	static const char * names[] = {ST_IPADDR, NULL};

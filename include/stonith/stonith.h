@@ -95,7 +95,7 @@ char **	stonith_types(void);	/* NULL-terminated list */
 Stonith*stonith_new(const char * type);
 void	stonith_delete(Stonith *);
 
-const char**	stonith_get_confignames	(Stonith* s);
+const char * const *	stonith_get_confignames	(Stonith* s);
 				/* static/global return */
 				/* Return number and list of valid s_names */
 

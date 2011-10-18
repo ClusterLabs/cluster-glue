@@ -40,7 +40,7 @@
 static StonithPlugin *	meatware_new(const char *);
 static void		meatware_destroy(StonithPlugin *);
 static int		meatware_set_config(StonithPlugin *, StonithNVpair *);
-static const char**	meatware_get_confignames(StonithPlugin *);
+static const char * const *	meatware_get_confignames(StonithPlugin *);
 static const char *	meatware_getinfo(StonithPlugin * s, int InfoType);
 static int		meatware_status(StonithPlugin * );
 static int		meatware_reset_req(StonithPlugin * s, int request, const char * host);
@@ -136,7 +136,7 @@ meatware_hostlist(StonithPlugin  *s)
 		return(NULL);
 	}
 
-	return OurImports->CopyHostList((const char **)nd->hostlist);
+	return OurImports->CopyHostList((const char * const *)nd->hostlist);
 }
 
 /*
@@ -265,7 +265,7 @@ meatware_set_config(StonithPlugin* s, StonithNVpair *list)
 /*
  * Return STONITH config vars
  */
-static const char**
+static const char * const *
 meatware_get_confignames(StonithPlugin* p)
 {
 	static const char *	MeatwareParams[] = {ST_HOSTLIST, NULL };

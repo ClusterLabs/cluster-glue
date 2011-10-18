@@ -53,7 +53,7 @@
 static StonithPlugin *	rhcs_new(const char *);
 static void		rhcs_destroy(StonithPlugin *);
 static int		rhcs_set_config(StonithPlugin *, StonithNVpair *);
-static const char**	rhcs_get_confignames(StonithPlugin *);
+static const char * const *	rhcs_get_confignames(StonithPlugin *);
 static const char *	rhcs_getinfo(StonithPlugin * s, int InfoType);
 static int		rhcs_status(StonithPlugin * );
 static int		rhcs_reset_req(StonithPlugin * s, int request, const char * host);
@@ -557,7 +557,7 @@ static int
 load_confignames(xmlNodeSet *nodes, struct pluginDevice *sd)
 {
 	xmlChar *attr;
-	const char **skip;
+	const char * const*skip;
 	xmlNode *cur;
 	int i, j, namecount;
 
@@ -659,7 +659,7 @@ err:
 /*
  * Return STONITH config vars
  */
-static const char**
+static const char * const *
 rhcs_get_confignames(StonithPlugin* p)
 {
   	struct pluginDevice *	sd;
@@ -703,7 +703,7 @@ rhcs_get_confignames(StonithPlugin* p)
 		sd->confignames[dircount] = NULL;
 	}
 
-	return (const char **)sd->confignames;
+	return (const char * const *)sd->confignames;
 }
 
 /*

@@ -42,7 +42,7 @@ static StonithPlugin*	null_new(const char *);
 static void		null_destroy(StonithPlugin *);
 static int		null_set_config(StonithPlugin*
 ,				StonithNVpair*);
-static const char**	null_get_confignames(StonithPlugin*);
+static const char * const *	null_get_confignames(StonithPlugin*);
 static const char *	null_getinfo(StonithPlugin * s, int InfoType);
 static int		null_status(StonithPlugin * );
 static int		null_reset_req(StonithPlugin * s
@@ -126,7 +126,7 @@ null_hostlist(StonithPlugin  *s)
 	struct pluginDevice*	nd = (struct pluginDevice*)s;
 
 	ERRIFWRONGDEV(s, NULL);
-	return OurImports->CopyHostList((const char**)nd->hostlist);
+	return OurImports->CopyHostList((const char * const *)nd->hostlist);
 }
 
 
@@ -148,7 +148,7 @@ null_reset_req(StonithPlugin * s, int request, const char * host)
 }
 
 
-static const char**
+static const char * const *
 null_get_confignames(StonithPlugin* p)
 {
 	static const char *	NullParams[] = {ST_HOSTLIST, NULL };

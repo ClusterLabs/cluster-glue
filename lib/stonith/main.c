@@ -191,7 +191,7 @@ confhelp(const char * cmd, FILE* stream, const char * devtype)
 	for(this=typelist; *this && !devfound; ++this) {
 		const char *    SwitchType = *this;
 		const char *	cres;
-		const char **	pnames;
+		const char * const *	pnames;
 
 
 		if ((s = stonith_new(SwitchType)) == NULL) {
@@ -318,7 +318,7 @@ print_types()
 void
 print_confignames(Stonith *s)
 {
-	const char**	names;
+	const char * const *	names;
 	int		i;
 
 	names = stonith_get_confignames(s);
@@ -572,7 +572,7 @@ main(int argc, char** argv)
 
 	if (!listparanames && !metadata && optfile == NULL &&
 			parameters == NULL && !params_from_env && nvcount == 0) {
-		const char**	names;
+		const char * const *	names;
 		int		needs_parms = 1;
 
 		if (s != NULL && (names = stonith_get_confignames(s)) != NULL && names[0] == NULL) {
@@ -654,7 +654,7 @@ main(int argc, char** argv)
 		 *	Configure STONITH device using cmdline arguments...
 		 */
 		if ((rc = stonith_set_config(s, nvargs)) != S_OK) {
-			const char**	names;
+			const char * const *	names;
 			int		j;
 			fprintf(stderr
 			,	"Invalid config info for %s device\n"

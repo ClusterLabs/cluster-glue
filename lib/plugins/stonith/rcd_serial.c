@@ -54,7 +54,7 @@
 static StonithPlugin*	rcd_serial_new(const char *);
 static void		rcd_serial_destroy(StonithPlugin *);
 static int		rcd_serial_set_config(StonithPlugin *, StonithNVpair *);
-static const char **	rcd_serial_get_confignames(StonithPlugin *);
+static const char * const *	rcd_serial_get_confignames(StonithPlugin *);
 static const char *	rcd_serial_getinfo(StonithPlugin * s, int InfoType);
 static int		rcd_serial_status(StonithPlugin * );
 static int		rcd_serial_reset_req(StonithPlugin * s, int request, const char * host);
@@ -347,7 +347,7 @@ rcd_serial_hostlist(StonithPlugin  *s)
 		return(NULL);
 	}
 
-	return OurImports->CopyHostList((const char **)rcd->hostlist);
+	return OurImports->CopyHostList((const char * const *)rcd->hostlist);
 }
 
 /*
@@ -497,7 +497,7 @@ rcd_serial_set_config(StonithPlugin* s, StonithNVpair *list)
 /*
  * Return STONITH config vars
  */
-static const char**
+static const char * const *
 rcd_serial_get_confignames(StonithPlugin* p)
 {
 	static const char *	RcdParams[] = {ST_HOSTLIST, ST_TTYDEV

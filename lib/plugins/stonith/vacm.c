@@ -59,7 +59,7 @@
 
 static StonithPlugin *	vacm_new(const char *);
 static void		vacm_destroy(StonithPlugin *);
-static const char **	vacm_get_confignames(StonithPlugin *);
+static const char * const *	vacm_get_confignames(StonithPlugin *);
 static int		vacm_set_config(StonithPlugin *, StonithNVpair *);
 static const char *	vacm_getinfo(StonithPlugin * s, int InfoType);
 static int		vacm_status(StonithPlugin * );
@@ -339,7 +339,7 @@ vacm_reset_req(StonithPlugin *s, int request, const char *host)
 }
 
 /* list => "nexxus:username:password" */
-static const char **
+static const char * const *
 vacm_get_confignames(StonithPlugin * s)
 {
 	static const char * ret[] = {ST_NEXXUS, ST_LOGIN, ST_PASSWD, NULL};
