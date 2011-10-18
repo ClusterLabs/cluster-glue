@@ -1,3 +1,30 @@
+* Tue Oct 18 2011 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
+- stable release 1.0.8
+- cl_log: log spamming control
+- LRM: raexecocf: list resource agents properly (bnc#664409)
+- LRM: lrmd: allow storing parameters in local files (lf#2415)
+- LRM: lrmd: limit number of "stayed too long in operation list"
+  log messages (bnc#636576)
+- stonith: external/libvirt: new plugin for libvirt virtualization technologies
+- stonith: external/vcenter: new plugin
+- stonith: external/hetzner: new plugin
+- stonith: sbd: support for multiple devices
+- stonith: sbd: Fix timeout setting on archs where int != long (bnc#635690)
+- stonith: sbd: abort start if watchdog cannot be initialized (bnc#680109)
+- stonith: sbd: Make failing to set the watchdog timeout non-fatal but annoying
+- stonith: sbd: Make the restart interval for servants configurable
+- stonith: sbd: Maximize scheduler and IO priority in the child processes (bnc#702907)
+- stonith: external/sbd: Fix ordering of arguments in reset
+- stonith: external/ipmi: fix unique parameters' attributes
+- stonith: external/rackpdu: split off assignment from local to
+  make it work with non-bash shells
+- stonith: external: avoid false error if parameter isn't set (bnc#646205)
+- hb_report: add .info files with the last byte pos for all logs
+- hb_report: use sudo for remove collectors if connecting with
+  user other than root
+- hb_report: install debuginfo packages on platforms with zypper (bnc#641979)
+- hb_report: improve detecting ssh user
+
 * Tue Nov 30 2010 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
 - stable release 1.0.7
 - clplumbing: ipc: adjust socket buffers size when adjusting ipc queue length
