@@ -166,7 +166,8 @@ static char **
 get_plugin_list(const char *pltype)
 {
 	char **	typelist = NULL;
-	const char **extPI, **p;
+	const char * const *extPI;
+	const char * const *p;
 	int numextPI, i;
 	Stonith * ext;
 
@@ -184,9 +185,6 @@ get_plugin_list(const char *pltype)
 
 	/* count the external plugins */
 	for (numextPI = 0, p = extPI; *p; p++, numextPI++);
-
-	/* sort the external plugins */
-	qsort(extPI, numextPI, sizeof(char *), qsort_string_cmp);
 
 	typelist = (char **)
 		MALLOC((numextPI+1)*sizeof(char *));
@@ -213,6 +211,10 @@ get_plugin_list(const char *pltype)
 	}
 
 	stonith_delete(ext);
+
+	/* sort the list of plugin names */
+	qsort(typelist, numextPI, sizeof(char *), qsort_string_cmp);
+
 	return typelist;
 err:
 	stonith_free_hostlist(typelist);
@@ -303,7 +305,7 @@ stonith_delete(Stonith *s)
 	}
 }
 
-const char **
+const char * const *
 stonith_get_confignames(Stonith* s)
 {
 	StonithPlugin*	sp = (StonithPlugin*)s;
@@ -471,7 +473,7 @@ stonith1_compat_string_to_NVpair(Stonith* s, const char * str)
 	 * Everything after the last delimiter is passed along as part of
 	 * the final argument - white space and all...
 	 */
-	const char **	config_names;
+	const char * const *	config_names;
 	int		n_names;
 	int		j;
 	const char *	delims = " \t\n\r\f";
@@ -521,7 +523,7 @@ StonithNVpair*
 stonith_env_to_NVpair(Stonith* s)
 {
 	/* Read the config names values from the environment */
-	const char **	config_names;
+	const char * const *	config_names;
 	int		n_names;
 	int		j;
 	StonithNVpair*	ret;

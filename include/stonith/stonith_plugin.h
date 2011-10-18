@@ -53,7 +53,7 @@ struct stonith_ops {
 	void (*destroy)		(StonithPlugin*);	/*(full) Destructor */
 
 	const char* (*get_info)	(StonithPlugin*, int infotype);
-	const char** (*get_confignames)	(StonithPlugin*);
+	const char * const * (*get_confignames)	(StonithPlugin*);
 	int (*set_config)	(StonithPlugin*, StonithNVpair* list);
 					/* Finishes construction */
 	/*
@@ -104,7 +104,7 @@ struct StonithImports_s {
 	const char* (*GetValue)(StonithNVpair*, const char * name);
 	int	(*CopyAllValues) (StonithNamesToGet* out, StonithNVpair* in);
 	char **(*StringToHostList)(const char * hlstring);
-	char **(*CopyHostList)(const char ** hlstring);
+	char **(*CopyHostList)(const char * const * hlstring);
 	void (*FreeHostList)(char** hostlist);
 	int (*TtyLock)(const char* tty);
 	int (*TtyUnlock)(const char* tty);

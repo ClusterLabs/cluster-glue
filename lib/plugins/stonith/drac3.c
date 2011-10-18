@@ -39,7 +39,7 @@
 
 static StonithPlugin *	drac3_new(const char *);
 static void	drac3_destroy(StonithPlugin *);
-static const char ** drac3_get_confignames(StonithPlugin *);
+static const char * const * drac3_get_confignames(StonithPlugin *);
 static int	drac3_set_config(StonithPlugin *, StonithNVpair *);
 static const char * drac3_getinfo(StonithPlugin * s, int InfoType);
 static int	drac3_status(StonithPlugin * );
@@ -191,7 +191,7 @@ drac3_destroy(StonithPlugin * s)
 }
 
 /* ------------------------------------------------------------------ */
-static const char **
+static const char * const *
 drac3_get_confignames(StonithPlugin * s)
 {
 	static const char * ret[] = {ST_HOST, ST_LOGIN, ST_PASSWD, NULL};

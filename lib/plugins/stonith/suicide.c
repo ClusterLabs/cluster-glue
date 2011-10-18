@@ -34,7 +34,7 @@
 
 static StonithPlugin *	suicide_new(const char *);
 static void		suicide_destroy(StonithPlugin *);
-static const char**	suicide_get_confignames(StonithPlugin *);
+static const char * const *	suicide_get_confignames(StonithPlugin *);
 static int		suicide_set_config(StonithPlugin *, StonithNVpair*);
 static const char *	suicide_get_info(StonithPlugin * s, int InfoType);
 static int		suicide_status(StonithPlugin * );
@@ -189,7 +189,7 @@ suicide_reset_req(StonithPlugin * s, int request, const char * host)
 	}
 }
 
-static const char**
+static const char * const *
 suicide_get_confignames(StonithPlugin* p)
 {
 	/* Donnot need to initialize from external. */

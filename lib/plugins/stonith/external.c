@@ -46,7 +46,7 @@
 static StonithPlugin *	external_new(const char *);
 static void		external_destroy(StonithPlugin *);
 static int		external_set_config(StonithPlugin *, StonithNVpair *);
-static const char**	external_get_confignames(StonithPlugin *);
+static const char * const *	external_get_confignames(StonithPlugin *);
 static const char *	external_getinfo(StonithPlugin * s, int InfoType);
 static int		external_status(StonithPlugin * );
 static int		external_reset_req(StonithPlugin * s, int request, const char * host);
@@ -461,7 +461,7 @@ exec_select(const struct dirent *dire)
 /*
  * Return STONITH config vars
  */
-static const char**
+static const char * const *
 external_get_confignames(StonithPlugin* p)
 {
   	struct pluginDevice *	sd;
@@ -544,7 +544,7 @@ external_get_confignames(StonithPlugin* p)
 		sd->confignames[dircount] = NULL;
 	}
 
-	return (const char **)sd->confignames;
+	return (const char * const *)sd->confignames;
 }
 
 /*

@@ -77,7 +77,7 @@
 
 static StonithPlugin *	wti_mpc_new(const char *);
 static void	wti_mpc_destroy(StonithPlugin *);
-static const char **	wti_mpc_get_confignames(StonithPlugin *);
+static const char * const *	wti_mpc_get_confignames(StonithPlugin *);
 static int	wti_mpc_set_config(StonithPlugin *, StonithNVpair *);
 static const char *	wti_mpc_getinfo(StonithPlugin * s, int InfoType);
 static int	wti_mpc_status(StonithPlugin * );
@@ -636,7 +636,7 @@ wti_mpc_reset_req(StonithPlugin * s, int request, const char *host)
  * Get the configuration parameter names.
  */
 
-static const char **
+static const char * const *
 wti_mpc_get_confignames(StonithPlugin * s)
 {
 	static const char * ret[] = {ST_IPADDR, ST_PORT, ST_COMMUNITY, ST_MIBVERSION, NULL};

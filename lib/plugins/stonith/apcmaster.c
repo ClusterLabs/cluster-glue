@@ -65,7 +65,7 @@
 
 static StonithPlugin *	apcmaster_new(const char *);
 static void		apcmaster_destroy(StonithPlugin *);
-static const char **	apcmaster_get_confignames(StonithPlugin *);
+static const char * const *	apcmaster_get_confignames(StonithPlugin *);
 static int		apcmaster_set_config(StonithPlugin *, StonithNVpair *);
 static const char *	apcmaster_getinfo(StonithPlugin * s, int InfoType);
 static int		apcmaster_status(StonithPlugin * );
@@ -678,7 +678,7 @@ apcmaster_reset_req(StonithPlugin * s, int request, const char * host)
 /*
  *	Get the configuration parameters names
  */
-static const char **
+static const char * const *
 apcmaster_get_confignames(StonithPlugin * s)
 {
 	static const char * ret[] = {ST_IPADDR, ST_LOGIN, ST_PASSWD, NULL};

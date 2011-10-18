@@ -40,7 +40,7 @@
 static StonithPlugin *	nw_rpc100s_new(const char *);
 static void		nw_rpc100s_destroy(StonithPlugin *);
 static int		nw_rpc100s_set_config(StonithPlugin *, StonithNVpair *);
-static const char**	nw_rpc100s_get_confignames(StonithPlugin *);
+static const char * const *	nw_rpc100s_get_confignames(StonithPlugin *);
 static const char *	nw_rpc100s_getinfo(StonithPlugin * s, int InfoType);
 static int		nw_rpc100s_status(StonithPlugin * );
 static int		nw_rpc100s_reset_req(StonithPlugin * s, int request, const char * host);
@@ -678,7 +678,7 @@ nw_rpc100s_set_config(StonithPlugin* s, StonithNVpair *list)
 /*
  * Return STONITH config vars
  */
-static const char **
+static const char * const *
 nw_rpc100s_get_confignames(StonithPlugin* p)
 {
 	static const char *	RpcParams[] = {ST_TTYDEV , ST_HOSTLIST, NULL };

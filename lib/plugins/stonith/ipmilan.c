@@ -46,7 +46,7 @@
 
 static StonithPlugin *	ipmilan_new(const char *);
 static void		ipmilan_destroy(StonithPlugin *);
-static const char **	ipmilan_get_confignames(StonithPlugin *);
+static const char * const *	ipmilan_get_confignames(StonithPlugin *);
 static int		ipmilan_set_config(StonithPlugin *, StonithNVpair *);
 static const char *	ipmilan_getinfo(StonithPlugin * s, int InfoType);
 static int		ipmilan_status(StonithPlugin * );
@@ -379,7 +379,7 @@ ipmilan_reset_req(StonithPlugin * s, int request, const char * host)
 /*
  *	Get configuration parameter names
  */
-static const char **
+static const char * const *
 ipmilan_get_confignames(StonithPlugin * s)
 {
 	static const char * ret[] = 

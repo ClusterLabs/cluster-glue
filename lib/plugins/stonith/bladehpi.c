@@ -69,7 +69,7 @@
 static StonithPlugin *	bladehpi_new(const char *);
 static void		bladehpi_destroy(StonithPlugin *);
 static const char *	bladehpi_getinfo(StonithPlugin *, int);
-static const char **	bladehpi_get_confignames(StonithPlugin *);
+static const char * const *	bladehpi_get_confignames(StonithPlugin *);
 static int		bladehpi_status(StonithPlugin *);
 static int		bladehpi_reset_req(StonithPlugin *, int, const char *);
 static char **		bladehpi_hostlist(StonithPlugin *);
@@ -333,7 +333,7 @@ done:
 }
 
 
-static const char **     
+static const char * const *
 bladehpi_get_confignames(StonithPlugin *s)
 {
 	static const char *	names[] = {ST_ENTITYROOT, NULL};

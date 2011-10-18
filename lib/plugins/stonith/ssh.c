@@ -36,7 +36,7 @@
 
 static StonithPlugin *	ssh_new(const char *);
 static void		ssh_destroy(StonithPlugin *);
-static const char**	ssh_get_confignames(StonithPlugin *);
+static const char * const *	ssh_get_confignames(StonithPlugin *);
 static int		ssh_set_config(StonithPlugin *, StonithNVpair*);
 static const char *	ssh_get_info(StonithPlugin * s, int InfoType);
 static int		ssh_status(StonithPlugin * );
@@ -161,7 +161,7 @@ ssh_hostlist(StonithPlugin  *s)
 		return(NULL);
 	}
 
-	return OurImports->CopyHostList((const char **)sd->hostlist);
+	return OurImports->CopyHostList((const char * const *)sd->hostlist);
 }
 
 
@@ -234,7 +234,7 @@ ssh_reset_req(StonithPlugin * s, int request, const char * host)
 	}
 }
 
-static const char**
+static const char * const *
 ssh_get_confignames(StonithPlugin* p)
 {
 	static const char *	SshParams[] = {ST_HOSTLIST, NULL };

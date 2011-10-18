@@ -45,7 +45,7 @@
 static StonithPlugin *	cyclades_new(const char *);
 static void		cyclades_destroy(StonithPlugin *);
 static int		cyclades_set_config(StonithPlugin *, StonithNVpair *);
-static const char **	cyclades_get_confignames(StonithPlugin * s);
+static const char * const *	cyclades_get_confignames(StonithPlugin * s);
 static const char *	cyclades_get_info(StonithPlugin * s, int InfoType);
 static int		cyclades_status(StonithPlugin *);
 static int		cyclades_reset_req(StonithPlugin * s, int request, const char * host);
@@ -523,7 +523,7 @@ cyclades_reset_req(StonithPlugin * s, int request, const char * host)
 	return rc;
 }
 
-static const char **
+static const char * const *
 cyclades_get_confignames(StonithPlugin * s)
 {
 	static const char * ret[] = {ST_IPADDR, ST_LOGIN, ST_SERIALPORT, NULL};

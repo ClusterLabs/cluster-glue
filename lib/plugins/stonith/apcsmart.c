@@ -109,7 +109,7 @@ static const char *NOTpluginID = "APCSmart device has been destroyed";
 
 static StonithPlugin *	apcsmart_new(const char *);
 static void		apcsmart_destroy(StonithPlugin *);
-static const char**	apcsmart_get_confignames(StonithPlugin*);
+static const char * const *	apcsmart_get_confignames(StonithPlugin*);
 static int		apcsmart_set_config(StonithPlugin *, StonithNVpair*);
 static const char *	apcsmart_get_info(StonithPlugin * s, int InfoType);
 static int		apcsmart_status(StonithPlugin * );
@@ -621,7 +621,7 @@ APC_deinit(struct pluginDevice *ad)
 		ad->upsfd = -1;
 	}
 }
-static const char**
+static const char * const *
 apcsmart_get_confignames(StonithPlugin* sp)
 {
 	static const char * names[] =  {ST_TTYDEV, ST_HOSTLIST, NULL};
@@ -719,7 +719,7 @@ apcsmart_hostlist(StonithPlugin * s)
 	}
 	ERRIFNOTCONFIGED(s,NULL);
 
-	return OurImports->CopyHostList((const char **)ad->hostlist);
+	return OurImports->CopyHostList((const char **)(void*)ad->hostlist);
 }
 
 static gboolean

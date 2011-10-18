@@ -37,7 +37,7 @@
 static StonithPlugin *	baytech_new(const char *);
 static void		baytech_destroy(StonithPlugin *);
 static int		baytech_set_config(StonithPlugin *, StonithNVpair *);
-static const char **	baytech_get_confignames(StonithPlugin * s);
+static const char * const *	baytech_get_confignames(StonithPlugin * s);
 static const char *	baytech_get_info(StonithPlugin * s, int InfoType);
 static int		baytech_status(StonithPlugin *);
 static int		baytech_reset_req(StonithPlugin * s, int request, const char * host);
@@ -744,7 +744,7 @@ baytech_reset_req(StonithPlugin * s, int request, const char * host)
 	return(rc != S_OK ? rc : lorc);
 }
 
-static const char **
+static const char * const *
 baytech_get_confignames(StonithPlugin * s)
 {
 	static const char * ret[] = {ST_IPADDR, ST_LOGIN, ST_PASSWD, NULL};
