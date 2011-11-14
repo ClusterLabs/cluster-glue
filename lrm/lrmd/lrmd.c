@@ -2817,6 +2817,11 @@ on_op_done(lrmd_rsc_t* rsc, lrmd_op_t* op)
 				to_repeatlist(rsc,op);
 		}
 	} else {
+		if (HA_OK != ha_msg_mod_int(op->msg,F_LRM_OPSTATUS,(int)LRM_OP_CANCELLED)) {
+			LOG_FAILED_TO_ADD_FIELD(F_LRM_OPSTATUS);
+			return HA_FAIL;
+		}
+		op_status = LRM_OP_CANCELLED;
 		remove_op_history(op);
 	}
 
