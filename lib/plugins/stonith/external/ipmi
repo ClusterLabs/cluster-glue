@@ -36,7 +36,7 @@ RESET="power reset"
 POWEROFF="power off"
 POWERON="power on"
 STATUS="power status"
-IPMITOOL=${ipmitool:-"`which ipmitool 2>/dev/null`}
+IPMITOOL=${ipmitool:-"`which ipmitool 2>/dev/null`"}
 
 have_ipmi() {
 	test -x "${IPMITOOL}"
