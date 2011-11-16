@@ -46,6 +46,7 @@ have_ipmi() {
 # username, and password, and invokes ipmitool with any arguments
 # passed in
 run_ipmitool() {
+	local ipmitool_opts privlvl=""
 	have_ipmi || {
 		ha_log.sh err "ipmitool not installed"
 		return 1
@@ -59,6 +60,12 @@ run_ipmitool() {
 		# default to "lan" interface
 		interface="lan"
 	fi
+	if [ -n "${priv}" ]; then
+		# default to "lan" interface
+		privlvl="-L $priv"
+	fi
+
+	ipmitool_opts="-I ${interface} -H ${ipaddr} $privlvl"
 
         case "${passwd_method}" in
             param|'')
@@ -80,10 +87,10 @@ run_ipmitool() {
 
         if [ $passwd_method = env ]
         then
-            IPMI_PASSWORD="${passwd}" ${IPMITOOL} -I ${interface} -H ${ipaddr} -U "${userid}" -E ${action} 2>&1
+            IPMI_PASSWORD="${passwd}" ${IPMITOOL} $ipmitool_opts -U "${userid}" -E ${action}
         else
-            ${IPMITOOL} -I ${interface} -H ${ipaddr} -U "${userid}" $M "${passwd}" ${action} 2>&1
-        fi
+            ${IPMITOOL} $ipmitool_opts -U "${userid}" $M "${passwd}" ${action}
+        fi 2>&1
 }
 
 # Yet another convenience wrapper that invokes run_ipmitool, captures
@@ -234,6 +241,18 @@ IPMI interface
 </shortdesc>
 <longdesc lang="en">
 IPMI interface to use, such as "lan" or "lanplus".
+</longdesc>
+</parameter>
+
+<parameter name="priv" unique="0">
+<content type="string" default=""/>
+<shortdesc lang="en">
+The privilege level of the user.
+</shortdesc>
+<longdesc lang="en">
+The privilege level of the user, for instance OPERATOR. If
+unspecified the privilege level is ADMINISTRATOR. See
+ipmitool(1) -L option for more information.
 </longdesc>
 </parameter>
 
