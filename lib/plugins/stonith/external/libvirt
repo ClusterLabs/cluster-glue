@@ -238,7 +238,7 @@ case $1 in
     ;;
 
     getinfo-devdescr)
-    echo "libvirt-based Linux host reset for Xen/KVM guest domain through hypervisor"
+    echo "libvirt-based host reset for Xen/KVM guest domain through hypervisor"
     exit 0
     ;;
 
