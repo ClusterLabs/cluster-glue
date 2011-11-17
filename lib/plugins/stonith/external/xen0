@@ -191,7 +191,7 @@ getinfo-devname)
     exit 0
     ;;
 getinfo-devdescr)
-    echo "ssh-based Linux host reset for Xen DomU trough Dom0"
+    echo "ssh-based host reset for Xen DomU trough Dom0"
     echo "Fine for testing, but not really suitable for production!"
     exit 0
     ;;

@@ -290,7 +290,7 @@ ssh_get_info(StonithPlugin * s, int reqtype)
 
 
 	case ST_DEVICEDESCR:	/* Description of device type */
-		ret = "SSH-based Linux host reset\n"
+		ret = "SSH-based host reset\n"
 		"Fine for testing, but not suitable for production!";
 		break;
 
