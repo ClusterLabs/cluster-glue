@@ -16,7 +16,7 @@
 
 /* Messages sent to the logging daemon */
 #define	LD_LOGIT	2
-#define MAXENTITY	32
+#define MAXENTITY	64
 
 /* Message contains following header, followed by the text (char[]) itself */
 struct LogDaemonMsgHdr_s {
