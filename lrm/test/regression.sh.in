@@ -177,7 +177,7 @@ rm_ra() {
 
 cp_ra
 start_lrmd || exit $?
-start_stonithd || exit $?
+# start_stonithd || exit $?
 trap "stop_lrmd; stop_stonithd; rm_ra" EXIT
 
 setenvironment() {
