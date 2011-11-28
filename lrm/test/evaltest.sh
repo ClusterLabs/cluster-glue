@@ -71,6 +71,10 @@ specopt_bgrepeat() { # common
 specopt_wait() { # common
 	waitforbgprocs
 }
+specopt_shell() { # run command with shell
+	echo "$rest" | sh -s |  # and execute the command
+		{ [ "$extcheck" ] && $extcheck || cat;}
+}
 specopt() {
 	cmd=`echo $cmd | sed 's/%//'`  # strip leading '%'
 	echo ".`echo $cmd | tr '[a-z]' '[A-Z]'` $rest"  # show what we got

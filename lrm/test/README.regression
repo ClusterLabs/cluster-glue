@@ -143,6 +143,9 @@ with the '%' sign and may be followed by additional parameters.
 %wait
 	wait for the last background test to finish
 
+%shell
+	feed whatever is in the rest of the line to 'sh -s'
+
 Filters and except files
 
 Some output is necessarily very volatile, such as time stamps.
