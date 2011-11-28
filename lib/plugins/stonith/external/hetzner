@@ -27,8 +27,15 @@
 # Read parameters from config file, format is based upon the hetzner OCF resource agent
 # developed by Kumina: http://blog.kumina.nl/2011/02/hetzner-failover-ip-ocf-script/
 conf_file="/etc/hetzner.cfg"
-user=`sed -n 's/^user.*=\ *//p' /etc/hetzner.cfg`
-pass=`sed -n 's/^pass.*=\ *//p' /etc/hetzner.cfg`
+
+case $1 in
+	get*) ;; # don't print errors if conf_file not present
+	*)
+		user=`sed -n 's/^user.*=\ *//p' $conf_file`
+		pass=`sed -n 's/^pass.*=\ *//p' $conf_file`
+	;;
+esac
+
 hetzner_server="https://robot-ws.your-server.de"
 
 check_http_response() {
