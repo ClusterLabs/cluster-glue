@@ -21,6 +21,7 @@ MAINTAINERCLEANFILES = Makefile.in
 testcasesdir		= 	$(datadir)/$(PACKAGE_NAME)/lrmtest/testcases
 testcases_SCRIPTS	=	common.filter ra-list.sh rscmgmt.log_filter xmllint.sh
 testcases_DATA	=	BSC basicset metadata metadata.exp rscexec \
-			rscexec.exp rscmgmt rscmgmt.exp
+			rscexec.exp rscmgmt rscmgmt.exp \
+			stonith stonith.exp
 #			shouldn't need this next line...
 EXTRA_DIST =		$(testcases_SCRIPTS) $(testcases_DATA)

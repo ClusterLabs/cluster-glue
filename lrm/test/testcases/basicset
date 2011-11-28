@@ -1,5 +1,6 @@
 rscmgmt
 metadata
 rscexec
+stonith
 serialize
 flood
