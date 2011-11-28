@@ -45,6 +45,7 @@ exec operation=stop
 exec operation=monitor
 exec operation=meta-data
 del
+%stop
 # stonith
 %setenv dflt_class=stonith dftl_rsc=rscexec_rsc_r1-stonith
 add type=null args="hostlist=node1"

@@ -8,22 +8,22 @@ types class=ocf
 types class=lsb
 %extcheck ra-list.sh
 types class=heartbeat
-%extcheck ra-list.sh
-types class=stonith
+#%extcheck ra-list.sh
+#types class=stonith
 %extcheck xmllint.sh many
 classmeta class=ocf
 %extcheck xmllint.sh many
 classmeta class=lsb
 %extcheck xmllint.sh many
 classmeta class=heartbeat
-%extcheck xmllint.sh many
-classmeta class=stonith
+#%extcheck xmllint.sh many
+#classmeta class=stonith
 %extcheck xmllint.sh
 meta class=ocf type=Dummy
 %extcheck xmllint.sh
 meta class=lsb type=lrmregtest
 %extcheck xmllint.sh
 meta class=heartbeat type=Dummy
-%extcheck xmllint.sh
-meta class=stonith type=ssh
+#%extcheck xmllint.sh
+#meta class=stonith type=ssh
 provider class=ocf type=IPaddr

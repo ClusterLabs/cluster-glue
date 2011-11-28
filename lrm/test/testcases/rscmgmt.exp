@@ -67,13 +67,13 @@ Resource agent provider:heartbeat
 Succeeded in adding this resource.
 .TRY List resources
 
-Resource ID:r1
-Resource agent class:lsb
+Resource ID:r2
+Resource agent class:ocf
 Resource agent type:lrmregtest
 Resource agent provider:heartbeat
 
-Resource ID:r2
-Resource agent class:ocf
+Resource ID:r1
+Resource agent class:lsb
 Resource agent type:lrmregtest
 Resource agent provider:heartbeat
 .TRY Delete resource r1
