@@ -178,7 +178,9 @@ get_plugin_list(const char *pltype)
 		return NULL;
 	}
 	if ((extPI = stonith_get_confignames(ext)) == NULL) {
-		LOG(PIL_INFO, "Cannot get %s plugin subplugins", pltype);
+		/* don't complain if rhcs plugins are not installed */
+		if (strcmp(pltype, "rhcs"))
+			LOG(PIL_INFO, "Cannot get %s plugin subplugins", pltype);
 		stonith_delete(ext);
 		return NULL;
 	}
