@@ -1,3 +1,10 @@
+* Mon Nov 28 2011 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
+- stable release 1.0.9
+- stonith: external/ipmi: add missing double quote
+- stonith: external/ipmi: add the priv parameter (ipmitool -L)
+- LRM: lrmd: set op status to cancelled for running monitor operations
+- ha_log: increase MAXENTITY size to accommodate long stonith strings
+- hb_report: improve destination directory handling (bnc#727295)
 * Tue Oct 18 2011 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
 - stable release 1.0.8
 - cl_log: log spamming control
