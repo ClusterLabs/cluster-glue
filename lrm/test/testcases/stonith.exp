@@ -1,0 +1,2 @@
+.EXTCHECK xmllint.sh many
+.SHELL stonith -L | while read p; do echo $p:heartbeat; stonith -m -t $p; done
