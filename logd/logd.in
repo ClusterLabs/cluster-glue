@@ -28,7 +28,7 @@
 # Required-Start: $network $syslog $remote_fs
 # Required-Stop: $network $syslog $remote_fs
 # X-Start-Before: heartbeat openais corosync
-# Default-Start: 2 3 4 5
+# Default-Start: 2 3 5
 # Default-Stop: 0 1 6
 ### END INIT INFO
 
