@@ -169,7 +169,7 @@ execra( const char * rsc_id, const char * rsc_type, const char * provider,
 	/* It'd be better if it returned GError, so we can distinguish
 	 * between failure modes (can't contact upstart, no such job,
 	 * or failure to do action. */
-	if (upstart_job_do(rsc_type, cmd)) {
+	if (upstart_job_do(rsc_type, cmd, timeout)) {
 		exit(EXECRA_OK);
 	} else {
 		exit(EXECRA_NO_RA);

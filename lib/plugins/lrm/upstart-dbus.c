@@ -319,7 +319,7 @@ upstart_job_is_running(const gchar *name)
 }
 
 gboolean
-upstart_job_do(const gchar *name, UpstartJobCommand cmd)
+upstart_job_do(const gchar *name, UpstartJobCommand cmd, const int timeout)
 {
 	DBusGConnection *conn;
 	DBusGProxy *manager;
@@ -342,7 +342,8 @@ upstart_job_do(const gchar *name, UpstartJobCommand cmd)
 		switch (cmd) {
 		case UPSTART_JOB_START:
 			cmd_name = "Start";
-			dbus_g_proxy_call (job, cmd_name, &error,
+			dbus_g_proxy_call_with_timeout (job, cmd_name,
+				timeout, &error,
 				G_TYPE_STRV, no_args,
 				G_TYPE_BOOLEAN, TRUE,
 				G_TYPE_INVALID,
@@ -352,7 +353,8 @@ upstart_job_do(const gchar *name, UpstartJobCommand cmd)
 			break;
 		case UPSTART_JOB_STOP:
 			cmd_name = "Stop";
-			dbus_g_proxy_call(job, cmd_name, &error,
+			dbus_g_proxy_call_with_timeout(job, cmd_name,
+				timeout, &error,
 				G_TYPE_STRV, no_args,
 				G_TYPE_BOOLEAN, TRUE,
 				G_TYPE_INVALID,
@@ -360,7 +362,8 @@ upstart_job_do(const gchar *name, UpstartJobCommand cmd)
 			break;
 		case UPSTART_JOB_RESTART:
 			cmd_name = "Restart";
-			dbus_g_proxy_call (job, cmd_name, &error,
+			dbus_g_proxy_call_with_timeout (job, cmd_name,
+				timeout, &error,
 				G_TYPE_STRV, no_args,
 				G_TYPE_BOOLEAN, TRUE,
 				G_TYPE_INVALID,
