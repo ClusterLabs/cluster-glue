@@ -128,6 +128,14 @@
  *
  */
 
+/*
+ * Recognized privilege levels
+ */
+
+#define PRIV_ADMIN 8 /* ADMIN_UIDS are administrators */
+#define ADMIN_UIDS "0,"HA_CCMUSER
+#define ADMIN_GIDS "0,"HA_APIGROUP /* unused */
+
 typedef struct
 {
 	char*		app_name;
@@ -144,6 +152,7 @@ typedef struct
 	time_t		lastreqstart;
 	time_t		lastreqend;
 	time_t		lastrcsent;
+	int		priv_lvl; /* client privilege level (depends on uid/gid) */
 }lrmd_client_t;
 
 typedef struct lrmd_rsc lrmd_rsc_t;
