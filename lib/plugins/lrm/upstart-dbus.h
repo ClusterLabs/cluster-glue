@@ -29,7 +29,7 @@ typedef enum {
 } UpstartJobCommand;
 
 G_GNUC_INTERNAL gchar **upstart_get_all_jobs(void);
-G_GNUC_INTERNAL gboolean upstart_job_do(const gchar *name, UpstartJobCommand cmd);
+G_GNUC_INTERNAL gboolean upstart_job_do(const gchar *name, UpstartJobCommand cmd, const int timeout);
 G_GNUC_INTERNAL gboolean upstart_job_is_running (const gchar *name);
 
 #endif /* _UPSTART_DBUS_H_ */
