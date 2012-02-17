@@ -76,6 +76,7 @@ struct msg_map
 	const char 	*msg_type;
 	int	reply_time;
 	msg_handler	handler;
+	int min_priv; /* minimum privileges required */
 };
 
 /*
@@ -89,23 +90,23 @@ struct msg_map
 	(p->reply_time==REPLY_NOW)
 
 struct msg_map msg_maps[] = {
-	{REGISTER,	REPLY_NOW,	on_msg_register},
-	{GETRSCCLASSES,	NO_MSG,	on_msg_get_rsc_classes},
-	{GETRSCTYPES,	NO_MSG,	on_msg_get_rsc_types},
-	{GETPROVIDERS,	NO_MSG,	on_msg_get_rsc_providers},
-	{ADDRSC,	REPLY_NOW,	on_msg_add_rsc},
-	{GETRSC,	NO_MSG,	on_msg_get_rsc},
-	{GETLASTOP,	NO_MSG,	on_msg_get_last_op},
-	{GETALLRCSES,	NO_MSG,	on_msg_get_all},
-	{DELRSC,	REPLY_NOW,	on_msg_del_rsc},
-	{FAILRSC,	REPLY_NOW,	on_msg_fail_rsc},
-	{PERFORMOP,	REPLY_NOW,	on_msg_perform_op},
-	{FLUSHOPS,	REPLY_NOW,	on_msg_flush_all},
-	{CANCELOP,	REPLY_NOW,	on_msg_cancel_op},
-	{GETRSCSTATE,	NO_MSG,	on_msg_get_state},
-	{GETRSCMETA,	NO_MSG, 	on_msg_get_metadata},
-	{SETLRMDPARAM,	REPLY_NOW, 	on_msg_set_lrmd_param},
-	{GETLRMDPARAM,	NO_MSG, 	on_msg_get_lrmd_param},
+	{REGISTER,	REPLY_NOW,	on_msg_register, 0},
+	{GETRSCCLASSES,	NO_MSG,	on_msg_get_rsc_classes, 0},
+	{GETRSCTYPES,	NO_MSG,	on_msg_get_rsc_types, 0},
+	{GETPROVIDERS,	NO_MSG,	on_msg_get_rsc_providers, 0},
+	{ADDRSC,	REPLY_NOW,	on_msg_add_rsc, PRIV_ADMIN},
+	{GETRSC,	NO_MSG,	on_msg_get_rsc, PRIV_ADMIN},
+	{GETLASTOP,	NO_MSG,	on_msg_get_last_op, PRIV_ADMIN},
+	{GETALLRCSES,	NO_MSG,	on_msg_get_all, PRIV_ADMIN},
+	{DELRSC,	REPLY_NOW,	on_msg_del_rsc, PRIV_ADMIN},
+	{FAILRSC,	REPLY_NOW,	on_msg_fail_rsc, PRIV_ADMIN},
+	{PERFORMOP,	REPLY_NOW,	on_msg_perform_op, PRIV_ADMIN},
+	{FLUSHOPS,	REPLY_NOW,	on_msg_flush_all, PRIV_ADMIN},
+	{CANCELOP,	REPLY_NOW,	on_msg_cancel_op, PRIV_ADMIN},
+	{GETRSCSTATE,	NO_MSG,	on_msg_get_state, PRIV_ADMIN},
+	{GETRSCMETA,	NO_MSG, 	on_msg_get_metadata, 0},
+	{SETLRMDPARAM,	REPLY_NOW, 	on_msg_set_lrmd_param, PRIV_ADMIN},
+	{GETLRMDPARAM,	NO_MSG, 	on_msg_get_lrmd_param, 0},
 };
 #define MSG_NR sizeof(msg_maps)/sizeof(struct msg_map)
 
@@ -123,6 +124,7 @@ static gboolean reg_to_apphbd		= FALSE;
 static int max_child_count		= 4;
 static int retry_interval		= 1000; /* Millisecond */
 static int child_count			= 0;
+static IPC_Auth	* auth = NULL;
 
 static struct {
 	int	opcount;
@@ -1084,13 +1086,9 @@ init_start ()
 	DIR* dir = NULL;
 	PILPluginUniv * PluginLoadingSystem = NULL;
 	struct dirent* subdir;
-	struct passwd*	pw_entry;
 	char* dot = NULL;
 	char* ra_name = NULL;
         int len;
-	IPC_Auth	* auth = NULL;
-	int		one = 1;
-	GHashTable*	uidlist;
 	IPC_WaitConnection* conn_cmd = NULL;
 	IPC_WaitConnection* conn_cbk = NULL;
 
@@ -1163,25 +1161,6 @@ init_start ()
 	 *the other is for create the callback channel
 	 */
 
-	uidlist = g_hash_table_new(g_direct_hash, g_direct_equal);
-	/* Add root's uid */
-	g_hash_table_insert(uidlist, GUINT_TO_POINTER(0), &one); 
-
-	pw_entry = getpwnam(HA_CCMUSER);
-	if (pw_entry == NULL) {
-		lrmd_log(LOG_ERR, "Cannot get the uid of HACCMUSER");
-	} else {
-		g_hash_table_insert(uidlist, GUINT_TO_POINTER(pw_entry->pw_uid)
-				    , &one); 
-	}
-
-	if ( NULL == (auth = MALLOCT(struct IPC_AUTH)) ) {
-		lrmd_log(LOG_ERR, "init_start: MALLOCT (IPC_AUTH) failed.");
-	} else {
-		auth->uid = uidlist;
-		auth->gid = NULL;
-	}
-
 	/*Create a waiting connection to accept command connect from client*/
 	conn_cmd_attrs = g_hash_table_new(g_str_hash, g_str_equal);
 	g_hash_table_insert(conn_cmd_attrs, path, cmd_path);
@@ -1196,8 +1175,11 @@ init_start ()
 	}
 
 	/*Create a source to handle new connect rquests for command*/
-	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cmd, auth, FALSE,
+	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cmd, NULL, FALSE,
 				   on_connect_cmd, conn_cmd, NULL);
+
+	/* auth is static, but used when clients register */
+	auth = ipc_str_to_auth(ADMIN_UIDS, strlen(ADMIN_UIDS), "", 0);
 
 	/*
 	 * Create a waiting connection to accept the callback connect from client
@@ -1215,7 +1197,7 @@ init_start ()
 	}
 
 	/*Create a source to handle new connect rquests for callback*/
-	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cbk, auth, FALSE,
+	G_main_add_IPC_WaitConnection( G_PRIORITY_HIGH, conn_cbk, NULL, FALSE,
 	                               on_connect_cbk, conn_cbk, NULL);
 
 	/* our child signal handling involves calls with
@@ -1294,10 +1276,7 @@ init_start ()
 	conn_cbk->ops->destroy(conn_cbk);
 	conn_cbk = NULL;
 
-	g_hash_table_destroy(uidlist);
-	if ( NULL != auth ) {
-		free(auth);
-	}
+	ipc_destroy_auth(auth);
 	if (cl_unlock_pidfile(PID_FILE) == 0) {
 		lrmd_debug(LOG_DEBUG, "[%s] stopped", lrm_system_name);
 	}
@@ -1419,6 +1398,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	lrmd_client_t* client = NULL;
 	struct ha_msg* msg = NULL;
 	char *msg_s;
+	int ret;
 
 	client = (lrmd_client_t*)user_data;
 
@@ -1437,7 +1417,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 
 
 	/*get the message */
-	msg = msgfromIPC_noauth(ch);
+	msg = msgfromIPC(ch, 0);
 	if (NULL == msg) {
 		lrmd_log(LOG_ERR, "on_receive_cmd: can not receive messages.");
 		return TRUE;
@@ -1455,6 +1435,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	in_type.msg_type = ha_msg_value(msg, F_LRM_TYPE);
 	if( !in_type.msg_type ) {
 		LOG_FAILED_TO_GET_FIELD(F_LRM_TYPE);
+		ha_msg_del(msg);
 		return TRUE;
 	}
 	msg_s = msg2string(msg);
@@ -1469,8 +1450,19 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 
 		lrmd_log(LOG_ERR, "on_receive_cmd: received an unknown msg");
 	} else {
-		int ret;
+		if( !client->app_name && msgmap_p->handler != on_msg_register ) {
+			ha_msg_del(msg);
+			lrmd_log(LOG_ERR, "%s: the client needs to register first", __FUNCTION__);
+			return FALSE;
+		}
 
+		if( client->priv_lvl < msgmap_p->min_priv ) {
+			ha_msg_del(msg);
+			lrmd_log(LOG_ERR, "%s: insufficient privileges for %s (pid %d)"
+			, __FUNCTION__
+			, client->app_name, client->pid);
+			return FALSE;
+		}
 		strncpy(client->lastrequest, in_type.msg_type, sizeof(client->lastrequest));
 		client->lastrequest[sizeof(client->lastrequest)-1]='\0';
 		client->lastreqstart = time(NULL);
@@ -1488,7 +1480,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	/*delete the msg*/
 	ha_msg_del(msg);
 
-	return TRUE;
+	return ret;
 }
 static void
 remove_repeat_op_from_client(gpointer key, gpointer value, gpointer user_data)
@@ -1623,6 +1615,14 @@ on_msg_register(lrmd_client_t* client, struct ha_msg* msg)
 			"internal client list, let remove it at first."
 		, 	client->pid);
 	}
+
+	/* everybody can connect, but only certain UIDs can perform
+	 * administrative actions
+	 */
+	if( client->ch_cmd->ops->verify_auth(client->ch_cmd, auth) == IPC_OK )
+		client->priv_lvl = PRIV_ADMIN;
+	else
+		client->priv_lvl = 0;
 
 	g_hash_table_insert(clients, (gpointer)&client->pid, client);
 	lrmd_debug(LOG_DEBUG, "on_msg_register:client %s [%d] registered"
