@@ -1099,6 +1099,10 @@ init_start ()
 	char cmd_path[] = LRM_CMDPATH;
 	char cbk_path[] = LRM_CALLBACKPATH;
 
+	if( getenv("LRMD_MAX_CHILDREN") ) {
+		set_lrmd_param("max-children", getenv("LRMD_MAX_CHILDREN"));
+	}
+
 	PILGenericIfMgmtRqst RegisterRqsts[]= {
 		{"RAExec", &RAExecFuncs, NULL, NULL, NULL},
 		{ NULL, NULL, NULL, NULL, NULL} };
