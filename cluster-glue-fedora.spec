@@ -53,10 +53,10 @@ BuildRequires:    net-snmp-devel >= 5.4
 BuildRequires:    gcc-c++
 %endif
 
-%if 0%{?fedora} < 12
-BuildRequires: e2fsprogs-devel
-%else
+%if 0%{?fedora} > 11 || 0%{?centos} > 5 || 0%{?rhel} > 5
 BuildRequires: libuuid-devel
+%else
+BuildRequires: e2fsprogs-devel
 %endif
 
 %prep
