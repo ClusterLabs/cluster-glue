@@ -239,18 +239,9 @@ elsif ($command ~~ @netCommands) {
 			}
 		}
 		elsif ($command eq "gethosts") {
-			# Create a regular expression to make vCenter find all the virtual machine matching
-			# mirtual machine names specified in HOSTLIST
-			# NOTE: this implementation make "gethosts" check that entries in HOSTLIST are consistent with VMware vCenter VM directory
-			my $regex = join "|", map { qr/\Q$_\E/i } values %host_to_vm;
-			eval {
-				my $vms = Vim::find_entity_views(view_type => "VirtualMachine", filter => { name => qr/^($regex)$/ });
-				foreach my $vm (@$vms) { print "$vm_to_host{(lc $vm->name)}\n" if exists $vm_to_host{(lc $vm->name)}; }
-			};
-			if ($@) {
-				if (ref($@) eq "SoapFault") { dielog("$@->detail\n"); }
-				dielog($@);
-			}
+                        foreach my $key (keys(%host_to_vm)) {
+                                print "$host_to_vm{$key} \n";
+                        }
 		}
 		else { dielog("Invalid command specified: $command\n"); }
 	}
