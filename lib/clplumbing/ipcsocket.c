@@ -1356,7 +1356,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 		if (pool == NULL){			
 			cl_log(LOG_ERR, "socket_resume_io_read: "
 			       "memory allocation for ipc pool failed");
-			exit(1);
+			return IPC_FAIL;
 		}
 	}
 	
@@ -1368,7 +1368,7 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 		if (newpool == NULL){			
 			cl_log(LOG_ERR, "socket_resume_io_read: "
 			       "memory allocation for a new ipc pool failed");
-			exit(1);
+			return IPC_FAIL;
 		}
 		
 		ipc_bufpool_partial_copy(newpool, pool);
