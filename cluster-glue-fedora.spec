@@ -129,10 +129,12 @@ standards, and an interface to common STONITH devices.
 %dir %{_libdir}/heartbeat/plugins
 %dir %{_libdir}/heartbeat/plugins/RAExec
 %dir %{_libdir}/heartbeat/plugins/InterfaceMgr
+%dir %{_libdir}/heartbeat/plugins/HBcompress
 %{_libdir}/heartbeat/lrmd
 %{_libdir}/heartbeat/ha_logd
 %{_libdir}/heartbeat/plugins/RAExec/*.so
 %{_libdir}/heartbeat/plugins/InterfaceMgr/*.so
+%{_libdir}/heartbeat/plugins/HBcompress/*.so
 %dir %{_libdir}/stonith
 %dir %{_libdir}/stonith/plugins
 %dir %{_libdir}/stonith/plugins/stonith2
