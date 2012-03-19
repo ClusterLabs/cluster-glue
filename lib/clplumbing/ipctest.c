@@ -438,6 +438,10 @@ main(int argc, char ** argv)
 				fprintf(stderr, "data size must be >=0\n");
 				argerrs++;
 			}
+			if (data_size > MAXMSG) {
+				fprintf(stderr, "maximum data size is %d\n", MAXMSG);
+				argerrs++;
+			}
 			break;
 		default:
 			argerrs++;
