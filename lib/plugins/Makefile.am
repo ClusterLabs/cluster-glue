@@ -17,4 +17,4 @@
 #
 
 MAINTAINERCLEANFILES    = Makefile.in
-SUBDIRS	= InterfaceMgr stonith lrm  
+SUBDIRS	= InterfaceMgr stonith lrm HBcompress

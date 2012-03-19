@@ -1090,15 +1090,27 @@ AM_CONDITIONAL(USE_OPENHPI, test "$ac_cv_header_openhpi_SaHpi_h" = yes && pkg-co
 AM_CONDITIONAL(IPMILAN_BUILD, test "X$enable_ipmilan" = "Xyes")
 
 dnl ========================================================================
-dnl    BZ2
+dnl    ZLIB and BZ2
 dnl ========================================================================
 
-AC_CHECK_HEADERS(bzlib.h)
-AC_CHECK_LIB(bz2, BZ2_bzBuffToBuffCompress)
-
-if test x$ac_cv_lib_bz2_BZ2_bzBuffToBuffCompress != xyes ; then
-   AC_MSG_ERROR(BZ2 libraries not found)
+dnl check if header file and lib are there for zlib
+zlib_installed="yes"
+AC_CHECK_HEADERS(zlib.h, , [zlib_installed="no"],)
+AC_CHECK_LIB(z, compress , , [zlib_installed="no"])
+AM_CONDITIONAL(BUILD_ZLIB_COMPRESS_MODULE, test "x${zlib_installed}" = "xyes")
+if test "x${zlib_installed}" = "xno"; then
+	FatalMissingThing "zlib" \
+	  "The zlib library is missing"
 fi
+
+bz2_installed="yes"
+AC_CHECK_HEADERS(bzlib.h, , [bz2_installed="no"],)
+AC_CHECK_LIB(bz2, BZ2_bzBuffToBuffCompress , , [bz2_installed="no"])
+AM_CONDITIONAL(BUILD_BZ2_COMPRESS_MODULE, test "x${bz2_installed}" = "xyes")
+
+#if test x$ac_cv_lib_bz2_BZ2_bzBuffToBuffCompress != xyes ; then
+#   AC_MSG_ERROR(BZ2 libraries not found)
+#fi
 
 if test x$ac_cv_header_bzlib_h != xyes; then
    AC_MSG_ERROR(BZ2 Development headers not found)
@@ -1324,6 +1336,7 @@ lib/Makefile							\
    lib/lrm/Makefile						\
    lib/plugins/Makefile						\
       lib/plugins/InterfaceMgr/Makefile				\
+      lib/plugins/HBcompress/Makefile					\
       lib/plugins/lrm/Makefile					\
          lib/plugins/lrm/dbus/Makefile				\
       lib/plugins/stonith/Makefile				\
