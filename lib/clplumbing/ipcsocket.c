@@ -970,7 +970,13 @@ socket_send(struct IPC_CHANNEL * ch, struct IPC_MESSAGE* msg)
 	int diff;
 	struct IPC_MESSAGE* newmsg;
 
-	if (msg->msg_len < 0 || msg->msg_len > MAXMSG) {
+	if (msg->msg_len > MAXMSG) {
+		cl_log(LOG_ERR, "%s: sorry, cannot send messages "
+			"bigger than %d (requested %d)",
+			__FUNCTION__, MAXMSG, msg->msg_len);
+		return IPC_FAIL;
+	}
+	if (msg->msg_len < 0) {
 		cl_log(LOG_ERR, "socket_send: "
 		       "invalid message");
 		return IPC_FAIL;
