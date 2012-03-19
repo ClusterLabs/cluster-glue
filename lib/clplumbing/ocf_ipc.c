@@ -281,6 +281,9 @@ ipc_bufpool_dump_stats(void)
 	       num_pool_allocated - num_pool_freed);
 }
 
+#define POOLHDR_SIZE \
+	(sizeof(struct ipc_bufpool) + 2*sizeof(struct SOCKET_MSG_HEAD))
+
 struct ipc_bufpool*
 ipc_bufpool_new(int size)
 {
@@ -294,16 +297,15 @@ ipc_bufpool_new(int size)
 	 * from happening when a client sends big messages
 	 * constantly*/
 
-	totalsize = size + sizeof(struct ipc_bufpool)
-		+ sizeof(struct SOCKET_MSG_HEAD) * 2 ;
+	totalsize = size + POOLHDR_SIZE;
 
 	if (totalsize < POOL_SIZE) {
 		totalsize = POOL_SIZE;
 	}
 
-	if (totalsize > MAXMSG) {
+	if (totalsize > MAXMSG + POOLHDR_SIZE) {
 		cl_log(LOG_INFO, "ipc_bufpool_new: "
-		       "asking for buffer with size %d"
+		       "asking for buffer with size %d; "
 		       "corrupted data len???", totalsize);
 		return NULL;
 	}
