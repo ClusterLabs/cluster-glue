@@ -72,6 +72,8 @@
 #define COMPRESSED_FIELD "_compressed_payload"
 #define COMPRESS_NAME "_compression_algorithm"
 #define HACOMPRESSNAME "HA_COMPRESSION"
+#define DFLT_COMPRESS_PLUGIN "bz2"
+
 static struct hb_compress_fns* msg_compress_fns = NULL;
 static char*  compress_name = NULL;
 GHashTable*		CompressFuncs = NULL;
@@ -168,6 +170,15 @@ cl_set_compress_fns(const char* pluginname)
 struct hb_compress_fns*
 cl_get_compress_fns(void)
 {
+	static int try_dflt = 1;
+
+	if (try_dflt && !msg_compress_fns) {
+		try_dflt = 0;
+		cl_log(LOG_INFO, "%s: user didn't set compression type, "
+		       "loading %s plugin",
+		       __FUNCTION__, DFLT_COMPRESS_PLUGIN);
+		cl_compress_load_plugin(DFLT_COMPRESS_PLUGIN);
+	}
 	return msg_compress_fns;
 }
 
@@ -185,8 +196,6 @@ get_compress_fns(const char* pluginname)
 	
 	funcs = g_hash_table_lookup(CompressFuncs, pluginname);      
 	return funcs;	
-
-	
 }
 
 void cl_realtime_malloc_check(void);
