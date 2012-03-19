@@ -394,7 +394,7 @@ transport_tests(int iterations, int clients)
 	return rc;
 }
 
-static int data_size = 10;
+static int data_size = 20;
 
 int
 main(int argc, char ** argv)
@@ -450,7 +450,7 @@ main(int argc, char ** argv)
 			"\t-v : verbose\n"
 			"\t-i : iterations (default %d)\n"
 			"\t-c : number of clients (default %d; nonzero invokes client/server)\n"
-			"\t-s : data size (default 10 bytes)\n",
+			"\t-s : data size (default 20 bytes)\n",
 		  procname, iter_def, clients_def);
 		exit(1);
 	}
@@ -560,7 +560,10 @@ echoserver(IPC_Channel* wchan, int repcount)
 	IPC_Message	wmsg;
 	IPC_Message*	rmsg = NULL;
 	
-	str = malloc(data_size);
+	if (!(str = malloc(data_size))) {
+		cl_log(LOG_ERR, "Out of memory");
+		exit(1);
+	}
 	
 	memset(&wmsg, 0, sizeof(wmsg));
 	wmsg.msg_private = NULL;
@@ -1205,7 +1208,10 @@ checkmsg(IPC_Message* rmsg, const char * who, int rcount)
 	char		*str;
 	size_t		len;
 	
-	str = malloc(data_size);
+	if (!(str = malloc(data_size))) {
+		cl_log(LOG_ERR, "Out of memory");
+		exit(1);
+	}
 
 	echomsgbody(str, data_size, rcount, &len);
 
