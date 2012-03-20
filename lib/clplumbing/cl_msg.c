@@ -2308,8 +2308,6 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 		
 		strcat(bp,"\n");
 		bp++;
-
-
 	}
 	if (needhead){
 		CHECKROOM_CONST(MSG_END);
@@ -2338,14 +2336,7 @@ msg2string(const struct ha_msg *m)
 	
 	len = get_stringlen(m);
 	
-	if (len >= MAXMSG){
-		cl_log(LOG_ERR, "msg2string: msg is too large"
-		       "len =%d,MAX msg allowed=%d", len, MAXMSG);
-		return NULL;
-	}
-	
 	buf = malloc(len);
-
 
 	if (buf == NULL) {
 		cl_log(LOG_ERR, "msg2string: no memory for string");
@@ -2400,8 +2391,7 @@ msg2wirefmt_ll(struct ha_msg*m, size_t* len, int flag)
  	    && cl_get_compress_fns() != NULL){ 
  		return cl_compressmsg(m, len);		 
  	} 
-	
-	
+
 	if (flag & MSG_NEEDCOMPRESS){
 		for (i=0 ;i < m->nfields; i++){
 			int type = m->types[i];
@@ -2410,48 +2400,42 @@ msg2wirefmt_ll(struct ha_msg*m, size_t* len, int flag)
 			}
 		}
 	}
-	
-	
+
 	if (msgfmt == MSGFMT_NETSTRING || must_use_netstring(m)){
 		wirefmtlen = get_netstringlen(m);		
 		if (!(flag&MSG_NOSIZECHECK) && wirefmtlen >= MAXMSG){
-			cl_log(LOG_ERR, "%s: msg too big(%d)"
-			       "for netstring fmt",
-			       __FUNCTION__, wirefmtlen);
-			return NULL;
+			if (cl_get_compress_fns() != NULL)
+				return cl_compressmsg(m, len);
 		}
 		if (flag& MSG_NEEDAUTH){
 			return msg2netstring(m, len);
 		}else{
 			ret =  msg2netstring_noauth(m, len);
 			return ret;
-
 		}
-		
 		
 	}else{
 		char	*tmp;
 		
 		wirefmtlen =  get_stringlen(m);
-		if (wirefmtlen >= MAXMSG){
+		if (!(flag&MSG_NOSIZECHECK) && wirefmtlen >= MAXMSG){
+			if ((flag&MSG_NEEDCOMPRESS)) {
+				if (cl_get_compress_fns() != NULL)
+					return cl_compressmsg(m, len);
+			}
 			cl_log(LOG_ERR, "%s: msg too big(%d)"
 			       " for string fmt",
 			       __FUNCTION__, wirefmtlen);
 			return NULL;
 		}
-		
 		tmp = msg2string(m);
-		
 		if(tmp == NULL){
 			*len = 0;
 			return NULL;
 		}
-		
 		*len = strlen(tmp) + 1;
 		return(tmp);
 	}
-	
-
 }
 
 
