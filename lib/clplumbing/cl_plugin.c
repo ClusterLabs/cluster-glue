@@ -45,7 +45,7 @@ static PILPluginUniv*		plugin_univ = NULL;
 
 static PILGenericIfMgmtRqst	reqs[] =
 	{
-		{"HBcompress", &funcstable[0], NULL, NULL, NULL},
+		{"compress", &funcstable[0], NULL, NULL, NULL},
 		{"HBcoms", &funcstable[1], NULL, NULL, NULL},
 		{"HBauth", &funcstable[2], NULL, NULL, NULL},
 		{"RAExec", &funcstable[3], NULL, NULL, NULL},

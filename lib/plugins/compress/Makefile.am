@@ -39,7 +39,7 @@ AM_CFLAGS		= @CFLAGS@
 ## libraries
 
 halibdir		= $(libdir)/@HB_PKG@
-plugindir		= $(halibdir)/plugins/HBcompress
+plugindir		= $(halibdir)/plugins/compress
 plugin_LTLIBRARIES	= $(zlibmodule) $(bz2module)
 
 zlib_la_SOURCES		= zlib.c

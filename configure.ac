@@ -1336,7 +1336,7 @@ lib/Makefile							\
    lib/lrm/Makefile						\
    lib/plugins/Makefile						\
       lib/plugins/InterfaceMgr/Makefile				\
-      lib/plugins/HBcompress/Makefile					\
+      lib/plugins/compress/Makefile					\
       lib/plugins/lrm/Makefile					\
          lib/plugins/lrm/dbus/Makefile				\
       lib/plugins/stonith/Makefile				\
