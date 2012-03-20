@@ -52,7 +52,7 @@
 #define		UUID_SLEN	64
 #define		MAXCHILDMSGLEN  512
 
-static int	compression_threshold = (2*1024);
+static int	compression_threshold = (128*1024);
 
 static enum cl_msgfmt msgfmt = MSGFMT_NVPAIR;
 static	gboolean use_traditional_compression = FALSE;
