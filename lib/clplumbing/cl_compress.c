@@ -47,7 +47,7 @@
  * it is using the new compression. For back compatibility, the default is legacy mode.
  *
  * The real compression work is done by compression plugins. There are two plugins right
- * now: zlib and bz2, they are in lib/plugins/HBcompress
+ * now: zlib and bz2, they are in lib/plugins/compress
  *
  */
 
@@ -80,7 +80,7 @@ GHashTable*		CompressFuncs = NULL;
 
 static PILGenericIfMgmtRqst	Reqs[] =
 	{
-		{"HBcompress", &CompressFuncs, NULL, NULL, NULL},
+		{"compress", &CompressFuncs, NULL, NULL, NULL},
 		{NULL, NULL, NULL, NULL, NULL}
 	};
 

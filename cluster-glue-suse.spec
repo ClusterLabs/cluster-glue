@@ -191,7 +191,7 @@ fi
 %dir %{_libdir}/heartbeat/plugins
 %dir %{_libdir}/heartbeat/plugins/RAExec
 %dir %{_libdir}/heartbeat/plugins/InterfaceMgr
-%dir %{_libdir}/heartbeat/plugins/HBcompress
+%dir %{_libdir}/heartbeat/plugins/compress
 
 %dir %{_libdir}/stonith
 %dir %{_libdir}/stonith/plugins
@@ -229,7 +229,7 @@ fi
 
 %{_libdir}/heartbeat/plugins/RAExec/*.so
 %{_libdir}/heartbeat/plugins/InterfaceMgr/*.so
-%{_libdir}/heartbeat/plugins/HBcompress/*.so
+%{_libdir}/heartbeat/plugins/compress/*.so
 
 %{_libdir}/stonith/plugins/external
 %{_libdir}/stonith/plugins/stonith2/*.so
