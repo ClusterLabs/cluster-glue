@@ -2369,6 +2369,7 @@ must_use_netstring(const struct ha_msg* msg)
 
 }
 
+#define use_netstring(m) (msgfmt == MSGFMT_NETSTRING || must_use_netstring(m))
 
 static char*
 msg2wirefmt_ll(struct ha_msg*m, size_t* len, int flag)
@@ -2376,15 +2377,9 @@ msg2wirefmt_ll(struct ha_msg*m, size_t* len, int flag)
 	
 	int	wirefmtlen;
 	int	i;
-	char*	ret;
-	
+	int	netstg = use_netstring(m);
 
-	if (msgfmt == MSGFMT_NETSTRING){
-		wirefmtlen = get_netstringlen(m);		
-	}else{
-		wirefmtlen =  get_stringlen(m);	
-	}
-	
+	wirefmtlen = netstg ? get_netstringlen(m) : get_stringlen(m);
 	if (use_traditional_compression
 	    &&(flag & MSG_NEEDCOMPRESS) 
  	    && (wirefmtlen> compression_threshold) 
@@ -2401,62 +2396,44 @@ msg2wirefmt_ll(struct ha_msg*m, size_t* len, int flag)
 		}
 	}
 
-	if (msgfmt == MSGFMT_NETSTRING || must_use_netstring(m)){
-		wirefmtlen = get_netstringlen(m);		
-		if (!(flag&MSG_NOSIZECHECK) && wirefmtlen >= MAXMSG){
+	wirefmtlen = netstg ? get_netstringlen(m) : get_stringlen(m);
+	if (wirefmtlen >= MAXMSG){
+		if (flag&MSG_NEEDCOMPRESS) {
 			if (cl_get_compress_fns() != NULL)
 				return cl_compressmsg(m, len);
 		}
-		if (flag& MSG_NEEDAUTH){
-			return msg2netstring(m, len);
-		}else{
-			ret =  msg2netstring_noauth(m, len);
-			return ret;
-		}
-		
-	}else{
-		char	*tmp;
-		
-		wirefmtlen =  get_stringlen(m);
-		if (!(flag&MSG_NOSIZECHECK) && wirefmtlen >= MAXMSG){
-			if ((flag&MSG_NEEDCOMPRESS)) {
-				if (cl_get_compress_fns() != NULL)
-					return cl_compressmsg(m, len);
-			}
-			cl_log(LOG_ERR, "%s: msg too big(%d)"
-			       " for string fmt",
-			       __FUNCTION__, wirefmtlen);
-			return NULL;
-		}
-		tmp = msg2string(m);
-		if(tmp == NULL){
-			*len = 0;
-			return NULL;
-		}
-		*len = strlen(tmp) + 1;
-		return(tmp);
+		cl_log(LOG_ERR, "%s: msg too big(%d)",
+			   __FUNCTION__, wirefmtlen);
+		return NULL;
 	}
+	if (flag & MSG_NEEDAUTH) {
+		return msg2netstring(m, len);
+	}
+	return msg2wirefmt_noac(m, len);
 }
-
 
 char*
 msg2wirefmt(struct ha_msg*m, size_t* len){
 	return msg2wirefmt_ll(m, len, MSG_NEEDAUTH|MSG_NEEDCOMPRESS);
 }
 
-
 char*
-msg2wirefmt_noac(struct ha_msg*m, size_t* len){
-	
-	/* in this execution path the size check is not necessary;
-	 * still, the msg2wirefmt_ll is invoked more than once for
-	 * the same message (or parts of it) which is somewhat
-	 * strange, though perhaps it helps reduce the code
-	 * complexity
-	 */
-	return msg2wirefmt_ll(m, len, MSG_NOSIZECHECK);
-}
+msg2wirefmt_noac(struct ha_msg*m, size_t* len)
+{
+	if (use_netstring(m)) {
+		return msg2netstring_noauth(m, len);
+	} else {
+		char	*tmp;
 
+		tmp = msg2string(m);
+		if(tmp == NULL){
+			*len = 0;
+			return NULL;
+		}
+		*len = strlen(tmp) + 1;
+		return tmp;
+	}
+}
 
 static struct ha_msg*
 wirefmt2msg_ll(const char* s, size_t length, int need_auth)
