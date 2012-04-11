@@ -152,20 +152,13 @@ stop_lrmd() {
 	$HA_BIN/lrmd -k
 }
 cp_ra() {
-	if [ ! -e $OCF_RA ]; then
-		cp -p lrmregtest $OCF_RA
-		lrmregtest_ocf=1
-	fi
+	cp -p lrmregtest $OCF_RA
 	chmod +x $OCF_RA
-	if [ ! -e $LSB_RA ]; then
-		cp -p lrmregtest-lsb $LSB_RA
-		lrmregtest_lsb=1
-	fi
+	cp -p lrmregtest-lsb $LSB_RA
 	chmod +x $LSB_RA
 }
 rm_ra() {
-	[ "$lrmregtest_ocf" ] && rm -f $OCF_RA
-	[ "$lrmregtest_lsb" ] && rm -f $LSB_RA
+	rm -f $OCF_RA $LSB_RA
 }
 
 cp_ra
