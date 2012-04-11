@@ -7,7 +7,7 @@ function chkoutput(ra) {
 	if( close(XMLLINT) ) # we need gawk for this
 		print "xmllint reported error in RA:",ra;
 }
-many=="many" && /^[a-zA-Z][^:]*:[a-z]+$/ {
+many=="many" && /^[a-zA-Z][^:]*:[a-zA-Z0-9]+$/ {
 	chkoutput(ra);
 	ra=$0;
 	next;
