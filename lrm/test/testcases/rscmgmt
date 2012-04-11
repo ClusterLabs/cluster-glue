@@ -10,18 +10,13 @@ list
 add rsc=r1
 list
 del rsc=r1
-%setenv dflt_class=heartbeat dflt_type=lrmregtest
-list
-add rsc=r1
-list
-del rsc=r1
 list
 #
 # a bit of mix
 #
 %setenv dflt_class=ocf
 add rsc=r1
-add rsc=r1 class=heartbeat type=lrmregtest
+add rsc=r1 class=lsb type=lrmregtest
 add rsc=r1
 del rsc=r1
 add rsc=r1 class=lsb type=lrmregtest

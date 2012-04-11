@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# WARNING: This script is for LRM regressions tests only
+#
+### BEGIN INIT INFO
+# Provides: lrmregtest
+# Required-Start:
+# Should-Start:
+# Required-Stop:
+# Should-Stop:
+# Default-Start:
+# Default-Stop:
+# Short-Description: LRM regression tests LSB RA
+# Description:    LRM regression tests LSB RA
+### END INIT INFO
+
+TYPE=lrmregtest
+# depends on resource-agents and the OCF
+: ${OCF_ROOT:=/usr/lib/ocf}
+. ${OCF_ROOT}/lib/heartbeat/ocf-shellfuncs
+
+case "$1" in
+    start)
+        echo -n "Starting $TYPE"
+		ha_pseudo_resource lrmregtest_lsb start
+        ;;
+    stop)
+        echo -n "Shutting down $TYPE"
+		ha_pseudo_resource lrmregtest_lsb stop
+        ;;
+    status)
+        echo -n "Checking for $TYPE"
+		ha_pseudo_resource lrmregtest_lsb monitor
+        if [ $? -eq 0 ]; then
+			echo " running"
+			exit 0
+		else
+			echo " stopped"
+			exit 3
+		fi
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|status}"
+        exit 1
+        ;;
+esac
+
+if [ $? -eq 0 ]; then
+	echo " OK"
+	exit 0
+else
+	echo " failed"
+	exit 1
+fi
