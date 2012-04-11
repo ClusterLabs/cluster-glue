@@ -42,7 +42,7 @@ callbacktest_LDADD 	= 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 callbacktest_DEPENDENCIES    = 	$(top_builddir)/lib/$(LRM_DIR)/liblrm.la
 
 testdir		= 	$(datadir)/$(PACKAGE_NAME)/lrmtest
-test_SCRIPTS	=	LRMBasicSanityCheck regression.sh evaltest.sh lrmregtest lrmregtest-heartbeat lrmregtest-lsb
+test_SCRIPTS	=	LRMBasicSanityCheck regression.sh evaltest.sh lrmregtest lrmregtest-lsb
 test_DATA	=	README.regression defaults descriptions lrmadmin-interface language
 #				shouldn't need this, but we do for some versions of autofoo tools
 EXTRA_DIST		=	$(test_SCRIPTS) $(test_DATA)

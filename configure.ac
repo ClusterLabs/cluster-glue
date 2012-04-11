@@ -1354,8 +1354,6 @@ lrm/Makefile					        	\
    lrm/test/Makefile				        	\
    lrm/test/regression.sh					\
    lrm/test/lrmregtest						\
-   lrm/test/lrmregtest-lsb					\
-   lrm/test/lrmregtest-heartbeat				\
    lrm/test/LRMBasicSanityCheck			        	\
    lrm/test/testcases/Makefile			        	\
 logd/Makefile					        	\
