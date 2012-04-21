@@ -16,7 +16,7 @@
 
 #ifndef _CL_UUID_H_
 #define _CL_UUID_H_
-#include <glib/gtypes.h>
+#include <glib.h>
 
 typedef struct cl_uuid_s{	
 	unsigned char	uuid[16];
