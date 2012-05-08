@@ -73,6 +73,7 @@ struct servants_list_item {
 	const char* devname;
 	pid_t pid;
 	int restarts;
+	struct timespec t_last, t_started;
 	struct servants_list_item *next;
 };
 
@@ -174,12 +175,12 @@ struct servants_list_item *lookup_servant_by_dev(const char *devname);
 struct servants_list_item *lookup_servant_by_pid(pid_t pid);
 void servants_kill(void);
 void servants_start(void);
+void servant_start(struct servants_list_item *s);
 void inquisitor_child(void);
 int inquisitor(void);
 int inquisitor_decouple(void);
 int messenger(const char *name, const char *msg);
 int check_timeout_inconsistent(void);
-void restart_servant_by_pid(pid_t pid);
 void cleanup_servant_by_pid(pid_t pid);
 int quorum_write(int good_servants);
 int quorum_read(int good_servants);
