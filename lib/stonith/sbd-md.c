@@ -559,6 +559,10 @@ void inquisitor_child(void)
 	struct timespec t_last_tickle, t_now;
 	struct servants_list_item* s;
 
+	if (debug_mode) {
+		cl_log(LOG_ERR, "DEBUG MODE IS ACTIVE - DO NOT RUN IN PRODUCTION!");
+	}
+
 	set_proc_title("sbd: inquisitor");
 
 	sigemptyset(&procmask);
@@ -662,7 +666,14 @@ void inquisitor_child(void)
 				exiting = 1;
 				continue;
 			}
-			do_reset();
+			if (debug_mode < 2) {
+				/* At level 2, we do nothing, but expect
+				 * things to eventually return to
+				 * normal. */
+				do_reset();
+			} else {
+				cl_log(LOG_ERR, "SBD: DEBUG MODE: Would have fenced due to timeout!");
+			}
 		}
 		if (timeout_watchdog_warn && (latency > timeout_watchdog_warn)) {
 			cl_log(LOG_WARNING,
@@ -833,10 +844,12 @@ int main(int argc, char **argv, char **envp)
 
 	get_uname();
 
-	while ((c = getopt(argc, argv, "DRWhvw:d:n:1:2:3:4:5:t:I:")) != -1) {
+	while ((c = getopt(argc, argv, "DRTWZhvw:d:n:1:2:3:4:5:t:I:")) != -1) {
 		switch (c) {
 		case 'D':
-			/* Ignore for historical reasons */
+			break;
+		case 'Z':
+			debug_mode++;
 			break;
 		case 'R':
 			skip_rt = 1;

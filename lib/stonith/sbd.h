@@ -145,6 +145,7 @@ extern int  watchdog_use;
 extern int  watchdog_set_timeout;
 extern int  skip_rt;
 extern int  debug;
+extern int  debug_mode;
 extern const char *watchdogdev;
 extern char*  local_uname;
 
