@@ -169,6 +169,7 @@ int ping_via_slots(const char *name);
 int dump_headers(void);
 
 int check_all_dead(void);
+void servant_exit(void);
 int servant(const char *diskname, const void* argp);
 void recruit_servant(const char *devname, pid_t pid);
 struct servants_list_item *lookup_servant_by_dev(const char *devname);
