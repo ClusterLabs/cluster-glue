@@ -15,8 +15,35 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
 #include <arpa/inet.h>
+#include <asm/unistd.h>
+#include <clplumbing/cl_log.h>
+#include <clplumbing/cl_reboot.h>
+#include <clplumbing/coredumps.h>
+#include <clplumbing/realtime.h>
+#include <clplumbing/setproctitle.h>
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <libaio.h>
+#include <linux/fs.h>
+#include <linux/types.h>
+#include <linux/watchdog.h>
+#include <malloc.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/ptrace.h>
+#include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
+#include <syslog.h>
+#include <time.h>
+#include <unistd.h>
 
 /* Sector data types */
 struct sector_header_s {
@@ -49,6 +76,12 @@ struct servants_list_item {
 	struct servants_list_item *next;
 };
 
+struct sbd_context {
+	int	devfd;
+	io_context_t	ioctx;
+	struct iocb	io;
+};
+
 #define SBD_MSG_EMPTY	0x00
 #define SBD_MSG_TEST	0x01
 #define SBD_MSG_RESET	0x02
@@ -65,32 +98,33 @@ int watchdog_tickle(void);
 int watchdog_init(void);
 void sysrq_init(void);
 void watchdog_close(void);
-int open_device(const char* devname);
+struct sbd_context *open_device(const char* devname);
+void close_device(struct sbd_context *st);
 signed char cmd2char(const char *cmd);
 void * sector_alloc(void);
 const char* char2cmd(const char cmd);
-int sector_write(int devfd, int sector, const void *data);
-int sector_read(int devfd, int sector, void *data);
-int slot_read(int devfd, int slot, struct sector_node_s *s_node);
-int slot_write(int devfd, int slot, const struct sector_node_s *s_node);
-int mbox_write(int devfd, int mbox, const struct sector_mbox_s *s_mbox);
-int mbox_read(int devfd, int mbox, struct sector_mbox_s *s_mbox);
-int mbox_write_verify(int devfd, int mbox, const struct sector_mbox_s *s_mbox);
+int sector_write(struct sbd_context *st, int sector, const void *data);
+int sector_read(struct sbd_context *st, int sector, void *data);
+int slot_read(struct sbd_context *st, int slot, struct sector_node_s *s_node);
+int slot_write(struct sbd_context *st, int slot, const struct sector_node_s *s_node);
+int mbox_write(struct sbd_context *st, int mbox, const struct sector_mbox_s *s_mbox);
+int mbox_read(struct sbd_context *st, int mbox, struct sector_mbox_s *s_mbox);
+int mbox_write_verify(struct sbd_context *st, int mbox, const struct sector_mbox_s *s_mbox);
 /* After a call to header_write(), certain data fields will have been
  * converted to on-disk byte-order; the header should not be accessed
  * afterwards anymore! */
-int header_write(int devfd, struct sector_header_s *s_header);
-int header_read(int devfd, struct sector_header_s *s_header);
+int header_write(struct sbd_context *st, struct sector_header_s *s_header);
+int header_read(struct sbd_context *st, struct sector_header_s *s_header);
 int valid_header(const struct sector_header_s *s_header);
-struct sector_header_s * header_get(int devfd);
-int init_device(int devfd);
-int slot_lookup(int devfd, const struct sector_header_s *s_header, const char *name);
-int slot_unused(int devfd, const struct sector_header_s *s_header);
-int slot_allocate(int devfd, const char *name);
-int slot_list(int devfd);
-int slot_ping(int devfd, const char *name);
-int slot_msg(int devfd, const char *name, const char *cmd);
-int header_dump(int devfd);
+struct sector_header_s * header_get(struct sbd_context *st);
+int init_device(struct sbd_context *st);
+int slot_lookup(struct sbd_context *st, const struct sector_header_s *s_header, const char *name);
+int slot_unused(struct sbd_context *st, const struct sector_header_s *s_header);
+int slot_allocate(struct sbd_context *st, const char *name);
+int slot_list(struct sbd_context *st);
+int slot_ping(struct sbd_context *st, const char *name);
+int slot_msg(struct sbd_context *st, const char *name, const char *cmd);
+int header_dump(struct sbd_context *st);
 void sysrq_trigger(char t);
 void do_crashdump(void);
 void do_reset(void);
@@ -105,6 +139,7 @@ extern unsigned long    timeout_watchdog_warn;
 extern int      timeout_allocate;
 extern int      timeout_loop;
 extern int      timeout_msgwait;
+extern int      timeout_io;
 extern int  watchdog_use;
 extern int  watchdog_set_timeout;
 extern int  skip_rt;

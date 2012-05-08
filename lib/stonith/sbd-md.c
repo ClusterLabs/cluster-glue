@@ -16,41 +16,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <signal.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <asm/unistd.h>
-#include <ctype.h>
-#include <string.h>
-#include <syslog.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/ptrace.h>
-#include <fcntl.h>
-#include <time.h>
-#include <clplumbing/cl_log.h>
-#include <clplumbing/coredumps.h>
-#include <clplumbing/realtime.h>
-#include <clplumbing/cl_reboot.h>
-#include <clplumbing/setproctitle.h>
-#include <malloc.h>
-#include <time.h>
-#include <sys/utsname.h>
-#include <sys/ioctl.h>
-#include <linux/types.h>
-#include <linux/watchdog.h>
-#include <linux/fs.h>
-
 #include "sbd.h"
 
 struct servants_list_item *servants_leader = NULL;
 
 static int	servant_count	= 0;
-static int	servant_restart_interval = 3600;
+static int	servant_restart_interval = 60;
+static int	servant_restart_count = 10;
 
 /* signals reserved for multi-disk sbd */
 #define SIG_LIVENESS (SIGRTMIN + 1)	/* report liveness of the disk */
@@ -104,18 +76,18 @@ int assign_servant(const char* devname, functionp_t functionp, const void* argp)
 int init_devices()
 {
 	int rc = 0;
-	int devfd;
+	struct sbd_context *st;
 	struct servants_list_item *s;
 
 	for (s = servants_leader; s; s = s->next) {
 		fprintf(stdout, "Initializing device %s\n",
 				s->devname);
-		devfd = open_device(s->devname);
-		if (devfd == -1) {
+		st = open_device(s->devname);
+		if (!st) {
 			return -1;
 		}
-		rc = init_device(devfd);
-		close(devfd);
+		rc = init_device(st);
+		close_device(st);
 		if (rc == -1) {
 			fprintf(stderr, "Failed to init device %s\n", s->devname);
 			return rc;
@@ -128,14 +100,14 @@ int init_devices()
 int slot_msg_wrapper(const char* devname, const void* argp)
 {
 	int rc = 0;
-	int devfd;
+	struct sbd_context *st;
 	const struct slot_msg_arg_t* arg = (const struct slot_msg_arg_t*)argp;
 
-        devfd = open_device(devname);
-        if (devfd == -1) 
+        st = open_device(devname);
+        if (!st) 
 		return -1;
-	rc = slot_msg(devfd, arg->name, arg->msg);
-	close(devfd);
+	rc = slot_msg(st, arg->name, arg->msg);
+	close_device(st);
 	return rc;
 }
 
@@ -143,32 +115,32 @@ int slot_ping_wrapper(const char* devname, const void* argp)
 {
 	int rc = 0;
 	const char* name = (const char*)argp;
-	int devfd;
+	struct sbd_context *st;
 
-	devfd = open_device(devname);
-	if (devfd == -1)
+	st = open_device(devname);
+	if (!st)
 		return -1;
-	rc = slot_ping(devfd, name);
-	close(devfd);
+	rc = slot_ping(st, name);
+	close_device(st);
 	return rc;
 }
 
 int allocate_slots(const char *name)
 {
 	int rc = 0;
-	int devfd;
+	struct sbd_context *st;
 	struct servants_list_item *s;
 
 	for (s = servants_leader; s; s = s->next) {
 		fprintf(stdout, "Trying to allocate slot for %s on device %s.\n", 
 				name,
 				s->devname);
-		devfd = open_device(s->devname);
-		if (devfd == -1) {
+		st = open_device(s->devname);
+		if (!st) {
 			return -1;
 		}
-		rc = slot_allocate(devfd, name);
-		close(devfd);
+		rc = slot_allocate(st, name);
+		close_device(st);
 		if (rc == -1)
 			return rc;
 		fprintf(stdout, "Slot for %s has been allocated on %s.\n",
@@ -182,15 +154,15 @@ int list_slots()
 {
 	int rc = 0;
 	struct servants_list_item *s;
-	int devfd;
+	struct sbd_context *st;
 
 	for (s = servants_leader; s; s = s->next) {
 		DBGPRINT("list slots on device %s\n", s->devname);
-		devfd = open_device(s->devname);
-		if (devfd == -1)
+		st = open_device(s->devname);
+		if (!st)
 			return -1;
-		rc = slot_list(devfd);
-		close(devfd);
+		rc = slot_list(st);
+		close_device(st);
 		if (rc == -1)
 			return rc;
 	}
@@ -207,7 +179,6 @@ int ping_via_slots(const char *name)
 	siginfo_t sinfo;
 	struct servants_list_item *s;
 
-	DBGPRINT("you shall know no fear\n");
 	sigemptyset(&procmask);
 	sigaddset(&procmask, SIGCHLD);
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
@@ -253,7 +224,7 @@ int servant(const char *diskname, const void* argp)
 	time_t t0, t1, latency;
 	union sigval signal_value;
 	sigset_t servant_masks;
-	int devfd;
+	struct sbd_context *st;
 	pid_t ppid;
 
 	if (!diskname) {
@@ -272,12 +243,12 @@ int servant(const char *diskname, const void* argp)
 	/* FIXME: check error */
 	sigprocmask(SIG_SETMASK, &servant_masks, NULL);
 
-	devfd = open_device(diskname);
-	if (devfd == -1) {
+	st = open_device(diskname);
+	if (!st) {
 		return -1;
 	}
 
-	mbox = slot_allocate(devfd, local_uname);
+	mbox = slot_allocate(st, local_uname);
 	if (mbox < 0) {
 		cl_log(LOG_ERR,
 		       "No slot allocated, and automatic allocation failed for disk %s.",
@@ -289,7 +260,7 @@ int servant(const char *diskname, const void* argp)
 	set_proc_title("sbd: watcher: %s - slot: %d", diskname, mbox);
 
 	s_mbox = sector_alloc();
-	if (mbox_write(devfd, mbox, s_mbox) < 0) {
+	if (mbox_write(st, mbox, s_mbox) < 0) {
 		rc = -1;
 		goto out;
 	}
@@ -308,7 +279,7 @@ int servant(const char *diskname, const void* argp)
 			do_reset();
 		}
 
-		if (mbox_read(devfd, mbox, s_mbox) < 0) {
+		if (mbox_read(st, mbox, s_mbox) < 0) {
 			cl_log(LOG_ERR, "mbox read failed in servant.");
 			exit(1);
 		}
@@ -321,7 +292,7 @@ int servant(const char *diskname, const void* argp)
 			switch (s_mbox->cmd) {
 			case SBD_MSG_TEST:
 				memset(s_mbox, 0, sizeof(*s_mbox));
-				mbox_write(devfd, mbox, s_mbox);
+				mbox_write(st, mbox, s_mbox);
 				sigqueue(ppid, SIG_TEST, signal_value);
 				break;
 			case SBD_MSG_RESET:
@@ -345,7 +316,7 @@ int servant(const char *diskname, const void* argp)
 				cl_log(LOG_ERR, "Unknown message on disk %s",
 				       diskname);
 				memset(s_mbox, 0, sizeof(*s_mbox));
-				mbox_write(devfd, mbox, s_mbox);
+				mbox_write(st, mbox, s_mbox);
 				break;
 			}
 		}
@@ -365,8 +336,7 @@ int servant(const char *diskname, const void* argp)
 	}
  out:
 	free(s_mbox);
-	close(devfd);
-	devfd = -1;
+	close_device(st);
 	return rc;
 }
 
@@ -465,17 +435,17 @@ void servants_kill(void)
 
 int check_timeout_inconsistent(void)
 {
-	int devfd;
+	struct sbd_context *st;
 	struct sector_header_s *hdr_cur = 0, *hdr_last = 0;
 	struct servants_list_item* s;
 	int inconsistent = 0;
 
 	for (s = servants_leader; s; s = s->next) {
-		devfd = open_device(s->devname);
-		if (devfd < 0)
+		st = open_device(s->devname);
+		if (!st)
 			continue;
-		hdr_cur = header_get(devfd);
-		close(devfd);
+		hdr_cur = header_get(st);
+		close_device(st);
 		if (!hdr_cur)
 			continue;
 		if (hdr_last) {
@@ -524,7 +494,7 @@ void restart_servant_by_pid(pid_t pid)
 
 	s = lookup_servant_by_pid(pid);
 	if (s) {
-		if (s->restarts < 10) {
+		if ((servant_restart_count == 0) || s->restarts < servant_restart_count) {
 			s->pid = assign_servant(s->devname, servant, NULL);
 			s->restarts++;
 		} else {
@@ -802,15 +772,15 @@ int dump_headers(void)
 {
 	int rc = 0;
 	struct servants_list_item *s = servants_leader;
-	int devfd;
+	struct sbd_context *st;
 
 	for (s = servants_leader; s; s = s->next) {
 		fprintf(stdout, "==Dumping header on disk %s\n", s->devname);
-		devfd = open_device(s->devname);
-		if (devfd == -1)
+		st = open_device(s->devname);
+		if (!st)
 			return -1;
-		rc = header_dump(devfd);
-		close(devfd);
+		rc = header_dump(st);
+		close_device(st);
 		if (rc == -1)
 			return rc;
 		fprintf(stdout, "==Header on disk %s is dumped\n", s->devname);
@@ -835,7 +805,7 @@ int main(int argc, char **argv, char **envp)
 
 	get_uname();
 
-	while ((c = getopt(argc, argv, "DRWhvw:d:n:1:2:3:4:5:t:")) != -1) {
+	while ((c = getopt(argc, argv, "DRWhvw:d:n:1:2:3:4:5:t:I:")) != -1) {
 		switch (c) {
 		case 'D':
 			/* Ignore for historical reasons */
@@ -878,6 +848,12 @@ int main(int argc, char **argv, char **envp)
 			break;
 		case 't':
 			servant_restart_interval = atoi(optarg);
+			break;
+		case 'I':
+			timeout_io = atoi(optarg);
+			break;
+		case 'F':
+			servant_restart_count = atoi(optarg);
 			break;
 		case 'h':
 			usage();
