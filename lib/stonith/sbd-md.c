@@ -636,7 +636,8 @@ void inquisitor_child(void)
 			if (age < timeout_watchdog) {
 				good_servants++;
 			} else {
-				cl_log(LOG_WARNING, "Servant for %s outdated (age: %d)",
+				if (!s->restart_blocked)
+					cl_log(LOG_WARNING, "Servant for %s outdated (age: %d)",
 						s->devname, age);
 			}
 		}
@@ -686,14 +687,22 @@ void inquisitor_child(void)
 
 			if (age > servant_restart_interval) {
 				s->restarts = 0;
+				s->restart_blocked = 0;
 			}
 
-			if (s->restarts > servant_restart_count) {
-				cl_log(LOG_WARNING, "Max retry count reached: not restarting servant for %s",
-						s->devname);
-				continue;
+			if (servant_restart_count
+					&& (s->restarts >= servant_restart_count)
+					&& !s->restart_blocked) {
+				if (servant_restart_count > 1) {
+					cl_log(LOG_WARNING, "Max retry count reached: not restarting servant for %s",
+							s->devname);
+				}
+				s->restart_blocked = 1;
 			}
-			servant_start(s);
+
+			if (!s->restart_blocked) {
+				servant_start(s);
+			}
 		}
 	}
 	/* not reached */
@@ -844,7 +853,7 @@ int main(int argc, char **argv, char **envp)
 
 	get_uname();
 
-	while ((c = getopt(argc, argv, "DRTWZhvw:d:n:1:2:3:4:5:t:I:")) != -1) {
+	while ((c = getopt(argc, argv, "DRTWZhvw:d:n:1:2:3:4:5:t:I:F:")) != -1) {
 		switch (c) {
 		case 'D':
 			break;
