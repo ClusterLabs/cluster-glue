@@ -23,12 +23,14 @@ struct servants_list_item *servants_leader = NULL;
 static int	servant_count	= 0;
 static int	servant_restart_interval = 60;
 static int	servant_restart_count = 10;
+static int	servant_inform_parent = 0;
 
 /* signals reserved for multi-disk sbd */
 #define SIG_LIVENESS (SIGRTMIN + 1)	/* report liveness of the disk */
 #define SIG_EXITREQ  (SIGRTMIN + 2)	/* exit request to inquisitor */
 #define SIG_TEST     (SIGRTMIN + 3)	/* trigger self test */
 #define SIG_RESTART  (SIGRTMIN + 4)	/* trigger restart of all failed disk */
+#define SIG_IO_FAIL  (SIGRTMIN + 5)	/* the IO child requests to be considered failed */
 /* FIXME: should add dynamic check of SIG_XX >= SIGRTMAX */
 
 /* Debug Helper */
@@ -216,6 +218,20 @@ int ping_via_slots(const char *name)
 	return 0;
 }
 
+/* This is a bit hackish, but the easiest way to rewire all process
+ * exits to send the desired signal to the parent. */
+void servant_exit(void)
+{
+	pid_t ppid;
+	union sigval signal_value;
+
+	ppid = getppid();
+	if (servant_inform_parent) {
+		memset(&signal_value, 0, sizeof(signal_value));
+		sigqueue(ppid, SIG_IO_FAIL, signal_value);
+	}
+}
+
 int servant(const char *diskname, const void* argp)
 {
 	struct sector_mbox_s *s_mbox = NULL;
@@ -260,6 +276,8 @@ int servant(const char *diskname, const void* argp)
 	}
 	cl_log(LOG_INFO, "Monitoring slot %d on disk %s", mbox, diskname);
 	set_proc_title("sbd: watcher: %s - slot: %d", diskname, mbox);
+	atexit(servant_exit);
+	servant_inform_parent = 1;
 
 	s_mbox = sector_alloc();
 	if (mbox_write(st, mbox, s_mbox) < 0) {
@@ -339,6 +357,9 @@ int servant(const char *diskname, const void* argp)
  out:
 	free(s_mbox);
 	close_device(st);
+	if (rc == 0) {
+		servant_inform_parent = 0;
+	}
 	return rc;
 }
 
@@ -496,9 +517,10 @@ inline void cleanup_servant_by_pid(pid_t pid)
 				s->devname, s->pid);
 		s->pid = 0;
 	} else {
-		/* TODO: This points to an inconsistency in our internal
-		 * data - how to recover? */
-		cl_log(LOG_ERR, "Cannot cleanup after unknown pid %i",
+		/* This most likely is a stray signal from somewhere, or
+		 * a SIGCHLD for a process that has previously
+		 * explicitly disconnected. */
+		cl_log(LOG_INFO, "cleanup_servant: Nothing known about pid %i",
 				pid);
 	}
 }
@@ -543,6 +565,7 @@ void inquisitor_child(void)
 	sigaddset(&procmask, SIG_LIVENESS);
 	sigaddset(&procmask, SIG_EXITREQ);
 	sigaddset(&procmask, SIG_TEST);
+	sigaddset(&procmask, SIG_IO_FAIL);
 	sigaddset(&procmask, SIGUSR1);
 	sigaddset(&procmask, SIGUSR2);
 	sigprocmask(SIG_BLOCK, &procmask, NULL);
@@ -571,6 +594,13 @@ void inquisitor_child(void)
 				} else {
 					cleanup_servant_by_pid(pid);
 				}
+			}
+		} else if (sig == SIG_IO_FAIL) {
+			s = lookup_servant_by_pid(sinfo.si_pid);
+			if (s) {
+				cl_log(LOG_WARNING, "Servant for %s requests to be disowned",
+						s->devname);
+				cleanup_servant_by_pid(sinfo.si_pid);
 			}
 		} else if (sig == SIG_LIVENESS) {
 			s = lookup_servant_by_pid(sinfo.si_pid);
