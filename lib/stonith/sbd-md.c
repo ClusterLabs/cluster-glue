@@ -232,6 +232,8 @@ int servant(const char *diskname, const void* argp)
 		return -1;
 	}
 
+	cl_log(LOG_INFO, "Servant starting for device %s", diskname);
+
 	/* Block most of the signals */
 	sigfillset(&servant_masks);
 	sigdelset(&servant_masks, SIGKILL);
@@ -405,20 +407,31 @@ int check_all_dead(void)
 }
 
 
-void servants_start(void)
+void servant_start(struct servants_list_item *s)
 {
-	struct servants_list_item *s;
 	int r = 0;
 	union sigval svalue;
 
+	if (s->pid != 0) {
+		r = sigqueue(s->pid, 0, svalue);
+		if ((r != -1 || errno != ESRCH))
+			return;
+	}
+	cl_log(LOG_INFO, "Starting servant for device %s",
+			s->devname);
+	s->restarts++;
+	s->pid = assign_servant(s->devname, servant, NULL);
+	clock_gettime(CLOCK_MONOTONIC, &s->t_started);
+	return;
+}
+
+void servants_start(void)
+{
+	struct servants_list_item *s;
+
 	for (s = servants_leader; s; s = s->next) {
-		if (s->pid != 0) {
-			r = sigqueue(s->pid, 0, svalue);
-			if ((r != -1 || errno != ESRCH))
-				continue;
-		}
 		s->restarts = 0;
-		s->pid = assign_servant(s->devname, servant, NULL);
+		servant_start(s);
 	}
 }
 
@@ -479,33 +492,13 @@ inline void cleanup_servant_by_pid(pid_t pid)
 
 	s = lookup_servant_by_pid(pid);
 	if (s) {
+		cl_log(LOG_WARNING, "Servant for %s (pid: %i) has terminated",
+				s->devname, s->pid);
 		s->pid = 0;
 	} else {
 		/* TODO: This points to an inconsistency in our internal
 		 * data - how to recover? */
 		cl_log(LOG_ERR, "Cannot cleanup after unknown pid %i",
-				pid);
-	}
-}
-
-void restart_servant_by_pid(pid_t pid)
-{
-	struct servants_list_item* s;
-
-	s = lookup_servant_by_pid(pid);
-	if (s) {
-		if ((servant_restart_count == 0) || s->restarts < servant_restart_count) {
-			s->pid = assign_servant(s->devname, servant, NULL);
-			s->restarts++;
-		} else {
-			cl_log(LOG_WARNING, "Max retry count reached: not restarting servant for %s",
-					s->devname);
-		}
-
-	} else {
-		/* TODO: This points to an inconsistency in our internal
-		 * data - how to recover? */
-		cl_log(LOG_ERR, "Cannot restart unknown pid %i",
 				pid);
 	}
 }
@@ -531,26 +524,19 @@ int inquisitor_decouple(void)
 
 void inquisitor_child(void)
 {
-	int sig, pid, i;
+	int sig, pid;
 	sigset_t procmask;
 	siginfo_t sinfo;
-	int *reports;
 	int status;
 	struct timespec timeout;
 	int good_servants = 0;
 	int exiting = 0;
 	int decoupled = 0;
 	time_t latency;
-	struct timespec t_last_tickle, t_now, t_last_restarted;
+	struct timespec t_last_tickle, t_now;
+	struct servants_list_item* s;
 
 	set_proc_title("sbd: inquisitor");
-
-	reports = malloc(sizeof(int) * servant_count);
-	if (!reports) {
-		cl_log(LOG_ERR, "malloc failed");
-		exit(1);
-	}
-	memset(reports, 0, sizeof(int) * servant_count);
 
 	sigemptyset(&procmask);
 	sigaddset(&procmask, SIGCHLD);
@@ -567,11 +553,12 @@ void inquisitor_child(void)
 	timeout.tv_nsec = 0;
 	good_servants = 0;
 	clock_gettime(CLOCK_MONOTONIC, &t_last_tickle);
-	clock_gettime(CLOCK_MONOTONIC, &t_last_restarted);
 
 	while (1) {
 		sig = sigtimedwait(&procmask, &sinfo, &timeout);
 		DBGPRINT("got signal %d\n", sig);
+
+		clock_gettime(CLOCK_MONOTONIC, &t_now);
 
 		if (sig == SIG_EXITREQ) {
 			servants_kill();
@@ -581,27 +568,19 @@ void inquisitor_child(void)
 			while ((pid = waitpid(-1, &status, WNOHANG))) {
 				if (pid == -1 && errno == ECHILD) {
 					break;
-				} else if (exiting) {
-					cleanup_servant_by_pid(pid);
 				} else {
-					restart_servant_by_pid(pid);
+					cleanup_servant_by_pid(pid);
 				}
 			}
 		} else if (sig == SIG_LIVENESS) {
-			for (i = 0; i < servant_count; i++) {
-				if (reports[i] == sinfo.si_pid) {
-					break;
-				} else if (reports[i] == 0) {
-					reports[i] = sinfo.si_pid;
-					good_servants++;
-					break;
-				}
+			s = lookup_servant_by_pid(sinfo.si_pid);
+			if (s) {
+				clock_gettime(CLOCK_MONOTONIC, &s->t_last);
 			}
 		} else if (sig == SIG_TEST) {
 		} else if (sig == SIGUSR1) {
 			if (exiting)
 				continue;
-			clock_gettime(CLOCK_MONOTONIC, &t_last_restarted);
 			servants_start();
 		}
 
@@ -612,8 +591,22 @@ void inquisitor_child(void)
 				continue;
 		}
 
+		good_servants = 0;
+		for (s = servants_leader; s; s = s->next) {
+			int age = t_now.tv_sec - s->t_last.tv_sec;
+
+			if (!s->t_last.tv_sec)
+				continue;
+
+			if (age < timeout_watchdog) {
+				good_servants++;
+			} else {
+				cl_log(LOG_WARNING, "Servant for %s outdated (age: %d)",
+						s->devname, age);
+			}
+		}
+
 		if (quorum_read(good_servants)) {
-			DBGPRINT("Enough liveness messages\n");
 			if (!decoupled) {
 				if (inquisitor_decouple() < 0) {
 					servants_kill();
@@ -626,11 +619,8 @@ void inquisitor_child(void)
 
 			watchdog_tickle();
 			clock_gettime(CLOCK_MONOTONIC, &t_last_tickle);
-			memset(reports, 0, sizeof(int) * servant_count);
-			good_servants = 0;
 		}
 
-		clock_gettime(CLOCK_MONOTONIC, &t_now);
 		latency = t_now.tv_sec - t_last_tickle.tv_sec;
 		if (timeout_watchdog && (latency > timeout_watchdog)) {
 			if (!decoupled) {
@@ -649,12 +639,19 @@ void inquisitor_child(void)
 			       (int)latency, (int)timeout_watchdog_warn, good_servants);
 		}
 		
-		latency = t_now.tv_sec - t_last_restarted.tv_sec;
-		if (servant_restart_interval > 0 
-				&& latency > servant_restart_interval) {
-			/* Restart all children every hour */
-			clock_gettime(CLOCK_MONOTONIC, &t_last_restarted);
-			servants_start();
+		for (s = servants_leader; s; s = s->next) {
+			int age = t_now.tv_sec - s->t_started.tv_sec;
+
+			if (age > servant_restart_interval) {
+				s->restarts = 0;
+			}
+
+			if (s->restarts > servant_restart_count) {
+				cl_log(LOG_WARNING, "Max retry count reached: not restarting servant for %s",
+						s->devname);
+				continue;
+			}
+			servant_start(s);
 		}
 	}
 	/* not reached */
