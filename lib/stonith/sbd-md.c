@@ -143,7 +143,7 @@ int allocate_slots(const char *name)
 		}
 		rc = slot_allocate(st, name);
 		close_device(st);
-		if (rc == -1)
+		if (rc < 0)
 			return rc;
 		fprintf(stdout, "Slot for %s has been allocated on %s.\n",
 				name,
@@ -261,6 +261,9 @@ int servant(const char *diskname, const void* argp)
 	/* FIXME: check error */
 	sigprocmask(SIG_SETMASK, &servant_masks, NULL);
 
+	atexit(servant_exit);
+	servant_inform_parent = 1;
+
 	st = open_device(diskname);
 	if (!st) {
 		return -1;
@@ -276,8 +279,6 @@ int servant(const char *diskname, const void* argp)
 	}
 	cl_log(LOG_INFO, "Monitoring slot %d on disk %s", mbox, diskname);
 	set_proc_title("sbd: watcher: %s - slot: %d", diskname, mbox);
-	atexit(servant_exit);
-	servant_inform_parent = 1;
 
 	s_mbox = sector_alloc();
 	if (mbox_write(st, mbox, s_mbox) < 0) {

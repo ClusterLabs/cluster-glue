@@ -554,7 +554,7 @@ slot_lookup(struct sbd_context *st, const struct sector_header_s *s_header, cons
 
 	for (i=0; i < s_header->slots; i++) {
 		if (slot_read(st, i, s_node) < 0) {
-			rc = -1; goto out;
+			rc = -2; goto out;
 		}
 		if (s_node->in_use != 0) {
 			if (strncasecmp(s_node->name, name,
@@ -617,7 +617,12 @@ slot_allocate(struct sbd_context *st, const char *name)
 
 	while (1) {
 		i = slot_lookup(st, s_header, name);
-		if (i >= 0) {
+		if ((i >= 0) || (i == -2)) {
+			/* -1 is "no slot found", in which case we
+			 * proceed to allocate a new one.
+			 * -2 is "read error during lookup", in which
+			 * case we error out too
+			 * >= 0 is "slot already allocated" */
 			rc = i; goto out;
 		}
 
