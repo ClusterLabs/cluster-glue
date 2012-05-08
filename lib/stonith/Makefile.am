@@ -43,7 +43,7 @@ meatclient_LDADD	= $(GLIBLIB)
 
 sbd_SOURCES		= sbd-md.c sbd-common.c
 sbd_CFLAGS		= -D_GNU_SOURCE
-sbd_LDADD		= $(GLIBLIB)					\
+sbd_LDADD		= $(GLIBLIB) -laio				\
 			$(top_builddir)/lib/clplumbing/libplumb.la	\
 			$(top_builddir)/lib/clplumbing/libplumbgpl.la
 

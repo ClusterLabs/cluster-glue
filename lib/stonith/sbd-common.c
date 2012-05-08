@@ -1,25 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <asm/unistd.h>
-#include <ctype.h>
-#include <string.h>
-#include <syslog.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/ptrace.h>
-#include <fcntl.h>
-#include <time.h>
-#include <clplumbing/cl_log.h>
-#include <clplumbing/coredumps.h>
-#include <clplumbing/realtime.h>
-#include <clplumbing/cl_reboot.h>
-#include <malloc.h>
-#include <sys/utsname.h>
-#include <sys/ioctl.h>
-#include <linux/types.h>
-#include <linux/watchdog.h>
-#include <linux/fs.h>
 
 #include "sbd.h"
 
@@ -33,6 +11,7 @@ unsigned long	timeout_watchdog_warn 	= 3;
 int		timeout_allocate 	= 2;
 int		timeout_loop	    	= 1;
 int		timeout_msgwait		= 10;
+int		timeout_io		= 3;
 
 int	watchdog_use		= 0;
 int	watchdog_set_timeout	= 1;
@@ -72,8 +51,11 @@ usage(void)
 "-4 <N>		Set msgwait timeout to N seconds (optional, create only)\n"
 "-5 <N>		Warn if loop latency exceeds threshold (optional, watch only)\n"
 "			(default is 3, set to 0 to disable)\n"
-"-t <N>		Interval in seconds for automatic child restarts (optional)\n"
-"			(default is 3600, set to 0 to disable)\n"
+"-I <N>		Async IO read timeout (defaults to 3 * loop timeout, optional)\n"
+"-t <N>		Dampening delay before faulty servants are restarted (optional)\n"
+"			(default is 60, set to 0 to disable)\n"
+"-F <N>		# of failures before a servant is considered faulty (optional)\n"
+"			(default is 10, set to 0 to disable)\n"
 "Commands:\n"
 "create		initialize N slots on <dev> - OVERWRITES DEVICE!\n"
 "list		List all allocated slots on device, and messages.\n"
@@ -212,27 +194,49 @@ maximize_priority(void)
 	}
 }
 
-int
+void
+close_device(struct sbd_context *st)
+{
+	close(st->devfd);
+	free(st);
+}
+
+struct sbd_context *
 open_device(const char* devname)
 {
-	int devfd;
+	struct sbd_context *st;
+
 	if (!devname)
-		return -1;
+		return NULL;
 
-	devfd = open(devname, O_SYNC|O_RDWR|O_DIRECT);
+	st = malloc(sizeof(struct sbd_context));
+	if (!st)
+		return NULL;
+	memset(st, 0, sizeof(struct sbd_context));
 
-	if (devfd == -1) {
+	if (io_setup(1, &st->ioctx) != 0) {
+		cl_perror("io_setup failed");
+		free(st);
+		return NULL;
+	}
+	
+	st->devfd = open(devname, O_SYNC|O_RDWR|O_DIRECT);
+
+	if (st->devfd == -1) {
 		cl_perror("Opening device %s failed.", devname);
-		return -1;
+		free(st);
+		return NULL;
 	}
 
-	ioctl(devfd, BLKSSZGET, &sector_size);
+	ioctl(st->devfd, BLKSSZGET, &sector_size);
 
 	if (sector_size == 0) {
 		cl_perror("Get sector size failed.\n");
-		return -1;
+		close_device(st);
+		return NULL;
 	}
-	return devfd;
+
+	return st;
 }
 
 signed char
@@ -297,14 +301,14 @@ char2cmd(const char cmd)
 }
 
 int
-sector_write(int devfd, int sector, const void *data)
+sector_write(struct sbd_context *st, int sector, const void *data)
 {
-	if (lseek(devfd, sector_size*sector, 0) < 0) {
+	if (lseek(st->devfd, sector_size*sector, 0) < 0) {
 		cl_perror("sector_write: lseek() failed");
 		return -1;
 	}
 
-	if (write(devfd, data, sector_size) <= 0) {
+	if (write(st->devfd, data, sector_size) <= 0) {
 		cl_perror("sector_write: write_sector() failed");
 		return -1;
 	}
@@ -312,55 +316,83 @@ sector_write(int devfd, int sector, const void *data)
 }
 
 int
-sector_read(int devfd, int sector, void *data)
+sector_read(struct sbd_context *st, int sector, void *data)
 {
-	if (lseek(devfd, sector_size*sector, 0) < 0) {
-		cl_perror("sector_read: lseek() failed");
+	struct timespec	timeout;
+	struct io_event event;
+	struct iocb	*ios[1] = { &st->io };
+	long		r;
+
+	timeout.tv_sec  = timeout_io;
+	timeout.tv_nsec = 0;
+
+	memset(&st->io, 0, sizeof(struct iocb));
+	io_prep_pread(&st->io, st->devfd, data, sector_size, sector_size * sector);
+	if (io_submit(st->ioctx, 1, ios) != 1) {
+		cl_log(LOG_ERR, "Failed to submit IO request!");
 		return -1;
 	}
 
-	if (read(devfd, data, sector_size) < sector_size) {
-		cl_perror("sector_read: read() failed");
+	errno = 0;
+	r = io_getevents(st->ioctx, 1L, 1L, &event, &timeout);
+
+	if (r < 0 ) {
+		cl_log(LOG_ERR, "Failed to retrieve IO events");
+		return -1;
+	} else if (r < 1L) {
+		cl_log(LOG_WARNING, "Cancelling IO request due to timeout");
+		r = io_cancel(st->ioctx, ios[0], &event);
+		if (r) {
+			cl_log(LOG_ERR, "Could not cancel IO request!");
+			/* TODO: Couldn't cancel the IO */
+		}
 		return -1;
 	}
-	return(0);
+	
+	/* IO is happy */
+	if (event.res == sector_size) {
+		return 0;
+	} else {
+		cl_log(LOG_ERR, "Short read");
+		return -1;
+	}
 }
 
 int
-slot_read(int devfd, int slot, struct sector_node_s *s_node)
+slot_read(struct sbd_context *st, int slot, struct sector_node_s *s_node)
 {
-	return sector_read(devfd, SLOT_TO_SECTOR(slot), s_node);
+	return sector_read(st, SLOT_TO_SECTOR(slot), s_node);
 }
 
 int
-slot_write(int devfd, int slot, const struct sector_node_s *s_node)
+slot_write(struct sbd_context *st, int slot, const struct sector_node_s *s_node)
 {
-	return sector_write(devfd, SLOT_TO_SECTOR(slot), s_node);
+	return sector_write(st, SLOT_TO_SECTOR(slot), s_node);
 }
 
 int
-mbox_write(int devfd, int mbox, const struct sector_mbox_s *s_mbox)
+mbox_write(struct sbd_context *st, int mbox, const struct sector_mbox_s *s_mbox)
 {
-	return sector_write(devfd, MBOX_TO_SECTOR(mbox), s_mbox);
+	return sector_write(st, MBOX_TO_SECTOR(mbox), s_mbox);
 }
 
 int
-mbox_read(int devfd, int mbox, struct sector_mbox_s *s_mbox)
+mbox_read(struct sbd_context *st, int mbox, struct sector_mbox_s *s_mbox)
 {
-	return sector_read(devfd, MBOX_TO_SECTOR(mbox), s_mbox);
+	return sector_read(st, MBOX_TO_SECTOR(mbox), s_mbox);
 }
 
 int
-mbox_write_verify(int devfd, int mbox, const struct sector_mbox_s *s_mbox)
+mbox_write_verify(struct sbd_context *st, int mbox, const struct sector_mbox_s *s_mbox)
 {
 	void *data;
 	int rc = 0;
 
-	if (sector_write(devfd, MBOX_TO_SECTOR(mbox), s_mbox) < 0)
+	if (sector_write(st, MBOX_TO_SECTOR(mbox), s_mbox) < 0)
 		return -1;
 
 	data = sector_alloc();
-	if (sector_read(devfd, MBOX_TO_SECTOR(mbox), data) < 0) {
+	if (sector_read(st, MBOX_TO_SECTOR(mbox), data) < 0) {
 		rc = -1;
 		goto out;
 	}
@@ -377,20 +409,20 @@ out:
 	return rc;
 }
 
-int header_write(int devfd, struct sector_header_s *s_header)
+int header_write(struct sbd_context *st, struct sector_header_s *s_header)
 {
 	s_header->sector_size = htonl(s_header->sector_size);
 	s_header->timeout_watchdog = htonl(s_header->timeout_watchdog);
 	s_header->timeout_allocate = htonl(s_header->timeout_allocate);
 	s_header->timeout_loop = htonl(s_header->timeout_loop);
 	s_header->timeout_msgwait = htonl(s_header->timeout_msgwait);
-	return sector_write(devfd, 0, s_header);
+	return sector_write(st, 0, s_header);
 }
 
 int
-header_read(int devfd, struct sector_header_s *s_header)
+header_read(struct sbd_context *st, struct sector_header_s *s_header)
 {
-	if (sector_read(devfd, 0, s_header) < 0)
+	if (sector_read(st, 0, s_header) < 0)
 		return -1;
 
 	s_header->sector_size = ntohl(s_header->sector_size);
@@ -426,18 +458,18 @@ valid_header(const struct sector_header_s *s_header)
 }
 
 struct sector_header_s *
-header_get(int devfd)
+header_get(struct sbd_context *st)
 {
 	struct sector_header_s *s_header;
 	s_header = sector_alloc();
 
-	if (header_read(devfd, s_header) < 0) {
-		cl_log(LOG_ERR, "Unable to read header from device %d", devfd);
+	if (header_read(st, s_header) < 0) {
+		cl_log(LOG_ERR, "Unable to read header from device %d", st->devfd);
 		return NULL;
 	}
 
 	if (valid_header(s_header) < 0) {
-		cl_log(LOG_ERR, "header on device %d is not valid.", devfd);
+		cl_log(LOG_ERR, "header on device %d is not valid.", st->devfd);
 		return NULL;
 	}
 
@@ -448,7 +480,7 @@ header_get(int devfd)
 }
 
 int
-init_device(int devfd)
+init_device(struct sbd_context *st)
 {
 	struct sector_header_s	*s_header;
 	struct sector_node_s	*s_node;
@@ -469,30 +501,30 @@ init_device(int devfd)
 	s_header->timeout_loop = timeout_loop;
 	s_header->timeout_msgwait = timeout_msgwait;
 
-	fstat(devfd, &s);
+	fstat(st->devfd, &s);
 	/* printf("st_size = %ld, st_blksize = %ld, st_blocks = %ld\n",
 			s.st_size, s.st_blksize, s.st_blocks); */
 
 	cl_log(LOG_INFO, "Creating version %d header on device %d",
 			s_header->version,
-			devfd);
+			st->devfd);
 	fprintf(stdout, "Creating version %d header on device %d\n",
 			s_header->version,
-			devfd);
-	if (header_write(devfd, s_header) < 0) {
+			st->devfd);
+	if (header_write(st, s_header) < 0) {
 		rc = -1; goto out;
 	}
 	cl_log(LOG_INFO, "Initializing %d slots on device %d",
 			s_header->slots,
-			devfd);
+			st->devfd);
 	fprintf(stdout, "Initializing %d slots on device %d\n",
 			s_header->slots,
-			devfd);
+			st->devfd);
 	for (i=0;i < s_header->slots;i++) {
-		if (slot_write(devfd, i, s_node) < 0) {
+		if (slot_write(st, i, s_node) < 0) {
 			rc = -1; goto out;
 		}
-		if (mbox_write(devfd, i, s_mbox) < 0) {
+		if (mbox_write(st, i, s_mbox) < 0) {
 			rc = -1; goto out;
 		}
 	}
@@ -507,7 +539,7 @@ out:	free(s_node);
  * slot number. If not found, returns -1.
  * This is necessary because slots might not be continuous. */
 int
-slot_lookup(int devfd, const struct sector_header_s *s_header, const char *name)
+slot_lookup(struct sbd_context *st, const struct sector_header_s *s_header, const char *name)
 {
 	struct sector_node_s	*s_node = NULL;
 	int 			i;
@@ -521,7 +553,7 @@ slot_lookup(int devfd, const struct sector_header_s *s_header, const char *name)
 	s_node = sector_alloc();
 
 	for (i=0; i < s_header->slots; i++) {
-		if (slot_read(devfd, i, s_node) < 0) {
+		if (slot_read(st, i, s_node) < 0) {
 			rc = -1; goto out;
 		}
 		if (s_node->in_use != 0) {
@@ -538,7 +570,7 @@ out:	free(s_node);
 }
 
 int
-slot_unused(int devfd, const struct sector_header_s *s_header)
+slot_unused(struct sbd_context *st, const struct sector_header_s *s_header)
 {
 	struct sector_node_s	*s_node;
 	int 			i;
@@ -547,7 +579,7 @@ slot_unused(int devfd, const struct sector_header_s *s_header)
 	s_node = sector_alloc();
 
 	for (i=0; i < s_header->slots; i++) {
-		if (slot_read(devfd, i, s_node) < 0) {
+		if (slot_read(st, i, s_node) < 0) {
 			rc = -1; goto out;
 		}
 		if (s_node->in_use == 0) {
@@ -561,7 +593,7 @@ out:	free(s_node);
 
 
 int
-slot_allocate(int devfd, const char *name)
+slot_allocate(struct sbd_context *st, const char *name)
 {
 	struct sector_header_s	*s_header = NULL;
 	struct sector_node_s	*s_node = NULL;
@@ -575,7 +607,7 @@ slot_allocate(int devfd, const char *name)
 		rc = -1; goto out;
 	}
 
-	s_header = header_get(devfd);
+	s_header = header_get(st);
 	if (!s_header) {
 		rc = -1; goto out;
 	}
@@ -584,19 +616,19 @@ slot_allocate(int devfd, const char *name)
 	s_mbox = sector_alloc();
 
 	while (1) {
-		i = slot_lookup(devfd, s_header, name);
+		i = slot_lookup(st, s_header, name);
 		if (i >= 0) {
 			rc = i; goto out;
 		}
 
-		i = slot_unused(devfd, s_header);
+		i = slot_unused(st, s_header);
 		if (i >= 0) {
 			cl_log(LOG_INFO, "slot %d is unused - trying to own", i);
 			fprintf(stdout, "slot %d is unused - trying to own\n", i);
 			memset(s_node, 0, sizeof(*s_node));
 			s_node->in_use = 1;
 			strncpy(s_node->name, name, sizeof(s_node->name));
-			if (slot_write(devfd, i, s_node) < 0) {
+			if (slot_write(st, i, s_node) < 0) {
 				rc = -1; goto out;
 			}
 			sleep(timeout_allocate);
@@ -614,7 +646,7 @@ out:	free(s_node);
 }
 
 int
-slot_list(int devfd)
+slot_list(struct sbd_context *st)
 {
 	struct sector_header_s	*s_header = NULL;
 	struct sector_node_s	*s_node = NULL;
@@ -622,7 +654,7 @@ slot_list(int devfd)
 	int 			i;
 	int			rc = 0;
 
-	s_header = header_get(devfd);
+	s_header = header_get(st);
 	if (!s_header) {
 		rc = -1; goto out;
 	}
@@ -631,11 +663,11 @@ slot_list(int devfd)
 	s_mbox = sector_alloc();
 
 	for (i=0; i < s_header->slots; i++) {
-		if (slot_read(devfd, i, s_node) < 0) {
+		if (slot_read(st, i, s_node) < 0) {
 			rc = -1; goto out;
 		}
 		if (s_node->in_use > 0) {
-			if (mbox_read(devfd, i, s_mbox) < 0) {
+			if (mbox_read(st, i, s_mbox) < 0) {
 				rc = -1; goto out;
 			}
 			printf("%d\t%s\t%s\t%s\n",
@@ -651,7 +683,7 @@ out:	free(s_node);
 }
 
 int
-slot_msg(int devfd, const char *name, const char *cmd)
+slot_msg(struct sbd_context *st, const char *name, const char *cmd)
 {
 	struct sector_header_s	*s_header = NULL;
 	struct sector_mbox_s	*s_mbox = NULL;
@@ -663,7 +695,7 @@ slot_msg(int devfd, const char *name, const char *cmd)
 		rc = -1; goto out;
 	}
 
-	s_header = header_get(devfd);
+	s_header = header_get(st);
 	if (!s_header) {
 		rc = -1; goto out;
 	}
@@ -672,7 +704,7 @@ slot_msg(int devfd, const char *name, const char *cmd)
 		name = local_uname;
 	}
 
-	mbox = slot_lookup(devfd, s_header, name);
+	mbox = slot_lookup(st, s_header, name);
 	if (mbox < 0) {
 		cl_log(LOG_ERR, "slot_msg(): No slot found for %s.", name);
 		rc = -1; goto out;
@@ -690,7 +722,7 @@ slot_msg(int devfd, const char *name, const char *cmd)
 
 	cl_log(LOG_INFO, "Writing %s to node slot %s",
 			cmd, name);
-	if (mbox_write_verify(devfd, mbox, s_mbox) < -1) {
+	if (mbox_write_verify(st, mbox, s_mbox) < -1) {
 		rc = -1; goto out;
 	}
 	if (strcasecmp(cmd, "exit") != 0) {
@@ -705,7 +737,7 @@ out:	free(s_mbox);
 }
 
 int
-slot_ping(int devfd, const char *name)
+slot_ping(struct sbd_context *st, const char *name)
 {
 	struct sector_header_s	*s_header = NULL;
 	struct sector_mbox_s	*s_mbox = NULL;
@@ -718,7 +750,7 @@ slot_ping(int devfd, const char *name)
 		rc = -1; goto out;
 	}
 
-	s_header = header_get(devfd);
+	s_header = header_get(st);
 	if (!s_header) {
 		rc = -1; goto out;
 	}
@@ -727,7 +759,7 @@ slot_ping(int devfd, const char *name)
 		name = local_uname;
 	}
 
-	mbox = slot_lookup(devfd, s_header, name);
+	mbox = slot_lookup(st, s_header, name);
 	if (mbox < 0) {
 		cl_log(LOG_ERR, "slot_msg(): No slot found for %s.", name);
 		rc = -1; goto out;
@@ -739,13 +771,13 @@ slot_ping(int devfd, const char *name)
 	strncpy(s_mbox->from, local_uname, sizeof(s_mbox->from)-1);
 
 	cl_log(LOG_DEBUG, "Pinging node %s", name);
-	if (mbox_write(devfd, mbox, s_mbox) < -1) {
+	if (mbox_write(st, mbox, s_mbox) < -1) {
 		rc = -1; goto out;
 	}
 
 	rc = -1;
 	while (waited <= timeout_msgwait) {
-		if (mbox_read(devfd, mbox, s_mbox) < 0)
+		if (mbox_read(st, mbox, s_mbox) < 0)
 			break;
 		if (s_mbox->cmd != SBD_MSG_TEST) {
 			rc = 0;
@@ -869,10 +901,10 @@ make_daemon(void)
 }
 
 int
-header_dump(int devfd)
+header_dump(struct sbd_context *st)
 {
 	struct sector_header_s *s_header;
-	s_header = header_get(devfd);
+	s_header = header_get(st);
 	if (s_header == NULL)
 		return -1;
 
