@@ -73,6 +73,7 @@ struct servants_list_item {
 	const char* devname;
 	pid_t pid;
 	int restarts;
+	int restart_blocked;
 	struct timespec t_last, t_started;
 	struct servants_list_item *next;
 };
