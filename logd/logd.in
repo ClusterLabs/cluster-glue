@@ -87,11 +87,13 @@ case "$1" in
   status) StatusLogd ;;
   stop) StopLogd ;;
   restart)
-        sleeptime=1
+	sleeptime=1
 	$0 stop && sleep $sleeptime && $0 start
 	echo
 	;;
-
+  try-restart)
+	$0 status && $0 restart
+	;;
   *)
 	echo "Usage: $0 {start|stop|status|restart}"
 	exit 1
