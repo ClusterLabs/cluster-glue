@@ -17,6 +17,7 @@ int	watchdog_use		= 0;
 int	watchdog_set_timeout	= 1;
 int	skip_rt			= 0;
 int	debug			= 0;
+int	debug_mode		= 0;
 const char *watchdogdev		= "/dev/watchdog";
 char *	local_uname;
 
@@ -56,6 +57,7 @@ usage(void)
 "			(default is 60, set to 0 to disable)\n"
 "-F <N>		# of failures before a servant is considered faulty (optional)\n"
 "			(default is 10, set to 0 to disable)\n"
+"-Z		Enable trace mode. WARNING: UNSAFE FOR PRODUCTION!\n"
 "Commands:\n"
 "create		initialize N slots on <dev> - OVERWRITES DEVICE!\n"
 "list		List all allocated slots on device, and messages.\n"
@@ -858,6 +860,17 @@ do_crashdump(void)
 void
 do_reset(void)
 {
+	if (debug_mode == 2) {
+		cl_log(LOG_ERR, "Skipping request to suicide due to DEBUG MODE!");
+		watchdog_close();
+		exit(0);
+	}
+	if (debug_mode == 1) {
+		cl_log(LOG_ERR, "Request to suicide changed to kdump due to DEBUG MODE!");
+		watchdog_close();
+		sysrq_trigger('c');
+		exit(0);
+	}
 	sysrq_trigger('b');
 	cl_reboot(5, "sbd is self-fencing (reset)");
 	sleep(timeout_watchdog * 2);
@@ -867,6 +880,17 @@ do_reset(void)
 void
 do_off(void)
 {
+	if (debug_mode == 2) {
+		cl_log(LOG_ERR, "Skipping request to power-off due to DEBUG MODE!");
+		watchdog_close();
+		exit(0);
+	}
+	if (debug_mode == 1) {
+		cl_log(LOG_ERR, "Request to power-off changed to kdump due to DEBUG MODE!");
+		watchdog_close();
+		sysrq_trigger('c');
+		exit(0);
+	}
 	sysrq_trigger('o');
 	cl_reboot(5, "sbd is self-fencing (power-off)");
 	sleep(timeout_watchdog * 2);
