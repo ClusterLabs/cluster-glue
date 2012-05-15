@@ -48,7 +48,6 @@ libplumb_la_SOURCES	= 		\
 			cl_reboot.c	\
 			coredumps.c	\
 			cpulimits.c	\
-			Gmain_timeout.c	\
 			GSource.c	\
 			ipcsocket.c	\
 			longclock.c	\
