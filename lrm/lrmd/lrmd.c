@@ -1574,7 +1574,6 @@ on_repeat_op_readytorun(gpointer data)
 
 	rsc->repeat_op_list = g_list_remove(rsc->repeat_op_list, op);
 	if (op->repeat_timeout_tag != 0) {
-		Gmain_timeout_remove(op->repeat_timeout_tag);
 		op->repeat_timeout_tag = (guint)0;
 	}
 
@@ -2905,7 +2904,6 @@ rsc_execution_freeze_timeout(gpointer data)
 	}
 
 	if (rsc->delay_timeout > 0) {
-		Gmain_timeout_remove(rsc->delay_timeout);
 		rsc->delay_timeout = (guint)0;
 	}
 
