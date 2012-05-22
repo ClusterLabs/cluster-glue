@@ -174,6 +174,8 @@ get_num_tokens(char *str)
 {
 	int namecount = 0;
 
+	if (!str)
+		return namecount;
 	while (*str != EOS) {
 		str += strspn(str, WHITESPACE);
 		if (*str == EOS)
