@@ -884,6 +884,7 @@ rhcs_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 	char			buff[BUFF_LEN];
 	int			read_len = 0;
 	int			rc;
+	char *k, *v;
 	char * 			data = NULL;
 	char			cmd[FILENAME_MAX+64];
 	struct stat		buf;
@@ -935,11 +936,13 @@ rhcs_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		close(fd1[0]);
 		close(fd2[1]);
 
+		k = g_strdup("action");
+		v = g_strdup(op);
+		g_hash_table_insert(sd->cmd_opts, k, v);
 		if (sd->cmd_opts) {
 			g_hash_table_foreach(sd->cmd_opts, rhcs_print_var,
 				GUINT_TO_POINTER(fd1[1]));
 		}
-		rhcs_print_var((gpointer)"action", (gpointer)op, (gpointer)fd1[1]);
 		close(fd1[1]); /* we have nothing more to say */
 
 		fcntl(fd2[0], F_SETFL, fcntl(fd2[0], F_GETFL, 0) | O_NONBLOCK);
