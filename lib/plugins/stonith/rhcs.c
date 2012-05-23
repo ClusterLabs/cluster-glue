@@ -939,6 +939,9 @@ rhcs_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		k = g_strdup("action");
 		v = g_strdup(op);
 		g_hash_table_insert(sd->cmd_opts, k, v);
+		k = g_strdup("agent");
+		v = g_strdup(sd->subplugin);
+		g_hash_table_insert(sd->cmd_opts, k, v);
 		if (sd->cmd_opts) {
 			g_hash_table_foreach(sd->cmd_opts, rhcs_print_var,
 				GUINT_TO_POINTER(fd1[1]));
