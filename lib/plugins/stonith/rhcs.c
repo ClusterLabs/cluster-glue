@@ -936,13 +936,13 @@ rhcs_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		close(fd1[0]);
 		close(fd2[1]);
 
-		k = g_strdup("action");
-		v = g_strdup(op);
-		g_hash_table_insert(sd->cmd_opts, k, v);
-		k = g_strdup("agent");
-		v = g_strdup(sd->subplugin);
-		g_hash_table_insert(sd->cmd_opts, k, v);
 		if (sd->cmd_opts) {
+			k = g_strdup("action");
+			v = g_strdup(op);
+			g_hash_table_insert(sd->cmd_opts, k, v);
+			k = g_strdup("agent");
+			v = g_strdup(sd->subplugin);
+			g_hash_table_insert(sd->cmd_opts, k, v);
 			g_hash_table_foreach(sd->cmd_opts, rhcs_print_var,
 				GUINT_TO_POINTER(fd1[1]));
 		}
@@ -1003,7 +1003,9 @@ rhcs_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		if (dup(fd2[1]) < 0)
 			goto err;
 		close(fd2[1]);
-		if (execlp(cmd, cmd, NULL) < 0) {
+		rc = sd->cmd_opts ?
+			execlp(cmd, cmd, NULL) : execlp(cmd, cmd, "-o", op, NULL);
+		if (rc < 0) {
 			LOG(PIL_CRIT, "%s: Calling '%s' failed: %m",
 				__FUNCTION__, cmd);
 		}
