@@ -125,7 +125,7 @@ static const char * NOTpluginID = "RHCS device has been destroyed";
 /* Run the command with op and return the exit status + the output 
  * (NULL -> discard output) */
 static int rhcs_run_cmd(struct pluginDevice *sd, const char *op, 
-		char **output);
+		const char *host, char **output);
 /* Just free up the configuration and the memory, if any */
 static void rhcs_unconfig(struct pluginDevice *sd);
 
@@ -149,7 +149,7 @@ rhcs_status(StonithPlugin  *s)
 		return(S_OOPS);
 	}
 	
-	rc = rhcs_run_cmd(sd, op, &output);
+	rc = rhcs_run_cmd(sd, op, NULL, &output);
 	if (rc != 0) {
 		LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
 			__FUNCTION__, sd->subplugin, op, rc);
@@ -250,7 +250,6 @@ rhcs_reset_req(StonithPlugin * s, int request, const char * host)
 	const char *		op;
 	int			rc;
 	char *			output = NULL;
-	char *k, *v;
 	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
@@ -288,13 +287,7 @@ rhcs_reset_req(StonithPlugin * s, int request, const char * host)
 			break;
 	}
 	
-	k = g_strdup("nodename");
-	v = g_strdup(host);
-	g_hash_table_insert(sd->cmd_opts, k, v);
-	rc = rhcs_run_cmd(sd, op, &output);
-	g_hash_table_remove(sd->cmd_opts, k);
-	g_free(k);
-	g_free(v);
+	rc = rhcs_run_cmd(sd, op, host, &output);
 	if (rc != 0) {
 		LOG(PIL_CRIT, "%s: '%s %s' for host %s failed with rc %d",
 			__FUNCTION__, sd->subplugin, op, host, rc);
@@ -477,7 +470,7 @@ load_metadata(struct pluginDevice *	sd)
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 	}
 
-	rc = rhcs_run_cmd(sd, op, &ret);
+	rc = rhcs_run_cmd(sd, op, NULL, &ret);
 	if (rc != 0) {
 		LOG(PIL_CRIT, "%s: '%s %s' failed with rc %d",
 			__FUNCTION__, sd->subplugin, op, rc);
@@ -855,36 +848,40 @@ rhcs_new(const char *subplugin)
 #define MAXLINE 512
 
 static void
-rhcs_print_var(gpointer key, gpointer value, gpointer user_data)
+printparam_to_fd(int fd, const char *key, const char *value)
 {
-	int fd = GPOINTER_TO_UINT(user_data);
 	char arg[MAXLINE];
 	int cnt;
 
-	cnt = snprintf(arg, MAXLINE, "%s=%s\n", (char *)key, (char *)value);
+	cnt = snprintf(arg, MAXLINE, "%s=%s\n", key, value);
 	if (cnt <= 0 || cnt >= MAXLINE) {
 		LOG(PIL_CRIT, "%s: param/value pair too large", __FUNCTION__);
 		return;
 	}
 	if (Debug) {
-		LOG(PIL_DEBUG, "set rhcs plugin param '%s=%s'", (char *)key, (char *)value);
+		LOG(PIL_DEBUG, "set rhcs plugin param '%s=%s'", key, value);
 	}
 	if (write(fd, arg, cnt) < 0) {
 		LOG(PIL_CRIT, "%s: write: %m", __FUNCTION__);
 	}
 }
 
+static void
+rhcs_print_var(gpointer key, gpointer value, gpointer user_data)
+{
+	printparam_to_fd(GPOINTER_TO_UINT(user_data), (char *)key, (char *)value);
+}
+
 /* Run the command with op as command line argument(s) and return the exit
  * status + the output */
 
 static int 
-rhcs_run_cmd(struct pluginDevice *sd, const char *op, char **output)
+rhcs_run_cmd(struct pluginDevice *sd, const char *op, const char *host, char **output)
 {
 	const int		BUFF_LEN=4096;
 	char			buff[BUFF_LEN];
 	int			read_len = 0;
 	int			rc;
-	char *k, *v;
 	char * 			data = NULL;
 	char			cmd[FILENAME_MAX+64];
 	struct stat		buf;
@@ -937,12 +934,10 @@ rhcs_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		close(fd2[1]);
 
 		if (sd->cmd_opts) {
-			k = g_strdup("action");
-			v = g_strdup(op);
-			g_hash_table_insert(sd->cmd_opts, k, v);
-			k = g_strdup("agent");
-			v = g_strdup(sd->subplugin);
-			g_hash_table_insert(sd->cmd_opts, k, v);
+			printparam_to_fd(fd1[1], "agent", sd->subplugin);
+			printparam_to_fd(fd1[1], "action", op);
+			if( host )
+				printparam_to_fd(fd1[1], "nodename", host);
 			g_hash_table_foreach(sd->cmd_opts, rhcs_print_var,
 				GUINT_TO_POINTER(fd1[1]));
 		}
