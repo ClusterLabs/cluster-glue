@@ -729,10 +729,10 @@ struct SOCKET_MSG_HEAD{
 
 
 /* MAXMSG is the maximum final message size on the wire. */
-#define	MAXMSG		(512*1024)
+#define	MAXMSG		(256*1024)
 /* MAXUNCOMPRESSED is the maximum, raw data size prior to compression. */
 /* 1:8 compression ratio is to be expected on data such as xml */
-#define	MAXUNCOMPRESSED	(4096*1024)
+#define	MAXUNCOMPRESSED	(2048*1024)
 #define HEADMAGIC	0xabcd
 #define POOL_SIZE (4*1024)
 struct ipc_bufpool{
