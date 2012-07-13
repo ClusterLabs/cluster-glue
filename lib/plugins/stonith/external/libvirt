@@ -34,7 +34,9 @@ libvirt_start() {
         return 0
     fi
 
-    if echo "$out" | grep -i 'Domain is already active' > /dev/null 2>&1
+    $VIRSH -c $hypervisor_uri dominfo $domain_id |
+        grep "^State:" | grep -q -e "running" -e "idle"
+    if [ $? -eq 0 ]
     then
         ha_log.sh notice "Domain $domain_id is already active"
         return 0
@@ -58,7 +60,9 @@ libvirt_stop() {
         return 0
     fi
 
-    if echo "$out" | grep -i 'domain is not running' > /dev/null 2>&1
+    $VIRSH -c $hypervisor_uri dominfo $domain_id |
+        grep "^State:" | grep -q "shut off"
+    if [ $? -eq 0 ]
     then
         ha_log.sh notice "Domain $domain_id is already stopped"
         return 2
