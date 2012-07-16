@@ -1,4 +1,4 @@
-* Thu Jul 12 2012 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
+* Mon Jul 16 2012 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
 - stable release 1.0.10
 - clplumbing: ipc: fix message size checks (bnc#752231)
 - clplumbing: load bz2 compression module by default
@@ -16,6 +16,8 @@
 - stonith: adjust timeouts in the meta-data template (bnc#733337)
 - stonith: external/vcenter: return list of configured hosts on
   gethosts
+- stonith: external/libvirt: add more search strings for domain
+  start and stop
 - stonith: rhcs: pass the action via stdin too
 - stonith: rhcs: avoid false error if parameter isn't set
 - logd: remove runlevel 4 from the LSB info section in the logd
