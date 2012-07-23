@@ -2405,7 +2405,7 @@ socket_verify_auth(struct IPC_CHANNEL* ch, struct IPC_AUTH * auth_info)
 
 #define	EXTRASPACE	0
 
-#ifdef HAVE_STRUCT_CMSGCRED
+#if defined(HAVE_STRUCT_CMSGCRED) || defined( __FreeBSD_kernel__) || defined(__GNU__)
 	/* FreeBSD */
   typedef struct cmsgcred Cred;
 #	define crRuid	cmcred_uid
