@@ -69,6 +69,10 @@
  * other negative value, if something unexpected happend (failure anyway)
  */
 
+#if !defined(PATH_MAX) && defined(__GNU__)
+/* Hurd :-) */
+#define PATH_MAX 4096
+#endif
 
 /* This is what the FHS standard specifies for the size of our lock file */
 #define	LOCKSTRLEN	12
@@ -92,7 +96,7 @@ int IsRunning(long pid)
 	/* check to make sure pid hasn't been reused by another process */
 	snprintf(proc_path, sizeof(proc_path), "/proc/%ld/exe", pid);
 	
-	rc = readlink(proc_path, exe_path, PATH_MAX-1);
+	rc = readlink(proc_path, exe_path, sizeof(exe_path)-1);
 	if(rc < 0) {
 		cl_perror("Could not read from %s", proc_path);
 		goto bail;
@@ -102,7 +106,7 @@ int IsRunning(long pid)
 	mypid = (unsigned long) getpid();
 	
 	snprintf(proc_path, sizeof(proc_path), "/proc/%ld/exe", mypid);
-	rc = readlink(proc_path, myexe_path, PATH_MAX-1);
+	rc = readlink(proc_path, myexe_path, sizeof(myexe_path)-1);
 	if(rc < 0) {
 		cl_perror("Could not read from %s", proc_path);
 		goto bail;
