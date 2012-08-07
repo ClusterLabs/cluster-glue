@@ -37,7 +37,7 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 # Build dependencies
 BuildRequires: automake autoconf libtool pkgconfig which
-BuildRequires: bzip2-devel glib2-devel python-devel libxml2-devel
+BuildRequires: bzip2-devel glib2-devel python-devel libxml2-devel libaio-devel
 BuildRequires: OpenIPMI-devel openssl-devel
 BuildRequires: libxslt docbook-dtds docbook-style-xsl
 BuildRequires: help2man
