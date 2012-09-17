@@ -25,7 +25,7 @@ sub dielog {
 # Define command groups
 my @configCommands = qw{getconfignames getinfo-devid getinfo-devname getinfo-devdescr getinfo-devurl getinfo-xml};
 my @actionCommands = qw{reset on off};
-my @netCommands = (@actionCommands, qw{status gethosts});
+my @netCommands = (@actionCommands, qw{status gethosts listvms});
 
 # Process command line arguments
 my $command = $ARGV[0] || dielog("No command specified\n");
@@ -162,6 +162,9 @@ elsif ($command ~~ @netCommands) {
 				# VI API: searches the inventory tree for a VirtualMachine managed entity whose name matches
 				# the name of the virtual machine assigned to the target host in HOSTLIST
 				$vm = Vim::find_entity_view(view_type => "VirtualMachine", filter => { name => qr/\Q$host_to_vm{$targetHost}\E/i });
+				if (!defined $vm) {
+					dielog("Machine $targetHost was not found");
+ 				}
 
 				# VI API: retrieves the properties of the managed object reference runtime.host of the VirtualMachine
 				# managed entity obtained by the previous command
@@ -242,6 +245,20 @@ elsif ($command ~~ @netCommands) {
                         foreach my $key (keys(%host_to_vm)) {
                                 print "$host_to_vm{$key} \n";
                         }
+		}
+		elsif ($command eq "listvms") {
+			eval {
+				# VI API: Searches the inventory tree for all VirtualMachine managed objects
+				my $vms = Vim::find_entity_views(view_type => "VirtualMachine");
+				if (defined $vms) {
+					printf(STDERR "%-50s    %-20s\n", "VM Name", "Power state");
+					print STDERR "-" x 70 . "\n";
+					foreach my $vm (@$vms) {
+					my $powerState = $vm->get_property('runtime.powerState')->val;
+						printf("%-50s    %-20s\n", $vm->{name}, $powerState);
+					}
+				}
+			};
 		}
 		else { dielog("Invalid command specified: $command\n"); }
 	}
