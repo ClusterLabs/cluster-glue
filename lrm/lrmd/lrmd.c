@@ -1079,6 +1079,31 @@ emit_apphb(gpointer data)
 	return TRUE;
 }
 
+static void
+calc_max_children()
+{
+#ifdef _SC_NPROCESSORS_ONLN
+	int nprocs;
+
+	nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+	if( nprocs < 1 ) {
+		lrmd_log(LOG_WARNING, "%s: couldn't get the number of processors"
+		, __FUNCTION__);
+	} else {
+		if( nprocs/2 > max_child_count ) {
+			max_child_count = nprocs/2;
+		}
+		lrmd_log(LOG_INFO, "max-children set to %d "
+		"(%d processors online)", max_child_count, nprocs);
+		return;
+	}
+#else
+	lrmd_log(LOG_WARNING, "%s: cannot get the number of processors "
+	"on this platform", __FUNCTION__);
+#endif
+	lrmd_log(LOG_INFO, "max-children set to %d", max_child_count);
+}
+
 /* main loop of the daemon*/
 int
 init_start ()
@@ -1105,6 +1130,8 @@ init_start ()
 
 	if( getenv("LRMD_MAX_CHILDREN") ) {
 		set_lrmd_param("max-children", getenv("LRMD_MAX_CHILDREN"));
+	} else {
+		calc_max_children();
 	}
 
 	qsort(msg_maps, MSG_NR, sizeof(struct msg_map), msg_type_cmp);
@@ -3470,6 +3497,9 @@ set_lrmd_param(const char *name, const char *value)
 			lrmd_log(LOG_ERR, "%s: invalid value for lrmd parameter %s"
 				, __FUNCTION__, name);
 			return HA_FAIL;
+		} else if (ival == max_child_count) {
+			lrmd_log(LOG_INFO, "max-children already set to %d", ival);
+			return HA_OK;
 		}
 		lrmd_log(LOG_INFO, "setting max-children to %d", ival);
 		max_child_count = ival;

@@ -87,6 +87,7 @@ static int prepare_failmsg(struct ha_msg* msg,
 static void async_notify(gpointer key, gpointer val, gpointer data);
 static gboolean client_cmp_name(gpointer key, gpointer val, gpointer app_name);
 static lrmd_client_t* lookup_client_by_name(char *app_name);
+static void calc_max_children(void);
 
 /*
  * following functions are used to monitor the exit of ra proc
