@@ -3121,17 +3121,6 @@ perform_ra_op(lrmd_op_t* op)
 	}
 
 	op_type = ha_msg_value(op->msg, F_LRM_OP);
-	op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
-	params = merge_str_tables(rsc->params,op_params);
-	ha_msg_mod_str_table(op->msg, F_LRM_PARAM, params);
-	if (op_params) {
-		free_str_table(op_params);
-		op_params = NULL;
-	}
-	if (params) {
-		free_str_table(params);
-		params = NULL;
-	}
 	op->t_perform = time_longclock();
 	check_queue_duration(op);
 
@@ -3261,7 +3250,14 @@ perform_ra_op(lrmd_op_t* op)
 			lrmd_debug2(LOG_DEBUG
 			,	"perform_ra_op:calling RA plugin to perform %s, pid: [%d]"
 			,	op_info(op), getpid());		
-			params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
+
+			op_params = ha_msg_value_str_table(op->msg, F_LRM_PARAM);
+			params = merge_str_tables(rsc->params,op_params);
+			if (op_params) {
+				free_str_table(op_params);
+				op_params = NULL;
+			}
+
 			if (replace_secret_params(rsc->id, params) < 0) {
 				/* replacing secrets failed! */
 				if (!strcmp(op_type,"stop")) {
