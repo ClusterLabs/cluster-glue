@@ -29,7 +29,6 @@ man_MANS		=
 
 if BUILD_DOC
 man_MANS		+= hb_report.8 ha_logd.8 ha_logger.1 stonith.8 meatclient.8
-endif
 
 EXTRA_DIST		= $(man_MANS)
 
@@ -47,3 +46,5 @@ XSLTPROC_FO_OPTIONS 	?= $(XSLTPROC_OPTIONS)
 	$(XSLTPROC) \
 	$(XSLTPROC_MANPAGES_OPTIONS) \
 	$(MANPAGES_STYLESHEET) $<
+
+endif
