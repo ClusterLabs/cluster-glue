@@ -456,9 +456,10 @@ AC_SUBST(GLUE_BUILD_VERSION)
 
 dnl check byte order
 AC_MSG_CHECKING(for byteorder)
-AC_TRY_RUN(`cat $srcdir/config/byteorder_test.c`,
+AC_C_BIGENDIAN(
+[AC_MSG_RESULT(big-endian); AC_DEFINE(CONFIG_BIG_ENDIAN, 1, [big-endian])],
 [AC_MSG_RESULT(little-endian); AC_DEFINE(CONFIG_LITTLE_ENDIAN, 1, [little-endian])],
-[AC_MSG_RESULT(big-endian); AC_DEFINE(CONFIG_BIG_ENDIAN, 1, [big-endian])],)
+)
 
 
 dnl ===============================================
@@ -492,11 +493,16 @@ AC_PATH_PROGS(EGREP, egrep)
 AC_PATH_PROGS(PKGCONFIG, pkg-config)
 AC_PATH_PROGS(XML2CONFIG, xml2-config)
 
-AC_PATH_PROGS(XSLTPROC, xsltproc)
-AM_CONDITIONAL(BUILD_DOC, test "x$XSLTPROC" != "x" )
-if test "x$XSLTPROC" = "x"; then
-   AC_MSG_WARN([xsltproc not installed, unable to (re-)build manual pages])
+AC_ARG_ENABLE([doc],
+ AS_HELP_STRING([--enable-doc], [build documentation (default is yes)]),
+ [], [enable_doc=yes])
+if test "x$enable_doc" != "xno"; then
+       AC_PATH_PROGS(XSLTPROC, xsltproc)
+       if test "x$XSLTPROC" = "x"; then
+           AC_MSG_WARN([xsltproc not installed, unable to (re-)build manual pages])
+       fi
 fi
+AM_CONDITIONAL(BUILD_DOC, test "x$XSLTPROC" != "x" )
 
 AC_PATH_PROGS(VALGRIND_BIN, valgrind, /usr/bin/valgrind)
 AC_DEFINE_UNQUOTED(VALGRIND_BIN, "$VALGRIND_BIN", Valgrind command)
@@ -933,7 +939,7 @@ dnl ========================================================================
 
 AC_ARG_ENABLE([libnet],
  [  --enable-libnet 	Use libnet for ARP based funcationality, [default=try]], 
- [enable_libnet=$withval], [enable_libnet=try])
+ [], [enable_libnet=try])
 
 libnet=""
 libnet_version="none"
@@ -1042,7 +1048,7 @@ elif test "x${ac_cv_header_net_snmp_net_snmp_config_h}" = "xyes"; then
 		ENABLE_SNMP="no"
 	else
 		AC_MSG_CHECKING(for special snmp libraries)
-		SNMPLIB=`net-snmp-config --libs`
+		SNMPLIB=`${SNMPCONFIG} --libs`
 		AC_MSG_RESULT($SNMPLIB)
 	fi
 elif test "x${ac_cv_header_ucd_snmp_snmp_h}" = "xyes"; then
