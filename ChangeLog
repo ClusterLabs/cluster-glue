@@ -1,3 +1,13 @@
+* Mon Oct 15 2012 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
+- stable release 1.0.11
+- lrmd: set max-children depending on the number of processors
+- lrmd: don't send parameters from ops back to crmd
+- stonith: external/libvirt: support for reboot reset method
+- hb_report: node's type got optional
+- hb_report: make use of bash trace features
+- hb_report: compatibility code for pacemaker v1.1.8
+- build: link libstonith with stonith2 agents
+
 * Mon Jul 16 2012 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
 - stable release 1.0.10
 - clplumbing: ipc: fix message size checks (bnc#752231)
