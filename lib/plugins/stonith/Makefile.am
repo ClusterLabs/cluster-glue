@@ -123,91 +123,93 @@ noinst_LTLIBRARIES = $(libipmilan_LIB)
 
 apcmaster_la_SOURCES	= apcmaster.c $(INCFILES)
 apcmaster_la_LDFLAGS	= -export-dynamic -module -avoid-version
-apcmaster_la_LIBADD	= $(GLIBLIB)
+apcmaster_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(GLIBLIB)
 
 apcmastersnmp_la_SOURCES= apcmastersnmp.c $(INCFILES)
 apcmastersnmp_la_LDFLAGS= -export-dynamic -module -avoid-version @SNMPLIB@ \
 			  @CRYPTOLIB@
-apcmastersnmp_la_LIBADD	= $(GLIBLIB)
+apcmastersnmp_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(GLIBLIB)
 
 apcsmart_la_SOURCES	= apcsmart.c $(INCFILES)
 apcsmart_la_LDFLAGS	= -export-dynamic -module -avoid-version
-apcsmart_la_LIBADD	= $(GLIBLIB)
+apcsmart_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(GLIBLIB)
 
 baytech_la_SOURCES	= baytech.c $(INCFILES)
 baytech_la_LDFLAGS	= -export-dynamic -module -avoid-version
-baytech_la_LIBADD	= $(GLIBLIB)
+baytech_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(GLIBLIB)
 
 bladehpi_la_SOURCES	= bladehpi.c $(INCFILES)
 bladehpi_la_LDFLAGS	= -export-dynamic -module -avoid-version
-bladehpi_la_LIBADD	= $(GLIBLIB) -lopenhpi
+bladehpi_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(GLIBLIB) -lopenhpi
 
 cyclades_la_SOURCES	= cyclades.c $(INCFILES)
 cyclades_la_LDFLAGS	= -export-dynamic -module -avoid-version
-cyclades_la_LIBADD	= $(GLIBLIB)
+cyclades_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(GLIBLIB)
 
 drac3_la_SOURCES	= drac3.c drac3_command.c drac3_command.h drac3_hash.c drac3_hash.h	$(INCFILES)
 drac3_la_LDFLAGS	= -export-dynamic -module -avoid-version
-drac3_la_LIBADD		= -lcurl -lxml2 $(GLIBLIB)
+drac3_la_LIBADD		= $(top_builddir)/lib/stonith/libstonith.la -lcurl -lxml2 $(GLIBLIB)
 
 external_la_SOURCES	= external.c	$(INCFILES)
 external_la_LDFLAGS	= -export-dynamic -module -avoid-version
-external_la_LIBADD	= $(top_builddir)/replace/libreplace.la
+external_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(top_builddir)/replace/libreplace.la
 
 rhcs_la_SOURCES	= rhcs.c	$(INCFILES)
 rhcs_la_LDFLAGS	= -export-dynamic -module -avoid-version
-rhcs_la_LIBADD	= $(top_builddir)/replace/libreplace.la
+rhcs_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(top_builddir)/replace/libreplace.la
 
 ibmhmc_la_SOURCES	= ibmhmc.c	$(INCFILES)
 ibmhmc_la_LDFLAGS	= -export-dynamic -module -avoid-version
-ibmhmc_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
+ibmhmc_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
 ipmilan_la_SOURCES	= ipmilan.c ipmilan.h ipmilan_command.c	$(INCFILES)
 ipmilan_la_LDFLAGS	= -export-dynamic -module -avoid-version
-ipmilan_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(OPENIPMI_LIB) $(GLIBLIB)
+ipmilan_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(top_builddir)/replace/libreplace.la $(OPENIPMI_LIB) $(GLIBLIB)
 
 libipmilan_la_SOURCES	= ipmilan.c ipmilan.h ipmilan_command.c	$(INCFILES)
 libipmilan_la_LDFLAGS	= -version-info 1:0:0
-libipmilan_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(OPENIPMI_LIB) $(GLIBLIB)
+libipmilan_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(top_builddir)/replace/libreplace.la $(OPENIPMI_LIB) $(GLIBLIB)
 
 meatware_la_SOURCES	= meatware.c $(INCFILES)
 meatware_la_LDFLAGS	= -export-dynamic -module -avoid-version
-meatware_la_LIBADD	= $(GLIBLIB)
+meatware_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(GLIBLIB)
 
 null_la_SOURCES		= null.c $(INCFILES)
 null_la_LDFLAGS		= -export-dynamic -module -avoid-version
-null_la_LIBADD		= $(GLIBLIB)
+null_la_LIBADD		= $(top_builddir)/lib/stonith/libstonith.la $(GLIBLIB)
 
 nw_rpc100s_la_SOURCES	= nw_rpc100s.c $(INCFILES)
 nw_rpc100s_la_LDFLAGS	= -export-dynamic -module -avoid-version
-nw_rpc100s_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
+nw_rpc100s_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
 rcd_serial_la_SOURCES	= rcd_serial.c $(INCFILES)
 rcd_serial_la_LDFLAGS	= -export-dynamic -module -avoid-version
-rcd_serial_la_LIBADD	= $(GLIBLIB)
+rcd_serial_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(GLIBLIB)
 
 rps10_la_SOURCES	= rps10.c $(INCFILES)
 rps10_la_LDFLAGS	= -export-dynamic -module -avoid-version
-rps10_la_LIBADD		= $(GLIBLIB)
+rps10_la_LIBADD		= $(top_builddir)/lib/stonith/libstonith.la $(GLIBLIB)
 
 ssh_la_SOURCES		= ssh.c $(INCFILES)
 ssh_la_LDFLAGS		= -export-dynamic -module -avoid-version
+ssh_la_LIBADD		= $(top_builddir)/lib/stonith/libstonith.la 
 
 vacm_la_SOURCES		= vacm.c $(INCFILES)
 vacm_la_LDFLAGS		= -export-dynamic -module -avoid-version
-vacm_la_LIBADD		= $(top_builddir)/replace/libreplace.la
+vacm_la_LIBADD		= $(top_builddir)/lib/stonith/libstonith.la $(top_builddir)/replace/libreplace.la
 
 wti_nps_la_SOURCES	= wti_nps.c $(INCFILES)
 wti_nps_la_LDFLAGS	= -export-dynamic -module -avoid-version
-wti_nps_la_LIBADD	= $(top_builddir)/replace/libreplace.la $(GLIBLIB)
+wti_nps_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(top_builddir)/replace/libreplace.la $(GLIBLIB)
 
 wti_mpc_la_SOURCES= wti_mpc.c $(INCFILES)
 wti_mpc_la_LDFLAGS= -export-dynamic -module -avoid-version @SNMPLIB@ \
 			  @CRYPTOLIB@
-wti_mpc_la_LIBADD	= $(GLIBLIB)
+wti_mpc_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la $(GLIBLIB)
 
 suicide_la_SOURCES	= suicide.c $(INCFILES)
 suicide_la_LDFLAGS	= -export-dynamic -module -avoid-version
+suicide_la_LIBADD	= $(top_builddir)/lib/stonith/libstonith.la 
 
 stonithscriptdir        =  $(stonith_plugindir)/stonith2
 
