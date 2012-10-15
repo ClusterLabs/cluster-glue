@@ -46,6 +46,23 @@ libvirt_start() {
     ha_log.sh err "$out"
     return 1
 }
+# reboot a domain
+# return
+#   0: success
+#   1: error
+libvirt_reboot() {
+    local rc out
+    out=$($VIRSH -c $hypervisor_uri reboot $domain_id 2>&1)
+    rc=$?
+    if [ $rc -eq 0 ]
+    then
+        ha_log.sh notice "Domain $domain_id was rebooted"
+        return 0
+    fi
+    ha_log.sh err "Failed to reboot domain $domain_id (exit code: $rc)"
+    ha_log.sh err "$out"
+    return 1
+}
 
 # stop a domain
 # return
@@ -106,6 +123,14 @@ libvirt_check_config() {
         ha_log.sh err "hostlist or hypervisor_uri missing; check configuration"
         exit 1
     fi
+
+    case "$reset_method" in
+    power_cycle|reboot) : ;;
+    *)
+        ha_log.sh err "unrecognized reset_method: $reset_method"
+        exit 1
+    ;;
+    esac
 }
 
 # set variable domain_id for the host specified as arg
@@ -159,6 +184,18 @@ virsh must be installed (e.g. libvir-client package) and access control must
 be configured for your selected URI.
 </longdesc>
 </parameter>
+
+<parameter name="reset_method" required="0">
+<content type="string" default="power_cycle"/>
+<shortdesc lang="en">
+How to reset a guest.
+</shortdesc>
+<longdesc lang="en">
+A guest reset may be done by a sequence of off and on commands
+(power_cycle) or by the reboot command. Which method works
+depend on the hypervisor and guest configuration management.
+</longdesc>
+</parameter>
 </parameters>
 LVIRTXML
 exit 0
@@ -174,6 +211,8 @@ unset SSH_AUTH_SOCK
 
 # support , as a separator as well
 hostlist=`echo $hostlist| sed -e 's/,/ /g'`
+
+reset_method=${reset_method:-"power_cycle"}
 
 case $1 in
     gethosts)
@@ -203,20 +242,19 @@ case $1 in
     ;;
 
     reset)
-    # libvirt has no reset so we do a power cycle
     libvirt_check_config
     libvirt_set_domain_id $2
 
-    libvirt_stop
+    if [ "$reset_method" = "power_cycle" ]; then
+        libvirt_stop
+        rc=$?
+        [ $rc = 1 ] && exit 1
+        sleep 2
+        libvirt_start
+    else
+        libvirt_reboot
+    fi
     rc=$?
-    [ $rc = 1 ] && exit 1
-
-    # stonith reset seems to require a power on even if it was off
-    # before so the next line is commented out
-    # [ $rc = 2 ] && exit 0
-
-    sleep 2
-    libvirt_start
     exit $?
     ;;
 
@@ -227,7 +265,7 @@ case $1 in
     ;;
 
     getconfignames)
-    echo "hostlist hypervisor_uri"
+    echo "hostlist hypervisor_uri reboot_method"
     exit 0
     ;;
 
@@ -261,3 +299,4 @@ case $1 in
     ;;
 esac
 
+# vi:et:ts=4:sw=4
