@@ -161,7 +161,7 @@ elsif ($command ~~ @netCommands) {
 			eval {
 				# VI API: searches the inventory tree for a VirtualMachine managed entity whose name matches
 				# the name of the virtual machine assigned to the target host in HOSTLIST
-				$vm = Vim::find_entity_view(view_type => "VirtualMachine", filter => { name => qr/\Q$host_to_vm{$targetHost}\E/i });
+				$vm = Vim::find_entity_view(view_type => "VirtualMachine", filter => { name => qr/^\Q$host_to_vm{$targetHost}\E/i });
 				if (!defined $vm) {
 					dielog("Machine $targetHost was not found");
  				}
