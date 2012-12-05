@@ -685,7 +685,9 @@ main(int argc, char** argv)
 
 			if (!silent) {
 				if (rc == S_OK) {
-					log_msg(LOG_INFO, "%s device OK.", SwitchType);
+					log_msg((log_destination == LOG_TERMINAL) ?
+					LOG_INFO : LOG_DEBUG,
+					"%s device OK.", SwitchType);
 				}else{
 					/* Uh-Oh */
 					log_msg(LOG_ERR, "%s device not accessible."
