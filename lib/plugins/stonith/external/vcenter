@@ -243,7 +243,7 @@ elsif ($command ~~ @netCommands) {
 		}
 		elsif ($command eq "gethosts") {
                         foreach my $key (keys(%host_to_vm)) {
-                                print "$host_to_vm{$key} \n";
+                                print "$key \n";
                         }
 		}
 		elsif ($command eq "listvms") {
