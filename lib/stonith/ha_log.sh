@@ -71,13 +71,14 @@ ha_log() {
 	prn_level=`level_pres $loglevel`
 	msg="$prn_level: $@"
 
+	if [ "x$HA_debug" = "x0" -a "x$loglevel" = xdebug ] ; then
+		return 0
+	fi
+
 	set_logtag
 
 	# if we're connected to a tty, then output to stderr
 	if tty >/dev/null; then
-		if [ "x$HA_debug" = "x0" -a "x$loglevel" = xdebug ] ; then
-			return 0
-		fi
 		if [ "$HA_LOGTAG" ]; then
 			echo "$HA_LOGTAG: $msg"
 		else
