@@ -334,10 +334,10 @@ print_confignames(Stonith *s)
 void
 log_buf(int severity, char *buf)
 {
+	if (severity == LOG_DEBUG && !debug)
+		return;
 	if (log_destination == LOG_TERMINAL) {
-		if (severity != LOG_DEBUG || debug) {
-			fprintf(stderr, "%s: %s\n", prio2str(severity),buf);
-		}
+		fprintf(stderr, "%s: %s\n", prio2str(severity),buf);
 	} else {
 		cl_log(severity, "%s", buf);
 	}
