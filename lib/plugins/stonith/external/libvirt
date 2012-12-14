@@ -97,8 +97,6 @@ libvirt_status() {
     out=$($VIRSH -c $hypervisor_uri version 2>&1)
     if [ $? -eq 0 ]
     then
-        out=`echo "$out" | tail -1`
-        ha_log.sh notice "$hypervisor_uri: $out"
         return 0
     fi
 
