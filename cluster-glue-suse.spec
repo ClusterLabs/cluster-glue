@@ -210,7 +210,6 @@ fi
 %{_sbindir}/cibsecret
 %{_sbindir}/meatclient
 %{_sbindir}/stonith
-%{_sbindir}/sbd
 
 %{_sysconfdir}/init.d/logd
 

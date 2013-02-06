@@ -20,14 +20,14 @@
 MAINTAINERCLEANFILES = Makefile.in
 
 EXTRA_DIST           = drac5 dracmc-telnet ibmrsa-telnet ipmi rackpdu vmware vcenter xen0 \
-			xen0-ha-dom0-stonith-helper sbd kdumpcheck nut
+			xen0-ha-dom0-stonith-helper kdumpcheck nut
 
 extdir		     = $(stonith_ext_plugindir)
 
 helperdir	     = $(stonith_plugindir)
 
 ext_SCRIPTS	     = drac5 dracmc-telnet ibmrsa ibmrsa-telnet ipmi riloe ssh vmware vcenter rackpdu xen0 hmchttp \
-			xen0-ha sbd kdumpcheck ippower9258 nut libvirt \
+			xen0-ha kdumpcheck ippower9258 nut libvirt \
 			hetzner
 
 helper_SCRIPTS	     = xen0-ha-dom0-stonith-helper
