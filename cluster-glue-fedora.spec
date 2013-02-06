@@ -124,7 +124,6 @@ standards, and an interface to common STONITH devices.
 %{_sbindir}/cibsecret
 %{_sbindir}/meatclient
 %{_sbindir}/stonith
-%{_sbindir}/sbd
 %dir %{_libdir}/heartbeat
 %dir %{_libdir}/heartbeat/plugins
 %dir %{_libdir}/heartbeat/plugins/RAExec

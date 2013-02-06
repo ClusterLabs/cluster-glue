@@ -27,9 +27,6 @@ INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include \
 
 ## binaries
 sbin_PROGRAMS		= stonith meatclient 
-if ON_LINUX
-sbin_PROGRAMS		+= sbd
-endif
 
 stonith_SOURCES		= main.c
 
@@ -40,12 +37,6 @@ stonith_LDFLAGS		=  @LIBADD_DL@ @LIBLTDL@ -export-dynamic @DLOPEN_FORCE_FLAGS@ @
 
 meatclient_SOURCES	= meatclient.c 
 meatclient_LDADD	= $(GLIBLIB)
-
-sbd_SOURCES		= sbd-md.c sbd-common.c
-sbd_CFLAGS		= -D_GNU_SOURCE
-sbd_LDADD		= $(GLIBLIB) -laio				\
-			$(top_builddir)/lib/clplumbing/libplumb.la	\
-			$(top_builddir)/lib/clplumbing/libplumbgpl.la
 
 ## libraries
 
@@ -60,4 +51,4 @@ libstonith_la_LIBADD	= $(top_builddir)/lib/pils/libpils.la	\
 helperdir		= 	$(datadir)/$(PACKAGE_NAME)
 helper_SCRIPTS		= ha_log.sh
 
-EXTRA_DIST              = $(helper_SCRIPTS) sbd.h
+EXTRA_DIST              = $(helper_SCRIPTS)

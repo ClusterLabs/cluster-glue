@@ -709,11 +709,6 @@ if test "$ac_cv_header_libxml_xpath_h" != "yes"; then
    AC_MSG_ERROR(The libxml developement headers were not found)
 fi
 
-AC_CHECK_HEADERS(libaio.h)
-if test "$ac_cv_header_libaio_h" != "yes"; then
-   AC_MSG_ERROR(The libaio developement headers were not found)
-fi
-
 dnl Check syslog.h for 'facilitynames' table
 dnl
 AC_CACHE_CHECK([for facilitynames in syslog.h],ac_cv_HAVE_SYSLOG_FACILITYNAMES,[
