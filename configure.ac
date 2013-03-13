@@ -501,6 +501,10 @@ if test "x$enable_doc" != "xno"; then
        if test "x$XSLTPROC" = "x"; then
            AC_MSG_WARN([xsltproc not installed, unable to (re-)build manual pages])
        fi
+       AC_PATH_PROGS(ASCIIDOC, asciidoc)
+       if test "x$ASCIIDOC" = "x"; then
+           AC_MSG_WARN([asciidoc not installed, unable to (re-)build manual pages])
+       fi
 fi
 AM_CONDITIONAL(BUILD_DOC, test "x$XSLTPROC" != "x" )
 

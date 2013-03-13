@@ -41,6 +41,7 @@ BuildRequires:  automake autoconf libtool e2fsprogs-devel glib2-devel pkgconfig 
 BuildRequires:  libnet net-snmp-devel OpenIPMI-devel openhpi-devel
 BuildRequires:  libxslt docbook_4 docbook-xsl-stylesheets
 BuildRequires:  help2man
+BuildRequires:  asciidoc
 
 Obsoletes:	heartbeat-common
 Provides:	heartbeat-common
