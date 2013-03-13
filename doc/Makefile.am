@@ -47,4 +47,7 @@ XSLTPROC_FO_OPTIONS 	?= $(XSLTPROC_OPTIONS)
 	$(XSLTPROC_MANPAGES_OPTIONS) \
 	$(MANPAGES_STYLESHEET) $<
 
+hb_report.8: hb_report.8.txt
+	a2x -f manpage $<
+
 endif
