@@ -190,7 +190,7 @@ static const char *NOTpluginID = "APCMS SNMP device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_PORT_PARM \
-	XML_PARAMETER_BEGIN(ST_PORT, "string", "1") \
+	XML_PARAMETER_BEGIN(ST_PORT, "string", "1", "0") \
 	  XML_PORT_SHORTDESC \
 	  XML_PORT_LONGDESC \
 	XML_PARAMETER_END

@@ -33,9 +33,9 @@
 #define XML_PARAMETERS_BEGIN "<parameters>"
 #define XML_PARAMETERS_END "</parameters>"
 
-/* <parameter name="ipaddr" unique="1">?<content type="string" /></parameter> */
-#define XML_PARAMETER_BEGIN(name,type,req) \
-	"<parameter name=\"" name "\" unique=\"1\" required=\"" req "\">" \
+/* <parameter name="ipaddr" unique="?">?<content type="string" /></parameter> */
+#define XML_PARAMETER_BEGIN(name,type,req,uniq) \
+	"<parameter name=\"" name "\" unique=\"" uniq "\" required=\"" req "\">" \
 	"<content type=\"" type "\" />\n"
 #define XML_PARAMETER_END "</parameter>\n"
 
@@ -119,37 +119,37 @@
  * Complete parameter descriptions for the few standardized parameter names
  */
 #define XML_HOSTLIST_PARM \
-	XML_PARAMETER_BEGIN(ST_HOSTLIST, "string", "1") \
+	XML_PARAMETER_BEGIN(ST_HOSTLIST, "string", "1", "0") \
 	  XML_HOSTLIST_SHORTDESC \
 	  XML_HOSTLIST_LONGDESC \
 	XML_PARAMETER_END
 
 #define XML_IPADDR_PARM \
-	XML_PARAMETER_BEGIN(ST_IPADDR, "string", "1") \
+	XML_PARAMETER_BEGIN(ST_IPADDR, "string", "1", "0") \
 	  XML_IPADDR_SHORTDESC \
 	  XML_IPADDR_LONGDESC \
 	XML_PARAMETER_END
 
 #define XML_LOGIN_PARM \
-	XML_PARAMETER_BEGIN(ST_LOGIN, "string", "1") \
+	XML_PARAMETER_BEGIN(ST_LOGIN, "string", "1", "0") \
 	  XML_LOGIN_SHORTDESC \
 	  XML_LOGIN_LONGDESC \
 	XML_PARAMETER_END
 
 #define XML_PASSWD_PARM \
-	XML_PARAMETER_BEGIN(ST_PASSWD, "string", "1") \
+	XML_PARAMETER_BEGIN(ST_PASSWD, "string", "1", "0") \
 	  XML_PASSWD_SHORTDESC \
 	  XML_PASSWD_LONGDESC \
 	XML_PARAMETER_END
 
 #define XML_COMMUNITY_PARM \
-	XML_PARAMETER_BEGIN(ST_COMMUNITY, "string", "1") \
+	XML_PARAMETER_BEGIN(ST_COMMUNITY, "string", "1", "0") \
 	  XML_COMMUNITY_SHORTDESC \
 	  XML_COMMUNITY_LONGDESC \
 	XML_PARAMETER_END
 
 #define XML_TTYDEV_PARM \
-	XML_PARAMETER_BEGIN(ST_TTYDEV, "string", "1") \
+	XML_PARAMETER_BEGIN(ST_TTYDEV, "string", "1", "0") \
 	  XML_TTYDEV_SHORTDESC \
 	  XML_TTYDEV_LONGDESC \
 	XML_PARAMETER_END

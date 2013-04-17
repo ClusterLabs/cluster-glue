@@ -118,7 +118,7 @@ static const char *NOTpluginID = "Dell DRACIII device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_HOST_PARM \
-	XML_PARAMETER_BEGIN(ST_HOST, "string", "1") \
+	XML_PARAMETER_BEGIN(ST_HOST, "string", "1", "1") \
 	  XML_HOST_SHORTDESC \
 	  XML_HOST_LONGDESC \
 	XML_PARAMETER_END

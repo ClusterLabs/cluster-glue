@@ -155,7 +155,7 @@ static const char *NOTpluginID = "IBM BladeCenter device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_ENTITYROOT_PARM \
-	XML_PARAMETER_BEGIN(ST_ENTITYROOT, "string", "1") \
+	XML_PARAMETER_BEGIN(ST_ENTITYROOT, "string", "1", "0") \
 	  XML_ENTITYROOT_SHORTDESC \
 	  XML_ENTITYROOT_LONGDESC \
 	XML_PARAMETER_END
@@ -171,7 +171,7 @@ static const char *NOTpluginID = "IBM BladeCenter device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_SOFTRESET_PARM \
-	XML_PARAMETER_BEGIN(ST_SOFTRESET, "string", "0") \
+	XML_PARAMETER_BEGIN(ST_SOFTRESET, "string", "0", "0") \
 	  XML_SOFTRESET_SHORTDESC \
 	  XML_SOFTRESET_LONGDESC \
 	XML_PARAMETER_END
