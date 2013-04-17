@@ -209,7 +209,7 @@ static const char * NOTpluginID = "IBM HMC device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_MANSYSPAT_PARM \
-	XML_PARAMETER_BEGIN(ST_MANSYSPAT, "string", "0") \
+	XML_PARAMETER_BEGIN(ST_MANSYSPAT, "string", "0", "0") \
 	  XML_MANSYSPAT_SHORTDESC \
 	  XML_MANSYSPAT_LONGDESC \
 	XML_PARAMETER_END
@@ -220,7 +220,7 @@ static const char * NOTpluginID = "IBM HMC device has been destroyed";
 	XML_PARM_LONGDESC_END
 
 #define XML_OPTPASSWD_PARM \
-	XML_PARAMETER_BEGIN(ST_PASSWD, "string", "0") \
+	XML_PARAMETER_BEGIN(ST_PASSWD, "string", "0", "0") \
 	  XML_PASSWD_SHORTDESC \
 	  XML_OPTPASSWD_LONGDESC \
 	XML_PARAMETER_END
