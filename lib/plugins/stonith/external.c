@@ -770,6 +770,7 @@ external_run_cmd(struct pluginDevice *sd, const char *op, char **output)
 		savevar = g_strdup(getenv(LOGTAG_VAR));
 	}
 	setenv(LOGTAG_VAR, logtag, 1);
+	g_free(logtag);
 
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: Calling '%s'", __FUNCTION__, cmd );
