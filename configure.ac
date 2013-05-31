@@ -1201,7 +1201,7 @@ if test "$GCC" != yes; then
         CFLAGS="$CFLAGS -g"
 	enable_fatal_warnings=no
 else
-        CFLAGS="$CFLAGS -ggdb3 -O0"
+        CFLAGS="$CFLAGS -ggdb"
 
 	# We had to eliminate -Wnested-externs because of libtool changes
         EXTRA_FLAGS="-fgnu89-inline
