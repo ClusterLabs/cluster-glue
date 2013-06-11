@@ -418,7 +418,7 @@ nw_rpc100s_hostlist(StonithPlugin  *s)
 	if (ret == NULL) {
 		LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
 	} else {
-		g_strdown(ret[0]);
+		strdown(ret[0]);
 	}
 
 	return(ret);

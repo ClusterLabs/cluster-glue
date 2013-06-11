@@ -89,7 +89,7 @@ main(int argc, char** argv)
 		usage(cmdname);
 	}
 	
-	g_strdown(opthost);
+	strdown(opthost);
 
 	if (clearhost) {
 

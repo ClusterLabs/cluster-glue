@@ -664,7 +664,7 @@ apcsmart_set_config(StonithPlugin * s, StonithNVpair* list)
 	}
 	for (ad->hostcount = 0; ad->hostlist[ad->hostcount]
 	;	ad->hostcount++) {
-		g_strdown(ad->hostlist[ad->hostcount]);
+		strdown(ad->hostlist[ad->hostcount]);
 	}
 	if (access(ad->upsdev, R_OK|W_OK|F_OK) < 0) {
 		LOG(PIL_CRIT,"Cannot access tty [%s]", ad->upsdev);

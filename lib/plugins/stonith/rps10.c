@@ -640,7 +640,7 @@ RPS_parse_config_info(struct pluginDevice* ctx, const char * info)
 		}
 		
 		ctx->controllers[ctx->unit_count].node = STRDUP(node);
-		g_strdown(ctx->controllers[ctx->unit_count].node);
+		strdown(ctx->controllers[ctx->unit_count].node);
 		ctx->controllers[ctx->unit_count].outlet_id = outlet_id;
 		ctx->unit_count++;
 

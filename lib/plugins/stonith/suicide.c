@@ -139,7 +139,7 @@ suicide_hostlist(StonithPlugin  *s)
 		LOG(PIL_CRIT, "out of memory");
 		return ret;
 	}
-	g_strdown(ret[0]);
+	strdown(ret[0]);
 
 	return ret;
 }

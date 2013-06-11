@@ -717,7 +717,7 @@ main(int argc, char** argv)
 		if (optind < argc) {
 			char *nodename;
 			nodename = g_strdup(argv[optind]);
-			g_strdown(nodename);
+			strdown(nodename);
 			rc = stonith_req_reset(s, reset_type, nodename);
 			g_free(nodename);
 		}

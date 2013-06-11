@@ -467,7 +467,7 @@ rcd_serial_set_config(StonithPlugin* s, StonithNVpair *list)
 		return S_OOPS;
 	}
 	rcd->hostlist[0] = namestocopy[0].s_value;
-	g_strdown(rcd->hostlist[0]);
+	strdown(rcd->hostlist[0]);
 	rcd->hostlist[1] = NULL;
 	rcd->hostcount = 1;
 	rcd->device = namestocopy[1].s_value;

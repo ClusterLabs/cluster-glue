@@ -182,7 +182,7 @@ null_set_config(StonithPlugin* s, StonithNVpair* list)
 	}
 	for (nd->hostcount = 0; nd->hostlist[nd->hostcount]
 	;	nd->hostcount++) {
-		g_strdown(nd->hostlist[nd->hostcount]);
+		strdown(nd->hostlist[nd->hostcount]);
 	}
 	return nd->hostcount ? S_OK : S_BADCONFIG;
 }

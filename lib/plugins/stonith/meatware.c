@@ -157,7 +157,7 @@ Meat_parse_config_info(struct pluginDevice* nd, const char * info)
 		return S_OOPS;
 	}
 	for (nd->hostcount = 0; nd->hostlist[nd->hostcount]; nd->hostcount++) {
-		g_strdown(nd->hostlist[nd->hostcount]);
+		strdown(nd->hostlist[nd->hostcount]);
 	}
 	return(S_OK);
 }
@@ -222,7 +222,7 @@ meatware_reset_req(StonithPlugin * s, int request, const char * host)
 		return S_RESETFAIL;
 	}
 	
-	g_strdown(resp_addr);
+	strdown(resp_addr);
 
 	if (strncmp(resp_mw, "meatware", 8) ||
 	    strncmp(resp_result, "reply", 5) ||

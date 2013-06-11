@@ -341,7 +341,7 @@ cyclades_hostlist(StonithPlugin  *s)
 			if (!nm) {
 				goto out_of_memory;
 			}
-			g_strdown(nm);
+			strdown(nm);
 			NameList[numnames] = nm;
 			numnames++;
 			NameList[numnames] = NULL;

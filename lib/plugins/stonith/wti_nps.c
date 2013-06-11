@@ -538,7 +538,7 @@ wti_nps_hostlist(StonithPlugin  *s)
 			if ((nm = STRDUP(sockname)) == NULL) {
 				goto out_of_memory;
 			}
-			g_strdown(nm);
+			strdown(nm);
 			NameList[numnames] = nm;
 			++numnames;
 			NameList[numnames] = NULL;

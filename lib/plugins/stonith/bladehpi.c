@@ -324,7 +324,7 @@ bladehpi_hostlist(StonithPlugin *s)
 			ret = NULL;
 			goto done;
 		}
-		g_strdown(ret[j]);
+		strdown(ret[j]);
 	}
 
 done:
