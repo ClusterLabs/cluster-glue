@@ -43,6 +43,7 @@
 #ifndef __STONITH_H
 #	define __STONITH_H
 #include <glib.h>
+#include <ctype.h>
 
 #include <pils/plugin.h>
 #define	STONITH_VERS	2
@@ -131,6 +132,7 @@ StonithNVpair*
 StonithNVpair*
 	stonith_ghash_to_NVpair(GHashTable* stringtable);
 void	free_NVpair(StonithNVpair*); /* Free result from above 2 functions */
+void strdown(char *str); /* simple replacement for g_strdown */
 
 /*
  * The ST_DEVICEID info call is intended to return the type of the Stonith

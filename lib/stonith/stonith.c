@@ -447,6 +447,16 @@ stonith_get_status(Stonith* s)
 	return S_INVAL;
 }
 
+void
+strdown(char *str)
+{
+	while( *str ) {
+		if( isupper(*str) )
+			*str = tolower(*str);
+		str++;
+	}
+}
+
 int
 stonith_req_reset(Stonith* s, int operation, const char* node)
 {
@@ -457,7 +467,7 @@ stonith_req_reset(Stonith* s, int operation, const char* node)
 		if (nodecopy == NULL) {
 			return S_OOPS;
 		}
-		g_strdown(nodecopy);
+		strdown(nodecopy);
 
 		rc = sp->s_ops->req_reset(sp, operation, nodecopy);
 		FREE(nodecopy);

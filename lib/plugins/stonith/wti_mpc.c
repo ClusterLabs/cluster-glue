@@ -508,7 +508,7 @@ wti_mpc_hostlist(StonithPlugin * s)
 		    hl = NULL;
 		    return (hl);
 		}
-		g_strdown(hl[num_outlets]);
+		strdown(hl[num_outlets]);
 		num_outlets++;
 	}
     }

@@ -414,7 +414,7 @@ StringToHostList(const char * s)
 		memcpy(*hret, here, slen);
 		/* Add EOS to result string */
 		(*hret)[slen] = EOS;
-		g_strdown(*hret);
+		strdown(*hret);
 		here += slen;
 		++hret;
 	}

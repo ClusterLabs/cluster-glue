@@ -312,7 +312,7 @@ ibmhmc_hostlist(StonithPlugin  *s)
 			stonith_free_hostlist(ret);
 			return NULL;
 		}
-		g_strdown(ret[j]);
+		strdown(ret[j]);
 	}
 	return ret;
 }

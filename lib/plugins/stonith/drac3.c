@@ -352,7 +352,7 @@ drac3_hostlist(StonithPlugin * s)
 	if (hl == NULL) {
 		LOG(PIL_CRIT, "%s: out of memory", __FUNCTION__);
 	} else {
-		g_strdown(hl[0]);
+		strdown(hl[0]);
 	}
 
 	return(hl);

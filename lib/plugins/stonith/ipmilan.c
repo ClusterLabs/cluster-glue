@@ -323,7 +323,7 @@ ipmilan_hostlist(StonithPlugin  *s)
 			ret = NULL;
 			break;
 		}
-		g_strdown(ret[j]);
+		strdown(ret[j]);
 	}
 
 	return(ret);

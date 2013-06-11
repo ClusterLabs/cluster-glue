@@ -262,7 +262,7 @@ ssh_set_config(StonithPlugin* s, StonithNVpair* list)
 	}else{
 		for (sd->hostcount = 0; sd->hostlist[sd->hostcount]
 		;	sd->hostcount++) {
-			g_strdown(sd->hostlist[sd->hostcount]);
+			strdown(sd->hostlist[sd->hostcount]);
 		}
 	}
 	

@@ -262,7 +262,7 @@ vacm_hostlist(StonithPlugin *s)
                stonith_free_hostlist(hlst);
                return NULL;
 	    }
-            g_strdown(hlst[hrcnt]);
+            strdown(hlst[hrcnt]);
             hrcnt++;
          }
       }else {
