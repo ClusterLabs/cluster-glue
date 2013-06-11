@@ -60,7 +60,7 @@ main(int argc, char** argv)
 	char *		opthost = NULL;
 	int		clearhost = 0;
 
-	int		c, argcount, waitmode;
+	int		c, argcount, waitmode = 0;
 	int		errors = 0;
 
 	if ((cmdname = strrchr(argv[0], '/')) == NULL) {

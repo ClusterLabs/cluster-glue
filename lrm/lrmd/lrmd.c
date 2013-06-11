@@ -1429,7 +1429,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 	lrmd_client_t* client = NULL;
 	struct ha_msg* msg = NULL;
 	char *msg_s;
-	int ret;
+	int ret = FALSE;
 
 	client = (lrmd_client_t*)user_data;
 
