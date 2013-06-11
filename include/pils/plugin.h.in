@@ -396,7 +396,8 @@ typedef enum {
 	PIL_INFO	= 4,	/* Informative message */
 	PIL_DEBUG= 5	/* Debug message */
 }PILLogLevel;
-typedef void (*PILLogFun)(PILLogLevel priority, const char * fmt, ...);
+typedef void (*PILLogFun)(PILLogLevel priority, const char * fmt, ...)
+	G_GNUC_PRINTF(2,3);
 
 /*
  * The size glib2 type du jour?
@@ -451,7 +452,8 @@ struct PILPluginImports_s {
 	,	const char * plugintype, const char * pluginname
 	,	void*	plugin_private);
 
-	void	(*log)	(PILLogLevel priority, const char * fmt, ...);
+	void	(*log)	(PILLogLevel priority, const char * fmt, ...)
+		G_GNUC_PRINTF(2,3);
         gpointer (*alloc)(glib_size_t size);
         gpointer (*mrealloc)(gpointer space, glib_size_t size);
 	void	(*mfree)(gpointer space);
@@ -482,7 +484,8 @@ void PilPluginUnivSetMemalloc(PILPluginUniv*
 
 
 void PilPluginUnivSetLog(PILPluginUniv*
-,	void	(*log)	(PILLogLevel priority, const char * fmt, ...));
+,	void	(*log)	(PILLogLevel priority, const char * fmt, ...)
+	G_GNUC_PRINTF(2,3));
 
 
 /* Delete a plugin universe - shut the plugin loading system down */

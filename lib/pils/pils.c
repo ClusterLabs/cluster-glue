@@ -223,7 +223,8 @@ PILRegisterInterface
 ,	void*		ud_interface	/* interface user data 		*/
 );
 static PIL_rc	PILunregister_interface(PILInterface* interfaceid);
-static void	PILLog(PILLogLevel priority, const char * fmt, ...);
+static void	PILLog(PILLogLevel priority, const char * fmt, ...)
+	G_GNUC_PRINTF(2,3);
 
 
 /*
@@ -309,7 +310,7 @@ NewPILPlugin(	PILPluginType* pitype
 	PILPlugin*	ret = NEW(PILPlugin);
 
 	if (DEBUGPLUGIN) {
-		PILLog(PIL_DEBUG, "NewPILPlugin(0x%x)", (unsigned long)ret);
+		PILLog(PIL_DEBUG, "NewPILPlugin(0x%lx)", (unsigned long)ret);
 	}
 
 	STATNEW(plugin);
@@ -362,7 +363,7 @@ NewPILPluginType(PILPluginUniv* pluginuniv
 {
 	PILPluginType*	ret = NEW(PILPluginType);
 	if (DEBUGPLUGIN) {
-		PILLog(PIL_DEBUG, "NewPILPlugintype(0x%x)", (unsigned long)ret);
+		PILLog(PIL_DEBUG, "NewPILPlugintype(0x%lx)", (unsigned long)ret);
 	}
 	STATNEW(pitype);
 
@@ -463,7 +464,7 @@ NewPILPluginUniv(const char * basepluginpath)
 
 	STATNEW(piuniv);
 	if (DEBUGPLUGIN) {
-		PILLog(PIL_DEBUG, "NewPILPluginUniv(0x%x)"
+		PILLog(PIL_DEBUG, "NewPILPluginUniv(0x%lx)"
 		,	(unsigned long)ret);
 	}
 	if (!g_path_is_absolute(basepluginpath)) {
@@ -796,7 +797,7 @@ NewPILInterface(PILInterfaceType*	interfacetype
 	ret = NEW(PILInterface);
 	STATNEW(interface);
 	if (DEBUGPLUGIN) {
-		PILLog(PIL_DEBUG, "NewPILInterface(0x%x)", (unsigned long)ret);
+		PILLog(PIL_DEBUG, "NewPILInterface(0x%lx)", (unsigned long)ret);
 	}
 
 	if (ret) {
@@ -813,7 +814,7 @@ NewPILInterface(PILInterfaceType*	interfacetype
 		ret->if_close = closefun;
 		ret->refcnt = 1;
 		if (DEBUGPLUGIN) {
-			PILLog(PIL_DEBUG, "NewPILInterface(0x%lx:%s/%s)*** user_data: 0x%lx *******"
+			PILLog(PIL_DEBUG, "NewPILInterface(0x%lx:%s/%s)*** user_data: 0x%p *******"
 			,	(unsigned long)ret
 			,	interfacetype->typename
 			,	ret->interfacename
@@ -1705,7 +1706,7 @@ NewPILInterfaceUniv(PILPluginUniv* piuniv)
 	static int		ltinityet = 0;
 
 	if (DEBUGPLUGIN) {
-		PILLog(PIL_DEBUG, "NewPILInterfaceUniv(0x%x)"
+		PILLog(PIL_DEBUG, "NewPILInterfaceUniv(0x%lx)"
 		,	(unsigned long)ret);
 	}
 	if (!ltinityet) {
@@ -1882,7 +1883,7 @@ so_select (const struct dirent *dire)
 	if (DEBUGPLUGIN) {
 		PILLog(PIL_DEBUG
 		,	"FILE %s Doesn't look like a plugin name [%s] "
-		"%d %d %s."
+		"%ld %zd %s."
 		,	dire->d_name, end
 		,	sizeof(obj_end), strlen(dire->d_name)
 		,	&dire->d_name[strlen(dire->d_name)
