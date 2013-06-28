@@ -1883,7 +1883,7 @@ so_select (const struct dirent *dire)
 	if (DEBUGPLUGIN) {
 		PILLog(PIL_DEBUG
 		,	"FILE %s Doesn't look like a plugin name [%s] "
-		"%ld %zd %s."
+		"%zd %zd %s."
 		,	dire->d_name, end
 		,	sizeof(obj_end), strlen(dire->d_name)
 		,	&dire->d_name[strlen(dire->d_name)
