@@ -232,14 +232,9 @@ elsif ($command ~~ @netCommands) {
 	} else {
 	# Command belongs to the group of commands that lookup the status of VMware vCenter and/or virtual machines
 		if ($command eq "status") {
-			eval {
-				# VI API: Searches the inventory tree for all VirtualMachine managed objects
-				my $vms = Vim::find_entity_views(view_type => "VirtualMachine");
-			};
-			if ($@) {
-				if (ref($@) eq "SoapFault") { dielog("$@->detail\n"); }
-				dielog($@);
-			}
+			# we already connect to the vcenter, no need to do
+			# anything else in status
+			;
 		}
 		elsif ($command eq "gethosts") {
                         foreach my $key (keys(%host_to_vm)) {
