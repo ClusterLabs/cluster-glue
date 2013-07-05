@@ -245,14 +245,12 @@ case $1 in
 
     if [ "$reset_method" = "power_cycle" ]; then
         libvirt_stop
-        rc=$?
-        [ $rc = 1 ] && exit 1
+        [ $? = 1 ] && exit 1
         sleep 2
         libvirt_start
     else
         libvirt_reboot
     fi
-    rc=$?
     exit $?
     ;;
 
