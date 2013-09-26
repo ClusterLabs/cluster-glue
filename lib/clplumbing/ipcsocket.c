@@ -108,7 +108,7 @@
 
 #if HB_IPC_METHOD == HB_IPC_SOCKET
 
-# define MAX_LISTEN_NUM 1024
+# define MAX_LISTEN_NUM 128
 
 # ifndef MSG_NOSIGNAL
 #  define		MSG_NOSIGNAL	0
