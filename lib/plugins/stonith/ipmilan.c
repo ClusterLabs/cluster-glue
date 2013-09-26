@@ -576,6 +576,7 @@ ipmilan_new(const char *subplugin)
 		LOG(PIL_CRIT, "out of memory");
 		return(NULL);
 	}
+	LOG(PIL_WARN, "The ipmilan stonith plugin is deprecated! Please use external/ipmi.");
 	memset(nd, 0, sizeof(*nd));
 	nd->pluginid = pluginid;
 	nd->hostlist = NULL;
