@@ -1,3 +1,24 @@
+* Thu Sep 26 2013 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
+- release candidate 1.0.12-rc1
+- clplumbing: increase listen backlog to 128
+- hb_report: add -X option for extra ssh options
+- hb_report: add support for the rfc5424 syslog date format
+- stonith: external/libvirt: fix exit code in reset
+- stonith: external/vcenter: do not list vms in status
+  (bnc#825765)
+- stonith: fix memory leak in external.c
+- hb_report: enable ssh to prompt for passwords (bnc#808373)
+- hb_report: collect RA trace files
+- hb_report: look for nodes in the archived CIB if pacemaker is
+  not running
+- sbd plugin now lives at http://hg.linux-ha.org/sbd/
+- stonith: if debug's not set, do not send debug messages to the
+  logger (bnc#792124)
+- stonith: log status message at the debug level (bnc#792124)
+- stonith: don't always log debug level messages (bnc#792124)
+- stonith: external/vcenter: fix gethosts to produce list of
+  nodes not vms (bnc#792704)
+
 * Mon Oct 15 2012 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
 - stable release 1.0.11
 - lrmd: set max-children depending on the number of processors

@@ -19,7 +19,7 @@ dnl     checks for compiler characteristics
 dnl     checks for library functions
 dnl     checks for system services
 
-AC_INIT(cluster-glue, 1.0.11, linux-ha-dev@lists.linux-ha.org)
+AC_INIT(cluster-glue, 1.0.12-rc1, linux-ha-dev@lists.linux-ha.org)
 
 FEATURES=""
 HB_PKG=heartbeat
