@@ -637,7 +637,7 @@ parse_config(const char* cfgfile)
 	gboolean	ret = TRUE;
 
 	if ((f = fopen(cfgfile, "r")) == NULL){
-		cl_perror("Cannot open config file [%s]", cfgfile);
+		cl_log(LOG_WARNING, "Cannot open config file [%s]", cfgfile);
 		return(FALSE);
 	}
 
@@ -1016,9 +1016,13 @@ main(int argc, char** argv, char** envp)
 	
 	
 	if (cfgfile && !parse_config(cfgfile)) {
-		cl_log(LOG_ERR, "Config file [%s] is incorrect."
-		,	cfgfile);
-		exit(LSB_EXIT_NOTCONFIGED);
+		FILE* f;
+		if ((f = fopen(cfgfile, "r")) != NULL){
+			fclose(f);
+			cl_log(LOG_ERR, "Config file [%s] is incorrect."
+			       ,	cfgfile);
+			exit(LSB_EXIT_NOTCONFIGED);
+		}
 	}
 	
 	if (strlen(logd_config.debugfile) > 0) {

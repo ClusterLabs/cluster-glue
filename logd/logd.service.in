@@ -1,0 +1,13 @@
+[Unit]
+Description=ha_logd logging daemon
+Before=pacemaker.service
+PartOf=pacemaker.service
+
+[Service]
+ExecStart=@libdir@/@HB_PKG@/ha_logd -c @sysconfdir@/logd.cf
+ExecStartPre=/bin/rm -f @HA_VARRUNDIR@/logd.pid
+ExecStopPost=/bin/rm -f @HA_VARRUNDIR@/logd.pid
+PIDFile=@HA_VARRUNDIR@/logd.pid
+
+[Install]
+WantedBy=multi-user.target
