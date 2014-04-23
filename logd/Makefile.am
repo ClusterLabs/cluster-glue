@@ -48,5 +48,9 @@ ha_logger_LDADD   = $(top_builddir)/lib/clplumbing/libplumb.la
 logtest_SOURCES   = logtest.c
 logtest_LDADD     = $(top_builddir)/lib/clplumbing/libplumb.la
 
+if HAVE_SYSTEMD
+systemdsystemunit_DATA = \
+        logd.service
+else
 initd_SCRIPTS     = logd
-
+endif
