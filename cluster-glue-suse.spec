@@ -112,6 +112,7 @@ export docdir=%{glue_docdir}
     --with-package-name=%{name} \
     --with-daemon-group=%{gname} \
     --with-daemon-user=%{uname} \
+    --with-rundir=%{_rundir} \
     --docdir=%{glue_docdir}
 %endif
 

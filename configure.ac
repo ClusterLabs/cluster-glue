@@ -177,6 +177,15 @@ AC_ARG_WITH(
     [ GLUE_DAEMON_USER="hacluster" ],
   )
 
+
+AC_ARG_WITH(
+  rundir,
+    [ --with-rundir=DIR
+			directory to store state information [default=localstatedir/run] ],
+    [ GLUE_STATE_DIR="$withval" ],
+    [ GLUE_STATE_DIR="${localstatedir}/run" ],
+  )
+
 dnl ===============================================
 dnl General Processing
 dnl ===============================================
