@@ -60,6 +60,11 @@ BuildRequires: libuuid-devel
 BuildRequires: e2fsprogs-devel
 %endif
 
+%if %{defined systemd_requires}
+BuildRequires:  systemd
+%{?systemd_requires}
+%endif
+
 %prep
 %setup -q -n cluster-glue
 
@@ -82,6 +87,9 @@ export docdir=%{glue_docdir}
     --with-daemon-user=%{uname} \
     --localstatedir=%{_var} \
     --libdir=%{_libdir} \
+%if %{defined _unitdir}
+    --with-systemdsystemunitdir=%{_unitdir} \
+%endif
     --docdir=%{glue_docdir}
 %endif
 
@@ -112,7 +120,11 @@ standards, and an interface to common STONITH devices.
 %files
 %defattr(-,root,root)
 %dir %{_datadir}/%{name}
+%if %{defined _unitdir}
+%{_unitdir}/logd.service
+%else
 %{_sysconfdir}/init.d/logd
+%endif
 %{_datadir}/%{name}/ha_cf_support.sh
 %{_datadir}/%{name}/openais_conf_support.sh
 %{_datadir}/%{name}/utillib.sh
@@ -175,6 +187,17 @@ getent passwd %{uname} >/dev/null || \
 useradd -r -g %{gname} -d %{_var}/lib/heartbeat/cores/hacluster -s /sbin/nologin \
 -c "cluster user" %{uname}
 exit 0
+
+%if %{defined _unitdir}
+%post
+%systemd_post logd.service
+
+%preun
+%systemd_preun logd.service
+
+%postun
+%systemd_postun_with_restart logd.service
+%endif
 
 %post -n cluster-glue-libs -p /sbin/ldconfig
 
