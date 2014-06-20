@@ -42,6 +42,7 @@ BuildRequires:  libnet net-snmp-devel OpenIPMI-devel openhpi-devel
 BuildRequires:  libxslt docbook_4 docbook-xsl-stylesheets
 BuildRequires:  help2man
 BuildRequires:  asciidoc
+BuildRequires:  libbz2-devel libaio-devel
 
 Obsoletes:	heartbeat-common
 Provides:	heartbeat-common
@@ -54,6 +55,11 @@ BuildRequires:  tcpd-devel
 BuildRequires:  sgml-skel
 %else
 BuildRequires:  libcurl-devel 
+%endif
+
+%if %{defined systemd_requires}
+BuildRequires:  systemd
+%{?systemd_requires}
 %endif
 
 %description
@@ -113,6 +119,9 @@ export docdir=%{glue_docdir}
     --with-daemon-group=%{gname} \
     --with-daemon-user=%{uname} \
     --with-rundir=%{_rundir} \
+%if %{defined _unitdir}
+    --with-systemdsystemunitdir=%{_unitdir} \
+%endif
     --docdir=%{glue_docdir}
 %endif
 
@@ -128,11 +137,15 @@ find $RPM_BUILD_ROOT -name '*.la' -type f -print0 | xargs -0 rm -f
 find $RPM_BUILD_ROOT -name '*.pyc' -type f -print0 | xargs -0 rm -f
 find $RPM_BUILD_ROOT -name '*.pyo' -type f -print0 | xargs -0 rm -f
 
+%if %{defined _unitdir}
+ln -s /usr/sbin/service %{buildroot}%{_sbindir}/rclogd
+%else
 test -d $RPM_BUILD_ROOT/sbin || mkdir $RPM_BUILD_ROOT/sbin
 (
   cd $RPM_BUILD_ROOT/sbin
   ln -s /etc/init.d/logd rclogd
 )
+%endif
 
 ###########################################################
 
@@ -163,7 +176,20 @@ else
         -d %{_var}/lib/heartbeat/cores/%{uname} -o -u %{uid} \
         %{uname} 2>/dev/null || :
 fi
+%if %{defined _unitdir}
+  %service_add_pre logd.service
+%endif
 
+%if %{defined _unitdir}
+%post
+%service_add_post logd.service
+
+%preun
+%service_del_preun logd.service
+
+%postun
+%service_del_postun logd.service
+%else
 %preun
 %stop_on_removal logd
 
@@ -172,6 +198,7 @@ fi
 
 %postun
 %insserv_cleanup
+%endif
 
 %post -n libglue2
 /sbin/ldconfig  
@@ -213,7 +240,13 @@ fi
 %{_sbindir}/meatclient
 %{_sbindir}/stonith
 
+%if %{defined _unitdir}
+%{_unitdir}/logd.service
+%{_sbindir}/rclogd
+%else
 %{_sysconfdir}/init.d/logd
+/sbin/rclogd
+%endif
 
 %doc %{_mandir}/man1/*
 %doc %{_mandir}/man8/*
@@ -222,8 +255,6 @@ fi
 %doc ChangeLog
 %doc logd/logd.cf
 %doc doc/stonith/README*
-
-/sbin/rclogd
 
 %{_libdir}/heartbeat/lrmd
 %{_libdir}/heartbeat/ha_logd
