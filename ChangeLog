@@ -1,3 +1,17 @@
+* Fri Jul 18 2014 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
+- stable release 1.0.12
+- hb_report: add -Q option for quick runs
+- hb_report: dot is not illegal in file names (bnc#884079, deb#715391)
+- build: update spec files for systemd
+- hb_report: update interface to zypper
+- hb_report: support logs with varied timestamps
+- stonith: external/vcenter: add parameter for SSL hostname
+  verification (bnc#851990)
+- hb_report: fix ssh passwords again (bnc#867365)
+- hb_report: Don't use deprecated corosync-fplay (bnc#870913)
+- logd: Add systemd unit file for logd (bnc#863248)
+- hb_report: Add support for xz compression (bnc#854060)
+
 * Thu Sep 26 2013 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
 - release candidate 1.0.12-rc1
 - clplumbing: increase listen backlog to 128
