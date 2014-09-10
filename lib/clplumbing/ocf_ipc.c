@@ -445,8 +445,8 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 		if (head->magic != HEADMAGIC) {
 			GList* last = g_list_last(rqueue->queue);
 			cl_log(LOG_ERR, "ipc_bufpool_update: "
-			       "magic number in head does not match."
-			       "Something very bad happened, abort now, farside pid =%d",
+			       "magic number in head does not match. "
+			       "Something very bad happened, farside pid =%d",
 			       ch->farside_pid);
 			cl_log(LOG_ERR, "magic=%x, expected value=%x", head->magic, HEADMAGIC);
 			ipc_bufpool_display(pool);
@@ -456,7 +456,7 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 				IPC_Message* m = (IPC_Message*)last;
 				ipcmsg_display(m);
 			}
-			abort();
+			return -1;
 		}
 
 		if ( head->msg_len > MAXMSG) {

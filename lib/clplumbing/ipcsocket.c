@@ -1388,8 +1388,15 @@ socket_resume_io_read(struct IPC_CHANNEL *ch, int* nbytes, gboolean read1anyway)
 			*nbytes = msg_len;
 			nmsgs = ipc_bufpool_update(pool, ch, msg_len, ch->recv_queue) ;
 
-			SocketIPCStats.ninqueued += nmsgs;
-
+			if (nmsgs < 0) {
+				/* we didn't like the other side */
+				cl_log(LOG_ERR, "socket_resume_io_read: "
+					   "disconnecting the other side");
+				ch->ch_status = IPC_DISCONNECT;
+				retcode = IPC_FAIL;
+			} else {
+				SocketIPCStats.ninqueued += nmsgs;
+			}
 		}
 	}
 
