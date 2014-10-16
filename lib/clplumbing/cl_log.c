@@ -719,12 +719,12 @@ cl_log(int priority, const char * fmt, ...)
 	}
 
 	if (stderr_enabled) {
-		print_logline(stderr, cl_log_entity,cl_process_pid,
+		append_log(stderr, cl_log_entity,cl_process_pid,
 			NULLTIME, prio2str(priority), buf);
 	}
 
 	if (stdout_enabled) {
-		print_logline(stdout, cl_log_entity,cl_process_pid,
+		append_log(stdout, cl_log_entity,cl_process_pid,
 			NULLTIME, prio2str(priority), buf);
 	}
 
