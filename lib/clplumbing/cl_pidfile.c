@@ -74,7 +74,7 @@
 /* This is what the FHS standard specifies for the size of our lock file */
 #define	LOCKSTRLEN	11
 #include <clplumbing/cl_log.h>
-static int IsRunning(long pid)
+int IsRunning(long pid)
 {
 	int rc = 0;
 	long mypid;
@@ -224,7 +224,7 @@ cl_read_pidfile(const char*filename)
 	pid = cl_read_pidfile_no_checking(filename);
 	
 	if (pid < 0){
-		return - LSB_STATUS_STOPPED;
+		return -LSB_STATUS_STOPPED;
 	}
 	
 	if (IsRunning(pid)){
