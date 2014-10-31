@@ -590,20 +590,17 @@ logd_stop(void)
 		alarm(0);
 		do {
 			sleep(1);
-		}while (kill((pid_t)running_logd_pid, 0) >= 0);
-	}
-	err = errno;
-	
-	if(errno == ESRCH) {
-		cl_log(LOG_INFO, "Pid %ld exited", running_logd_pid);
-		exit(LSB_EXIT_OK);
-	} else {
+		}while (IsRunning(running_logd_pid));
+	} else if (errno != ESRCH) {
+		err = errno;
 		cl_perror("Pid %ld not killed", running_logd_pid);
 		exit((err == EPERM || err == EACCES)
 		     ?	LSB_EXIT_EPERM
 		     :	LSB_EXIT_GENERIC);
 	}
-	
+
+	cl_log(LOG_INFO, "Pid %ld exited", running_logd_pid);
+	exit(LSB_EXIT_OK);
 }
 
 
