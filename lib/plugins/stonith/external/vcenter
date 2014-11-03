@@ -31,7 +31,7 @@ my @netCommands = (@actionCommands, qw{status gethosts listvms});
 my $command = $ARGV[0] || dielog("No command specified\n");
 
 # Command belongs to the group of commands that do not require any connection to VMware vCenter
-if ($command ~~ @configCommands) {
+if (grep /^\Q$command\E$/, @configCommands) {
 	if ($command eq "getconfignames") {
 		print "VI_SERVER\nVI_PORTNUMBER\nVI_PROTOCOL\nVI_SERVICEPATH\nVI_CREDSTORE\nHOSTLIST\nRESETPOWERON\n";
 	}
@@ -122,7 +122,7 @@ See LWP(3pm) for more information.
 }
 
 # Command belongs to the group of commands that require connecting to VMware vCenter
-elsif ($command ~~ @netCommands) {
+elsif (grep /^\Q$command\E$/, @netCommands) {
 
 	eval { require VMware::VIRuntime; }
 	or dielog("Missing perl module VMware::VIRuntime. Download and install 'VMware Infrastructure (VI) Perl Toolkit', available at http://www.vmware.com/support/developer/viperltoolkit/ \n");
@@ -159,7 +159,7 @@ elsif ($command ~~ @netCommands) {
 	}
 
 	# Command belongs to the group of commands that performs actions on Virtual Machines
-	if ($command ~~ @actionCommands) {
+	if (grep /^\Q$command\E$/, @actionCommands) {
 
 		my $targetHost = $ARGV[1] || dielog("No target specified\n");
 
