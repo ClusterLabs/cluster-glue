@@ -191,7 +191,7 @@ function instance_on()
 
 function instance_off()
 {
-	if [ $unknown_are_stopped = 1 -a $instance_not_found ]; then
+	if [ "$unknown_are_stopped" = 1 -a $instance_not_found ]; then
 		: nothing to do
 		ha_log.sh info "Assuming unknown instance $instance is already off"
 	else
@@ -206,7 +206,7 @@ function instance_status()
 	local rc=1
 
 	# List of instances and their current status
-	if [ $unknown_are_stopped = 1 -a $instance_not_found ]; then
+	if [ "$unknown_are_stopped" = 1 -a $instance_not_found ]; then
 		ha_log.sh info "$instance stopped (unknown)"
 	else
 		status=`aws ec2 describe-instances $options --instance-ids $instance | awk '{ 
