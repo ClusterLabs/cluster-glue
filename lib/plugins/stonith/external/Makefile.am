@@ -28,6 +28,6 @@ helperdir	     = $(stonith_plugindir)
 
 ext_SCRIPTS	     = drac5 dracmc-telnet ibmrsa ibmrsa-telnet ipmi riloe ssh vmware vcenter rackpdu xen0 hmchttp \
 			xen0-ha kdumpcheck ippower9258 nut libvirt \
-			hetzner
+			hetzner ec2
 
 helper_SCRIPTS	     = xen0-ha-dom0-stonith-helper
