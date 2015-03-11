@@ -282,7 +282,7 @@ case $action in
 		getinfo_xml
 	;;
 	getconfignames)
-		for i in profile port tag
+		for i in profile port tag unknown_are_stopped
 		do
 			echo $i
 		done
