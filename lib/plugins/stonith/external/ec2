@@ -297,7 +297,7 @@ case $action in
 		exit 0
 	;;
 	getinfo-devdescr)
-		echo "fence_ec2 is an I/O Fencing agent which can be used with Amazon EC2 instances."
+		echo "ec2 is an I/O Fencing agent which can be used with Amazon EC2 instances."
 		exit 0
 	;;
 	getinfo-devurl)
