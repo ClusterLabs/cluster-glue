@@ -3361,9 +3361,9 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 						, op->rapop);
 		} else {
 			lrmd_log(LOG_WARNING, "There is something wrong: the "
-				"first line isn't read in. Maybe the heartbeat "
-				"does not ouput string correctly for status "
-				"operation. Or the code (myself) is wrong.");
+				"first line wasn't read in. Maybe heartbeat does "
+				"not output the string correctly for the status "
+				"operation, or perhaps the code is wrong.");
 		}
 	}
 
