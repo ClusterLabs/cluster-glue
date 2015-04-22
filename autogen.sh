@@ -91,16 +91,11 @@ do
   fi
 done
 
-for command in libtool14 libtool15 libtool glibtool 
-do
-  URL=$gnu/$pkg/
-  if
-    testProgram $command
-  then
-    libtool=$command
-    libtoolize=`echo  "$libtool" | sed -e 's/libtool/libtoolize/'`
-  fi
-done
+if
+  testProgram libtoolize
+then
+  libtoolize=libtoolize
+fi
 
 if [ -z $autoconf ]; then 
     echo You must have autoconf installed to compile the cluster-glue package.
@@ -114,7 +109,7 @@ elif [ -z $automake ]; then
     echo or get the source tarball at: $gnu/automake/
     exit 1
 
-elif [ -z $libtool ]; then 
+elif [ -z $libtoolize ]; then
     echo You must have libtool installed to compile the cluster-glue package.
     echo Download the appropriate package for your system,
     echo or get the source tarball at: $gnu/libtool/
@@ -125,7 +120,7 @@ oneline() {
   read x; echo "$x"
 }
 
-LT_version=`$libtool --version | oneline | sed -e 's%^[^0-9]*%%' -e s'% .*%%'`
+LT_version=`$libtoolize --version | oneline | sed -e 's%^[^0-9]*%%' -e s'% .*%%'`
 LT_majvers=`echo "$LT_version" | sed -e 's%\..*%%'`
 LT_minvers=`echo "$LT_version" | sed -e 's%^[^.]*\.%%' `
 LT_minnum=`echo  "$LT_minvers" | sed -e 's%[^0-9].*%%'`
@@ -138,8 +133,7 @@ then
 fi
 
 # Create local copies so that the incremental updates will work.
-rm -f ./autoconf ./automake ./autoheader ./libtool
-ln -s `which $libtool` ./libtool
+rm -f ./autoconf ./automake ./autoheader
 ln -s `which $autoconf` ./autoconf
 ln -s `which $automake` ./automake
 ln -s `which $autoheader` ./autoheader
