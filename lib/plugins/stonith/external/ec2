@@ -47,7 +47,6 @@ If the tag containing the uname is not [Name], then it will need to be specified
 #######################################################################
 
 quiet=0
-port_default=""
 
 instance_not_found=0
 unknown_are_stopped=0
@@ -57,10 +56,9 @@ ec2_tag_default="Name"	       # EC2 Tag containing the instance's uname
 
 sleep_time="1"
 
-ec2_tag=${tag}
+[ -n "$tag" ] && ec2_tag="$tag"
 
 : ${ec2_tag=${ec2_tag_default}}
-: ${port=${port_default}}
 
 function usage()
 {
@@ -94,7 +92,7 @@ function getinfo_xml()
 {
 	cat <<EOF
 <parameters>
-	<parameter name="port" unique="1" required="1">
+	<parameter name="port" unique="1" required="0">
 		<content type="string" />
 		<shortdesc lang="en">The name/id/tag of a instance to control/check</shortdesc>
 	</parameter>
@@ -102,7 +100,7 @@ function getinfo_xml()
 		<content type="string" default="default" />
 		<shortdesc lang="en">Use a specific profile from your credential file.</shortdesc>
 	</parameter>
-	<parameter name="tag" unique="0" required="1">
+	<parameter name="tag" unique="0" required="0">
 		<content type="string" default="Name" />
 		<shortdesc lang="en">Name of the tag containing the instances uname</shortdesc>
 	</parameter>
@@ -129,7 +127,7 @@ $description
 		<content type="string" default="reboot" />
 		<shortdesc lang="en">Fencing Action</shortdesc>
 	</parameter>
-	<parameter name="port" unique="1" required="1">
+	<parameter name="port" unique="1" required="0">
 		<getopt mixed="-n, --port=[port]" />
 		<content type="string" />
 		<shortdesc lang="en">The name/id/tag of a instance to control/check</shortdesc>
@@ -139,7 +137,7 @@ $description
 		<content type="string" default="default" />
 		<shortdesc lang="en">Use a specific profile from your credential file.</shortdesc>
 	</parameter>
-	<parameter name="tag" unique="0" required="1">
+	<parameter name="tag" unique="0" required="0">
 		<getopt mixed="-t, --tag=[tag]" />
 		<content type="string" default="Name" />
 		<shortdesc lang="en">Name of the tag containing the instances uname</shortdesc>
@@ -219,6 +217,11 @@ function instance_status()
 	return $rc
 }
 
+function monitor()
+{
+		# Is the device ok?
+		aws ec2 describe-instances $options | grep INSTANCES &> /dev/null
+}
 
 TEMP=`getopt -o qVho:e:p:n:t:U --long version,help,action:,port:,option:,profile:,tag:,quiet,unknown-are-stopped \
      -n 'fence_ec2' -- "$@"`
@@ -265,6 +268,7 @@ while true ; do
 done
 
 [ -n "$1" ] && action=$1
+[ -n "$2" ] && node_to_fence=$2
 
 if [ -z "$ec2_profile"]; then
 	options="--output text --profile default"
@@ -324,6 +328,10 @@ if [ "$mystatus" != "running" ]; then #do not fence
 	exit 1
 fi
 
+if [ -z "$port" ]; then
+	port="$node_to_fence"
+fi
+
 # get target's instance id
 instance=""
 if [ ! -z "$port" ]; then
@@ -376,8 +384,7 @@ case $action in
 		done
 	;;
 	monitor)
-		# Is the device ok?
-		aws ec2 describe-instances $options | grep INSTANCES &> /dev/null
+		monitor
 	;;
 	gethosts|hostlist|list)
 		# List of names we know about
@@ -388,7 +395,7 @@ case $action in
 		echo $a
 	;;
 	stat|status)
-		instance_status $instance > /dev/null
+		monitor
 	;;
 	*) ha_log.sh err "Unknown action: $action"; exit 1;;
 esac
