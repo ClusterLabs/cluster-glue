@@ -136,14 +136,15 @@ libvirt_set_domain_id ()
 {
     for h in $hostlist
     do
-        case $h in
+        h_comp=`echo $h | tr A-Z a-z`
+        case $h_comp in
             $1:*)
             domain_id=`expr $h : '.*:\(.*\)'`
             return
             ;;
 
             $1)
-            domain_id=$1
+            domain_id=$h
             return
         esac
     done
