@@ -67,7 +67,11 @@ hz_longclock(void)
 #	define	TIMES_PARAM	&dummy_longclock_tms_struct
 #endif
 
+#if __ILP32__ && __x86_64__
+unsigned long long
+#else
 unsigned long
+#endif
 cl_times(void)	/* Make times(2) behave rationally on Linux */
 {
 	clock_t		ret;
@@ -113,9 +117,13 @@ cl_times(void)	/* Make times(2) behave rationally on Linux */
 	 * because of sign extension.
 	 * We do expect sizeof(clock_t) <= sizeof(long), however.
 	 */
+#if __ILP32__ && __x86_64__
+	return ret;
+#else
 	BUILD_BUG_ON(sizeof(clock_t) > sizeof(unsigned long));
 #define CLOCK_T_MAX	(~0UL >> (8*(sizeof(unsigned long) - sizeof(clock_t))))
 	return (unsigned long)ret & CLOCK_T_MAX;
+#endif
 }
 
 #ifdef CLOCK_T_IS_LONG_ENOUGH
