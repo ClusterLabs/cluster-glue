@@ -64,6 +64,7 @@
 	  <arg choice="plain"><replaceable>name</replaceable>=<replaceable>value</replaceable></arg>
 	</group>
 	<arg choice="plain"><option>-p</option> <replaceable>stonith-device-parameters</replaceable></arg>
+	<arg choice="plain"><option>-E</option> </arg>
 	<arg choice="plain"><option>-F</option> <replaceable>stonith-device-parameters-file</replaceable></arg>
       </group>
       <arg choice="opt"><option>-c</option> <replaceable>count</replaceable></arg>
@@ -80,6 +81,7 @@
 	  <arg choice="plain"><replaceable>name</replaceable>=<replaceable>value</replaceable></arg>
 	</group>
 	<arg choice="plain"><option>-p</option> <replaceable>stonith-device-parameters</replaceable></arg>
+	<arg choice="plain"><option>-E</option> </arg>
 	<arg choice="plain"><option>-F</option> <replaceable>stonith-device-parameters-file</replaceable></arg>
       </group>
       <arg choice="opt"><option>-c</option> <replaceable>count</replaceable></arg>
@@ -130,6 +132,15 @@
 	  <para>All of the listed parameters need to appear in order
 	  on a single line in the parameters file and be delimited by
 	  whitespace.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>
+	  <option>-E</option>
+	</term>
+	<listitem>
+	  <para>Read the configuration from the environment. The environment variable
+	  names are the same as the parameter names.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
