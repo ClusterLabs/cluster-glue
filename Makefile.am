@@ -15,6 +15,8 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 #
 
+AUTOMAKE_OPTIONS = foreign
+
 DISTCHECK_CONFIGURE_FLAGS = \
         --with-systemdsystemunitdir=$$dc_install_base/$(systemdsystemunitdir)
 
