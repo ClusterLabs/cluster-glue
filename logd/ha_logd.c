@@ -74,9 +74,6 @@
 #define EOS '\0'
 #define	nullchk(a)	((a) ? (a) : "<null>")
 
-static const int logd_keepalive_ms = 1000;
-static const int logd_warntime_ms = 5000;
-static const int logd_deadtime_ms = 10000;
 static gboolean verbose = FALSE;
 static pid_t write_process_pid;
 static IPC_Channel *chanspair[2];
