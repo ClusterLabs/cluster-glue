@@ -1148,7 +1148,7 @@ ChildLogIPCMessage(int priority, const char *buf, int bufstrlen,
 	
 	
 	if (ch->msgpad > MAX_MSGPAD){
-		cl_log(LOG_ERR, "ChildLogIPCMessage: invalid msgpad(%d)",
+		cl_log(LOG_ERR, "ChildLogIPCMessage: invalid msgpad(%u)",
 		       ch->msgpad);
 		return NULL;
 	}

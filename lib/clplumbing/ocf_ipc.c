@@ -447,7 +447,7 @@ ipc_bufpool_update(struct ipc_bufpool* pool,
 			       "magic number in head does not match. "
 			       "Something very bad happened, farside pid =%d",
 			       ch->farside_pid);
-			cl_log(LOG_ERR, "magic=%x, expected value=%x", head->magic, HEADMAGIC);
+			cl_log(LOG_ERR, "magic=%x, expected value=%x", head->magic, (unsigned)HEADMAGIC);
 			ipc_bufpool_display(pool);
 			cl_log(LOG_INFO, "nmsgs=%d", nmsgs);
 			/*print out the last message in queue*/

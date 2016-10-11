@@ -74,7 +74,7 @@ lc_fetch(char *ptr) {
 #define	WARN_DELAY(ms, mx, input)	cl_log(LOG_WARNING		\
 	,	"%s: Dispatch function for %s was delayed"		\
 	" %lu ms (> %lu ms) before being called (GSource: 0x%lx)"	\
-	,	__FUNCTION__,	(input)->description, ms, mx		\
+	,	__FUNCTION__,	(input)->description, (unsigned long)ms, (unsigned long)mx		\
 	,	POINTER_TO_ULONG(input))
 
 #define EXPLAINDELAY(started, detected) cl_log(LOG_INFO			\
@@ -86,7 +86,7 @@ lc_fetch(char *ptr) {
 #define	WARN_TOOLONG(ms, mx, input)	cl_log(LOG_WARNING		\
 	,	"%s: Dispatch function for %s took too long to execute"	\
 	": %lu ms (> %lu ms) (GSource: 0x%lx)"				\
-	,	__FUNCTION__,	(input)->description, ms, mx		\
+	,	__FUNCTION__,	(input)->description, (unsigned long)ms, (unsigned long)mx		\
 	,	POINTER_TO_ULONG(input))
 
 #define CHECK_DISPATCH_DELAY(i)	{ 					\
@@ -948,7 +948,7 @@ G_main_add_SignalHandler(int priority, int signal,
 		sig_src->description = "signal";
 		if (sig_src->gsourceid < 1) {
 			cl_log(LOG_ERR
-			,	"%s: Could not attach source for signal %d (%d)"
+			,	"%s: Could not attach source for signal %d (%u)"
 			,	__FUNCTION__
 			,	signal, sig_src->gsourceid);
 			failed = TRUE;
@@ -1297,7 +1297,7 @@ G_main_add_TriggerHandler(int priority,
 		trig_src->gsourceid = g_source_attach(source, NULL);
 		trig_src->description = "trigger";
 		if (trig_src->gsourceid < 1) {
-			cl_log(LOG_ERR, "G_main_add_TriggerHandler: Could not attach new source (%d)",
+			cl_log(LOG_ERR, "G_main_add_TriggerHandler: Could not attach new source (%u)",
 			       trig_src->gsourceid);
 			failed = TRUE;
 		}

@@ -88,7 +88,7 @@ cl_cdtocoredir(void)
 	pwent = getpwuid(getuid());
 	if (pwent == NULL) {
 		int errsave = errno;
-		cl_perror("Cannot get name for uid [%d]", getuid());
+		cl_perror("Cannot get name for uid [%u]", getuid());
 		errno = errsave;
 		return -1;
 	}

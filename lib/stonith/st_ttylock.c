@@ -141,7 +141,7 @@ DoLock(const char * prefix, const char *lockname)
 	snprintf(lf_name, sizeof(lf_name), "%s/%s%s"
 	,	HA_VARLOCKDIR, prefix, lockname);
 
-	snprintf(tf_name, sizeof(tf_name), "%s/tmp%lu-%s"
+	snprintf(tf_name, sizeof(tf_name), "%s/tmp%ld-%s"
 	,	HA_VARLOCKDIR, mypid, lockname);
 
 	if ((fd = open(lf_name, O_RDONLY)) >= 0) {
@@ -157,7 +157,7 @@ DoLock(const char * prefix, const char *lockname)
 		if (read(fd, buf, sizeof(buf)) < 1) {
 			/* lockfile empty -> rm it and go on */;
 		} else {
-			if (sscanf(buf, "%lu", &pid) < 1) {
+			if (sscanf(buf, "%ld", &pid) < 1) {
 				/* lockfile screwed up -> rm it and go on */
 			} else {
 				if (pid > 1 && ((long)getpid() != pid)
@@ -181,7 +181,7 @@ DoLock(const char * prefix, const char *lockname)
 	}
 
 	/* Slight overkill with the %*d format ;-) */
-	snprintf(buf, sizeof(buf), "%*lu\n", LOCKSTRLEN-1, mypid);
+	snprintf(buf, sizeof(buf), "%*ld\n", LOCKSTRLEN-1, mypid);
 
 	if (write(fd, buf, LOCKSTRLEN) != LOCKSTRLEN) {
 		/* Again, nothing we can do about this */

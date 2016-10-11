@@ -897,7 +897,7 @@ DelPILInterfaceType(PILInterfaceType*ift)
 		gpointer	key, iftype;
 		if (DEBUGPLUGIN) {
 			PILLog(PIL_DEBUG
-			,	"DelPILInterfaceType(%s): table size (%d)"
+			,	"DelPILInterfaceType(%s): table size (%u)"
 			,	ift->typename, g_hash_table_size(ift->interfaces));
 		}
 		if (g_hash_table_lookup_extended(ift->interfaces
@@ -1882,7 +1882,7 @@ so_select (const struct dirent *dire)
 	if (DEBUGPLUGIN) {
 		PILLog(PIL_DEBUG
 		,	"FILE %s Doesn't look like a plugin name [%s] "
-		"%zd %zd %s."
+		"%zu %zu %s."
 		,	dire->d_name, end
 		,	sizeof(obj_end), strlen(dire->d_name)
 		,	&dire->d_name[strlen(dire->d_name)
@@ -2114,7 +2114,7 @@ PILValidateInterfaceUniv(gpointer key, gpointer ifuniv, gpointer piuniv)
 
 #define PRSTAT(type)	{					\
 	PILLog(PIL_INFO, "Plugin system objects (" #type "): "		\
-	"\tnew %ld free \%ld current %ld"			\
+	"\tnew %lu free \%lu current %lu"			\
 	,	PILstats.type.news				\
 	,	PILstats.type.frees				\
 	,	PILstats.type.news - PILstats.type.frees);	\

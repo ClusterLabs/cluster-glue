@@ -99,7 +99,7 @@ PIL_PLUGIN_INIT(PILPlugin*us, PILPluginImports* imports, void *user_ptr)
 	,	&OurIf
 	,	(void*)&OurIfImports
 	,	NULL);
-	imports->log(PIL_INFO, "test init function: returning %d"
+	imports->log(PIL_INFO, "test init function: returning %u"
 		,	ret);
 
 	return ret;

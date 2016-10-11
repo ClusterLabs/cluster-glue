@@ -860,7 +860,7 @@ get_resource_type(char *entityRoot, SaHpiRptEntryT *ohRPT)
 			case SAHPI_ENT_SYSTEM_CHASSIS:
 				snprintf(rootName, sizeof(rootName)
 				,	SYSTEM_CHASSIS_FMT
-				,	ohep->Entry[i].EntityLocation);
+				,	(int)ohep->Entry[i].EntityLocation);
 				if (!strcmp(entityRoot, rootName)) {
 					foundRoot = 1;
 				}
@@ -977,7 +977,7 @@ try_again:
 			dev->ohdevid = ohRPT.ResourceId;
 
 			if (Debug) {
-				LOG(PIL_DEBUG, "BladeCenter '%s' has id %d"
+				LOG(PIL_DEBUG, "BladeCenter '%s' has id %u"
 				,	(char*)ohRPT.ResourceTag.Data
 				,	dev->ohdevid);
 			}
@@ -993,8 +993,8 @@ try_again:
 
 					if (Debug) {
 						LOG(PIL_DEBUG
-						, "MgmtModule '%s' has id %d "
-						"with sensor #%d"
+						, "MgmtModule '%s' has id %u "
+						"with sensor #%u"
 						, (char*)ohRPT.ResourceTag.Data
 						, dev->ohsensid
 						, dev->ohsensnum);
@@ -1035,7 +1035,7 @@ try_again:
 			dev->hostlist = g_list_append(dev->hostlist, bi);
 
 			if (Debug) {
-				LOG(PIL_DEBUG, "Blade '%s' has id %d, caps %x"
+				LOG(PIL_DEBUG, "Blade '%s' has id %u, caps %x"
 				, bi->name, bi->resourceId, bi->resourceCaps);
 			}
 			break;
@@ -1054,7 +1054,7 @@ try_again:
 		free_bladehpi_hostlist(dev);
 		if(Debug){
 			LOG(PIL_DEBUG, "Looping through entries again,"
-				" count changed from %d to %d"
+				" count changed from %u to %u"
 			,	ohupdate, ohdi.RptUpdateCount);
 		}
 		goto try_again;
