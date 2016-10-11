@@ -43,7 +43,7 @@ frequently requested by the developers to isolate and fix bugs, and
 are commonly found as attachments to Bugzilla entries.
 
 NOTE: hb_report has been integrated into
-[https://crmsh.github.io](crmsh), and is now maintained as part of the
+[crmsh](https://github.com/ClusterLabs/crmsh.git), and is now maintained as part of the
 `crmsh` project.
 
 ### Cluster Plumbing Library
