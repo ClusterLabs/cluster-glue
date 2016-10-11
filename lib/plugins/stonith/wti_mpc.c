@@ -467,11 +467,11 @@ wti_mpc_hostlist(StonithPlugin * s)
 	/* prepare objname */
 	switch (ad->mib_version) {
 	    case 3:
-                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V3,j+1);
+                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V3,(unsigned)j+1);
                 break;
             case 1:
             default:
-                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V1,j+1);
+                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V1,(unsigned)j+1);
 		break;
 	}
 	if (Debug) {
@@ -548,11 +548,11 @@ wti_mpc_reset_req(StonithPlugin * s, int request, const char *host)
 	/* prepare objname */
 	switch (ad->mib_version) {
 	    case 3:
-                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V3,outlet);
+                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V3,(unsigned)outlet);
                 break;
             case 1:
             default:
-                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V1,outlet);
+                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V1,(unsigned)outlet);
 		break;
 	}
 
@@ -694,11 +694,11 @@ wti_mpc_set_config(StonithPlugin * s, StonithNVpair * list)
             for (mo=1;mo<MAX_OUTLETS;mo++) {
 		switch (sd->mib_version) {
 		    case 3:
-	                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V3,mo);
+	                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V3,(unsigned)mo);
 	                break;
 	            case 1:
 	            default:
-	                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V1,mo);
+	                snprintf(objname,MAX_STRING,OID_GROUP_NAMES_V1,(unsigned)mo);
 			break;
 		}
 

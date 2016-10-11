@@ -1043,7 +1043,7 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 		if ((pf[0].revents & (POLLERR|POLLNVAL)) != 0) {
 			cl_log(LOG_ERR
 			,	"Async echoclient: bad poll revents."
-			" revents: 0x%x iter %d", pf[0].revents, rdcount);
+			" revents: 0x%x iter %d", (unsigned)pf[0].revents, rdcount);
 			++errcount;
 			continue;
 		}
@@ -1053,7 +1053,7 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 		&&	((pf[0].revents&POLLIN) == 0)) {
 			cl_log(LOG_ERR
 			,	"Async echoclient: premature pollhup."
-			" revents: 0x%x iter %d", pf[0].revents, rdcount);
+			" revents: 0x%x iter %d", (unsigned)pf[0].revents, rdcount);
 			EOFcheck(chan);
 			++errcount;
 			continue;
@@ -1064,7 +1064,7 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 		&&	(pf[1].revents & (POLLERR|POLLNVAL)) != 0) {
 			cl_log(LOG_ERR
 			,	"Async echoclient: bad poll revents[1]."
-			" revents: 0x%x iter %d", pf[1].revents, rdcount);
+			" revents: 0x%x iter %d", (unsigned)pf[1].revents, rdcount);
 			++errcount;
 			continue;
 		}
@@ -1077,7 +1077,7 @@ asyn_echoclient(IPC_Channel* chan, int repcount)
 			/* Neither I nor O available... */
 			cl_log(LOG_ERR
 			,	"Async echoclient: bad events."
-			" revents: 0x%x iter %d", pf[0].revents, rdcount);
+			" revents: 0x%x iter %d", (unsigned)pf[0].revents, rdcount);
 			++errcount;
 		}
 	}

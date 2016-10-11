@@ -741,7 +741,7 @@ convert_nl_sym(char* s, int len, char sym, int direction)
 			if (s[i] == sym){
 				cl_log(LOG_ERR
 				, "convert_nl_sym(): special symbol \'0x%x\' (%c) found"
-				" in string at %d (len=%d)", s[i], s[i], i, len);
+				" in string at %d (len=%d)", (unsigned)s[i], s[i], i, len);
 				i -= 10;
 				if(i < 0) {
 					i = 0;

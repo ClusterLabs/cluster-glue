@@ -313,7 +313,7 @@ cl_realtime_malloc_check(void)
 			       post_rt_morecore_count - lastcount);
 			
 			cl_log(LOG_INFO,
-			       "Total non-realtime malloc bytes: %ld",
+			       "Total non-realtime malloc bytes: %lu",
 			       MALLOC_TOTALSIZE() - init_malloc_arena);
 			oldarena = MALLOC_TOTALSIZE();			
 			

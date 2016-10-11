@@ -1130,7 +1130,7 @@ socket_check_poll(struct IPC_CHANNEL * ch
 		}
 		cl_log(LOG_ERR
 		,	"revents failure: fd %d, flags 0x%x"
-		,	sockpoll->fd, sockpoll->revents);
+		,	sockpoll->fd, (unsigned)sockpoll->revents);
 		errno = EINVAL;
 		return IPC_FAIL;
 	}

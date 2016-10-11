@@ -281,7 +281,7 @@ cl_init_poll_sig(struct pollfd *fds, unsigned int nfds)
 	if (fds->events != 0 && debug) {
 		cl_log(LOG_DEBUG
 		,	"Current event mask for fd [0] {%d} 0x%x"
-		,	fds->fd, fds->events);
+		,	fds->fd, (unsigned)fds->events);
 	}
 	/*
 	 * Examine each fd for the following things:
@@ -328,15 +328,15 @@ cl_init_poll_sig(struct pollfd *fds, unsigned int nfds)
 			if (debug) {
 				cl_log(LOG_DEBUG
 				,	"revents for fd %d: 0x%x"
-				,	fds[j].fd, fds[j].revents);
+				,	fds[j].fd, (unsigned)fds[j].revents);
 				cl_log(LOG_DEBUG
 				,	"events for fd %d: 0x%x"
-				,	fds[j].fd, fds[j].events);
+				,	fds[j].fd, (unsigned)fds[j].events);
 			}
 		}else if (fds[j].events && debug) {
 			cl_log(LOG_DEBUG
 			,	"pendevents for fd %d: 0x%x"
-			,	fds[j].fd, moni->pendevents);
+			,	fds[j].fd, (unsigned)moni->pendevents);
 		}
 		if (badfd) {
 			cl_poll_ignore(fd);
@@ -382,7 +382,7 @@ cl_real_poll_fd(int fd)
 		if (debug) {
 			cl_log(LOG_DEBUG
 			,	"Old news from poll(2) for fd %d: 0x%x"
-			,	fd, pfd[0].revents);
+			,	fd, (unsigned)pfd[0].revents);
 		}
 	}else{
 		if (fcntl(fd, F_GETFL) < 0) {
@@ -689,14 +689,15 @@ dump_fd_info(struct pollfd *fds, unsigned int nfds, int timeoutms)
 
 		cl_log(LOG_DEBUG, "fd %d flags: 0%o, signal: %d, events: 0x%x"
 		", revents: 0x%x, pendevents: 0x%x"
-		,	fd, fcntl(fd, F_GETFL), moni->nsig
-		,	fds[j].events, fds[j].revents, moni->pendevents);
+		,	fd, (unsigned)fcntl(fd, F_GETFL), moni->nsig
+		,	(unsigned)fds[j].events, (unsigned)fds[j].revents
+		,       (unsigned)moni->pendevents);
 	}
 	for (j=SIGRTMIN; j < (unsigned)SIGRTMAX; ++j) {
 		if (!sigismember(&SignalSet, j)) {
 			continue;
 		}
-		cl_log(LOG_DEBUG, "Currently monitoring RT signal %d", j);
+		cl_log(LOG_DEBUG, "Currently monitoring RT signal %u", j);
 	}
 }
 
@@ -726,19 +727,19 @@ check_fd_info(struct pollfd *fds, unsigned int nfds)
 		}
 		sig = fcntl(j, F_GETSIG);
 		if (sig == 0) {
-			cl_log(LOG_ERR, "FD %d will get SIGIO", j);
+			cl_log(LOG_ERR, "FD %u will get SIGIO", j);
 		}
 		if (!sigismember(&SignalSet, sig)) {
-			cl_log(LOG_ERR, "FD %d (signal %d) is not in SignalSet"
+			cl_log(LOG_ERR, "FD %u (signal %d) is not in SignalSet"
 			,	j, sig);
 		}
 		if (sig < SIGRTMIN || sig >= SIGRTMAX) {
-			cl_log(LOG_ERR, "FD %d (signal %d) is not RealTime"
+			cl_log(LOG_ERR, "FD %u (signal %d) is not RealTime"
 			,	j, sig);
 		}
 		pid = fcntl(j, F_GETOWN);
 		if (pid != getpid()) {
-			cl_log(LOG_ERR, "FD %d (signal %d) owner is pid %d"
+			cl_log(LOG_ERR, "FD %u (signal %d) owner is pid %d"
 			,	j, sig, pid);
 		}
 	}

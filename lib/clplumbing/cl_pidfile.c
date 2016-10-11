@@ -90,7 +90,7 @@ int IsRunning(long pid)
 #endif
 	
 	/* check to make sure pid hasn't been reused by another process */
-	snprintf(proc_path, sizeof(proc_path), "/proc/%lu/exe", pid);
+	snprintf(proc_path, sizeof(proc_path), "/proc/%ld/exe", pid);
 	
 	rc = readlink(proc_path, exe_path, PATH_MAX-1);
 	if(rc < 0) {
@@ -101,7 +101,7 @@ int IsRunning(long pid)
 	
 	mypid = (unsigned long) getpid();
 	
-	snprintf(proc_path, sizeof(proc_path), "/proc/%lu/exe", mypid);
+	snprintf(proc_path, sizeof(proc_path), "/proc/%ld/exe", mypid);
 	rc = readlink(proc_path, myexe_path, PATH_MAX-1);
 	if(rc < 0) {
 		cl_perror("Could not read from %s", proc_path);
@@ -130,7 +130,7 @@ DoLock(const char *filename)
 	
 	snprintf(lf_name, sizeof(lf_name), "%s",filename);
 	
-	snprintf(tf_name, sizeof(tf_name), "%s.%lu",
+	snprintf(tf_name, sizeof(tf_name), "%s.%ld",
 		 filename, mypid);
 	
 	if ((fd = open(lf_name, O_RDONLY)) >= 0) {
@@ -146,7 +146,7 @@ DoLock(const char *filename)
 		if (read(fd, buf, sizeof(buf)) < 1) {
 			/* lockfile empty -> rm it and go on */;
 		} else {
-			if (sscanf(buf, "%lu", &pid) < 1) {
+			if (sscanf(buf, "%ld", &pid) < 1) {
 				/* lockfile screwed up -> rm it and go on */
 			} else {
 				if (pid > 1 && (getpid() != pid)
@@ -169,7 +169,7 @@ DoLock(const char *filename)
 	}
 
 	/* Slight overkill with the %*d format ;-) */
-	snprintf(buf, sizeof(buf), "%*lu\n", LOCKSTRLEN-1, mypid);
+	snprintf(buf, sizeof(buf), "%*ld\n", LOCKSTRLEN-1, mypid);
 
 	if (write(fd, buf, LOCKSTRLEN) != LOCKSTRLEN) {
 		/* Again, nothing we can do about this */
@@ -249,7 +249,7 @@ cl_read_pidfile_no_checking(const char*filename)
 		return -1;
 	} 
 	
-	if (sscanf(buf, "%lu", &pid) <= 0) {
+	if (sscanf(buf, "%ld", &pid) <= 0) {
 		close(fd);
 		return -1;
 	}
