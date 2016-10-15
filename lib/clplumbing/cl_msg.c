@@ -1343,7 +1343,7 @@ cl_msg_add_list_str(struct ha_msg* msg, const char* name,
 	if (n <= 0  || buf == NULL|| name ==NULL ||msg == NULL){
 		cl_log(LOG_ERR, "%s:"
 		       "invalid parameter(%s)", 
-		       !n <= 0?"n is negative or zero": 
+		       n <= 0?"n is negative or zero": 
 		       !buf?"buf is NULL":
 		       !name?"name is NULL":
 		       "msg is NULL",__FUNCTION__);
@@ -1396,7 +1396,7 @@ cl_msg_add_list_int(struct ha_msg* msg, const char* name,
 	if (n <= 0  || buf == NULL|| name ==NULL ||msg == NULL){
 		cl_log(LOG_ERR, "cl_msg_add_list_int:"
 		       "invalid parameter(%s)", 
-		       !n <= 0?"n is negative or zero": 
+		       n <= 0?"n is negative or zero": 
 		       !buf?"buf is NULL":
 		       !name?"name is NULL":
 		       "msg is NULL");
