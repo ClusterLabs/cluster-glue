@@ -143,7 +143,7 @@ cl_msg_stats_open(const char* filename)
 		cl_log(LOG_ERR, "%s: filename is NULL", __FUNCTION__);
 		return -1;
 	}
-	
+
 	return open(filename, O_WRONLY|O_CREAT|O_APPEND, 0644);
 
 }
@@ -154,9 +154,9 @@ cl_msg_stats_close(void)
 	if (msg_stats_fd > 0){
 		close(msg_stats_fd);
 	}
-	
+
 	msg_stats_fd = -1;
-	
+
 	return HA_OK;
 }
 
@@ -176,7 +176,7 @@ cl_msg_stats_add(longclock_t time, int size)
 		}
 	}
 
-	
+
 	sprintf(buf, "%lld %d\n", (long long)time, size);
 	len = strnlen(buf, MAXLINE);
 	if (write(msg_stats_fd, buf, len) ==  len){
@@ -185,9 +185,9 @@ cl_msg_stats_add(longclock_t time, int size)
 	}
 
 	cl_msg_stats_close();
-	
+
 	return HA_FAIL;;
-	
+
 }
 
 
@@ -232,7 +232,7 @@ ha_msg_new(int nfields)
 {
 	struct ha_msg *	ret;
 	int	nalloc;
-	
+
 	ret = MALLOCT(struct ha_msg);
 	if (ret) {
 		ret->nfields = 0;
@@ -295,8 +295,8 @@ ha_msg_del(struct ha_msg *msg)
 				if (msg->values[j] == NULL){
 					continue;
 				}
-				
-				if(msg->types[j] < DIMOF(fieldtypefuncs)){					
+
+				if(msg->types[j] < DIMOF(fieldtypefuncs)){
 					fieldtypefuncs[msg->types[j]].memfree(msg->values[j]);
 				}
 			}
@@ -326,11 +326,11 @@ ha_msg_copy(const struct ha_msg *msg)
 	struct ha_msg*		ret;
 	int			j;
 
-	
+
 	PARANOIDAUDITMSG(msg);
-	if (msg == NULL || (ret = ha_msg_new(msg->nalloc)) == NULL) {   
-		return NULL;   
-	} 
+	if (msg == NULL || (ret = ha_msg_new(msg->nalloc)) == NULL) {
+		return NULL;
+	}
 
 	ret->nfields	= msg->nfields;
 
@@ -339,14 +339,14 @@ ha_msg_copy(const struct ha_msg *msg)
 	memcpy(ret->types, msg->types, sizeof(msg->types[0])*msg->nfields);
 
 	for (j=0; j < msg->nfields; ++j) {
-		
+
 		if ((ret->names[j] = malloc(msg->nlens[j]+1)) == NULL) {
 			goto freeandleave;
 		}
 		memcpy(ret->names[j], msg->names[j], msg->nlens[j]+1);
-		
-		
-		if(msg->types[j] < DIMOF(fieldtypefuncs)){					
+
+
+		if(msg->types[j] < DIMOF(fieldtypefuncs)){
 			ret->values[j] = fieldtypefuncs[msg->types[j]].dup(msg->values[j],
 									   msg->vlens[j]);
 			if (!ret->values[j]){
@@ -358,12 +358,12 @@ ha_msg_copy(const struct ha_msg *msg)
 	return ret;
 
 freeandleave:
-        /*   
+        /*
 	 * ha_msg_del nicely handles partially constructed ha_msgs
-	 * so, there's not really a memory leak here at all, but BEAM   
-	 * thinks there is.   
-	 */   
-	ha_msg_del(ret);/* memory leak */       ret=NULL; 
+	 * so, there's not really a memory leak here at all, but BEAM
+	 * thinks there is.
+	 */
+	ha_msg_del(ret);/* memory leak */       ret=NULL;
 	return ret;
 }
 
@@ -422,12 +422,12 @@ ha_msg_audit(const struct ha_msg* msg)
 		abort();
 	}
 	for (j=0; j < msg->nfields; ++j) {
-		
+
 		if (msg->nlens[j] == 0){
 			cl_log(LOG_ERR, "zero namelen found in msg");
 			abort();
 		}
-		
+
 		if (msg->types[j] == FT_STRING){
 			if (msg->vlens[j] != strlen(msg->values[j])){
 				cl_log(LOG_ERR, "stringlen does not match");
@@ -435,10 +435,10 @@ ha_msg_audit(const struct ha_msg* msg)
 				abort();
 			}
 		}
-		
+
 		if (!msg->names[j]) {
 			cl_log(LOG_CRIT, "Message name[%d] @ 0x%p"
-			       " is not allocated." ,	
+			       " is not allocated." ,
 			       j, msg->names[j]);
 			abort();
 		}
@@ -456,14 +456,14 @@ ha_msg_audit(const struct ha_msg* msg)
 
 int
 ha_msg_expand(struct ha_msg* msg )
-{	
+{
 	char **	names ;
 	size_t  *nlens ;
 	void **	values ;
 	size_t*	vlens ;
 	int *	types ;
 	int	nalloc;
-       
+
 	if(!msg){
 		cl_log(LOG_ERR, "ha_msg_expand:"
 		       "input msg is null");
@@ -475,37 +475,37 @@ ha_msg_expand(struct ha_msg* msg )
 	values = msg->values;
 	vlens = msg->vlens;
 	types = msg->types;
-	
+
 	nalloc = msg->nalloc + MINFIELDS;
 	msg->names = 	(char **)calloc(sizeof(char *), nalloc);
 	msg->nlens = 	(size_t *)calloc(sizeof(size_t), nalloc);
 	msg->values = 	(void **)calloc(sizeof(void *), nalloc);
 	msg->vlens = 	(size_t *)calloc(sizeof(size_t), nalloc);
 	msg->types= 	(int*)calloc(sizeof(int), nalloc);
-	
+
 	if (msg->names == NULL || msg->values == NULL
 	    ||	msg->nlens == NULL || msg->vlens == NULL
 	    ||	msg->types == NULL) {
-		
+
 		cl_log(LOG_ERR, "%s"
-		       ,	" out of memory for ha_msg");		
+		       ,	" out of memory for ha_msg");
 		return(HA_FAIL);
 	}
-	
+
 	memcpy(msg->names, names, msg->nalloc*sizeof(char *));
 	memcpy(msg->nlens, nlens, msg->nalloc*sizeof(size_t));
 	memcpy(msg->values, values, msg->nalloc*sizeof(void *));
 	memcpy(msg->vlens, vlens, msg->nalloc*sizeof(size_t));
 	memcpy(msg->types, types, msg->nalloc*sizeof(int));
-	
+
 	free(names);
 	free(nlens);
 	free(values);
 	free(vlens);
 	free(types);
-	
+
 	msg->nalloc = nalloc;
-	
+
 	return HA_OK;
 }
 
@@ -513,23 +513,23 @@ int
 cl_msg_remove_value(struct ha_msg* msg, const void* value)
 {
 	int j;
-	
+
 	if (msg == NULL || value == NULL){
 		cl_log(LOG_ERR, "cl_msg_remove: invalid argument");
 		return HA_FAIL;
 	}
-	
+
 	for (j = 0; j < msg->nfields; ++j){
 		if (value == msg->values[j]){
-			break;			
+			break;
 		}
 	}
-	if (j == msg->nfields){		
+	if (j == msg->nfields){
 		cl_log(LOG_ERR, "cl_msg_remove: field %p not found", value);
 		return HA_FAIL;
 	}
 	return cl_msg_remove_offset(msg, j);
-	
+
 }
 
 
@@ -537,19 +537,19 @@ int
 cl_msg_remove(struct ha_msg* msg, const char* name)
 {
 	int j;
-	
+
 	if (msg == NULL || name == NULL){
 		cl_log(LOG_ERR, "cl_msg_remove: invalid argument");
 		return HA_FAIL;
 	}
-	
+
 	for (j = 0; j < msg->nfields; ++j){
 		if (strcmp(name, msg->names[j]) == 0){
-			break;			
+			break;
 		}
 	}
-	
-	if (j == msg->nfields){		
+
+	if (j == msg->nfields){
 		cl_log(LOG_ERR, "cl_msg_remove: field %s not found", name);
 		return HA_FAIL;
 	}
@@ -561,15 +561,15 @@ cl_msg_remove_offset(struct ha_msg* msg, int offset)
 {
 	int j = offset;
 	int i;
-	
-	if (j == msg->nfields){		
+
+	if (j == msg->nfields){
 		cl_log(LOG_ERR, "cl_msg_remove: field %d not found", j);
 		return HA_FAIL;
 	}
-		
+
 	free(msg->names[j]);
 	fieldtypefuncs[msg->types[j]].memfree(msg->values[j]);
-	
+
 	for (i= j + 1; i < msg->nfields ; i++){
 		msg->names[i -1] = msg->names[i];
 		msg->nlens[i -1] = msg->nlens[i];
@@ -579,7 +579,7 @@ cl_msg_remove_offset(struct ha_msg* msg, int offset)
 	}
 	msg->nfields--;
 
-	
+
 	return HA_OK;
 }
 
@@ -595,26 +595,26 @@ static int
 ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		 void * value, size_t vallen, int type, int depth)
 {
-	
+
 	size_t	startlen = sizeof(MSG_START)-1;
-	
+
 
 	int (*addfield) (struct ha_msg* msg, char* name, size_t namelen,
 			 void* value, size_t vallen, int depth);
-		
+
 	if (!msg || msg->names == NULL || (msg->values == NULL) ) {
 		cl_log(LOG_ERR,	"ha_msg_addraw_ll: cannot add field to ha_msg");
 		return(HA_FAIL);
 	}
-	
+
 	if (msg->nfields >= msg->nalloc) {
 		if( ha_msg_expand(msg) != HA_OK){
 			cl_log(LOG_ERR, "message expanding failed");
 			return(HA_FAIL);
 		}
-		
+
 	}
-	
+
 	if (namelen >= startlen
 	    && name[0] == '>'
 	    && strncmp(name, MSG_START, startlen) == 0) {
@@ -630,16 +630,16 @@ ha_msg_addraw_ll(struct ha_msg * msg, char * name, size_t namelen,
 		       "cannot add name/value to ha_msg");
 		return(HA_FAIL);
 	}
-	
+
 	HA_MSG_ASSERT(type < DIMOF(fieldtypefuncs));
-	
+
 	addfield =  fieldtypefuncs[type].addfield;
-	if (!addfield || 
+	if (!addfield ||
 	    addfield(msg, name, namelen, value, vallen,depth) != HA_OK){
 		cl_log(LOG_ERR, "ha_msg_addraw_ll: addfield failed");
 		return(HA_FAIL);
 	}
-	
+
 	PARANOIDAUDITMSG(msg);
 
 	return(HA_OK);
@@ -661,25 +661,25 @@ ha_msg_addraw(struct ha_msg * msg, const char * name, size_t namelen,
 		cl_log(LOG_ERR, "%s: Adding a field with 0 name length", __FUNCTION__);
 		return HA_FAIL;
 	}
-	
+
 	if ((cpname = malloc(namelen+1)) == NULL) {
 		cl_log(LOG_ERR, "ha_msg_addraw: no memory for string (name)");
 		return(HA_FAIL);
 	}
 	strncpy(cpname, name, namelen);
 	cpname[namelen] = EOS;
-	
+
 	HA_MSG_ASSERT(type < DIMOF(fieldtypefuncs));
-	
+
 	if (fieldtypefuncs[type].dup){
-		cpvalue = fieldtypefuncs[type].dup(value, vallen);	
+		cpvalue = fieldtypefuncs[type].dup(value, vallen);
 	}
 	if (cpvalue == NULL){
 		cl_log(LOG_ERR, "ha_msg_addraw: copying message failed");
 		free(cpname);
 		return(HA_FAIL);
 	}
-	
+
 	ret = ha_msg_addraw_ll(msg, cpname, namelen, cpvalue, vallen
 	,	type, depth);
 
@@ -704,7 +704,7 @@ ha_msg_addbin(struct ha_msg * msg, const char * name,
 
 }
 
-int 
+int
 ha_msg_adduuid(struct ha_msg* msg, const char *name, const cl_uuid_t* u)
 {
 	return(ha_msg_addraw(msg, name, strlen(name),
@@ -716,30 +716,30 @@ int
 ha_msg_addstruct(struct ha_msg * msg, const char * name, const void * value)
 {
 	const struct ha_msg* childmsg = (const struct ha_msg*) value;
-	
+
 	if (get_netstringlen(childmsg) > MAXCHILDMSGLEN
 	    || get_stringlen(childmsg) > MAXCHILDMSGLEN) {
 		/*cl_log(LOG_WARNING,
 		       "%s: childmsg too big (name=%s, nslen=%d, len=%d)."
 		       "   Use ha_msg_addstruct_compress() instead.",
-		       __FUNCTION__, name, get_netstringlen(childmsg), 
+		       __FUNCTION__, name, get_netstringlen(childmsg),
 		       get_stringlen(childmsg));
 		*/
 	}
-	
-	return ha_msg_addraw(msg, name, strlen(name), value, 
+
+	return ha_msg_addraw(msg, name, strlen(name), value,
 			     sizeof(struct ha_msg), FT_STRUCT, 0);
 }
 
 int
 ha_msg_addstruct_compress(struct ha_msg * msg, const char * name, const void * value)
 {
-	
+
 	if (use_traditional_compression){
-		return ha_msg_addraw(msg, name, strlen(name), value, 
+		return ha_msg_addraw(msg, name, strlen(name), value,
 				     sizeof(struct ha_msg), FT_STRUCT, 0);
 	}else{
-		return ha_msg_addraw(msg, name, strlen(name), value, 
+		return ha_msg_addraw(msg, name, strlen(name), value,
 				     sizeof(struct ha_msg), FT_UNCOMPRESS, 0);
 	}
 }
@@ -749,7 +749,7 @@ ha_msg_add_int(struct ha_msg * msg, const char * name, int value)
 {
 	char buf[MAX_INT_LEN];
 	snprintf(buf, MAX_INT_LEN, "%d", value);
-	return (ha_msg_add(msg, name, buf));	
+	return (ha_msg_add(msg, name, buf));
 }
 
 int
@@ -757,7 +757,7 @@ ha_msg_mod_int(struct ha_msg * msg, const char * name, int value)
 {
 	char buf[MAX_INT_LEN];
 	snprintf(buf, MAX_INT_LEN, "%d", value);
-	return (cl_msg_modstring(msg, name, buf));	
+	return (cl_msg_modstring(msg, name, buf));
 }
 
 int
@@ -776,7 +776,7 @@ ha_msg_add_ul(struct ha_msg * msg, const char * name, unsigned long value)
 {
 	char buf[MAX_INT_LEN];
 	snprintf(buf, MAX_INT_LEN, "%lu", value);
-	return (ha_msg_add(msg, name, buf));	
+	return (ha_msg_add(msg, name, buf));
 }
 
 int
@@ -784,7 +784,7 @@ ha_msg_mod_ul(struct ha_msg * msg, const char * name, unsigned long value)
 {
 	char buf[MAX_INT_LEN];
 	snprintf(buf, MAX_INT_LEN, "%lu", value);
-	return (cl_msg_modstring(msg, name, buf));	
+	return (cl_msg_modstring(msg, name, buf));
 }
 
 int
@@ -808,20 +808,20 @@ ha_msg_value_ul(const struct ha_msg * msg, const char * name, unsigned long* val
  *	etc.
  */
 
-GList* 
+GList*
 ha_msg_value_str_list(struct ha_msg * msg, const char * name)
 {
-	
+
 	int i = 1;
 	int len = 0;
 	const char* value;
 	char* element;
 	GList* list = NULL;
-	
-	
+
+
 	if( NULL==msg||NULL==name||strnlen(name, MAX_NAME_LEN)>=MAX_NAME_LEN ){
 		return NULL;
-	}	
+	}
 	len = cl_msg_list_length(msg,name);
 	for(i=0; i<len; i++) {
 		value = cl_msg_list_nth_data(msg,name,i);
@@ -947,26 +947,26 @@ cl_msg_list_add_string(struct ha_msg* msg, const char* name, const char* value)
 {
 	GList* list = NULL;
 	int ret;
-	
+
 	if(!msg || !name || !value){
 		cl_log(LOG_ERR, "cl_msg_list_add_string: input invalid");
 		return HA_FAIL;
 	}
-	
-	
+
+
 	list = g_list_append(list, UNCONST_CAST_POINTER(gpointer, value));
 	if (!list){
 		cl_log(LOG_ERR, "cl_msg_list_add_string: append element to"
 		       "a glist failed");
 		return HA_FAIL;
 	}
-	
-	ret = ha_msg_addraw(msg, name, strlen(name), list, 
+
+	ret = ha_msg_addraw(msg, name, strlen(name), list,
 			    string_list_pack_length(list),
 			    FT_LIST, 0);
-	
+
 	g_list_free(list);
-	
+
 	return ret;
 
 }
@@ -1056,7 +1056,7 @@ static void *
 cl_get_value(const struct ha_msg * msg, const char * name,
 	     size_t * vallen, int *type)
 {
-	
+
 	int	j;
 	if (!msg || !msg->names || !msg->values) {
 		cl_log(LOG_ERR, "%s: wrong argument (%s)",
@@ -1074,7 +1074,7 @@ cl_get_value(const struct ha_msg * msg, const char * name,
 			}
 			if (type){
 				*type = msg->types[j];
-			}			
+			}
 			return(msg->values[j]);
 		}
 	}
@@ -1085,14 +1085,14 @@ static void *
 cl_get_value_mutate(struct ha_msg * msg, const char * name,
 	     size_t * vallen, int *type)
 {
-	
+
 	int	j;
 	if (!msg || !msg->names || !msg->values) {
 		cl_log(LOG_ERR, "%s: wrong argument",
 		       __FUNCTION__);
 		return(NULL);
 	}
-	
+
 	AUDITMSG(msg);
 	for (j=0; j < msg->nfields; ++j) {
 		if (strcmp(name, msg->names[j]) == 0) {
@@ -1100,13 +1100,13 @@ cl_get_value_mutate(struct ha_msg * msg, const char * name,
 			if (fieldtypefuncs[tp].pregetaction){
 				fieldtypefuncs[tp].pregetaction(msg, j);
 			}
-			
+
 			if (vallen){
 				*vallen = msg->vlens[j];
 			}
 			if (type){
 				*type = msg->types[j];
-			}			
+			}
 			return(msg->values[j]);
 		}
 	}
@@ -1123,7 +1123,7 @@ cl_get_binary(const struct ha_msg *msg,
 	int		type;
 
 	ret = cl_get_value( msg, name, vallen, &type);
-	
+
 	if (ret == NULL){
 		/*
 		cl_log(LOG_WARNING, "field %s not found", name);
@@ -1146,7 +1146,7 @@ cl_get_uuid(const struct ha_msg *msg, const char * name, cl_uuid_t* retval)
 {
 	const void *	vret;
 	size_t		vretsize;
-	
+
 	cl_uuid_clear(retval);
 
 	if ((vret = cl_get_binary(msg, name, &vretsize)/*discouraged function*/) == NULL) {
@@ -1211,22 +1211,22 @@ cl_get_struct(const struct ha_msg *msg, const char* name)
 	size_t		vallen;
 
 	ret = cl_get_value(msg, name, &vallen, &type);
-	
+
 	if (ret == NULL ){
 		return(NULL);
 	}
-	
+
 	switch(type){
-		
+
 	case FT_STRUCT:
 		break;
-		
+
 	default:
 		cl_log(LOG_ERR, "%s: field %s is not a struct (%d)",
 		       __FUNCTION__, name, type);
 		return NULL;
 	}
-	
+
 	return ret;
 }
 */
@@ -1238,25 +1238,25 @@ cl_get_struct(struct ha_msg *msg, const char* name)
 	struct ha_msg*	ret;
 	int		type = -1;
 	size_t		vallen;
-	
+
 	ret = cl_get_value_mutate(msg, name, &vallen, &type);
-	
+
 	if (ret == NULL ){
 		return(NULL);
 	}
-	
+
 	switch(type){
-		
+
 	case FT_UNCOMPRESS:
 	case FT_STRUCT:
 		break;
-		
+
 	default:
 		cl_log(LOG_ERR, "%s: field %s is not a struct (%d)",
 		       __FUNCTION__, name, type);
 		return NULL;
 	}
-	
+
 	return ret;
 }
 
@@ -1266,51 +1266,51 @@ cl_msg_list_length(struct ha_msg* msg, const char* name)
 {
 	GList*   ret;
 	int		type;
-	
+
 	ret = cl_get_value( msg, name, NULL, &type);
-	
+
 	if ( ret == NULL || type != FT_LIST){
 		return -1;
 	}
 
 	return g_list_length(ret);
-	
+
 }
 
 
-void* 
+void*
 cl_msg_list_nth_data(struct ha_msg* msg, const char* name, int n)
 {
 	GList*   ret;
 	int		type;
-	
+
 	ret = cl_get_value( msg, name, NULL, &type);
-	
+
 	if ( ret == NULL || type != FT_LIST){
 		cl_log(LOG_WARNING, "field %s not found "
 		       " or type mismatch", name);
 		return NULL;
 	}
-	
+
 	return g_list_nth_data(ret, n);
-	
+
 }
 
 int
 cl_msg_add_list(struct ha_msg* msg, const char* name, GList* list)
 {
 	int		ret;
-	
+
 	if(msg == NULL|| name ==NULL || list == NULL){
 		cl_log(LOG_ERR, "cl_msg_add_list:"
 		       "invalid arguments");
 		return HA_FAIL;
 	}
-	
-	ret = ha_msg_addraw(msg, name, strlen(name), list, 
+
+	ret = ha_msg_addraw(msg, name, strlen(name), list,
 			    string_list_pack_length(list),
 			    FT_LIST, 0);
-	
+
 	return ret;
 }
 
@@ -1319,15 +1319,15 @@ cl_msg_get_list(struct ha_msg* msg, const char* name)
 {
 	GList*		ret;
 	int		type;
-	
+
 	ret = cl_get_value( msg, name, NULL, &type);
-	
+
 	if ( ret == NULL || type != FT_LIST){
 		cl_log(LOG_WARNING, "field %s not found "
 		       " or type mismatch", name);
 		return NULL;
-	}	
-	
+	}
+
 	return ret;
 }
 
@@ -1335,21 +1335,21 @@ cl_msg_get_list(struct ha_msg* msg, const char* name)
 int
 cl_msg_add_list_str(struct ha_msg* msg, const char* name,
 		    char** buf, size_t n)
-{		
+{
 	GList*		list = NULL;
 	int		i;
 	int		ret = HA_FAIL;
-	
+
 	if (n <= 0  || buf == NULL|| name ==NULL ||msg == NULL){
 		cl_log(LOG_ERR, "%s:"
-		       "invalid parameter(%s)", 
-		       n <= 0?"n is negative or zero": 
+		       "invalid parameter(%s)",
+		       n <= 0?"n is negative or zero":
 		       !buf?"buf is NULL":
 		       !name?"name is NULL":
 		       "msg is NULL",__FUNCTION__);
 		return HA_FAIL;
 	}
-	
+
 	for ( i = 0; i < n; i++){
 		if (buf[i] == NULL){
 			cl_log(LOG_ERR, "%s: %dth element in buf is null",
@@ -1363,11 +1363,11 @@ cl_msg_add_list_str(struct ha_msg* msg, const char* name,
 			goto free_and_out;
 		}
 	}
-	
-	ret = ha_msg_addraw(msg, name, strlen(name), list, 
+
+	ret = ha_msg_addraw(msg, name, strlen(name), list,
 			    string_list_pack_length(list),
 			    FT_LIST, 0);
-	
+
  free_and_out:
 	if (list){
 		g_list_free(list);
@@ -1381,30 +1381,30 @@ list_element_free(gpointer data, gpointer userdata)
 {
 	if (data){
 		g_free(data);
-	}	
+	}
 }
 
 int
 cl_msg_add_list_int(struct ha_msg* msg, const char* name,
 		    int* buf, size_t n)
 {
-	
+
 	GList*		list = NULL;
 	size_t		i;
 	int		ret = HA_FAIL;
-	
+
 	if (n <= 0  || buf == NULL|| name ==NULL ||msg == NULL){
 		cl_log(LOG_ERR, "cl_msg_add_list_int:"
-		       "invalid parameter(%s)", 
-		       n <= 0?"n is negative or zero": 
+		       "invalid parameter(%s)",
+		       n <= 0?"n is negative or zero":
 		       !buf?"buf is NULL":
 		       !name?"name is NULL":
 		       "msg is NULL");
 		goto free_and_out;
 	}
-	
+
 	for ( i = 0; i < n; i++){
-		char intstr[MAX_INT_LEN];		
+		char intstr[MAX_INT_LEN];
 		sprintf(intstr,"%d", buf[i]);
 		list = g_list_append(list, g_strdup(intstr));
 		if (list == NULL){
@@ -1413,8 +1413,8 @@ cl_msg_add_list_int(struct ha_msg* msg, const char* name,
 			goto free_and_out;
 		}
 	}
-	
-	ret = ha_msg_addraw(msg, name, strlen(name), list, 
+
+	ret = ha_msg_addraw(msg, name, strlen(name), list,
 			    string_list_pack_length(list),
 			    FT_LIST, 0);
  free_and_out:
@@ -1434,18 +1434,18 @@ cl_msg_get_list_int(struct ha_msg* msg, const char* name,
 	size_t	len;
 	int	i;
 	GList* list_element;
-	
+
 
 	if (n == NULL || buf == NULL|| name ==NULL ||msg == NULL){
 		cl_log(LOG_ERR, "cl_msg_get_list_int:"
-		       "invalid parameter(%s)", 
-		       !n?"n is NULL": 
+		       "invalid parameter(%s)",
+		       !n?"n is NULL":
 		       !buf?"buf is NULL":
 		       !name?"name is NULL":
 		       "msg is NULL");
 		return HA_FAIL;
 	}
-	
+
 	list = cl_msg_get_list(msg, name);
 	if (list == NULL){
 		cl_log(LOG_ERR, "cl_msg_get_list_int:"
@@ -1459,10 +1459,10 @@ cl_msg_get_list_int(struct ha_msg* msg, const char* name,
 		       "buffer too small: *n=%ld, required len=%ld",
 		       (long)*n, (long)len);
 		*n = len;
-		return HA_FAIL;	
+		return HA_FAIL;
 	}
-	
-	*n = len; 
+
+	*n = len;
 	i = 0;
 	list_element = g_list_first(list);
 	while( list_element != NULL){
@@ -1471,38 +1471,38 @@ cl_msg_get_list_int(struct ha_msg* msg, const char* name,
 			cl_log(LOG_ERR, "cl_msg_get_list_int:"
 			       "element data is NULL");
 			return HA_FAIL;
-		}		
-		
+		}
+
 		if (sscanf(intstr,"%d", &buf[i]) != 1){
 			cl_log(LOG_ERR, "cl_msg_get_list_int:"
 			       "element data is NULL");
 			return HA_FAIL;
 		}
-		
+
 		i++;
 		list_element = g_list_next(list_element);
 	}
-	
+
 	return HA_OK;
 }
 
-int 
+int
 cl_msg_replace_value(struct ha_msg* msg, const void *old_value,
 		     const void* value, size_t vlen, int type)
 {
 	int j;
-	
+
 	if (msg == NULL || old_value == NULL) {
 		cl_log(LOG_ERR, "cl_msg_replace: invalid argument");
 		return HA_FAIL;
 	}
-	
+
 	for (j = 0; j < msg->nfields; ++j){
 		if (old_value == msg->values[j]){
-			break;			
+			break;
 		}
 	}
-	if (j == msg->nfields){		
+	if (j == msg->nfields){
 		cl_log(LOG_ERR, "cl_msg_replace: field %p not found", old_value);
 		return HA_FAIL;
 	}
@@ -1510,66 +1510,66 @@ cl_msg_replace_value(struct ha_msg* msg, const void *old_value,
 }
 
 /*this function is for internal use only*/
-int 
+int
 cl_msg_replace(struct ha_msg* msg, int index,
 	       const void* value, size_t vlen, int type)
 {
 	void *	newv ;
 	int	newlen = vlen;
 	int	oldtype;
-	
+
 	PARANOIDAUDITMSG(msg);
 	if (msg == NULL || value == NULL) {
 		cl_log(LOG_ERR, "%s: NULL input.", __FUNCTION__);
 		return HA_FAIL;
 	}
-	
+
 	if(type >= DIMOF(fieldtypefuncs)){
 		cl_log(LOG_ERR, "%s:"
 		       "invalid type(%d)",__FUNCTION__, type);
 		return HA_FAIL;
 	}
-	
+
 	if (index >= msg->nfields){
 		cl_log(LOG_ERR, "%s: index(%d) out of range(%d)",
 		       __FUNCTION__,index, msg->nfields);
 		return HA_FAIL;
 	}
-	
+
 	oldtype = msg->types[index];
-	
+
 	newv = fieldtypefuncs[type].dup(value,vlen);
 	if (!newv){
 		cl_log(LOG_ERR, "%s: duplicating message fields failed"
-		       "value=%p, vlen=%d, msg->names[i]=%s", 
+		       "value=%p, vlen=%d, msg->names[i]=%s",
 		       __FUNCTION__,value, (int)vlen, msg->names[index]);
 		return HA_FAIL;
 	}
-	
+
 	fieldtypefuncs[oldtype].memfree(msg->values[index]);
-	
+
 	msg->values[index] = newv;
 	msg->vlens[index] = newlen;
 	msg->types[index] = type;
 	PARANOIDAUDITMSG(msg);
 	return(HA_OK);
-	
+
 }
 
 
 static int
 cl_msg_mod(struct ha_msg * msg, const char * name,
 	       const void* value, size_t vlen, int type)
-{  
+{
   	int j;
-	int rc;	
+	int rc;
 
 	PARANOIDAUDITMSG(msg);
 	if (msg == NULL || name == NULL || value == NULL) {
 		cl_log(LOG_ERR, "cl_msg_mod: NULL input.");
 		return HA_FAIL;
 	}
-	
+
 	if(type >= DIMOF(fieldtypefuncs)){
 		cl_log(LOG_ERR, "cl_msg_mod:"
 		       "invalid type(%d)", type);
@@ -1578,24 +1578,24 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 
 	for (j=0; j < msg->nfields; ++j) {
 		if (strcmp(name, msg->names[j]) == 0) {
-			
+
 			char *	newv ;
 			int	newlen = vlen;
-			
+
 			if (type != msg->types[j]){
 				cl_log(LOG_ERR, "%s: type mismatch(%d %d)",
 				       __FUNCTION__, type, msg->types[j]);
 				return HA_FAIL;
 			}
-			
+
 			newv = fieldtypefuncs[type].dup(value,vlen);
 			if (!newv){
 				cl_log(LOG_ERR, "duplicating message fields failed"
-				       "value=%p, vlen=%d, msg->names[j]=%s", 
+				       "value=%p, vlen=%d, msg->names[j]=%s",
 				       value, (int)vlen, msg->names[j]);
 				return HA_FAIL;
 			}
-						
+
 			fieldtypefuncs[type].memfree(msg->values[j]);
 			msg->values[j] = newv;
 			msg->vlens[j] = newlen;
@@ -1603,34 +1603,34 @@ cl_msg_mod(struct ha_msg * msg, const char * name,
 			return(HA_OK);
 		}
 	}
-	
+
 	rc = ha_msg_nadd_type(msg, name,strlen(name), value, vlen, type);
-  
+
 	PARANOIDAUDITMSG(msg);
 	return rc;
 }
 
 int
-cl_msg_modstruct(struct ha_msg * msg, const char* name, 
+cl_msg_modstruct(struct ha_msg * msg, const char* name,
 		 const struct ha_msg* value)
 {
-	return cl_msg_mod(msg, name, value, 0, FT_STRUCT);	
+	return cl_msg_mod(msg, name, value, 0, FT_STRUCT);
 }
 
 int
-cl_msg_modbin(struct ha_msg * msg, const char* name, 
+cl_msg_modbin(struct ha_msg * msg, const char* name,
 	      const void* value, size_t vlen)
 {
 	return cl_msg_mod(msg, name, value, vlen, FT_BINARY);
-	
+
 }
 int
-cl_msg_moduuid(struct ha_msg * msg, const char* name, 
+cl_msg_moduuid(struct ha_msg * msg, const char* name,
 	       const cl_uuid_t* uuid)
 {
 	return cl_msg_mod(msg, name, uuid, sizeof(cl_uuid_t), FT_BINARY);
 }
-	
+
 
 
 /* Modify the value associated with a particular name */
@@ -1746,7 +1746,7 @@ msgfromstream_netstring(FILE * f)
 		}
 
 		nvpair = malloc(nvlen + 2);
-		
+
 		if ((n =fread(nvpair, 1, nvlen + 1, f)) != nvlen + 1){
 			cl_log(LOG_WARNING, "msgfromstream_netstring()"
 			       ": Can't get enough nvpair,"
@@ -1755,7 +1755,7 @@ msgfromstream_netstring(FILE * f)
 			ha_msg_del(ret);
 			return(NULL);
 		}
-		
+
 		process_netstring_nvpair(ret, nvpair, nvlen);
 
 	}
@@ -1805,7 +1805,7 @@ msgfromIPC_ll(IPC_Channel * ch, int flag, unsigned int timeout, int *rc_out)
 	struct ha_msg*	hmsg;
 	int		need_auth = flag & MSG_NEEDAUTH;
 	int		allow_intr = flag & MSG_ALLOWINTR;
-	
+
  startwait:
 	if(timeout > 0) {
 	    rc = cl_ipc_wait_timeout(ch, ch->ops->waitin, timeout);
@@ -1816,7 +1816,7 @@ msgfromIPC_ll(IPC_Channel * ch, int flag, unsigned int timeout, int *rc_out)
 	if(rc_out) {
 	    *rc_out = rc;
 	}
-	
+
 	switch(rc) {
 	default:
 	case IPC_FAIL:
@@ -1825,23 +1825,23 @@ msgfromIPC_ll(IPC_Channel * ch, int flag, unsigned int timeout, int *rc_out)
 
 	case IPC_TIMEOUT:
 		return NULL;
-		
+
 	case IPC_BROKEN:
 		sleep(1);
 		return NULL;
-		
+
 	case IPC_INTR:
 		if ( allow_intr){
 			goto startwait;
 		}else{
 			return NULL;
 		}
-		
+
 	case IPC_OK:
 		break;
 	}
-	
-	
+
+
 	ipcmsg = NULL;
 	rc = ch->ops->recv(ch, &ipcmsg);
 #if 0
@@ -1885,7 +1885,7 @@ struct ha_msg*
 msgfromIPC_noauth(IPC_Channel * ch)
 {
 	int flag = 0;
-	
+
 	flag |= MSG_ALLOWINTR;
 	return msgfromIPC_ll(ch, flag, 0, NULL);
 }
@@ -1970,7 +1970,7 @@ dump_clmsg_ipcmsg_stats(void)
 	       clmsg_ipcmsg_allocated,
 	       clmsg_ipcmsg_freed,
 	       clmsg_ipcmsg_allocated - clmsg_ipcmsg_freed);
-	
+
 	return;
 }
 
@@ -2007,16 +2007,16 @@ wirefmt2ipcmsg(void* p, size_t len, IPC_Channel* ch)
 	if (!ret) {
 		return(NULL);
 	}
-	
+
 	memset(ret, 0, sizeof(IPC_Message));
-	
+
 	if (NULL == (ret->msg_buf = malloc(len + ch->msgpad))) {
 		free(ret);
 		return NULL;
 	}
 	ret->msg_body = (char*)ret->msg_buf + ch->msgpad;
 	memcpy(ret->msg_body, p, len);
-	
+
 	ret->msg_done = ipcmsg_done;
 	ret->msg_private = NULL;
 	ret->msg_ch = ch;
@@ -2043,7 +2043,7 @@ hamsg2ipcmsg(struct ha_msg* m, IPC_Channel* ch)
 		free(s);
 		return ret;
 	}
-	
+
 	memset(ret, 0, sizeof(IPC_Message));
 
 	if (NULL == (ret->msg_buf = malloc(len + ch->msgpad))) {
@@ -2054,7 +2054,7 @@ hamsg2ipcmsg(struct ha_msg* m, IPC_Channel* ch)
 	ret->msg_body = (char*)ret->msg_buf + ch->msgpad;
 	memcpy(ret->msg_body, s, len);
 	free(s);
-	
+
 	ret->msg_done = ipcmsg_done;
 	ret->msg_private = NULL;
 	ret->msg_ch = ch;
@@ -2093,10 +2093,10 @@ msg2ipcchan(struct ha_msg*m, IPC_Channel*ch)
 
 	if (ch->ops->send(ch, imsg) != IPC_OK) {
 		if (ch->ch_status == IPC_CONNECT) {
-			snprintf(ch->failreason,MAXFAILREASON, 
+			snprintf(ch->failreason,MAXFAILREASON,
 				 "send failed,farside_pid=%d, sendq length=%ld(max is %ld)",
-				 ch->farside_pid, (long)ch->send_queue->current_qlen, 
-				 (long)ch->send_queue->max_qlen);	
+				 ch->farside_pid, (long)ch->send_queue->current_qlen,
+				 (long)ch->send_queue->max_qlen);
 		}
 		imsg->msg_done(imsg);
 		return HA_FAIL;
@@ -2130,7 +2130,7 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 		cl_log(LOG_ERR, "%s: creating new msg failed", __FUNCTION__);
 		return(NULL);
 	}
-	
+
 	startlen = sizeof(MSG_START)-1;
 	if (strncmp(sp, MSG_START, startlen) != 0) {
 		/* This can happen if the sender gets killed */
@@ -2174,9 +2174,9 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 				cl_log(LOG_ERR, "NV failure (string2msg_ll):");
 				cl_log(LOG_ERR, "Input string: [%s]", s);
 				cl_log(LOG_ERR, "sp=%s", sp);
-				cl_log(LOG_ERR, "depth=%d", depth);				
+				cl_log(LOG_ERR, "depth=%d", depth);
 				cl_log_message(LOG_ERR,ret);
-			}			
+			}
 			ha_msg_del(ret);
 			return(NULL);
 		}
@@ -2187,7 +2187,7 @@ string2msg_ll(const char * s, size_t length, int depth, int need_auth)
 		}
 		sp += strcspn(sp, NEWLINE);
 	}
-	
+
 	if (need_auth && msg_authentication_method
 	    &&		!msg_authentication_method(ret)) {
 		const char* from = ha_msg_value(ret, F_ORIG);
@@ -2216,12 +2216,12 @@ string2msg(const char * s, size_t length)
 
 
 /* Converts a message into a string (for sending out UDP interface)
-   
+
    used in two places:
 
    1.called by msg2string as a implementation for computing string for a
    message provided the buffer
-   
+
    2.called by is_authentic. In this case, there are no start/end string
    and the "auth" field is not included in the string
 
@@ -2265,9 +2265,9 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 	}
 
 	for (j=0; j < m->nfields; ++j) {
-		
+
 		int truelen;
-		int (*tostring)(char*, char*, void*, size_t, int);	
+		int (*tostring)(char*, char*, void*, size_t, int);
 
 		if (needhead == NOHEAD && strcmp(m->names[j], F_AUTH) == 0) {
 			continue;
@@ -2288,7 +2288,7 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 		bp += m->nlens[j];
 		strcat(bp, "=");
 		bp++;
-		
+
 		if(m->types[j] < DIMOF(fieldtypefuncs)){
 			tostring = fieldtypefuncs[m->types[j]].tostring;
 		} else {
@@ -2299,12 +2299,12 @@ msg2string_buf(const struct ha_msg *m, char* buf, size_t len
 		    (truelen = tostring(bp, maxp, m->values[j], m->vlens[j], depth))
 		    < 0){
 			cl_log(LOG_ERR, "tostring failed for field %d", j);
-			return HA_FAIL;			
+			return HA_FAIL;
 		}
-		
+
 		CHECKROOM_INT(truelen+1);
 		bp +=truelen;
-		
+
 		strcat(bp,"\n");
 		bp++;
 	}
@@ -2332,9 +2332,9 @@ msg2string(const struct ha_msg *m)
 		cl_log(LOG_ERR, "msg2string: Message with zero fields");
 		return(NULL);
 	}
-	
+
 	len = get_stringlen(m);
-	
+
 	buf = malloc(len);
 
 	if (buf == NULL) {
@@ -2347,15 +2347,15 @@ msg2string(const struct ha_msg *m)
 		free(buf);
 		return(NULL);
 	}
-	
+
 	return(buf);
 }
 
 gboolean
 must_use_netstring(const struct ha_msg* msg)
 {
-	int	i; 
-	
+	int	i;
+
 	for ( i = 0; i < msg->nfields; i++){
 		if (msg->types[i] == FT_COMPRESS
 		    || msg->types[i] == FT_UNCOMPRESS
@@ -2363,7 +2363,7 @@ must_use_netstring(const struct ha_msg* msg)
 			return TRUE;
 		}
 	}
-	
+
 	return FALSE;
 
 }
@@ -2373,18 +2373,18 @@ must_use_netstring(const struct ha_msg* msg)
 static char*
 msg2wirefmt_ll(struct ha_msg*m, size_t* len, int flag)
 {
-	
+
 	int	wirefmtlen;
 	int	i;
 	int	netstg = use_netstring(m);
 
 	wirefmtlen = netstg ? get_netstringlen(m) : get_stringlen(m);
 	if (use_traditional_compression
-	    &&(flag & MSG_NEEDCOMPRESS) 
- 	    && (wirefmtlen> compression_threshold) 
- 	    && cl_get_compress_fns() != NULL){ 
- 		return cl_compressmsg(m, len);		 
- 	} 
+	    &&(flag & MSG_NEEDCOMPRESS)
+ 	    && (wirefmtlen> compression_threshold)
+ 	    && cl_get_compress_fns() != NULL){
+ 		return cl_compressmsg(m, len);
+ 	}
 
 	if (flag & MSG_NEEDCOMPRESS){
 		for (i=0 ;i < m->nfields; i++){
@@ -2439,11 +2439,11 @@ wirefmt2msg_ll(const char* s, size_t length, int need_auth)
 {
 
 	size_t startlen;
-	struct ha_msg* msg = NULL;	
+	struct ha_msg* msg = NULL;
 
 
 	startlen = sizeof(MSG_START)-1;
-	
+
 	if (startlen > length){
 		return NULL;
 	}
@@ -2454,11 +2454,11 @@ wirefmt2msg_ll(const char* s, size_t length, int need_auth)
 	}
 
 	startlen = sizeof(MSG_START_NETSTRING) - 1;
-	
+
 	if (startlen > length){
 		return NULL;
 	}
-	
+
 	if (strncmp(s, MSG_START_NETSTRING, startlen) == 0) {
 		msg =  netstring2msg(s, length, need_auth);
 		goto out;
@@ -2494,18 +2494,18 @@ void
 cl_log_message (int log_level, const struct ha_msg *m)
 {
 	int	j;
-	
+
 	if(m == NULL) {
 		cl_log(log_level, "MSG: No message to dump");
 		return;
 	}
-	
+
 	cl_log(log_level, "MSG: Dumping message with %d fields", m->nfields);
-	
+
 	for (j=0; j < m->nfields; ++j) {
-		
-		if(m->types[j] < DIMOF(fieldtypefuncs)){					
-			fieldtypefuncs[m->types[j]].display(log_level, j, 
+
+		if(m->types[j] < DIMOF(fieldtypefuncs)){
+			fieldtypefuncs[m->types[j]].display(log_level, j,
 							    m->names[j],
 							    m->values[j],
 							    m->vlens[j]);
