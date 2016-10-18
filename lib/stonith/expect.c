@@ -480,13 +480,26 @@ OpenStreamSocket(const char * host, int port, const char * service)
 	}else if (inet_pton(AF_INET6, host, (void*)&sockun.si6.sin6_addr)<0){
 		sockun.si6.sin6_family = AF_INET6;
 	}else{
-		struct hostent*	hostp = gethostbyname(host);
-		if (hostp == NULL) {
+		struct addrinfo *res;
+		int rc;
+		rc = getaddrinfo(host, NULL, NULL, &res);
+		if (rc != 0) {
 			errno = EINVAL;
 			return -1;
 		}
-		sockun.si4.sin_family = hostp->h_addrtype;
-		memcpy(&sockun.si4.sin_addr, hostp->h_addr, hostp->h_length);
+		if (res->ai_family == AF_INET6) {
+			sockun.si6.sin6_family = res->ai_family;
+			memcpy(&sockun.si6.sin6_addr, res->ai_addr, res->ai_addrlen);
+			freeaddrinfo(res);
+		} else if (res->ai_family == AF_INET) {
+			sockun.si4.sin_family = res->ai_family;
+			memcpy(&sockun.si4.sin_addr, res->ai_addr, res->ai_addrlen);
+			freeaddrinfo(res);
+		} else {
+			freeaddrinfo(res);
+			errno = EINVAL;
+			return -1;
+		}
 	}
 	if ((sock = socket(sockun.si4.sin_family, SOCK_STREAM, 0)) < 0) {
 		return -1;
