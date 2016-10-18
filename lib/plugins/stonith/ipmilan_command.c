@@ -23,7 +23,7 @@
 #include <stdlib.h> /* malloc() */
 #include <unistd.h> /* getopt() */
 #include <string.h> /* strerror() */
-#include <netdb.h> /* gethostbyname() */
+#include <netdb.h> /* getaddrinfo() */
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -260,9 +260,9 @@ con_changed_handler(ipmi_con_t *ipmi, int err, unsigned int port_num,
 static int
 setup_ipmi_conn(struct ipmilanHostInfo * host, int *request)
 {
-	int rv;
+	int rv, rc;
 
-	struct hostent *ent;
+	struct addrinfo *res;
 	struct in_addr lan_addr[2];
 	int lan_port[2];
 	int num_addr = 1;
@@ -293,13 +293,13 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int *request)
 		return rv;
 	}
 
-	ent = gethostbyname(host->ipaddr);
-	if (!ent) {
-		PILCallLog(PluginImports->log,PIL_CRIT, "gethostbyname failed: %s\n", strerror(h_errno));
+	rc = getaddrinfo(host->ipaddr, NULL, NULL, &res);
+	if (rc != 0) {
+		PILCallLog(PluginImports->log,PIL_CRIT, "getaddrinfo failed: %s\n", gai_strerror(rc));
 		return 1;
 	}
 
-	memcpy(&lan_addr[0], ent->h_addr_list[0], ent->h_length);
+	memcpy(&lan_addr[0], res->ai_addr, res->ai_addrlen);
 	lan_port[0] = host->portnumber;
 	lan_port[1] = 0;
 
