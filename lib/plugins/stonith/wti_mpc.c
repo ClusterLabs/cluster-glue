@@ -650,6 +650,7 @@ static int
 wti_mpc_set_config(StonithPlugin * s, StonithNVpair * list)
 {
 	struct pluginDevice* sd = (struct pluginDevice *)s;
+	struct addrinfo *res;
 	int	rc;
 	char *	i;
     int mo;
@@ -679,7 +680,8 @@ wti_mpc_set_config(StonithPlugin * s, StonithNVpair * list)
 	PluginImports->mfree(namestocopy[3].s_value);
 
         /* try to resolve the hostname/ip-address */
-	if (gethostbyname(sd->hostname) != NULL) {
+	if ((rc = getaddrinfo(sd->hostname, NULL, NULL, &res)) == 0) {
+		freeaddrinfo(res);
         	/* init snmp library */
 		init_snmp("wti_mpc");
 
@@ -732,8 +734,8 @@ wti_mpc_set_config(StonithPlugin * s, StonithNVpair * list)
 			,       __FUNCTION__);
 		}
 	}else{
-		LOG(PIL_CRIT, "%s: cannot resolve hostname '%s', h_errno %d."
-		,       __FUNCTION__, sd->hostname, h_errno);
+		LOG(PIL_CRIT, "%s: cannot resolve hostname '%s', %s."
+		,       __FUNCTION__, sd->hostname, gai_strerror(rc));
 	}
 
 	/* not a valid config */
