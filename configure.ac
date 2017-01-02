@@ -1396,7 +1396,6 @@ logd/logd					        	\
 logd/logd.service					        	\
 replace/Makefile				        	\
 hb_report/Makefile				        	\
-   hb_report/hb_report				        	\
 doc/Makefile							\
    doc/ha_logd.xml						\
    doc/ha_logger.xml						\
