@@ -52,8 +52,8 @@ static int mainloop_client(IPC_Channel* chan, int repcount);
 static int checksock(IPC_Channel* channel);
 static void checkifblocked(IPC_Channel* channel);
 
-static int (*PollFunc)(struct pollfd * fds, unsigned int, int)
-=	(int (*)(struct pollfd * fds, unsigned int, int))  poll;
+static int (*PollFunc)(struct pollfd * fds, nfds_t, int)
+=	(int (*)(struct pollfd * fds, nfds_t, int))  poll;
 static gboolean checkmsg(IPC_Message* rmsg, const char * who, int rcount);
 
 static const char *procname;

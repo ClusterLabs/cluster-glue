@@ -699,7 +699,7 @@ extern IPC_Auth * ipc_set_auth(uid_t * a_uid, gid_t * a_gid
 /* Destroys an object constructed by ipc_set_auth or ipc_str_to_auth() */
 extern void ipc_destroy_auth(IPC_Auth * auth);
 
-extern void ipc_set_pollfunc(int (*)(struct pollfd*, unsigned int, int));
+extern void ipc_set_pollfunc(int (*)(struct pollfd*, nfds_t, int));
 extern void ipc_bufpool_dump_stats(void);
 
 #ifdef IPC_TIME_DEBUG

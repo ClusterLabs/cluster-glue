@@ -46,12 +46,12 @@ void	ipc_time_debug(IPC_Channel* ch, IPC_Message* ipcmsg, int whichpos);
 struct IPC_WAIT_CONNECTION * socket_wait_conn_new(GHashTable* ch_attrs);
 struct IPC_CHANNEL * socket_client_channel_new(GHashTable* ch_attrs);
 
-int (*ipc_pollfunc_ptr)(struct pollfd*, unsigned int, int)
-=	(int (*)(struct pollfd*, unsigned int, int)) poll;
+int (*ipc_pollfunc_ptr)(struct pollfd*, nfds_t, int)
+=	(int (*)(struct pollfd*, nfds_t, int)) poll;
 
 /* Set the IPC poll function to the given function */
 void
-ipc_set_pollfunc(int (*pf)(struct pollfd*, unsigned int, int))
+ipc_set_pollfunc(int (*pf)(struct pollfd*, nfds_t, int))
 {
 	ipc_pollfunc_ptr = pf;
 }
