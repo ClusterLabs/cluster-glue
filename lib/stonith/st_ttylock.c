@@ -125,7 +125,7 @@ st_ttyunlock(const char *serial_device)
 }
 
 /* This is what the FHS standard specifies for the size of our lock file */
-#define	LOCKSTRLEN	11
+#define	LOCKSTRLEN	12
 
 static int
 DoLock(const char * prefix, const char *lockname)

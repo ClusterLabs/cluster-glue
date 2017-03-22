@@ -71,7 +71,7 @@
 
 
 /* This is what the FHS standard specifies for the size of our lock file */
-#define	LOCKSTRLEN	11
+#define	LOCKSTRLEN	12
 #include <clplumbing/cl_log.h>
 int IsRunning(long pid)
 {
