@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 #
-MAINTAINERCLEANFILES    = Makefile.in hb_report.xml ha_logd.xml ha_logger.xml stonith.xml meatclient.xml
+MAINTAINERCLEANFILES    = Makefile.in ha_logd.xml ha_logger.xml stonith.xml meatclient.xml
 
 CLEANFILES		= $(man_MANS)
 
@@ -27,7 +27,7 @@ hanoarchdir		= $(datadir)/heartbeat
 man_MANS		=
 
 if BUILD_DOC
-man_MANS		+= hb_report.8 ha_logd.8 ha_logger.1 stonith.8 meatclient.8
+man_MANS		+= ha_logd.8 ha_logger.1 stonith.8 meatclient.8
 
 EXTRA_DIST		= $(man_MANS)
 
@@ -45,8 +45,5 @@ XSLTPROC_FO_OPTIONS 	?= $(XSLTPROC_OPTIONS)
 	$(XSLTPROC) \
 	$(XSLTPROC_MANPAGES_OPTIONS) \
 	$(MANPAGES_STYLESHEET) $<
-
-hb_report.8: hb_report.8.txt
-	a2x -f manpage $<
 
 endif
