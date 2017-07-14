@@ -233,7 +233,6 @@ fi
 %{_datadir}/%{name}/ha_log.sh
 
 %{_sbindir}/ha_logger
-%{_sbindir}/hb_report
 %{_sbindir}/lrmadmin
 %{_sbindir}/cibsecret
 %{_sbindir}/meatclient
