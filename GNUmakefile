@@ -30,12 +30,12 @@ getdistro = $(shell test -e /etc/SuSE-release || echo fedora; test -e /etc/SuSE-
 DISTRO ?= $(call getdistro)
 TAG    ?= tip
 
-hgarchive:
+gitarchive:
 	rm -f $(TARFILE)
-	hg archive -t tbz2 -r $(TAG) $(TARFILE)
+	git archive --prefix cluster-glue/ $(TAG) | bzip2 > $(TARFILE)
 	echo `date`: Rebuilt $(TARFILE)
 
-srpm:	hgarchive
+srpm:	gitarchive
 	rm -f *.src.rpm
 	@echo To create custom builds, edit the flags and options in $(PACKAGE)-$(DISTRO).spec first
 	rpmbuild -bs --define "dist .$(DISTRO)" $(RPM_OPTS) $(PACKAGE)-$(DISTRO).spec
