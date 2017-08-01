@@ -209,6 +209,8 @@ elsif (grep /^\Q$command\E$/, @netCommands) {
 						if ($powerState eq "poweredOff" && (! exists $ENV{'RESETPOWERON'} || $ENV{'RESETPOWERON'} ne 0)) {
 							$vm->PowerOnVM();
 							system("ha_log.sh", "info", "Machine $esx:$vm->{'name'} has been powered on");
+						} elsif ($powerState eq "poweredOff") {
+							system("ha_log.sh", "info", "Machine $esx:$vm->{'name'} won't be powered on with configured parameter RESETPOWERON=0");
 						} else {
 							dielog("Could not complete $esx:$vm->{'name'} power cycle");
 						}
