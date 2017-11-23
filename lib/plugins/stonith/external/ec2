@@ -59,6 +59,12 @@ sleep_time="1"
 
 : ${ec2_tag=${ec2_tag_default}}
 
+# Always invoke aws command with UTF-8 locale
+# to avoid issues when the tag contains non-ASCII
+# characters (bsc#1059171)
+LC_ALL=en_US.UTF-8
+export LC_ALL
+
 function usage()
 {
 cat <<EOF
