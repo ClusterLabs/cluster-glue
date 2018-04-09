@@ -20,6 +20,7 @@ then the agent should be able to automatically discover the instances it can con
 If the tag containing the uname is not [Name], then it will need to be specified using the [tag] option.
 "
 
+
 #
 # Copyright (c) 2011-2013 Andrew Beekhof
 # Copyright (c) 2014 NIPPON TELEGRAPH AND TELEPHONE CORPORATION
@@ -69,15 +70,15 @@ function usage()
 {
 cat <<EOF
 `basename $0` - A fencing agent for Amazon EC2 instances
- 
+
 $description
- 
+
 Usage: `basename $0` -o|--action [-n|--port] [options]
 Options:
  -h, --help 		This text
  -V, --version		Version information
  -q, --quiet 		Reduced output mode
- 
+
 Commands:
  -o, --action		Action to perform: on|off|reboot|status|monitor
  -n, --port 		The name of a machine/instance to control/check
@@ -90,7 +91,7 @@ Dangerous options:
  -U, --unknown-are-stopped 	Assume any unknown instance is safely stopped
 
 EOF
-    exit 0;
+	exit 0;
 }
 
 function getinfo_xml()
@@ -229,11 +230,11 @@ function monitor()
 }
 
 TEMP=`getopt -o qVho:e:p:n:t:U --long version,help,action:,port:,option:,profile:,tag:,quiet,unknown-are-stopped \
-     -n 'fence_ec2' -- "$@"`
+	-n 'fence_ec2' -- "$@"`
 
-if [ $? != 0 ];then 
-    usage
-    exit 1
+if [ $? != 0 ]; then
+	usage
+	exit 1
 fi
 
 # Note the quotes around `$TEMP': they are essential!
@@ -242,7 +243,7 @@ eval set -- "$TEMP"
 if [ -z $1 ]; then
 	# If there are no command line args, look for options from stdin
 	while read line; do
-		case $line in 
+		case $line in
 			option=*|action=*) action=`echo $line | sed s/.*=//`;;
 			port=*)        port=`echo $line | sed s/.*=//`;;
 			profile=*)     ec2_profile=`echo $line | sed s/.*=//`;;
@@ -264,7 +265,7 @@ while true ; do
 		-U|--unknown-are-stopped) unknown_are_stopped=1; shift;;
 		-q|--quiet) quiet=1; shift;;
 		-V|--version) echo "1.0.0"; exit 0;;
-		--help|-h) 
+		--help|-h)
 			usage;
 			exit 0;;
 		--) shift ; break ;;
@@ -283,7 +284,7 @@ fi
 
 action=`echo $action | tr 'A-Z' 'a-z'`
 
-case $action in 
+case $action in
 	metadata)
 		metadata
 	;;
@@ -343,7 +344,7 @@ if [ ! -z "$port" ]; then
 	instance=`instance_for_port $port $options`
 fi
 
-case $action in 
+case $action in
 	reboot|reset)
 		status=`instance_status $instance`
 		if [ "$status" != "stopped" ]; then
