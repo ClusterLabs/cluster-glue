@@ -22,6 +22,8 @@ If the tag containing the uname is not [Name], then it will need to be specified
 
 
 #
+# Copyright (c) 2018 Stefan Schneider <stsch@amazon.de>
+# Copyright (c) 2018 Kristoffer Gronlund <kgronlund@suse.com>
 # Copyright (c) 2011-2013 Andrew Beekhof
 # Copyright (c) 2014 NIPPON TELEGRAPH AND TELEPHONE CORPORATION
 #                    All Rights Reserved.
@@ -174,11 +176,7 @@ function instance_for_port()
 	local instance=""
 
 	# Look for port name -n in the INSTANCE data
-	instance=`aws ec2 describe-instances $options | grep "^INSTANCES[[:space:]].*[[:space:]]$port[[:space:]]" | awk '{print $8}'`
-	if [ -z $instance ]; then
-		# Look for port name -n in the Name TAG
-		instance=`aws ec2 describe-tags $options | grep "^TAGS[[:space:]]$ec2_tag[[:space:]].*[[:space:]]instance[[:space:]]$port$" | awk '{print $3}'`
-	fi
+	instance=`aws ec2 describe-instances $options --filters "Name=tag-value,Values=${port}" "Name=tag-key,Values=${ec2_tag}" --query 'Reservations[*].Instances[*].InstanceId'  `
 
 	if [ -z $instance ]; then
 		instance_not_found=1
@@ -213,9 +211,7 @@ function instance_status()
 	if [ "$unknown_are_stopped" = 1 -a $instance_not_found ]; then
 		ha_log.sh info "$instance stopped (unknown)"
 	else
-		status=`aws ec2 describe-instances $options --instance-ids $instance | awk '{ 
-			if (/^STATE\t/) { printf "%s", $3 }
-			}'`
+		status=`aws ec2 describe-instances $options --instance-ids $instance --query 'Reservations[*].Instances[*].State.Name' `
 		rc=$?
 	fi
 	ha_log.sh info "status check for $instance is $status"
@@ -226,7 +222,7 @@ function instance_status()
 function monitor()
 {
 		# Is the device ok?
-		aws ec2 describe-instances $options | grep INSTANCES &> /dev/null
+		aws ec2 describe-instances $options --filters "Name=tag-key,Values=${ec2_tag}" | grep INSTANCES &> /dev/null
 }
 
 TEMP=`getopt -o qVho:e:p:n:t:U --long version,help,action:,port:,option:,profile:,tag:,quiet,unknown-are-stopped \
@@ -394,10 +390,7 @@ case $action in
 	;;
 	gethosts|hostlist|list)
 		# List of names we know about
-		a=`aws ec2 describe-instances $options | awk -v tag_pat="^TAGS\t$ec2_tag\t" -F '\t' '{ 
-			if (/^INSTANCES/) { printf "%s\n", $8 }
-			else if ( $1"\t"$2"\t" ~ tag_pat ) { printf "%s\n", $3 }
-			}' | sort -u`
+		a=`aws ec2 describe-instances $options --filters "Name=tag-key,Values=${ec2_tag}" --query 'Reservations[*].Instances[*].Tags[?Key==\`'${ec2_tag}'\`].Value' | sort -u`
 		echo $a
 	;;
 	stat|status)
