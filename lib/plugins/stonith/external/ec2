@@ -170,6 +170,33 @@ EOF
 	exit 0;
 }
 
+function is_instance_running()
+{
+	local myinstance
+	local mystatus
+
+	# get my instance id
+	myinstance="$(curl http://169.254.169.254/latest/meta-data/instance-id)"
+
+	# check my status.
+	# When the EC2 instance be stopped by the "aws ec2 stop-instances" , the stop processing of the OS is executed.
+	# While the OS stop processing, Pacemaker can execute the STONITH processing.
+	# So, If my status is not "running", it determined that I was already fenced. And to prevent fencing each other
+	# in split-brain, I don't fence other node.
+	if [ -z "$myinstance" ]; then
+		ha_log.sh err "Failed to get Instance ID. Unable to check instance status."
+		return 1
+	fi
+
+	mystatus="$(instance_status $myinstance)"
+
+	if [ "$mystatus" != "running" ]; then #do not fence
+		ha_log.sh warn "Already fenced (Instance status = $mystatus). Aborting fence attempt."
+		return 1
+	fi
+	return 0
+}
+
 function instance_for_port()
 {
 	local port=$1
@@ -312,24 +339,6 @@ case $action in
 	;;
 esac
 
-# get my instance id
-myinstance=`curl http://169.254.169.254/latest/meta-data/instance-id`
-
-# check my status.
-# When the EC2 instance be stopped by the "aws ec2 stop-instances" , the stop processing of the OS is executed.
-# While the OS stop processing, Pacemaker can execute the STONITH processing.
-# So, If my status is not "running", it determined that I was already fenced. And to prevent fencing each other
-# in split-brain, I don't fence other node.
-if [ -z "$myinstance" ]; then
-	ha_log.sh err "Failed to get My Instance ID. so can not check my status."
-	exit 1
-fi
-mystatus=`instance_status $myinstance`
-if [ "$mystatus" != "running" ]; then #do not fence
-	ha_log.sh warn "I was already fenced (My instance status=$mystatus). I don't fence other node."
-	exit 1
-fi
-
 if [ -z "$port" ]; then
 	port="$node_to_fence"
 fi
@@ -339,6 +348,8 @@ instance=""
 if [ ! -z "$port" ]; then
 	instance=`instance_for_port $port $options`
 fi
+
+is_instance_running || exit 1
 
 case $action in
 	reboot|reset)
