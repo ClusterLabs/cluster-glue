@@ -1014,7 +1014,7 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 		
 	} else { 
 		cl_log(LOG_ERR, "field already exists "
-		       "with differnt type=%d", msg->types[j]);
+		       "with different type=%d", msg->types[j]);
 		return (HA_FAIL);
 	}
 		
