@@ -1,5 +1,6 @@
 [Unit]
 Description=ha_logd logging daemon
+Documentation=man:ha_logd(8)
 Before=pacemaker.service
 PartOf=pacemaker.service
 
