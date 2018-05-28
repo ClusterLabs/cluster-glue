@@ -48,7 +48,7 @@ extern const PILPluginImports*  PluginImports;
 #define OPERATION_TIME_OUT 10
 
 os_handler_t *os_hnd=NULL;
-selector_t *os_sel;
+struct selector_s *os_sel;
 static ipmi_con_t *con;
 extern os_handler_t ipmi_os_cb_handlers;
 static int reset_method;
@@ -83,10 +83,10 @@ int rsp_handler(ipmi_con_t *ipmi, ipmi_msgi_t *rspi);
 
 void send_ipmi_cmd(ipmi_con_t *con, int request);
 
-void timed_out(selector_t *sel, sel_timer_t *timer, void *data);
+void timed_out(struct selector_s *sel, sel_timer_t *timer, void *data);
 
 void 
-timed_out(selector_t  *sel, sel_timer_t *timer, void *data)
+timed_out(struct selector_s  *sel, sel_timer_t *timer, void *data)
 {
 	PILCallLog(PluginImports->log,PIL_CRIT, "IPMI operation timed out... :(\n");
 	gstatus = S_TIMEOUT;
@@ -279,7 +279,7 @@ setup_ipmi_conn(struct ipmilanHostInfo * host, int *request)
 		return 1;
 	}
 
-	rv = sel_alloc_selector(os_hnd, &os_sel);
+	rv = sel_alloc_selector_nothread(&os_sel);
 	if (rv) {
 		PILCallLog(PluginImports->log,PIL_CRIT, "Could not allocate selector\n");
 		return rv;
