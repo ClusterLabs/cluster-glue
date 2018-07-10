@@ -320,7 +320,7 @@ ibmhmc_hostlist(StonithPlugin  *s)
 static const char * const *
 ibmhmc_get_confignames(StonithPlugin* p)
 {
-	static const char * names[] = {ST_IPADDR, NULL};
+	static const char * names[] = {ST_IPADDR, ST_MANSYSPAT, ST_PASSWD, NULL};
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s: called.", __FUNCTION__);
 	}
