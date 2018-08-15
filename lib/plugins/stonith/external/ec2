@@ -21,6 +21,11 @@ If the tag containing the uname is not [Name], then it will need to be specified
 "
 
 
+# Update by stsch@amazon.de April 4, 2018
+# all AWS CLI describe commands have been changed to report the result directly. This has the following advantages
+# no more unicode errory in Python runtime when other tags use UNICODE charcters
+# no more interpreatation errors with aws and grep if the text format changes
+# faster execution due to siginificantly reduced result sets
 #
 # Copyright (c) 2018 Stefan Schneider <stsch@amazon.de>
 # Copyright (c) 2018 Kristoffer Gronlund <kgronlund@suse.com>
@@ -61,12 +66,6 @@ sleep_time="1"
 [ -n "$tag" ] && ec2_tag="$tag"
 
 : ${ec2_tag=${ec2_tag_default}}
-
-# Always invoke aws command with UTF-8 locale
-# to avoid issues when the tag contains non-ASCII
-# characters (bsc#1059171)
-LC_ALL=en_US.UTF-8
-export LC_ALL
 
 function usage()
 {
@@ -201,6 +200,26 @@ function instance_off()
 	fi
 }
 
+function my_status()
+{
+	myinstance=`curl http://169.254.169.254/latest/meta-data/instance-id`
+
+	# check my status.
+	# When the EC2 instance be stopped by the "aws ec2 stop-instances" , the stop processing of the OS is executed.
+	# While the OS stop processing, Pacemaker can execute the STONITH processing.
+	# So, If my status is not "running", it determined that I was already fenced. And to prevent fencing each other
+	# in split-brain, I don't fence other node.
+	if [ -z "$myinstance" ]; then
+		ha_log.sh err "Failed to get My Instance ID. so can not check my status."
+		exit 1
+	fi
+	mystatus=`instance_status $myinstance`
+	if [ "$mystatus" != "running" ]; then #do not fence
+		ha_log.sh warn "I was already fenced (My instance status=$mystatus). I don't fence other node."
+		exit 1
+	fi
+}
+
 function instance_status()
 {
 	local instance=$1
@@ -225,8 +244,7 @@ function monitor()
 		aws ec2 describe-instances $options --filters "Name=tag-key,Values=${ec2_tag}" | grep INSTANCES &> /dev/null
 }
 
-TEMP=`getopt -o qVho:e:p:n:t:U --long version,help,action:,port:,option:,profile:,tag:,quiet,unknown-are-stopped \
-	-n 'fence_ec2' -- "$@"`
+TEMP=`getopt -o qVho:e:p:n:t:U --long version,help,action:,port:,option:,profile:,tag:,quiet,unknown-are-stopped -n 'fence_ec2' -- "$@"`
 
 if [ $? != 0 ]; then
 	usage
@@ -313,6 +331,7 @@ case $action in
 esac
 
 # get my instance id
+sleep 5
 myinstance=`curl http://169.254.169.254/latest/meta-data/instance-id`
 
 # check my status.
@@ -375,6 +394,7 @@ case $action in
 		done
 	;;
 	poweroff|off)
+		my_status
 		instance_off
 		while true;
 		do
