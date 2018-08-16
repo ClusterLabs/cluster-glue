@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 #
 # External STONITH module for VMWare vCenter/ESX
 #
