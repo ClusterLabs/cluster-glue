@@ -382,7 +382,6 @@ GLUE_DAEMON_DIR=$libdir/heartbeat
 AC_DEFINE_UNQUOTED(GLUE_DAEMON_DIR,"$GLUE_DAEMON_DIR", Location for daemons)
 AC_SUBST(GLUE_DAEMON_DIR)
 
-GLUE_STATE_DIR=${localstatedir}/run
 AC_DEFINE_UNQUOTED(GLUE_STATE_DIR,"$GLUE_STATE_DIR", Where to keep state files and sockets)
 AC_SUBST(GLUE_STATE_DIR)
 
@@ -390,7 +389,8 @@ GLUE_SHARED_DIR=${datadir}/"$PACKAGE_NAME"
 AC_DEFINE_UNQUOTED(GLUE_SHARED_DIR,"$GLUE_SHARED_DIR", Location for scripts)
 AC_SUBST(GLUE_SHARED_DIR)
 
-AC_DEFINE_UNQUOTED(HA_VARRUNDIR,"$GLUE_STATE_DIR", Where Heartbeat keeps state files and sockets - old name)
+HA_VARRUNDIR="$GLUE_STATE_DIR"
+AC_DEFINE_UNQUOTED(HA_VARRUNDIR,"$HA_VARRUNDIR", Where Heartbeat keeps state files and sockets - old name)
 AC_SUBST(HA_VARRUNDIR)
 
 HA_VARLIBHBDIR=${localstatedir}/lib/heartbeat
