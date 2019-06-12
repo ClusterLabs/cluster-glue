@@ -1135,7 +1135,7 @@ do_shell_cmd(const char* cmd, int* status, const char* password)
 		snprintf(cmd_password, MAX_CMD_LEN
 		,"umask 077;"
 		 "if [ ! -d  " HA_VARRUNDIR "/heartbeat/rsctmp/ibmhmc ];"
-		 "then mkdir " HA_VARRUNDIR "/heartbeat/rsctmp/ibmhmc 2>/dev/null;"
+		 "then mkdir -p " HA_VARRUNDIR "/heartbeat/rsctmp/ibmhmc 2>/dev/null;"
 		 "fi;"
 		 "export ibmhmc_tmp=`mktemp -p " HA_VARRUNDIR "/heartbeat/rsctmp/ibmhmc/`;" 
 		 "echo \"echo '%s'\">$ibmhmc_tmp;" 
