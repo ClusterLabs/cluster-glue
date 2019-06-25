@@ -74,7 +74,7 @@ class DracMC(telnetlib.Telnet):
 
     def _get_timestamp(self):
         ct = time.time()
-        msecs = (ct - long(ct)) * 1000
+        msecs = (ct - int(ct)) * 1000
         return "%s,%03d" % (time.strftime("%Y-%m-%d %H:%M:%S",
                             time.localtime(ct)), msecs)
 
@@ -92,48 +92,48 @@ class DracMC(telnetlib.Telnet):
     def login(self, user, passwd):
         time.sleep(0.3)
         try:
-            line = self.read_until('Login: ', self._timeout)
-            self.write(user)
-            self.write('\r')
-            line = self.read_until('Password: ', self._timeout)
-            self.write(passwd)
-            self.write('\r')
+            line = self.read_until(b'Login: ', self._timeout)
+            self.write(user.encode("utf-8"))
+            self.write(b'\r')
+            line = self.read_until(b'Password: ', self._timeout)
+            self.write(passwd.encode("utf-8"))
+            self.write(b'\r')
         except:
-            self.write("\r")
-            line = self.read_until('Login: ', self._timeout)
-            self.write(user)
-            self.write('\r')
-            line = self.read_until('Password: ', self._timeout)
-            self.write(passwd)
-            self.write('\r')
+            self.write(b"\r")
+            line = self.read_until(b'Login: ', self._timeout)
+            self.write(user.encode("utf-8"))
+            self.write(b'\r')
+            line = self.read_until(b'Password: ', self._timeout)
+            self.write(passwd.encode("utf-8"))
+            self.write('b\r')
         try:
-            line = self.read_until('DRAC/MC:', self._timeout)
+            line = self.read_until(b'DRAC/MC:', self._timeout)
         except:
-            self.write("\r")
-            line = self.read_until('DRAC/MC:', self._timeout)
+            self.write(b"\r")
+            line = self.read_until(b'DRAC/MC:', self._timeout)
 
     def hardreset(self):
-        self.write('serveraction -s %s hardreset\r' % self._server)
-        line = self.read_until('OK', 10)
-        line = self.read_until('DRAC/MC:', self._timeout)
+        self.write(b'serveraction -s %b hardreset\r' % self._server.encode("utf-8"))
+        line = self.read_until(b'OK', 10)
+        line = self.read_until(b'DRAC/MC:', self._timeout)
             
     def powercycle(self):
-        self.write('serveraction -s %s powercycle\r' % self._server)
-        line = self.read_until('OK', 10)
-        line = self.read_until('DRAC/MC:', self._timeout)
+        self.write(b'serveraction -s %b powercycle\r' % self._server.encode("utf-8"))
+        line = self.read_until(b'OK', 10)
+        line = self.read_until(b'DRAC/MC:', self._timeout)
 
     def on(self):
-        self.write('serveraction -s %s powerup\r' % self._server)
-        line = self.read_until('OK', 10)
-        line = self.read_until('DRAC/MC:', self._timeout)
+        self.write(b'serveraction -s %b powerup\r' % self._server.encode("utf-8"))
+        line = self.read_until(b'OK', 10)
+        line = self.read_until(b'DRAC/MC:', self._timeout)
 
     def off(self):
-        self.write('serveraction -s %s powerdown\r' % self._server)
-        line = self.read_until('OK', 10)
-        line = self.read_until('DRAC/MC:', self._timeout)
+        self.write(b'serveraction -s %b powerdown\r' % self._server.encode("utf-8"))
+        line = self.read_until(b'OK', 10)
+        line = self.read_until(b'DRAC/MC:', self._timeout)
 
     def exit(self):
-        self.write('exit\r')
+        self.write(b'exit\r')
 
     def get_history(self):
         return "\n".join(self._history)
@@ -170,7 +170,7 @@ class DracMCStonithPlugin:
 
     def _get_timestamp(self):
         ct = time.time()
-        msecs = (ct - long(ct)) * 1000
+        msecs = (ct - int(ct)) * 1000
         return "%s,%03d" % (time.strftime("%Y-%m-%d %H:%M:%S",
                             time.localtime(ct)), msecs)
 
@@ -200,7 +200,7 @@ class DracMCStonithPlugin:
                            self._parameters['cyclades_port'])
                     c.login(self._parameters['username'],
                             self._parameters['password'])
-                except Exception, args:
+                except Exception as args:
                     if "Connection reset by peer" in str(args):
                         self._echo_debug("Someone is already logged in... retry=%s" % tries)
                         c.close()
@@ -362,7 +362,7 @@ class DracMCStonithPlugin:
             func = getattr(self, cmd, self.not_implemented)
             rc = func()
             return(rc)
-        except Exception, args:
+        except Exception as args:
             self.echo_log("err", 'Exception raised:', str(args))
             if self._connection:
                 self.echo_log("err", self._connection.get_history())

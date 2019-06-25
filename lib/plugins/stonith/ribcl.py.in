@@ -18,7 +18,7 @@
 
 import sys
 import socket
-from httplib import *
+from http.client import *
 from time import sleep
 
 
@@ -29,30 +29,30 @@ try:
         host = argv[1].split('.')[0]+'-rm'
         cmd = argv[2]
 except IndexError:
-        print "Not enough arguments"
+        print("Not enough arguments")
         sys.exit(1)
 
 
-login = [ '<RIBCL VERSION="1.2">',
-          '<LOGIN USER_LOGIN="Administrator" PASSWORD="********">' ]
+login = [ b'<RIBCL VERSION="1.2">',
+          b'<LOGIN USER_LOGIN="Administrator" PASSWORD="********">' ]
 
 
-logout = [ '</LOGIN>', '</RIBCL>' ]
+logout = [ b'</LOGIN>', b'</RIBCL>' ]
 
 
-status = [ '<SERVER_INFO MODE="read">', '<GET_HOST_POWER_STATUS/>',
-           '</SERVER_INFO>' ]
+status = [ b'<SERVER_INFO MODE="read">', b'<GET_HOST_POWER_STATUS/>',
+           b'</SERVER_INFO>' ]
 
 
-reset = [ '<SERVER_INFO MODE="write">', '<RESET_SERVER/>', '</SERVER_INFO>' ]
+reset = [ b'<SERVER_INFO MODE="write">', b'<RESET_SERVER/>', b'</SERVER_INFO>' ]
 
 
-off = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "N"/>',
-          '</SERVER_INFO>' ]
+off = [ b'<SERVER_INFO MODE = "write">', b'<SET_HOST_POWER HOST_POWER  = "N"/>',
+          b'</SERVER_INFO>' ]
 
 
-on = [ '<SERVER_INFO MODE = "write">', '<SET_HOST_POWER HOST_POWER  = "Y"/>',
-          '</SERVER_INFO>' ]
+on = [ b'<SERVER_INFO MODE = "write">', b'<SET_HOST_POWER HOST_POWER  = "Y"/>',
+          b'</SERVER_INFO>' ]
 
 
 todo = { 'reset':reset, 'on':on, 'off':off, 'status':status }
@@ -66,7 +66,7 @@ try:
         else:   
                 acmds.append(login + todo[cmd] + logout)
 except KeyError:
-        print "Invalid command: "+ cmd
+        print("Invalid command: "+ cmd)
         sys.exit(1)
 
 
@@ -75,12 +75,12 @@ try:
 
 
                 c=HTTPSConnection(host)
-                c.send('<?xml version="1.0"?>\r\n')
+                c.send(b'<?xml version="1.0"?>\r\n')
                 c.sock.recv(1024)
 
 
                 for line in cmds:
-                        c.send(line+'\r\n')
+                        c.send(line+b'\r\n')
                         c.sock.recv(1024)
 
 
@@ -88,13 +88,9 @@ try:
                 sleep(1)
 
 
-except socket.gaierror, msg:
-        print msg
+except socket.gaierror as msg:
+        print(msg)
         sys.exit(1)
-except socket.sslerror, msg:
-        print msg
+except socket.error as msg:
+        print(msg)
         sys.exit(1)
-except socket.error, msg:
-        print msg
-        sys.exit(1)
-
