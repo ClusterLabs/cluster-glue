@@ -27,7 +27,7 @@ hanoarchdir		= $(datadir)/heartbeat
 man_MANS		=
 
 if BUILD_DOC
-man_MANS		+= ha_logd.8 ha_logger.1 stonith.8 meatclient.8
+man_MANS		+= ha_logd.8 ha_logger.8 stonith.8 meatclient.8
 
 EXTRA_DIST		= $(man_MANS)
 
