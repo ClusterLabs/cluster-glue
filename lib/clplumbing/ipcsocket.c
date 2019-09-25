@@ -705,8 +705,10 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 			conn_private=(struct SOCKET_WAIT_CONN_PRIVATE*)
 			(	wait_conn->ch_private);
 			ch_private = (struct SOCKET_CH_PRIVATE *)(ch->ch_private);
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
 			strncpy(ch_private->path_name,conn_private->path_name
-			,		sizeof(conn_private->path_name));
+			,		sizeof(conn_private->path_name) - 1);
+#pragma GCC diagnostic warning "-Wstringop-truncation"
 
 #if HB_IPC_METHOD == HB_IPC_SOCKET
 			ch_private->peer_addr = peer_addr;
@@ -1974,7 +1976,7 @@ socket_wait_conn_new(GHashTable *ch_attrs)
   wait_private->pipefds[0] = pipefds[0];
   wait_private->pipefds[1] = pipefds[1];
 #endif
-  strncpy(wait_private->path_name, path_name, sizeof(wait_private->path_name));
+  strncpy(wait_private->path_name, path_name, sizeof(wait_private->path_name) - 1);
   temp_ch = g_new(struct IPC_WAIT_CONNECTION, 1);
   temp_ch->ch_private = (void *) wait_private;
   temp_ch->ch_status = IPC_WAIT;
@@ -2122,7 +2124,7 @@ channel_new(int sockfd, int conntype, const char *path_name) {
 #if HB_IPC_METHOD == HB_IPC_SOCKET
   conn_info->peer_addr = NULL;
 #endif
-  strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
+  strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name) - 1);
 
 #ifdef DEBUG
   cl_log(LOG_INFO, "Initializing socket %d to DISCONNECT", sockfd);

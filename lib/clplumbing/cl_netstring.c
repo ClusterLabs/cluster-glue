@@ -208,7 +208,7 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 	char*	s;
 	int	authnum;
 	char	authtoken[MAXLINE];
-	char	authstring[MAXLINE];
+	char	authstring[MAXLINE + 15];
 	char*	sp;
 	size_t	payload_len;
 	char*   smax;

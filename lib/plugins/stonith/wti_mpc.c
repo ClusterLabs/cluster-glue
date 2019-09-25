@@ -266,7 +266,7 @@ MPC_open(char *hostname, int port, char *community)
     /* fill session */
     session.peername = hostname;
     session.version = SNMP_VERSION_1;
-    session.remote_port = port;
+    /* session.remote_port = port; */
     session.community = (u_char *)community;
     session.community_len = strlen(community);
     session.retries = 5;

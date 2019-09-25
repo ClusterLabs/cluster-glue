@@ -154,7 +154,7 @@ set_debugfile(const char* option)
 	}
 	
 	cl_log(LOG_INFO, "setting debug file to %s", option);
-	strncpy(logd_config.debugfile, option, MAXLINE);
+	strncpy(logd_config.debugfile, option, MAXLINE - 1);
 	return TRUE;
 }
 static int
@@ -165,7 +165,7 @@ set_logfile(const char* option)
 		return FALSE;
 	}
 	cl_log(LOG_INFO, "setting log file to %s", option);
-	strncpy(logd_config.logfile, option, MAXLINE);
+	strncpy(logd_config.logfile, option, MAXLINE - 1);
 	return TRUE;
 }
 

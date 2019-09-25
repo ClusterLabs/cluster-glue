@@ -431,7 +431,9 @@ NPSNametoOutlet(struct pluginDevice* nps, const char * name, char **outlets)
   			if (strncasecmp(name, sockname, 16) == 0) {
   				ret = sockno;
   				snprintf(buf, sizeof(buf), "%d ", sockno);
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
   				strncat(*outlets, buf, left);
+#pragma GCC diagnostic warning "-Wstringop-truncation"
   				left = left - strlen(buf);
   			}
   		}

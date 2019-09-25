@@ -174,7 +174,9 @@ replace_secret_params(char *rsc_id, GHashTable* params)
 				"for the sign file: %s.sign"
 				, __FUNCTION__, __LINE__, hash_file);
 		} else {
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
 			strncat(hash_file, ".sign", 5);
+#pragma GCC diagnostic warning "-Wstringop-overflow"
 			hash = read_local_file(hash_file);
 			if (!check_md5_hash(hash, secret_value)) {
 				lrmd_log(LOG_ERR
