@@ -53,14 +53,19 @@ quiet=0
 instance_not_found=0
 unknown_are_stopped=0
 
-action_default="reset"         # Default fence action
-ec2_tag_default="Name"	       # EC2 Tag containing the instance's uname
+action_default="reset"	    	# Default fence action
+ec2_tag_default="Name"	    	# EC2 Tag containing the instance's uname
+ec2_profile_default="default"	# EC2 Profile containing the AWS's profile
 
 sleep_time="1"
 
+# Set the correct value for the tag
 [ -n "$tag" ] && ec2_tag="$tag"
-
 : ${ec2_tag=${ec2_tag_default}}
+
+# Set the correct value for the profile
+[ -n "$profile" ] && ec2_profile="$profile"
+: ${ec2_profile=${ec2_profile_default}}
 
 # Always invoke aws command with UTF-8 locale
 # to avoid issues when the tag contains non-ASCII
@@ -299,12 +304,7 @@ done
 [ -n "$1" ] && action=$1
 [ -n "$2" ] && node_to_fence=$2
 
-if [ -z "$ec2_profile"]; then
-	options="--output text --profile default"
-else
-	options="--output text --profile $ec2_profile "
-fi
-
+options="--output text --profile $ec2_profile"
 action=`echo $action | tr 'A-Z' 'a-z'`
 
 case $action in
