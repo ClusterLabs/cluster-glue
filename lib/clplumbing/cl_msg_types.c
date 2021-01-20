@@ -1127,7 +1127,7 @@ binary2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	baselen = B64_stringlen(len) + 1;
 	
 	if ( buf + baselen > maxp){
-		cl_log(LOG_ERR, "binary2string: out of bounary");
+		cl_log(LOG_ERR, "binary2string: out of boundary");
 		return -1;
 	}
 	
