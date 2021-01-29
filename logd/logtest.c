@@ -55,13 +55,13 @@ send_log_msg(gpointer data)
 	
 	if (chan == NULL){
 		cl_log(LOG_ERR, "logging channel is NULL");
-		g_main_quit(loop);
+		g_main_loop_quit(loop);
 		return FALSE;
 
 	}
 	if (count >= maxcount){
 		cl_log(LOG_INFO, "total message dropped: %d", dropmsg);
-		g_main_quit(loop);
+		g_main_loop_quit(loop);
 		return FALSE;
 	}
 	
@@ -121,7 +121,7 @@ main(int argc, char** argv)
 	
 
 	loop = g_main_loop_new(NULL, FALSE);
-	g_main_run(loop);
+	g_main_loop_run(loop);
 	return(1);
 	
 }

@@ -389,7 +389,7 @@ get_resource_meta(const char* rsc_type,  const char* provider)
 	GString * meta_data;
 
 	meta_data = g_string_new("");
-	g_string_sprintf( meta_data, meta_data_template, rsc_type
+	g_string_printf( meta_data, meta_data_template, rsc_type
 			, rsc_type, rsc_type);
 	return meta_data->str;
 }

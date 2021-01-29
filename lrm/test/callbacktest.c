@@ -117,8 +117,8 @@ main(int argc, char *argv[])
 		      lrm_dispatch, lrm,
 		      NULL);
 
-	mainloop = g_main_new(FALSE);
-	g_main_run(mainloop);
+	mainloop = g_main_loop_new(NULL, FALSE);
+	g_main_loop_run(mainloop);
 
 	puts("delete_rsc...");
 	lrm->lrm_ops->delete_rsc(lrm, rid);

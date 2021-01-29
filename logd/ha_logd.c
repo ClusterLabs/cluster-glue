@@ -719,7 +719,7 @@ logd_term_action(int sig, gpointer userdata)
 		
 	}
 	
-        g_main_quit(mainloop);
+        g_main_loop_quit(mainloop);
 	
         return TRUE;
 }
@@ -751,7 +751,7 @@ read_msg_process(IPC_Channel* chan)
 
 	
 
-	mainloop = g_main_new(FALSE);       
+	mainloop = g_main_loop_new(NULL, FALSE);
 	
 	G_main_add_SignalHandler(G_PRIORITY_HIGH, SIGTERM, 
 				 logd_term_action,mainloop, NULL);
@@ -780,7 +780,7 @@ read_msg_process(IPC_Channel* chan)
 	
 	G_main_add_SignalHandler(G_PRIORITY_DEFAULT, SIGHUP, 
 				 logd_hup_action, mainloop, NULL);
-	g_main_run(mainloop);
+	g_main_loop_run(mainloop);
 	
 	return;
 }
@@ -855,7 +855,7 @@ direct_log(IPC_Channel* ch, gpointer user_data)
 
 	if(needs_shutdown) {
 		cl_log(LOG_INFO, "Exiting write process");
-		g_main_quit(loop);
+		g_main_loop_quit(loop);
 		return FALSE;
 	}
 	return TRUE;
@@ -885,7 +885,7 @@ write_msg_process(IPC_Channel* readchan)
 	IPC_Channel*	ch = readchan;
 	
 	
-	mainloop = g_main_new(FALSE);   
+	mainloop = g_main_loop_new(NULL, FALSE);
 	
 	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT,
 			       ch, FALSE,
@@ -897,7 +897,7 @@ write_msg_process(IPC_Channel* readchan)
 	G_main_add_SignalHandler(G_PRIORITY_DEFAULT, SIGHUP, 
 				 logd_hup_action, mainloop, NULL);
 	
-	g_main_run(mainloop);
+	g_main_loop_run(mainloop);
 	
 }
 

@@ -45,7 +45,7 @@ main(int argc, char ** argv)
     
 	/* give the server a chance to start */
 	cl_log(LOG_INFO, "#--#--#--#--# Beginning test run %d against server %d...", lpc, iteration);
-	client_main = g_main_new(FALSE);
+	client_main = g_main_loop_new(NULL, FALSE);
     
 	/* connect, send messages */
 	server_channel = init_client_ipctest_comms("echo", transient_client_callback, client_main);
@@ -76,7 +76,7 @@ main(int argc, char ** argv)
 	 */
     
 	cl_log(LOG_DEBUG, "Waiting for replies from the echo server");
-	g_main_run(client_main);
+	g_main_loop_run(client_main);
 	cl_log(LOG_INFO, "[Iteration %d] Client %d completed successfully", iteration, lpc);
 
 	return 0;
@@ -182,7 +182,7 @@ transient_client_callback(IPC_Channel* server, void* private_data)
 	if(received_responses > 2) {
 		cl_log(LOG_INFO, "[Client] Processed %d IPC messages, all done.", received_responses);
 		received_responses = 0;
-		g_main_quit(mainloop);
+		g_main_loop_quit(mainloop);
 		cl_log(LOG_INFO, "[Client] Exiting.");
 		return FALSE;
 	}
