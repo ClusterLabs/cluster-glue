@@ -145,6 +145,8 @@ logd_log( const char * fmt, ...)
 	return;
 }
 
+#define str_assign(dst, src) strlcpy(dst, src, sizeof(dst))
+
 static int
 set_debugfile(const char* option)
 {
@@ -154,7 +156,7 @@ set_debugfile(const char* option)
 	}
 	
 	cl_log(LOG_INFO, "setting debug file to %s", option);
-	strncpy(logd_config.debugfile, option, MAXLINE);
+	str_assign(logd_config.debugfile, option);
 	return TRUE;
 }
 static int
@@ -165,7 +167,7 @@ set_logfile(const char* option)
 		return FALSE;
 	}
 	cl_log(LOG_INFO, "setting log file to %s", option);
-	strncpy(logd_config.logfile, option, MAXLINE);
+	str_assign(logd_config.logfile, option);
 	return TRUE;
 }
 
@@ -193,7 +195,7 @@ set_entity(const char * option)
 		logd_config.entity[0] = EOS;
 		return FALSE;
 	}
-	strncpy(logd_config.entity, option, MAXENTITY);
+	str_assign(logd_config.entity, option);
 	logd_config.entity[MAXENTITY-1] = '\0';
 	if (strlen(option) >= MAXENTITY)
 		cl_log(LOG_WARNING, "setting entity to %s (truncated from %s)",
@@ -211,7 +213,7 @@ set_syslogprefix(const char * option)
 		logd_config.syslogprefix[0] = EOS;
 		return FALSE;
 	}
-	strncpy(logd_config.syslogprefix, option, MAXENTITY);
+	str_assign(logd_config.syslogprefix, option);
 	logd_config.syslogprefix[MAXENTITY-1] = '\0';
 	if (strlen(option) >= MAXENTITY)
 		cl_log(LOG_WARNING,
@@ -429,7 +431,7 @@ on_receive_cmd (IPC_Channel* ch, gpointer user_data)
 		if (client->app_name[0] == '\0'){
 			LogDaemonMsgHdr*	logmsghdr;
 			logmsghdr = (LogDaemonMsgHdr*) ipcmsg->msg_body;
-			strncpy(client->app_name, logmsghdr->entity, MAXENTITY);
+			str_assign(client->app_name, logmsghdr->entity);
 		}
 
 		if (!IPC_ISWCONN(logchan)){

@@ -208,7 +208,7 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 	char*	s;
 	int	authnum;
 	char	authtoken[MAXLINE];
-	char	authstring[MAXLINE];
+	char	authstring[MAXLINE+12];
 	char*	sp;
 	size_t	payload_len;
 	char*   smax;
@@ -249,7 +249,7 @@ msg2netstring_ll(const struct ha_msg *m, size_t * slen, int need_auth)
 			return(NULL);
 		}
 		
-		sprintf(authstring, "%d %s", authnum, authtoken);
+		snprintf(authstring, sizeof(authstring), "%d %s", authnum, authtoken);
 		auth_strlen = strlen(authstring);
 		if (sp  + 2 + auth_strlen + bytes_for_int(auth_strlen)  >= smax){
 			cl_log(LOG_ERR, "%s: out of boundary for auth", __FUNCTION__);
