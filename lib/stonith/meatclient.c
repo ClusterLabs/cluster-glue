@@ -95,7 +95,7 @@ main(int argc, char** argv)
 		int rc, fd;
 		char resp[3];
 
-		char line[256];
+		char line[320];
 		char meatpipe[256];
 
 		gboolean waited=FALSE;

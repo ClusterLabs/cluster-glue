@@ -40,10 +40,10 @@ main(int argc, char ** argv)
     /* wait for the reply by creating a mainloop and running it until
      * the callbacks are invoked...
      */
-    mainloop = g_main_new(FALSE);
+    mainloop = g_main_loop_new(NULL, FALSE);
 
     cl_log(LOG_INFO, "#--#--#--# Echo Server %d is active...", iteration);
-    g_main_run(mainloop);
+    g_main_loop_run(mainloop);
     cl_log(LOG_INFO, "#--#--#--# Echo Server %d is stopped...", iteration);
 
 	return 0;

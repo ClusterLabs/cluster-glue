@@ -1967,14 +1967,14 @@ socket_wait_conn_new(GHashTable *ch_attrs)
     return NULL;
   }
 
-  wait_private =  g_new(struct SOCKET_WAIT_CONN_PRIVATE, 1);
+  wait_private =  g_new0(struct SOCKET_WAIT_CONN_PRIVATE, 1);
 #if HB_IPC_METHOD == HB_IPC_SOCKET
   wait_private->s = s;
 #elif HB_IPC_METHOD == HB_IPC_STREAM
   wait_private->pipefds[0] = pipefds[0];
   wait_private->pipefds[1] = pipefds[1];
 #endif
-  strncpy(wait_private->path_name, path_name, sizeof(wait_private->path_name));
+  strlcpy(wait_private->path_name, path_name, sizeof(wait_private->path_name));
   temp_ch = g_new(struct IPC_WAIT_CONNECTION, 1);
   temp_ch->ch_private = (void *) wait_private;
   temp_ch->ch_status = IPC_WAIT;
@@ -2090,14 +2090,13 @@ channel_new(int sockfd, int conntype, const char *path_name) {
 	return NULL;
   }
 
-  temp_ch = g_new(struct IPC_CHANNEL, 1);
+  temp_ch = g_new0(struct IPC_CHANNEL, 1);
   if (temp_ch == NULL) {
 	  cl_log(LOG_ERR, "channel_new: allocating memory for channel failed");
 	  return NULL;
   }
-  memset(temp_ch, 0, sizeof(struct IPC_CHANNEL));
 
-  conn_info = g_new(struct SOCKET_CH_PRIVATE, 1);
+  conn_info = g_new0(struct SOCKET_CH_PRIVATE, 1);
 
   flags = fcntl(sockfd, F_GETFL);
   if (flags == -1) {
@@ -2122,7 +2121,7 @@ channel_new(int sockfd, int conntype, const char *path_name) {
 #if HB_IPC_METHOD == HB_IPC_SOCKET
   conn_info->peer_addr = NULL;
 #endif
-  strncpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
+  strlcpy(conn_info->path_name, path_name, sizeof(conn_info->path_name));
 
 #ifdef DEBUG
   cl_log(LOG_INFO, "Initializing socket %d to DISCONNECT", sockfd);

@@ -603,9 +603,9 @@ int main(int argc, char **argv)
 			Gmain_timeout_add(TIMEOUT, lrm_op_timeout, &ret_value);
 		}
 
-		mainloop = g_main_new(FALSE);
+		mainloop = g_main_loop_new(NULL, FALSE);
 		printf( "Waiting for lrmd to callback...\n");
-        	g_main_run(mainloop);
+		g_main_loop_run(mainloop);
 	}
 
 	lrmd->lrm_ops->signoff(lrmd);
@@ -620,7 +620,7 @@ lrm_op_timeout(gpointer data)
 	printf("ERROR: This operation has timed out - no result from lrmd.\n");
 
 	*idata = -5;
-	g_main_quit(mainloop);
+	g_main_loop_quit(mainloop);
 	return FALSE;
 }
 
@@ -630,7 +630,7 @@ lrmd_output_dispatch(IPC_Channel* notused, gpointer user_data)
         ll_lrm_t *lrm = (ll_lrm_t*)user_data;
         lrm->lrm_ops->rcvmsg(lrm, FALSE);
 
-	g_main_quit(mainloop);
+	g_main_loop_quit(mainloop);
         return TRUE;
 }
 

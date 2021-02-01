@@ -560,7 +560,7 @@ get_resource_meta(const char* rsc_type,  const char* provider)
 	}
 	fclose(fp);
 	
-	g_string_sprintf( meta_data, meta_data_template, rsc_type
+	g_string_printf( meta_data, meta_data_template, rsc_type
 			, (xml_l_dscrpt==NULL)? rsc_type : xml_l_dscrpt
 			, (s_dscrpt==NULL)? rsc_type : s_dscrpt
 			, (provides==NULL)? "" : provides

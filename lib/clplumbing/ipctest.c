@@ -1140,7 +1140,7 @@ s_send_msg(gpointer data)
 			return FALSE;
 		}
 		if (i->errcount >= MAXERRORS) {
-			g_main_quit(loop);
+			g_main_loop_quit(loop);
 			return FALSE;
 		}
 	}
@@ -1198,7 +1198,7 @@ s_rcv_msg(IPC_Channel* chan, gpointer data)
 			++i->errcount;
 			cl_log(LOG_INFO, "Early exit from s_rcv_msg");
 		}
-		g_main_quit(loop);
+		g_main_loop_quit(loop);
 		return FALSE;
 	}
 
@@ -1316,7 +1316,7 @@ s_echo_msg(IPC_Channel* chan, gpointer data)
 	if (i->rcount >= i->max || chan->ch_status == IPC_DISCONNECT
 	    ||	i->errcount > MAXERRORS) {
 		chan->ops->waitout(chan);
-		g_main_quit(loop);
+		g_main_loop_quit(loop);
 		return FALSE;
 	}
 	return TRUE;
@@ -1339,7 +1339,7 @@ mainloop_server(IPC_Channel* chan, int repcount)
 
 	
 
-	loop = g_main_new(FALSE);
+	loop = g_main_loop_new(NULL, FALSE);
 	init_iterinfo(&info, chan, repcount);
 
 	chan->ops->set_high_flow_callback(chan, mainloop_high_flow_callback, &info);
@@ -1351,8 +1351,8 @@ mainloop_server(IPC_Channel* chan, int repcount)
 	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT, chan
 	,	FALSE, s_rcv_msg, &info, NULL);
 	cl_log(LOG_INFO, "Mainloop echo server: %d reps pid %d.", repcount, (int)getpid());
-	g_main_run(loop);
-	g_main_destroy(loop);
+	g_main_loop_run(loop);
+	g_main_loop_unref(loop);
 	g_source_remove(sendmsgsrc);
 	loop = NULL;
 	cl_log(LOG_INFO, "Mainloop echo server: %d errors", info.errcount);
@@ -1362,13 +1362,13 @@ static int
 mainloop_client(IPC_Channel* chan, int repcount)
 {
 	struct iterinfo info;
-	loop = g_main_new(FALSE);
+	loop = g_main_loop_new(NULL, FALSE);
 	init_iterinfo(&info, chan, repcount);
 	G_main_add_IPC_Channel(G_PRIORITY_DEFAULT, chan
 	,	FALSE, s_echo_msg, &info, NULL);
 	cl_log(LOG_INFO, "Mainloop echo client: %d reps pid %d.", repcount, (int)getpid());	
-	g_main_run(loop);
-	g_main_destroy(loop);
+	g_main_loop_run(loop);
+	g_main_loop_unref(loop);
 	loop = NULL;
 	cl_log(LOG_INFO, "Mainloop echo client: %d errors, %d read %d written"
 	,	info.errcount, info.rcount, info.wcount);

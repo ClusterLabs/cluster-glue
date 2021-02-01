@@ -972,9 +972,9 @@ static gboolean
 lrm_shutdown(void)
 {
 	lrmd_log(LOG_INFO,"lrmd is shutting down");
-	if (mainloop != NULL && g_main_is_running(mainloop)) {
+	if (mainloop != NULL && g_main_loop_is_running(mainloop)) {
 		g_hash_table_foreach(resources, warning_on_active_rsc, NULL);
-		g_main_quit(mainloop);
+		g_main_loop_quit(mainloop);
 	}else {
 		exit(LSB_EXIT_OK);
 	}
@@ -1279,7 +1279,7 @@ init_start ()
 	}
 
 	/*Create the mainloop and run it*/
-	mainloop = g_main_new(FALSE);
+	mainloop = g_main_loop_new(NULL, FALSE);
 	lrmd_debug(LOG_DEBUG, "main: run the loop...");
 	lrmd_log(LOG_INFO, "Started.");
 
@@ -1287,7 +1287,7 @@ init_start ()
 	init_using_apphb();
 	emit_apphb(NULL); /* Avoid warning */
 
-	g_main_run(mainloop);
+	g_main_loop_run(mainloop);
 
 	emit_apphb(NULL);
         if (reg_to_apphbd == TRUE) {

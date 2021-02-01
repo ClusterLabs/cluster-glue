@@ -387,20 +387,23 @@ NPSNametoOutlet(struct pluginDevice* nps, const char * name, char **outlets)
   	int	sockno;
   	char	sockname[32];
         char buf[32];
-        int left = 17;
+	/* Expected outlets numbers are in the range 1 to 8 (max),
+	 * so even if they all match, the output buffer
+	 * is only "1 2 3 4 5 6 7 8 ",
+	 * which is 17 byte including terminating NUL */
+        int outlets_size = 17;
   	int ret = -1;
 	
 	if (Debug) {
 		LOG(PIL_DEBUG, "%s:called.", __FUNCTION__);
 	}
         
-        if ((*outlets = (char *)MALLOC(left*sizeof(char))) == NULL) {
+        if ((*outlets = (char *)MALLOC(outlets_size*sizeof(char))) == NULL) {
                 LOG(PIL_CRIT, "out of memory");
                 return(-1);
         }
 	
-        strncpy(*outlets, "", left);
-        left = left - 1;        /* ensure terminating '\0' */
+        strlcpy(*outlets, "", outlets_size);
   	/* Expect "PS>" */
   	EXPECT(nps->rdfd, Prompt, 5);
 	
@@ -428,14 +431,16 @@ NPSNametoOutlet(struct pluginDevice* nps, const char * name, char **outlets)
   					break;
   				}
   			}
+			if (1 > sockno || sockno > 8) {
+				LOG(PIL_WARN, "Outlet number expected to be in range 1..8, but found %d", sockno);
+			}
   			if (strncasecmp(name, sockname, 16) == 0) {
   				ret = sockno;
   				snprintf(buf, sizeof(buf), "%d ", sockno);
-  				strncat(*outlets, buf, left);
-  				left = left - strlen(buf);
+  				strlcat(*outlets, buf, outlets_size);
   			}
   		}
-  	} while (strlen(NameMapping) > 2 && left > 0);
+  	} while (strlen(NameMapping) > 2);
 
   	return(ret);
 }
