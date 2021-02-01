@@ -1339,8 +1339,8 @@ AC_MSG_RESULT(Supress make details: ${enable_quiet})
 AC_MSG_RESULT(Pretty print compiler output: ${enable_pretty})
 
 dnl Put the above variables to use
-LIBTOOL="${LIBTOOL} --tag=CC \$(QUIET_LIBTOOL_OPTS)"
-MAKE="${MAKE} \$(QUIET_MAKE_OPTS)"
+LIBTOOL="${LIBTOOL} --tag=CC \${QUIET_LIBTOOL_OPTS}"
+MAKE="${MAKE} \${QUIET_MAKE_OPTS}"
 
 AC_SUBST(CC)
 AC_SUBST(MAKE)
