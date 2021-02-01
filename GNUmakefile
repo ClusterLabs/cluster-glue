@@ -18,7 +18,7 @@
 -include Makefile
 
 PACKAGE		?= cluster-glue
-TARFILE		= $(PACKAGE).tar.bz2
+TARFILE		= $(PACKAGE).tar
 
 RPM_ROOT	= $(shell pwd)
 RPM_OPTS	= --define "_sourcedir $(RPM_ROOT)" 	\
@@ -28,19 +28,22 @@ RPM_OPTS	= --define "_sourcedir $(RPM_ROOT)" 	\
 
 getdistro = $(shell test -e /etc/SuSE-release || echo fedora; test -e /etc/SuSE-release && echo suse)
 DISTRO ?= $(call getdistro)
-TAG    ?= tip
+TAG    ?= HEAD
 
-gitarchive:
-	rm -f $(TARFILE)
-	git archive --prefix cluster-glue/ $(TAG) | bzip2 > $(TARFILE)
-	echo `date`: Rebuilt $(TARFILE)
+tarball:
+	rm -f $(TARFILE) $(TARFILE).bz2 $(TARFILE).tmp .tarball-version.tmp .tarball-version
+	./buildversion.sh $(TAG) > .tarball-version.tmp && mv .tarball-version.tmp .tarball-version
+	git archive --prefix $(PACKAGE)/ $(TAG) > $(TARFILE).tmp
+	tar --append --transform 's,^,$(PACKAGE)/,' -f $(TARFILE).tmp .tarball-version
+	mv $(TARFILE).tmp $(TARFILE)
+	bzip2 $(TARFILE)
+	@echo `date`: Rebuilt $(TARFILE).bz2
 
-srpm:	gitarchive
+srpm:	tarball
 	rm -f *.src.rpm
 	@echo To create custom builds, edit the flags and options in $(PACKAGE)-$(DISTRO).spec first
 	rpmbuild -bs --define "dist .$(DISTRO)" $(RPM_OPTS) $(PACKAGE)-$(DISTRO).spec
 
 rpm:	srpm
 	rpmbuild $(RPM_OPTS) --rebuild $(RPM_ROOT)/*.src.rpm
-
 

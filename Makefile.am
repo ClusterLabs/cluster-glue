@@ -26,6 +26,14 @@ MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure DRF/config-h.in \
 SUBDIRS			= include $(LIBLTDL_DIR) replace lib lrm logd \
 			  hb_report doc config
 
+EXTRA_DIST = .tarball-version
+.tarball-version: FORCE
+	@if ./build-version.sh > $@.tmp ; \
+	    if cmp -s $@.tmp $@ ; then rm -f $@.tmp ; else mv $@.tmp $@; fi ; \
+	else \
+	    rm -f $@.tmp ; \
+	fi
+
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)/$(HA_COREDIR)
 	-$(INSTALL) -d -m 700 -o root $(DESTDIR)/$(HA_COREDIR)/root
@@ -37,4 +45,6 @@ install-exec-local:
 dist-clean-local:
 	rm -f autoconf automake autoheader $(TARFILE)
 
-.PHONY: 
+.PHONY: FORCE
+FORCE:
+	

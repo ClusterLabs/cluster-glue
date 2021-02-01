@@ -463,17 +463,8 @@ AC_DEFINE_UNQUOTED(HA_LIBHBDIR,  "$GLUE_DAEMON_DIR",   Location for daemons)
 LRM_DIR=lrm
 AC_SUBST(LRM_DIR)
 
-AC_PATH_PROGS(HG, hg false)
 AC_MSG_CHECKING(build version)
-GLUE_BUILD_VERSION=unknown
-if test -f $srcdir/.hg_archival.txt; then
-   GLUE_BUILD_VERSION=`cat $srcdir/.hg_archival.txt | awk '/node:/ { print $2 }'`
-elif test -x $HG -a -d .hg; then
-   GLUE_BUILD_VERSION=`$HG id -itb`
-   if test $? != 0; then
-       GLUE_BUILD_VERSION=unknown
-   fi
-fi
+GLUE_BUILD_VERSION=`./buildversion.sh`
 
 AC_DEFINE_UNQUOTED(GLUE_BUILD_VERSION, "$GLUE_BUILD_VERSION", Build version)
 AC_MSG_RESULT($GLUE_BUILD_VERSION)
@@ -506,7 +497,6 @@ AC_PATH_PROGS(HELP2MAN, help2man)
 AC_PATH_PROGS(POD2MAN, pod2man, pod2man)
 AC_PATH_PROGS(SSH, ssh, /usr/bin/ssh)
 AC_PATH_PROGS(SCP, scp, /usr/bin/scp)
-AC_PATH_PROGS(HG, hg, /bin/false)
 AC_PATH_PROGS(TAR, tar)
 AC_PATH_PROGS(MD5, md5)
 AC_PATH_PROGS(RPM, rpm)

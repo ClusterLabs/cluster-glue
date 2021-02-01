@@ -8,11 +8,6 @@
 # Directory where we install documentation
 %global glue_docdir %{_defaultdocdir}/%{name}-%{version}
 
-# When downloading directly from Mercurial, it will automatically add this prefix
-# Invoking 'hg archive' wont but you can add one with: hg archive -t tgz -p "Reusable-Cluster-Components-" -r $upstreamversion $upstreamversion.tar.gz
-%global upstreamprefix Reusable-Cluster-Components-
-%global upstreamversion d97b9dea436e
-
 Name:		cluster-glue
 Summary:	Reusable cluster components
 Version:	1.0.12
