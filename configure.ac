@@ -499,7 +499,7 @@ dnl Replacing AC_PROG_LIBTOOL with AC_CHECK_PROG because LIBTOOL
 dnl was NOT being expanded all the time thus causing things to fail.
 AC_CHECK_PROGS(LIBTOOL, glibtool libtool libtool15 libtool13)
 
-AM_PATH_PYTHON
+AM_PATH_PYTHON(3)
 AC_CHECK_PROGS(MAKE, gmake make)
 AC_PATH_PROGS(HTML2TXT, lynx w3m)
 AC_PATH_PROGS(HELP2MAN, help2man)
@@ -1369,7 +1369,6 @@ lib/Makefile							\
       lib/plugins/lrm/Makefile					\
          lib/plugins/lrm/dbus/Makefile				\
       lib/plugins/stonith/Makefile				\
-         lib/plugins/stonith/ribcl.py				\
          lib/plugins/stonith/external/Makefile			\
             lib/plugins/stonith/external/drac5			\
             lib/plugins/stonith/external/kdumpcheck		\

@@ -37,7 +37,7 @@ Group:		Productivity/Clustering/HA
 Source:         cluster-glue.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 AutoReqProv:    on
-BuildRequires:  automake autoconf libtool e2fsprogs-devel glib2-devel pkgconfig python-devel libxml2-devel
+BuildRequires:  automake autoconf libtool e2fsprogs-devel glib2-devel pkgconfig python3-devel libxml2-devel
 BuildRequires:  libnet net-snmp-devel OpenIPMI-devel openhpi-devel
 BuildRequires:  libxslt docbook_4 docbook-xsl-stylesheets
 BuildRequires:  help2man
