@@ -33,7 +33,7 @@
 
 #include <time.h>
 
-extern selector_t *os_sel;
+extern struct selector_s *os_sel;
 
 #if 0
 static void check_no_locks(os_handler_t *handler);
@@ -106,7 +106,7 @@ struct os_hnd_timer_id_s
 };
 
 static void
-timer_handler(selector_t  *sel,
+timer_handler(struct selector_s  *sel,
 	      sel_timer_t *timer,
 	      void        *data)
 {

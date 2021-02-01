@@ -196,7 +196,7 @@ lrm_signon (ll_lrm_t* lrm, const char * app_name)
 	/* if already signed on, sign off first*/
 	if (is_signed_on) {
 		cl_log(LOG_WARNING,
-			"lrm_signon: the client is alreay signed on, re-sign");
+			"lrm_signon: the client is already signed on, re-sign");
 		lrm_signoff(lrm);
 	}
 

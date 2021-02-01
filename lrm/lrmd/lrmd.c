@@ -1393,7 +1393,7 @@ on_connect_cbk (IPC_Channel* ch, gpointer user_data)
 	/*get the client in the client list*/
 	client = lookup_client(pid);
 	if (NULL == client) {
-		lrmd_log(LOG_ERR, "on_connect_cbk: donnot find the client "
+		lrmd_log(LOG_ERR, "on_connect_cbk: do not find the client "
 			"[pid:%d] in internal client list. ", pid);
 		send_ret_msg(ch, HA_FAIL);
 		return TRUE;
@@ -1679,7 +1679,7 @@ on_msg_get_rsc_classes(lrmd_client_t* client, struct ha_msg* msg)
 	cl_msg_add_list(ret,F_LRM_RCLASS,ra_class_list);
 	if (HA_OK != msg2ipcchan(ret, client->ch_cmd)) {
 		lrmd_log(LOG_ERR,
-			"on_msg_get_rsc_classes: cannot send the ret mesage");
+			"on_msg_get_rsc_classes: cannot send the ret message");
 	}
 	ha_msg_del(ret);
 
@@ -3361,9 +3361,9 @@ on_ra_proc_finished(ProcTrack* p, int status, int signo, int exitcode
 						, op->rapop);
 		} else {
 			lrmd_log(LOG_WARNING, "There is something wrong: the "
-				"first line isn't read in. Maybe the heartbeat "
-				"does not ouput string correctly for status "
-				"operation. Or the code (myself) is wrong.");
+				"first line wasn't read in. Maybe heartbeat does "
+				"not output the string correctly for the status "
+				"operation, or perhaps the code is wrong.");
 		}
 	}
 

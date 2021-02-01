@@ -78,7 +78,11 @@
  *
  *	extern const longclock_t	zero_longclock;
  */
+#if __ILP32__ && __x86_64__
+extern unsigned long long cl_times(void);
+#else
 extern unsigned long cl_times(void);
+#endif
 
 #ifdef CLOCK_T_IS_LONG_ENOUGH
 #	ifndef	HAVE_LONGCLOCK_ARITHMETIC

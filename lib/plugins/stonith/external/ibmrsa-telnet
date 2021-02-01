@@ -71,7 +71,7 @@ class RSABoard(telnetlib.Telnet):
 
     def _get_timestamp(self):
         ct = time.time()
-        msecs = (ct - long(ct)) * 1000
+        msecs = (ct - int(ct)) * 1000
         return "%s,%03d" % (time.strftime("%Y-%m-%d %H:%M:%S",
                             time.localtime(ct)), msecs)
 
@@ -89,31 +89,31 @@ class RSABoard(telnetlib.Telnet):
 
     def login(self, user, passwd):
         time.sleep(1)
-        line = self.expect(['\nlogin : ', '\nusername: '], self._timeout)
-        self.write(user)
-        self.write('\r')
-        line = self.expect(['\nPassword: ', '\npassword: '], self._timeout)
-        self.write(passwd, nolog = True)
-        self.write('\r')
-        line = self.expect(['\nsystem>', '> '], self._timeout)
+        line = self.expect([b'\nlogin : ', b'\nusername: '], self._timeout)
+        self.write(user.encode("utf-8"))
+        self.write(b'\r')
+        line = self.expect([b'\nPassword: ', b'\npassword: '], self._timeout)
+        self.write(passwd.encode("utf-8"), nolog = True)
+        self.write(b'\r')
+        line = self.expect([b'\nsystem>', b'> '], self._timeout)
 
     def reset(self):
-        self.write('power cycle\r')
-        line = self.expect(['\nok'], self._timeout)
-        line = self.expect(['\nsystem>', '> '], self._timeout)
+        self.write(b'power cycle\r')
+        line = self.expect([b'\nok'], self._timeout)
+        line = self.expect([b'\nsystem>', b'> '], self._timeout)
 
     def on(self):
-        self.write('power on\r')
-        line = self.expect(['\nok'], self._timeout)
-        line = self.expect(['\nsystem>', '> '], self._timeout)
+        self.write(b'power on\r')
+        line = self.expect([b'\nok'], self._timeout)
+        line = self.expect([b'\nsystem>', b'> '], self._timeout)
 
     def off(self):
-        self.write('power off\r')
-        line = self.expect(['\nok'], self._timeout)
-        line = self.expect(['\nsystem>', '> '], self._timeout)
+        self.write(b'power off\r')
+        line = self.expect([b'\nok'], self._timeout)
+        line = self.expect([b'\nsystem>', b'> '], self._timeout)
 
     def exit(self):
-        self.write('exit\r')
+        self.write(b'exit\r')
 
     def get_history(self):
         return "\n".join(self._history)
@@ -149,7 +149,7 @@ class RSAStonithPlugin:
 
     def _get_timestamp(self):
         ct = time.time()
-        msecs = (ct - long(ct)) * 1000
+        msecs = (ct - int(ct)) * 1000
         return "%s,%03d" % (time.strftime("%Y-%m-%d %H:%M:%S",
                             time.localtime(ct)), msecs)
 
@@ -305,7 +305,7 @@ class RSAStonithPlugin:
             func = getattr(self, cmd, self.not_implemented)
             rc = func()
             return(rc)
-        except Exception, args:
+        except Exception as args:
             self.echo_log("err", 'Exception raised:', str(args))
             if self._connection:
                 self.echo_log("err", self._connection.get_history())

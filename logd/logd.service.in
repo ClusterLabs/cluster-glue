@@ -1,7 +1,6 @@
 [Unit]
 Description=ha_logd logging daemon
-Before=pacemaker.service
-PartOf=pacemaker.service
+Documentation=man:ha_logd(8)
 
 [Service]
 ExecStart=@libdir@/@HB_PKG@/ha_logd -c @sysconfdir@/logd.cf

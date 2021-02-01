@@ -1014,7 +1014,7 @@ add_list_field(struct ha_msg* msg, char* name, size_t namelen,
 		
 	} else { 
 		cl_log(LOG_ERR, "field already exists "
-		       "with differnt type=%d", msg->types[j]);
+		       "with different type=%d", msg->types[j]);
 		return (HA_FAIL);
 	}
 		
@@ -1127,7 +1127,7 @@ binary2string(char* buf, char* maxp, void* value, size_t len, int depth)
 	baselen = B64_stringlen(len) + 1;
 	
 	if ( buf + baselen > maxp){
-		cl_log(LOG_ERR, "binary2string: out of bounary");
+		cl_log(LOG_ERR, "binary2string: out of boundary");
 		return -1;
 	}
 	

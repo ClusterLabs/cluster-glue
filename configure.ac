@@ -382,7 +382,6 @@ GLUE_DAEMON_DIR=$libdir/heartbeat
 AC_DEFINE_UNQUOTED(GLUE_DAEMON_DIR,"$GLUE_DAEMON_DIR", Location for daemons)
 AC_SUBST(GLUE_DAEMON_DIR)
 
-GLUE_STATE_DIR=${localstatedir}/run
 AC_DEFINE_UNQUOTED(GLUE_STATE_DIR,"$GLUE_STATE_DIR", Where to keep state files and sockets)
 AC_SUBST(GLUE_STATE_DIR)
 
@@ -390,7 +389,8 @@ GLUE_SHARED_DIR=${datadir}/"$PACKAGE_NAME"
 AC_DEFINE_UNQUOTED(GLUE_SHARED_DIR,"$GLUE_SHARED_DIR", Location for scripts)
 AC_SUBST(GLUE_SHARED_DIR)
 
-AC_DEFINE_UNQUOTED(HA_VARRUNDIR,"$GLUE_STATE_DIR", Where Heartbeat keeps state files and sockets - old name)
+HA_VARRUNDIR="$GLUE_STATE_DIR"
+AC_DEFINE_UNQUOTED(HA_VARRUNDIR,"$HA_VARRUNDIR", Where Heartbeat keeps state files and sockets - old name)
 AC_SUBST(HA_VARRUNDIR)
 
 HA_VARLIBHBDIR=${localstatedir}/lib/heartbeat
@@ -516,7 +516,6 @@ AC_PATH_PROGS(IFCONFIG, ifconfig, /sbin/ifconfig)
 AC_PATH_PROGS(MAILCMD, mailx mail)
 AC_PATH_PROGS(EGREP, egrep)
 AC_PATH_PROGS(PKGCONFIG, pkg-config)
-AC_PATH_PROGS(XML2CONFIG, xml2-config)
 
 AC_ARG_ENABLE([doc],
  AS_HELP_STRING([--enable-doc], [build documentation (default is yes)]),
@@ -723,16 +722,11 @@ dnl AC_CHECK_HEADERS(netinet/ip6.h)
 dnl AC_CHECK_HEADERS(netinet/ip_icmp.h)
 
 AC_MSG_CHECKING(for special libxml2 includes)
-if test "x$XML2CONFIG" = "x"; then
-   AC_MSG_ERROR(libxml2 config not found)
-else
-   XML2HEAD="`$XML2CONFIG --cflags`"
-   AC_MSG_RESULT($XML2HEAD)
-   AC_CHECK_LIB(xml2, xmlReadMemory)
-fi
+PKG_CHECK_MODULES(XML, [libxml-2.0])
+CPPFLAGS="$CPPFLAGS $XML_CFLAGS"
+LIBS="$LIBS $XML_LIBS"
 
-CPPFLAGS="$CPPFLAGS $XML2HEAD"
-
+AC_CHECK_LIB(xml2, xmlReadMemory)
 AC_CHECK_HEADERS(libxml/xpath.h)
 if test "$ac_cv_header_libxml_xpath_h" != "yes"; then
    AC_MSG_ERROR(The libxml developement headers were not found)

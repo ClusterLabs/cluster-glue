@@ -128,7 +128,7 @@ static const char * rc_msg[] = {
         "daemon dead1",
         "daemon dead2",
         "daemon stopped",
-        "status unknow"
+        "status unknown"
 };
 
 
