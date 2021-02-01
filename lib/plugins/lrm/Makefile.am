@@ -21,11 +21,11 @@ SUBDIRS = dbus
 endif
 
 LRM_DIR = lrm
-INCLUDES 			=	-I$(top_builddir)/include -I$(top_srcdir)/include \
+AM_CPPFLAGS			=	-I$(top_builddir)/include -I$(top_srcdir)/include \
 					-I$(top_builddir)/linux-ha -I$(top_srcdir)/linux-ha \
 					-I$(top_builddir)/libltdl -I$(top_srcdir)/libltdl
 if UPSTART
-INCLUDES			+=	$(DBUS_CFLAGS)
+AM_CPPFLAGS			+=	$(DBUS_CFLAGS)
 endif
 
 halibdir			=	$(libdir)/@HB_PKG@
