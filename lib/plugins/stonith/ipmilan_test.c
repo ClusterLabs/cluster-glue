@@ -46,12 +46,8 @@ int main(int argc, char * argv[])
 	host.privilege = IPMI_PRIVILEGE_ADMIN;
 
 	host.ipaddr = ip;
-	memcpy(host.username, user, sizeof(user));
-	memcpy(host.password, pass, sizeof(pass));
-	/*
-	memset(host.username, 0, sizeof(host.username));
-	memset(host.password, 0, sizeof(host.password));
-	*/
+	host.username = strdup(user);
+	host.password = strdup(pass);
 
 	rv = do_ipmi_cmd(&host, request);
 	if (rv)  
