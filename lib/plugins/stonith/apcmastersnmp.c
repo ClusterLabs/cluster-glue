@@ -185,7 +185,7 @@ static const char *NOTpluginID = "APCMS SNMP device has been destroyed";
 
 #define XML_PORT_LONGDESC \
 	XML_PARM_LONGDESC_BEGIN("en") \
-	"The port number on which the SNMP server is running on the STONITH device" \
+	"!!IGNORED!! The port number on which the SNMP server is running on the STONITH device. !!IGNORED!!" \
 	XML_PARM_LONGDESC_END
 
 #define XML_PORT_PARM \
@@ -246,7 +246,9 @@ APC_open(char *hostname, int port, char *community)
     /* fill session */
     session.peername = hostname;
     session.version = SNMP_VERSION_1;
-    session.remote_port = port;
+    /* session.remote_port = port;
+     * documented as UNUSED, ignored, deprecated since decades
+     * any non-default port would need to be part of peername = host:port */
     session.community = (u_char *)community;
     session.community_len = strlen(community);
     session.retries = 5;
