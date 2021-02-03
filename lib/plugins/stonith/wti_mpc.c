@@ -203,14 +203,14 @@ static const char *NOTpluginID = "WTI MPC device has been destroyed";
 	XML_PARM_SHORTDESC_END
 
 #define XML_MIBVERSION_LONGDESC \
-	XML_MIBVERSION_LONGDESC_BEGIN("en") \
+	XML_PARM_LONGDESC_BEGIN("en") \
 	"Version number of MPC MIB that we should use. Valid values are 1 (for 1.44 firmware) and 3 (for 1.62 firmware and later)" \
 	XML_PARM_LONGDESC_END
 
 #define XML_MIBVERSION_PARM \
 	XML_PARAMETER_BEGIN(ST_MIBVERSION, "string", "1", "0") \
-	  XML_PORT_SHORTDESC \
-	  XML_PORT_LONGDESC \
+	  XML_MIBVERSION_SHORTDESC \
+	  XML_MIBVERSION_LONGDESC \
 	XML_PARAMETER_END
 
 static const char *apcmastersnmpXML = 
