@@ -706,7 +706,7 @@ socket_accept_connection(struct IPC_WAIT_CONNECTION * wait_conn
 			(	wait_conn->ch_private);
 			ch_private = (struct SOCKET_CH_PRIVATE *)(ch->ch_private);
 			strncpy(ch_private->path_name,conn_private->path_name
-			,		sizeof(conn_private->path_name));
+			,		sizeof(ch_private->path_name));
 
 #if HB_IPC_METHOD == HB_IPC_SOCKET
 			ch_private->peer_addr = peer_addr;
