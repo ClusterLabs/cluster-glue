@@ -199,11 +199,13 @@ drac3Login (CURL *curl,
     chunk.size = 0;
     
     /* sends authToken */
-    snprintf(url, BUFLEN, "https://%s/cgi/login?user=%s&hash=%s",
+    status = snprintf(url, BUFLEN, "https://%s/cgi/login?user=%s&hash=%s",
 		    host,
 		    user,
 		    token);
     url[BUFLEN-1] = 0x00;
+    if (status >= BUFLEN)
+	return 1;
     
     if (curl_easy_setopt(curl, CURLOPT_URL, url))
 	    return(1);
