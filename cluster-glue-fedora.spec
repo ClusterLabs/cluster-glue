@@ -155,7 +155,6 @@ standards, and an interface to common STONITH devices.
 %dir %attr (0700, root, root)		%{_var}/lib/heartbeat/cores/root
 %dir %attr (0700, nobody, %{nogroup})	%{_var}/lib/heartbeat/cores/nobody
 %dir %attr (0700, %{uname}, %{gname})	%{_var}/lib/heartbeat/cores/%{uname}
-%{_mandir}/man1/*
 %{_mandir}/man8/*
 %doc doc/stonith/README*
 %doc logd/logd.cf
