@@ -351,6 +351,11 @@ fi
 
 is_instance_running || exit 1
 
+if [ ! $instance =~ i-.* ]; then
+	ha_log.sh err "Invalid instance_id"
+	exit 1
+fi
+
 case $action in
 	reboot|reset)
 		status=`instance_status $instance`
