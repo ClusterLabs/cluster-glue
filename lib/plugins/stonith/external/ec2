@@ -105,6 +105,10 @@ function getinfo_xml()
 {
 	cat <<EOF
 <parameters>
+	<parameter name="action" unique="0" required="0">
+		<content type="string" default="reboot" />
+		<shortdesc lang="en">Fencing Action</shortdesc>
+	</parameter>
 	<parameter name="port" unique="1" required="0">
 		<content type="string" />
 		<shortdesc lang="en">The name/id/tag of a instance to control/check</shortdesc>
