@@ -181,11 +181,15 @@ EOF
 
 function is_instance_running()
 {
+	local token
 	local myinstance
 	local mystatus
+	
+	# get session token, required for IMDSv2
+	token="$(curl -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -X PUT http://169.254.169.254/latest/api/token)"
 
 	# get my instance id
-	myinstance="$(curl http://169.254.169.254/latest/meta-data/instance-id)"
+	myinstance="$(curl -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-id)"
 
 	# check my status.
 	# When the EC2 instance be stopped by the "aws ec2 stop-instances" , the stop processing of the OS is executed.
