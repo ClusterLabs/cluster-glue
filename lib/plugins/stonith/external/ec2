@@ -234,7 +234,7 @@ function instance_on()
 function instance_off()
 {
 	if [ "$unknown_are_stopped" = 1 -a $instance_not_found ]; then
-		: nothing to do
+		# nothing to do
 		ha_log.sh info "Assuming unknown instance $instance is already off"
 	else
 		aws ec2 stop-instances $options --instance-ids $instance --force
