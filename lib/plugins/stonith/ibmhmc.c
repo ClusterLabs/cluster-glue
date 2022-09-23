@@ -694,7 +694,7 @@ ibmhmc_set_config(StonithPlugin * s, StonithNVpair* list)
 	}		
 
 	/* parse the HMC's version info (i.e. "*RM V4R2.1" or "*RM R3V2.6") */
-	if ((sscanf(output, "*RM %c%1d", &firstchar, &firstnum) == 2)
+	if ((sscanf(output, "*RM %c%d", &firstchar, &firstnum) == 2)
 	&& ((firstchar == 'V') || (firstchar == 'R'))) {
 		dev->hmcver = firstnum;
 		if(Debug){
