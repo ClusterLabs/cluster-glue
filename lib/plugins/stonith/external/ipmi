@@ -45,7 +45,7 @@ have_ipmi() {
 # username, and password, and invokes ipmitool with any arguments
 # passed in
 run_ipmitool() {
-	local ipmitool_opts privlvl=""
+	local ipmitool_opts privlvl="" port=""
 	have_ipmi || {
 		ha_log.sh err "ipmitool not installed"
 		return 1
@@ -64,7 +64,11 @@ run_ipmitool() {
 		privlvl="-L $priv"
 	fi
 
-	ipmitool_opts="-I ${interface} -H ${ipaddr} $privlvl"
+	if [ -n "${ipport}" ]; then
+		port="-p $ipport"
+	fi
+
+	ipmitool_opts="-I ${interface} -H ${ipaddr} $port $privlvl"
 
         case "${passwd_method}" in
             param|'')
@@ -152,7 +156,7 @@ status)
 	exit $?
 	;;
 getconfignames)
-	for i in hostname ipaddr userid passwd interface; do
+	for i in hostname ipaddr ipport userid passwd interface; do
 		echo $i
 	done
 	exit 0
@@ -190,7 +194,7 @@ The name of the host to be managed by this STONITH device.
 </longdesc>
 </parameter>
 
-<parameter name="ipaddr" unique="1">
+<parameter name="ipaddr" unique="0">
 <content type="string" />
 <shortdesc lang="en">
 IP Address
@@ -262,6 +266,16 @@ IPMI command(ipmitool)
 </shortdesc>
 <longdesc lang="en">
 Specify the full path to IPMI command.
+</longdesc>
+</parameter>
+
+<parameter name="ipport" unique="0">
+<content type="string" default=""/>
+<shortdesc lang="en">
+IPMI port
+</shortdesc>
+<longdesc lang="en">
+Specify a custom port to use for the IPMI connection.
 </longdesc>
 </parameter>
 
