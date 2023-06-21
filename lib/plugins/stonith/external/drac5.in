@@ -6,19 +6,45 @@
 # License:      GNU General Public License (GPL)
 #
 
-trap 'if [ -n "$outf" ]; then ha_log.sh err "`cat $outf`"; rm -f "$outf"; fi' 0
-outf=`mktemp` || {
-	ha_log.sh err "mktemp failed"
-	exit 1
+ha_log() {
+	severity=$1
+	outfile=$2
+	if [ -n "$outfile" ]
+	then
+		if [ -s "$outfile" ]
+		then
+			ha_log.sh "$severity" "`cat $outfile`"
+		fi
+	fi
+}
+
+cleanup () {
+	if [ -e "$outf" ]
+	then
+		rm -r "$outf"
+	fi
 }
 
 sshlogin() {
+	outf=`mktemp` || {
+		ha_log.sh err "mktemp failed"
+		return 1
+	}
+
 	if [ x = "x$ipaddr" -o x = "x$userid" ]
 	then
 		ha_log.sh err "ipaddr or userid missing; check configuration"
 		return 1
 	fi
 	@SSH@ -q -x -n $userid@$ipaddr racadm serveraction "$1" >$outf 2>&1
+	if [ $? -ne 0 ]
+	then
+		ha_log err "$outf"
+	else
+		ha_log debug "$outf"
+	fi
+
+	cleanup
 }
 
 drac_reset() {
