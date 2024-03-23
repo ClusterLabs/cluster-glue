@@ -1,3 +1,48 @@
+* Fri Mar 22 2024 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
+- stable release 1.0.13
+* Fix cl_times on x32
+* Medium: clplumbing: don't abort on bad input
+* Medium: ha_logd: prevent race caused by pid reuse (bsc#894272)
+* Medium: stonith: external/vcenter: replace experimental smartmatch (bnc#900353)
+* Medium: hb_report: use faster zypper interface if available
+* stonith: describe -E option
+* Medium: hb_report: invoke crm to create a report
+* Current Pacemaker does not use ha_logd
+* Fix build on FreeBSD #650820
+* Fix build on hurd #650820
+* Fix: stonith: external/vcenter: Reset returns success with RESETPOWERON=0 if vm is already off
+* Fix: stonith:ibmhmc: Add "managedsyspat" and "password" as supported parameters
+* Support custom port in external/ipmi
+* Medium: stonith: external/libvirt: fix handling of hosts with uppercase letters in names
+* libtoolize_check
+* High: stonith: external/ec2: new agent for aws/ec2
+* ibmhmc: Create /var/run/heartbeat/rsctmp if it doesn't exist (bsc#1131545)
+* fix syslogmsgfmt logging inconsistency for stderr/stdout
+* fix addresses of FSF, point to gnu.org/licenses instead
+* fix ambiguous "GPL v 2.1"
+* Stop using glib2 "deprecated symbols"
+* Fix Werror: format-overflow, format-truncation, stringop-truncation
+* automake: use AM_CPPFLAGS; INCLUDES was deprecated years ago
+* fix config.status: QUIET_MAKE_OPTS: command not found
+* use git describe to generate ./.tarball-version
+* spec: drop /man1/ from file list, no longer used
+* fix for -Werror=sizeof-pointer-memaccess
+* ipmilan_test: fix for -Werror=uninitialized
+* fix for spurious compiler warning -Werror=stringop-overflow=
+* net-snmp "remote_port" is unused and deprecated since decades
+* wti_mpc: fix metadata mib-version description
+* drac3_command: check for truncated url
+* ibmhmc: get the correct hmc version
+* Convert scripts to python3
+* Fix spelling errors reported by lintian
+* Add manpage to systemd service documentation
+* Fix FTBFS with openipmi 2.0.25 selector_t deprecated in new openipmi version
+* Fix interpreter for perl scripts Policy 10.4 states that Perl scripts must use /usr/bin/perl directly and not via /usr/bin/env
+* Adjust file paths for Debian Fix --with-rundir option for configure
+* Move ha_logger manpage to section 8 Fixes lintian warning for /usr/sbin binaries.
+* Use pkgconfig to configure libxml-2.0 xml2-config to be removed from Debian packaging
+* Fix warnings reported by GCC7.
+
 * Fri Jul 18 2014 Dejan Muhamedagic <dejan@suse.de>, Lars Ellenberg <lars.ellenberg@linbit.com>, and many others
 - stable release 1.0.12
 - hb_report: add -Q option for quick runs
