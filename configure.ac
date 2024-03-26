@@ -126,7 +126,7 @@ AC_ARG_ENABLE([ansi],
 
 AC_ARG_ENABLE([fatal-warnings],
 [  --enable-fatal-warnings very pedantic and fatal warnings for gcc
-     [default=yes]])
+     [default=no]])
 
 AC_ARG_ENABLE([pretty],
 [  --enable-pretty 
