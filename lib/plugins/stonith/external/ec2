@@ -216,7 +216,7 @@ function instance_for_port()
 	local instance=""
 
 	# Look for port name -n in the INSTANCE data
-	instance=`aws ec2 describe-instances $options --filters "Name=tag-value,Values=${port}" "Name=tag-key,Values=${ec2_tag}" --query 'Reservations[*].Instances[*].InstanceId'  `
+	instance=`aws ec2 describe-instances $options --filters "Name=tag:${ec2_tag},Values=${port}" --query 'Reservations[*].Instances[*].InstanceId'`
 
 	if [ -z $instance ]; then
 		instance_not_found=1
