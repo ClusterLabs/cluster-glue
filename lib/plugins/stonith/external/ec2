@@ -56,6 +56,9 @@ unknown_are_stopped=0
 action_default="reset"	    	# Default fence action
 ec2_tag_default="Name"	    	# EC2 Tag containing the instance's uname
 ec2_profile_default="default"	# EC2 Profile containing the AWS's profile
+ec2_dmi_file="/sys/devices/virtual/dmi/id/board_asset_tag"	 # Only supported on nitro-based instances.
+ec2_retry_retries=4	    	# Default retries used by ec2_retry function
+ec2_retry_sleep=3	    	# Default sleep time used by ec2_retry function
 
 sleep_time="1"
 
@@ -179,17 +182,48 @@ EOF
 	exit 0;
 }
 
+function ec2_retry() {
+	local retries=$ec2_retry_retries sleep=$ec2_retry_sleep
+	local tries=$(($retries + 1))
+	local result rc
+
+	for try in $(seq $tries) ;do
+		result=$(eval "${@}")
+		rc=$?
+		[ $rc -eq 0 ] && break
+		sleep $sleep
+	done
+
+	if [ $rc -ne 0 ]; then
+		ha_log.sh err "$@ failed $tries tries"
+		exit 1
+	fi
+
+	echo "$result"
+	return $rc
+}
+
 function is_instance_running()
 {
 	local token
 	local myinstance
 	local mystatus
-	
-	# get session token, required for IMDSv2
-	token="$(curl -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -X PUT http://169.254.169.254/latest/api/token)"
+	local ec2_dmi_file_content
 
-	# get my instance id
-	myinstance="$(curl -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/instance-id)"
+	if [ -r "$ec2_dmi_file" ] && [ -s "$ec2_dmi_file" ]; then
+		ec2_dmi_file_content="$(cat "$ec2_dmi_file")"
+		case "$ec2_dmi_file_content" in
+			i-0*) myinstance="$ec2_dmi_file_content" ;;
+		esac
+	fi
+
+	if [ -z "$myinstance" ] ;then
+		# get session token, required for IMDSv2
+		token="$(ec2_retry curl -H \"X-aws-ec2-metadata-token-ttl-seconds: 21600\" -X PUT http://169.254.169.254/latest/api/token)"
+
+		# get my instance id
+		myinstance="$(ec2_retry curl -H \"X-aws-ec2-metadata-token: $token\" http://169.254.169.254/latest/meta-data/instance-id)"
+	fi
 
 	# check my status.
 	# When the EC2 instance be stopped by the "aws ec2 stop-instances" , the stop processing of the OS is executed.
@@ -216,7 +250,7 @@ function instance_for_port()
 	local instance=""
 
 	# Look for port name -n in the INSTANCE data
-	instance=`aws ec2 describe-instances $options --filters "Name=tag-value,Values=${port}" "Name=tag-key,Values=${ec2_tag}" --query 'Reservations[*].Instances[*].InstanceId'  `
+	instance=`ec2_retry aws ec2 describe-instances $options --filters \"Name=tag-value,Values=${port}\" \"Name=tag-key,Values=${ec2_tag}\" --query 'Reservations[*].Instances[*].InstanceId'  `
 
 	if [ -z $instance ]; then
 		instance_not_found=1
@@ -228,7 +262,7 @@ function instance_for_port()
 
 function instance_on()
 {
-	aws ec2 start-instances $options --instance-ids $instance
+	ec2_retry aws ec2 start-instances $options --instance-ids $instance
 }
 
 function instance_off()
@@ -237,7 +271,7 @@ function instance_off()
 		# nothing to do
 		ha_log.sh info "Assuming unknown instance $instance is already off"
 	else
-		aws ec2 stop-instances $options --instance-ids $instance --force
+		ec2_retry aws ec2 stop-instances $options --instance-ids $instance --force
 	fi
 }
 
@@ -251,7 +285,7 @@ function instance_status()
 	if [ "$unknown_are_stopped" = 1 -a $instance_not_found ]; then
 		ha_log.sh info "$instance stopped (unknown)"
 	else
-		status=`aws ec2 describe-instances $options --instance-ids $instance --query 'Reservations[*].Instances[*].State.Name' `
+		status=`ec2_retry aws ec2 describe-instances $options --instance-ids $instance --query 'Reservations[*].Instances[*].State.Name' `
 		rc=$?
 	fi
 	ha_log.sh info "status check for $instance is $status"
@@ -261,8 +295,8 @@ function instance_status()
 
 function monitor()
 {
-		# Is the device ok?
-		aws ec2 describe-instances $options --filters "Name=tag-key,Values=${ec2_tag}" | grep INSTANCES &> /dev/null
+	# Is the device ok?
+	ec2_retry aws ec2 describe-instances $options --filters \"Name=tag-key,Values=${ec2_tag}\" | grep INSTANCES &> /dev/null
 }
 
 TEMP=`getopt -o qVho:e:p:n:t:U --long version,help,action:,port:,option:,profile:,tag:,quiet,unknown-are-stopped \
@@ -409,7 +443,7 @@ case $action in
 	;;
 	gethosts|hostlist|list)
 		# List of names we know about
-		a=`aws ec2 describe-instances $options --filters "Name=tag-key,Values=${ec2_tag}" --query 'Reservations[*].Instances[*].Tags[?Key==\`'${ec2_tag}'\`].Value' | sort -u`
+		a=$(ec2_retry aws ec2 describe-instances $options --filters \"Name=tag-key,Values=${ec2_tag}\" --query 'Reservations[*].Instances[*].Tags[?Key==\`'${ec2_tag}'\`].Value' |sort -u)
 		echo $a
 	;;
 	stat|status)
