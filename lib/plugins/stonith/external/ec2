@@ -195,7 +195,7 @@ function ec2_retry() {
 	done
 
 	if [ $rc -ne 0 ]; then
-		ha_log.sh err "$@ failed $tries tries"
+		ha_log.sh err "command=$@ ; result=$result ; failed $tries tries"
 		exit 1
 	fi
 
@@ -210,6 +210,7 @@ function is_instance_running()
 	local mystatus
 	local ec2_dmi_file_content
 
+	# get my instance id from local file
 	if [ -r "$ec2_dmi_file" ] && [ -s "$ec2_dmi_file" ]; then
 		ec2_dmi_file_content="$(cat "$ec2_dmi_file")"
 		case "$ec2_dmi_file_content" in
@@ -217,7 +218,10 @@ function is_instance_running()
 		esac
 	fi
 
+	# if not $myinstance then fallback to ec2 imds to get instance id
 	if [ -z "$myinstance" ] ;then
+		ha_log.sh info "Unable to get Instance ID from local file, then fallback to EC2 IMDS"
+
 		# get session token, required for IMDSv2
 		token="$(ec2_retry curl -H \"X-aws-ec2-metadata-token-ttl-seconds: 21600\" -X PUT http://169.254.169.254/latest/api/token)"
 
